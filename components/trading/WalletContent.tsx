@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable */
 
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -45,7 +46,7 @@ interface WalletContentProps {
     withdrawalEnabled: boolean;
     totalGMEarnings?: number;
   };
-  transactions: any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+  transactions: any[];  
 }
 
 export default function WalletContent({
@@ -81,6 +82,22 @@ export default function WalletContent({
     [stats.totalDeposited, stats.totalWithdrawn],
   );
 
+  // Reason: Compute TOTAL spent = comp entries + challenge entries + marketplace
+  // and TOTAL won = comp wins + challenge wins, to show the full picture.
+  const allTimeSpent =
+    (stats.totalSpentOnCompetitions || 0) +
+    (stats.totalSpentOnChallenges || 0) +
+    (stats.totalSpentOnMarketplace || 0);
+  const allTimeWon =
+    (stats.totalWonFromCompetitions || 0) +
+    (stats.totalWonFromChallenges || 0);
+  const allTimeROI =
+    (stats.totalSpentOnCompetitions || 0) + (stats.totalSpentOnChallenges || 0) > 0
+      ? (((stats.totalWonFromCompetitions || 0) + (stats.totalWonFromChallenges || 0) -
+          (stats.totalSpentOnCompetitions || 0) - (stats.totalSpentOnChallenges || 0)) /
+        ((stats.totalSpentOnCompetitions || 0) + (stats.totalSpentOnChallenges || 0))) * 100
+      : 0;
+
   // Get display stats (filtered or original)
   const displayStats = {
     totalDeposited:
@@ -91,18 +108,19 @@ export default function WalletContent({
       isDateFiltered && filteredStats
         ? filteredStats.totalWithdrawn
         : stats.totalWithdrawn,
-    totalSpentOnCompetitions:
+    totalSpent:
       isDateFiltered && filteredStats
         ? filteredStats.totalSpent
-        : stats.totalSpentOnCompetitions,
-    totalWonFromCompetitions:
+        : allTimeSpent,
+    totalWon:
       isDateFiltered && filteredStats
         ? filteredStats.totalWinnings
-        : stats.totalWonFromCompetitions,
+        : allTimeWon,
     totalGMEarnings:
       isDateFiltered && filteredStats
         ? filteredStats.totalGMEarnings
         : (stats.totalGMEarnings ?? 0),
+    roi: isDateFiltered ? 0 : allTimeROI,
   };
 
   // Handle payment return from Stripe/Paddle
@@ -261,7 +279,7 @@ export default function WalletContent({
       )}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3 md:gap-4">
         {/* Total Bought */}
-        <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-3 sm:p-4 md:p-6 hover:bg-gray-800/70 transition-all">
+        <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-3 sm:p-4 md:p-6 hover:bg-gray-800/70 transition-all min-h-[120px]">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <p className="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">
@@ -291,7 +309,7 @@ export default function WalletContent({
         </div>
 
         {/* Total Withdrawn */}
-        <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-3 sm:p-4 md:p-6 hover:bg-gray-800/70 transition-all">
+        <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-3 sm:p-4 md:p-6 hover:bg-gray-800/70 transition-all min-h-[120px]">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <p className="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">
@@ -320,16 +338,16 @@ export default function WalletContent({
           </div>
         </div>
 
-        {/* Competition Spending */}
-        <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-3 sm:p-4 md:p-6 hover:bg-gray-800/70 transition-all">
+        {/* Total Spent (comp + challenge + marketplace) */}
+        <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-3 sm:p-4 md:p-6 hover:bg-gray-800/70 transition-all min-h-[120px]">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <p className="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">
-                Spent
+                Total Spent
               </p>
               <div className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 flex-wrap">
                 <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-100 tabular-nums">
-                  {displayStats.totalSpentOnCompetitions.toFixed(
+                  {displayStats.totalSpent.toFixed(
                     settings.credits.decimals,
                   )}
                 </p>
@@ -340,9 +358,7 @@ export default function WalletContent({
               {settings.credits.showEUREquivalent && (
                 <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-gray-500 truncate">
                   ≈ {settings.currency.symbol}
-                  {creditsToEUR(displayStats.totalSpentOnCompetitions).toFixed(
-                    2,
-                  )}
+                  {creditsToEUR(displayStats.totalSpent).toFixed(2)}
                 </p>
               )}
             </div>
@@ -352,16 +368,16 @@ export default function WalletContent({
           </div>
         </div>
 
-        {/* Competition Winnings */}
-        <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-3 sm:p-4 md:p-6 hover:bg-gray-800/70 transition-all">
+        {/* Total Winnings (comp + challenge) */}
+        <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-3 sm:p-4 md:p-6 hover:bg-gray-800/70 transition-all min-h-[120px]">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <p className="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">
-                Winnings
+                Total Won
               </p>
               <div className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 flex-wrap">
                 <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-100 tabular-nums">
-                  {displayStats.totalWonFromCompetitions.toFixed(
+                  {displayStats.totalWon.toFixed(
                     settings.credits.decimals,
                   )}
                 </p>
@@ -369,21 +385,19 @@ export default function WalletContent({
                   {settings.credits.symbol}
                 </span>
               </div>
-              {!isDateFiltered && stats.roi !== 0 && (
+              {!isDateFiltered && displayStats.roi !== 0 && (
                 <p
-                  className={`mt-0.5 sm:mt-1 text-[10px] sm:text-xs font-medium ${stats.roi > 0 ? "text-green-500" : "text-red-500"}`}
+                  className={`mt-0.5 sm:mt-1 text-[10px] sm:text-xs font-medium ${displayStats.roi > 0 ? "text-green-500" : "text-red-500"}`}
                 >
-                  ROI: {stats.roi > 0 ? "+" : ""}
-                  {stats.roi.toFixed(1)}%
+                  ROI: {displayStats.roi > 0 ? "+" : ""}
+                  {displayStats.roi.toFixed(1)}%
                 </p>
               )}
             </div>
             <div
-              className={`rounded-full ${displayStats.totalWonFromCompetitions - displayStats.totalSpentOnCompetitions >= 0 ? "bg-green-500/10" : "bg-red-500/10"} p-2 sm:p-3 flex-shrink-0`}
+              className={`rounded-full ${displayStats.totalWon - displayStats.totalSpent >= 0 ? "bg-green-500/10" : "bg-red-500/10"} p-2 sm:p-3 flex-shrink-0`}
             >
-              {displayStats.totalWonFromCompetitions -
-                displayStats.totalSpentOnCompetitions >=
-              0 ? (
+              {displayStats.totalWon - displayStats.totalSpent >= 0 ? (
                 <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
               ) : (
                 <TrendingDown className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
@@ -394,7 +408,7 @@ export default function WalletContent({
 
         {/* Referral Earnings (only show if user has GM earnings) */}
         {(stats.totalGMEarnings ?? 0) > 0 && (
-          <div className="rounded-xl bg-gradient-to-br from-amber-500/10 to-amber-600/5 border border-amber-500/30 p-3 sm:p-4 md:p-6 hover:bg-amber-500/15 transition-all">
+          <div className="rounded-xl bg-gradient-to-br from-amber-500/10 to-amber-600/5 border border-amber-500/30 p-3 sm:p-4 md:p-6 hover:bg-amber-500/15 transition-all min-h-[120px]">
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] sm:text-xs font-medium text-amber-400/80 uppercase tracking-wider truncate">

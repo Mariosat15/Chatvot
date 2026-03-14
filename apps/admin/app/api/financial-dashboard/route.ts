@@ -1,3 +1,4 @@
+ 
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { connectToDatabase } from "@/database/mongoose";
@@ -277,22 +278,56 @@ export async function GET(request: NextRequest) {
       (sum, w) => sum + (w.totalWithdrawn || 0),
       0,
     );
-    const totalWonFromCompetitions = wallets.reduce(
-      (sum, w) => sum + (w.totalWonFromCompetitions || 0),
-      0,
-    );
     const totalSpentOnCompetitions = wallets.reduce(
       (sum, w) => sum + (w.totalSpentOnCompetitions || 0),
-      0,
-    );
-    const totalWonFromChallenges = wallets.reduce(
-      (sum, w) => sum + (w.totalWonFromChallenges || 0),
       0,
     );
     const totalSpentOnChallenges = wallets.reduce(
       (sum, w) => sum + (w.totalSpentOnChallenges || 0),
       0,
     );
+
+    // Reason: Use WalletTransaction as single source of truth for win totals.
+    // CreditWallet fields (totalWonFromCompetitions/Challenges) were historically
+    // polluted by refunds being counted as wins. Transaction aggregation is accurate.
+    const [compWinAgg, chalWinAgg] = await Promise.all([
+      WalletTransaction.aggregate([
+        { $match: { transactionType: "competition_win", status: "completed" } },
+        { $group: { _id: null, total: { $sum: "$amount" } } },
+      ]),
+      WalletTransaction.aggregate([
+        { $match: { transactionType: "challenge_win", status: "completed" } },
+        { $group: { _id: null, total: { $sum: "$amount" } } },
+      ]),
+    ]);
+    const totalWonFromCompetitions = compWinAgg[0]?.total || 0;
+    const totalWonFromChallenges = chalWinAgg[0]?.total || 0;
+
+    // Reason: Per-user win totals also need transaction-based calculation
+    // to avoid showing polluted CreditWallet values in the admin wallets table.
+    const perUserWins = await WalletTransaction.aggregate([
+      {
+        $match: {
+          transactionType: { $in: ["competition_win", "challenge_win"] },
+          status: "completed",
+        },
+      },
+      {
+        $group: {
+          _id: { userId: "$userId", type: "$transactionType" },
+          total: { $sum: "$amount" },
+        },
+      },
+    ]);
+    // Build lookup: userId -> { compWins, chalWins }
+    const userWinsMap = new Map<string, { compWins: number; chalWins: number }>();
+    for (const row of perUserWins) {
+      const uid = row._id.userId;
+      if (!userWinsMap.has(uid)) userWinsMap.set(uid, { compWins: 0, chalWins: 0 });
+      const entry = userWinsMap.get(uid)!;
+      if (row._id.type === "competition_win") entry.compWins = row.total;
+      else if (row._id.type === "challenge_win") entry.chalWins = row.total;
+    }
 
     // Calculate liability metrics
     const conversionRate = conversionSettings.eurToCreditsRate;
@@ -309,6 +344,8 @@ export async function GET(request: NextRequest) {
       data: {
         wallets: wallets.map((w) => {
           const userInfo = usersMap.get(w.userId);
+          // Reason: Use transaction-based wins instead of CreditWallet fields
+          const wins = userWinsMap.get(w.userId) || { compWins: 0, chalWins: 0 };
           return {
             userId: w.userId,
             userName: userInfo?.name || "Unknown",
@@ -316,9 +353,9 @@ export async function GET(request: NextRequest) {
             creditBalance: w.creditBalance,
             totalDeposited: w.totalDeposited,
             totalWithdrawn: w.totalWithdrawn,
-            totalWonFromCompetitions: w.totalWonFromCompetitions || 0,
+            totalWonFromCompetitions: wins.compWins,
             totalSpentOnCompetitions: w.totalSpentOnCompetitions || 0,
-            totalWonFromChallenges: w.totalWonFromChallenges || 0,
+            totalWonFromChallenges: wins.chalWins,
             totalSpentOnChallenges: w.totalSpentOnChallenges || 0,
           };
         }),

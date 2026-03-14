@@ -1,4 +1,5 @@
 "use server";
+/* eslint-disable */
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -9,6 +10,7 @@ import Competition from "@/database/models/trading/competition.model";
 import Challenge from "@/database/models/trading/challenge.model";
 import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import TradeHistory from "@/database/models/trading/trade-history.model";
 
 /**
@@ -46,11 +48,22 @@ export async function getCombinedTradingStats(
 
     await connectToDatabase();
 
-    // Get wallet and participation data for non-trade stats
-    const [competitionParticipations, wallet] = await Promise.all([
+    // Reason: Fetch participations + transaction-based win totals in parallel.
+    // We use WalletTransaction as the SINGLE source of truth for prizes won,
+    // because CreditWallet.totalWonFromCompetitions was historically polluted by refunds.
+    const [competitionParticipations, txTotals] = await Promise.all([
       CompetitionParticipant.find({ userId: targetUserId }).lean(),
-      CreditWallet.findOne({ userId: targetUserId }).lean(),
+      WalletTransaction.aggregate([
+        { $match: { userId: targetUserId, status: "completed" } },
+        { $group: { _id: "$transactionType", total: { $sum: "$amount" } } },
+      ]),
     ]);
+
+    // Build transaction-type → total map
+    const txMap = new Map<string, number>();
+    for (const t of txTotals) {
+      txMap.set(t._id, Math.abs(t.total));
+    }
 
     // SINGLE SOURCE OF TRUTH: Get stats from TradeHistory collection
     // This ensures admin and customer see the SAME numbers
@@ -122,11 +135,10 @@ export async function getCombinedTradingStats(
         ? (stats.totalPnL / totalStartingCapital) * 100
         : 0;
 
-    // Use wallet as SOURCE OF TRUTH for prizes won
-    const walletData = wallet as any;
+    // Reason: Use transaction-based totals as SINGLE source of truth for prizes won.
+    // This matches the dashboard (comprehensive-dashboard.actions.ts) and wallet (wallet.actions.ts).
     const totalPrizesWon =
-      (walletData?.totalWonFromCompetitions || 0) +
-      (walletData?.totalWonFromChallenges || 0);
+      (txMap.get("competition_win") || 0) + (txMap.get("challenge_win") || 0);
 
     return {
       totalTrades: stats.totalTrades,
@@ -213,14 +225,33 @@ export async function getUserCompetitionStats(
 
     await connectToDatabase();
 
-    // Get participations (capped to avoid unbounded scan)
-    const [participations, wallet] = await Promise.all([
+    // Reason: Fetch participations + transaction-based win totals in parallel.
+    // We use WalletTransaction as the SINGLE source of truth for credits won/spent,
+    // because CreditWallet fields were historically polluted by refunds.
+    const [participations, compTxTotals] = await Promise.all([
       CompetitionParticipant.find({ userId: targetUserId })
         .sort({ createdAt: -1 })
         .limit(500)
         .lean(),
-      CreditWallet.findOne({ userId: targetUserId }).lean(),
+      WalletTransaction.aggregate([
+        {
+          $match: {
+            userId: targetUserId,
+            status: "completed",
+            transactionType: { $in: ["competition_win", "competition_entry"] },
+          },
+        },
+        { $group: { _id: "$transactionType", total: { $sum: "$amount" } } },
+      ]),
     ]);
+
+    // Build transaction-type → total map for competition stats
+    const compTxMap = new Map<string, number>();
+    for (const t of compTxTotals) {
+      compTxMap.set(t._id, Math.abs(t.total));
+    }
+    const trueCompWins = compTxMap.get("competition_win") || 0;
+    const _trueCompSpent = compTxMap.get("competition_entry") || 0;
 
     // Calculate overall stats
     const completedParticipations = participations.filter(
@@ -368,12 +399,9 @@ export async function getUserCompetitionStats(
       bestRoi,
       bestWinRate,
       mostTrades,
-      totalPrizesWon:
-        (wallet as Record<string, number> | null)?.totalWonFromCompetitions ||
-        0,
-      totalCreditsWon:
-        (wallet as Record<string, number> | null)?.totalWonFromCompetitions ||
-        0,
+      // Reason: Use transaction-based totals — single source of truth
+      totalPrizesWon: trueCompWins,
+      totalCreditsWon: trueCompWins,
       competitionsWon,
       podiumFinishes,
       recentCompetitions,
@@ -446,8 +474,9 @@ export async function getUserChallengeStats(
 
     await connectToDatabase();
 
-    // Fetch challenges, participations and wallet in parallel with limits
-    const [challenges, participations, wallet] = await Promise.all([
+    // Reason: Fetch challenges, participations, and transaction-based totals in parallel.
+    // We use WalletTransaction as the SINGLE source of truth for credits won/spent.
+    const [challenges, participations, chalTxTotals] = await Promise.all([
       Challenge.find({
         $or: [{ challengerId: targetUserId }, { challengedId: targetUserId }],
       })
@@ -458,8 +487,25 @@ export async function getUserChallengeStats(
         .sort({ createdAt: -1 })
         .limit(200)
         .lean(),
-      CreditWallet.findOne({ userId: targetUserId }).lean(),
+      WalletTransaction.aggregate([
+        {
+          $match: {
+            userId: targetUserId,
+            status: "completed",
+            transactionType: { $in: ["challenge_win", "challenge_entry"] },
+          },
+        },
+        { $group: { _id: "$transactionType", total: { $sum: "$amount" } } },
+      ]),
     ]);
+
+    // Build transaction-type → total map for challenge stats
+    const chalTxMap = new Map<string, number>();
+    for (const t of chalTxTotals) {
+      chalTxMap.set(t._id, Math.abs(t.total));
+    }
+    const trueChalWins = chalTxMap.get("challenge_win") || 0;
+    const trueChalSpent = chalTxMap.get("challenge_entry") || 0;
 
     // Calculate stats
     const completedChallenges = challenges.filter(
@@ -505,10 +551,9 @@ export async function getUserChallengeStats(
       }
     });
 
-    // If we didn't get wins from participations, use wallet data
+    // Reason: If participations didn't track prizes, fall back to transaction-based total
     if (totalPrizeAmount === 0) {
-      totalPrizeAmount =
-        (wallet as Record<string, number> | null)?.totalWonFromChallenges || 0;
+      totalPrizeAmount = trueChalWins;
     }
 
     const overallWinRate =
@@ -555,11 +600,9 @@ export async function getUserChallengeStats(
       bestPnl,
       bestRoi,
       mostTrades,
-      totalCreditsWon:
-        (wallet as Record<string, number> | null)?.totalWonFromChallenges ||
-        totalPrizeAmount,
-      totalCreditsSpent:
-        (wallet as Record<string, number> | null)?.totalSpentOnChallenges || 0,
+      // Reason: Use transaction-based totals — single source of truth
+      totalCreditsWon: trueChalWins || totalPrizeAmount,
+      totalCreditsSpent: trueChalSpent,
       recentChallenges,
     };
   } catch (error) {

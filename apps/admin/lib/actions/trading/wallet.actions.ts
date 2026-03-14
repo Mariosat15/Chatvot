@@ -1,4 +1,5 @@
 "use server";
+ 
 
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/better-auth/auth";
@@ -800,11 +801,24 @@ export const getWalletStats = async () => {
       };
     }
 
-    const netProfitCompetitions =
-      wallet.totalWonFromCompetitions - wallet.totalSpentOnCompetitions;
+    // Reason: Use WalletTransaction as single source of truth for win totals.
+    // CreditWallet fields were historically polluted by refunds.
+    const [compWinAgg, chalWinAgg] = await Promise.all([
+      WalletTransaction.aggregate([
+        { $match: { userId: session.user.id, transactionType: "competition_win", status: "completed" } },
+        { $group: { _id: null, total: { $sum: "$amount" } } },
+      ]),
+      WalletTransaction.aggregate([
+        { $match: { userId: session.user.id, transactionType: "challenge_win", status: "completed" } },
+        { $group: { _id: null, total: { $sum: "$amount" } } },
+      ]),
+    ]);
+    const txCompWins = compWinAgg[0]?.total || 0;
+    const txChalWins = chalWinAgg[0]?.total || 0;
+
+    const netProfitCompetitions = txCompWins - wallet.totalSpentOnCompetitions;
     const netProfitChallenges =
-      (wallet.totalWonFromChallenges || 0) -
-      (wallet.totalSpentOnChallenges || 0);
+      txChalWins - (wallet.totalSpentOnChallenges || 0);
     const totalSpent =
       wallet.totalSpentOnCompetitions + (wallet.totalSpentOnChallenges || 0);
     const roi =
@@ -817,9 +831,9 @@ export const getWalletStats = async () => {
       totalDeposited: wallet.totalDeposited,
       totalWithdrawn: wallet.totalWithdrawn,
       totalSpentOnCompetitions: wallet.totalSpentOnCompetitions,
-      totalWonFromCompetitions: wallet.totalWonFromCompetitions,
+      totalWonFromCompetitions: txCompWins,
       totalSpentOnChallenges: wallet.totalSpentOnChallenges || 0,
-      totalWonFromChallenges: wallet.totalWonFromChallenges || 0,
+      totalWonFromChallenges: txChalWins,
       netProfitFromCompetitions: netProfitCompetitions,
       netProfitFromChallenges: netProfitChallenges,
       roi: roi,

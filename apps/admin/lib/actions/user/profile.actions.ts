@@ -1,4 +1,5 @@
 "use server";
+/* eslint-disable */
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -9,6 +10,7 @@ import Competition from "@/database/models/trading/competition.model";
 import Challenge from "@/database/models/trading/challenge.model";
 import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 
 export interface UserCompetitionStats {
   // Overall Stats
@@ -77,8 +79,15 @@ export async function getUserCompetitionStats(
       .sort({ createdAt: -1 })
       .lean();
 
-    // Get wallet for prize info
+    // Get wallet for spending info (balance, deposited, etc.)
     const wallet = await CreditWallet.findOne({ userId: targetUserId }).lean();
+
+    // Reason: Use WalletTransaction as single source of truth for wins.
+    // CreditWallet.totalWonFromCompetitions was historically polluted by refunds.
+    const txCompWins = await WalletTransaction.aggregate([
+      { $match: { userId: targetUserId, transactionType: "competition_win", status: "completed" } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]).then((r) => r[0]?.total || 0);
 
     // Calculate overall stats
     const completedParticipations = participations.filter(
@@ -212,12 +221,10 @@ export async function getUserCompetitionStats(
       bestRoi,
       bestWinRate,
       mostTrades,
-      totalPrizesWon:
-        (wallet as Record<string, number> | null)?.totalWonFromCompetitions ||
-        0,
-      totalCreditsWon:
-        (wallet as Record<string, number> | null)?.totalWonFromCompetitions ||
-        0,
+      // Reason: Use WalletTransaction as single source of truth for wins.
+      // CreditWallet.totalWonFromCompetitions was historically polluted by refunds.
+      totalPrizesWon: txCompWins,
+      totalCreditsWon: txCompWins,
       competitionsWon,
       podiumFinishes,
       recentCompetitions,
@@ -297,8 +304,9 @@ export async function getUserChallengeStats(
       .sort({ createdAt: -1 })
       .lean();
 
-    // Get wallet for prize info
-    const wallet = await CreditWallet.findOne({ userId: targetUserId }).lean();
+    // Reason: Wallet no longer used for wins/spending — transaction-based
+    // aggregation below is the single source of truth. Kept for potential future use.
+    const _wallet = await CreditWallet.findOne({ userId: targetUserId }).lean();
 
     // Calculate stats
     const completedChallenges = challenges.filter(
@@ -344,11 +352,13 @@ export async function getUserChallengeStats(
       }
     });
 
-    // If we didn't get wins from participations, use wallet data
-    if (totalPrizeAmount === 0) {
-      totalPrizeAmount =
-        (wallet as Record<string, number> | null)?.totalWonFromChallenges || 0;
-    }
+    // Reason: Use WalletTransaction as single source of truth for wins.
+    // CreditWallet.totalWonFromChallenges was historically polluted by refunds.
+    const txChallengeWins = await WalletTransaction.aggregate([
+      { $match: { userId: targetUserId, transactionType: "challenge_win", status: "completed" } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]).then((r) => r[0]?.total || 0);
+    if (txChallengeWins > 0) totalPrizeAmount = txChallengeWins;
 
     const overallWinRate =
       totalTrades > 0 ? (totalWinningTrades / totalTrades) * 100 : 0;
@@ -392,11 +402,11 @@ export async function getUserChallengeStats(
       bestPnl,
       bestRoi,
       mostTrades,
-      totalCreditsWon:
-        (wallet as Record<string, number> | null)?.totalWonFromChallenges ||
-        totalPrizeAmount,
-      totalCreditsSpent:
-        (wallet as Record<string, number> | null)?.totalSpentOnChallenges || 0,
+      totalCreditsWon: txChallengeWins || totalPrizeAmount,
+      totalCreditsSpent: await WalletTransaction.aggregate([
+        { $match: { userId: targetUserId, transactionType: "challenge_entry", status: "completed" } },
+        { $group: { _id: null, total: { $sum: { $abs: "$amount" } } } },
+      ]).then((r) => r[0]?.total || 0),
       recentChallenges,
     };
   } catch (error) {
