@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable security/detect-object-injection */
 
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
@@ -15,12 +16,9 @@ import {
   Trophy,
   Target,
   TrendingUp,
-  Zap,
   Loader2,
   RefreshCw,
   Users,
-  Award,
-  BarChart3,
   Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -645,7 +643,10 @@ export default function MatchmakingCards({
             level: getLevelNumber(vsMatch.trader.level),
             winRate: vsMatch.trader.winRate,
             totalTrades: vsMatch.trader.totalTrades,
+            competitionsEntered: vsMatch.trader.competitionsEntered,
+            competitionsWon: vsMatch.trader.competitionsWon,
             challengesEntered: vsMatch.trader.challengesEntered,
+            challengesWon: vsMatch.trader.challengesWon,
             matchScore: vsMatch.matchScore,
           }}
           onChallenge={handleVsChallenge}
@@ -659,7 +660,7 @@ export default function MatchmakingCards({
 // Trader Card Component
 function TraderCard({
   match,
-  swipeProgress = 0,
+  swipeProgress: _swipeProgress = 0,
   isSwipingRight = false,
   isSwipingLeft = false,
 }: {
@@ -809,7 +810,7 @@ function TraderCard({
                     trader.winRate >= 50 ? "text-green-400" : "text-red-400",
                   )}
                 >
-                  {trader.winRate.toFixed(0)}%
+                  {trader.winRate.toFixed(1)}%
                 </p>
                 <span className="text-[8px] text-gray-500 uppercase">Win</span>
               </div>
@@ -833,7 +834,7 @@ function TraderCard({
               <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 rounded-lg p-2 border border-yellow-500/20 text-center">
                 <Trophy className="h-3.5 w-3.5 mx-auto mb-0.5 text-yellow-400/80" />
                 <p className="text-lg font-black text-yellow-400">
-                  {trader.competitionsEntered}
+                  {trader.competitionsWon}/{trader.competitionsEntered}
                 </p>
                 <span className="text-[8px] text-gray-500 uppercase">
                   Comps
@@ -844,7 +845,7 @@ function TraderCard({
               <div className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 rounded-lg p-2 border border-purple-500/20 text-center">
                 <Swords className="h-3.5 w-3.5 mx-auto mb-0.5 text-purple-400/80" />
                 <p className="text-lg font-black text-purple-400">
-                  {trader.challengesEntered}
+                  {trader.challengesWon}/{trader.challengesEntered}
                 </p>
                 <span className="text-[8px] text-gray-500 uppercase">1v1</span>
               </div>

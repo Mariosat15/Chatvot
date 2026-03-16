@@ -1,8 +1,10 @@
 "use server";
+/* eslint-disable security/detect-object-injection */
 
 import { connectToDatabase } from "@/database/mongoose";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
+import TradeHistory from "@/database/models/trading/trade-history.model";
 import UserBadge from "@/database/models/user-badge.model";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
@@ -107,18 +109,18 @@ export async function getGlobalLeaderboard(
     // instead of $in with 4952 IDs (was 1.8s due to huge $in filter on free tier).
     // Join in JS via the userIdsSet — O(n) and instant.
     const userIdsSet = new Set(userIds);
-    const [allCompetitionParticipants, allChallengeParticipants, allUserBadges] =
+    const [allCompetitionParticipants, allChallengeParticipants, allUserBadges, tradeStatsByUser] =
       await Promise.all([
         CompetitionParticipant.find({})
           .select(
-            "userId pnl startingCapital totalTrades winningTrades losingTrades currentRank",
+            "userId pnl startingCapital currentRank",
           )
           .read("secondaryPreferred")
           .lean()
           .then((docs) => docs.filter((d) => userIdsSet.has(d.userId))),
         ChallengeParticipant.find({})
           .select(
-            "userId pnl startingCapital totalTrades winningTrades losingTrades isWinner",
+            "userId pnl startingCapital isWinner",
           )
           .read("secondaryPreferred")
           .lean()
@@ -128,7 +130,40 @@ export async function getGlobalLeaderboard(
           .read("secondaryPreferred")
           .lean()
           .then((docs) => docs.filter((d) => userIdsSet.has(d.userId))),
+        // Reason: TradeHistory is the SINGLE SOURCE OF TRUTH for totalTrades/winRate
+        // to stay consistent with dashboard, profile, and admin views.
+        TradeHistory.aggregate([
+          {
+            $group: {
+              _id: "$userId",
+              totalTrades: { $sum: 1 },
+              winningTrades: { $sum: { $cond: ["$isWinner", 1, 0] } },
+              losingTrades: { $sum: { $cond: ["$isWinner", 0, 1] } },
+              grossProfit: {
+                $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, "$realizedPnl", 0] },
+              },
+              grossLoss: {
+                $sum: { $cond: [{ $lt: ["$realizedPnl", 0] }, { $abs: "$realizedPnl" }, 0] },
+              },
+            },
+          },
+        ]).read("secondaryPreferred"),
       ]);
+
+    // Build a map of TradeHistory-based stats per userId
+    const tradeHistoryMap = new Map<
+      string,
+      { totalTrades: number; winningTrades: number; losingTrades: number; grossProfit: number; grossLoss: number }
+    >();
+    for (const row of tradeStatsByUser) {
+      tradeHistoryMap.set(row._id, {
+        totalTrades: row.totalTrades,
+        winningTrades: row.winningTrades,
+        losingTrades: row.losingTrades,
+        grossProfit: row.grossProfit,
+        grossLoss: row.grossLoss,
+      });
+    }
 
     // OPTIMIZATION: Pre-process badge counts into a Map (O(n) instead of repeated lookups)
     const badgeCounts = new Map<string, { total: number; legendary: number }>();
@@ -153,16 +188,11 @@ export async function getGlobalLeaderboard(
         profileImage?: string;
         totalPnl: number;
         totalCapital: number;
-        totalTrades: number;
-        winningTrades: number;
-        losingTrades: number;
         competitionsEntered: number;
         competitionsWon: number;
         podiumFinishes: number;
         challengesEntered: number;
         challengesWon: number;
-        grossProfit: number;
-        grossLoss: number;
       }
     >();
 
@@ -176,20 +206,17 @@ export async function getGlobalLeaderboard(
         profileImage: user.profileImage,
         totalPnl: 0,
         totalCapital: 0,
-        totalTrades: 0,
-        winningTrades: 0,
-        losingTrades: 0,
         competitionsEntered: 0,
         competitionsWon: 0,
         podiumFinishes: 0,
         challengesEntered: 0,
         challengesWon: 0,
-        grossProfit: 0,
-        grossLoss: 0,
       });
     }
 
-    // Add competition stats
+    // Add competition stats (PnL, capital, comp/challenge counts)
+    // Reason: totalTrades/winRate now come from TradeHistory (single source of truth).
+    // Participant docs are only used for PnL, capital, comp/challenge enter/win counts.
     for (const participant of allCompetitionParticipants) {
       const userId = participant.userId;
       const userStats = userStatsMap.get(userId);
@@ -197,9 +224,6 @@ export async function getGlobalLeaderboard(
 
       userStats.totalPnl += participant.pnl || 0;
       userStats.totalCapital += participant.startingCapital || 0;
-      userStats.totalTrades += participant.totalTrades || 0;
-      userStats.winningTrades += participant.winningTrades || 0;
-      userStats.losingTrades += participant.losingTrades || 0;
       userStats.competitionsEntered += 1;
 
       if (participant.currentRank === 1) {
@@ -207,13 +231,6 @@ export async function getGlobalLeaderboard(
       }
       if (participant.currentRank && participant.currentRank <= 3) {
         userStats.podiumFinishes += 1;
-      }
-
-      const pnl = participant.pnl || 0;
-      if (pnl > 0) {
-        userStats.grossProfit += pnl;
-      } else {
-        userStats.grossLoss += Math.abs(pnl);
       }
     }
 
@@ -225,20 +242,10 @@ export async function getGlobalLeaderboard(
 
       userStats.totalPnl += participant.pnl || 0;
       userStats.totalCapital += participant.startingCapital || 0;
-      userStats.totalTrades += participant.totalTrades || 0;
-      userStats.winningTrades += participant.winningTrades || 0;
-      userStats.losingTrades += participant.losingTrades || 0;
       userStats.challengesEntered += 1;
 
       if (participant.isWinner) {
         userStats.challengesWon += 1;
-      }
-
-      const pnl = participant.pnl || 0;
-      if (pnl > 0) {
-        userStats.grossProfit += pnl;
-      } else {
-        userStats.grossLoss += Math.abs(pnl);
       }
     }
 
@@ -246,12 +253,22 @@ export async function getGlobalLeaderboard(
     const leaderboardEntries: GlobalLeaderboardEntry[] = [];
 
     for (const [userId, stats] of userStatsMap.entries()) {
+      // Reason: Use TradeHistory aggregate as SINGLE SOURCE OF TRUTH for totalTrades/winRate.
+      // This ensures consistency with dashboard, profile, and admin views.
+      const th = tradeHistoryMap.get(userId) || {
+        totalTrades: 0,
+        winningTrades: 0,
+        losingTrades: 0,
+        grossProfit: 0,
+        grossLoss: 0,
+      };
+
       const winRate =
-        stats.totalTrades > 0
-          ? (stats.winningTrades / stats.totalTrades) * 100
+        th.totalTrades > 0
+          ? (th.winningTrades / th.totalTrades) * 100
           : 0;
       const profitFactor =
-        stats.grossLoss > 0 ? stats.grossProfit / stats.grossLoss : 0;
+        th.grossLoss > 0 ? th.grossProfit / th.grossLoss : 0;
       const totalPnlPercentage =
         stats.totalCapital > 0
           ? (stats.totalPnl / stats.totalCapital) * 100
@@ -281,7 +298,7 @@ export async function getGlobalLeaderboard(
         tiedWith: [],
         totalPnl: stats.totalPnl,
         totalPnlPercentage,
-        totalTrades: stats.totalTrades,
+        totalTrades: th.totalTrades,
         winRate,
         profitFactor,
         competitionsEntered: stats.competitionsEntered,

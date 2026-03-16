@@ -12,7 +12,10 @@ interface LeaderboardChallengeButtonProps {
   // Stats from leaderboard data
   winRate?: number;
   totalTrades?: number;
+  competitionsEntered?: number;
+  competitionsWon?: number;
   challengesEntered?: number;
+  challengesWon?: number;
   level?: number;
   profileImage?: string;
   // Mobile: compact display
@@ -92,7 +95,10 @@ export default function LeaderboardChallengeButton({
   isCurrentUser,
   winRate = 0,
   totalTrades = 0,
+  competitionsEntered = 0,
+  competitionsWon = 0,
   challengesEntered = 0,
+  challengesWon = 0,
   level = 3,
   profileImage,
   compact = false,
@@ -146,7 +152,10 @@ export default function LeaderboardChallengeButton({
       level,
       winRate,
       totalTrades,
+      competitionsEntered,
+      competitionsWon,
       challengesEntered,
+      challengesWon,
     });
 
     setShowVsScreen(true);

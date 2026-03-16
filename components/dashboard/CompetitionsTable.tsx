@@ -93,7 +93,7 @@ export default function CompetitionsTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-700/50">
-            {competitions.map((comp, index) => {
+            {competitions.map((comp, _index) => {
               const isProfitable = comp.participation.pnl >= 0;
               const capitalHealth =
                 (comp.participation.currentCapital /
@@ -111,7 +111,7 @@ export default function CompetitionsTable({
                   : Infinity;
 
               // Also calculate margin usage percentage for display
-              const marginUsagePercent =
+              const _marginUsagePercent =
                 comp.participation.currentCapital > 0
                   ? (comp.participation.usedMargin /
                       comp.participation.currentCapital) *
@@ -324,7 +324,7 @@ export default function CompetitionsTable({
                   {/* Win Rate */}
                   <td className="px-1 py-2 text-center">
                     <span className="text-xs font-semibold text-yellow-500">
-                      {comp.participation.winRate.toFixed(0)}%
+                      {comp.participation.winRate.toFixed(1)}%
                     </span>
                   </td>
 

@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import {
   AreaChart,
@@ -93,7 +94,7 @@ export default function DailyPnLChart({ data }: DailyPnLChartProps) {
           <div className="bg-gray-900/50 rounded-lg px-4 py-2 border border-gray-700/50">
             <p className="text-xs text-gray-400 mb-1">Win Days</p>
             <p className="text-lg font-bold text-yellow-500">
-              {winRate.toFixed(0)}%
+              {winRate.toFixed(1)}%
             </p>
           </div>
         </div>

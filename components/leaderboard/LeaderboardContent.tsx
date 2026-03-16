@@ -230,7 +230,7 @@ export default function LeaderboardContent({
   const resetFilters = () => setFilters(defaultFilters);
 
   // Rank visuals
-  const getRankIcon = (rank: number, isTied?: boolean) => {
+  const getRankIcon = (rank: number, _isTied?: boolean) => {
     if (rank === 1) return <RankIcon rank={1} size={18} />;
     if (rank === 2) return <RankIcon rank={2} size={18} />;
     if (rank === 3) return <RankIcon rank={3} size={18} />;
@@ -767,7 +767,7 @@ export default function LeaderboardContent({
                       {/* Win Rate */}
                       <div className="text-right">
                         <p className="font-semibold tabular-nums text-sm text-white">
-                          {entry.winRate.toFixed(0)}%
+                          {entry.winRate.toFixed(1)}%
                         </p>
                       </div>
 
@@ -789,16 +789,9 @@ export default function LeaderboardContent({
 
                       {/* Competitions */}
                       <div className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <span className="text-xs text-gray-500">
-                            {entry.competitionsEntered}
-                          </span>
-                          {entry.competitionsWon > 0 && (
-                            <span className="px-2 py-0.5 rounded-md text-xs bg-yellow-500/20 text-yellow-400 font-bold">
-                              🏆{entry.competitionsWon}
-                            </span>
-                          )}
-                        </div>
+                        <span className="font-semibold tabular-nums text-sm text-yellow-400">
+                          {entry.competitionsWon}/{entry.competitionsEntered}
+                        </span>
                       </div>
 
                       {/* Badges */}
@@ -836,7 +829,10 @@ export default function LeaderboardContent({
                               isCurrentUser={isCurrentUser}
                               winRate={entry.winRate}
                               totalTrades={entry.totalTrades}
+                              competitionsEntered={entry.competitionsEntered}
+                              competitionsWon={entry.competitionsWon}
                               challengesEntered={entry.challengesEntered || 0}
+                              challengesWon={entry.challengesWon || 0}
                               level={getLevelFromTitle(entry.userTitle)}
                               profileImage={entry.profileImage}
                             />
@@ -1015,7 +1011,7 @@ export default function LeaderboardContent({
                     </div>
                     <div className="text-center p-2 rounded-lg bg-gray-800/50">
                       <p className="font-bold text-xs text-white">
-                        {entry.winRate.toFixed(0)}%
+                        {entry.winRate.toFixed(1)}%
                       </p>
                       <p className="text-[10px] text-gray-500">Win Rate</p>
                     </div>
@@ -1041,7 +1037,10 @@ export default function LeaderboardContent({
                         isCurrentUser={isCurrentUser}
                         winRate={entry.winRate}
                         totalTrades={entry.totalTrades}
+                        competitionsEntered={entry.competitionsEntered}
+                        competitionsWon={entry.competitionsWon}
                         challengesEntered={entry.challengesEntered || 0}
+                        challengesWon={entry.challengesWon || 0}
                         level={getLevelFromTitle(entry.userTitle)}
                         profileImage={entry.profileImage}
                         compact

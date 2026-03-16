@@ -93,7 +93,7 @@ export default function PerformanceRings({
       label: "Win Rate",
       value: winRate,
       max: 100,
-      displayValue: `${winRate.toFixed(0)}%`,
+      displayValue: `${winRate.toFixed(1)}%`,
       color: "#22C55E",
       glow: "rgba(34,197,94,0.5)",
     },

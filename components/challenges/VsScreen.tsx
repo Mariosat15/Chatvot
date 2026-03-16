@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -68,7 +69,10 @@ export interface VsOpponent {
   level?: number;
   winRate?: number;
   totalTrades?: number;
+  competitionsEntered?: number;
+  competitionsWon?: number;
   challengesEntered?: number;
+  challengesWon?: number;
   matchScore?: number;
 }
 
@@ -335,7 +339,7 @@ export default function VsScreen({
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.6 }}
-              className="mt-4 grid grid-cols-3 gap-2 max-w-sm mx-auto"
+              className="mt-4 grid grid-cols-4 gap-2 max-w-md mx-auto"
             >
               <div className="text-center p-2 bg-gray-800/60 rounded-lg border border-gray-700/50">
                 <p className="text-[10px] text-gray-500 mb-0.5">Win Rate</p>
@@ -347,7 +351,7 @@ export default function VsScreen({
                       : "text-red-400",
                   )}
                 >
-                  {opponent.winRate?.toFixed(0) ?? "0"}%
+                  {opponent.winRate?.toFixed(1) ?? "0.0"}%
                 </p>
               </div>
               <div className="text-center p-2 bg-gray-800/60 rounded-lg border border-gray-700/50">
@@ -357,9 +361,15 @@ export default function VsScreen({
                 </p>
               </div>
               <div className="text-center p-2 bg-gray-800/60 rounded-lg border border-gray-700/50">
-                <p className="text-[10px] text-gray-500 mb-0.5">Challenges</p>
+                <p className="text-[10px] text-gray-500 mb-0.5">Comps</p>
+                <p className="text-base font-bold text-yellow-400">
+                  {opponent.competitionsWon ?? 0}/{opponent.competitionsEntered ?? 0}
+                </p>
+              </div>
+              <div className="text-center p-2 bg-gray-800/60 rounded-lg border border-gray-700/50">
+                <p className="text-[10px] text-gray-500 mb-0.5">1v1</p>
                 <p className="text-base font-bold text-purple-400">
-                  {opponent.challengesEntered ?? 0}
+                  {opponent.challengesWon ?? 0}/{opponent.challengesEntered ?? 0}
                 </p>
               </div>
             </motion.div>
