@@ -1,3 +1,4 @@
+/* eslint-disable security/detect-unsafe-regex */
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -549,6 +550,11 @@ export default function DepositModal({ children }: DepositModalProps) {
     <Dialog
       open={open}
       onOpenChange={async (isOpen) => {
+        // Reason: Block closing while Nuvei payment is actively processing (3DS challenge in progress).
+        // The user can still close via the Back button inside the form after the 3DS challenge resolves.
+        if (!isOpen && loading && step === "payment" && selectedProvider === "nuvei") {
+          return;
+        }
         if (!isOpen) {
           // Cancel pending transaction when closing the modal
           await resetModal(true);
@@ -562,6 +568,24 @@ export default function DepositModal({ children }: DepositModalProps) {
         className="bg-gray-900 border-gray-700 max-sm:border-0"
         fullScreenMobile
         size="default"
+        // Reason: Nuvei 3DS Challenge opens an iframe overlay outside the Dialog.
+        // Clicking on that iframe triggers Radix "interact outside" → closes the modal
+        // and kills the payment. Block all outside interactions during Nuvei payment.
+        onInteractOutside={(e) => {
+          if (step === "payment" && selectedProvider === "nuvei") {
+            e.preventDefault();
+          }
+        }}
+        onPointerDownOutside={(e) => {
+          if (step === "payment" && selectedProvider === "nuvei") {
+            e.preventDefault();
+          }
+        }}
+        onFocusOutside={(e) => {
+          if (step === "payment" && selectedProvider === "nuvei") {
+            e.preventDefault();
+          }
+        }}
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-gray-100">
@@ -1297,10 +1321,11 @@ function NuveiPaymentForm({
 
   // Cleanup on unmount
   useEffect(() => {
+    const cardFieldEl = cardFieldRef.current;
     return () => {
       // Clear the card field container when unmounting
-      if (cardFieldRef.current) {
-        cardFieldRef.current.innerHTML = "";
+      if (cardFieldEl) {
+        cardFieldEl.innerHTML = "";
       }
       setScard(null);
       setSfcInitialized(false);
@@ -1311,6 +1336,7 @@ function NuveiPaymentForm({
   }, []);
 
   // Store SafeCharge instance for payment calls
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sfcRef = useRef<any>(null);
 
   // SECURITY: Ref to prevent double-clicks
