@@ -889,6 +889,34 @@
 }
 
 /* ========================================
+   NUVEI 3DS CHALLENGE — DIALOG STEP-ASIDE
+   When the 3DS challenge iframe opens, the Radix Dialog overlay
+   blocks clicks. This hides the overlay and dims the dialog so the
+   user can interact with the 3DS iframe behind it.
+   ======================================== */
+
+body.nuvei-3ds-active [data-slot="dialog-overlay"] {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+body.nuvei-3ds-active [data-slot="dialog-content"] {
+  opacity: 0.15 !important;
+  pointer-events: none !important;
+  transform: scale(0.9) translate(-50%, -50%) !important;
+  transition: opacity 0.3s ease, transform 0.3s ease !important;
+}
+
+/* Boost z-index of any Nuvei / SafeCharge 3DS iframes */
+body.nuvei-3ds-active iframe[src*="safecharge"],
+body.nuvei-3ds-active iframe[src*="nuvei"],
+body.nuvei-3ds-active iframe[src*="threeDSecure"],
+body.nuvei-3ds-active iframe[src*="3dsecure"] {
+  z-index: 99999 !important;
+  position: fixed !important;
+}
+
+/* ========================================
    GAMIFIED DASHBOARD ANIMATIONS
    ======================================== */
 

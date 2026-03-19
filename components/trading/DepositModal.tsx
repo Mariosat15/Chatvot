@@ -1332,6 +1332,8 @@ function NuveiPaymentForm({
       setCardFieldReady(false);
       // Clear SafeCharge instance
       sfcRef.current = null;
+      // Ensure 3DS body class is removed if component unmounts mid-payment
+      document.body.classList.remove("nuvei-3ds-active");
     };
   }, []);
 
@@ -1396,6 +1398,11 @@ function NuveiPaymentForm({
       const firstName = nameParts[0] || "Customer";
       const lastName = nameParts.slice(1).join(" ") || "Customer";
 
+      // Reason: The 3DS challenge iframe opens outside the Radix Dialog.
+      // Adding this class makes the dialog overlay transparent + non-blocking
+      // so the user can interact with the 3DS challenge page.
+      document.body.classList.add("nuvei-3ds-active");
+
       // Create payment with required user details for 3DS2 compliance
       // According to Nuvei docs, 3DS2 requires complete user details including billing address
       // https://docs.nuvei.com/documentation/features/3d-secure/
@@ -1441,6 +1448,8 @@ function NuveiPaymentForm({
           reason?: string;
           transactionId?: string;
         }) => {
+          // 3DS challenge completed — restore the dialog
+          document.body.classList.remove("nuvei-3ds-active");
 
           if (result.result === "APPROVED" && result.errCode === "0") {
             // Verify payment on server
@@ -1520,6 +1529,8 @@ function NuveiPaymentForm({
         },
       );
     } catch (err) {
+      // Restore dialog if createPayment threw before callback fired
+      document.body.classList.remove("nuvei-3ds-active");
       console.error("Nuvei payment error:", err);
       const errorMsg = err instanceof Error ? err.message : "Payment failed";
 
