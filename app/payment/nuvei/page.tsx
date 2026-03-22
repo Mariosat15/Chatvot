@@ -168,7 +168,10 @@ function NuveiPaymentContent() {
         setParseError("No payment data found. Please close this window and try again.");
         return;
       }
-      const decoded = JSON.parse(atob(decodeURIComponent(encoded))) as PaymentData;
+      // Reason: Decode UTF-8 safe base64 — reverse of TextEncoder + btoa in DepositModal
+      const binaryStr = atob(decodeURIComponent(encoded));
+      const bytes = Uint8Array.from(binaryStr, (c) => c.charCodeAt(0));
+      const decoded = JSON.parse(new TextDecoder().decode(bytes)) as PaymentData;
       if (!decoded.sessionToken || !decoded.merchantId || !decoded.siteId) {
         setParseError("Invalid payment data. Please close this window and try again.");
         return;

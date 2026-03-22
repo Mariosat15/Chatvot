@@ -540,7 +540,11 @@ export default function DepositModal({ children }: DepositModalProps) {
         };
 
         // Navigate popup to the Nuvei payment page with encoded data
-        const encoded = btoa(JSON.stringify(paymentData));
+        // Reason: btoa() fails on non-Latin1 chars (e.g. currency symbols like "₺").
+        // TextEncoder → Uint8Array → binary string → btoa is UTF-8 safe.
+        const jsonStr = JSON.stringify(paymentData);
+        const bytes = new TextEncoder().encode(jsonStr);
+        const encoded = btoa(String.fromCharCode(...bytes));
         popup.location.href = `/payment/nuvei?d=${encodeURIComponent(encoded)}`;
 
         // Track popup state
