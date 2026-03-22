@@ -36,6 +36,7 @@ import { useAppSettings } from "@/contexts/AppSettingsContext";
 import ActionTermsDialog, {
   ACTION_TERM_SLUGS,
 } from "@/components/ActionTermsDialog";
+import { toast } from "sonner";
 
 interface DepositModalProps {
   children: React.ReactNode;
@@ -129,7 +130,35 @@ declare global {
 
 export default function DepositModal({ children }: DepositModalProps) {
   const { settings, eurToCredits } = useAppSettings();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+
+  // Reason: On mobile, Nuvei payment happens via full-page redirect to /payment/nuvei.
+  // When the user returns, the payment result is stored in sessionStorage.
+  // This effect picks it up and shows a toast notification.
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem("nuvei-payment-result");
+      if (!stored) return;
+      sessionStorage.removeItem("nuvei-payment-result");
+      // Also clean up the pending TX marker
+      sessionStorage.removeItem("nuvei-pending-tx");
+
+      const result = JSON.parse(stored) as {
+        success: boolean;
+        error?: string;
+      };
+      if (result.success) {
+        toast.success("Payment successful! Credits added to your wallet.");
+        // Refresh page data to reflect new balance
+        router.refresh();
+      } else if (result.error && result.error !== "cancelled") {
+        toast.error(result.error || "Payment failed. Please try again.");
+      }
+    } catch {
+      // Ignore parse errors — sessionStorage may be corrupted
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [amount, setAmount] = useState("50");
   const [clientSecret, setClientSecret] = useState("");
   const [loading, setLoading] = useState(false);
@@ -455,28 +484,39 @@ export default function DepositModal({ children }: DepositModalProps) {
         setClientSecret(data.clientSecret);
         setStep("payment");
       } else if (provider === "nuvei") {
-        // CRITICAL: Open popup window IMMEDIATELY within the user-gesture scope
-        // Browsers block window.open() if called after an async delay.
-        const popupFeatures = "width=550,height=750,scrollbars=yes,resizable=yes,left=200,top=100";
-        const popup = window.open("", "nuvei-3ds", popupFeatures);
+        // Reason: On mobile, window.open() is unreliable (blocked or opens as tab).
+        // We detect mobile and use a full-page redirect instead.
+        const isMobile =
+          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+            navigator.userAgent,
+          ) || window.innerWidth < 768;
 
-        if (!popup) {
-          throw new Error(
-            "Your browser blocked the payment window. Please allow popups for this site and try again.",
+        // On DESKTOP, open popup immediately within user-gesture scope
+        // (browsers block window.open() if called after async delay)
+        let popup: Window | null = null;
+        if (!isMobile) {
+          const popupFeatures =
+            "width=550,height=750,scrollbars=yes,resizable=yes,left=200,top=100";
+          popup = window.open("", "nuvei-3ds", popupFeatures);
+
+          if (!popup) {
+            throw new Error(
+              "Your browser blocked the payment window. Please allow popups for this site and try again.",
+            );
+          }
+
+          // Show a styled loading page in the blank popup while we fetch the session
+          popup.document.write(
+            `<!DOCTYPE html><html><head><title>Secure Payment</title></head>` +
+              `<body style="margin:0;background:#111827;color:#f3f4f6;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh">` +
+              `<div style="text-align:center"><div style="width:40px;height:40px;border:3px solid #374151;border-top-color:#eab308;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px"></div>` +
+              `<p style="font-size:18px;font-weight:600;margin:0 0 8px">Preparing Secure Payment...</p>` +
+              `<p style="font-size:14px;color:#9ca3af;margin:0">Please wait</p></div>` +
+              `<style>@keyframes spin{to{transform:rotate(360deg)}}</style></body></html>`,
           );
+
+          nuveiPopupRef.current = popup;
         }
-
-        // Show a styled loading page in the blank popup while we fetch the session
-        popup.document.write(
-          `<!DOCTYPE html><html><head><title>Secure Payment</title></head>` +
-          `<body style="margin:0;background:#111827;color:#f3f4f6;font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh">` +
-          `<div style="text-align:center"><div style="width:40px;height:40px;border:3px solid #374151;border-top-color:#eab308;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px"></div>` +
-          `<p style="font-size:18px;font-weight:600;margin:0 0 8px">Preparing Secure Payment...</p>` +
-          `<p style="font-size:14px;color:#9ca3af;margin:0">Please wait</p></div>` +
-          `<style>@keyframes spin{to{transform:rotate(360deg)}}</style></body></html>`,
-        );
-
-        nuveiPopupRef.current = popup;
 
         // Create Nuvei session — send same fee breakdown as Stripe
         const response = await fetch("/api/nuvei/open-order", {
@@ -496,14 +536,14 @@ export default function DepositModal({ children }: DepositModalProps) {
           }),
         });
 
-        // Check if popup was closed while waiting for API
-        if (popup.closed) {
+        // Check if popup was closed while waiting for API (desktop only)
+        if (popup && popup.closed) {
           throw new Error("Payment window was closed. Please try again.");
         }
 
         if (!response.ok) {
           const errData = await response.json();
-          popup.close();
+          popup?.close();
           throw new Error(errData.error || "Failed to create Nuvei session");
         }
 
@@ -515,14 +555,16 @@ export default function DepositModal({ children }: DepositModalProps) {
         setNuveiUserEmail(data.userEmail || "");
         setNuveiUserTokenId(data.userTokenId || "");
 
-        // Build payment data for the popup page
+        // Build payment data for the payment page
         const paymentData = {
           sessionToken: data.sessionToken,
           clientUniqueId: data.clientUniqueId,
           merchantId: providers?.nuvei?.merchantId || "",
           siteId: providers?.nuvei?.siteId || "",
           testMode: providers?.nuvei?.testMode ?? true,
-          sdkUrl: providers?.nuvei?.sdkUrl || "https://cdn.safecharge.com/safecharge_resources/v1/websdk/safecharge.js",
+          sdkUrl:
+            providers?.nuvei?.sdkUrl ||
+            "https://cdn.safecharge.com/safecharge_resources/v1/websdk/safecharge.js",
           amount: amountNum,
           totalAmount: totalPayment,
           vatAmount,
@@ -537,15 +579,29 @@ export default function DepositModal({ children }: DepositModalProps) {
           creditsDecimals: settings?.credits?.decimals || 2,
           creditsReceived: eurToCredits(amountNum),
           vatEnabled: vatEnabled && vatAmount > 0,
+          // Reason: On mobile, the payment page needs to know where to redirect back
+          ...(isMobile ? { returnUrl: window.location.pathname } : {}),
         };
 
-        // Navigate popup to the Nuvei payment page with encoded data
-        // Reason: btoa() fails on non-Latin1 chars (e.g. currency symbols like "₺").
-        // TextEncoder → Uint8Array → binary string → btoa is UTF-8 safe.
+        // Encode payment data (UTF-8 safe)
         const jsonStr = JSON.stringify(paymentData);
         const bytes = new TextEncoder().encode(jsonStr);
         const encoded = btoa(String.fromCharCode(...bytes));
-        popup.location.href = `/payment/nuvei?d=${encodeURIComponent(encoded)}`;
+        const paymentUrl = `/payment/nuvei?d=${encodeURIComponent(encoded)}`;
+
+        if (isMobile) {
+          // MOBILE: Full-page redirect — save pending TX for cleanup on return
+          try {
+            sessionStorage.setItem("nuvei-pending-tx", data.clientUniqueId);
+          } catch {
+            // sessionStorage may be unavailable
+          }
+          window.location.href = paymentUrl;
+          return; // Navigation in progress — don't update state
+        }
+
+        // DESKTOP: Navigate popup to the Nuvei payment page
+        popup!.location.href = paymentUrl;
 
         // Track popup state
         setNuveiPopupOpen(true);

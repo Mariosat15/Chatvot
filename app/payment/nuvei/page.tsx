@@ -88,6 +88,9 @@ interface PaymentData {
   creditsDecimals: number;
   creditsReceived: number;
   vatEnabled: boolean;
+  // Reason: On mobile, popups don't work well. Instead we do a full-page redirect.
+  // returnUrl tells us where to navigate back after payment completes.
+  returnUrl?: string;
 }
 
 // ── Icons (inline SVGs to avoid heavy imports) ──────────────────────────────
@@ -190,10 +193,16 @@ function NuveiPaymentContent() {
           <h2 className="text-xl font-semibold text-gray-100">Payment Error</h2>
           <p className="text-gray-400">{parseError}</p>
           <button
-            onClick={() => window.close()}
+            onClick={() => {
+              if (window.opener && !window.opener.closed) {
+                window.close();
+              } else {
+                window.location.href = "/dashboard";
+              }
+            }}
             className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-gray-100 rounded-lg transition-colors"
           >
-            Close Window
+            {window.opener && !window.opener.closed ? "Close Window" : "Return to App"}
           </button>
         </div>
       </div>
@@ -234,21 +243,37 @@ function NuveiPaymentForm({ data }: { data: PaymentData }) {
   // Ref to prevent double-clicks
   const isSubmittingRef = useRef(false);
 
-  // ── Send result back to parent window ─────────────────────────────────
-  const sendResultToParent = (result: {
+  // Reason: On mobile browsers, window.open() opens a new tab (not a popup)
+  // and window.opener is unreliable. We detect this to use sessionStorage + redirect instead.
+  const isPopupMode = typeof window !== "undefined" && !!window.opener && !window.opener.closed;
+  const returnUrl = data.returnUrl || "/dashboard";
+
+  // ── Send result back to parent window (popup) or sessionStorage (redirect) ─
+  const sendResult = (result: {
     success: boolean;
     error?: string;
     transactionId?: string;
   }) => {
-    try {
-      if (window.opener && !window.opener.closed) {
+    if (isPopupMode) {
+      // Desktop popup: postMessage to opener
+      try {
         window.opener.postMessage(
           { type: "nuvei-payment-result", ...result },
           window.location.origin,
         );
+      } catch (e) {
+        console.error("Failed to send result to parent:", e);
       }
-    } catch (e) {
-      console.error("Failed to send result to parent:", e);
+    } else {
+      // Mobile redirect: store in sessionStorage for the main app to pick up
+      try {
+        sessionStorage.setItem(
+          "nuvei-payment-result",
+          JSON.stringify(result),
+        );
+      } catch {
+        // sessionStorage may be unavailable in some contexts
+      }
     }
   };
 
@@ -399,26 +424,30 @@ function NuveiPaymentForm({ data }: { data: PaymentData }) {
               if (verifyData.success || verifyData.status === "APPROVED") {
                 setSuccess(true);
                 isSubmittingRef.current = false;
-                sendResultToParent({
+                sendResult({
                   success: true,
                   transactionId: result.transactionId,
                 });
-                // Auto-close popup after 3 seconds
+                // Auto-close popup (desktop) or redirect back (mobile) after 3s
                 setTimeout(() => {
-                  window.close();
+                  if (isPopupMode) {
+                    window.close();
+                  } else {
+                    window.location.href = returnUrl;
+                  }
                 }, 3000);
               } else {
                 const errMsg = verifyData.reason || "Payment verification failed";
                 setError(errMsg);
                 setLoading(false);
                 isSubmittingRef.current = false;
-                sendResultToParent({ success: false, error: errMsg });
+                sendResult({ success: false, error: errMsg });
               }
             } catch {
               setError("Payment verification failed. Please check your wallet.");
               setLoading(false);
               isSubmittingRef.current = false;
-              sendResultToParent({ success: false, error: "Verification failed" });
+              sendResult({ success: false, error: "Verification failed" });
             }
           } else {
             // Payment failed
@@ -455,7 +484,7 @@ function NuveiPaymentForm({ data }: { data: PaymentData }) {
             setError(userError);
             setLoading(false);
             isSubmittingRef.current = false;
-            sendResultToParent({ success: false, error: userError });
+            sendResult({ success: false, error: userError });
           }
         },
       );
@@ -479,7 +508,7 @@ function NuveiPaymentForm({ data }: { data: PaymentData }) {
       setError(errorMsg);
       setLoading(false);
       isSubmittingRef.current = false;
-      sendResultToParent({ success: false, error: errorMsg });
+      sendResult({ success: false, error: errorMsg });
     }
   };
 
@@ -500,8 +529,12 @@ function NuveiPaymentForm({ data }: { data: PaymentData }) {
         // Ignore cancel errors
       }
     }
-    sendResultToParent({ success: false, error: "cancelled" });
-    window.close();
+    sendResult({ success: false, error: "cancelled" });
+    if (isPopupMode) {
+      window.close();
+    } else {
+      window.location.href = returnUrl;
+    }
   };
 
   // ── Success screen ────────────────────────────────────────────────────
@@ -517,7 +550,16 @@ function NuveiPaymentForm({ data }: { data: PaymentData }) {
             {data.creditsReceived.toFixed(data.creditsDecimals)} {data.creditsSymbol} added
             to your wallet
           </p>
-          <p className="text-sm text-gray-500">This window will close automatically...</p>
+          {isPopupMode ? (
+            <p className="text-sm text-gray-500">This window will close automatically...</p>
+          ) : (
+            <button
+              onClick={() => { window.location.href = returnUrl; }}
+              className="mt-4 px-8 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
+            >
+              Return to App
+            </button>
+          )}
         </div>
       </div>
     );
@@ -664,7 +706,7 @@ function NuveiPaymentForm({ data }: { data: PaymentData }) {
               disabled={loading}
               className="flex-1 px-4 py-2.5 bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-100 rounded-lg transition-colors disabled:opacity-50"
             >
-              Cancel
+              {isPopupMode ? "Cancel" : "Back"}
             </button>
             <button
               type="submit"
