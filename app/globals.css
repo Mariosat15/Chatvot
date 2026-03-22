@@ -889,17 +889,6 @@
 }
 
 /* ========================================
-   NUVEI 3DS CHALLENGE — DIALOG STEP-ASIDE
-   When the 3DS challenge iframe opens, the Radix Dialog overlay
-   blocks clicks. pointer-events:none does NOT work with cross-origin
-   iframes, so we must fully hide the dialog via display:none.
-   ======================================== */
-
-body.nuvei-3ds-active [data-radix-portal] {
-  display: none !important;
-}
-
-/* ========================================
    GAMIFIED DASHBOARD ANIMATIONS
    ======================================== */
 
