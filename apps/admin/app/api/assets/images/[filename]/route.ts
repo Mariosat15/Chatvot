@@ -3,6 +3,10 @@ import { readFile, access, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { constants } from "fs";
 
+// Reason: Track which missing filenames have already been warned about to avoid
+// spamming server logs on every request for the same missing image.
+const warnedMissing = new Set<string>();
+
 /**
  * GET /api/assets/images/[filename]
  * Serve branding images from the assets directory
@@ -120,11 +124,14 @@ export async function GET(
       console.warn(`⚠️ [Serve] DB fallback failed:`, dbErr);
     }
 
-    // Reason: Downgrade to warn — missing branding files are a content issue,
-    // not a code error. Log once at warn level to avoid spamming server logs.
-    console.warn(
-      `⚠️ Branding image not found: ${sanitizedFilename} (checked ${possiblePaths.length} paths)`,
-    );
+    // Reason: Only warn once per filename per server lifecycle to avoid log spam.
+    // Missing branding files are a content issue — re-upload from Admin > Settings > Branding to fix.
+    if (!warnedMissing.has(sanitizedFilename)) {
+      warnedMissing.add(sanitizedFilename);
+      console.warn(
+        `⚠️ Branding image not found: ${sanitizedFilename} (checked ${possiblePaths.length} paths + DB). Re-upload from Admin > Settings > Branding to fix.`,
+      );
+    }
 
     // Return a 1x1 transparent PNG instead of JSON error so <img> tags
     // degrade gracefully without broken image icons or fetch errors.

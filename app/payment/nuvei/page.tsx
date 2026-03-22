@@ -1,7 +1,7 @@
  
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Script from "next/script";
 
@@ -93,6 +93,56 @@ interface PaymentData {
   returnUrl?: string;
 }
 
+// ── Scroll indicator arrow (shows when content overflows) ────────────────────
+function ScrollIndicator({ containerRef }: { containerRef: React.RefObject<HTMLDivElement | null> }) {
+  const [showArrow, setShowArrow] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    // Reason: Show arrow only when there's more content below the visible area
+    const hasMore = el.scrollHeight - el.scrollTop - el.clientHeight > 20;
+    setShowArrow(hasMore);
+  }, [containerRef]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    checkScroll();
+    el.addEventListener("scroll", checkScroll, { passive: true });
+    // Re-check on resize (mobile orientation change, etc.)
+    window.addEventListener("resize", checkScroll);
+    // Also observe content changes (e.g., error messages appearing)
+    const observer = new ResizeObserver(checkScroll);
+    observer.observe(el);
+    return () => {
+      el.removeEventListener("scroll", checkScroll);
+      window.removeEventListener("resize", checkScroll);
+      observer.disconnect();
+    };
+  }, [containerRef, checkScroll]);
+
+  if (!showArrow) return null;
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 flex justify-center pointer-events-none z-50 pb-2">
+      <div className="flex flex-col items-center animate-bounce">
+        <svg
+          className="h-6 w-6 text-yellow-500/80 drop-shadow-lg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 // ── Icons (inline SVGs to avoid heavy imports) ──────────────────────────────
 function LoaderIcon({ className }: { className?: string }) {
   return (
@@ -159,6 +209,7 @@ function XIcon({ className }: { className?: string }) {
 // ── Main payment content ────────────────────────────────────────────────────
 function NuveiPaymentContent() {
   const searchParams = useSearchParams();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Parse payment data from URL
   const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
@@ -187,7 +238,7 @@ function NuveiPaymentContent() {
 
   if (parseError) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-6">
+      <div className="h-screen bg-gray-900 flex items-center justify-center p-6">
         <div className="text-center space-y-4 max-w-md">
           <XIcon className="h-12 w-12 text-red-500 mx-auto" />
           <h2 className="text-xl font-semibold text-gray-100">Payment Error</h2>
@@ -211,7 +262,7 @@ function NuveiPaymentContent() {
 
   if (!paymentData) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center space-y-4">
           <LoaderIcon className="h-8 w-8 text-yellow-500 mx-auto" />
           <p className="text-gray-400">Loading payment data...</p>
@@ -220,7 +271,26 @@ function NuveiPaymentContent() {
     );
   }
 
-  return <NuveiPaymentForm data={paymentData} />;
+  return (
+    <>
+      {/* Reason: Hide native scrollbar but keep scroll functionality.
+          The scroll indicator arrow guides the user instead. */}
+      <style>{`
+        .nuvei-scroll-container {
+          overflow-y: auto;
+          scrollbar-width: none; /* Firefox */
+          -ms-overflow-style: none; /* IE/Edge */
+        }
+        .nuvei-scroll-container::-webkit-scrollbar {
+          display: none; /* Chrome/Safari/Opera */
+        }
+      `}</style>
+      <div ref={scrollContainerRef} className="nuvei-scroll-container h-screen bg-gray-900">
+        <NuveiPaymentForm data={paymentData} />
+      </div>
+      <ScrollIndicator containerRef={scrollContainerRef} />
+    </>
+  );
 }
 
 // ── Nuvei Payment Form ──────────────────────────────────────────────────────
@@ -540,7 +610,7 @@ function NuveiPaymentForm({ data }: { data: PaymentData }) {
   // ── Success screen ────────────────────────────────────────────────────
   if (success) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-6">
+      <div className="h-full flex items-center justify-center p-6">
         <div className="text-center space-y-4 max-w-md">
           <div className="mx-auto w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center">
             <CheckIcon className="h-10 w-10 text-green-500" />
@@ -567,7 +637,7 @@ function NuveiPaymentForm({ data }: { data: PaymentData }) {
 
   // ── Payment form ──────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+    <div className="flex items-start justify-center py-6 px-4 min-h-full">
       {/* Load Nuvei SDK */}
       <Script
         src={data.sdkUrl}
@@ -738,7 +808,7 @@ export default function NuveiPaymentPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="h-screen bg-gray-900 flex items-center justify-center">
           <div className="text-center space-y-4">
             <LoaderIcon className="h-8 w-8 text-yellow-500 mx-auto" />
             <p className="text-gray-400">Preparing secure payment...</p>

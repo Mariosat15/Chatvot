@@ -496,7 +496,7 @@ export default function DepositModal({ children }: DepositModalProps) {
         let popup: Window | null = null;
         if (!isMobile) {
           const popupFeatures =
-            "width=550,height=750,scrollbars=yes,resizable=yes,left=200,top=100";
+            "width=550,height=750,scrollbars=no,resizable=yes,left=200,top=100";
           popup = window.open("", "nuvei-3ds", popupFeatures);
 
           if (!popup) {
