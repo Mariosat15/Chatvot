@@ -291,6 +291,9 @@ export default function DepositModal({ children }: DepositModalProps) {
   // Tracks whether a Nuvei popup is open
   const [nuveiPopupOpen, setNuveiPopupOpen] = useState(false);
 
+  // Stripe pending transaction ID — used to cancel the pending transaction if user abandons payment
+  const [stripeTransactionId, setStripeTransactionId] = useState("");
+
   // FIX: Sync nuveiLoaded with actual SDK state whenever we enter payment step
   useEffect(() => {
     if (step === "payment" && selectedProvider === "nuvei" && !nuveiLoaded) {
@@ -323,12 +326,14 @@ export default function DepositModal({ children }: DepositModalProps) {
         // Refresh the page data
         window.location.reload();
       } else if (event.data.error === "cancelled") {
-        // User cancelled — go back to provider selection
+        // User cancelled — cancel the pending transaction and go back
+        cancelPendingDepositTransaction("User cancelled payment in popup");
         setNuveiPopupOpen(false);
         setLoading(false);
         setStep("provider");
       } else {
-        // Payment failed — show error
+        // Payment failed — cancel the pending transaction and show error
+        cancelPendingDepositTransaction("Payment failed");
         setNuveiPopupOpen(false);
         setLoading(false);
         setError(event.data.error || "Payment failed. Please try again.");
@@ -342,15 +347,17 @@ export default function DepositModal({ children }: DepositModalProps) {
     // Poll to detect if popup was closed without completing payment
     nuveiPopupPollRef.current = setInterval(() => {
       if (nuveiPopupRef.current && nuveiPopupRef.current.closed) {
-        // Popup was closed by user
+        // Popup was closed by user — cancel the pending transaction
         if (nuveiPopupPollRef.current) {
           clearInterval(nuveiPopupPollRef.current);
           nuveiPopupPollRef.current = null;
         }
+        // Reason: If user closes the popup without completing, cancel the pending DB transaction
+        // so it doesn't stay as "pending" forever.
+        cancelPendingDepositTransaction("User closed payment popup window");
         setNuveiPopupOpen(false);
         setLoading(false);
         nuveiPopupRef.current = null;
-        // Don't automatically go back — let user decide
       }
     }, 1000);
 
@@ -482,6 +489,10 @@ export default function DepositModal({ children }: DepositModalProps) {
 
         const data = await response.json();
         setClientSecret(data.clientSecret);
+        // Reason: Store Stripe transaction ID so we can cancel it if the user abandons payment
+        if (data.transactionId) {
+          setStripeTransactionId(data.transactionId);
+        }
         setStep("payment");
       } else if (provider === "nuvei") {
         // Reason: On mobile, window.open() is unreliable (blocked or opens as tab).
@@ -652,8 +663,12 @@ export default function DepositModal({ children }: DepositModalProps) {
     }
   };
 
-  // Cancel pending Nuvei transaction
-  const cancelPendingNuveiTransaction = async (clientId: string) => {
+  // Reason: Generic cancel function — works for both Nuvei and Stripe pending transactions.
+  // The /api/nuvei/cancel-order endpoint accepts `txn_[transactionId]` format
+  // and finds the transaction by ID regardless of provider.
+  const cancelPendingDepositTransaction = async (reason: string = "User cancelled payment") => {
+    // Determine which clientUniqueId to use (Nuvei or Stripe)
+    const clientId = nuveiClientUniqueId || (stripeTransactionId ? `txn_${stripeTransactionId}` : "");
     if (!clientId) return;
     try {
       await fetch("/api/nuvei/cancel-order", {
@@ -662,23 +677,19 @@ export default function DepositModal({ children }: DepositModalProps) {
         body: JSON.stringify({
           clientUniqueId: clientId,
           status: "cancelled",
-          reason: "User closed payment modal",
+          reason,
         }),
       });
     } catch (err) {
-      console.error("Failed to cancel Nuvei transaction:", err);
+      console.error("Failed to cancel pending transaction:", err);
     }
   };
 
   const resetModal = async (cancelTransaction = true) => {
-    // Cancel any pending Nuvei transaction before resetting
-    if (
-      cancelTransaction &&
-      nuveiClientUniqueId &&
-      step === "payment" &&
-      selectedProvider === "nuvei"
-    ) {
-      await cancelPendingNuveiTransaction(nuveiClientUniqueId);
+    // Reason: Cancel any pending transaction (Nuvei or Stripe) before resetting.
+    // This ensures abandoned deposits don't stay as "pending" in the DB.
+    if (cancelTransaction && step === "payment") {
+      await cancelPendingDepositTransaction("User closed payment modal");
     }
 
     // Close any open Nuvei popup
@@ -702,6 +713,7 @@ export default function DepositModal({ children }: DepositModalProps) {
     setNuveiUserEmail("");
     setNuveiUserTokenId("");
     setNuveiPopupOpen(false);
+    setStripeTransactionId("");
     // FIX: Don't reset nuveiLoaded to false if SDK is already in window
     // The Script onLoad only fires once per page load
     setNuveiLoaded(typeof window !== "undefined" && !!window.SafeCharge);
@@ -1101,7 +1113,14 @@ export default function DepositModal({ children }: DepositModalProps) {
                 setOpen(false);
                 resetModal(false); // Don't cancel - payment succeeded
               }}
-              onCancel={() => setStep("provider")}
+              onCancel={async () => {
+                // Reason: Cancel the pending Stripe transaction when user clicks Back,
+                // so it doesn't stay as "pending" in the DB.
+                await cancelPendingDepositTransaction("User cancelled Stripe payment");
+                setStripeTransactionId("");
+                setClientSecret("");
+                setStep("provider");
+              }}
             />
           </Elements>
         ) : null}
@@ -1166,9 +1185,7 @@ export default function DepositModal({ children }: DepositModalProps) {
                   nuveiPopupRef.current = null;
                   setNuveiPopupOpen(false);
                   setLoading(false);
-                  if (nuveiClientUniqueId) {
-                    await cancelPendingNuveiTransaction(nuveiClientUniqueId);
-                  }
+                  await cancelPendingDepositTransaction("User cancelled Nuvei payment");
                   setStep("provider");
                 }}
                 className="w-full bg-red-900/30 border-red-800/50 hover:bg-red-900/50 text-red-300"
