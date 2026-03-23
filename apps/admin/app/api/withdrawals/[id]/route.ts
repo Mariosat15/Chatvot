@@ -281,6 +281,48 @@ export async function PUT(
               userPaymentOptionId = withdrawal.bankDetails.nuveiUpoId;
             }
 
+            // Reason: Fallback — if UPO wasn't stored on the withdrawal document
+            // (e.g., created before schema update), look it up from NuveiUserPaymentOption collection.
+            // This uses the same shared MongoDB connection (both apps share the same DB).
+            if (!userPaymentOptionId && withdrawal.userId) {
+              try {
+                const mongoose = (await import("mongoose")).default;
+                // Reason: Avoid registering the model twice; reuse if already registered
+                const NuveiUPO =
+                  mongoose.models?.NuveiUserPaymentOption ||
+                  mongoose.model(
+                    "NuveiUserPaymentOption",
+                    new mongoose.Schema({
+                      userId: String,
+                      userPaymentOptionId: String,
+                      type: String,
+                      isActive: Boolean,
+                      lastUsed: Date,
+                    }),
+                  );
+                const upo = await NuveiUPO.findOne({
+                  userId: withdrawal.userId,
+                  isActive: true,
+                })
+                  .sort({ lastUsed: -1 })
+                  .lean();
+
+                if (upo && (upo as Record<string, unknown>).userPaymentOptionId) {
+                  userPaymentOptionId = String(
+                    (upo as Record<string, unknown>).userPaymentOptionId,
+                  );
+                  console.log(
+                    `🔍 Found UPO ${userPaymentOptionId} from NuveiUserPaymentOption collection (fallback)`,
+                  );
+                }
+              } catch (upoLookupErr) {
+                console.warn(
+                  "⚠️ Failed to look up UPO from NuveiUserPaymentOption:",
+                  upoLookupErr,
+                );
+              }
+            }
+
             if (userPaymentOptionId) {
               console.log(
                 `🏦 Creating Nuvei withdrawal request for manual withdrawal ${withdrawal._id}...`,

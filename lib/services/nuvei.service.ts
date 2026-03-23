@@ -189,7 +189,7 @@ class NuveiService {
       const provider = await PaymentProvider.findOne({
         slug: "nuvei",
         isActive: true,
-      }).lean() as any;
+      }).lean() as Record<string, unknown> | null;
 
       console.log("💳 Nuvei provider lookup:", {
         found: !!provider,
@@ -511,7 +511,7 @@ class NuveiService {
     let data = "";
     for (const key of sortedKeys) {
       if (key !== "advanceResponseChecksum" && key !== "responsechecksum") {
-        data += params[key];
+        data += String(params[key as keyof typeof params]);
       }
     }
     data += secretKey;
@@ -654,7 +654,7 @@ class NuveiService {
       // Based on Nuvei docs + error feedback:
       // - languageCode is REQUIRED (despite not being in docs example)
       // - urlDetails is REQUIRED for redirect after form submission
-      const accountCaptureRequest: Record<string, any> = {
+      const accountCaptureRequest: Record<string, unknown> = {
         sessionToken,
         merchantId: credentials.merchantId,
         merchantSiteId: credentials.siteId,
@@ -1217,7 +1217,17 @@ class NuveiService {
         body: JSON.stringify(requestBody),
       });
 
-      const data = await response.json();
+      // Reason: Nuvei sometimes returns HTML error pages (e.g., gateway errors, 5xx).
+      // Calling response.json() on HTML throws "Unexpected token '<'".
+      const responseText = await response.text();
+      let data: Record<string, unknown>;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        console.error("❌ Nuvei returned non-JSON response (HTTP", response.status + "):");
+        console.error("   Body preview:", responseText.slice(0, 300));
+        return { error: `Nuvei returned non-JSON response (HTTP ${response.status}). Possible server/gateway error.` };
+      }
 
       console.log("📥 RESPONSE:");
       console.log(JSON.stringify(data, null, 2));
@@ -1232,7 +1242,7 @@ class NuveiService {
           errCode: 0,
           reason: "",
           wdRequestId: data.wdRequestId,
-          wdRequestStatus: data.wdRequestStatus || "Pending",
+          wdRequestStatus: (data.wdRequestStatus as string) || "Pending",
           merchantId: data.merchantId,
           merchantSiteId: data.merchantSiteId,
           userTokenId: data.userTokenId,
@@ -1244,8 +1254,8 @@ class NuveiService {
         );
         return {
           error:
-            data.reason ||
-            data.gwErrorReason ||
+            (data.reason as string) ||
+            (data.gwErrorReason as string) ||
             `Withdrawal request failed (code: ${data.errCode})`,
           ...data,
         };
@@ -1265,7 +1275,7 @@ class NuveiService {
   async approveWithdrawRequest(params: {
     wdRequestId: string;
     merchantWDRequestId?: string;
-  }): Promise<{ success: boolean; error?: string; data?: any }> {
+  }): Promise<{ success: boolean; error?: string; data?: unknown }> {
     const credentials = await this.getCredentials();
     if (!credentials) {
       return { success: false, error: "Nuvei not configured or not active" };
@@ -1323,7 +1333,16 @@ class NuveiService {
         body: JSON.stringify(requestBody),
       });
 
-      const data = await response.json();
+      // Reason: Nuvei sometimes returns HTML error pages instead of JSON
+      const responseText = await response.text();
+      let data: Record<string, unknown>;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        console.error("❌ Nuvei approveWD returned non-JSON (HTTP", response.status + "):");
+        console.error("   Body preview:", responseText.slice(0, 300));
+        return { success: false, error: `Nuvei returned non-JSON response (HTTP ${response.status})` };
+      }
 
       console.log("📥 RESPONSE:");
       console.log(JSON.stringify(data, null, 2));
@@ -1338,7 +1357,7 @@ class NuveiService {
         console.error("❌ Approve withdrawal failed:", data.reason);
         return {
           success: false,
-          error: data.reason || `Failed to approve (code: ${data.errCode})`,
+          error: (data.reason as string) || `Failed to approve (code: ${data.errCode})`,
           data,
         };
       }
@@ -1357,7 +1376,7 @@ class NuveiService {
   async declineWithdrawRequest(params: {
     wdRequestId: string;
     merchantWDRequestId?: string;
-  }): Promise<{ success: boolean; error?: string; data?: any }> {
+  }): Promise<{ success: boolean; error?: string; data?: unknown }> {
     const credentials = await this.getCredentials();
     if (!credentials) {
       return { success: false, error: "Nuvei not configured or not active" };
@@ -1415,7 +1434,16 @@ class NuveiService {
         body: JSON.stringify(requestBody),
       });
 
-      const data = await response.json();
+      // Reason: Nuvei sometimes returns HTML error pages instead of JSON
+      const responseText = await response.text();
+      let data: Record<string, unknown>;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        console.error("❌ Nuvei declineWD returned non-JSON (HTTP", response.status + "):");
+        console.error("   Body preview:", responseText.slice(0, 300));
+        return { success: false, error: `Nuvei returned non-JSON response (HTTP ${response.status})` };
+      }
 
       console.log("📥 RESPONSE:");
       console.log(JSON.stringify(data, null, 2));
@@ -1430,7 +1458,7 @@ class NuveiService {
         console.error("❌ Decline withdrawal failed:", data.reason);
         return {
           success: false,
-          error: data.reason || `Failed to decline (code: ${data.errCode})`,
+          error: (data.reason as string) || `Failed to decline (code: ${data.errCode})`,
           data,
         };
       }
@@ -1490,7 +1518,7 @@ class NuveiService {
       .digest("hex");
 
     // Build request with bank details as alternativePaymentMethod
-    const requestBody: Record<string, any> = {
+    const requestBody: Record<string, unknown> = {
       merchantId: credentials.merchantId,
       merchantSiteId: credentials.siteId,
       clientRequestId,

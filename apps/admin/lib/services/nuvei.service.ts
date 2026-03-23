@@ -344,7 +344,17 @@ class NuveiService {
         body: JSON.stringify(requestBody),
       });
 
-      const data = await response.json();
+      // Reason: Nuvei sometimes returns HTML error pages (e.g., gateway errors, 5xx).
+      // Calling response.json() on HTML throws "Unexpected token '<'".
+      const responseText = await response.text();
+      let data: Record<string, unknown>;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        console.error("❌ Nuvei returned non-JSON response (HTTP", response.status + "):");
+        console.error("   Body preview:", responseText.slice(0, 300));
+        return { error: `Nuvei returned non-JSON response (HTTP ${response.status}). Possible server/gateway error.` };
+      }
 
       if (data.status === "SUCCESS" && data.errCode === 0) {
         console.log("✅ Withdrawal request created:", data.wdRequestId);
@@ -353,7 +363,7 @@ class NuveiService {
           errCode: 0,
           reason: "",
           wdRequestId: data.wdRequestId,
-          wdRequestStatus: data.wdRequestStatus || "Pending",
+          wdRequestStatus: (data.wdRequestStatus as string) || "Pending",
           merchantId: data.merchantId,
           merchantSiteId: data.merchantSiteId,
           userTokenId: data.userTokenId,
@@ -365,8 +375,8 @@ class NuveiService {
         );
         return {
           error:
-            data.reason ||
-            data.gwErrorReason ||
+            (data.reason as string) ||
+            (data.gwErrorReason as string) ||
             `Withdrawal request failed (code: ${data.errCode})`,
         };
       }
@@ -432,7 +442,16 @@ class NuveiService {
         body: JSON.stringify(requestBody),
       });
 
-      const data = await response.json();
+      // Reason: Nuvei sometimes returns HTML error pages instead of JSON
+      const responseText = await response.text();
+      let data: Record<string, unknown>;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        console.error("❌ Nuvei approveWD returned non-JSON (HTTP", response.status + "):");
+        console.error("   Body preview:", responseText.slice(0, 300));
+        return { success: false, error: `Nuvei returned non-JSON response (HTTP ${response.status})` };
+      }
 
       if (data.status === "SUCCESS" && data.errCode === 0) {
         console.log("✅ Withdrawal request approved in Nuvei");
@@ -441,7 +460,7 @@ class NuveiService {
         console.error("❌ Approve withdrawal failed:", data.reason);
         return {
           success: false,
-          error: data.reason || `Failed to approve (code: ${data.errCode})`,
+          error: (data.reason as string) || `Failed to approve (code: ${data.errCode})`,
           data,
         };
       }
@@ -507,7 +526,16 @@ class NuveiService {
         body: JSON.stringify(requestBody),
       });
 
-      const data = await response.json();
+      // Reason: Nuvei sometimes returns HTML error pages instead of JSON
+      const responseText = await response.text();
+      let data: Record<string, unknown>;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        console.error("❌ Nuvei declineWD returned non-JSON (HTTP", response.status + "):");
+        console.error("   Body preview:", responseText.slice(0, 300));
+        return { success: false, error: `Nuvei returned non-JSON response (HTTP ${response.status})` };
+      }
 
       if (data.status === "SUCCESS" && data.errCode === 0) {
         console.log("✅ Withdrawal request declined in Nuvei");
@@ -516,7 +544,7 @@ class NuveiService {
         console.error("❌ Decline withdrawal failed:", data.reason);
         return {
           success: false,
-          error: data.reason || `Failed to decline (code: ${data.errCode})`,
+          error: (data.reason as string) || `Failed to decline (code: ${data.errCode})`,
           data,
         };
       }
