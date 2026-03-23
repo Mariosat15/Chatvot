@@ -694,17 +694,35 @@ export default function PendingWithdrawalsSection() {
                     <XCircle className="h-4 w-4 mr-1" />
                     Reject
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => openActionDialog(withdrawal, "cancelled")}
+                  >
+                    <Ban className="h-4 w-4 mr-1" />
+                    Cancel
+                  </Button>
                 </>
               )}
               {withdrawal.status === "approved" && (
-                <Button
-                  size="sm"
-                  className="bg-purple-600 hover:bg-purple-700"
-                  onClick={() => openActionDialog(withdrawal, "processing")}
-                >
-                  <PlayCircle className="h-4 w-4 mr-1" />
-                  Process
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    className="bg-purple-600 hover:bg-purple-700"
+                    onClick={() => openActionDialog(withdrawal, "processing")}
+                  >
+                    <PlayCircle className="h-4 w-4 mr-1" />
+                    Process
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => openActionDialog(withdrawal, "cancelled")}
+                  >
+                    <Ban className="h-4 w-4 mr-1" />
+                    Cancel
+                  </Button>
+                </>
               )}
               {withdrawal.status === "processing" && (
                 <>
@@ -1206,21 +1224,49 @@ export default function PendingWithdrawalsSection() {
                                 <XCircle className="h-3 w-3 mr-1" />
                                 Reject ({selectedIds.size})
                               </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                className="h-7 text-xs"
+                                onClick={() => {
+                                  if (selected.length > 0) {
+                                    openActionDialog(selected[0], "cancelled");
+                                  }
+                                }}
+                              >
+                                <Ban className="h-3 w-3 mr-1" />
+                                Cancel ({selectedIds.size})
+                              </Button>
                             </>
                           )}
                           {commonStatus === "approved" && (
-                            <Button
-                              size="sm"
-                              className="bg-purple-600 hover:bg-purple-700 h-7 text-xs"
-                              onClick={() => {
-                                if (selected.length > 0) {
-                                  openActionDialog(selected[0], "processing");
-                                }
-                              }}
-                            >
-                              <PlayCircle className="h-3 w-3 mr-1" />
-                              Process ({selectedIds.size})
-                            </Button>
+                            <>
+                              <Button
+                                size="sm"
+                                className="bg-purple-600 hover:bg-purple-700 h-7 text-xs"
+                                onClick={() => {
+                                  if (selected.length > 0) {
+                                    openActionDialog(selected[0], "processing");
+                                  }
+                                }}
+                              >
+                                <PlayCircle className="h-3 w-3 mr-1" />
+                                Process ({selectedIds.size})
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                className="h-7 text-xs"
+                                onClick={() => {
+                                  if (selected.length > 0) {
+                                    openActionDialog(selected[0], "cancelled");
+                                  }
+                                }}
+                              >
+                                <Ban className="h-3 w-3 mr-1" />
+                                Cancel ({selectedIds.size})
+                              </Button>
+                            </>
                           )}
                           {commonStatus === "processing" && (
                             <>
@@ -1300,6 +1346,7 @@ export default function PendingWithdrawalsSection() {
             <DialogTitle className="text-white">
               {actionDialog.action === "approved" && "✅ Approve Withdrawal"}
               {actionDialog.action === "rejected" && "❌ Reject Withdrawal"}
+              {actionDialog.action === "cancelled" && "🚫 Cancel Withdrawal"}
               {actionDialog.action === "processing" && "⚡ Start Processing"}
               {actionDialog.action === "completed" && "🎉 Mark as Completed"}
               {actionDialog.action === "failed" && "⚠️ Mark as Failed"}
@@ -1400,13 +1447,18 @@ export default function PendingWithdrawalsSection() {
                 </div>
               )}
             {(actionDialog.action === "rejected" ||
+              actionDialog.action === "cancelled" ||
               actionDialog.action === "failed") && (
               <div>
                 <Label className="text-gray-300">Reason (required)</Label>
                 <Textarea
                   value={actionReason}
                   onChange={(e) => setActionReason(e.target.value)}
-                  placeholder="Enter reason for rejection/failure..."
+                  placeholder={
+                    actionDialog.action === "cancelled"
+                      ? "Enter reason for cancellation..."
+                      : "Enter reason for rejection/failure..."
+                  }
                   className="bg-gray-700 border-gray-600 mt-2"
                 />
               </div>
@@ -1435,6 +1487,7 @@ export default function PendingWithdrawalsSection() {
               disabled={
                 actionLoading ||
                 ((actionDialog.action === "rejected" ||
+                  actionDialog.action === "cancelled" ||
                   actionDialog.action === "failed") &&
                   !actionReason) ||
                 (actionDialog.action === "completed" &&
@@ -1446,6 +1499,7 @@ export default function PendingWithdrawalsSection() {
                 actionDialog.action === "completed"
                   ? "bg-emerald-600 hover:bg-emerald-700"
                   : actionDialog.action === "rejected" ||
+                      actionDialog.action === "cancelled" ||
                       actionDialog.action === "failed"
                     ? "bg-red-600 hover:bg-red-700"
                     : "bg-purple-600 hover:bg-purple-700"

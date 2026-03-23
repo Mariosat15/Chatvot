@@ -16,9 +16,11 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
@@ -40,6 +42,7 @@ import {
   Calendar,
   Building2,
   Wallet,
+  Loader2,
 } from "lucide-react";
 
 interface PaymentMetadata {
@@ -146,6 +149,14 @@ export default function PendingPaymentsSection() {
   // Available filter options
   const [providers, setProviders] = useState<string[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
+
+  // Cancel dialog state
+  const [cancelDialog, setCancelDialog] = useState<{
+    open: boolean;
+    payment: Payment | null;
+  }>({ open: false, payment: null });
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
 
   // Detail dialog state
   const [detailDialog, setDetailDialog] = useState<{
@@ -293,6 +304,42 @@ export default function PendingPaymentsSection() {
     for (const payment of payments) {
       await completePayment(payment._id);
       await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  };
+
+  const cancelPayment = async () => {
+    if (!cancelDialog.payment) return;
+
+    try {
+      setCancelling(true);
+
+      const response = await fetch("/api/cancel-pending-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transactionId: cancelDialog.payment._id,
+          reason: cancelReason || "Cancelled by admin",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success("Payment cancelled successfully");
+        setCancelDialog({ open: false, payment: null });
+        setCancelReason("");
+        fetchPendingPayments();
+        if (activeTab === "history") {
+          fetchPaymentHistory();
+        }
+      } else {
+        toast.error(data.error || "Failed to cancel payment");
+      }
+    } catch (error) {
+      console.error("Error cancelling payment:", error);
+      toast.error("Failed to cancel payment");
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -562,18 +609,33 @@ export default function PendingPaymentsSection() {
             <Eye className="h-4 w-4" />
           </Button>
           {showActions && payment.status === "pending" && (
-            <Button
-              onClick={() => completePayment(payment._id)}
-              disabled={processing !== null}
-              size="sm"
-              className="bg-green-500 hover:bg-green-600 text-white"
-            >
-              {processing === payment._id ? (
-                <RefreshCw className="h-4 w-4 animate-spin" />
-              ) : (
-                <CheckCircle2 className="h-4 w-4" />
-              )}
-            </Button>
+            <>
+              <Button
+                onClick={() => completePayment(payment._id)}
+                disabled={processing !== null || cancelling}
+                size="sm"
+                className="bg-green-500 hover:bg-green-600 text-white"
+                title="Complete Payment"
+              >
+                {processing === payment._id ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
+              </Button>
+              <Button
+                onClick={() => {
+                  setCancelDialog({ open: true, payment });
+                  setCancelReason("");
+                }}
+                disabled={processing !== null || cancelling}
+                size="sm"
+                variant="destructive"
+                title="Cancel Payment"
+              >
+                <XCircle className="h-4 w-4" />
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -1454,6 +1516,92 @@ export default function PendingPaymentsSection() {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Payment Dialog */}
+      <Dialog
+        open={cancelDialog.open}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCancelDialog({ open: false, payment: null });
+            setCancelReason("");
+          }
+        }}
+      >
+        <DialogContent className="bg-gray-900 border-gray-700 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl text-white flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-red-400" />
+              Cancel Pending Payment
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              {cancelDialog.payment && (
+                <>
+                  Cancel payment of{" "}
+                  <span className="text-yellow-400 font-semibold">
+                    {cancelDialog.payment.amount.toFixed(2)} Credits
+                  </span>{" "}
+                  ({cs}
+                  {(
+                    cancelDialog.payment.metadata?.totalCharged ||
+                    cancelDialog.payment.metadata?.eurAmount ||
+                    cancelDialog.payment.amount
+                  ).toFixed(2)}
+                  ) for{" "}
+                  <span className="text-white font-medium">
+                    {cancelDialog.payment.user?.email || "Unknown User"}
+                  </span>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Warning Banner */}
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+              <p className="text-sm text-red-300 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                This will mark the deposit as cancelled. No credits will be
+                added to the user&apos;s wallet.
+              </p>
+            </div>
+
+            {/* Reason */}
+            <div>
+              <Label className="text-gray-300">
+                Reason for Cancellation (optional)
+              </Label>
+              <Textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="e.g., Payment provider declined, duplicate transaction, user request..."
+                className="bg-gray-800 border-gray-700 mt-2"
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCancelDialog({ open: false, payment: null });
+                setCancelReason("");
+              }}
+              className="bg-gray-800 border-gray-700 hover:bg-gray-700"
+            >
+              Go Back
+            </Button>
+            <Button
+              onClick={cancelPayment}
+              disabled={cancelling}
+              variant="destructive"
+            >
+              {cancelling && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Cancel Payment
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
