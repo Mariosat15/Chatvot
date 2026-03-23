@@ -811,9 +811,9 @@ function TransactionItem({
                 <span className="text-gray-400">
                   {" "}
                   (You receive: {settings?.currency?.symbol || "€"}
-                  {transaction.metadata.netAmountEUR.toFixed(2)}, Fee:{" "}
+                  {Number(transaction.metadata.netAmountEUR).toFixed(2)}, Fee:{" "}
                   {settings?.currency?.symbol || "€"}
-                  {transaction.metadata.platformFee.toFixed(2)})
+                  {Number(transaction.metadata.platformFee).toFixed(2)})
                 </span>
               ) : null}
             </p>
@@ -830,17 +830,17 @@ function TransactionItem({
               className="text-xs text-red-400 mt-1 truncate max-w-md"
               title={
                 transaction.failureReason ||
-                transaction.metadata?.cancelReason ||
-                transaction.metadata?.clientErrorDescription ||
-                transaction.metadata?.errorReason ||
+                (transaction.metadata?.cancelReason as string) ||
+                (transaction.metadata?.clientErrorDescription as string) ||
+                (transaction.metadata?.errorReason as string) ||
                 "No details available"
               }
             >
               ❌{" "}
               {transaction.failureReason ||
-                transaction.metadata?.cancelReason ||
-                transaction.metadata?.clientErrorDescription ||
-                transaction.metadata?.errorReason ||
+                (transaction.metadata?.cancelReason as string) ||
+                (transaction.metadata?.clientErrorDescription as string) ||
+                (transaction.metadata?.errorReason as string) ||
                 (transaction.status === "cancelled"
                   ? "Payment was cancelled by user"
                   : "Payment was declined by card issuer")}

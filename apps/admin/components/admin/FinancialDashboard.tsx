@@ -818,10 +818,12 @@ export default function FinancialDashboard() {
     }
 
     const amountEUR = parseFloat(withdrawAmount);
+    // Reason: Include pending withdrawals in obligation calculation to prevent over-withdrawal.
     const maxWithdrawable = Math.max(
       0,
       (liabilityMetrics?.theoreticalBankBalance || 0) -
         (liabilityMetrics?.totalUserCreditsEUR || 0) -
+        (liabilityMetrics?.pendingWithdrawalsEUR || 0) -
         (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
     );
 
@@ -1258,66 +1260,75 @@ export default function FinancialDashboard() {
         {/* OVERVIEW TAB */}
         <TabsContent value="overview" className="space-y-6">
           {/* TOP SUMMARY - 3 Key Numbers */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="bg-gradient-to-br from-green-900/40 to-gray-900 border border-green-500/30">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-400">🏦 Theoretical Bank Balance</p>
-                    <p className="text-3xl font-bold text-green-400">
-                      {currencySymbol}
-                      {(liabilityMetrics?.theoreticalBankBalance || 0).toFixed(
-                        2,
-                      )}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      All deposits − all withdrawals − bank fees
-                    </p>
-                  </div>
-                  <TrendingUp className="h-10 w-10 text-green-500/30" />
-                </div>
-              </CardContent>
-            </Card>
+          {(() => {
+            // Reason: Centralize obligation & safe-to-spend calculations so
+            // the top cards, the Available to Withdraw section, and the wiki
+            // all reference the same numbers.
+            const bankBalance = liabilityMetrics?.theoreticalBankBalance || 0;
+            const userCreditsEUR = liabilityMetrics?.totalUserCreditsEUR || 0;
+            const outstandingVAT = vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0;
+            const pendingWdEUR = liabilityMetrics?.pendingWithdrawalsEUR || 0;
+            const totalObligations = userCreditsEUR + outstandingVAT + pendingWdEUR;
+            // Reason: Allow negative so admin sees the deficit clearly.
+            const safeToSpend = bankBalance - totalObligations;
+            const isPositive = safeToSpend >= 0;
+            const coveragePct = totalObligations > 0
+              ? ((bankBalance / totalObligations) * 100).toFixed(0)
+              : "100";
 
-            <Card className="bg-gradient-to-br from-red-900/40 to-gray-900 border border-red-500/30">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-400">⚠️ Total Obligations</p>
-                    <p className="text-3xl font-bold text-red-400">
-                      {currencySymbol}
-                      {(
-                        (liabilityMetrics?.totalUserCreditsEUR || 0) +
-                        (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0)
-                      ).toFixed(2)}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {liabilityMetrics?.totalUserCredits?.toLocaleString() || 0}{" "}
-                      {creditName} owed to users
-                      {vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0
-                        ? ` + ${currencySymbol}${(platformFinancials?.outstandingVAT || 0).toFixed(2)} VAT`
-                        : ""}
-                    </p>
-                  </div>
-                  <ShieldAlert className="h-10 w-10 text-red-500/30" />
-                </div>
-              </CardContent>
-            </Card>
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="bg-gradient-to-br from-green-900/40 to-gray-900 border border-green-500/30">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-400">🏦 Theoretical Bank Balance</p>
+                        <p className="text-3xl font-bold text-green-400">
+                          {currencySymbol}{bankBalance.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          All deposits − all withdrawals − bank fees
+                        </p>
+                      </div>
+                      <TrendingUp className="h-10 w-10 text-green-500/30" />
+                    </div>
+                  </CardContent>
+                </Card>
 
-            {(() => {
-              const safeToSpend = Math.max(
-                0,
-                (liabilityMetrics?.theoreticalBankBalance || 0) -
-                  (liabilityMetrics?.totalUserCreditsEUR || 0) -
-                  (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
-              );
-              const isPositive = safeToSpend > 0;
-              return (
+                <Card className="bg-gradient-to-br from-red-900/40 to-gray-900 border border-red-500/30">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-400">⚠️ Total Obligations</p>
+                        <p className="text-3xl font-bold text-red-400">
+                          {currencySymbol}{totalObligations.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-500 space-y-0.5">
+                          <span className="block">
+                            👥 {currencySymbol}{userCreditsEUR.toFixed(2)} user balances
+                          </span>
+                          {outstandingVAT > 0 && (
+                            <span className="block">
+                              📋 {currencySymbol}{outstandingVAT.toFixed(2)} VAT owed
+                            </span>
+                          )}
+                          {pendingWdEUR > 0 && (
+                            <span className="block">
+                              ⏳ {currencySymbol}{pendingWdEUR.toFixed(2)} pending withdrawals
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <ShieldAlert className="h-10 w-10 text-red-500/30" />
+                    </div>
+                  </CardContent>
+                </Card>
+
                 <Card
                   className={`bg-gradient-to-br ${
                     isPositive
                       ? "from-cyan-900/40 to-gray-900 border-cyan-500/30"
-                      : "from-orange-900/40 to-gray-900 border-orange-500/30"
+                      : "from-red-900/40 to-gray-900 border-red-500/30"
                   } border`}
                 >
                   <CardContent className="pt-6">
@@ -1328,25 +1339,30 @@ export default function FinancialDashboard() {
                         </p>
                         <p
                           className={`text-3xl font-bold ${
-                            isPositive ? "text-cyan-400" : "text-orange-400"
+                            isPositive ? "text-cyan-400" : "text-red-400"
                           }`}
                         >
-                          {currencySymbol}
-                          {safeToSpend.toFixed(2)}
+                          {safeToSpend < 0 ? "-" : ""}{currencySymbol}
+                          {Math.abs(safeToSpend).toFixed(2)}
                         </p>
                         <p className="text-xs text-gray-500">
-                          Bank − obligations · Coverage:{" "}
-                          {((liabilityMetrics?.coverageRatio || 1) * 100).toFixed(0)}%
-                          {(liabilityMetrics?.coverageRatio || 1) >= 1 ? " ✅" : " ⚠️"}
+                          Bank − obligations · Coverage: {coveragePct}%
+                          {isPositive ? " ✅" : " ⚠️"}
+                          {!isPositive && (
+                            <span className="block text-red-400 mt-0.5">
+                              Deficit: need {currencySymbol}{Math.abs(safeToSpend).toFixed(2)} more
+                            </span>
+                          )}
                         </p>
                       </div>
-                      <Wallet className="h-10 w-10 text-cyan-500/30" />
+                      <Wallet className={`h-10 w-10 ${isPositive ? "text-cyan-500/30" : "text-red-500/30"}`} />
                     </div>
                   </CardContent>
                 </Card>
-              );
-            })()}
-          </div>
+              </div>
+            );
+          })()}
+          
 
           {/* TWO-COLUMN MONEY FLOW */}
           <Card className="bg-gray-900 border-gray-700">
@@ -1666,56 +1682,53 @@ export default function FinancialDashboard() {
               )}
 
               {/* Bottom Summary Bar */}
-              <div className="mt-4 p-4 bg-gradient-to-r from-cyan-900/30 to-emerald-900/30 border border-cyan-500/30 rounded-lg">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                  <div>
-                    <p className="text-sm text-gray-400">
-                      Theoretical Bank Balance
-                    </p>
-                    <p className="text-2xl font-bold text-green-400">
-                      {currencySymbol}
-                      {(liabilityMetrics?.theoreticalBankBalance || 0).toFixed(
-                        2,
-                      )}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Total IN − Total OUT
-                    </p>
+              {(() => {
+                const bBal = liabilityMetrics?.theoreticalBankBalance || 0;
+                const uCred = liabilityMetrics?.totalUserCreditsEUR || 0;
+                const oVAT = vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0;
+                const pWd = liabilityMetrics?.pendingWithdrawalsEUR || 0;
+                const totalReserve = uCred + oVAT + pWd;
+                const netSafe = bBal - totalReserve;
+                return (
+                  <div className="mt-4 p-4 bg-gradient-to-r from-cyan-900/30 to-emerald-900/30 border border-cyan-500/30 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                      <div>
+                        <p className="text-sm text-gray-400">
+                          Theoretical Bank Balance
+                        </p>
+                        <p className="text-2xl font-bold text-green-400">
+                          {currencySymbol}{bBal.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Total IN − Total OUT
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-400">
+                          Must Reserve (All Obligations)
+                        </p>
+                        <p className="text-2xl font-bold text-red-400">
+                          -{currencySymbol}{totalReserve.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Users{oVAT > 0 ? " + VAT" : ""}{pWd > 0 ? " + pending WD" : ""}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-400">
+                          Safe to Spend / Withdraw
+                        </p>
+                        <p className={`text-2xl font-bold ${netSafe >= 0 ? "text-cyan-400" : "text-red-400"}`}>
+                          {netSafe < 0 ? "-" : ""}{currencySymbol}{Math.abs(netSafe).toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          After all obligations {netSafe >= 0 ? "✅" : "⚠️"}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-400">
-                      Must Reserve for Users
-                    </p>
-                    <p className="text-2xl font-bold text-red-400">
-                      -{currencySymbol}
-                      {(
-                        (liabilityMetrics?.totalUserCreditsEUR || 0) +
-                        (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0)
-                      ).toFixed(2)}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      User balances{vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0 ? " + outstanding VAT" : ""}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-400">
-                      Safe to Spend / Withdraw
-                    </p>
-                    <p className="text-2xl font-bold text-cyan-400">
-                      {currencySymbol}
-                      {Math.max(
-                        0,
-                        (liabilityMetrics?.theoreticalBankBalance || 0) -
-                          (liabilityMetrics?.totalUserCreditsEUR || 0) -
-                          (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
-                      ).toFixed(2)}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      After all obligations
-                    </p>
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
             </CardContent>
           </Card>
 
@@ -1867,19 +1880,18 @@ export default function FinancialDashboard() {
             </Card>
 
             {(() => {
-              const availableToSpend = Math.max(
-                0,
+              const availableToSpend =
                 (liabilityMetrics?.theoreticalBankBalance || 0) -
                   (liabilityMetrics?.totalUserCreditsEUR || 0) -
-                  (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
-              );
-              const isPositive = availableToSpend > 0;
+                  (liabilityMetrics?.pendingWithdrawalsEUR || 0) -
+                  (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0);
+              const isPositive = availableToSpend >= 0;
               return (
                 <Card
                   className={`bg-gradient-to-br ${
                     isPositive
                       ? "from-cyan-900/40 to-gray-900 border-cyan-500/30"
-                      : "from-orange-900/40 to-gray-900 border-orange-500/30"
+                      : "from-red-900/40 to-gray-900 border-red-500/30"
                   } border`}
                 >
                   <CardContent className="pt-6">
@@ -1890,17 +1902,18 @@ export default function FinancialDashboard() {
                         </p>
                         <p
                           className={`text-3xl font-bold ${
-                            isPositive ? "text-cyan-400" : "text-orange-400"
+                            isPositive ? "text-cyan-400" : "text-red-400"
                           }`}
                         >
-                          {currencySymbol}
-                          {availableToSpend.toFixed(2)}
+                          {availableToSpend < 0 ? "-" : ""}{currencySymbol}
+                          {Math.abs(availableToSpend).toFixed(2)}
                         </p>
                         <p className="text-xs text-gray-500">
-                          Bank − user credits{vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0 ? " − VAT" : ""}
+                          Bank − all obligations
+                          {!isPositive && " ⚠️ Deficit"}
                         </p>
                       </div>
-                      <Wallet className="h-10 w-10 text-cyan-500/30" />
+                      <Wallet className={`h-10 w-10 ${isPositive ? "text-cyan-500/30" : "text-red-500/30"}`} />
                     </div>
                   </CardContent>
                 </Card>
@@ -2084,45 +2097,44 @@ export default function FinancialDashboard() {
               </div>
 
               {/* Bottom Summary */}
-              <div className="mt-6 p-4 bg-gradient-to-r from-cyan-900/30 to-emerald-900/30 border border-cyan-500/30 rounded-lg">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                  <div>
-                    <p className="text-sm text-gray-400">Bank Balance</p>
-                    <p className="text-2xl font-bold text-green-400">
-                      {currencySymbol}
-                      {(liabilityMetrics?.theoreticalBankBalance || 0).toFixed(
-                        2,
-                      )}
-                    </p>
-                    <p className="text-xs text-gray-500">IN - OUT</p>
+              {(() => {
+                const bb = liabilityMetrics?.theoreticalBankBalance || 0;
+                const totalObl = (liabilityMetrics?.totalUserCreditsEUR || 0) +
+                  (liabilityMetrics?.pendingWithdrawalsEUR || 0) +
+                  (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0);
+                const avail = bb - totalObl;
+                return (
+                  <div className="mt-6 p-4 bg-gradient-to-r from-cyan-900/30 to-emerald-900/30 border border-cyan-500/30 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                      <div>
+                        <p className="text-sm text-gray-400">Bank Balance</p>
+                        <p className="text-2xl font-bold text-green-400">
+                          {currencySymbol}{bb.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-500">IN - OUT</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-400">All Obligations</p>
+                        <p className="text-2xl font-bold text-red-400">
+                          -{currencySymbol}{totalObl.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Users + pending WD{vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0 ? " + VAT" : ""}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-400">Available to Spend</p>
+                        <p className={`text-2xl font-bold ${avail >= 0 ? "text-cyan-400" : "text-red-400"}`}>
+                          {avail < 0 ? "-" : ""}{currencySymbol}{Math.abs(avail).toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          After all obligations {avail >= 0 ? "✅" : "⚠️"}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-400">User Liabilities</p>
-                    <p className="text-2xl font-bold text-red-400">
-                      -{currencySymbol}
-                      {(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Must reserve for users
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-400">Available to Spend</p>
-                    <p className="text-2xl font-bold text-cyan-400">
-                      {currencySymbol}
-                      {Math.max(
-                        0,
-                        (liabilityMetrics?.theoreticalBankBalance || 0) -
-                          (liabilityMetrics?.totalUserCreditsEUR || 0) -
-                          (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
-                      ).toFixed(2)}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      After user credits{vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0 ? " + VAT" : ""}
-                    </p>
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
             </CardContent>
           </Card>
 
@@ -2554,150 +2566,265 @@ export default function FinancialDashboard() {
             </CardContent>
           </Card>
 
-          {/* Available to Withdraw Section */}
-          <Card className="bg-gray-900 border-gray-700">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-white text-lg flex items-center gap-2">
-                <Banknote className="h-5 w-5 text-cyan-400" />
-                Available to Withdraw
-              </CardTitle>
-              <CardDescription>
-                After reserving funds for user liabilities
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Left: Calculation */}
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center py-2 border-b border-gray-700">
-                    <span className="text-gray-300">Platform Net Earnings</span>
-                    <span className="text-green-400 font-semibold">
-                      +{currencySymbol}
-                      {(platformFinancials?.totalNetEarningsEUR || 0).toFixed(
-                        2,
-                      )}
-                    </span>
-                  </div>
-                  {(platformFinancials?.totalAdminBalanceAdded || 0) > 0 && (
-                    <div className="flex justify-between items-center py-2 border-b border-gray-700">
-                      <span className="text-gray-300">
-                        💵 Admin Balance Injected
-                      </span>
-                      <span className="text-teal-400 font-semibold">
-                        +{currencySymbol}
-                        {(
-                          platformFinancials?.totalAdminBalanceAdded || 0
-                        ).toFixed(2)}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center py-2 border-b border-gray-700">
-                    <span className="text-gray-300">Admin Withdrawals</span>
-                    <span className="text-red-400 font-semibold">
-                      -{currencySymbol}
-                      {(
-                        platformFinancials?.totalAdminWithdrawalsEUR || 0
-                      ).toFixed(2)}
-                    </span>
-                  </div>
-                  {(platformFinancials?.totalVendorPayments || 0) > 0 && (
-                    <div className="flex justify-between items-center py-2 border-b border-gray-700">
-                      <span className="text-gray-300">🏢 Vendor Payments</span>
-                      <span className="text-purple-400 font-semibold">
-                        -{currencySymbol}
-                        {(platformFinancials?.totalVendorPayments || 0).toFixed(
-                          2,
-                        )}
-                      </span>
-                    </div>
-                  )}
-                  {(platformFinancials?.totalCustomExpenses || 0) > 0 && (
-                    <div className="flex justify-between items-center py-2 border-b border-gray-700">
-                      <span className="text-gray-300">📝 Custom Expenses</span>
-                      <span className="text-rose-400 font-semibold">
-                        -{currencySymbol}
-                        {(platformFinancials?.totalCustomExpenses || 0).toFixed(
-                          2,
-                        )}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center py-2 border-b border-gray-700">
-                    <span className="text-gray-300">User Credit Balances</span>
-                    <span className="text-orange-400 font-semibold">
-                      -{currencySymbol}
-                      {(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)}
-                    </span>
-                  </div>
-                  {vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0 && (
-                    <div className="flex justify-between items-center py-2 border-b border-gray-700">
-                      <span className="text-gray-300">Outstanding VAT</span>
-                      <span className="text-orange-400 font-semibold">
-                        -{currencySymbol}
-                        {(platformFinancials?.outstandingVAT || 0).toFixed(2)}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center pt-3 border-t-2 border-cyan-500/30">
-                    <span className="text-white font-bold text-lg">
-                      💰 Can Withdraw
-                    </span>
-                    <span className="text-cyan-400 font-bold text-2xl">
-                      {currencySymbol}
-                      {Math.max(
-                        0,
-                        (liabilityMetrics?.theoreticalBankBalance || 0) -
-                          (liabilityMetrics?.totalUserCreditsEUR || 0) -
-                          (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
-                      ).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
+          {/* Available to Withdraw Section — Full Breakdown */}
+          {(() => {
+            const bankBal = liabilityMetrics?.theoreticalBankBalance || 0;
+            const userCredEUR = liabilityMetrics?.totalUserCreditsEUR || 0;
+            const vatOwed = vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0;
+            const pendingWd = liabilityMetrics?.pendingWithdrawalsEUR || 0;
+            const gmFees = platformFinancials?.totalGameMasterFees || 0;
+            const vendorPay = platformFinancials?.totalVendorPayments || 0;
+            const customExp = platformFinancials?.totalCustomExpenses || 0;
+            const bankFees = platformFinancials?.totalBankFees || 0;
+            const adminWd = platformFinancials?.totalAdminWithdrawalsEUR || 0;
+            const incidentComp = platformFinancials?.totalIncidentCompensations || 0;
+            const adminInjected = platformFinancials?.totalAdminBalanceAdded || 0;
+            const netEarnings = platformFinancials?.totalNetEarningsEUR || 0;
 
-                {/* Right: Summary + Button */}
-                <div className="flex flex-col justify-between">
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-center">
-                      <p className="text-xs text-gray-400">Bank Balance</p>
-                      <p className="text-xl font-bold text-green-400">
-                        {currencySymbol}
-                        {(
-                          liabilityMetrics?.theoreticalBankBalance || 0
-                        ).toFixed(2)}
+            // Reason: Total obligations = everything still owed / reserved.
+            // Vendor payments, bank fees, admin withdrawals etc. are already
+            // deducted from theoreticalBankBalance, so they are NOT current
+            // obligations. Only unpaid liabilities count.
+            const currentObligations = userCredEUR + vatOwed + pendingWd;
+            const netAvailable = bankBal - currentObligations;
+            const isNetPositive = netAvailable >= 0;
+
+            return (
+              <Card className="bg-gray-900 border-gray-700">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-white text-lg flex items-center gap-2">
+                    <Banknote className="h-5 w-5 text-cyan-400" />
+                    Available to Withdraw — Full Breakdown
+                  </CardTitle>
+                  <CardDescription>
+                    Detailed view of all obligations and what&apos;s safe to withdraw
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Left: Detailed Calculation */}
+                    <div className="space-y-1">
+                      {/* ── What's in the bank ──────────────────── */}
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider pt-1 pb-2">
+                        🏦 What&apos;s In The Bank
                       </p>
-                    </div>
-                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-center">
-                      <p className="text-xs text-gray-400">User Liabilities</p>
-                      <p className="text-xl font-bold text-red-400">
-                        -{currencySymbol}
-                        {(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(
-                          2,
+                      <div className="flex justify-between items-center py-2 border-b border-green-500/20 bg-green-500/5 -mx-2 px-2 rounded">
+                        <span className="text-gray-200 font-medium">Theoretical Bank Balance</span>
+                        <span className="text-green-400 font-bold text-lg">
+                          {currencySymbol}{bankBal.toFixed(2)}
+                        </span>
+                      </div>
+
+                      {/* ── Current Obligations (still owed) ──── */}
+                      <p className="text-xs font-semibold text-red-400 uppercase tracking-wider pt-4 pb-2">
+                        ⚠️ Current Obligations (Unpaid / Reserved)
+                      </p>
+                      <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                        <div>
+                          <span className="text-gray-300">👥 User Credit Balances</span>
+                          <p className="text-[10px] text-gray-500">
+                            {liabilityMetrics?.totalUserCredits?.toLocaleString() || 0} {creditName} owed if all users withdraw
+                          </p>
+                        </div>
+                        <span className="text-red-400 font-semibold">
+                          -{currencySymbol}{userCredEUR.toFixed(2)}
+                        </span>
+                      </div>
+                      {pendingWd > 0 && (
+                        <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                          <div>
+                            <span className="text-gray-300">⏳ Pending Withdrawals</span>
+                            <p className="text-[10px] text-gray-500">
+                              Approved but not yet transferred
+                            </p>
+                          </div>
+                          <span className="text-orange-400 font-semibold">
+                            -{currencySymbol}{pendingWd.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                      {vatOwed > 0 && (
+                        <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                          <div>
+                            <span className="text-gray-300">📋 Outstanding VAT</span>
+                            <p className="text-[10px] text-gray-500">
+                              Collected but not yet remitted to tax authority
+                            </p>
+                          </div>
+                          <span className="text-orange-400 font-semibold">
+                            -{currencySymbol}{vatOwed.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* ── Net Available ─────────────────────── */}
+                      <div className={`flex justify-between items-center pt-4 mt-2 border-t-2 ${isNetPositive ? "border-cyan-500/30" : "border-red-500/30"}`}>
+                        <span className="text-white font-bold text-lg">
+                          {isNetPositive ? "💰" : "🚨"} Net Available
+                        </span>
+                        <span className={`font-bold text-2xl ${isNetPositive ? "text-cyan-400" : "text-red-400"}`}>
+                          {netAvailable < 0 ? "-" : ""}{currencySymbol}{Math.abs(netAvailable).toFixed(2)}
+                        </span>
+                      </div>
+                      {!isNetPositive && (
+                        <p className="text-xs text-red-400 mt-1">
+                          ⚠️ Deficit — obligations exceed bank balance by {currencySymbol}{Math.abs(netAvailable).toFixed(2)}
+                        </p>
+                      )}
+
+                      {/* ── Already Paid / Deducted (for reference) ── */}
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider pt-5 pb-2">
+                        ✅ Already Paid (Deducted from Bank Balance)
+                      </p>
+                      <div className="space-y-1 text-sm">
+                        {adminWd > 0 && (
+                          <div className="flex justify-between items-center py-1.5 border-b border-gray-800">
+                            <span className="text-gray-400">Admin Withdrawals</span>
+                            <span className="text-gray-400">
+                              {currencySymbol}{adminWd.toFixed(2)}
+                            </span>
+                          </div>
                         )}
+                        {bankFees > 0 && (
+                          <div className="flex justify-between items-center py-1.5 border-b border-gray-800">
+                            <span className="text-gray-400">Bank / Payment Processor Fees</span>
+                            <span className="text-gray-400">
+                              {currencySymbol}{bankFees.toFixed(2)}
+                            </span>
+                          </div>
+                        )}
+                        {vatEnabled && (platformFinancials?.totalVATPaid || 0) > 0 && (
+                          <div className="flex justify-between items-center py-1.5 border-b border-gray-800">
+                            <span className="text-gray-400">VAT Already Remitted</span>
+                            <span className="text-gray-400">
+                              {currencySymbol}{(platformFinancials?.totalVATPaid || 0).toFixed(2)}
+                            </span>
+                          </div>
+                        )}
+                        {vendorPay > 0 && (
+                          <div className="flex justify-between items-center py-1.5 border-b border-gray-800">
+                            <span className="text-gray-400">Vendor Payments</span>
+                            <span className="text-gray-400">
+                              {currencySymbol}{vendorPay.toFixed(2)}
+                            </span>
+                          </div>
+                        )}
+                        {customExp > 0 && (
+                          <div className="flex justify-between items-center py-1.5 border-b border-gray-800">
+                            <span className="text-gray-400">Custom Expenses</span>
+                            <span className="text-gray-400">
+                              {currencySymbol}{customExp.toFixed(2)}
+                            </span>
+                          </div>
+                        )}
+                        {gmFees > 0 && (
+                          <div className="flex justify-between items-center py-1.5 border-b border-gray-800">
+                            <span className="text-gray-400">Game Master Payouts</span>
+                            <span className="text-gray-400">
+                              {currencySymbol}{gmFees.toFixed(2)}
+                            </span>
+                          </div>
+                        )}
+                        {incidentComp > 0 && (
+                          <div className="flex justify-between items-center py-1.5 border-b border-gray-800">
+                            <span className="text-gray-400">Incident Compensations</span>
+                            <span className="text-gray-400">
+                              {currencySymbol}{incidentComp.toFixed(2)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right: Visual Summary + Withdraw Button */}
+                    <div className="flex flex-col justify-between">
+                      <div className="space-y-3 mb-4">
+                        {/* Bank vs Obligations visual */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-center">
+                            <p className="text-xs text-gray-400">Bank Balance</p>
+                            <p className="text-xl font-bold text-green-400">
+                              {currencySymbol}{bankBal.toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-center">
+                            <p className="text-xs text-gray-400">Total Obligations</p>
+                            <p className="text-xl font-bold text-red-400">
+                              -{currencySymbol}{currentObligations.toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Obligation breakdown mini-cards */}
+                        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 space-y-2">
+                          <p className="text-xs font-semibold text-gray-400 uppercase">Obligation Breakdown</p>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-400">👥 Users</span>
+                            <span className="text-red-400">{currencySymbol}{userCredEUR.toFixed(2)}</span>
+                          </div>
+                          {pendingWd > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-400">⏳ Pending WD</span>
+                              <span className="text-orange-400">{currencySymbol}{pendingWd.toFixed(2)}</span>
+                            </div>
+                          )}
+                          {vatOwed > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-400">📋 VAT Owed</span>
+                              <span className="text-orange-400">{currencySymbol}{vatOwed.toFixed(2)}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Platform earnings info */}
+                        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 space-y-2">
+                          <p className="text-xs font-semibold text-gray-400 uppercase">Platform Earnings</p>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-400">Net Earnings</span>
+                            <span className="text-green-400">+{currencySymbol}{netEarnings.toFixed(2)}</span>
+                          </div>
+                          {adminInjected > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-400">Admin Injected</span>
+                              <span className="text-teal-400">+{currencySymbol}{adminInjected.toFixed(2)}</span>
+                            </div>
+                          )}
+                          {adminWd > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-400">Admin Withdrawn</span>
+                              <span className="text-red-400">-{currencySymbol}{adminWd.toFixed(2)}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Net Available highlight */}
+                        <div className={`rounded-lg p-4 text-center ${isNetPositive ? "bg-cyan-500/10 border border-cyan-500/30" : "bg-red-500/10 border border-red-500/30"}`}>
+                          <p className="text-xs text-gray-400">
+                            {isNetPositive ? "Safe to Withdraw" : "Deficit"}
+                          </p>
+                          <p className={`text-2xl font-bold ${isNetPositive ? "text-cyan-400" : "text-red-400"}`}>
+                            {netAvailable < 0 ? "-" : ""}{currencySymbol}{Math.abs(netAvailable).toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <Button
+                        onClick={() => setShowWithdrawDialog(true)}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 h-12 text-lg"
+                        disabled={netAvailable <= 0}
+                      >
+                        <Banknote className="h-5 w-5 mr-2" />
+                        Withdraw to Bank
+                      </Button>
+                      <p className="text-xs text-gray-500 text-center mt-2">
+                        Maximum safe withdrawal after reserving all obligations
                       </p>
                     </div>
                   </div>
-                  <Button
-                    onClick={() => setShowWithdrawDialog(true)}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 h-12 text-lg"
-                    disabled={
-                      Math.max(
-                        0,
-                        (liabilityMetrics?.theoreticalBankBalance || 0) -
-                          (liabilityMetrics?.totalUserCreditsEUR || 0) -
-                          (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
-                      ) <= 0
-                    }
-                  >
-                    <Banknote className="h-5 w-5 mr-2" />
-                    Withdraw to Bank
-                  </Button>
-                  <p className="text-xs text-gray-500 text-center mt-2">
-                    Maximum safe withdrawal after reserving user funds
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            );
+          })()}
 
           {/* Unclaimed Pools Detail (Collapsible Info) */}
           {platformFinancials?.unclaimedPools &&
@@ -3048,27 +3175,29 @@ export default function FinancialDashboard() {
               </CardContent>
             </Card>
 
-            <Card className="bg-gray-900 border-cyan-500/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-400">
-                  Available to Pay
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-cyan-400">
-                  {currencySymbol}
-                  {Math.max(
-                    0,
-                    (liabilityMetrics?.theoreticalBankBalance || 0) -
-                      (liabilityMetrics?.totalUserCreditsEUR || 0) -
-                      (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
-                  ).toFixed(2)}
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Bank − user credits{vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0 ? " − VAT" : ""}
-                </p>
-              </CardContent>
-            </Card>
+            {(() => {
+              const atpVal = (liabilityMetrics?.theoreticalBankBalance || 0) -
+                (liabilityMetrics?.totalUserCreditsEUR || 0) -
+                (liabilityMetrics?.pendingWithdrawalsEUR || 0) -
+                (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0);
+              return (
+                <Card className={`bg-gray-900 ${atpVal >= 0 ? "border-cyan-500/50" : "border-red-500/50"}`}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-400">
+                      Available to Pay
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className={`text-2xl font-bold ${atpVal >= 0 ? "text-cyan-400" : "text-red-400"}`}>
+                      {atpVal < 0 ? "-" : ""}{currencySymbol}{Math.abs(atpVal).toFixed(2)}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Bank − all obligations {atpVal < 0 ? "⚠️" : ""}
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            })()}
 
             <Card className="bg-gray-900 border-green-500/50">
               <CardHeader className="pb-2">
@@ -3433,27 +3562,29 @@ export default function FinancialDashboard() {
               </CardContent>
             </Card>
 
-            <Card className="bg-gray-900 border-green-500/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-400">
-                  Platform Net Position
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-400">
-                  {currencySymbol}
-                  {Math.max(
-                    0,
-                    (liabilityMetrics?.theoreticalBankBalance || 0) -
-                      (liabilityMetrics?.totalUserCreditsEUR || 0) -
-                      (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
-                  ).toFixed(2)}
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  After user liabilities{vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0 ? " + VAT" : ""}
-                </p>
-              </CardContent>
-            </Card>
+            {(() => {
+              const pnpVal = (liabilityMetrics?.theoreticalBankBalance || 0) -
+                (liabilityMetrics?.totalUserCreditsEUR || 0) -
+                (liabilityMetrics?.pendingWithdrawalsEUR || 0) -
+                (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0);
+              return (
+                <Card className={`bg-gray-900 ${pnpVal >= 0 ? "border-green-500/50" : "border-red-500/50"}`}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-400">
+                      Platform Net Position
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className={`text-2xl font-bold ${pnpVal >= 0 ? "text-green-400" : "text-red-400"}`}>
+                      {pnpVal < 0 ? "-" : ""}{currencySymbol}{Math.abs(pnpVal).toFixed(2)}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      After all obligations {pnpVal < 0 ? "⚠️" : ""}
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            })()}
           </div>
 
           {/* Action Buttons */}
@@ -3603,7 +3734,8 @@ export default function FinancialDashboard() {
             // to ensure consistency across all financial dashboard views.
             const bankBalance = liabilityMetrics?.theoreticalBankBalance || 0;
             const outstandingVAT = vatEnabled ? (platformFinancials?.outstandingVAT || 0) : 0;
-            const weOwe = totalCreditsEUR + outstandingVAT;
+            const pendingWdAmt = liabilityMetrics?.pendingWithdrawalsEUR || 0;
+            const weOwe = totalCreditsEUR + outstandingVAT + pendingWdAmt;
             const netPosition = bankBalance - weOwe;
             const isHealthy = netPosition >= 0;
             // Reason: Sum admin adjustments from per-user wallet data to show total manual credits/debits
@@ -3659,7 +3791,7 @@ export default function FinancialDashboard() {
                           {netPosition >= 0 ? "+" : "-"}{currencySymbol}{Math.abs(netPosition).toFixed(2)}
                         </p>
                         <p className="text-xs text-gray-500">
-                          Bank ({currencySymbol}{bankBalance.toFixed(2)}) − Owe ({currencySymbol}{weOwe.toFixed(2)}{outstandingVAT > 0 ? ` incl. VAT` : ""})
+                          Bank ({currencySymbol}{bankBalance.toFixed(2)}) − Owe ({currencySymbol}{weOwe.toFixed(2)}{outstandingVAT > 0 ? ` incl. VAT` : ""}{pendingWdAmt > 0 ? ` + pending WD` : ""})
                         </p>
                       </div>
                       <PiggyBank className={`h-10 w-10 ${isHealthy ? "text-cyan-500/30" : "text-red-500/30"}`} />
@@ -5161,63 +5293,69 @@ export default function FinancialDashboard() {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div className="bg-gray-800 rounded-lg p-4">
-              <div className="text-sm text-gray-400">Available to withdraw</div>
-              <div className="text-2xl font-bold text-emerald-400">
-                {currencySymbol}
-                {Math.max(
-                  0,
-                  (liabilityMetrics?.theoreticalBankBalance || 0) -
-                    (liabilityMetrics?.totalUserCreditsEUR || 0) -
-                    (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
-                ).toFixed(2)}
-              </div>
-              <div className="text-xs text-gray-500 mt-1 space-y-1">
-                <div className="flex justify-between">
-                  <span>Bank Balance:</span>
-                  <span className="text-green-400">
-                    {currencySymbol}
-                    {(liabilityMetrics?.theoreticalBankBalance || 0).toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>User Liabilities:</span>
-                  <span className="text-red-400">
-                    -{currencySymbol}
-                    {(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)}
-                  </span>
-                </div>
-                {vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0 && (
-                  <div className="flex justify-between">
-                    <span>Outstanding VAT:</span>
-                    <span className="text-red-400">
-                      -{currencySymbol}
-                      {(platformFinancials?.outstandingVAT || 0).toFixed(2)}
-                    </span>
+            {(() => {
+              const wdBankBal = liabilityMetrics?.theoreticalBankBalance || 0;
+              const wdUserLiab = liabilityMetrics?.totalUserCreditsEUR || 0;
+              const wdPendingWd = liabilityMetrics?.pendingWithdrawalsEUR || 0;
+              const wdVAT = vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0;
+              const wdMaxAvailable = Math.max(0, wdBankBal - wdUserLiab - wdPendingWd - wdVAT);
+              const wdNetAvailable = wdBankBal - wdUserLiab - wdPendingWd - wdVAT;
+              return (
+                <>
+                  <div className="bg-gray-800 rounded-lg p-4">
+                    <div className="text-sm text-gray-400">Available to withdraw</div>
+                    <div className={`text-2xl font-bold ${wdNetAvailable >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {wdNetAvailable < 0 ? "-" : ""}{currencySymbol}{Math.abs(wdNetAvailable).toFixed(2)}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1 space-y-1">
+                      <div className="flex justify-between">
+                        <span>Bank Balance:</span>
+                        <span className="text-green-400">
+                          {currencySymbol}{wdBankBal.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>User Balances:</span>
+                        <span className="text-red-400">
+                          -{currencySymbol}{wdUserLiab.toFixed(2)}
+                        </span>
+                      </div>
+                      {wdPendingWd > 0 && (
+                        <div className="flex justify-between">
+                          <span>Pending Withdrawals:</span>
+                          <span className="text-orange-400">
+                            -{currencySymbol}{wdPendingWd.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                      {wdVAT > 0 && (
+                        <div className="flex justify-between">
+                          <span>Outstanding VAT:</span>
+                          <span className="text-red-400">
+                            -{currencySymbol}{wdVAT.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
 
-            <div>
-              <label className="text-sm text-gray-400">
-                Withdrawal Amount ({currencyCode})
-              </label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={withdrawAmount}
-                onChange={(e) => setWithdrawAmount(e.target.value)}
-                max={Math.max(
-                  0,
-                  (liabilityMetrics?.theoreticalBankBalance || 0) -
-                    (liabilityMetrics?.totalUserCreditsEUR || 0) -
-                    (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
-                )}
-                className="mt-1 bg-gray-800 border-gray-700 text-white"
-              />
-            </div>
+                  <div>
+                    <label className="text-sm text-gray-400">
+                      Withdrawal Amount ({currencyCode})
+                    </label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={withdrawAmount}
+                      onChange={(e) => setWithdrawAmount(e.target.value)}
+                      max={wdMaxAvailable}
+                      className="mt-1 bg-gray-800 border-gray-700 text-white"
+                    />
+                  </div>
+                </>
+              );
+            })()}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -5425,60 +5563,61 @@ export default function FinancialDashboard() {
               </div>
 
               {/* Platform Position Info */}
-              <div className="bg-gray-800/50 rounded-lg p-4 text-sm">
-                <div className="flex justify-between mb-2">
-                  <span className="text-gray-400">
-                    Theoretical Bank Balance:
-                  </span>
-                  <span className="text-cyan-400 font-mono">
-                    {currencySymbol}
-                    {(liabilityMetrics?.theoreticalBankBalance || 0).toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-gray-400">
-                    User Credit Liabilities:
-                  </span>
-                  <span className="text-red-400 font-mono">
-                    -{currencySymbol}
-                    {(liabilityMetrics?.totalUserCreditsEUR || 0).toFixed(2)}
-                  </span>
-                </div>
-                {vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0 && (
-                  <div className="flex justify-between mb-2">
-                    <span className="text-gray-400">
-                      Outstanding VAT:
-                    </span>
-                    <span className="text-red-400 font-mono">
-                      -{currencySymbol}
-                      {(platformFinancials?.outstandingVAT || 0).toFixed(2)}
-                    </span>
+              {(() => {
+                const vpBankBal = liabilityMetrics?.theoreticalBankBalance || 0;
+                const vpUserLiab = liabilityMetrics?.totalUserCreditsEUR || 0;
+                const vpPendWd = liabilityMetrics?.pendingWithdrawalsEUR || 0;
+                const vpVAT = vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0;
+                const vpAvailable = vpBankBal - vpUserLiab - vpPendWd - vpVAT;
+                return (
+                  <div className="bg-gray-800/50 rounded-lg p-4 text-sm">
+                    <div className="flex justify-between mb-2">
+                      <span className="text-gray-400">
+                        Bank Balance:
+                      </span>
+                      <span className="text-cyan-400 font-mono">
+                        {currencySymbol}{vpBankBal.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between mb-2">
+                      <span className="text-gray-400">
+                        User Balances:
+                      </span>
+                      <span className="text-red-400 font-mono">
+                        -{currencySymbol}{vpUserLiab.toFixed(2)}
+                      </span>
+                    </div>
+                    {vpPendWd > 0 && (
+                      <div className="flex justify-between mb-2">
+                        <span className="text-gray-400">
+                          Pending Withdrawals:
+                        </span>
+                        <span className="text-orange-400 font-mono">
+                          -{currencySymbol}{vpPendWd.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    {vpVAT > 0 && (
+                      <div className="flex justify-between mb-2">
+                        <span className="text-gray-400">
+                          Outstanding VAT:
+                        </span>
+                        <span className="text-red-400 font-mono">
+                          -{currencySymbol}{vpVAT.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between pt-2 border-t border-gray-700">
+                      <span className="text-gray-300 font-semibold">
+                        Available to Pay:
+                      </span>
+                      <span className={`font-mono font-bold ${vpAvailable >= 0 ? "text-green-400" : "text-red-400"}`}>
+                        {vpAvailable < 0 ? "-" : ""}{currencySymbol}{Math.abs(vpAvailable).toFixed(2)}
+                      </span>
+                    </div>
                   </div>
-                )}
-                <div className="flex justify-between pt-2 border-t border-gray-700">
-                  <span className="text-gray-300 font-semibold">
-                    Available to Pay:
-                  </span>
-                  <span
-                    className={`font-mono font-bold ${
-                      (liabilityMetrics?.theoreticalBankBalance || 0) -
-                        (liabilityMetrics?.totalUserCreditsEUR || 0) -
-                        (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0) >=
-                      0
-                        ? "text-green-400"
-                        : "text-orange-400"
-                    }`}
-                  >
-                    {currencySymbol}
-                    {Math.max(
-                      0,
-                      (liabilityMetrics?.theoreticalBankBalance || 0) -
-                        (liabilityMetrics?.totalUserCreditsEUR || 0) -
-                        (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0),
-                    ).toFixed(2)}
-                  </span>
-                </div>
-              </div>
+                );
+              })()}
 
               {/* Payment Amount */}
               <div className="space-y-2">
