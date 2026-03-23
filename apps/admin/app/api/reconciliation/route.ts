@@ -553,16 +553,24 @@ export async function POST(request: NextRequest) {
       }
 
       case "competition_spent_mismatch": {
+        // Reason: totalSpentOnCompetitions is NET (entries minus refunds from cancellations).
+        // We must subtract competition_refund amounts to get the correct net value.
         const competitionSpentTx = await WalletTransaction.find({
           userId,
-          transactionType: { $in: ["competition_entry"] },
+          transactionType: { $in: ["competition_entry", "competition_refund"] },
           status: "completed",
         }).session(session);
 
-        const correctTotal = competitionSpentTx.reduce(
-          (sum, tx) => sum + Math.abs(tx.amount || 0),
-          0,
-        );
+        let grossEntries = 0;
+        let totalRefunds = 0;
+        for (const tx of competitionSpentTx) {
+          if (tx.transactionType === "competition_entry") {
+            grossEntries += Math.abs(tx.amount || 0);
+          } else if (tx.transactionType === "competition_refund") {
+            totalRefunds += Math.abs(tx.amount || 0);
+          }
+        }
+        const correctTotal = grossEntries - totalRefunds;
         const wallet = await CreditWallet.findOne({ userId }).session(session);
         const previousValue = wallet?.totalSpentOnCompetitions || 0;
 
@@ -578,22 +586,30 @@ export async function POST(request: NextRequest) {
 
         result = {
           success: true,
-          message: `Competition spent corrected from ${previousValue} to ${Math.round(correctTotal * 100) / 100} credits`,
+          message: `Competition spent corrected from ${previousValue} to ${Math.round(correctTotal * 100) / 100} credits (${grossEntries} entries - ${totalRefunds} refunds)`,
         };
         break;
       }
 
       case "challenge_spent_mismatch": {
+        // Reason: totalSpentOnChallenges is NET (entries minus refunds from cancellations/declines).
+        // We must subtract challenge_refund amounts to get the correct net value.
         const challengeSpentTx = await WalletTransaction.find({
           userId,
-          transactionType: { $in: ["challenge_entry"] },
+          transactionType: { $in: ["challenge_entry", "challenge_refund"] },
           status: "completed",
         }).session(session);
 
-        const correctTotal = challengeSpentTx.reduce(
-          (sum, tx) => sum + Math.abs(tx.amount || 0),
-          0,
-        );
+        let grossEntries = 0;
+        let totalRefunds = 0;
+        for (const tx of challengeSpentTx) {
+          if (tx.transactionType === "challenge_entry") {
+            grossEntries += Math.abs(tx.amount || 0);
+          } else if (tx.transactionType === "challenge_refund") {
+            totalRefunds += Math.abs(tx.amount || 0);
+          }
+        }
+        const correctTotal = grossEntries - totalRefunds;
         const wallet = await CreditWallet.findOne({ userId }).session(session);
         const previousValue = wallet?.totalSpentOnChallenges || 0;
 
@@ -609,7 +625,7 @@ export async function POST(request: NextRequest) {
 
         result = {
           success: true,
-          message: `Challenge spent corrected from ${previousValue} to ${Math.round(correctTotal * 100) / 100} credits`,
+          message: `Challenge spent corrected from ${previousValue} to ${Math.round(correctTotal * 100) / 100} credits (${grossEntries} entries - ${totalRefunds} refunds)`,
         };
         break;
       }
@@ -1287,10 +1303,10 @@ async function getDetailedUserReconciliation(
     });
   }
 
-  // Check challenge spent
-  const chalSpentDiff = Math.abs(
-    walletData.totalSpentOnChallenges - challengeSpentTotal,
-  );
+  // Check challenge spent (gross entries minus refunds should match net spent)
+  // Reason: Same logic as competition spent — totalSpentOnChallenges is decremented on refund
+  const expectedNetChalSpent = challengeSpentTotal - challengeRefundTotal;
+  const chalSpentDiff = Math.abs(walletData.totalSpentOnChallenges - expectedNetChalSpent);
   if (chalSpentDiff > 0.01) {
     issues.push({
       type: "challenge_spent_mismatch",
@@ -1298,13 +1314,13 @@ async function getDetailedUserReconciliation(
       userId,
       userEmail,
       details: {
-        expected: Math.round(challengeSpentTotal * 100) / 100,
+        expected: Math.round(expectedNetChalSpent * 100) / 100,
         actual: walletData.totalSpentOnChallenges,
         difference:
           Math.round(
-            (walletData.totalSpentOnChallenges - challengeSpentTotal) * 100,
+            (walletData.totalSpentOnChallenges - expectedNetChalSpent) * 100,
           ) / 100,
-        description: `Challenge spent mismatch: stored ${walletData.totalSpentOnChallenges}, calculated ${Math.round(challengeSpentTotal * 100) / 100}`,
+        description: `Challenge net spent mismatch: stored ${walletData.totalSpentOnChallenges}, calculated ${Math.round(expectedNetChalSpent * 100) / 100} (${Math.round(challengeSpentTotal * 100) / 100} entries - ${Math.round(challengeRefundTotal * 100) / 100} refunds)`,
       },
     });
   }
@@ -1359,8 +1375,10 @@ async function getDetailedUserReconciliation(
       withdrawalTotal: Math.round(withdrawalFromRequests * 100) / 100,
       competitionWinTotal: Math.round(competitionWinTotal * 100) / 100,
       challengeWinTotal: Math.round(challengeWinTotal * 100) / 100,
-      competitionSpentTotal: Math.round(competitionSpentTotal * 100) / 100,
-      challengeSpentTotal: Math.round(challengeSpentTotal * 100) / 100,
+      // Reason: Return NET spent (entries minus refunds) to match what the wallet stores.
+      // The wallet's totalSpentOnCompetitions/totalSpentOnChallenges is decremented on refund.
+      competitionSpentTotal: Math.round((competitionSpentTotal - competitionRefundTotal) * 100) / 100,
+      challengeSpentTotal: Math.round((challengeSpentTotal - challengeRefundTotal) * 100) / 100,
       marketplaceSpentTotal: Math.round(marketplaceSpentTotal * 100) / 100,
       gmEarningsTotal: Math.round(gmEarningsTotal * 100) / 100,
       adminAdjustmentNet: Math.round(adminAdjustmentTotal * 100) / 100,
