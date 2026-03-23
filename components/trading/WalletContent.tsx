@@ -12,6 +12,7 @@ import {
   Zap,
   CheckCircle2,
   XCircle,
+  UserCog,
 } from "lucide-react";
 import { GameIcon } from "@/components/ui/GameIcon";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ interface WalletContentProps {
     kycVerified: boolean;
     withdrawalEnabled: boolean;
     totalGMEarnings?: number;
+    totalAdminAdjustments?: number;
   };
   transactions: any[];  
 }
@@ -119,6 +121,10 @@ export default function WalletContent({
       isDateFiltered && filteredStats
         ? filteredStats.totalGMEarnings
         : (stats.totalGMEarnings ?? 0),
+    totalAdminAdjustments:
+      isDateFiltered && filteredStats
+        ? filteredStats.totalAdminAdjustments
+        : (stats.totalAdminAdjustments ?? 0),
     roi: isDateFiltered ? 0 : allTimeROI,
   };
 
@@ -361,6 +367,36 @@ export default function WalletContent({
               </div>
               <div className="rounded-full bg-amber-500/10 p-2 sm:p-3 flex-shrink-0">
                 <GameIcon name="crown" size={22} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Admin Adjustments (only show if non-zero) */}
+        {(stats.totalAdminAdjustments ?? 0) !== 0 && (
+          <div className="rounded-xl bg-gradient-to-br from-purple-500/10 to-purple-600/5 border border-purple-500/30 p-3 sm:p-4 md:p-6 hover:bg-purple-500/15 transition-all min-h-[120px]">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] sm:text-xs font-medium text-purple-400/80 uppercase tracking-wider truncate">
+                  Admin Adjustments
+                </p>
+                <div className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 flex-wrap">
+                  <p className={`text-lg sm:text-xl md:text-2xl font-bold tabular-nums ${displayStats.totalAdminAdjustments > 0 ? "text-green-400" : "text-red-400"}`}>
+                    {displayStats.totalAdminAdjustments > 0 ? "+" : ""}
+                    {displayStats.totalAdminAdjustments.toFixed(
+                      settings.credits.decimals,
+                    )}
+                  </p>
+                  <span className="text-sm sm:text-lg text-purple-500">
+                    {settings.credits.symbol}
+                  </span>
+                </div>
+                <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-purple-500/60 truncate">
+                  {displayStats.totalAdminAdjustments > 0 ? "Credits added" : "Credits removed"}
+                </p>
+              </div>
+              <div className="rounded-full bg-purple-500/10 p-2 sm:p-3 flex-shrink-0">
+                <UserCog className="h-5 w-5 text-purple-400" />
               </div>
             </div>
           </div>

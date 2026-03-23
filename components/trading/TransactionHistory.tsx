@@ -18,7 +18,7 @@ import {
   X,
   Download,
 } from "lucide-react";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -129,7 +129,7 @@ interface Transaction {
   exchangeRate?: number;
   paymentId?: string;
   failureReason?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 interface TransactionHistoryProps {
@@ -143,6 +143,7 @@ export interface FilteredStats {
   totalSpent: number;
   totalWinnings: number;
   totalGMEarnings: number;
+  totalAdminAdjustments: number;
 }
 
 type FilterType =
@@ -317,6 +318,9 @@ export default function TransactionHistory({
           case "gamemaster_challenge_referral":
             acc.totalGMEarnings += tx.amount;
             break;
+          case "admin_adjustment":
+            acc.totalAdminAdjustments += tx.amount;
+            break;
         }
         return acc;
       },
@@ -326,6 +330,7 @@ export default function TransactionHistory({
         totalSpent: 0,
         totalWinnings: 0,
         totalGMEarnings: 0,
+        totalAdminAdjustments: 0,
       },
     );
 

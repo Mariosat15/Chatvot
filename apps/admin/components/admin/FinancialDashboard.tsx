@@ -63,6 +63,7 @@ import {
   FileSpreadsheet,
   Loader2,
   Info,
+  UserCog,
 } from "lucide-react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import ReconciliationSection from "./ReconciliationSection";
@@ -96,6 +97,7 @@ interface WalletData {
   totalWonFromChallenges: number;
   totalSpentOnChallenges: number;
   totalSpentOnMarketplace: number;
+  totalAdminAdjustments?: number; // Net admin credits/debits
 }
 
 interface PendingWithdrawal {
@@ -3604,9 +3606,11 @@ export default function FinancialDashboard() {
             const weOwe = totalCreditsEUR + outstandingVAT;
             const netPosition = bankBalance - weOwe;
             const isHealthy = netPosition >= 0;
+            // Reason: Sum admin adjustments from per-user wallet data to show total manual credits/debits
+            const totalAdminAdj = wallets.reduce((sum, w) => sum + (w.totalAdminAdjustments || 0), 0);
 
             return (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Card 1: Total User Credits */}
                 <Card className="bg-gradient-to-br from-violet-900/40 to-gray-900 border border-violet-500/30">
                   <CardContent className="pt-6">
@@ -3662,6 +3666,24 @@ export default function FinancialDashboard() {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Card 4: Admin Adjustments */}
+                <Card className={`bg-gradient-to-br ${totalAdminAdj !== 0 ? "from-orange-900/40 to-gray-900 border-orange-500/30" : "from-gray-800/40 to-gray-900 border-gray-700"} border`}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-400">🔧 Admin Adjustments</p>
+                        <p className={`text-3xl font-bold ${totalAdminAdj > 0 ? "text-orange-400" : totalAdminAdj < 0 ? "text-red-400" : "text-gray-500"}`}>
+                          {totalAdminAdj > 0 ? "+" : ""}{creditSymbol} {totalAdminAdj.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Net manual credits/debits to users
+                        </p>
+                      </div>
+                      <UserCog className="h-10 w-10 text-orange-500/30" />
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             );
           })()}
@@ -3710,6 +3732,10 @@ export default function FinancialDashboard() {
                         <div className="text-xs font-normal">
                           (Comp / Chall)
                         </div>
+                      </TableHead>
+                      <TableHead className="text-gray-400 text-center">
+                        <div>Admin Adj.</div>
+                        <div className="text-xs font-normal">(Credits/Debits)</div>
                       </TableHead>
                       <TableHead className="text-gray-400">
                         <div>Net</div>
@@ -3792,6 +3818,16 @@ export default function FinancialDashboard() {
                                 wallet.totalSpentOnMarketplace || 0
                               ).toLocaleString()}
                             </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {(wallet.totalAdminAdjustments || 0) !== 0 ? (
+                              <span className={(wallet.totalAdminAdjustments || 0) > 0 ? "text-orange-400" : "text-red-400"}>
+                                {(wallet.totalAdminAdjustments || 0) > 0 ? "+" : ""}
+                                {creditSymbol} {(wallet.totalAdminAdjustments || 0).toLocaleString()}
+                              </span>
+                            ) : (
+                              <span className="text-gray-600">—</span>
+                            )}
                           </TableCell>
                           <TableCell
                             className={

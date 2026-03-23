@@ -940,6 +940,7 @@ export const getWalletStats = async () => {
         netProfitFromChallenges: 0,
         roi: 0,
         totalGMEarnings: fs.gmEarnings,
+        totalAdminAdjustments: fs.adminAdjustments,
       };
     }
 
@@ -958,6 +959,9 @@ export const getWalletStats = async () => {
       kycVerified: wallet.kycVerified,
       withdrawalEnabled: wallet.withdrawalEnabled,
       totalGMEarnings: fs.gmEarnings,
+      // Reason: Admin adjustments are tracked separately so users can see
+      // manual credit/debit activity on their wallet without affecting ROI stats.
+      totalAdminAdjustments: fs.adminAdjustments,
     };
   } catch (error) {
     // Re-throw redirect errors so Next.js can handle them

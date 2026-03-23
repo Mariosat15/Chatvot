@@ -282,6 +282,8 @@ export async function GET(request: NextRequest) {
     // Reason: Use WalletTransaction as SINGLE source of truth for ALL financial totals.
     // CreditWallet fields were historically polluted by refunds.
     // Net spending = entries − refunds (refunds reverse the original entry fee).
+    // Reason: Include admin_adjustment so manual credits/debits are visible
+    // in the financial dashboard and per-user wallet breakdown.
     const platformTxTotals = await WalletTransaction.aggregate([
       {
         $match: {
@@ -292,6 +294,8 @@ export async function GET(request: NextRequest) {
               "competition_entry", "challenge_entry",
               "competition_refund", "challenge_refund",
               "marketplace_purchase",
+              "admin_adjustment",
+              "incident_compensation",
             ],
           },
         },
@@ -309,6 +313,10 @@ export async function GET(request: NextRequest) {
     const totalSpentOnCompetitions = Math.abs(platTxMap.get("competition_entry") || 0) - totalCompRefund;
     const totalSpentOnChallenges = Math.abs(platTxMap.get("challenge_entry") || 0) - totalChalRefund;
     const totalSpentOnMarketplace = Math.abs(platTxMap.get("marketplace_purchase") || 0);
+    // Reason: admin_adjustment amount is signed (+credits, -debits).
+    // We report the net total (positive = net credits added by admin).
+    const totalAdminAdjustments = platTxMap.get("admin_adjustment") || 0;
+    const totalIncidentCompensations = platTxMap.get("incident_compensation") || 0;
 
     // Reason: Per-user totals also need transaction-based calculation
     // to avoid showing polluted CreditWallet values in the admin wallets table.
@@ -322,6 +330,7 @@ export async function GET(request: NextRequest) {
               "competition_entry", "challenge_entry",
               "competition_refund", "challenge_refund",
               "marketplace_purchase",
+              "admin_adjustment",
             ],
           },
         },
@@ -333,11 +342,11 @@ export async function GET(request: NextRequest) {
         },
       },
     ]);
-    // Build lookup: userId -> { compWins, chalWins, compSpent, chalSpent, marketplace }
-    const userTxMap = new Map<string, { compWins: number; chalWins: number; compSpent: number; chalSpent: number; compRefund: number; chalRefund: number; marketplace: number }>();
+    // Build lookup: userId -> { compWins, chalWins, compSpent, chalSpent, marketplace, adminAdjust }
+    const userTxMap = new Map<string, { compWins: number; chalWins: number; compSpent: number; chalSpent: number; compRefund: number; chalRefund: number; marketplace: number; adminAdjust: number }>();
     for (const row of perUserTotals) {
       const uid = row._id.userId;
-      if (!userTxMap.has(uid)) userTxMap.set(uid, { compWins: 0, chalWins: 0, compSpent: 0, chalSpent: 0, compRefund: 0, chalRefund: 0, marketplace: 0 });
+      if (!userTxMap.has(uid)) userTxMap.set(uid, { compWins: 0, chalWins: 0, compSpent: 0, chalSpent: 0, compRefund: 0, chalRefund: 0, marketplace: 0, adminAdjust: 0 });
       const entry = userTxMap.get(uid)!;
       const absTotal = Math.abs(row.total);
       if (row._id.type === "competition_win") entry.compWins = absTotal;
@@ -347,6 +356,8 @@ export async function GET(request: NextRequest) {
       else if (row._id.type === "competition_refund") entry.compRefund = absTotal;
       else if (row._id.type === "challenge_refund") entry.chalRefund = absTotal;
       else if (row._id.type === "marketplace_purchase") entry.marketplace = absTotal;
+      // Reason: admin_adjustment is signed — keep the raw total (not abs) for net display
+      else if (row._id.type === "admin_adjustment") entry.adminAdjust = row.total;
     }
 
     // Calculate liability metrics
@@ -365,7 +376,7 @@ export async function GET(request: NextRequest) {
         wallets: wallets.map((w) => {
           const userInfo = usersMap.get(w.userId);
           // Reason: Use transaction-based totals for BOTH wins and spending
-          const uTx = userTxMap.get(w.userId) || { compWins: 0, chalWins: 0, compSpent: 0, chalSpent: 0, compRefund: 0, chalRefund: 0, marketplace: 0 };
+          const uTx = userTxMap.get(w.userId) || { compWins: 0, chalWins: 0, compSpent: 0, chalSpent: 0, compRefund: 0, chalRefund: 0, marketplace: 0, adminAdjust: 0 };
           return {
             userId: w.userId,
             userName: userInfo?.name || "Unknown",
@@ -378,6 +389,8 @@ export async function GET(request: NextRequest) {
             totalWonFromChallenges: uTx.chalWins,
             totalSpentOnChallenges: uTx.chalSpent - uTx.chalRefund,
             totalSpentOnMarketplace: uTx.marketplace,
+            // Reason: Net admin adjustments (positive = credits added, negative = debits)
+            totalAdminAdjustments: uTx.adminAdjust,
           };
         }),
         pendingWithdrawals: pendingWithdrawalRequests.map((w) => {
@@ -414,6 +427,10 @@ export async function GET(request: NextRequest) {
           totalSpentOnMarketplace,
           totalPlatformFees: platformFees[0]?.totalFees || 0,
           totalFeeTransactions: platformFees[0]?.count || 0,
+          // Reason: Admin adjustments are a separate flow from deposits/withdrawals.
+          // They must be tracked and displayed to explain balance discrepancies.
+          totalAdminAdjustments,
+          totalIncidentCompensations,
         },
         // NEW: Enhanced platform financial metrics
         // Reason: GM fees from WalletTransaction are in credits — convert to EUR for consistency

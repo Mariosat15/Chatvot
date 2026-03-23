@@ -39,6 +39,11 @@ export interface UserFinancialSummary {
 
   // GM Earnings (from gamemaster_earning + gamemaster_challenge_referral)
   gmEarnings: number;
+
+  // Admin adjustments (manual credits/debits by admin — tracked separately)
+  // Reason: Admin adjustments are NOT included in ROI or netProfit because
+  // they are manual corrections, not investment returns.
+  adminAdjustments: number; // net (positive = credits added, negative = debits)
 }
 
 // ── Transaction types we aggregate ─────────────────────────────────────────
@@ -53,6 +58,7 @@ const ALL_FINANCIAL_TX_TYPES = [
   "marketplace_purchase",
   "gamemaster_earning",
   "gamemaster_challenge_referral",
+  "admin_adjustment",
 ] as const;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -84,6 +90,10 @@ function buildSummaryFromMap(txMap: Map<string, number>): UserFinancialSummary {
     Math.abs(txMap.get("gamemaster_earning") || 0) +
     Math.abs(txMap.get("gamemaster_challenge_referral") || 0);
 
+  // Reason: Admin adjustments are signed (+credits, -debits).
+  // Keep the raw total — NOT included in ROI/profit calculations.
+  const adminAdjustments = txMap.get("admin_adjustment") || 0;
+
   return {
     competitionWins,
     challengeWins,
@@ -99,6 +109,7 @@ function buildSummaryFromMap(txMap: Map<string, number>): UserFinancialSummary {
     netProfit,
     roi,
     gmEarnings,
+    adminAdjustments,
   };
 }
 
@@ -225,5 +236,6 @@ export function emptyFinancialSummary(): UserFinancialSummary {
     netProfit: 0,
     roi: 0,
     gmEarnings: 0,
+    adminAdjustments: 0,
   };
 }
