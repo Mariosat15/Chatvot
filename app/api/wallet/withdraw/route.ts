@@ -724,11 +724,11 @@ export async function POST(request: NextRequest) {
       // In manual mode, all withdrawals stay in 'pending' status
       // Admin must manually approve/process them
 
-      // If usePaymentProcessorForManual is enabled, create the request in Nuvei
-      // This allows Nuvei to process the payout when admin approves
+      // Reason: In manual mode, do NOT call Nuvei here. The /payout.do endpoint
+      // directly sends money — it must only be called when admin processes the withdrawal.
+      // Instead, just save the UPO info so the admin can trigger the payout later.
       if (withdrawalSettings.usePaymentProcessorForManual) {
         try {
-          // Get user's UPO for the withdrawal method
           let userPaymentOptionId: string | undefined;
 
           if (
@@ -737,72 +737,29 @@ export async function POST(request: NextRequest) {
           ) {
             userPaymentOptionId = originalPaymentDetails.userPaymentOptionId;
           } else if (payoutMethodType === "bank_transfer" && bankAccount) {
-            // Get UPO from bank account if connected to Nuvei
             userPaymentOptionId = bankAccount.nuveiUpoId;
           }
 
-          if (userPaymentOptionId) {
-            const nuveiService = (await import("@/lib/services/nuvei.service"))
-              .default;
+          // Save the UPO info for admin to use when processing
+          withdrawalRequest[0].metadata = {
+            ...(withdrawalRequest[0].metadata || {}),
+            usePaymentProcessor: true,
+            savedUpoId: userPaymentOptionId || null,
+            noUpoReason: userPaymentOptionId
+              ? undefined
+              : "No payment option linked",
+          };
+          await withdrawalRequest[0].save();
 
-            // Reason: /payout.do uses clientUniqueId (not merchantWDRequestId)
-            const clientUniqueId = `wd_${session.user.id.slice(-8)}_${Date.now()}`;
-            const origin =
-              request.headers.get("origin") ||
-              process.env.NEXT_PUBLIC_APP_URL ||
-              process.env.NEXT_PUBLIC_BASE_URL;
-
-            // Reason: /withdraw.do returns 404 for REST API integrations.
-            // /payout.do is the correct REST endpoint for payouts.
-            const nuveiResult = await nuveiService.submitPayout({
-              userTokenId: `user_${session.user.id}`,
-              amount: netAmountEUR.toFixed(2),
-              currency: appSettings?.currency?.code || "EUR",
-              clientUniqueId,
-              userPaymentOptionId,
-              email: session.user.email || undefined,
-              firstName: session.user.name?.split(" ")[0] || undefined,
-              lastName:
-                session.user.name?.split(" ").slice(1).join(" ") || undefined,
-              notificationUrl: `${origin}/api/nuvei/webhook`,
-            });
-
-            if ("error" in nuveiResult && nuveiResult.error) {
-              console.error(
-                "Failed to submit Nuvei payout:",
-                nuveiResult.error,
-              );
-              // Don't fail the withdrawal - just mark for manual processing
-              withdrawalRequest[0].metadata = {
-                ...(withdrawalRequest[0].metadata || {}),
-                nuveiError: nuveiResult.error,
-                requiresManualProcessing: true,
-              };
-            } else if ("transactionId" in nuveiResult && nuveiResult.transactionId) {
-              withdrawalRequest[0].metadata = {
-                ...(withdrawalRequest[0].metadata || {}),
-                nuveiTransactionId: nuveiResult.transactionId,
-                nuveiTransactionStatus: nuveiResult.transactionStatus,
-                nuveiClientUniqueId: clientUniqueId,
-                usePaymentProcessor: true,
-                payoutMethod: "payout_api",
-              };
-            }
-            await withdrawalRequest[0].save();
-            } else {
-            withdrawalRequest[0].metadata = {
-              ...(withdrawalRequest[0].metadata || {}),
-              requiresManualProcessing: true,
-              noUpoReason: "No payment option linked",
-            };
-            await withdrawalRequest[0].save();
-          }
-        } catch (nuveiError) {
-          console.error(
-            "Error creating Nuvei withdrawal request:",
-            nuveiError,
+          console.log(
+            `📋 Manual withdrawal ${withdrawalRequest[0]._id} saved with UPO ${userPaymentOptionId || "N/A"} — awaiting admin processing`,
           );
-          // Don't fail - just mark for manual processing
+        } catch (metadataError) {
+          console.error(
+            "Error saving withdrawal metadata:",
+            metadataError,
+          );
+          // Don't fail - withdrawal is already created
         }
       }
     } else if (isSandbox && withdrawalSettings.sandboxAutoApprove) {

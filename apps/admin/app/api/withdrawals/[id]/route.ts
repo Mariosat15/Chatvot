@@ -256,12 +256,16 @@ export async function PUT(
         // Reason: When manual withdrawals don't have a Nuvei reference yet,
         // create one now so the "completed" step can approve it in Nuvei,
         // triggering the actual payout to the user.
-        if (!withdrawal.metadata?.nuveiWdRequestId) {
+        // Reason: Check if payout wasn't already submitted (e.g., via a previous processing attempt)
+        if (!withdrawal.metadata?.nuveiTransactionId) {
           try {
             // Find user payment option ID from the withdrawal data
             let userPaymentOptionId: string | undefined;
 
-            if (withdrawal.originalCardDetails?.userPaymentOptionId) {
+            // Reason: Main app now saves the UPO ID in metadata.savedUpoId during withdrawal creation
+            if (withdrawal.metadata?.savedUpoId) {
+              userPaymentOptionId = String(withdrawal.metadata.savedUpoId);
+            } else if (withdrawal.originalCardDetails?.userPaymentOptionId) {
               // Card payout — UPO stored at creation time
               userPaymentOptionId =
                 withdrawal.originalCardDetails.userPaymentOptionId;
@@ -392,7 +396,7 @@ export async function PUT(
           }
         } else {
           console.log(
-            `🏦 Withdrawal ${withdrawal._id} already has Nuvei request: ${withdrawal.metadata.nuveiWdRequestId}`,
+            `🏦 Withdrawal ${withdrawal._id} already has Nuvei payout: ${withdrawal.metadata.nuveiTransactionId}`,
           );
         }
         break;
