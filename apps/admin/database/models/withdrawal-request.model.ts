@@ -48,6 +48,15 @@ export interface IWithdrawalRequest extends Document {
   // Original Payment Reference (for refunds to original method)
   originalPaymentId?: string; // Original Stripe payment intent ID
   originalPaymentMethod?: string; // Original payment method type
+  originalCardDetails?: {
+    // Card details for admin reference
+    brand?: string; // Card brand (Visa, Mastercard, etc.)
+    last4?: string; // Last 4 digits
+    expMonth?: number; // Expiration month
+    expYear?: number; // Expiration year
+    country?: string; // Card country
+    userPaymentOptionId?: string; // Nuvei UPO ID for card payouts
+  };
 
   // Stripe Connect (for direct payouts to user's connected account)
   stripeConnectedAccountId?: string; // User's Stripe Connect account ID
@@ -62,6 +71,7 @@ export interface IWithdrawalRequest extends Document {
     iban?: string; // Last 4 characters only for security
     bankName?: string;
     swiftBic?: string;
+    nuveiUpoId?: string; // Nuvei UPO ID for bank payouts
   };
 
   // Processing Info
@@ -105,6 +115,16 @@ export interface IWithdrawalRequest extends Document {
   // Notes
   userNote?: string; // User's note/reason
   adminNote?: string; // Admin's internal note
+
+  // Metadata (for storing provider-specific data like Nuvei request IDs)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  metadata?: Record<string, any>;
+
+  // Failure tracking
+  failedAt?: Date;
+
+  // Withdrawal method (alternative to payoutMethod for display purposes)
+  withdrawalMethod?: string;
 
   // KYC Status at Time of Request
   kycVerified: boolean;
@@ -216,6 +236,14 @@ const WithdrawalRequestSchema = new Schema<IWithdrawalRequest>(
     // Original Payment Reference
     originalPaymentId: String,
     originalPaymentMethod: String,
+    originalCardDetails: {
+      brand: String,
+      last4: String,
+      expMonth: Number,
+      expYear: Number,
+      country: String,
+      userPaymentOptionId: String,
+    },
 
     // Stripe Connect
     stripeConnectedAccountId: String,
@@ -230,6 +258,7 @@ const WithdrawalRequestSchema = new Schema<IWithdrawalRequest>(
       iban: String,
       bankName: String,
       swiftBic: String,
+      nuveiUpoId: String,
     },
 
     // Processing Info
@@ -292,6 +321,18 @@ const WithdrawalRequestSchema = new Schema<IWithdrawalRequest>(
     userNote: String,
     adminNote: String,
 
+    // Metadata (Nuvei request IDs, processing flags, etc.)
+    metadata: {
+      type: Schema.Types.Mixed,
+      default: {},
+    },
+
+    // Failure tracking
+    failedAt: Date,
+
+    // Withdrawal method
+    withdrawalMethod: String,
+
     // KYC Status
     kycVerified: {
       type: Boolean,
@@ -322,7 +363,7 @@ WithdrawalRequestSchema.index({ payoutId: 1 });
 WithdrawalRequestSchema.statics.getPendingCount = async function (
   userId?: string,
 ): Promise<number> {
-  const query: any = { status: { $in: ["pending", "approved", "processing"] } };
+  const query: Record<string, unknown> = { status: { $in: ["pending", "approved", "processing"] } };
   if (userId) query.userId = userId;
   return this.countDocuments(query);
 };

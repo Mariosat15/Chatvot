@@ -31,8 +31,23 @@ interface NuveiCredentials {
   testMode: boolean;
 }
 
-interface PaymentStatusParams {
+interface _PaymentStatusParams {
   sessionToken: string;
+}
+
+interface WithdrawalResponse {
+  status: "SUCCESS" | "ERROR";
+  errCode: number;
+  reason?: string;
+  wdRequestId?: string;
+  wdRequestStatus?: string;
+  merchantWDRequestId?: string;
+  userTokenId?: string;
+  merchantId?: string;
+  merchantSiteId?: string;
+  transactionId?: string;
+  transactionStatus?: string;
+  userPaymentOptionId?: string;
 }
 
 interface PaymentStatusResponse {
@@ -185,7 +200,7 @@ class NuveiService {
    */
   async getPaymentStatus(
     sessionToken: string,
-    clientUniqueId?: string,
+    _clientUniqueId?: string,
   ): Promise<
     | {
         status: "APPROVED" | "DECLINED" | "PENDING" | "ERROR";
@@ -250,6 +265,265 @@ class NuveiService {
   async isEnabled(): Promise<boolean> {
     const credentials = await this.getCredentials();
     return credentials !== null;
+  }
+
+  /**
+   * Create a withdrawal request in Nuvei (Manual Mode)
+   * Creates a request that waits for merchant approval via approveWDRequest/declineWDRequest
+   * See: https://docs.nuvei.com/documentation/features/financial-operations/withdrawal/
+   */
+  async createWithdrawRequest(params: {
+    userTokenId: string;
+    amount: string;
+    currency: string;
+    merchantWDRequestId: string;
+    userPaymentOptionId: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    notificationUrl?: string;
+  }): Promise<WithdrawalResponse | { error: string }> {
+    const credentials = await this.getCredentials();
+    if (!credentials) {
+      return { error: "Nuvei not configured or not active" };
+    }
+
+    const apiUrl = this.getApiUrl(credentials.testMode);
+    const timeStamp = this.generateTimeStamp();
+    const clientRequestId = `wdreq_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Checksum: SHA256(merchantId + merchantSiteId + clientRequestId + amount + currency + timeStamp + secretKey)
+    const checksumString =
+      credentials.merchantId +
+      credentials.siteId +
+      clientRequestId +
+      params.amount +
+      params.currency +
+      timeStamp +
+      credentials.secretKey;
+    const checksum = crypto
+      .createHash("sha256")
+      .update(checksumString)
+      .digest("hex");
+
+    const requestBody: Record<string, unknown> = {
+      merchantId: credentials.merchantId,
+      merchantSiteId: credentials.siteId,
+      clientRequestId,
+      userTokenId: params.userTokenId,
+      merchantWDRequestId: params.merchantWDRequestId,
+      amount: params.amount,
+      currency: params.currency,
+      userPaymentOption: {
+        userPaymentOptionId: params.userPaymentOptionId,
+      },
+      timeStamp,
+      checksum,
+    };
+
+    if (params.email || params.firstName || params.lastName) {
+      requestBody.userDetails = {
+        email: params.email,
+        firstName: params.firstName,
+        lastName: params.lastName,
+      };
+    }
+
+    if (params.notificationUrl) {
+      requestBody.urlDetails = {
+        notificationUrl: params.notificationUrl,
+      };
+    }
+
+    console.log("🏦 Nuvei createWithdrawRequest:", `${apiUrl}/withdraw.do`);
+
+    try {
+      const response = await fetch(`${apiUrl}/withdraw.do`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+
+      const data = await response.json();
+
+      if (data.status === "SUCCESS" && data.errCode === 0) {
+        console.log("✅ Withdrawal request created:", data.wdRequestId);
+        return {
+          status: "SUCCESS",
+          errCode: 0,
+          reason: "",
+          wdRequestId: data.wdRequestId,
+          wdRequestStatus: data.wdRequestStatus || "Pending",
+          merchantId: data.merchantId,
+          merchantSiteId: data.merchantSiteId,
+          userTokenId: data.userTokenId,
+        } as WithdrawalResponse;
+      } else {
+        console.error(
+          "❌ Withdrawal request failed:",
+          data.reason || data.gwErrorReason,
+        );
+        return {
+          error:
+            data.reason ||
+            data.gwErrorReason ||
+            `Withdrawal request failed (code: ${data.errCode})`,
+        };
+      }
+    } catch (error) {
+      console.error("❌ Nuvei createWithdrawRequest error:", error);
+      return { error: "Failed to create withdrawal request" };
+    }
+  }
+
+  /**
+   * Approve a withdrawal request in Nuvei (Manual Mode)
+   * Call this when admin marks a withdrawal as completed
+   * Nuvei will then process the actual payout to the user
+   */
+  async approveWithdrawRequest(params: {
+    wdRequestId: string;
+    merchantWDRequestId?: string;
+  }): Promise<{ success: boolean; error?: string; data?: Record<string, unknown> }> {
+    const credentials = await this.getCredentials();
+    if (!credentials) {
+      return { success: false, error: "Nuvei not configured or not active" };
+    }
+
+    const apiUrl = this.getApiUrl(credentials.testMode);
+    const timeStamp = this.generateTimeStamp();
+    const clientRequestId = `appwd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Checksum: SHA256(merchantId + merchantSiteId + clientRequestId + wdRequestId + timeStamp + secretKey)
+    const checksumString =
+      credentials.merchantId +
+      credentials.siteId +
+      clientRequestId +
+      params.wdRequestId +
+      timeStamp +
+      credentials.secretKey;
+    const checksum = crypto
+      .createHash("sha256")
+      .update(checksumString)
+      .digest("hex");
+
+    const requestBody: Record<string, unknown> = {
+      merchantId: credentials.merchantId,
+      merchantSiteId: credentials.siteId,
+      clientRequestId,
+      wdRequestId: params.wdRequestId,
+      timeStamp,
+      checksum,
+    };
+
+    if (params.merchantWDRequestId) {
+      requestBody.merchantWDRequestId = params.merchantWDRequestId;
+    }
+
+    console.log(
+      "🏦 Nuvei approveWithdrawRequest:",
+      `${apiUrl}/approveWDRequest.do`,
+    );
+
+    try {
+      const response = await fetch(`${apiUrl}/approveWDRequest.do`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+
+      const data = await response.json();
+
+      if (data.status === "SUCCESS" && data.errCode === 0) {
+        console.log("✅ Withdrawal request approved in Nuvei");
+        return { success: true, data };
+      } else {
+        console.error("❌ Approve withdrawal failed:", data.reason);
+        return {
+          success: false,
+          error: data.reason || `Failed to approve (code: ${data.errCode})`,
+          data,
+        };
+      }
+    } catch (error) {
+      console.error("❌ Nuvei approveWithdrawRequest error:", error);
+      return { success: false, error: "Failed to approve withdrawal request" };
+    }
+  }
+
+  /**
+   * Decline a withdrawal request in Nuvei (Manual Mode)
+   * Call this when admin rejects/cancels a withdrawal
+   * This cancels the pending request in Nuvei — no payout will be made
+   */
+  async declineWithdrawRequest(params: {
+    wdRequestId: string;
+    merchantWDRequestId?: string;
+  }): Promise<{ success: boolean; error?: string; data?: Record<string, unknown> }> {
+    const credentials = await this.getCredentials();
+    if (!credentials) {
+      return { success: false, error: "Nuvei not configured or not active" };
+    }
+
+    const apiUrl = this.getApiUrl(credentials.testMode);
+    const timeStamp = this.generateTimeStamp();
+    const clientRequestId = `decwd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Checksum: SHA256(merchantId + merchantSiteId + clientRequestId + wdRequestId + timeStamp + secretKey)
+    const checksumString =
+      credentials.merchantId +
+      credentials.siteId +
+      clientRequestId +
+      params.wdRequestId +
+      timeStamp +
+      credentials.secretKey;
+    const checksum = crypto
+      .createHash("sha256")
+      .update(checksumString)
+      .digest("hex");
+
+    const requestBody: Record<string, unknown> = {
+      merchantId: credentials.merchantId,
+      merchantSiteId: credentials.siteId,
+      clientRequestId,
+      wdRequestId: params.wdRequestId,
+      timeStamp,
+      checksum,
+    };
+
+    if (params.merchantWDRequestId) {
+      requestBody.merchantWDRequestId = params.merchantWDRequestId;
+    }
+
+    console.log(
+      "🏦 Nuvei declineWithdrawRequest:",
+      `${apiUrl}/declineWDRequest.do`,
+    );
+
+    try {
+      const response = await fetch(`${apiUrl}/declineWDRequest.do`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+
+      const data = await response.json();
+
+      if (data.status === "SUCCESS" && data.errCode === 0) {
+        console.log("✅ Withdrawal request declined in Nuvei");
+        return { success: true, data };
+      } else {
+        console.error("❌ Decline withdrawal failed:", data.reason);
+        return {
+          success: false,
+          error: data.reason || `Failed to decline (code: ${data.errCode})`,
+          data,
+        };
+      }
+    } catch (error) {
+      console.error("❌ Nuvei declineWithdrawRequest error:", error);
+      return { success: false, error: "Failed to decline withdrawal request" };
+    }
   }
 }
 

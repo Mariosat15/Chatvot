@@ -186,9 +186,9 @@ export async function PUT(
         if (nuveiWdReqId) {
           try {
             console.log("🏦 Declining withdrawal in Nuvei...", nuveiWdReqId);
-            const NuveiService = (await import("@/lib/services/nuvei.service"))
+            // Reason: default export is already the singleton instance, not the class
+            const nuveiService = (await import("@/lib/services/nuvei.service"))
               .default;
-            const nuveiService = NuveiService.getInstance();
 
             const nuveiResult = await nuveiService.declineWithdrawRequest({
               wdRequestId: nuveiWdReqId,
@@ -286,10 +286,10 @@ export async function PUT(
                 `🏦 Creating Nuvei withdrawal request for manual withdrawal ${withdrawal._id}...`,
               );
 
-              const NuveiService = (
+              // Reason: default export is already the singleton instance, not the class
+              const nuveiService = (
                 await import("@/lib/services/nuvei.service")
               ).default;
-              const nuveiService = NuveiService.getInstance();
 
               const merchantWDRequestId = `wd_${withdrawal.userId.slice(-8)}_${Date.now()}`;
               const origin =
@@ -370,9 +370,9 @@ export async function PUT(
               "🏦 Approving withdrawal in Nuvei...",
               nuveiWdRequestId,
             );
-            const NuveiService = (await import("@/lib/services/nuvei.service"))
+            // Reason: default export is already the singleton instance, not the class
+            const nuveiService = (await import("@/lib/services/nuvei.service"))
               .default;
-            const nuveiService = NuveiService.getInstance();
 
             const nuveiResult = await nuveiService.approveWithdrawRequest({
               wdRequestId: nuveiWdRequestId,
