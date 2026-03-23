@@ -122,7 +122,7 @@ export async function GET() {
     }> = [];
 
     // Try to get stored UPOs for card refunds (Nuvei)
-    let storedUPOs: any[] = [];
+    let storedUPOs: Record<string, unknown>[] = [];
     try {
       const NuveiUserPaymentOption = (
         await import("@/database/models/nuvei-user-payment-option.model")
@@ -595,7 +595,8 @@ export async function POST(request: NextRequest) {
     await wallet.save({ session: mongoSession });
 
     // Build withdrawal request data based on selected method
-    const withdrawalRequestData: any = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const withdrawalRequestData: Record<string, any> = {
       userId: session.user.id,
       userEmail: session.user.email,
       userName: session.user.name,
@@ -677,7 +678,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Record wallet transaction with proper description (same format as deposits)
-    const withdrawalTx = await WalletTransaction.create(
+    const _withdrawalTx = await WalletTransaction.create(
       [
         {
           userId: session.user.id,
@@ -744,17 +745,20 @@ export async function POST(request: NextRequest) {
             const nuveiService = (await import("@/lib/services/nuvei.service"))
               .default;
 
-            const merchantWDRequestId = `wd_${session.user.id.slice(-8)}_${Date.now()}`;
+            // Reason: /payout.do uses clientUniqueId (not merchantWDRequestId)
+            const clientUniqueId = `wd_${session.user.id.slice(-8)}_${Date.now()}`;
             const origin =
               request.headers.get("origin") ||
               process.env.NEXT_PUBLIC_APP_URL ||
               process.env.NEXT_PUBLIC_BASE_URL;
 
-            const nuveiResult = await nuveiService.createWithdrawRequest({
+            // Reason: /withdraw.do returns 404 for REST API integrations.
+            // /payout.do is the correct REST endpoint for payouts.
+            const nuveiResult = await nuveiService.submitPayout({
               userTokenId: `user_${session.user.id}`,
               amount: netAmountEUR.toFixed(2),
               currency: appSettings?.currency?.code || "EUR",
-              merchantWDRequestId,
+              clientUniqueId,
               userPaymentOptionId,
               email: session.user.email || undefined,
               firstName: session.user.name?.split(" ")[0] || undefined,
@@ -765,7 +769,7 @@ export async function POST(request: NextRequest) {
 
             if ("error" in nuveiResult && nuveiResult.error) {
               console.error(
-                "Failed to create Nuvei withdrawal request:",
+                "Failed to submit Nuvei payout:",
                 nuveiResult.error,
               );
               // Don't fail the withdrawal - just mark for manual processing
@@ -774,13 +778,14 @@ export async function POST(request: NextRequest) {
                 nuveiError: nuveiResult.error,
                 requiresManualProcessing: true,
               };
-            } else if ("wdRequestId" in nuveiResult) {
+            } else if ("transactionId" in nuveiResult && nuveiResult.transactionId) {
               withdrawalRequest[0].metadata = {
                 ...(withdrawalRequest[0].metadata || {}),
-                nuveiWdRequestId: nuveiResult.wdRequestId,
-                nuveiWdStatus: nuveiResult.wdRequestStatus,
-                merchantWDRequestId,
+                nuveiTransactionId: nuveiResult.transactionId,
+                nuveiTransactionStatus: nuveiResult.transactionStatus,
+                nuveiClientUniqueId: clientUniqueId,
                 usePaymentProcessor: true,
+                payoutMethod: "payout_api",
               };
             }
             await withdrawalRequest[0].save();
@@ -909,8 +914,11 @@ export async function POST(request: NextRequest) {
  */
 async function checkWithdrawalEligibility(
   userId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   wallet: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   settings: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   creditSettings: any,
   isSandbox: boolean,
   kycRequired: boolean = false,
@@ -1113,7 +1121,7 @@ async function checkWithdrawalEligibility(
     if (participantRecords.length > 0) {
       // Check if any of these competitions are actually still active
       const competitionIds = participantRecords.map(
-        (p: any) => p.competitionId,
+        (p: Record<string, unknown>) => p.competitionId,
       );
       const activeCompetitionCount = await Competition.countDocuments({
         _id: { $in: competitionIds },
@@ -1140,9 +1148,9 @@ async function checkWithdrawalEligibility(
 
         for (const comp of nonActiveCompetitions) {
           const newStatus =
-            (comp as any).status === "cancelled" ? "refunded" : "completed";
+            (comp as Record<string, unknown>).status === "cancelled" ? "refunded" : "completed";
           await CompetitionParticipant.updateMany(
-            { userId, competitionId: (comp as any)._id, status: "active" },
+            { userId, competitionId: (comp as Record<string, unknown>)._id, status: "active" },
             { $set: { status: newStatus } },
           );
         }
@@ -1164,10 +1172,10 @@ async function checkWithdrawalEligibility(
       // Check if any pending challenges have expired accept deadlines
       const now = new Date();
       const expiredPending = activeChallenges.filter(
-        (c: any) =>
+        (c: Record<string, unknown>) =>
           c.status === "pending" &&
           c.acceptDeadline &&
-          new Date(c.acceptDeadline) < now,
+          new Date(c.acceptDeadline as string) < now,
       );
 
       if (expiredPending.length > 0) {
@@ -1188,11 +1196,11 @@ async function checkWithdrawalEligibility(
 
         // Re-check after cleanup
         const remainingChallenges = activeChallenges.filter(
-          (c: any) =>
+          (c: Record<string, unknown>) =>
             !(
               c.status === "pending" &&
               c.acceptDeadline &&
-              new Date(c.acceptDeadline) < now
+              new Date(c.acceptDeadline as string) < now
             ),
         );
 
@@ -1200,10 +1208,10 @@ async function checkWithdrawalEligibility(
           // Continue to next check instead of blocking
         } else {
           const pendingCount = remainingChallenges.filter(
-            (c: any) => c.status === "pending",
+            (c: Record<string, unknown>) => c.status === "pending",
           ).length;
           const activeCount = remainingChallenges.filter(
-            (c: any) => c.status === "accepted" || c.status === "active",
+            (c: Record<string, unknown>) => c.status === "accepted" || c.status === "active",
           ).length;
 
           let message = "You have ";
@@ -1223,10 +1231,10 @@ async function checkWithdrawalEligibility(
         }
       } else {
         const pendingCount = activeChallenges.filter(
-          (c: any) => c.status === "pending",
+          (c: Record<string, unknown>) => c.status === "pending",
         ).length;
         const activeCount = activeChallenges.filter(
-          (c: any) => c.status === "accepted" || c.status === "active",
+          (c: Record<string, unknown>) => c.status === "accepted" || c.status === "active",
         ).length;
 
         let message = "You have ";

@@ -181,34 +181,23 @@ export async function PUT(
 
       case "rejected":
       case "cancelled":
-        // If this withdrawal was created in Nuvei, decline it there too
-        const nuveiWdReqId = withdrawal.metadata?.nuveiWdRequestId;
-        if (nuveiWdReqId) {
-          try {
-            console.log("🏦 Declining withdrawal in Nuvei...", nuveiWdReqId);
-            // Reason: default export is already the singleton instance, not the class
-            const nuveiService = (await import("@/lib/services/nuvei.service"))
-              .default;
-
-            const nuveiResult = await nuveiService.declineWithdrawRequest({
-              wdRequestId: nuveiWdReqId,
-              merchantWDRequestId: withdrawal.metadata?.merchantWDRequestId,
-            });
-
-            if (!nuveiResult.success) {
-              console.error(
-                "❌ Failed to decline withdrawal in Nuvei:",
-                nuveiResult.error,
-              );
-              withdrawal.adminNote =
-                (withdrawal.adminNote || "") +
-                `\n⚠️ Nuvei decline note: ${nuveiResult.error}`;
-            } else {
-              console.log("✅ Nuvei withdrawal declined");
-            }
-          } catch (nuveiError) {
-            console.error("❌ Error calling Nuvei decline API:", nuveiError);
-          }
+        // Reason: With /payout.do, payouts are processed immediately — no pending Nuvei request to decline.
+        // If a payout was already submitted, it cannot be reversed here (would need a refund).
+        if (withdrawal.metadata?.nuveiTransactionId) {
+          console.warn(
+            `⚠️ Withdrawal ${withdrawal._id} has Nuvei transaction ${withdrawal.metadata.nuveiTransactionId} — payout already processed, may need manual refund`,
+          );
+          withdrawal.adminNote =
+            (withdrawal.adminNote || "") +
+            `\n⚠️ Nuvei payout ${withdrawal.metadata.nuveiTransactionId} was already processed. May require manual refund.`;
+        } else if (withdrawal.metadata?.nuveiWdRequestId) {
+          // Legacy: old-style withdrawal request — log for manual follow-up
+          console.warn(
+            `⚠️ Legacy Nuvei WD request ${withdrawal.metadata.nuveiWdRequestId} — verify if it needs manual cancellation`,
+          );
+          withdrawal.adminNote =
+            (withdrawal.adminNote || "") +
+            `\nℹ️ Legacy Nuvei request — verify manually in Nuvei dashboard`;
         }
 
         withdrawal.status = action === "rejected" ? "rejected" : "cancelled";
@@ -325,7 +314,7 @@ export async function PUT(
 
             if (userPaymentOptionId) {
               console.log(
-                `🏦 Creating Nuvei withdrawal request for manual withdrawal ${withdrawal._id}...`,
+                `🏦 Submitting Nuvei payout for manual withdrawal ${withdrawal._id}...`,
               );
 
               // Reason: default export is already the singleton instance, not the class
@@ -333,17 +322,20 @@ export async function PUT(
                 await import("@/lib/services/nuvei.service")
               ).default;
 
-              const merchantWDRequestId = `wd_${withdrawal.userId.slice(-8)}_${Date.now()}`;
+              // Reason: /payout.do uses clientUniqueId (not merchantWDRequestId)
+              const clientUniqueId = `wd_${withdrawal.userId.slice(-8)}_${Date.now()}`;
               const origin =
                 process.env.NEXT_PUBLIC_APP_URL ||
                 process.env.NEXT_PUBLIC_BASE_URL ||
                 "https://chartvolt.app";
 
-              const nuveiResult = await nuveiService.createWithdrawRequest({
+              // Reason: /withdraw.do returns 404 for REST API integrations.
+              // /payout.do is the correct endpoint for REST API payouts.
+              const nuveiResult = await nuveiService.submitPayout({
                 userTokenId: `user_${withdrawal.userId}`,
                 amount: (withdrawal.netAmountEUR || withdrawal.amountEUR).toFixed(2),
                 currency: "EUR",
-                merchantWDRequestId,
+                clientUniqueId,
                 userPaymentOptionId,
                 email: withdrawal.userEmail || undefined,
                 firstName: withdrawal.userName?.split(" ")[0] || undefined,
@@ -355,28 +347,31 @@ export async function PUT(
 
               if ("error" in nuveiResult && nuveiResult.error) {
                 console.error(
-                  "❌ Failed to create Nuvei withdrawal request:",
+                  "❌ Failed to submit Nuvei payout:",
                   nuveiResult.error,
                 );
                 withdrawal.adminNote =
                   (withdrawal.adminNote || "") +
-                  `\n⚠️ Nuvei request failed: ${nuveiResult.error}. Manual bank transfer required.`;
-              } else if ("wdRequestId" in nuveiResult) {
+                  `\n⚠️ Nuvei payout failed: ${nuveiResult.error}. Manual bank transfer required.`;
+              } else if ("transactionId" in nuveiResult && nuveiResult.transactionId) {
                 console.log(
-                  "✅ Nuvei withdrawal request created:",
-                  nuveiResult.wdRequestId,
+                  "✅ Nuvei payout submitted:",
+                  nuveiResult.transactionId,
+                  "Status:",
+                  nuveiResult.transactionStatus,
                 );
                 withdrawal.metadata = withdrawal.metadata || {};
-                withdrawal.metadata.nuveiWdRequestId =
-                  nuveiResult.wdRequestId;
-                withdrawal.metadata.nuveiWdStatus =
-                  nuveiResult.wdRequestStatus;
-                withdrawal.metadata.merchantWDRequestId =
-                  merchantWDRequestId;
+                withdrawal.metadata.nuveiTransactionId =
+                  nuveiResult.transactionId;
+                withdrawal.metadata.nuveiTransactionStatus =
+                  nuveiResult.transactionStatus;
+                withdrawal.metadata.nuveiClientUniqueId = clientUniqueId;
                 withdrawal.metadata.usePaymentProcessor = true;
+                // Reason: payout.do directly processes the payout — no separate approve step needed
+                withdrawal.metadata.payoutMethod = "payout_api";
                 withdrawal.adminNote =
                   (withdrawal.adminNote || "") +
-                  `\n✅ Nuvei request created: ${nuveiResult.wdRequestId}`;
+                  `\n✅ Nuvei payout submitted: ${nuveiResult.transactionId} (${nuveiResult.transactionStatus})`;
               }
             } else {
               console.log(
@@ -403,46 +398,29 @@ export async function PUT(
         break;
 
       case "completed":
-        // If this withdrawal was created in Nuvei (manual mode with payment processor),
-        // approve it in Nuvei so they process the actual payout
-        const nuveiWdRequestId = withdrawal.metadata?.nuveiWdRequestId;
-        if (nuveiWdRequestId) {
-          try {
-            console.log(
-              "🏦 Approving withdrawal in Nuvei...",
-              nuveiWdRequestId,
-            );
-            // Reason: default export is already the singleton instance, not the class
-            const nuveiService = (await import("@/lib/services/nuvei.service"))
-              .default;
-
-            const nuveiResult = await nuveiService.approveWithdrawRequest({
-              wdRequestId: nuveiWdRequestId,
-              merchantWDRequestId: withdrawal.metadata?.merchantWDRequestId,
-            });
-
-            if (!nuveiResult.success) {
-              console.error(
-                "❌ Failed to approve withdrawal in Nuvei:",
-                nuveiResult.error,
-              );
-              // Don't block completion - Nuvei may have already processed it
-              withdrawal.adminNote =
-                (withdrawal.adminNote || "") +
-                `\n⚠️ Nuvei approval note: ${nuveiResult.error}`;
-            } else {
-              console.log(
-                "✅ Nuvei withdrawal approved - they will process the payout",
-              );
-              withdrawal.adminNote =
-                (withdrawal.adminNote || "") + `\n✅ Nuvei payout approved`;
-            }
-          } catch (nuveiError) {
-            console.error("❌ Error calling Nuvei approve API:", nuveiError);
-            withdrawal.adminNote =
-              (withdrawal.adminNote || "") +
-              `\n⚠️ Nuvei API error (manual follow-up may be needed)`;
-          }
+        // Reason: If payout was already submitted via /payout.do during the "processing" step,
+        // no additional Nuvei call is needed — the money was already sent.
+        // The /payout.do endpoint directly processes the payout (no separate approve step).
+        if (withdrawal.metadata?.nuveiTransactionId) {
+          console.log(
+            "✅ Nuvei payout already processed during 'processing' step:",
+            withdrawal.metadata.nuveiTransactionId,
+            "Status:",
+            withdrawal.metadata.nuveiTransactionStatus,
+          );
+          withdrawal.adminNote =
+            (withdrawal.adminNote || "") +
+            `\n✅ Nuvei payout already processed (txn: ${withdrawal.metadata.nuveiTransactionId})`;
+        } else if (withdrawal.metadata?.nuveiWdRequestId) {
+          // Backward compat: old-style withdrawal requests that used /withdraw.do
+          console.log(
+            "ℹ️ Legacy withdrawal request found:",
+            withdrawal.metadata.nuveiWdRequestId,
+            "— no auto-approve available for legacy requests",
+          );
+          withdrawal.adminNote =
+            (withdrawal.adminNote || "") +
+            `\nℹ️ Legacy Nuvei request ${withdrawal.metadata.nuveiWdRequestId} — verify payout manually`;
         }
 
         withdrawal.status = "completed";
