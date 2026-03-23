@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import {
   Card,
@@ -103,12 +103,17 @@ export default function FailedDepositsSection() {
   const [verificationNotes, setVerificationNotes] = useState("");
   const [processing, setProcessing] = useState(false);
 
+  // Cancel/Dismiss dialog
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
+
   const openDetailsDialog = (deposit: FailedDeposit) => {
     setSelectedDeposit(deposit);
     setShowDetailsDialog(true);
   };
 
-  const fetchDeposits = async () => {
+  const fetchDeposits = useCallback(async () => {
     try {
       const response = await fetch(
         `/api/deposits/failed?status=${statusFilter}&page=${page}&limit=20`,
@@ -125,11 +130,11 @@ export default function FailedDepositsSection() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [statusFilter, page]);
 
   useEffect(() => {
     fetchDeposits();
-  }, [statusFilter, page]);
+  }, [fetchDeposits]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -185,6 +190,50 @@ export default function FailedDepositsSection() {
       );
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const openCancelDialog = (deposit: FailedDeposit) => {
+    setSelectedDeposit(deposit);
+    setCancelReason("");
+    setShowCancelDialog(true);
+  };
+
+  const handleCancelDeposit = async () => {
+    if (!selectedDeposit) return;
+
+    if (cancelReason.trim().length < 5) {
+      toast.error("Please provide a reason (min 5 characters)");
+      return;
+    }
+
+    setCancelling(true);
+    try {
+      const response = await fetch("/api/cancel-pending-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transactionId: selectedDeposit._id,
+          reason: cancelReason,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to cancel");
+      }
+
+      toast.success("Deposit cancelled/dismissed successfully");
+      setShowCancelDialog(false);
+      fetchDeposits();
+    } catch (error) {
+      console.error("Error cancelling deposit:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to cancel deposit",
+      );
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -445,15 +494,25 @@ export default function FailedDepositsSection() {
                     {/* Actions */}
                     <div className="flex flex-col gap-2">
                       {!deposit.metadata?.manuallyResolved &&
-                        deposit.status === "failed" && (
-                          <Button
-                            size="sm"
-                            className="bg-green-600 hover:bg-green-700"
-                            onClick={() => openCreditDialog(deposit)}
-                          >
-                            <CheckCircle2 className="h-4 w-4 mr-1" />
-                            Manual Credit
-                          </Button>
+                        (deposit.status === "failed" || deposit.status === "pending") && (
+                          <>
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700"
+                              onClick={() => openCreditDialog(deposit)}
+                            >
+                              <CheckCircle2 className="h-4 w-4 mr-1" />
+                              Manual Credit
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => openCancelDialog(deposit)}
+                            >
+                              <XCircle className="h-4 w-4 mr-1" />
+                              Cancel
+                            </Button>
+                          </>
                         )}
                       <Button
                         variant="outline"
@@ -605,6 +664,88 @@ export default function FailedDepositsSection() {
                 <>
                   <CheckCircle2 className="h-4 w-4 mr-2" />
                   Credit User
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel/Dismiss Dialog */}
+      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <DialogContent className="bg-gray-900 border-gray-700 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-red-400" />
+              Cancel Deposit
+            </DialogTitle>
+            <DialogDescription>
+              Dismiss this {selectedDeposit?.status === "failed" ? "failed" : "pending"} deposit without crediting the user.
+              It will be removed from the review queue.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedDeposit && (
+            <div className="space-y-4">
+              {/* Summary */}
+              <div className="bg-gray-800 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">User</span>
+                  <span className="text-white">
+                    {selectedDeposit.user?.name || selectedDeposit.user?.email}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Amount</span>
+                  <span className="text-yellow-400 font-bold">
+                    {cs}{(selectedDeposit.metadata?.eurAmount || 0).toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Credits</span>
+                  <span className="text-white">
+                    {Math.abs(selectedDeposit.amount)} credits
+                  </span>
+                </div>
+              </div>
+
+              {/* Reason */}
+              <div className="space-y-2">
+                <Label className="text-gray-300">
+                  Reason for Cancellation <span className="text-red-400">*</span>
+                </Label>
+                <Textarea
+                  placeholder="e.g., Payment was never received, duplicate transaction, user requested cancellation..."
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  className="bg-gray-800 border-gray-700 min-h-[80px]"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowCancelDialog(false)}
+              disabled={cancelling}
+            >
+              Back
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleCancelDeposit}
+              disabled={cancelling || cancelReason.trim().length < 5}
+            >
+              {cancelling ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Cancelling...
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Confirm Cancel
                 </>
               )}
             </Button>
@@ -796,17 +937,29 @@ export default function FailedDepositsSection() {
             </Button>
             {selectedDeposit &&
               !selectedDeposit.metadata?.manuallyResolved &&
-              selectedDeposit.status === "failed" && (
-                <Button
-                  className="bg-green-600 hover:bg-green-700"
-                  onClick={() => {
-                    setShowDetailsDialog(false);
-                    openCreditDialog(selectedDeposit);
-                  }}
-                >
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Manual Credit
-                </Button>
+              (selectedDeposit.status === "failed" || selectedDeposit.status === "pending") && (
+                <>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      setShowDetailsDialog(false);
+                      openCancelDialog(selectedDeposit);
+                    }}
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Cancel
+                  </Button>
+                  <Button
+                    className="bg-green-600 hover:bg-green-700"
+                    onClick={() => {
+                      setShowDetailsDialog(false);
+                      openCreditDialog(selectedDeposit);
+                    }}
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Manual Credit
+                  </Button>
+                </>
               )}
           </DialogFooter>
         </DialogContent>

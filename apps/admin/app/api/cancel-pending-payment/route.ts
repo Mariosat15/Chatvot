@@ -6,8 +6,9 @@ import { auditLogService } from "@/lib/services/audit-log.service";
 
 /**
  * POST /api/cancel-pending-payment
- * Admin cancels a pending deposit transaction.
- * No credit refund is needed because credits haven't been added yet.
+ * Admin cancels a pending or failed deposit transaction.
+ * For pending: marks as cancelled (credits were never added).
+ * For failed: marks as cancelled/dismissed so it leaves the review queue.
  */
 export async function POST(request: Request) {
   try {
@@ -33,12 +34,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // Only pending deposits can be cancelled
-    if (transaction.status !== "pending") {
+    // Only pending or failed deposits can be cancelled/dismissed
+    if (transaction.status !== "pending" && transaction.status !== "failed") {
       return NextResponse.json(
         {
           error: `Cannot cancel a ${transaction.status} transaction`,
-          details: `This payment is already ${transaction.status}. Only pending payments can be cancelled.`,
+          details: `This payment is already ${transaction.status}. Only pending or failed payments can be cancelled.`,
         },
         { status: 400 },
       );
@@ -54,7 +55,8 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log("🚫 Cancelling pending deposit:");
+    const wasFailed = transaction.status === "failed";
+    console.log(`🚫 Cancelling ${wasFailed ? "failed" : "pending"} deposit:`);
     console.log("   ID:", transaction._id);
     console.log("   User:", transaction.userId);
     console.log("   Amount:", transaction.amount, transaction.currency);
@@ -71,8 +73,15 @@ export async function POST(request: Request) {
     transaction.metadata.cancelReason = reason || "Cancelled by admin";
     transaction.metadata.cancelledAt = new Date().toISOString();
 
+    // Reason: For failed deposits, also mark as manuallyResolved so it
+    // leaves the "Needs Review" queue in FailedDepositsSection.
+    if (wasFailed) {
+      transaction.metadata.manuallyResolved = true;
+      transaction.metadata.resolutionType = "dismissed";
+    }
+
     await transaction.save();
-    console.log("✅ Deposit cancelled successfully");
+    console.log(`✅ Deposit ${wasFailed ? "dismissed" : "cancelled"} successfully`);
 
     // Log audit action
     try {
@@ -87,7 +96,7 @@ export async function POST(request: Request) {
           },
           action: "payment_cancelled",
           category: "financial",
-          description: `Cancelled pending deposit: ${transaction.amount} credits for user ${transaction.userId}. Reason: ${reason || "Admin cancelled"}`,
+          description: `${wasFailed ? "Dismissed failed" : "Cancelled pending"} deposit: ${transaction.amount} credits for user ${transaction.userId}. Reason: ${reason || "Admin cancelled"}`,
           targetType: "transaction",
           targetId: transaction._id.toString(),
           metadata: {

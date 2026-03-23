@@ -222,7 +222,7 @@ export async function PUT(
           userId: withdrawal.userId,
         }).session(session);
         if (wallet) {
-          const balanceBefore = wallet.creditBalance;
+          const _balanceBefore = wallet.creditBalance;
           wallet.creditBalance += withdrawal.amountCredits;
           await wallet.save({ session });
           withdrawal.walletBalanceAfter = wallet.creditBalance;
@@ -263,6 +263,101 @@ export async function PUT(
       case "processing":
         withdrawal.status = "processing";
         withdrawal.processedAt = new Date();
+
+        // Reason: When manual withdrawals don't have a Nuvei reference yet,
+        // create one now so the "completed" step can approve it in Nuvei,
+        // triggering the actual payout to the user.
+        if (!withdrawal.metadata?.nuveiWdRequestId) {
+          try {
+            // Find user payment option ID from the withdrawal data
+            let userPaymentOptionId: string | undefined;
+
+            if (withdrawal.originalCardDetails?.userPaymentOptionId) {
+              // Card payout — UPO stored at creation time
+              userPaymentOptionId =
+                withdrawal.originalCardDetails.userPaymentOptionId;
+            } else if (withdrawal.bankDetails?.nuveiUpoId) {
+              // Bank transfer — UPO stored at creation time
+              userPaymentOptionId = withdrawal.bankDetails.nuveiUpoId;
+            }
+
+            if (userPaymentOptionId) {
+              console.log(
+                `🏦 Creating Nuvei withdrawal request for manual withdrawal ${withdrawal._id}...`,
+              );
+
+              const NuveiService = (
+                await import("@/lib/services/nuvei.service")
+              ).default;
+              const nuveiService = NuveiService.getInstance();
+
+              const merchantWDRequestId = `wd_${withdrawal.userId.slice(-8)}_${Date.now()}`;
+              const origin =
+                process.env.NEXT_PUBLIC_APP_URL ||
+                process.env.NEXT_PUBLIC_BASE_URL ||
+                "https://chartvolt.app";
+
+              const nuveiResult = await nuveiService.createWithdrawRequest({
+                userTokenId: `user_${withdrawal.userId}`,
+                amount: (withdrawal.netAmountEUR || withdrawal.amountEUR).toFixed(2),
+                currency: "EUR",
+                merchantWDRequestId,
+                userPaymentOptionId,
+                email: withdrawal.userEmail || undefined,
+                firstName: withdrawal.userName?.split(" ")[0] || undefined,
+                lastName:
+                  withdrawal.userName?.split(" ").slice(1).join(" ") ||
+                  undefined,
+                notificationUrl: `${origin}/api/nuvei/webhook`,
+              });
+
+              if ("error" in nuveiResult && nuveiResult.error) {
+                console.error(
+                  "❌ Failed to create Nuvei withdrawal request:",
+                  nuveiResult.error,
+                );
+                withdrawal.adminNote =
+                  (withdrawal.adminNote || "") +
+                  `\n⚠️ Nuvei request failed: ${nuveiResult.error}. Manual bank transfer required.`;
+              } else if ("wdRequestId" in nuveiResult) {
+                console.log(
+                  "✅ Nuvei withdrawal request created:",
+                  nuveiResult.wdRequestId,
+                );
+                withdrawal.metadata = withdrawal.metadata || {};
+                withdrawal.metadata.nuveiWdRequestId =
+                  nuveiResult.wdRequestId;
+                withdrawal.metadata.nuveiWdStatus =
+                  nuveiResult.wdRequestStatus;
+                withdrawal.metadata.merchantWDRequestId =
+                  merchantWDRequestId;
+                withdrawal.metadata.usePaymentProcessor = true;
+                withdrawal.adminNote =
+                  (withdrawal.adminNote || "") +
+                  `\n✅ Nuvei request created: ${nuveiResult.wdRequestId}`;
+              }
+            } else {
+              console.log(
+                `⚠️ No Nuvei UPO available for withdrawal ${withdrawal._id} — requires manual bank transfer`,
+              );
+              withdrawal.adminNote =
+                (withdrawal.adminNote || "") +
+                `\n⚠️ No Nuvei payment option — process via manual bank transfer`;
+            }
+          } catch (nuveiError) {
+            console.error(
+              "❌ Error creating Nuvei withdrawal request during processing:",
+              nuveiError,
+            );
+            withdrawal.adminNote =
+              (withdrawal.adminNote || "") +
+              `\n⚠️ Nuvei API error — manual follow-up may be needed`;
+          }
+        } else {
+          console.log(
+            `🏦 Withdrawal ${withdrawal._id} already has Nuvei request: ${withdrawal.metadata.nuveiWdRequestId}`,
+          );
+        }
         break;
 
       case "completed":
@@ -501,7 +596,7 @@ export async function PUT(
           userId: withdrawal.userId,
         }).session(session);
         if (walletForRefund) {
-          const balanceBeforeRefund = walletForRefund.creditBalance;
+          const _balanceBeforeRefund = walletForRefund.creditBalance;
           walletForRefund.creditBalance += withdrawal.amountCredits;
           await walletForRefund.save({ session });
           withdrawal.walletBalanceAfter = walletForRefund.creditBalance;
