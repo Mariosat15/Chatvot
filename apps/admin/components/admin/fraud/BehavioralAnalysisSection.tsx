@@ -86,7 +86,8 @@ export default function BehavioralAnalysisSection() {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedProfile, setSelectedProfile] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [selectedProfile, setSelectedProfile] = useState<Record<string, any> | null>(null);
   const [showProfileDialog, setShowProfileDialog] = useState(false);
 
   useEffect(() => {
@@ -149,7 +150,7 @@ export default function BehavioralAnalysisSection() {
       } else {
         throw new Error("Analysis failed");
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to run analysis");
     } finally {
       setAnalyzing(false);
@@ -167,7 +168,7 @@ export default function BehavioralAnalysisSection() {
         setSelectedProfile(data.profile);
         setShowProfileDialog(true);
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to load profile");
     }
   };
@@ -353,15 +354,15 @@ export default function BehavioralAnalysisSection() {
                     <div className="flex items-center gap-4">
                       <div className="text-center">
                         <p className="text-xs text-gray-500">Account 1</p>
-                        <p className="font-mono text-sm text-gray-300">
-                          {pair.userId1.substring(0, 12)}...
+                        <p className="font-mono text-sm text-gray-300 break-all">
+                          {pair.userId1}
                         </p>
                       </div>
                       <div className="text-2xl">🪞</div>
                       <div className="text-center">
                         <p className="text-xs text-gray-500">Account 2</p>
-                        <p className="font-mono text-sm text-gray-300">
-                          {pair.userId2.substring(0, 12)}...
+                        <p className="font-mono text-sm text-gray-300 break-all">
+                          {pair.userId2}
                         </p>
                       </div>
                     </div>
@@ -417,12 +418,12 @@ export default function BehavioralAnalysisSection() {
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-4">
-                      <code className="text-xs text-gray-300 bg-gray-800 px-2 py-1 rounded">
-                        {pair.userId1.substring(0, 12)}...
+                      <code className="text-xs text-gray-300 bg-gray-800 px-2 py-1 rounded break-all">
+                        {pair.userId1}
                       </code>
                       <span className="text-gray-500">↔</span>
-                      <code className="text-xs text-gray-300 bg-gray-800 px-2 py-1 rounded">
-                        {pair.userId2.substring(0, 12)}...
+                      <code className="text-xs text-gray-300 bg-gray-800 px-2 py-1 rounded break-all">
+                        {pair.userId2}
                       </code>
                     </div>
                     <div className="flex items-center gap-2">
@@ -529,8 +530,8 @@ export default function BehavioralAnalysisSection() {
                   onClick={() => viewProfile(profile.userId)}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <code className="text-xs text-gray-400 font-mono">
-                      {profile.userId.substring(0, 16)}...
+                    <code className="text-xs text-gray-400 font-mono break-all">
+                      {profile.userId}
                     </code>
                     <Badge className={getStyleColor(profile.tradingStyle)}>
                       {getStyleIcon(profile.tradingStyle)}{" "}
@@ -738,16 +739,15 @@ export default function BehavioralAnalysisSection() {
                     Mirror Trading Suspects
                   </p>
                   <div className="space-y-2">
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    {selectedProfile.mirrorTradingSuspects.map(
-                      (suspect: any, index: number) => (
+                    { }
+                    {(selectedProfile.mirrorTradingSuspects as Array<{pairedUserId?: unknown; confidence: number}>).map(
+                      (suspect, index: number) => (
                         <div
                           key={index}
                           className="flex items-center justify-between text-sm"
                         >
-                          <code className="text-gray-300">
-                            {suspect.pairedUserId?.toString().substring(0, 16)}
-                            ...
+                          <code className="text-gray-300 break-all">
+                            {suspect.pairedUserId?.toString()}
                           </code>
                           <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
                             {(suspect.confidence * 100).toFixed(0)}% confidence

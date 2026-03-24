@@ -294,9 +294,9 @@ export default function DetectionMethodsList({ evidence }: DetectionMethodsListP
                           {(item.data.connectedAccountIds as string[]).map((id: string) => (
                             <code
                               key={id}
-                              className="text-[10px] bg-gray-900 px-1.5 py-0.5 rounded text-yellow-400 font-mono"
+                              className="text-[10px] bg-gray-900 px-1.5 py-0.5 rounded text-yellow-400 font-mono break-all"
                             >
-                              {id.slice(0, 12)}...
+                              {id}
                             </code>
                           ))}
                         </div>

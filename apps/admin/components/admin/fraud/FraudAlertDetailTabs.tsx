@@ -2,8 +2,6 @@
 
 import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import {
   Tabs,
   TabsContent,
@@ -11,7 +9,6 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import {
-  ExternalLink,
   Clock,
   Shield,
   Users,
@@ -25,10 +22,11 @@ import {
   Layers,
   FileText,
 } from "lucide-react";
-import { toast } from "sonner";
 import DetectionMethodsList from "./DetectionMethodsList";
 import EvidenceGroupedPanel from "./EvidenceGroupedPanel";
 import FraudNetworkGraph from "./FraudNetworkGraph";
+import ConnectedAccountsPanel from "./ConnectedAccountsPanel";
+import AIInvestigationReport from "./AIInvestigationReport";
 
 // ─── Types ──────────────────────────────────────────────────
 interface EvidenceItem {
@@ -371,48 +369,21 @@ export default function FraudAlertDetailTabs({
           </div>
         </div>
 
-        {/* Suspicious Accounts */}
-        <div>
-          <Label className="text-gray-400 text-sm">
-            Suspicious Accounts ({alert.suspiciousUserIds.length})
-          </Label>
-          <div className="mt-2 grid grid-cols-2 gap-3">
-            {alert.suspiciousUserIds.map((userId, idx) => (
-              <div
-                key={userId}
-                className="p-3 bg-gray-800 rounded border border-gray-700 flex items-center justify-between gap-3"
-              >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <span className="text-yellow-500 font-bold text-base flex-shrink-0">
-                    #{idx + 1}
-                  </span>
-                  <span className="text-gray-100 font-mono text-xs break-all">
-                    {userId}
-                  </span>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    navigator.clipboard.writeText(userId);
-                    toast.success(
-                      "User ID copied! Switch to Users tab to search.",
-                    );
-                    onCloseDialog();
-                    const adminTab = document.querySelector(
-                      '[data-value="users"]',
-                    ) as HTMLElement;
-                    if (adminTab) adminTab.click();
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700 border-blue-500 text-white flex-shrink-0"
-                >
-                  <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                  View
-                </Button>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* All Involved Accounts — resolved to name/email with navigation */}
+        <ConnectedAccountsPanel
+          accountIds={allConnectedIds}
+          title="All Involved Accounts"
+          onNavigateToUser={(_userId) => {
+            onCloseDialog();
+            const adminTab = document.querySelector(
+              '[data-value="users"]',
+            ) as HTMLElement;
+            if (adminTab) adminTab.click();
+          }}
+        />
+
+        {/* AI Investigation Report */}
+        <AIInvestigationReport alert={alert} />
 
         {/* Detection History */}
         {alert.detectionHistory && alert.detectionHistory.length > 0 && (
@@ -438,8 +409,8 @@ export default function FraudAlertDetailTabs({
                     </span>
                     <span className="text-gray-300">
                       by{" "}
-                      <span className="font-mono text-blue-400">
-                        {entry.triggeredBy?.substring(0, 8)}…
+                      <span className="font-mono text-blue-400 break-all">
+                        {entry.triggeredBy}
                       </span>
                     </span>
                     {entry.ipAddress && (

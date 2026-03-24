@@ -195,8 +195,8 @@ export default function SuspicionScoreCard({ score }: Props) {
           </h2>
           <p className="text-sm text-gray-400 mt-1">
             User:{" "}
-            <span className="font-mono text-gray-300">
-              {score.userId.substring(0, 16)}...
+            <span className="font-mono text-gray-300 break-all">
+              {score.userId}
             </span>
           </p>
         </div>
@@ -418,8 +418,8 @@ export default function SuspicionScoreCard({ score }: Props) {
                     className="p-3 bg-gray-800 rounded-lg border border-gray-700"
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="font-mono text-sm text-gray-300">
-                        #{idx + 1} {account.userId.substring(0, 20)}...
+                      <span className="font-mono text-sm text-gray-300 break-all">
+                        #{idx + 1} {account.userId}
                       </span>
                       <Badge
                         variant="outline"

@@ -109,7 +109,7 @@ function DeviceFingerprintGrouped({ items }: { items: EvidenceItem[] }) {
                 </Badge>
               </div>
               {acct && (
-                <span className="text-[10px] text-gray-500 font-mono mt-1 block">
+                <span className="text-[10px] text-gray-500 font-mono mt-1 block break-all">
                   Account: {acct.userId}
                 </span>
               )}
@@ -183,6 +183,8 @@ function DeviceFingerprintGrouped({ items }: { items: EvidenceItem[] }) {
 }
 
 // ─── Payment Fingerprint Panel ──────────────────────────────
+// Reason: Shows card details + all involved accounts with full IDs and emails
+// resolved via ConnectedAccountsPanel.
 function PaymentFingerprintGrouped({ items }: { items: EvidenceItem[] }) {
   const grouped = useMemo(() => {
     const groups = new Map<string, { item: EvidenceItem; dates: string[] }>();
@@ -196,6 +198,17 @@ function PaymentFingerprintGrouped({ items }: { items: EvidenceItem[] }) {
       }
     }
     return Array.from(groups.entries());
+  }, [items]);
+
+  // Collect all account IDs from accountsDetails across all items
+  const allAccountIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const item of items) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (item.data?.accountsDetails) (item.data.accountsDetails as any[]).forEach((a) => { if (a.userId) set.add(String(a.userId)); });
+      if (item.data?.connectedAccountIds) (item.data.connectedAccountIds as string[]).forEach((id) => set.add(id));
+    }
+    return Array.from(set);
   }, [items]);
 
   return (
@@ -230,7 +243,7 @@ function PaymentFingerprintGrouped({ items }: { items: EvidenceItem[] }) {
             <div className="grid grid-cols-3 gap-3 text-xs">
               <DetailField label="Country" value={item.data?.cardCountry} />
               <DetailField label="Provider" value={item.data?.paymentProvider} />
-              <DetailField label="Accounts" value={item.data?.accountsInvolved || 2} />
+              <DetailField label="Accounts" value={item.data?.accountsInvolved || allAccountIds.length || 2} />
             </div>
             {item.data?.paymentFingerprint && (
               <div className="mt-2 pt-2 border-t border-gray-700/50">
@@ -245,27 +258,44 @@ function PaymentFingerprintGrouped({ items }: { items: EvidenceItem[] }) {
         </div>
       ))}
 
-      <SharedConnectedAccounts items={items} />
+      {/* Accounts involved — resolved to name/email */}
+      {allAccountIds.length > 0 && (
+        <ConnectedAccountsPanel accountIds={allAccountIds} title="Accounts Sharing This Payment Method" />
+      )}
     </div>
   );
 }
 
 // ─── Mirror Trading Panel ───────────────────────────────────
+// Reason: Shows aggregated mirror trading stats, recent matches,
+// and all involved accounts with full IDs/emails so admins can
+// identify who is mirroring whom.
 function MirrorTradingGrouped({ items }: { items: EvidenceItem[] }) {
-  // Reason: Aggregate stats across all mirror trading evidence items
   const aggregated = useMemo(() => {
     let totalMatches = 0;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const allRecentMatches: any[] = [];
     const dates: string[] = [];
+    const accountIds = new Set<string>();
 
     for (const item of items) {
       totalMatches += item.data?.matchingTrades || 0;
       if (item.data?.detectedAt) dates.push(item.data.detectedAt);
       if (item.data?.recentMatches) allRecentMatches.push(...item.data.recentMatches);
+      // Collect all involved account IDs
+      if (item.data?.connectedAccountIds) (item.data.connectedAccountIds as string[]).forEach((id) => accountIds.add(id));
+      if (item.data?.userId1) accountIds.add(String(item.data.userId1));
+      if (item.data?.userId2) accountIds.add(String(item.data.userId2));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (item.data?.accountsDetails) (item.data.accountsDetails as any[]).forEach((a) => { if (a.userId) accountIds.add(String(a.userId)); });
     }
 
-    return { totalMatches, allRecentMatches: allRecentMatches.slice(0, 20), dates };
+    return {
+      totalMatches,
+      allRecentMatches: allRecentMatches.slice(0, 20),
+      dates,
+      accountIds: Array.from(accountIds),
+    };
   }, [items]);
 
   const firstItem = items[0];
@@ -317,7 +347,11 @@ function MirrorTradingGrouped({ items }: { items: EvidenceItem[] }) {
       )}
 
       <DetectionDates dates={aggregated.dates} />
-      <SharedConnectedAccounts items={items} />
+
+      {/* All accounts involved — resolved with email/name */}
+      {aggregated.accountIds.length > 0 && (
+        <ConnectedAccountsPanel accountIds={aggregated.accountIds} title="Accounts Involved in Mirror Trading" />
+      )}
     </div>
   );
 }
@@ -372,18 +406,18 @@ function CoordinatedEntryGrouped({ items }: { items: EvidenceItem[] }) {
               <DetailField label="Avg Gap" value={item.data?.averageGap || "N/A"} />
             </div>
 
-            {/* Entry sequence */}
+            {/* Entry sequence — show full user IDs */}
             {item.data?.entrySequence && item.data.entrySequence.length > 0 && (
               <div className="mt-3 space-y-1">
                 <span className="text-[10px] text-gray-500 uppercase tracking-wider">Entry Timeline</span>
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {(item.data.entrySequence as any[]).map((entry, idx) => (
                   <div key={idx} className="flex items-center justify-between p-1.5 bg-gray-900/50 rounded text-[11px]">
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-600">#{idx + 1}</span>
-                      <code className="font-mono text-green-300 text-[10px]">{entry.userId}</code>
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="text-gray-600 flex-shrink-0">#{idx + 1}</span>
+                      <code className="font-mono text-green-300 text-[10px] break-all">{entry.userId}</code>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                       <span className="text-gray-400">{new Date(entry.entryTime).toLocaleTimeString()}</span>
                       {idx > 0 && <Badge className="bg-yellow-500/20 text-yellow-400 text-[9px]">+{entry.timeDelta || 0}s</Badge>}
                     </div>
@@ -591,7 +625,7 @@ function ActivityLogSection({ items }: { items: EvidenceItem[] }) {
               <Badge variant="outline" className="border-blue-500/30 text-blue-400 text-[9px]">
                 {activity.action === "initial_detection" ? "🎯 Initial" : "🔄 Login"}
               </Badge>
-              <span className="font-mono text-gray-400">{String(activity.userId).substring(0, 12)}…</span>
+              <span className="font-mono text-gray-400 break-all">{String(activity.userId)}</span>
               <span className="text-gray-500">via {activity.browser}</span>
             </div>
             <span className="text-gray-500">{formatDate(activity.timestamp)}</span>
