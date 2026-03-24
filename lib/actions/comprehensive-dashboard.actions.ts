@@ -123,6 +123,18 @@ export interface ComprehensiveDashboardData {
       marketplace: number;
       other: number;
     }[];
+    // Reason: All-time totals from getUserFinancialSummary() — single source of truth.
+    // The dailyCreditBreakdown only covers 30 days, so the chart summary chips
+    // must use these all-time values instead of summing the chart range.
+    allTimeTotals: {
+      deposits: number;
+      wins: number;
+      entries: number;
+      withdrawals: number;
+      marketplace: number;
+      gmEarnings: number;
+      refunds: number;
+    };
     winLossDistribution: { wins: number; losses: number; breakeven: number };
     tradesBySymbol: { symbol: string; count: number; pnl: number }[];
     tradesByHour: { hour: number; count: number; pnl: number }[];
@@ -1177,7 +1189,20 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     },
     competitions: processedCompetitions,
     challenges: processedChallenges,
-    charts,
+    charts: {
+      ...charts,
+      // Reason: All-time totals from getUserFinancialSummary() — SSOT.
+      // Chart range only covers 30 days; summary chips need all-time values.
+      allTimeTotals: {
+        deposits: wTotalDeposited,
+        wins: financialSummary.totalPrizesWon,
+        entries: financialSummary.netCompetitionSpent + financialSummary.netChallengeSpent,
+        withdrawals: wTotalWithdrawn,
+        marketplace: financialSummary.marketplaceSpent,
+        gmEarnings: financialSummary.gmEarnings,
+        refunds: financialSummary.competitionRefunds + financialSummary.challengeRefunds,
+      },
+    },
     recentActivity: {
       trades: recentTrades,
       positions: positionsWithPrices,

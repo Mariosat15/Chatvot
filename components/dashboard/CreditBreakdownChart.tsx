@@ -16,8 +16,21 @@ interface DayData {
   other: number;
 }
 
+interface AllTimeTotals {
+  deposits: number;
+  wins: number;
+  entries: number;
+  withdrawals: number;
+  marketplace: number;
+  gmEarnings: number;
+  refunds: number;
+}
+
 interface CreditBreakdownChartProps {
   data: DayData[];
+  // Reason: All-time totals from getUserFinancialSummary() — single source of truth.
+  // Without this, summary chips only reflect the 30-day chart window.
+  allTimeTotals?: AllTimeTotals;
 }
 
 const INCOME_CATEGORIES = [
@@ -35,7 +48,7 @@ const SPENDING_CATEGORIES = [
 
 // Reason: Paired side-by-side bar chart showing daily income (green) vs spending (red)
 // with proper spacing so bars never overlay numbers or axis labels.
-export default function CreditBreakdownChart({ data }: CreditBreakdownChartProps) {
+export default function CreditBreakdownChart({ data, allTimeTotals }: CreditBreakdownChartProps) {
   const [range, setRange] = useState<"7d" | "30d">("30d");
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
@@ -309,13 +322,16 @@ export default function CreditBreakdownChart({ data }: CreditBreakdownChartProps
         </motion.div>
       )}
 
-      {/* Summary totals */}
+      {/* Summary totals — all-time from SSOT (getUserFinancialSummary) */}
+      {/* Reason: The chart only shows the last 7/30 days, but summary chips should
+          reflect the user's all-time activity to avoid confusion (e.g. marketplace
+          showing 20 when the user has spent 500+ all-time). */}
       <div className="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-2">
-        <SummaryChip label="Deposits" value={totals.deposits} color="#22c55e" />
-        <SummaryChip label="Wins" value={totals.wins} color="#facc15" />
-        <SummaryChip label="Entries" value={totals.entries} color="#ef4444" />
-        <SummaryChip label="Withdrawals" value={totals.withdrawals} color="#fb923c" />
-        <SummaryChip label="Marketplace" value={totals.marketplace} color="#f472b6" />
+        <SummaryChip label="Deposits" value={allTimeTotals?.deposits ?? totals.deposits} color="#22c55e" />
+        <SummaryChip label="Wins" value={allTimeTotals?.wins ?? totals.wins} color="#facc15" />
+        <SummaryChip label="Entries" value={allTimeTotals?.entries ?? totals.entries} color="#ef4444" />
+        <SummaryChip label="Withdrawals" value={allTimeTotals?.withdrawals ?? totals.withdrawals} color="#fb923c" />
+        <SummaryChip label="Marketplace" value={allTimeTotals?.marketplace ?? totals.marketplace} color="#f472b6" />
       </div>
     </motion.div>
   );

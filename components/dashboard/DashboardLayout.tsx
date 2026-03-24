@@ -81,7 +81,7 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
         <div className="lg:col-span-2 space-y-4">
           <EquityChart data={charts.walletBalanceHistory} />
           <DailyCreditFlow data={charts.dailyCreditFlow} />
-          <CreditBreakdownChart data={charts.dailyCreditBreakdown} />
+          <CreditBreakdownChart data={charts.dailyCreditBreakdown} allTimeTotals={charts.allTimeTotals} />
         </div>
 
         {/* Right: Contests sidebar (1/3 width) */}
