@@ -470,6 +470,7 @@ async function _finalizeChallengeAttempt(challengeId: string) {
       winningTrades?: number;
       losingTrades?: number;
       totalTrades?: number;
+      enteredAt?: string | Date;
     }
 
     // Determine winner based on ranking method (supports all 6 competition ranking methods)
@@ -1564,14 +1565,15 @@ export async function expirePendingChallenges() {
       return { expired: 0 };
     }
 
-    // Reason: Define lean result shapes to avoid `any` casts on Mongoose lean() results.
-    type ExpiredChallengeLean = { _id: string; challengerId: string; challengedName: string; slug: string; entryFee: number };
-    type WalletLean = { userId: string; creditBalance: number };
+    // Reason: Cast lean() results to typed shapes to avoid `any` in map callbacks.
+    interface ExpiredChallengeLean { _id: string; challengerId: string; challengedName: string; slug: string; entryFee: number }
+    interface WalletLean { userId: string; creditBalance: number }
+    const typedExpired = expiredChallenges as unknown as ExpiredChallengeLean[];
 
     // Bulk expire
     const result = await Challenge.updateMany(
       {
-        _id: { $in: expiredChallenges.map((c: ExpiredChallengeLean) => c._id) },
+        _id: { $in: typedExpired.map((c) => c._id) },
         status: "pending",
       },
       { $set: { status: "expired" } },
@@ -1582,18 +1584,18 @@ export async function expirePendingChallenges() {
     // Record informational €0 transactions for challengers (fire and forget)
     try {
       const challengerIds = [
-        ...new Set(expiredChallenges.map((c: ExpiredChallengeLean) => c.challengerId)),
+        ...new Set(typedExpired.map((c) => c.challengerId)),
       ];
       const wallets = await CreditWallet.find({
         userId: { $in: challengerIds },
       })
         .select("userId creditBalance")
-        .lean();
+        .lean() as unknown as WalletLean[];
       const walletMap = new Map(
-        wallets.map((w: WalletLean) => [w.userId, w.creditBalance]),
+        wallets.map((w) => [w.userId, w.creditBalance]),
       );
 
-      const txDocs = expiredChallenges.map((c: ExpiredChallengeLean) => {
+      const txDocs = typedExpired.map((c) => {
         const balance = walletMap.get(c.challengerId) ?? 0;
         return {
           userId: c.challengerId,
