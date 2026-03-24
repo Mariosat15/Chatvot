@@ -1428,10 +1428,11 @@ async function buildChartData(
     if (!entry) continue;
     const amount = Math.abs(tx.amount || 0);
     const txType = (tx as any).transactionType as string;
+    // Reason: Only actual user deposits count as "deposits". Previously, manual_deposit_credit,
+    // incident_compensation, admin_adjustment, and any unknown positive-amount transaction were
+    // all inflating the deposits total, causing a mismatch with wallet.totalDeposited.
     switch (txType) {
       case "deposit":
-      case "manual_deposit_credit":
-      case "incident_compensation":
         entry.deposits += amount; break;
       case "competition_win":
       case "challenge_win":
@@ -1442,6 +1443,10 @@ async function buildChartData(
       case "competition_refund":
       case "challenge_refund":
       case "withdrawal_refund":
+      case "challenge_declined":
+      case "challenge_expired":
+      case "incident_compensation":
+      case "gamemaster_subscription_refund":
         entry.refunds += amount; break;
       case "competition_entry":
       case "challenge_entry":
@@ -1452,9 +1457,11 @@ async function buildChartData(
       case "marketplace_purchase":
       case "gamemaster_subscription":
         entry.marketplace += amount; break;
+      case "manual_deposit_credit":
+      case "admin_adjustment":
+      case "platform_fee":
       default:
-        if ((tx.amount || 0) > 0) entry.deposits += amount;
-        else entry.other += amount;
+        entry.other += amount;
         break;
     }
   }
