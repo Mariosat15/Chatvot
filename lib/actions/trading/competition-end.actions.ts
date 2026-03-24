@@ -1405,6 +1405,16 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
     // End session immediately after commit to prevent "abortTransaction after commitTransaction" error
     session.endSession();
 
+    // Reason: Leaderboard includes competitionsWon/podiumFinishes — invalidate after end.
+    try {
+      const { clearLeaderboardCache } = await import(
+        "@/lib/actions/leaderboard/global-leaderboard.actions"
+      );
+      await clearLeaderboardCache();
+    } catch {
+      // Best effort
+    }
+
     console.log(`✅ Competition ${competition.name} finalized successfully!`);
     console.log(`   Winners: ${winnerTransactions.length}`);
     console.log(`   Total Distributed: ${totalDistributed} credits`);

@@ -207,9 +207,6 @@ export default function WalletContent({
 
       {/* Header - Mobile Optimized */}
       <div className="flex items-center gap-2 sm:gap-3">
-        <div className="rounded-full bg-yellow-500/10 p-2 sm:p-3 flex-shrink-0">
-          <GameIcon name="chest1" size={26} />
-        </div>
         <div className="min-w-0">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-100 flex items-center gap-2 truncate">
             <GameIcon name="coin" size={32} className="flex-shrink-0" />
@@ -233,7 +230,6 @@ export default function WalletContent({
             Available Balance
           </p>
           <div className="mt-2 sm:mt-4 flex items-baseline gap-1.5 sm:gap-3 flex-wrap">
-            <Zap className="h-8 w-8 sm:h-10 md:h-12 sm:w-10 md:w-12 text-yellow-500 flex-shrink-0" />
             <span className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-yellow-400 tabular-nums">
               {stats.currentBalance.toFixed(settings.credits.decimals)}
             </span>

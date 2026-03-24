@@ -22,12 +22,13 @@ export async function finalizeChallenge(challengeId: string) {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       return await _finalizeChallengeAttempt(challengeId);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const mongoErr = error as Record<string, unknown> | null;
       const isTransient =
-        error?.errorLabelSet?.has?.("TransientTransactionError") ||
-        error?.errorLabels?.includes?.("TransientTransactionError") ||
-        error?.code === 112 || // WriteConflict
-        error?.codeName === "WriteConflict";
+        (mongoErr?.errorLabelSet as Set<string> | undefined)?.has?.("TransientTransactionError") ||
+        (mongoErr?.errorLabels as string[] | undefined)?.includes?.("TransientTransactionError") ||
+        mongoErr?.code === 112 || // WriteConflict
+        mongoErr?.codeName === "WriteConflict";
 
       if (isTransient && attempt < MAX_RETRIES) {
         const delay = Math.min(500 * Math.pow(2, attempt - 1), 4000); // 500ms, 1s, 2s
@@ -42,6 +43,13 @@ export async function finalizeChallenge(challengeId: string) {
       throw error;
     }
   }
+
+  // Reason: This line is only reached if MAX_RETRIES is 0 (impossible with current config).
+  // Added to satisfy TypeScript's "not all code paths return a value" check.
+  return {
+    success: false,
+    error: `Challenge finalization failed after ${MAX_RETRIES} retries`,
+  };
 }
 
 async function _finalizeChallengeAttempt(challengeId: string) {
@@ -400,6 +408,7 @@ async function _finalizeChallengeAttempt(challengeId: string) {
 
     // ========== STEP 3: DETERMINE WINNER ==========
     // Get settings for tie resolution
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Mongoose singleton plugin adds getSingleton() at runtime
     const settings = await (ChallengeSettings as any).getSingleton();
 
     // Check for disqualification (minimum trades OR liquidation if flag is set)
@@ -452,8 +461,19 @@ async function _finalizeChallengeAttempt(challengeId: string) {
     let winnerPnL = 0;
     let loserPnL = 0;
 
+    // Reason: Minimal shape of a challenge participant for ranking calculations
+    interface RankableParticipant {
+      pnl?: number;
+      pnlPercentage?: number;
+      currentCapital?: number;
+      winRate?: number;
+      winningTrades?: number;
+      losingTrades?: number;
+      totalTrades?: number;
+    }
+
     // Determine winner based on ranking method (supports all 6 competition ranking methods)
-    const getRankingValue = (participant: any) => {
+    const getRankingValue = (participant: RankableParticipant) => {
       switch (challenge.rules.rankingMethod) {
         case "pnl":
           return participant.pnl || 0;
@@ -477,7 +497,7 @@ async function _finalizeChallengeAttempt(challengeId: string) {
     };
 
     // Get tiebreaker value (same as competitions)
-    const getTieBreakerValue = (participant: any, tieBreaker: string) => {
+    const getTieBreakerValue = (participant: RankableParticipant, tieBreaker: string) => {
       switch (tieBreaker) {
         case "trades_count":
           return -(participant.totalTrades || 0); // Negative because fewer is better
@@ -1017,10 +1037,11 @@ async function _finalizeChallengeAttempt(challengeId: string) {
         const prizes = [Math.ceil(halfPrize), Math.floor(halfPrize)];
 
         // Give half to each — atomic $inc for safe concurrent access
-        const participants = [challenger, challenged];
-        for (let i = 0; i < participants.length; i++) {
-          const participant = participants[i];
-          const splitPrize = prizes[i];
+        const participantPrizePairs = [
+          { participant: challenger, splitPrize: prizes[0] },
+          { participant: challenged, splitPrize: prizes[1] },
+        ];
+        for (const { participant, splitPrize } of participantPrizePairs) {
 
           const updatedWallet = await CreditWallet.findOneAndUpdate(
             { userId: participant.userId },
@@ -1178,7 +1199,7 @@ async function _finalizeChallengeAttempt(challengeId: string) {
       if (deferredFeeData.gmPayments.length > 0) {
         const db = mongoose.connection.db;
         if (db) {
-          const allGmIds = deferredFeeData.gmPayments.map((p: any) => p.gmId);
+          const allGmIds = deferredFeeData.gmPayments.map((p: { gmId: string }) => p.gmId);
           const [allGmSubs, allGmWallets] = await Promise.all([
             db.collection("gamemastersubscriptions").find({ userId: { $in: allGmIds } }).toArray(),
             db.collection("creditwallets").find({ userId: { $in: allGmIds } }).toArray(),
@@ -1266,7 +1287,7 @@ async function _finalizeChallengeAttempt(challengeId: string) {
               const feePercentage = (payment.amount / deferredFeeData.entryFee) * 100;
               await db.collection("gamemasterearnings").insertOne({
                 gameMasterId: payment.gmId,
-                gameMasterEmail: (gmSubscription as any)?.userEmail || "",
+                gameMasterEmail: (gmSubscription as Record<string, unknown>)?.userEmail as string || "",
                 sourceType: "challenge",
                 sourceId: deferredFeeData.challengeId,
                 sourceName: `${deferredFeeData.challengerName} vs ${deferredFeeData.challengedName}`,
@@ -1440,6 +1461,16 @@ async function _finalizeChallengeAttempt(challengeId: string) {
       console.error("Error awarding challenge XP:", xpError);
     }
 
+    // Reason: Leaderboard includes challengesWon — invalidate after finalize.
+    try {
+      const { clearLeaderboardCache } = await import(
+        "@/lib/actions/leaderboard/global-leaderboard.actions"
+      );
+      await clearLeaderboardCache();
+    } catch {
+      // Best effort
+    }
+
     console.log(
       `✅ Challenge ${challengeId} finalized: Winner: ${winnerName || "TIE"}`,
     );
@@ -1533,10 +1564,14 @@ export async function expirePendingChallenges() {
       return { expired: 0 };
     }
 
+    // Reason: Define lean result shapes to avoid `any` casts on Mongoose lean() results.
+    type ExpiredChallengeLean = { _id: string; challengerId: string; challengedName: string; slug: string; entryFee: number };
+    type WalletLean = { userId: string; creditBalance: number };
+
     // Bulk expire
     const result = await Challenge.updateMany(
       {
-        _id: { $in: expiredChallenges.map((c: any) => c._id) },
+        _id: { $in: expiredChallenges.map((c: ExpiredChallengeLean) => c._id) },
         status: "pending",
       },
       { $set: { status: "expired" } },
@@ -1547,7 +1582,7 @@ export async function expirePendingChallenges() {
     // Record informational €0 transactions for challengers (fire and forget)
     try {
       const challengerIds = [
-        ...new Set(expiredChallenges.map((c: any) => c.challengerId)),
+        ...new Set(expiredChallenges.map((c: ExpiredChallengeLean) => c.challengerId)),
       ];
       const wallets = await CreditWallet.find({
         userId: { $in: challengerIds },
@@ -1555,10 +1590,10 @@ export async function expirePendingChallenges() {
         .select("userId creditBalance")
         .lean();
       const walletMap = new Map(
-        wallets.map((w: any) => [w.userId, w.creditBalance]),
+        wallets.map((w: WalletLean) => [w.userId, w.creditBalance]),
       );
 
-      const txDocs = expiredChallenges.map((c: any) => {
+      const txDocs = expiredChallenges.map((c: ExpiredChallengeLean) => {
         const balance = walletMap.get(c.challengerId) ?? 0;
         return {
           userId: c.challengerId,

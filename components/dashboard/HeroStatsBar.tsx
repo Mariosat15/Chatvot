@@ -108,12 +108,12 @@ export default function HeroStatsBar({
     () => [
       {
         ...STAT_CONFIG[0],
-        value: `⚡ ${creditBalance.toFixed(decimals)}`,
+        value: creditBalance.toFixed(decimals),
         sub: symbol,
       },
       {
         ...STAT_CONFIG[1],
-        value: `⚡ ${totalSpent.toFixed(decimals)}`,
+        value: `${symbol} ${totalSpent.toFixed(decimals)}`,
         sub: "Comp + Challenges + Market",
       },
       {
@@ -129,12 +129,12 @@ export default function HeroStatsBar({
       },
       {
         ...STAT_CONFIG[4],
-        value: `⚡ ${gmEarnings.toFixed(decimals)}`,
+        value: `${symbol} ${gmEarnings.toFixed(decimals)}`,
         sub: "referral earnings",
       },
       {
         ...STAT_CONFIG[5],
-        value: `⚡ ${totalPrizesWon.toFixed(decimals)}`,
+        value: `${symbol} ${totalPrizesWon.toFixed(decimals)}`,
         sub: "from competitions",
       },
     ],

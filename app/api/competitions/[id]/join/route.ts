@@ -263,6 +263,16 @@ export async function POST(
       await mongoSession.commitTransaction();
       mongoSession.endSession();
 
+      // Reason: Leaderboard includes competitionsEntered, so invalidate after a new join.
+      try {
+        const { clearLeaderboardCache } = await import(
+          "@/lib/actions/leaderboard/global-leaderboard.actions"
+        );
+        await clearLeaderboardCache();
+      } catch {
+        // Best effort — leaderboard will rebuild on next request anyway
+      }
+
       return NextResponse.json({
         success: true,
         participantId: participant._id.toString(),

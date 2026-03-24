@@ -229,6 +229,16 @@ export async function POST(
 
     await dbSession.commitTransaction();
 
+    // Reason: Leaderboard includes challengesEntered — invalidate after accept.
+    try {
+      const { clearLeaderboardCache } = await import(
+        "@/lib/actions/leaderboard/global-leaderboard.actions"
+      );
+      await clearLeaderboardCache();
+    } catch {
+      // Best effort
+    }
+
     // Send notifications
     try {
       const { notificationService } =

@@ -111,9 +111,11 @@ export async function getGlobalLeaderboard(
     const userIdsSet = new Set(userIds);
     const [allCompetitionParticipants, allChallengeParticipants, allUserBadges, tradeStatsByUser] =
       await Promise.all([
+        // Reason: Include `status` so we only count wins/podiums from completed competitions.
+        // Active competitions have temporary ranks that would incorrectly inflate win counts.
         CompetitionParticipant.find({})
           .select(
-            "userId pnl startingCapital currentRank",
+            "userId pnl startingCapital currentRank status",
           )
           .read("secondaryPreferred")
           .lean()
@@ -226,10 +228,14 @@ export async function getGlobalLeaderboard(
       userStats.totalCapital += participant.startingCapital || 0;
       userStats.competitionsEntered += 1;
 
-      if (participant.currentRank === 1) {
+      // Reason: Only count wins/podiums from COMPLETED competitions.
+      // Active competitions have temporary ranks that shift — counting them
+      // as "won" would be misleading and inconsistent with the dashboard.
+      const isCompleted = (participant as Record<string, unknown>).status === "completed";
+      if (isCompleted && participant.currentRank === 1) {
         userStats.competitionsWon += 1;
       }
-      if (participant.currentRank && participant.currentRank <= 3) {
+      if (isCompleted && participant.currentRank && participant.currentRank <= 3) {
         userStats.podiumFinishes += 1;
       }
     }
