@@ -18,10 +18,18 @@ import {
   X,
   Download,
 } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+/** Escape a CSV field: wrap in quotes if it contains comma, quote, or newline */
+function csvField(value: string): string {
+  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
 
 /**
  * Export transactions as a CSV file (opens natively in Excel).
@@ -68,22 +76,33 @@ function exportTransactionsToCSV(
     gamemaster_challenge_referral: "Challenge Referral",
   };
 
+  const statusLabels: Record<string, string> = {
+    completed: "Completed",
+    pending: "Pending",
+    failed: "Failed",
+    cancelled: "Cancelled",
+  };
+
   const rows = transactions.map((tx) => {
-    const date = new Date(tx.createdAt).toLocaleString("en-GB", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
+    // Reason: toLocaleString produces commas (e.g. "23/03/2026, 08:58:15") which
+    // would split the date across two CSV columns. We format without commas.
+    const d = new Date(tx.createdAt);
+    const date = `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()} ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}:${d.getSeconds().toString().padStart(2, "0")}`;
     const type = typeLabels[tx.transactionType] || tx.transactionType;
-    // Escape double-quotes inside the description
-    const desc = `"${(tx.description || "").replace(/"/g, '""')}"`;
+    const desc = tx.description || "";
     const amount = tx.amount.toFixed(2);
     const eurAmount = creditsToEUR(Math.abs(tx.amount)).toFixed(2);
     const eurSigned = tx.amount >= 0 ? eurAmount : `-${eurAmount}`;
-    return [date, type, desc, amount, eurSigned, tx.status, tx.paymentMethod || ""].join(",");
+    const status = statusLabels[tx.status] || tx.status;
+    return [
+      csvField(date),
+      csvField(type),
+      csvField(desc),
+      amount,
+      eurSigned,
+      status,
+      tx.paymentMethod || "",
+    ].join(",");
   });
 
   const csv = [headers.join(","), ...rows].join("\n");
@@ -154,6 +173,7 @@ type FilterType =
   | "challenges"
   | "marketplace"
   | "referrals";
+type StatusFilter = "all" | "completed" | "pending" | "failed" | "cancelled";
 type DatePreset = "all" | "30" | "60" | "90" | "120" | "custom";
 
 const FILTER_OPTIONS: { value: FilterType; label: string }[] = [
@@ -164,6 +184,14 @@ const FILTER_OPTIONS: { value: FilterType; label: string }[] = [
   { value: "challenges", label: "Challenges" },
   { value: "marketplace", label: "Marketplace" },
   { value: "referrals", label: "Referrals" },
+];
+
+const STATUS_OPTIONS: { value: StatusFilter; label: string; color: string }[] = [
+  { value: "all", label: "All Status", color: "text-gray-300" },
+  { value: "completed", label: "Completed", color: "text-green-400" },
+  { value: "pending", label: "Pending", color: "text-yellow-400" },
+  { value: "failed", label: "Failed", color: "text-red-400" },
+  { value: "cancelled", label: "Cancelled", color: "text-gray-400" },
 ];
 
 const DATE_PRESETS: { value: DatePreset; label: string }[] = [
@@ -183,7 +211,25 @@ export default function TransactionHistory({
 }: TransactionHistoryProps) {
   const { settings, creditsToEUR } = useAppSettings();
   const [filter, setFilter] = useState<FilterType>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const dateDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Reason: Close dropdowns when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(e.target as Node)) {
+        setShowStatusDropdown(false);
+      }
+      if (dateDropdownRef.current && !dateDropdownRef.current.contains(e.target as Node)) {
+        setShowDateDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // ── Batch invoice lookup ─────────────────────────────────────────────
   // Instead of each TransactionItem fetching /api/user/invoices/by-transaction/X
@@ -247,11 +293,17 @@ export default function TransactionHistory({
     });
   }, [transactions, datePreset, customStartDate, customEndDate]);
 
+  // Filter transactions by status
+  const statusFilteredTransactions = useMemo(() => {
+    if (statusFilter === "all") return dateFilteredTransactions;
+    return dateFilteredTransactions.filter((tx) => tx.status === statusFilter);
+  }, [dateFilteredTransactions, statusFilter]);
+
   // Filter transactions based on selected type
   const filteredTransactions = useMemo(() => {
-    if (filter === "all") return dateFilteredTransactions;
+    if (filter === "all") return statusFilteredTransactions;
 
-    return dateFilteredTransactions.filter((tx) => {
+    return statusFilteredTransactions.filter((tx) => {
       switch (filter) {
         case "deposits":
           return tx.transactionType === "deposit";
@@ -289,15 +341,23 @@ export default function TransactionHistory({
           return true;
       }
     });
-  }, [dateFilteredTransactions, filter]);
+  }, [statusFilteredTransactions, filter]);
 
   // Calculate filtered stats and notify parent
+  // Reason: Uses statusFilteredTransactions so stats respect both date AND status filters.
+  // When statusFilter is "all", only completed transactions are counted (real money moved).
+  // When a specific status is selected, ALL transactions with that status are counted
+  // so totals match exactly what the user sees in the list.
   useEffect(() => {
     if (!onFilteredStatsChange) return;
 
-    const stats = dateFilteredTransactions.reduce(
+    const countOnlyCompleted = statusFilter === "all";
+
+    const stats = statusFilteredTransactions.reduce(
       (acc, tx) => {
-        if (tx.status !== "completed") return acc;
+        // When viewing all statuses, only count completed for accurate financial totals.
+        // When filtered to a specific status, count everything shown.
+        if (countOnlyCompleted && tx.status !== "completed") return acc;
 
         switch (tx.transactionType) {
           case "deposit":
@@ -335,7 +395,24 @@ export default function TransactionHistory({
     );
 
     onFilteredStatsChange(stats);
-  }, [dateFilteredTransactions, onFilteredStatsChange]);
+  }, [statusFilteredTransactions, statusFilter, onFilteredStatsChange]);
+
+  // Count transactions per status for filter badges
+  const statusCounts = useMemo(() => {
+    const counts: Record<StatusFilter, number> = {
+      all: dateFilteredTransactions.length,
+      completed: 0,
+      pending: 0,
+      failed: 0,
+      cancelled: 0,
+    };
+    for (const tx of dateFilteredTransactions) {
+      if (tx.status in counts) {
+        counts[tx.status as StatusFilter]++;
+      }
+    }
+    return counts;
+  }, [dateFilteredTransactions]);
 
   // Check which optional filter tabs should be visible
   const hasReferralTransactions = useMemo(
@@ -368,10 +445,10 @@ export default function TransactionHistory({
     [hasReferralTransactions, hasMarketplaceTransactions],
   );
 
-  // Reason: Reset pagination when filter/date changes so user always sees first page
+  // Reason: Reset pagination when filter/date/status changes so user always sees first page
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [filter, datePreset, customStartDate, customEndDate]);
+  }, [filter, statusFilter, datePreset, customStartDate, customEndDate]);
 
   const handleDatePresetChange = (preset: DatePreset) => {
     setDatePreset(preset);
@@ -425,29 +502,114 @@ export default function TransactionHistory({
   return (
     <div className="space-y-4">
       {/* Filters Row */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        {/* Type Filter Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0">
-          <Filter className="h-4 w-4 text-gray-400 flex-shrink-0" />
-          <div className="flex gap-1.5">
-            {availableFilters.map((option) => (
-              <button
-                key={option.value}
-                onClick={() => setFilter(option.value)}
-                className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
-                  filter === option.value
-                    ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
-                    : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border border-transparent"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
+      <div className="flex flex-col gap-3">
+        {/* Top row: Type filter + Date/Status */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          {/* Type Filter Tabs */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0">
+            <Filter className="h-4 w-4 text-gray-400 flex-shrink-0" />
+            <div className="flex gap-1.5">
+              {availableFilters.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setFilter(option.value)}
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
+                    filter === option.value
+                      ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
+                      : "text-gray-400 hover:text-gray-200 hover:bg-gray-800/50 border border-transparent"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+
+          {/* Right side: Status + Date filters */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Status Filter Dropdown */}
+            <div className="relative" ref={statusDropdownRef}>
+              <button
+                onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors border",
+                  statusFilter !== "all"
+                    ? "bg-blue-500/10 text-blue-400 border-blue-500/30 hover:bg-blue-500/20"
+                    : "bg-gray-800 text-gray-300 hover:bg-gray-700 border-gray-700",
+                )}
+              >
+                <span className={cn(
+                  "w-2 h-2 rounded-full flex-shrink-0",
+                  statusFilter === "all" ? "bg-gray-500" :
+                  statusFilter === "completed" ? "bg-green-400" :
+                  statusFilter === "pending" ? "bg-yellow-400" :
+                  statusFilter === "failed" ? "bg-red-400" : "bg-gray-400",
+                )} />
+                <span className="hidden sm:inline">
+                  {STATUS_OPTIONS.find((s) => s.value === statusFilter)?.label || "All Status"}
+                </span>
+                <span className="sm:hidden">
+                  {statusFilter === "all" ? "Status" : STATUS_OPTIONS.find((s) => s.value === statusFilter)?.label || "Status"}
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "h-3.5 w-3.5 transition-transform",
+                    showStatusDropdown && "rotate-180",
+                  )}
+                />
+                {statusFilter !== "all" && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setStatusFilter("all");
+                      setShowStatusDropdown(false);
+                    }}
+                    className="ml-0.5 p-0.5 rounded hover:bg-gray-600"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </button>
+
+              {showStatusDropdown && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-gray-800 rounded-xl border border-gray-700 shadow-xl z-50">
+                  <div className="p-1.5">
+                    {STATUS_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => {
+                          setStatusFilter(option.value);
+                          setShowStatusDropdown(false);
+                        }}
+                        className={cn(
+                          "w-full px-3 py-2 rounded-lg text-sm text-left transition-colors flex items-center justify-between",
+                          statusFilter === option.value
+                            ? "bg-blue-500/20 text-blue-400"
+                            : "text-gray-300 hover:bg-gray-700",
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={cn(
+                            "w-2 h-2 rounded-full",
+                            option.value === "all" ? "bg-gray-500" :
+                            option.value === "completed" ? "bg-green-400" :
+                            option.value === "pending" ? "bg-yellow-400" :
+                            option.value === "failed" ? "bg-red-400" : "bg-gray-400",
+                          )} />
+                          <span>{option.label}</span>
+                        </div>
+                        <span className="text-xs text-gray-500 tabular-nums">
+                          {statusCounts[option.value]}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
         {/* Date Filter */}
-        <div className="relative flex-shrink-0">
+        <div className="relative flex-shrink-0" ref={dateDropdownRef}>
           <button
             onClick={() => setShowDateDropdown(!showDateDropdown)}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors border border-gray-700"
@@ -534,7 +696,9 @@ export default function TransactionHistory({
             </div>
           )}
         </div>
-      </div>
+          </div>{/* end Status + Date filters */}
+        </div>{/* end Top row */}
+      </div>{/* end Filters Row */}
 
       {/* Transaction count + Download */}
       <div className="flex items-center justify-between">

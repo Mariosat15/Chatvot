@@ -74,10 +74,11 @@ export default function WalletContent({
   const handleFilteredStatsChange = useCallback(
     (newStats: FilteredStats) => {
       setFilteredStats(newStats);
-      // Check if any filtering is happening (compare with original stats)
+      // Reason: Check if any filtering is active (date or status) by comparing
+      // the filtered totals against the all-time server-side stats.
       const isFiltered =
-        newStats.totalDeposited !== stats.totalDeposited ||
-        newStats.totalWithdrawn !== stats.totalWithdrawn;
+        Math.abs(newStats.totalDeposited - stats.totalDeposited) > 0.01 ||
+        Math.abs(newStats.totalWithdrawn - stats.totalWithdrawn) > 0.01;
       setIsDateFiltered(isFiltered);
     },
     [stats.totalDeposited, stats.totalWithdrawn],
@@ -279,7 +280,7 @@ export default function WalletContent({
       {/* Stats Grid - Mobile: 2 cols, Desktop: 5 cols */}
       {isDateFiltered && (
         <div className="text-xs text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-3 py-2 mb-2">
-          📊 Stats are filtered by selected date range
+          📊 Stats reflect your current filters (date/status)
         </div>
       )}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
