@@ -1070,8 +1070,14 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       // Active restrictions for this user
       UserRestriction.find({ userId, isActive: true }).lean().catch(() => []),
       // Open/investigating fraud alerts involving this user
+      // Reason: Also check evidence.data.connectedAccountIds because some
+      // users may only appear in evidence but not in top-level suspiciousUserIds.
       FraudAlert.find({
-        $or: [{ primaryUserId: userId }, { suspiciousUserIds: userId }],
+        $or: [
+          { primaryUserId: userId },
+          { suspiciousUserIds: userId },
+          { "evidence.data.connectedAccountIds": userId },
+        ],
         status: { $in: ["pending", "investigating"] },
       })
         .select("alertType severity status title description confidence detectedAt")

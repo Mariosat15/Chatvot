@@ -34,7 +34,6 @@ import {
   AlertOctagon,
   ExternalLink,
   Unlock,
-  Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -58,9 +57,11 @@ import FraudSettingsSection from "@/components/admin/FraudSettingsSection";
 import FraudDebugger from "@/components/admin/FraudDebugger";
 import RestrictedUsersSection from "@/components/admin/RestrictedUsersSection";
 import SuspicionScoreCard from "@/components/admin/fraud/SuspicionScoreCard";
+import ConnectedAccountsPanel from "@/components/admin/fraud/ConnectedAccountsPanel";
+import FraudNetworkGraph from "@/components/admin/fraud/FraudNetworkGraph";
 import FraudHistorySection from "@/components/admin/FraudHistorySection";
 import { History } from "lucide-react";
-import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
+
 
 interface FraudAlert {
   _id: string;
@@ -85,6 +86,8 @@ interface FraudAlert {
   resolvedBy?: string;
   investigationClearedAt?: string; // When users were unbanned/unsuspended
   clearanceNote?: string; // Admin notes when clearing
+  competitionId?: string; // Competition ID if alert is competition-related
+  updatedAt?: string; // Last update timestamp
   // Detection tracking
   detectionCount?: number; // Times this alert type triggered
   detectionHistory?: Array<{
@@ -160,7 +163,7 @@ interface ManualCheckResult {
 
 export default function FraudMonitoringSection() {
   const [alerts, setAlerts] = useState<FraudAlert[]>([]);
-  const [devices, setDevices] = useState<DeviceFingerprint[]>([]);
+  const [_devices, setDevices] = useState<DeviceFingerprint[]>([]);
   const [stats, setStats] = useState<FraudStats | null>(null);
   const [deviceStats, setDeviceStats] = useState<DeviceStats | null>(null);
   const [loading, setLoading] = useState(false);
@@ -196,7 +199,7 @@ export default function FraudMonitoringSection() {
   const [blockCompetitions, setBlockCompetitions] = useState<boolean>(true);
   const [blockDeposit, setBlockDeposit] = useState<boolean>(true);
   const [blockWithdraw, setBlockWithdraw] = useState<boolean>(true);
-  const [fraudScores, setFraudScores] = useState<Record<string, any>>({});
+  const [fraudScores, setFraudScores] = useState<Record<string, unknown>>({});
   const [selectedScoreUserId, setSelectedScoreUserId] = useState<string | null>(
     null,
   );
@@ -450,7 +453,9 @@ export default function FraudMonitoringSection() {
 
   // Get fraud score for a user (from cache or fetch)
   const getFraudScore = (userId: string) => {
-    return fraudScores[userId] || null;
+    return Object.prototype.hasOwnProperty.call(fraudScores, userId)
+      ? fraudScores[userId as keyof typeof fraudScores]
+      : null;
   };
 
   // Get risk badge color
@@ -470,7 +475,7 @@ export default function FraudMonitoringSection() {
   };
 
   // Device action handlers
-  const handleDeviceAction = (
+  const _handleDeviceAction = (
     device: DeviceFingerprint,
     action: "suspend" | "dismiss" | "ban",
   ) => {
@@ -725,7 +730,8 @@ export default function FraudMonitoringSection() {
       vpn_usage: "VPN Usage",
       high_risk_device: "High Risk Device",
     };
-    return labels[type] || type;
+    const labelsMap = new Map(Object.entries(labels));
+    return labelsMap.get(type) || type;
   };
 
   const filteredAlerts = alerts.filter((alert) => {
@@ -1121,7 +1127,7 @@ export default function FraudMonitoringSection() {
                       No cases under investigation
                     </p>
                     <p className="text-gray-500 text-sm mt-2">
-                      Elevate alerts from the "Fraud Alerts" tab to investigate
+                      Elevate alerts from the &quot;Fraud Alerts&quot; tab to investigate
                       them here
                     </p>
                   </div>
@@ -1225,7 +1231,7 @@ export default function FraudMonitoringSection() {
                                   <div className="flex flex-wrap gap-2">
                                     {alert.suspiciousUserIds
                                       .slice(0, 3)
-                                      .map((userId, idx) => (
+                                      .map((userId, _idx) => (
                                         <span
                                           key={userId}
                                           className="text-xs font-mono bg-gray-800 text-gray-300 px-2 py-1 rounded"
@@ -1410,21 +1416,19 @@ export default function FraudMonitoringSection() {
                               {alert.alertType.replace(/_/g, " ")}
                             </Badge>
                             {/* Show "Cleared" badge if users were unbanned/unsuspended */}
-                            {(alert as any).investigationClearedAt && (
+                            {alert.investigationClearedAt && (
                               <Badge
                                 className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
-                                title={`Cleared on: ${new Date((alert as any).investigationClearedAt).toLocaleDateString()}`}
+                                title={`Cleared on: ${new Date(alert.investigationClearedAt).toLocaleDateString()}`}
                               >
                                 <Unlock className="h-3 w-3 mr-1" />
                                 Cleared - Can Alert Again
                               </Badge>
                             )}
-                            {(alert as any).competitionId && (
+                            {alert.competitionId && (
                               <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">
                                 Competition:{" "}
-                                {(
-                                  (alert as any).competitionId as string
-                                ).substring(0, 8)}
+                                {alert.competitionId.substring(0, 8)}
                                 ...
                               </Badge>
                             )}
@@ -1445,7 +1449,7 @@ export default function FraudMonitoringSection() {
                               <Clock className="h-3 w-3" />
                               Resolved:{" "}
                               {new Date(
-                                alert.resolvedAt || (alert as any).updatedAt,
+                                alert.resolvedAt || alert.updatedAt || alert.detectedAt,
                               ).toLocaleDateString()}
                             </span>
                             {alert.actionTaken && (
@@ -1844,7 +1848,7 @@ export default function FraudMonitoringSection() {
 
                   <div className="flex flex-wrap gap-2">
                     {/* Group evidence by type and show count */}
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                    { }
                     {Object.entries(
                       selectedAlert.evidence.reduce(
                         (acc: Record<string, number>, e: { type: string }) => {
@@ -1874,15 +1878,14 @@ export default function FraudMonitoringSection() {
                       Detection Timeline:
                     </p>
                     <div className="flex items-center gap-2 overflow-x-auto pb-2">
-                      {/* eslint-disable @typescript-eslint/no-explicit-any */}
                       {selectedAlert.evidence
-                        .filter((e: any) => e.data?.detectedAt)
+                        .filter((e) => e.data?.detectedAt)
                         .sort(
-                          (a: any, b: any) =>
+                          (a, b) =>
                             new Date(a.data.detectedAt).getTime() -
                             new Date(b.data.detectedAt).getTime(),
                         )
-                        .map((e: any, idx: number) => (
+                        .map((e, idx) => (
                           <div
                             key={idx}
                             className="flex items-center gap-1 text-xs whitespace-nowrap"
@@ -1896,14 +1899,14 @@ export default function FraudMonitoringSection() {
                             </span>
                             {idx <
                               selectedAlert.evidence.filter(
-                                (e: any) => e.data?.detectedAt,
+                                (e) => e.data?.detectedAt,
                               ).length -
                                 1 && (
                               <span className="text-gray-600 mx-1">→</span>
                             )}
                           </div>
                         ))}
-                      {/* eslint-enable @typescript-eslint/no-explicit-any */}
+                      { }
                     </div>
                   </div>
                 </div>
@@ -1998,6 +2001,7 @@ export default function FraudMonitoringSection() {
                         evidence.data.accountsDetails.length > 0 ? (
                           <div className="space-y-3">
                             {evidence.data.accountsDetails.map(
+                              // eslint-disable-next-line @typescript-eslint/no-explicit-any
                               (account: any, accIndex: number) => (
                                 <div
                                   key={accIndex}
@@ -2019,6 +2023,7 @@ export default function FraudMonitoringSection() {
                                     </p>
 
                                     {account.devicesUsed.map(
+                                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                       (device: any, devIndex: number) => (
                                         <div
                                           key={devIndex}
@@ -2203,6 +2208,7 @@ export default function FraudMonitoringSection() {
 
                                   <div className="space-y-1 max-h-40 overflow-y-auto">
                                     {evidence.data.activityLog.map(
+                                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                       (activity: any, actIndex: number) => (
                                         <div
                                           key={actIndex}
@@ -2367,51 +2373,10 @@ export default function FraudMonitoringSection() {
                             {/* Connected Account IDs */}
                             {evidence.data.connectedAccountIds &&
                               evidence.data.connectedAccountIds.length > 0 && (
-                                <div className="p-3 bg-yellow-900/20 border border-yellow-700/30 rounded">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <Users className="h-4 w-4 text-yellow-400" />
-                                    <span className="text-sm font-semibold text-yellow-400">
-                                      Connected Account IDs (
-                                      {evidence.data.connectedAccountIds.length}
-                                      )
-                                    </span>
-                                  </div>
-                                  <div className="space-y-2">
-                                    {evidence.data.connectedAccountIds.map(
-                                      (accountId: string, idx: number) => (
-                                        <div
-                                          key={idx}
-                                          className="flex items-center justify-between p-2 bg-gray-900 rounded border border-gray-700"
-                                        >
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-xs text-gray-500">
-                                              #{idx + 1}
-                                            </span>
-                                            <code className="font-mono text-xs text-yellow-300 break-all">
-                                              {accountId}
-                                            </code>
-                                          </div>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-6 px-2 text-xs text-blue-400 hover:text-blue-300"
-                                            onClick={() => {
-                                              // Navigate to user management with this ID
-                                              const adminTab =
-                                                document.querySelector(
-                                                  '[data-value="users"]',
-                                                ) as HTMLElement;
-                                              if (adminTab) adminTab.click();
-                                            }}
-                                          >
-                                            <ExternalLink className="h-3 w-3 mr-1" />
-                                            View
-                                          </Button>
-                                        </div>
-                                      ),
-                                    )}
-                                  </div>
-                                </div>
+                                <ConnectedAccountsPanel
+                                  accountIds={evidence.data.connectedAccountIds}
+                                  title="Connected Account IDs"
+                                />
                               )}
 
                             {/* Warning Banner */}
@@ -2666,6 +2631,7 @@ export default function FraudMonitoringSection() {
                                   </div>
                                   <div className="space-y-2">
                                     {evidence.data.recentMatches.map(
+                                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                       (match: any, idx: number) => (
                                         <div
                                           key={idx}
@@ -2699,28 +2665,9 @@ export default function FraudMonitoringSection() {
                             {/* Connected Accounts */}
                             {evidence.data.connectedAccountIds &&
                               evidence.data.connectedAccountIds.length > 0 && (
-                                <div className="p-3 bg-yellow-900/20 border border-yellow-700/30 rounded">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <Users className="h-4 w-4 text-yellow-400" />
-                                    <span className="text-sm font-semibold text-yellow-400">
-                                      Connected Accounts (
-                                      {evidence.data.connectedAccountIds.length}
-                                      )
-                                    </span>
-                                  </div>
-                                  <div className="space-y-1">
-                                    {evidence.data.connectedAccountIds.map(
-                                      (accountId: string, idx: number) => (
-                                        <code
-                                          key={idx}
-                                          className="block font-mono text-xs text-yellow-300 bg-gray-900 px-2 py-1 rounded"
-                                        >
-                                          {accountId}
-                                        </code>
-                                      ),
-                                    )}
-                                  </div>
-                                </div>
+                                <ConnectedAccountsPanel
+                                  accountIds={evidence.data.connectedAccountIds}
+                                />
                               )}
                           </div>
                         ) : evidence.type === "coordinated_entry" ? (
@@ -2781,6 +2728,7 @@ export default function FraudMonitoringSection() {
                                   </div>
                                   <div className="space-y-2">
                                     {evidence.data.entrySequence.map(
+                                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                       (entry: any, idx: number) => (
                                         <div
                                           key={idx}
@@ -2898,26 +2846,10 @@ export default function FraudMonitoringSection() {
                             {/* Connected Accounts */}
                             {evidence.data.connectedAccountIds &&
                               evidence.data.connectedAccountIds.length > 0 && (
-                                <div className="p-3 bg-yellow-900/20 border border-yellow-700/30 rounded">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <Users className="h-4 w-4 text-yellow-400" />
-                                    <span className="text-sm font-semibold text-yellow-400">
-                                      Similar Trading Accounts
-                                    </span>
-                                  </div>
-                                  <div className="space-y-1">
-                                    {evidence.data.connectedAccountIds.map(
-                                      (accountId: string, idx: number) => (
-                                        <code
-                                          key={idx}
-                                          className="block font-mono text-xs text-yellow-300 bg-gray-900 px-2 py-1 rounded"
-                                        >
-                                          {accountId}
-                                        </code>
-                                      ),
-                                    )}
-                                  </div>
-                                </div>
+                                <ConnectedAccountsPanel
+                                  accountIds={evidence.data.connectedAccountIds}
+                                  title="Similar Trading Accounts"
+                                />
                               )}
                           </div>
                         ) : evidence.type === "rapid_creation" ? (
@@ -2949,28 +2881,10 @@ export default function FraudMonitoringSection() {
                             {/* Connected Accounts */}
                             {evidence.data.connectedAccountIds &&
                               evidence.data.connectedAccountIds.length > 0 && (
-                                <div className="p-3 bg-yellow-900/20 border border-yellow-700/30 rounded">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <Users className="h-4 w-4 text-yellow-400" />
-                                    <span className="text-sm font-semibold text-yellow-400">
-                                      Linked Accounts (
-                                      {evidence.data.connectedAccountIds.length}
-                                      )
-                                    </span>
-                                  </div>
-                                  <div className="space-y-1">
-                                    {evidence.data.connectedAccountIds.map(
-                                      (accountId: string, idx: number) => (
-                                        <code
-                                          key={idx}
-                                          className="block font-mono text-xs text-yellow-300 bg-gray-900 px-2 py-1 rounded"
-                                        >
-                                          {accountId}
-                                        </code>
-                                      ),
-                                    )}
-                                  </div>
-                                </div>
+                                <ConnectedAccountsPanel
+                                  accountIds={evidence.data.connectedAccountIds}
+                                  title="Linked Accounts"
+                                />
                               )}
                           </div>
                         ) : (
@@ -2994,6 +2908,27 @@ export default function FraudMonitoringSection() {
                   </div>
                 </div>
               </div>
+
+              {/* Fraud Network Graph — visual web of connected accounts */}
+              {(selectedAlert.suspiciousUserIds.length > 1 ||
+                selectedAlert.evidence.some(
+                  (e) =>
+                    e.data?.connectedAccountIds &&
+                    e.data.connectedAccountIds.length > 1,
+                )) && (
+                <div className="mt-4">
+                  <FraudNetworkGraph
+                    alert={selectedAlert}
+                    onNavigateToUser={(_userId) => {
+                      setSelectedAlert(null);
+                      const adminTab = document.querySelector(
+                        '[data-value="users"]',
+                      ) as HTMLElement;
+                      if (adminTab) adminTab.click();
+                    }}
+                  />
+                </div>
+              )}
 
               <DialogFooter className="flex gap-2">
                 <Button
@@ -3381,7 +3316,7 @@ export default function FraudMonitoringSection() {
                 <div className="p-4 bg-green-900/20 border border-green-700/30 rounded">
                   <p className="text-sm text-green-400">
                     This will mark the alert as resolved and close the
-                    investigation. The alert will move to "Dismissed" status.
+                    investigation. The alert will move to &quot;Dismissed&quot; status.
                   </p>
                 </div>
               )}
@@ -3501,9 +3436,9 @@ export default function FraudMonitoringSection() {
           <DialogTitle className="sr-only">
             Fraud Detection Score Details
           </DialogTitle>
-          {selectedScoreUserId && fraudScores[selectedScoreUserId] ? (
+          {selectedScoreUserId && getFraudScore(selectedScoreUserId) ? (
             <>
-              <SuspicionScoreCard score={fraudScores[selectedScoreUserId]} />
+              <SuspicionScoreCard score={getFraudScore(selectedScoreUserId)} />
 
               {/* Close Button */}
               <div className="flex justify-end mt-6 pt-6 border-t border-gray-700">
@@ -3516,7 +3451,7 @@ export default function FraudMonitoringSection() {
                 </Button>
               </div>
             </>
-          ) : selectedScoreUserId && !fraudScores[selectedScoreUserId] ? (
+          ) : selectedScoreUserId && !getFraudScore(selectedScoreUserId) ? (
             <>
               <div className="py-24 text-center">
                 <Shield className="h-20 w-20 text-gray-600 mx-auto mb-6" />
