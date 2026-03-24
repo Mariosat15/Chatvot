@@ -739,7 +739,6 @@ export default function BehavioralAnalysisSection() {
                     Mirror Trading Suspects
                   </p>
                   <div className="space-y-2">
-                    { }
                     {(selectedProfile.mirrorTradingSuspects as Array<{pairedUserId?: unknown; confidence: number}>).map(
                       (suspect, index: number) => (
                         <div

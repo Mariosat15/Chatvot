@@ -85,6 +85,154 @@ async function resolveUserIds(
   return result;
 }
 
+// ─── Evidence Summarizer ─────────────────────────────────────
+// Reason: Fraud alert evidence.data can be enormous (100k+ tokens).
+// We extract only the fields relevant for analysis and cap array sizes.
+const MAX_ARRAY_ITEMS = 5; // Show at most 5 examples from any array
+const MAX_DETECTION_HISTORY = 10; // Show at most 10 detection history entries
+const MAX_EVIDENCE_ITEMS = 15; // Show at most 15 evidence items
+const MAX_CHAR_PER_EVIDENCE = 2000; // Cap serialized data per evidence item
+
+function summarizeEvidenceData(
+  data: Record<string, unknown> | null | undefined,
+  evidenceType: string,
+): string {
+  if (!data) return "(no data)";
+
+  // Extract key fields based on evidence type
+  const summary: Record<string, unknown> = {};
+
+  switch (evidenceType) {
+    case "device_fingerprint":
+      summary.matchedDeviceId = data.matchedDeviceId ?? data.deviceId;
+      summary.matchCount = data.matchCount ?? data.accountCount;
+      if (Array.isArray(data.accountsDetails)) {
+        summary.accountCount = data.accountsDetails.length;
+        summary.accounts = data.accountsDetails
+          .slice(0, MAX_ARRAY_ITEMS)
+          .map((a: Record<string, unknown>) => ({
+            userId: a.userId,
+            loginCount: a.loginCount,
+            lastSeen: a.lastSeen,
+          }));
+        if (data.accountsDetails.length > MAX_ARRAY_ITEMS) {
+          summary.accountsTruncatedFrom = data.accountsDetails.length;
+        }
+      }
+      if (Array.isArray(data.connectedAccountIds)) {
+        summary.connectedAccountIds = data.connectedAccountIds.slice(0, 20);
+      }
+      break;
+
+    case "payment_fingerprint":
+      summary.matchType = data.matchType;
+      summary.sharedDetail = data.sharedCardLast4 ?? data.sharedPaymentMethod;
+      if (Array.isArray(data.connectedAccountIds)) {
+        summary.connectedAccountIds = data.connectedAccountIds.slice(0, 20);
+      }
+      if (Array.isArray(data.transactions)) {
+        summary.transactionCount = data.transactions.length;
+        summary.transactions = data.transactions.slice(0, MAX_ARRAY_ITEMS);
+      }
+      break;
+
+    case "mirror_trading":
+      summary.userId1 = data.userId1;
+      summary.userId2 = data.userId2;
+      summary.correlationScore = data.correlationScore ?? data.similarity;
+      summary.matchedTradeCount = data.matchedTradeCount ?? data.tradeCount;
+      if (Array.isArray(data.matchedTrades)) {
+        summary.matchedTradeCount = data.matchedTrades.length;
+        summary.sampleTrades = data.matchedTrades.slice(0, 3);
+      }
+      if (Array.isArray(data.connectedAccountIds)) {
+        summary.connectedAccountIds = data.connectedAccountIds.slice(0, 20);
+      }
+      break;
+
+    case "coordinated_entry":
+      summary.competitionId = data.competitionId;
+      summary.timingWindowMs = data.timingWindowMs ?? data.windowMs;
+      if (Array.isArray(data.entries)) {
+        summary.entryCount = data.entries.length;
+        summary.entries = data.entries.slice(0, MAX_ARRAY_ITEMS).map(
+          (e: Record<string, unknown>) => ({
+            userId: e.userId,
+            enteredAt: e.enteredAt ?? e.timestamp,
+          }),
+        );
+      }
+      if (Array.isArray(data.connectedAccountIds)) {
+        summary.connectedAccountIds = data.connectedAccountIds.slice(0, 20);
+      }
+      break;
+
+    case "trading_similarity":
+      summary.userId1 = data.userId1;
+      summary.userId2 = data.userId2;
+      summary.similarityScore = data.similarityScore ?? data.score;
+      summary.commonPairs = data.commonPairs;
+      summary.timeOverlap = data.timeOverlap;
+      break;
+
+    case "ip_browser_match":
+      summary.sharedIP = data.sharedIP ?? data.ipAddress;
+      summary.matchedBrowser = data.matchedBrowser ?? data.userAgent;
+      if (Array.isArray(data.connectedAccountIds)) {
+        summary.connectedAccountIds = data.connectedAccountIds.slice(0, 20);
+      }
+      break;
+
+    default: {
+      // Generic: pick known important keys, skip large nested objects
+      /* eslint-disable security/detect-object-injection */
+      const importantKeys = [
+        "connectedAccountIds",
+        "userId",
+        "userId1",
+        "userId2",
+        "confidence",
+        "score",
+        "matchCount",
+        "accountCount",
+        "ipAddress",
+        "reason",
+        "details",
+        "competitionId",
+      ] as const;
+      for (const key of importantKeys) {
+        if (data[key] !== undefined) {
+          const val = data[key];
+          if (Array.isArray(val)) {
+            summary[key] = val.slice(0, 10);
+          } else {
+            summary[key] = val;
+          }
+        }
+      }
+      /* eslint-enable security/detect-object-injection */
+      // If nothing was extracted, do a limited dump
+      if (Object.keys(summary).length === 0) {
+        const truncated = JSON.stringify(data).slice(0, MAX_CHAR_PER_EVIDENCE);
+        return truncated.length < JSON.stringify(data).length
+          ? truncated + "... (truncated)"
+          : truncated;
+      }
+      break;
+    }
+  }
+
+  const result = JSON.stringify(summary, null, 2);
+  if (result.length > MAX_CHAR_PER_EVIDENCE) {
+    return result.slice(0, MAX_CHAR_PER_EVIDENCE) + "... (truncated)";
+  }
+  return result;
+}
+
+// Reason: Rough token estimate — 1 token ≈ 4 chars for English text.
+// We target ~80k tokens for the user prompt to leave room for system prompt + response.
+const MAX_PROMPT_CHARS = 320_000; // ~80k tokens
+
 // ─── System prompt ──────────────────────────────────────────
 const SYSTEM_PROMPT = `You are a senior fraud analyst AI for the ChartVolt trading platform.
 Your job is to analyze fraud investigation data and produce a structured, precise report.
@@ -196,16 +344,22 @@ export async function POST(request: NextRequest) {
       })
       .join("\n");
 
-    // Build evidence summary for the AI
-    const evidenceSummary = (alert.evidence || [])
+    // Build evidence summary — summarized, not raw dumps
+    const evidenceItems = (alert.evidence || []).slice(0, MAX_EVIDENCE_ITEMS);
+    const totalEvidenceCount = (alert.evidence || []).length;
+    const evidenceSummary = evidenceItems
       .map(
-        (ev: { type: string; description: string; data: unknown }, idx: number) =>
-          `Evidence #${idx + 1}:\n  Type: ${ev.type}\n  Description: ${ev.description}\n  Data: ${JSON.stringify(ev.data, null, 2)}`,
+        (ev: { type: string; description: string; data: Record<string, unknown> }, idx: number) =>
+          `Evidence #${idx + 1}:\n  Type: ${ev.type}\n  Description: ${ev.description}\n  Key Data: ${summarizeEvidenceData(ev.data, ev.type)}`,
       )
       .join("\n\n");
 
+    // Truncate detection history to most recent entries
+    const detectionHistory = alert.detectionHistory || [];
+    const recentHistory = detectionHistory.slice(-MAX_DETECTION_HISTORY);
+
     // Build the user prompt with all investigation data
-    const userPrompt = `Analyze the following fraud investigation and produce a detailed report.
+    let userPrompt = `Analyze the following fraud investigation and produce a detailed report.
 
 ## ALERT DETAILS
 - Alert ID: ${alert._id}
@@ -222,12 +376,12 @@ export async function POST(request: NextRequest) {
 ## ACCOUNTS INVOLVED (${allUserIds.size} total)
 ${accountReference}
 
-## EVIDENCE (${alert.evidence?.length || 0} items)
+## EVIDENCE (${totalEvidenceCount} total items${totalEvidenceCount > MAX_EVIDENCE_ITEMS ? `, showing first ${MAX_EVIDENCE_ITEMS}` : ""})
 ${evidenceSummary}
 
 ${
-  alert.detectionHistory && alert.detectionHistory.length > 0
-    ? `## DETECTION HISTORY (${alert.detectionHistory.length} entries)\n${alert.detectionHistory
+  recentHistory.length > 0
+    ? `## DETECTION HISTORY (${detectionHistory.length} total, showing ${recentHistory.length} most recent)\n${recentHistory
         .map(
           (h: { timestamp: string; triggeredBy: string; ipAddress?: string; details?: string }) =>
             `- ${h.timestamp}: triggered by ${h.triggeredBy}${h.ipAddress ? ` (IP: ${h.ipAddress})` : ""}${h.details ? ` — ${h.details}` : ""}`,
@@ -240,6 +394,17 @@ ${alert.resolution ? `## PREVIOUS RESOLUTION\n${alert.resolution}` : ""}
 ${alert.actionTaken ? `## PREVIOUS ACTION TAKEN\n${alert.actionTaken}` : ""}
 
 Now produce the investigation report following the exact format specified.`;
+
+    // Reason: Final safety net — if the prompt is still too large after
+    // summarization, hard-truncate to stay under the model's context window.
+    if (userPrompt.length > MAX_PROMPT_CHARS) {
+      console.warn(
+        `⚠️ AI report prompt was ${userPrompt.length} chars (~${Math.round(userPrompt.length / 4)} tokens), truncating to ${MAX_PROMPT_CHARS} chars`,
+      );
+      userPrompt =
+        userPrompt.slice(0, MAX_PROMPT_CHARS) +
+        "\n\n[NOTE: Some evidence data was truncated due to size limits. Analyze what is available above.]";
+    }
 
     const openai = new OpenAI({ apiKey: config.apiKey });
 
