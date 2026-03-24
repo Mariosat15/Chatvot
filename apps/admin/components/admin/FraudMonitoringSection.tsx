@@ -63,6 +63,48 @@ import FraudHistorySection from "@/components/admin/FraudHistorySection";
 import { History } from "lucide-react";
 
 
+// Reason: Matches SuspicionScoreData in SuspicionScoreCard.tsx — needed for typed fraud score state.
+interface ScoreBreakdownEntry {
+  percentage?: number;
+  points?: number;
+  evidence?: string;
+  lastDetected?: string;
+}
+
+interface FraudScore {
+  userId: string;
+  totalScore: number;
+  riskLevel: "low" | "medium" | "high" | "critical";
+  lastUpdated: string;
+  scoreBreakdown: {
+    deviceMatch: ScoreBreakdownEntry;
+    ipMatch: ScoreBreakdownEntry;
+    ipBrowserMatch: ScoreBreakdownEntry;
+    sameCity: ScoreBreakdownEntry;
+    samePayment: ScoreBreakdownEntry;
+    rapidCreation: ScoreBreakdownEntry;
+    coordinatedEntry: ScoreBreakdownEntry;
+    tradingSimilarity: ScoreBreakdownEntry;
+    mirrorTrading: ScoreBreakdownEntry;
+    timezoneLanguage: ScoreBreakdownEntry;
+    deviceSwitching: ScoreBreakdownEntry;
+    kycDuplicate: ScoreBreakdownEntry;
+  };
+  linkedAccounts: Array<{
+    userId: string;
+    matchType: string;
+    confidence: number;
+    detectedAt: string;
+  }>;
+  scoreHistory: Array<{
+    timestamp: string;
+    score: number;
+    reason: string;
+    delta: number;
+    triggeredBy: string;
+  }>;
+}
+
 interface FraudAlert {
   _id: string;
   alertType: string;
@@ -199,7 +241,7 @@ export default function FraudMonitoringSection() {
   const [blockCompetitions, setBlockCompetitions] = useState<boolean>(true);
   const [blockDeposit, setBlockDeposit] = useState<boolean>(true);
   const [blockWithdraw, setBlockWithdraw] = useState<boolean>(true);
-  const [fraudScores, setFraudScores] = useState<Record<string, unknown>>({});
+  const [fraudScores, setFraudScores] = useState<Record<string, FraudScore>>({});
   const [selectedScoreUserId, setSelectedScoreUserId] = useState<string | null>(
     null,
   );
@@ -452,10 +494,10 @@ export default function FraudMonitoringSection() {
   };
 
   // Get fraud score for a user (from cache or fetch)
-  const getFraudScore = (userId: string) => {
-    return Object.prototype.hasOwnProperty.call(fraudScores, userId)
-      ? fraudScores[userId as keyof typeof fraudScores]
-      : null;
+  const getFraudScore = (userId: string): FraudScore | null => {
+    if (!Object.prototype.hasOwnProperty.call(fraudScores, userId)) return null;
+    // eslint-disable-next-line security/detect-object-injection
+    return fraudScores[userId] ?? null;
   };
 
   // Get risk badge color
@@ -3436,9 +3478,11 @@ export default function FraudMonitoringSection() {
           <DialogTitle className="sr-only">
             Fraud Detection Score Details
           </DialogTitle>
-          {selectedScoreUserId && getFraudScore(selectedScoreUserId) ? (
+          {(() => {
+            const scoreData = selectedScoreUserId ? getFraudScore(selectedScoreUserId) : null;
+            return scoreData ? (
             <>
-              <SuspicionScoreCard score={getFraudScore(selectedScoreUserId)} />
+              <SuspicionScoreCard score={scoreData} />
 
               {/* Close Button */}
               <div className="flex justify-end mt-6 pt-6 border-t border-gray-700">
@@ -3451,7 +3495,7 @@ export default function FraudMonitoringSection() {
                 </Button>
               </div>
             </>
-          ) : selectedScoreUserId && !getFraudScore(selectedScoreUserId) ? (
+          ) : selectedScoreUserId ? (
             <>
               <div className="py-24 text-center">
                 <Shield className="h-20 w-20 text-gray-600 mx-auto mb-6" />
@@ -3472,7 +3516,8 @@ export default function FraudMonitoringSection() {
                 </Button>
               </div>
             </>
-          ) : null}
+          ) : null;
+          })()}
         </DialogContent>
       </Dialog>
     </div>
