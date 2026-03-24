@@ -59,6 +59,7 @@ import RestrictedUsersSection from "@/components/admin/RestrictedUsersSection";
 import SuspicionScoreCard from "@/components/admin/fraud/SuspicionScoreCard";
 import ConnectedAccountsPanel from "@/components/admin/fraud/ConnectedAccountsPanel";
 import FraudNetworkGraph from "@/components/admin/fraud/FraudNetworkGraph";
+import DetectionMethodsList from "@/components/admin/fraud/DetectionMethodsList";
 import FraudHistorySection from "@/components/admin/FraudHistorySection";
 import { History } from "lucide-react";
 
@@ -1875,83 +1876,8 @@ export default function FraudMonitoringSection() {
                     </div>
                   )}
 
-                {/* Detection Methods Summary */}
-                <div className="p-4 bg-gradient-to-r from-red-900/30 to-orange-900/30 rounded-lg border border-red-500/30">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-lg font-semibold text-red-400 flex items-center gap-2">
-                      <AlertTriangle className="h-5 w-5" />
-                      Detection Methods Summary
-                    </h4>
-                    <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-sm">
-                      {selectedAlert.evidence.length} total detection
-                      {selectedAlert.evidence.length !== 1 ? "s" : ""}
-                    </Badge>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {/* Group evidence by type and show count */}
-                    { }
-                    {Object.entries(
-                      selectedAlert.evidence.reduce(
-                        (acc: Record<string, number>, e: { type: string }) => {
-                          acc[e.type] = (acc[e.type] || 0) + 1;
-                          return acc;
-                        },
-                        {},
-                      ),
-                    ).map(([type, count]) => (
-                      <Badge
-                        key={type}
-                        className="bg-gray-700 text-gray-200 border-gray-600 px-3 py-1"
-                      >
-                        {type
-                          .replace(/_/g, " ")
-                          .replace(/\b\w/g, (l) => l.toUpperCase())}
-                        {count > 1 && (
-                          <span className="ml-1 text-yellow-400">×{count}</span>
-                        )}
-                      </Badge>
-                    ))}
-                  </div>
-
-                  {/* Timeline showing when detections were added */}
-                  <div className="mt-3 pt-3 border-t border-red-500/20">
-                    <p className="text-xs text-gray-400 mb-2">
-                      Detection Timeline:
-                    </p>
-                    <div className="flex items-center gap-2 overflow-x-auto pb-2">
-                      {selectedAlert.evidence
-                        .filter((e) => e.data?.detectedAt)
-                        .sort(
-                          (a, b) =>
-                            new Date(a.data.detectedAt).getTime() -
-                            new Date(b.data.detectedAt).getTime(),
-                        )
-                        .map((e, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center gap-1 text-xs whitespace-nowrap"
-                          >
-                            <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                            <span className="text-gray-500">
-                              {new Date(e.data.detectedAt).toLocaleTimeString()}
-                            </span>
-                            <span className="text-gray-400 capitalize">
-                              {e.type.replace(/_/g, " ").substring(0, 15)}...
-                            </span>
-                            {idx <
-                              selectedAlert.evidence.filter(
-                                (e) => e.data?.detectedAt,
-                              ).length -
-                                1 && (
-                              <span className="text-gray-600 mx-1">→</span>
-                            )}
-                          </div>
-                        ))}
-                      { }
-                    </div>
-                  </div>
-                </div>
+                {/* Detection Methods — Filterable List */}
+                <DetectionMethodsList evidence={selectedAlert.evidence} />
 
                 {/* Suspicious Users */}
                 <div>
