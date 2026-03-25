@@ -1074,6 +1074,9 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       // Open/investigating fraud alerts involving this user
       // Reason: Also check evidence.data.connectedAccountIds because some
       // users may only appear in evidence but not in top-level suspiciousUserIds.
+      // Reason: Select evidence.data.connectedAccountIds and
+      // evidence.data.accountsDetails.userId so we can filter evidence
+      // to only show types where THIS user is specifically involved.
       FraudAlert.find({
         $or: [
           { primaryUserId: userId },
@@ -1082,7 +1085,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
         ],
         status: { $in: ["pending", "investigating"] },
       })
-        .select("alertType severity status title description confidence detectedAt evidence.type")
+        .select("alertType severity status title description confidence detectedAt evidence.type evidence.data.connectedAccountIds evidence.data.accountsDetails.userId")
         .sort({ detectedAt: -1 })
         .limit(10)
         .lean()
@@ -1143,13 +1146,29 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
         description: a.description,
         confidence: a.confidence,
         detectedAt: a.detectedAt,
-        // Reason: Extract unique evidence method types so the customer-facing
-        // AccountStatusCard can list each flagged reason individually.
+        // Reason: Only include evidence types where THIS specific user
+        // is actually involved — not all evidence from the alert.
+        // Each evidence item stores which users are connected via
+        // data.connectedAccountIds or data.accountsDetails[].userId.
         evidenceTypes: [
           ...new Set(
-            (a.evidence || []).map(
-              (ev: { type: string }) => ev.type,
-            ),
+            (a.evidence || [])
+              .filter((ev: { type: string; data?: { connectedAccountIds?: string[]; accountsDetails?: Array<{ userId: string }> } }) => {
+                const connectedIds = ev.data?.connectedAccountIds;
+                const accountDetails = ev.data?.accountsDetails;
+                // If evidence has connectedAccountIds, check if this user is listed
+                if (connectedIds && connectedIds.length > 0) {
+                  return connectedIds.some((id: string) => id.toString() === userId);
+                }
+                // If evidence has accountsDetails (device fingerprint), check userId
+                if (accountDetails && accountDetails.length > 0) {
+                  return accountDetails.some((acc: { userId: string }) => acc.userId?.toString() === userId);
+                }
+                // Reason: If neither field exists (legacy evidence or minimal data),
+                // include it conservatively — the user is already in suspiciousUserIds.
+                return true;
+              })
+              .map((ev: { type: string }) => ev.type),
           ),
         ],
       })),

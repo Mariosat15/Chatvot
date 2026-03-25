@@ -261,9 +261,9 @@ export default function AccountStatusCard({
     lockouts.length +
     (hasKycIssue ? 1 : 0);
 
-  // Reason: Collect ALL unique evidence method types across all fraud alerts.
-  // Each alert may contain multiple evidence types (e.g., same_device + mirror_trading).
-  // We also include the top-level alertType as a fallback.
+  // Reason: Collect unique evidence types that THIS user is specifically involved in.
+  // The server already filters evidence to only include types where this user appears
+  // in connectedAccountIds or accountsDetails. Falls back to alertType if empty.
   const uniqueEvidenceTypes = [
     ...new Set(
       fraudAlerts.flatMap((a) =>
