@@ -50,11 +50,11 @@ export async function POST(request: Request) {
 
     const users = await userCollection
       .find({ $or: orConditions })
-      .project({ id: 1, _id: 1, name: 1, email: 1, createdAt: 1, image: 1 })
+      .project({ id: 1, _id: 1, name: 1, email: 1, createdAt: 1, image: 1, isDeactivated: 1 })
       .toArray();
 
     // Build a map: userId -> user details
-    const userMap = new Map<string, { id: string; name: string; email: string; createdAt: string; image?: string }>();
+    const userMap = new Map<string, { id: string; name: string; email: string; createdAt: string; image?: string; isDeactivated?: boolean }>();
 
     for (const user of users) {
       const resolvedId = String(user.id || user._id?.toString());
@@ -64,6 +64,7 @@ export async function POST(request: Request) {
         email: String(user.email || "No email"),
         createdAt: user.createdAt ? new Date(user.createdAt).toISOString() : "",
         image: user.image ? String(user.image) : undefined,
+        isDeactivated: user.isDeactivated === true,
       };
       userMap.set(resolvedId, entry);
       // Also map by _id string if different from id

@@ -18,8 +18,6 @@ import {
   RefreshCw,
   FileText,
   Ban,
-  Calendar,
-  Mail,
   MailCheck,
   MailX,
   Coins,
@@ -33,10 +31,7 @@ import {
   TrendingUp,
   TrendingDown,
   CreditCard,
-  Building2,
   MapPin,
-  Phone,
-  Globe,
   Send,
   Eye,
   ArrowLeft,
@@ -52,7 +47,6 @@ import {
   ClipboardList,
   Crown,
   Users,
-  Link as LinkIcon,
   ExternalLink,
   DollarSign,
   Pause,
@@ -74,7 +68,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { UserData, Assignment, GameMasterData } from "./UsersSection";
+import { UserData, Assignment } from "./UsersSection";
 import { CustomerAssignmentCard } from "./CustomerAssignmentBadge";
 import { CustomerAuditTrail } from "./CustomerAuditTrail";
 import { TransferCustomerDialog } from "./TransferCustomerDialog";
@@ -184,11 +178,11 @@ interface HistoryItem {
   type: string;
   category: string;
   description: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   status?: string;
   amount?: number;
   createdAt: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 const HISTORY_TYPE_CONFIG: Record<
@@ -261,7 +255,7 @@ const HISTORY_TYPE_CONFIG: Record<
 
 const KYC_STATUS_CONFIG: Record<
   string,
-  { color: string; bgColor: string; icon: React.ComponentType<any> }
+  { color: string; bgColor: string; icon: React.ComponentType<{ className?: string }> }
 > = {
   none: { color: "text-gray-400", bgColor: "bg-gray-500/20", icon: Shield },
   pending: {
@@ -340,9 +334,10 @@ export default function UserFullDetailPanel({
   const [loading, setLoading] = useState(true);
 
   // Check if user has active GM subscription
+   
+  const gmData = (user as Record<string, unknown>).gameMaster as Record<string, unknown> | undefined;
   const hasActiveGMSubscription =
-    (user as any).gameMaster?.isGameMaster &&
-    (user as any).gameMaster?.status === "active";
+    gmData?.isGameMaster === true && gmData?.status === "active";
 
   // Determine the effective role - if user has active GM, they should be 'gamemaster'
   const effectiveRole: UserRole = hasActiveGMSubscription
@@ -388,6 +383,12 @@ export default function UserFullDetailPanel({
   const [expiresAt, setExpiresAt] = useState("");
   const [savingRestriction, setSavingRestriction] = useState(false);
 
+  // Account Deactivation State
+  const [isDeactivated, setIsDeactivated] = useState(
+    user.isDeactivated || false,
+  );
+  const [togglingDeactivation, setTogglingDeactivation] = useState(false);
+
   // Email Verification State
   const [emailVerified, setEmailVerified] = useState<boolean | null>(
     user.emailVerified,
@@ -397,7 +398,7 @@ export default function UserFullDetailPanel({
 
   // Invoices State
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const [_loadingInvoices, _setLoadingInvoices] = useState(false);
   const [resendingInvoice, setResendingInvoice] = useState<string | null>(null);
 
   // History State
@@ -506,7 +507,7 @@ export default function UserFullDetailPanel({
       } else {
         toast.error(data.error || "Failed to assign customer");
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to assign customer");
     } finally {
       setAssigningToSelf(false);
@@ -527,7 +528,7 @@ export default function UserFullDetailPanel({
       } else {
         toast.error(data.error || "Failed to unassign customer");
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to unassign customer");
     }
   };
@@ -643,6 +644,7 @@ export default function UserFullDetailPanel({
       setAvailableHistoryTypes([]);
       setHistoryFilters({ type: "all", status: "all", dateFrom: "", dateTo: "", search: "" });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, user, fetchUserData, fetchAssignment]);
 
   // Fetch history when tab is selected (lazy loading)
@@ -1175,6 +1177,40 @@ export default function UserFullDetailPanel({
     }
   };
 
+  // Account Deactivation
+  const handleToggleDeactivation = async () => {
+    setTogglingDeactivation(true);
+    try {
+      const endpoint = `/api/users/${user.id}/deactivate`;
+      const method = isDeactivated ? "DELETE" : "POST";
+      const body = isDeactivated ? undefined : JSON.stringify({ reason: "Admin decision" });
+
+      const response = await fetch(endpoint, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+
+      if (response.ok) {
+        setIsDeactivated(!isDeactivated);
+        toast.success(
+          isDeactivated
+            ? "Account reactivated successfully"
+            : "Account deactivated successfully",
+        );
+        onRefresh?.();
+      } else {
+        const data = await response.json();
+        toast.error(data.error || "Failed to update account status");
+      }
+    } catch (error) {
+      console.error("Error toggling account deactivation:", error);
+      toast.error("Failed to update account status");
+    } finally {
+      setTogglingDeactivation(false);
+    }
+  };
+
   // Invoices
   const handleResendInvoice = async (invoiceId: string) => {
     setResendingInvoice(invoiceId);
@@ -1205,8 +1241,8 @@ export default function UserFullDetailPanel({
   if (!open) return null;
 
   // Check if user is a Game Master
-  const isGameMaster = (user as any).gameMaster?.isGameMaster === true;
-  const gmData = (user as any).gameMaster;
+  const isGameMaster = user.gameMaster?.isGameMaster === true;
+  const gmData = user.gameMaster;
 
   const tabs = [
     { id: "overview", label: "Overview", icon: User },
@@ -1264,6 +1300,11 @@ export default function UserFullDetailPanel({
                   <Badge className={`${roleConfig.color} text-white text-xs`}>
                     {roleConfig.label}
                   </Badge>
+                  {isDeactivated && (
+                    <Badge className="bg-red-700 text-white text-xs">
+                      DEACTIVATED
+                    </Badge>
+                  )}
                 </h1>
                 <p className="text-sm text-gray-400">{user.email}</p>
               </div>
@@ -2452,6 +2493,65 @@ export default function UserFullDetailPanel({
                 {/* Restrictions Tab */}
                 {activeTab === "restrictions" && (
                   <div className="space-y-6">
+                    {/* Account Deactivation Toggle */}
+                    <Card
+                      className={
+                        isDeactivated
+                          ? "bg-red-500/10 border-red-500/30"
+                          : "bg-gray-800/50 border-gray-700"
+                      }
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Pause
+                              className={`h-5 w-5 ${isDeactivated ? "text-red-400" : "text-gray-400"}`}
+                            />
+                            <div>
+                              <p className="text-sm font-semibold text-white">
+                                Account Deactivation
+                              </p>
+                              <p className="text-xs text-gray-400">
+                                {isDeactivated
+                                  ? "This account is deactivated. The user cannot log in."
+                                  : "Deactivating prevents the user from logging in. Data is preserved."}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant={isDeactivated ? "outline" : "destructive"}
+                            size="sm"
+                            onClick={handleToggleDeactivation}
+                            disabled={togglingDeactivation}
+                            className={
+                              isDeactivated
+                                ? "border-green-500/50 text-green-400 hover:bg-green-500/10"
+                                : ""
+                            }
+                          >
+                            {togglingDeactivation ? (
+                              <RefreshCw className="h-4 w-4 animate-spin mr-1" />
+                            ) : isDeactivated ? (
+                              <Play className="h-4 w-4 mr-1" />
+                            ) : (
+                              <Pause className="h-4 w-4 mr-1" />
+                            )}
+                            {togglingDeactivation
+                              ? "Processing..."
+                              : isDeactivated
+                                ? "Reactivate"
+                                : "Deactivate"}
+                          </Button>
+                        </div>
+                        {isDeactivated && user.deactivatedAt && (
+                          <p className="text-xs text-red-400/70 mt-2">
+                            Deactivated on{" "}
+                            {new Date(user.deactivatedAt).toLocaleString()}
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+
                     {/* Add Restriction */}
                     {showRestrictionForm ? (
                       <Card className="bg-red-500/10 border-red-500/30">
@@ -4072,7 +4172,7 @@ function UserConversationsTab({
         <Select
           value={statusFilter}
           onValueChange={(v) => {
-            setStatusFilter(v as any);
+            setStatusFilter(v as "all" | "active" | "resolved");
             setPage(1);
           }}
         >
@@ -4173,7 +4273,7 @@ function UserConversationsTab({
                       )}
                       {conv.lastMessage && (
                         <p className="text-sm text-gray-500 mt-2 italic truncate max-w-md">
-                          "{conv.lastMessage.content}"
+                          &quot;{conv.lastMessage.content}&quot;
                         </p>
                       )}
                     </div>

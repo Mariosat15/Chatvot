@@ -16,8 +16,6 @@ import {
   Filter,
   ArrowUpDown,
   Shield,
-  Ban,
-  Mail,
   MailCheck,
   MailX,
   TrendingUp,
@@ -27,7 +25,6 @@ import {
   Swords,
   Download,
   UserCheck,
-  UserPlus,
   AlertTriangle,
   Crown,
 } from "lucide-react";
@@ -142,6 +139,9 @@ export interface UserData {
   // Online status
   isOnline?: boolean;
   lastSeen?: string;
+  // Deactivation status
+  isDeactivated?: boolean;
+  deactivatedAt?: string;
   // Optional fields that may be present
   country?: string;
   city?: string;
@@ -212,6 +212,7 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
   // Fetch users when page, pageSize, search, or sort changes (server-side pagination)
   useEffect(() => {
     fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, pageSize, searchQuery, sortField, sortDirection]);
 
   // After users load, fetch presence and assignments for this page only (avoids loading 4k+ on User Management)
@@ -243,6 +244,7 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
         fetchUserById(initialUserId);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialUserId, users]);
 
   const fetchUserById = async (userId: string) => {
@@ -300,7 +302,7 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
       if (response.ok) {
         const data = await response.json();
         const assignmentMap = new Map<string, Assignment>();
-        (data.assignments || []).forEach((a: any) => {
+        (data.assignments || []).forEach((a: { customerId: string; employeeId: string; employeeName: string; employeeEmail: string; employeeRole: string; assignedAt: string }) => {
           assignmentMap.set(a.customerId, {
             employeeId: a.employeeId,
             employeeName: a.employeeName,
@@ -860,6 +862,11 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
                                   !user.gameMaster.isPaused
                                     ? ""
                                     : `(${user.gameMaster.isPaused ? "paused" : user.gameMaster.status})`}
+                                </Badge>
+                              )}
+                              {user.isDeactivated && (
+                                <Badge className="bg-red-700/80 text-white text-[10px] border-red-600/50">
+                                  DEACTIVATED
                                 </Badge>
                               )}
                             </div>

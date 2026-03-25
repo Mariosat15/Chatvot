@@ -18,6 +18,8 @@ import {
   Phone,
   Shield,
   UserPlus,
+  AlertTriangle,
+  Power,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -91,6 +93,11 @@ export default function ProfileSettingsSection() {
   const [allowFriendRequests, setAllowFriendRequests] = useState(true);
   const [savingPrivacy, setSavingPrivacy] = useState(false);
 
+  // Account deactivation
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
+  const [deactivateConfirmText, setDeactivateConfirmText] = useState("");
+  const [deactivating, setDeactivating] = useState(false);
+
   const countries = countryList().getData();
 
   // Helper function to get flag emoji
@@ -104,7 +111,7 @@ export default function ProfileSettingsSection() {
   };
 
   // Check if profile has changes
-  const hasProfileChanges = () => {
+  const _hasProfileChanges = () => {
     if (!originalValues.current) return false;
     return (
       name !== originalValues.current.name ||
@@ -169,6 +176,34 @@ export default function ProfileSettingsSection() {
       toast.error("Failed to load profile");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeactivateAccount = async () => {
+    if (deactivateConfirmText !== "DEACTIVATE") return;
+    setDeactivating(true);
+    try {
+      const response = await fetch("/api/user/deactivate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        toast.success("Account deactivated. You will be signed out.");
+        // Reason: Sign the user out after deactivation — redirect to home
+        setTimeout(() => {
+          window.location.href = "/sign-in";
+        }, 1500);
+      } else {
+        toast.error(data.error || "Failed to deactivate account");
+      }
+    } catch (error) {
+      console.error("Error deactivating account:", error);
+      toast.error("Something went wrong. Please contact support.");
+    } finally {
+      setDeactivating(false);
+      setShowDeactivateConfirm(false);
+      setDeactivateConfirmText("");
     }
   };
 
@@ -855,6 +890,78 @@ export default function ProfileSettingsSection() {
                 : "N/A"}
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Deactivate Account */}
+      <div className="bg-red-950/30 rounded-2xl p-6 shadow-xl border border-red-900/50">
+        <div className="flex items-center gap-3 mb-4">
+          <Power className="h-6 w-6 text-red-500" />
+          <h2 className="text-2xl font-bold text-red-400">Deactivate Account</h2>
+        </div>
+
+        <div className="space-y-3">
+          <p className="text-gray-300 text-sm">
+            Deactivating your account will prevent you from logging in.
+            Your data will be preserved and can be reactivated by contacting support.
+          </p>
+          <div className="flex items-start gap-2 text-sm text-yellow-400/80 bg-yellow-500/10 rounded-lg p-3 border border-yellow-500/20">
+            <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <span>
+              This action is immediate. You will be signed out and will not be able to log back in
+              until support reactivates your account.
+            </span>
+          </div>
+
+          {!showDeactivateConfirm ? (
+            <Button
+              variant="destructive"
+              onClick={() => setShowDeactivateConfirm(true)}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              <Power className="mr-2 h-4 w-4" />
+              Deactivate My Account
+            </Button>
+          ) : (
+            <div className="space-y-3 bg-red-950/50 rounded-lg p-4 border border-red-800/50">
+              <p className="text-sm text-red-300 font-medium">
+                Type <span className="font-mono font-bold text-white">DEACTIVATE</span> to confirm:
+              </p>
+              <Input
+                value={deactivateConfirmText}
+                onChange={(e) => setDeactivateConfirmText(e.target.value)}
+                placeholder="Type DEACTIVATE"
+                className="bg-dark-800 border-red-700/50 text-white"
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="destructive"
+                  disabled={deactivateConfirmText !== "DEACTIVATE" || deactivating}
+                  onClick={handleDeactivateAccount}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  {deactivating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Deactivating...
+                    </>
+                  ) : (
+                    "Confirm Deactivation"
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowDeactivateConfirm(false);
+                    setDeactivateConfirmText("");
+                  }}
+                  className="border-gray-600 text-gray-300"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

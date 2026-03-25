@@ -390,6 +390,16 @@ export const signInWithEmail = async ({ email, password }: SignInFormData) => {
     if (db) {
       const user = await db.collection("user").findOne({ email });
 
+      // Reason: Deactivated accounts must be blocked from logging in.
+      // The account data is preserved but the user cannot access it.
+      if (user && user.isDeactivated === true) {
+        return {
+          success: false,
+          error:
+            "This account has been deactivated. If you believe this is an error, please contact support.",
+        };
+      }
+
       // Block if user exists and email is NOT verified
       // emailVerified can be false, null, or undefined - all mean not verified
       // This matches the check in app/(root)/layout.tsx

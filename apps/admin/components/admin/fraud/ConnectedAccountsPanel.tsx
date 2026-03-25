@@ -22,6 +22,7 @@ interface ResolvedUser {
   email: string;
   createdAt: string;
   image?: string;
+  isDeactivated?: boolean;
 }
 
 interface ConnectedAccountsPanelProps {
@@ -155,6 +156,11 @@ export default function ConnectedAccountsPanel({
                         <span className="text-sm font-medium text-gray-200 truncate">
                           {resolved.name}
                         </span>
+                        {resolved.isDeactivated && (
+                          <Badge className="bg-red-700/80 text-white text-[9px] px-1">
+                            DEACTIVATED
+                          </Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <Mail className="h-3 w-3 text-gray-500 flex-shrink-0" />

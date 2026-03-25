@@ -338,6 +338,8 @@ export async function GET(request: NextRequest) {
         isAdmin: storedRole === "admin",
         createdAt: user.createdAt,
         emailVerified: user.emailVerified || false,
+        isDeactivated: user.isDeactivated || false,
+        deactivatedAt: user.deactivatedAt || null,
 
         // Address fields
         country: user.country || "",
