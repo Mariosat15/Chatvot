@@ -96,7 +96,7 @@ function DeviceFingerprintGrouped({ items }: { items: EvidenceItem[] }) {
         return (
           <div key={fpId} className="bg-gray-800/60 rounded-lg border border-gray-700 overflow-hidden">
             {/* Device header */}
-            <div className="px-4 py-3 bg-gradient-to-r from-amber-900/20 to-orange-900/20 border-b border-gray-700">
+            <div className="px-4 py-3 bg-linear-to-r from-amber-900/20 to-orange-900/20 border-b border-gray-700">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Monitor className="h-4 w-4 text-amber-400" />
@@ -216,10 +216,10 @@ function PaymentFingerprintGrouped({ items }: { items: EvidenceItem[] }) {
       {grouped.map(([key, { item, dates }]) => (
         <div key={key} className="bg-gray-800/60 rounded-lg border border-gray-700 overflow-hidden">
           {/* Card header */}
-          <div className="px-4 py-3 bg-gradient-to-r from-purple-900/20 to-blue-900/20 border-b border-gray-700">
+          <div className="px-4 py-3 bg-linear-to-r from-purple-900/20 to-blue-900/20 border-b border-gray-700">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-14 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded flex items-center justify-center">
+                <div className="h-10 w-14 bg-linear-to-br from-yellow-500 to-yellow-600 rounded flex items-center justify-center">
                   <span className="text-xs font-bold text-white">💳</span>
                 </div>
                 <div>
@@ -303,10 +303,10 @@ function MirrorTradingGrouped({ items }: { items: EvidenceItem[] }) {
   return (
     <div className="space-y-4">
       {/* Summary card */}
-      <div className="p-4 bg-gradient-to-br from-pink-900/20 to-purple-900/20 rounded-lg border border-pink-500/30">
+      <div className="p-4 bg-linear-to-br from-pink-900/20 to-purple-900/20 rounded-lg border border-pink-500/30">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <div className="h-12 w-12 bg-gradient-to-br from-pink-500 to-purple-500 rounded-lg flex items-center justify-center">
+            <div className="h-12 w-12 bg-linear-to-br from-pink-500 to-purple-500 rounded-lg flex items-center justify-center">
               <span className="text-xl">🪞</span>
             </div>
             <div>
@@ -383,7 +383,7 @@ function CoordinatedEntryGrouped({ items }: { items: EvidenceItem[] }) {
 
       {grouped.map(([key, { item, dates }]) => (
         <div key={key} className="bg-gray-800/60 rounded-lg border border-gray-700 overflow-hidden">
-          <div className="px-4 py-3 bg-gradient-to-r from-green-900/20 to-teal-900/20 border-b border-gray-700">
+          <div className="px-4 py-3 bg-linear-to-r from-green-900/20 to-teal-900/20 border-b border-gray-700">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-lg">🎯</span>
@@ -414,10 +414,10 @@ function CoordinatedEntryGrouped({ items }: { items: EvidenceItem[] }) {
                 {(item.data.entrySequence as any[]).map((entry, idx) => (
                   <div key={idx} className="flex items-center justify-between p-1.5 bg-gray-900/50 rounded text-[11px]">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <span className="text-gray-600 flex-shrink-0">#{idx + 1}</span>
+                      <span className="text-gray-600 shrink-0">#{idx + 1}</span>
                       <code className="font-mono text-green-300 text-[10px] break-all">{entry.userId}</code>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                    <div className="flex items-center gap-2 shrink-0 ml-2">
                       <span className="text-gray-400">{new Date(entry.entryTime).toLocaleTimeString()}</span>
                       {idx > 0 && <Badge className="bg-yellow-500/20 text-yellow-400 text-[9px]">+{entry.timeDelta || 0}s</Badge>}
                     </div>
@@ -449,9 +449,9 @@ function TradingSimilarityGrouped({ items }: { items: EvidenceItem[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="p-4 bg-gradient-to-br from-indigo-900/20 to-violet-900/20 rounded-lg border border-indigo-500/30">
+      <div className="p-4 bg-linear-to-br from-indigo-900/20 to-violet-900/20 rounded-lg border border-indigo-500/30">
         <div className="flex items-center gap-3 mb-3">
-          <div className="h-10 w-10 bg-gradient-to-br from-indigo-500 to-violet-500 rounded-lg flex items-center justify-center">
+          <div className="h-10 w-10 bg-linear-to-br from-indigo-500 to-violet-500 rounded-lg flex items-center justify-center">
             <span className="text-lg">📊</span>
           </div>
           <div>
@@ -493,7 +493,7 @@ function IpBrowserGrouped({ items }: { items: EvidenceItem[] }) {
     <div className="space-y-4">
       {grouped.map(([key, { item, dates }]) => (
         <div key={key} className="bg-gray-800/60 rounded-lg border border-gray-700 overflow-hidden">
-          <div className="px-4 py-3 bg-gradient-to-r from-orange-900/20 to-red-900/20 border-b border-gray-700">
+          <div className="px-4 py-3 bg-linear-to-r from-orange-900/20 to-red-900/20 border-b border-gray-700">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Monitor className="h-4 w-4 text-orange-400" />
