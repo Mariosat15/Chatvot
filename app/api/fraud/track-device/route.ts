@@ -108,6 +108,9 @@ export async function POST(request: Request) {
       riskScore: number;
       country?: string;
       city?: string;
+      isp?: string;
+      org?: string;
+      asn?: string;
     } = {
       isVPN: false,
       isProxy: false,
@@ -984,6 +987,9 @@ export async function POST(request: Request) {
         fingerprintId: newFingerprint.fingerprintId,
       });
     }
+
+    // Reason: Fallback return in case no branch above explicitly returns.
+    return NextResponse.json({ success: true, message: "Device processed" });
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
