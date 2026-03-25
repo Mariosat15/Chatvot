@@ -223,6 +223,8 @@ export interface ComprehensiveDashboardData {
       description: string;
       confidence: number;
       detectedAt: Date;
+      /** Unique evidence method types within this alert (e.g. same_device, mirror_trading) */
+      evidenceTypes: string[];
     }>;
     // Active account lockouts
     lockouts: Array<{
@@ -1080,7 +1082,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
         ],
         status: { $in: ["pending", "investigating"] },
       })
-        .select("alertType severity status title description confidence detectedAt")
+        .select("alertType severity status title description confidence detectedAt evidence.type")
         .sort({ detectedAt: -1 })
         .limit(10)
         .lean()
@@ -1141,6 +1143,15 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
         description: a.description,
         confidence: a.confidence,
         detectedAt: a.detectedAt,
+        // Reason: Extract unique evidence method types so the customer-facing
+        // AccountStatusCard can list each flagged reason individually.
+        evidenceTypes: [
+          ...new Set(
+            (a.evidence || []).map(
+              (ev: { type: string }) => ev.type,
+            ),
+          ),
+        ],
       })),
       lockouts: (lockouts as any[]).map((l) => ({
         id: l._id.toString(),

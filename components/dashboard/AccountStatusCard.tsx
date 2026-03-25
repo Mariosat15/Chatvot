@@ -187,9 +187,17 @@ export default function AccountStatusCard({
     lockouts.length +
     (hasKycIssue ? 1 : 0);
 
-  // Collect unique alert types from all fraud alerts for bullet-point display
-  const uniqueAlertTypes = [
-    ...new Set(fraudAlerts.map((a) => a.alertType)),
+  // Reason: Collect ALL unique evidence method types across all fraud alerts.
+  // Each alert may contain multiple evidence types (e.g., same_device + mirror_trading).
+  // We also include the top-level alertType as a fallback.
+  const uniqueEvidenceTypes = [
+    ...new Set(
+      fraudAlerts.flatMap((a) =>
+        a.evidenceTypes && a.evidenceTypes.length > 0
+          ? a.evidenceTypes
+          : [a.alertType],
+      ),
+    ),
   ];
 
   return (
@@ -309,19 +317,23 @@ export default function AccountStatusCard({
                   </div>
                 </div>
 
-                {/* What was flagged — bullet points */}
-                {uniqueAlertTypes.length > 0 && (
-                  <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/15 space-y-2">
+                {/* What was flagged — bullet points for EVERY evidence type */}
+                {uniqueEvidenceTypes.length > 0 && (
+                  <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/15 space-y-3">
                     <p className="text-[11px] text-amber-200 font-medium">
-                      What was flagged:
+                      What was flagged ({uniqueEvidenceTypes.length}{" "}
+                      {uniqueEvidenceTypes.length === 1
+                        ? "indicator"
+                        : "indicators"}
+                      ):
                     </p>
-                    <ul className="space-y-2">
-                      {uniqueAlertTypes.map((alertType) => {
+                    <ul className="space-y-2.5">
+                      {uniqueEvidenceTypes.map((evType) => {
                         const info =
-                          INVESTIGATION_REASON_EXPLANATIONS.get(alertType);
+                          INVESTIGATION_REASON_EXPLANATIONS.get(evType);
                         return (
                           <li
-                            key={alertType}
+                            key={evType}
                             className="flex items-start gap-2"
                           >
                             <span className="text-amber-400 mt-1 shrink-0">
@@ -340,6 +352,17 @@ export default function AccountStatusCard({
                         );
                       })}
                     </ul>
+                    <p className="text-[10px] text-gray-500 leading-relaxed pt-1 border-t border-amber-500/10">
+                      If you recognise any of the above and believe it may be
+                      related to your activity, please{" "}
+                      <Link
+                        href="/messaging"
+                        className="text-blue-400 hover:text-blue-300 underline"
+                      >
+                        contact our support team
+                      </Link>{" "}
+                      so we can resolve this quickly.
+                    </p>
                   </div>
                 )}
 
