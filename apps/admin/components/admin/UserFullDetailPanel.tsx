@@ -334,10 +334,8 @@ export default function UserFullDetailPanel({
   const [loading, setLoading] = useState(true);
 
   // Check if user has active GM subscription
-   
-  const gmData = (user as Record<string, unknown>).gameMaster as Record<string, unknown> | undefined;
   const hasActiveGMSubscription =
-    gmData?.isGameMaster === true && gmData?.status === "active";
+    user.gameMaster?.isGameMaster === true && user.gameMaster?.status === "active";
 
   // Determine the effective role - if user has active GM, they should be 'gamemaster'
   const effectiveRole: UserRole = hasActiveGMSubscription
@@ -3149,12 +3147,12 @@ export default function UserFullDetailPanel({
                                               </span>
                                             )}
                                           {/* View Terms button for terms_acceptance entries */}
-                                          {item.type === "terms_acceptance" && item.details?.termsSlug && (
+                                          {item.type === "terms_acceptance" && typeof item.details?.termsSlug === "string" && (
                                             <Button
                                               size="sm"
                                               variant="outline"
                                               className="h-6 px-2 text-[10px] border-emerald-600/40 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300"
-                                              onClick={() => handleViewTerms(item.details!.termsSlug)}
+                                              onClick={() => handleViewTerms(item.details!.termsSlug as string)}
                                             >
                                               <Eye className="h-3 w-3 mr-1" />
                                               View Terms
