@@ -130,6 +130,80 @@ const INVESTIGATION_REASON_EXPLANATIONS: ReadonlyMap<
         "A higher-than-usual volume of actions was detected on your account. We review this to ensure everything is in order.",
     },
   ],
+  // Reason: Evidence-level type names differ from top-level alertType names.
+  // The fraud detection services store evidence with these specific type keys.
+  [
+    "device_fingerprint",
+    {
+      label: "Device Verification",
+      explanation:
+        "Our system detected that your device may be associated with multiple accounts. This check ensures each account belongs to a unique user.",
+    },
+  ],
+  [
+    "payment_fingerprint",
+    {
+      label: "Payment Method Verification",
+      explanation:
+        "A payment method linked to your account was also found on another account. This check protects against unauthorized use of your payment details.",
+    },
+  ],
+  [
+    "trading_similarity",
+    {
+      label: "Trading Pattern Review",
+      explanation:
+        "Your recent trading activity showed patterns that closely match another account. We review these to maintain fair competition.",
+    },
+  ],
+  [
+    "duplicate_document",
+    {
+      label: "Identity Document Review",
+      explanation:
+        "An identity document associated with your account was flagged for additional review to ensure it has not been used elsewhere.",
+    },
+  ],
+  [
+    "ip_browser_match",
+    {
+      label: "Session Verification",
+      explanation:
+        "Your browsing session matched patterns that require a brief review to confirm account ownership.",
+    },
+  ],
+  [
+    "rapid_creation",
+    {
+      label: "Account Timing Review",
+      explanation:
+        "Your account creation timing was close to other accounts. We review these patterns to ensure platform integrity.",
+    },
+  ],
+  [
+    "burst_entry",
+    {
+      label: "Competition Entry Review",
+      explanation:
+        "The timing of your competition entry matched a pattern that we review to ensure all participants compete fairly.",
+    },
+  ],
+  [
+    "failed_logins",
+    {
+      label: "Login Security Check",
+      explanation:
+        "Multiple login attempts were detected on your account. We review these to protect your account from unauthorized access.",
+    },
+  ],
+  [
+    "suspicion_score",
+    {
+      label: "Account Review",
+      explanation:
+        "Your account was flagged for a routine security review based on combined activity patterns. No action is needed from you at this time.",
+    },
+  ],
 ]);
 
 const LOCKOUT_REASON_LABELS: ReadonlyMap<string, string> = new Map([
