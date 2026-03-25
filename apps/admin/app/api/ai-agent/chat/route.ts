@@ -3769,35 +3769,60 @@ Detects same ID document used by multiple accounts:
     },
     fraud_detection: {
       title: "Fraud Detection Guide",
-      content: `## FRAUD DETECTION
+      content: `## FRAUD DETECTION SYSTEM — COMPREHENSIVE GUIDE
 
 ### Overview
-- Device fingerprinting (same device = same user)
-- Payment method sharing (same card across accounts)
-- VPN/Proxy detection
-- Multi-account detection
-- Suspicious behavior analysis
+The platform has 8 automated detection methods that work together to catch multi-accounting, collusion, and manipulation:
+
+### Detection Methods
+
+**1. Device Fingerprinting** — Tracks browser/device signatures. If two accounts share the same device, both are flagged. Automatic on every login. Points: +10 to +30.
+
+**2. Payment Fingerprinting** — Checks if the same credit card, bank account, or payment method is used across multiple accounts. Triggers after every deposit. Points: +20 to +40.
+
+**3. IP & Browser Match** — Logs IP address and browser user-agent on every login. Flags accounts sharing the same IP + browser combination. Points: +10 to +20.
+
+**4. VPN/Proxy/Tor Detection** — Checks IPs against known VPN, proxy, Tor exit node, and hosting/datacenter databases. Configurable: block or flag. Points: VPN +30, Proxy +25, Tor +50.
+
+**5. Mirror Trading Detection** — Checks if two accounts open the same trade (same pair, direction, and size) within seconds of each other. Each matching trade pair is stored as evidence. Points: +30.
+
+**6. Trading Similarity Detection** — Builds a "Trading Behavior Profile" for each user from their closed trades. Compares profiles using 7 weighted metrics: Pair Similarity (15%), Timing (15%), Size (15%), Duration (10%), Risk Management (10%), Style (15%), Behavioral Fingerprint (20%). Alert triggers at ≥70% similarity, escalated at ≥90%. Points: +30. Profiles update on every trade close; comparison runs on-demand via "Run Full Analysis".
+
+**7. Coordinated Entry Detection** — When a user joins a competition, checks if any previously linked accounts are already in that competition. Competition-specific alerts. Points: +20 to +40.
+
+**8. KYC Document Reuse** — When KYC completes, checks if the same identity document was submitted by another account. Critical severity alert + possible auto-suspend. Points: +50.
 
 ### Settings Location
-Admin Panel → Security → Fraud Settings
+Admin Panel → Fraud Tab → Settings
 
 **Key Settings**:
-- Risk Thresholds: Alert (40), Block (70), Auto-suspend (90)
-- VPN/Proxy: Block or just flag
-- Multi-account: Max accounts per device
+- Entry Block Threshold: Block competition entry if suspicion score > threshold (default: 70)
+- Alert Threshold: Create admin alert if score > threshold (default: 40)
+- Auto-Suspend: Automatically suspend accounts above threshold (default: 90)
+- VPN/Proxy: Toggle blocking per type (VPN, Proxy, Tor)
+- Max accounts per device
 - Rate Limiting: Max signups/hour, max login attempts
+- Whitelisted IPs and fingerprints
 
-### Fraud Alerts
-**Location**: Admin Panel → Security → Fraud Alerts
+### Fraud Alerts & Investigation
+**Location**: Admin Panel → Fraud Tab → Monitoring
 
-Actions: Investigate, Dismiss, Suspend, Ban
+- Alerts merge: Multiple methods for the same accounts combine into ONE alert
+- Each alert has evidence tabs organized by detection type
+- AI Investigation Report: Generates a detailed analysis of all evidence
+- Network graph visualization: Shows connections between flagged accounts
+- Actions: Investigate, Dismiss/Clear, Suspend, Ban, Deactivate
 
-### Suspicion Scores
-Risk scores based on:
-- Device sharing (+10-30)
-- Payment sharing (+20-40)
-- VPN usage (+30)
-- Failed verification (+25)`,
+### Suspicion Score Breakdown
+Each detection method adds points to the user's cumulative risk score:
+- Device sharing: +10-30
+- Payment sharing: +20-40
+- IP/Browser: +10-20
+- VPN: +30, Proxy: +25, Tor: +50
+- Trading Similarity (≥70%): +30
+- Mirror Trading: +30
+- KYC Document Reuse: +50
+- Coordinated Entry: +20-40`,
     },
     badges_xp: {
       title: "Badges & XP System Guide",

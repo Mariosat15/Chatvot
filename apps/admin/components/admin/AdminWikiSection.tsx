@@ -606,82 +606,491 @@ export default function AdminWikiSection() {
     // ==================== FRAUD DETECTION ====================
     {
       id: "fraud-overview",
-      title: "Fraud Detection System",
+      title: "Fraud Detection Overview",
       icon: Shield,
       category: "Fraud Detection",
-      tags: ["fraud", "security", "detection", "vpn", "cheating"],
+      tags: ["fraud", "security", "detection", "overview", "multi-accounting"],
       content: (
         <div className="space-y-6">
           <div>
             <h2 className="text-2xl font-bold text-red-400 mb-3">
-              Understanding Fraud Detection
+              Fraud Detection System — Overview
             </h2>
             <p className="text-gray-300 mb-4">
-              Our multi-layered fraud detection system protects your
-              competitions from cheaters.
+              The platform uses a multi-layered, automated fraud detection system
+              designed to catch multi-accounting, collusion, and manipulation in
+              competitions and challenges. The system operates across 8 detection
+              methods that work together to build a comprehensive risk profile for
+              every user.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="bg-gray-800 border-red-500/30">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base text-red-400">
-                  Device Fingerprinting
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm text-gray-300 space-y-1">
-                  <p>
-                    <strong>Detects:</strong> Multiple accounts from same device
-                  </p>
-                  <p>
-                    <strong>Accuracy:</strong> ~85%
-                  </p>
+          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-5">
+            <h3 className="text-lg font-bold text-red-400 mb-3 flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5" />
+              8 Detection Methods
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {[
+                { name: "Device Fingerprinting", desc: "Same device across multiple accounts", color: "red" },
+                { name: "Payment Fingerprinting", desc: "Same payment method (card/bank) across accounts", color: "orange" },
+                { name: "IP & Browser Match", desc: "Same IP address and browser signature", color: "yellow" },
+                { name: "Mirror Trading", desc: "Two accounts opening identical trades within seconds", color: "purple" },
+                { name: "Trading Similarity", desc: "Behavioral pattern analysis (pairs, timing, size, style)", color: "pink" },
+                { name: "Coordinated Entry", desc: "Multiple linked accounts entering same competition", color: "blue" },
+                { name: "VPN/Proxy Detection", desc: "VPN, proxy, Tor, or hosting IP usage", color: "cyan" },
+                { name: "KYC Document Reuse", desc: "Same identity document submitted by different accounts", color: "green" },
+              ].map((method) => (
+                <div key={method.name} className={`bg-gray-800 border border-${method.color}-500/30 rounded-lg p-3`}>
+                  <h4 className={`font-semibold text-${method.color}-400 text-sm`}>{method.name}</h4>
+                  <p className="text-xs text-gray-400 mt-1">{method.desc}</p>
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gray-800 border-orange-500/30">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base text-orange-400">
-                  VPN/Proxy Detection
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm text-gray-300 space-y-1">
-                  <p>
-                    <strong>Detects:</strong> VPNs, proxies, Tor
-                  </p>
-                  <p>
-                    <strong>Accuracy:</strong> 60-95%
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gray-800 border-yellow-500/30">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base text-yellow-400">
-                  Risk Scoring
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm text-gray-300 space-y-1">
-                  <p>
-                    <strong>Range:</strong> 0-100 points
-                  </p>
-                  <p>
-                    <strong>Action:</strong> Auto-block at threshold
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+              ))}
+            </div>
           </div>
 
           <Card className="bg-gray-800 border-gray-700">
             <CardHeader>
-              <CardTitle className="text-lg text-red-400">
-                Fraud Settings
+              <CardTitle className="text-lg text-blue-400 flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                How Alerts Work
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300 text-sm">
+              <p>
+                When any detection method triggers, a <strong>Fraud Alert</strong> is
+                created (or merged into an existing one for the same accounts). Each
+                alert contains:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-gray-400">
+                <li><strong>Suspicious User IDs</strong> — all accounts involved</li>
+                <li><strong>Evidence items</strong> — each detection method adds its own evidence with timestamps</li>
+                <li><strong>Severity</strong> — low / medium / high / critical</li>
+                <li><strong>Confidence score</strong> — 0-100% certainty</li>
+                <li><strong>Suspicion Score</strong> — cumulative risk score per user</li>
+              </ul>
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded p-3 mt-2">
+                <p className="text-blue-300 text-xs">
+                  <strong>Merging logic:</strong> If multiple detection methods fire for the
+                  same group of accounts, all evidence is merged into ONE alert. This gives
+                  you a single investigation card with all findings in one place.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-yellow-400">
+                Alert Lifecycle
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-300 space-y-3">
+              <div className="flex flex-wrap gap-2">
+                <Badge className="bg-yellow-500/20 text-yellow-400">Pending</Badge>
+                <ArrowRight className="h-4 w-4 text-gray-500 self-center" />
+                <Badge className="bg-blue-500/20 text-blue-400">Investigating</Badge>
+                <ArrowRight className="h-4 w-4 text-gray-500 self-center" />
+                <Badge className="bg-green-500/20 text-green-400">Resolved / Dismissed</Badge>
+              </div>
+              <div className="space-y-2 mt-3">
+                <div className="bg-gray-900 p-2 rounded">
+                  <strong className="text-yellow-400">Investigate:</strong>{" "}
+                  Mark alert for review, gather more evidence, use AI report
+                </div>
+                <div className="bg-gray-900 p-2 rounded">
+                  <strong className="text-orange-400">Suspend / Restrict:</strong>{" "}
+                  Block user from competitions or specific features
+                </div>
+                <div className="bg-gray-900 p-2 rounded">
+                  <strong className="text-red-400">Ban / Deactivate:</strong>{" "}
+                  Permanently block user or deactivate account
+                </div>
+                <div className="bg-gray-900 p-2 rounded">
+                  <strong className="text-green-400">Dismiss / Clear:</strong>{" "}
+                  Mark as false positive. Cleared users won&apos;t be re-flagged for the same evidence.
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-purple-400 flex items-center gap-2">
+                <Cpu className="h-5 w-5" />
+                AI Investigation Agent
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-300 space-y-2">
+              <p>
+                Each fraud alert card includes an <strong>AI Investigation Report</strong> button.
+                When clicked, an AI agent analyses all evidence for that investigation and generates
+                a detailed report including:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-gray-400">
+                <li>Summary of all accounts involved and what each did</li>
+                <li>Timeline of suspicious activities</li>
+                <li>Connections between accounts (shared devices, payments, trades)</li>
+                <li>Confidence assessment and risk rating</li>
+                <li>Recommended actions (suspend, ban, dismiss, monitor)</li>
+              </ul>
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded p-3 mt-2">
+                <p className="text-purple-300 text-xs">
+                  The AI agent uses real data from the investigation — it does not hallucinate.
+                  Sensitive data is masked before being sent for analysis.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ),
+    },
+    {
+      id: "fraud-device-payment",
+      title: "Device & Payment Detection",
+      icon: Cpu,
+      category: "Fraud Detection",
+      tags: ["device", "fingerprint", "payment", "card", "multi-account", "ip", "browser"],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-red-400 mb-3">
+              Device Fingerprinting, Payment Fingerprinting &amp; IP/Browser Match
+            </h2>
+            <p className="text-gray-300 mb-4">
+              These three methods detect multi-accounting by identifying shared
+              hardware, payment instruments, and network signatures across accounts.
+            </p>
+          </div>
+
+          <Card className="bg-gray-800 border-red-500/30">
+            <CardHeader>
+              <CardTitle className="text-lg text-red-400 flex items-center gap-2">
+                <Cpu className="h-5 w-5" />
+                1. Device Fingerprinting
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-300 space-y-3">
+              <p><strong>What it detects:</strong> Multiple accounts using the same physical device (computer/phone).</p>
+              <p><strong>How it works:</strong></p>
+              <ul className="list-disc list-inside space-y-1 text-gray-400">
+                <li>On every login and page visit, the system collects a device fingerprint using browser properties (screen resolution, GPU, timezone, language, installed fonts, etc.)</li>
+                <li>Fingerprints are compared against all known fingerprints in the database</li>
+                <li>If two different user accounts share the same fingerprint, a fraud alert is created linking both accounts</li>
+                <li>Component similarity matching catches fingerprints that are 85%+ similar (e.g., same device with different browser)</li>
+              </ul>
+              <div className="bg-red-500/10 border border-red-500/30 rounded p-3">
+                <p className="text-red-300 text-xs">
+                  <strong>Trigger:</strong> Automatic on every login/session. No admin action needed to activate.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-orange-500/30">
+            <CardHeader>
+              <CardTitle className="text-lg text-orange-400 flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                2. Payment Fingerprinting
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-300 space-y-3">
+              <p><strong>What it detects:</strong> Multiple accounts using the same credit/debit card or bank account.</p>
+              <p><strong>How it works:</strong></p>
+              <ul className="list-disc list-inside space-y-1 text-gray-400">
+                <li>When a user makes a deposit, the payment processor returns a unique payment option ID (UPO) and card details</li>
+                <li>The system stores a &quot;payment fingerprint&quot; — a hash of the card number, expiry, and card type</li>
+                <li>If another account uses the same payment fingerprint, both accounts are flagged</li>
+                <li>This also catches cases where the same card is used across different payment sessions</li>
+              </ul>
+              <div className="bg-orange-500/10 border border-orange-500/30 rounded p-3">
+                <p className="text-orange-300 text-xs">
+                  <strong>Trigger:</strong> Automatic after every successful deposit. Checks all previous deposits across all users.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-yellow-500/30">
+            <CardHeader>
+              <CardTitle className="text-lg text-yellow-400 flex items-center gap-2">
+                <Globe className="h-5 w-5" />
+                3. IP &amp; Browser Match
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-300 space-y-3">
+              <p><strong>What it detects:</strong> Multiple accounts logging in from the same IP address and browser.</p>
+              <p><strong>How it works:</strong></p>
+              <ul className="list-disc list-inside space-y-1 text-gray-400">
+                <li>The system logs the IP address and user-agent string on every login</li>
+                <li>If two accounts share the same IP + similar browser signature, they are flagged</li>
+                <li>IP geolocation data (country, city, ISP) is also recorded for context</li>
+                <li>Distinguished from VPN detection — this catches users on the same home/office network</li>
+              </ul>
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-3">
+                <p className="text-yellow-300 text-xs">
+                  <strong>Note:</strong> Shared public WiFi can cause false positives. Use the AI report and other
+                  evidence to confirm before taking action.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-cyan-500/30">
+            <CardHeader>
+              <CardTitle className="text-lg text-cyan-400 flex items-center gap-2">
+                <Eye className="h-5 w-5" />
+                4. VPN / Proxy / Tor Detection
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-300 space-y-3">
+              <p><strong>What it detects:</strong> Users hiding their real IP address using VPN services, proxies, or Tor.</p>
+              <p><strong>How it works:</strong></p>
+              <ul className="list-disc list-inside space-y-1 text-gray-400">
+                <li>IP addresses are checked against known VPN/proxy/Tor exit node databases</li>
+                <li>Hosting/datacenter IPs are also flagged (real users don&apos;t browse from servers)</li>
+                <li>Configurable: you can choose to block, flag, or allow VPN users</li>
+                <li>Risk scores: VPN (+30), Proxy (+25), Tor (+50), Hosting (+40)</li>
+              </ul>
+              <div className="bg-cyan-500/10 border border-cyan-500/30 rounded p-3">
+                <p className="text-cyan-300 text-xs">
+                  <strong>Settings:</strong> Admin Panel → Fraud Tab → Settings → VPN/Proxy Detection.
+                  You can toggle blocking for each type independently.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ),
+    },
+    {
+      id: "fraud-trading-analysis",
+      title: "Trading Behavior Analysis",
+      icon: LineChart,
+      category: "Fraud Detection",
+      tags: ["mirror", "trading", "similarity", "behavior", "pattern", "collusion"],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-purple-400 mb-3">
+              Mirror Trading &amp; Trading Similarity Detection
+            </h2>
+            <p className="text-gray-300 mb-4">
+              These methods detect collusion and multi-accounting by analyzing
+              how users trade. If two accounts trade identically or with
+              suspiciously similar patterns, the system flags them.
+            </p>
+          </div>
+
+          <Card className="bg-gray-800 border-purple-500/30">
+            <CardHeader>
+              <CardTitle className="text-lg text-purple-400 flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                5. Mirror Trading Detection
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-300 space-y-3">
+              <p><strong>What it detects:</strong> Two accounts opening the exact same trade (same pair, same direction) within a very short time window.</p>
+              <p><strong>How it works:</strong></p>
+              <ul className="list-disc list-inside space-y-1 text-gray-400">
+                <li>When a trade is opened, the system checks if any linked/suspicious account opened the same trade recently</li>
+                <li>Compares: currency pair, direction (buy/sell), timing gap, and lot size</li>
+                <li>If trades match within the time threshold, it&apos;s flagged as mirror trading</li>
+                <li>Each matching trade pair is stored as individual evidence</li>
+              </ul>
+              <p><strong>Evidence includes:</strong></p>
+              <ul className="list-disc list-inside space-y-1 text-gray-400">
+                <li>Timing correlation — how close the trades were opened (e.g., within 30 seconds)</li>
+                <li>Direction correlation — same direction (buy/buy or sell/sell) vs opposite</li>
+                <li>Matching trade details (pair, size, time)</li>
+              </ul>
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded p-3">
+                <p className="text-purple-300 text-xs">
+                  <strong>Example:</strong> Account A opens BUY EUR/USD 0.5 lots at 14:32:05. Account B opens BUY EUR/USD 0.5 lots at 14:32:12. That&apos;s a 7-second gap on the exact same trade → flagged.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-pink-500/30">
+            <CardHeader>
+              <CardTitle className="text-lg text-pink-400 flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                6. Trading Similarity Detection
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-300 space-y-3">
+              <p><strong>What it detects:</strong> Two accounts with suspiciously similar overall trading behavior, even if they don&apos;t mirror individual trades.</p>
+              <p><strong>How it works — 3-layer pipeline:</strong></p>
+
+              <div className="bg-gray-900 rounded-lg p-4 space-y-4">
+                <div>
+                  <h5 className="text-pink-400 font-semibold mb-2">Layer 1: Profile Building</h5>
+                  <p className="text-gray-400 text-xs mb-2">
+                    Every time a user closes a trade, their <strong>Trading Behavior Profile</strong> is updated.
+                    The profile tracks:
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-gray-500 text-xs">
+                    <li><strong>Preferred pairs</strong> — top 5 most-traded currency pairs</li>
+                    <li><strong>Trading hours</strong> — 24-hour distribution of when the user trades</li>
+                    <li><strong>Average trade size</strong> — typical lot size</li>
+                    <li><strong>Average trade duration</strong> — how long positions are held</li>
+                    <li><strong>Risk management</strong> — average stop-loss and take-profit distances</li>
+                    <li><strong>Win rate &amp; profit factor</strong> — performance metrics</li>
+                    <li><strong>Trading style</strong> — scalper, day trader, or swing trader scores</li>
+                    <li><strong>Behavioral fingerprint</strong> — a 32-dimension numeric vector encoding all of the above</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h5 className="text-pink-400 font-semibold mb-2">Layer 2: Similarity Calculation</h5>
+                  <p className="text-gray-400 text-xs mb-2">
+                    The system compares two profiles using 7 weighted metrics:
+                  </p>
+                  <div className="bg-gray-800 rounded overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-700">
+                        <tr>
+                          <th className="text-left p-2 text-gray-300">Metric</th>
+                          <th className="text-left p-2 text-gray-300">Weight</th>
+                          <th className="text-left p-2 text-gray-300">Algorithm</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-gray-400">
+                        <tr className="border-t border-gray-700"><td className="p-2">Pair Similarity</td><td className="p-2 text-pink-400">15%</td><td className="p-2">Jaccard similarity (overlap of pair sets)</td></tr>
+                        <tr className="border-t border-gray-700"><td className="p-2">Timing Similarity</td><td className="p-2 text-pink-400">15%</td><td className="p-2">Cosine similarity of hour distributions</td></tr>
+                        <tr className="border-t border-gray-700"><td className="p-2">Size Similarity</td><td className="p-2 text-pink-400">15%</td><td className="p-2">Normalized difference (max 10 lots)</td></tr>
+                        <tr className="border-t border-gray-700"><td className="p-2">Duration Similarity</td><td className="p-2 text-pink-400">10%</td><td className="p-2">Normalized difference (max 8 hours)</td></tr>
+                        <tr className="border-t border-gray-700"><td className="p-2">Risk Similarity</td><td className="p-2 text-pink-400">10%</td><td className="p-2">Average of SL + TP differences</td></tr>
+                        <tr className="border-t border-gray-700"><td className="p-2">Style Score</td><td className="p-2 text-pink-400">15%</td><td className="p-2">Euclidean distance of style vectors</td></tr>
+                        <tr className="border-t border-gray-700"><td className="p-2">Fingerprint Distance</td><td className="p-2 text-pink-400">20%</td><td className="p-2">Cosine similarity of 32-dim vectors</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div>
+                  <h5 className="text-pink-400 font-semibold mb-2">Layer 3: Alert Thresholds</h5>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-yellow-500/20 text-yellow-400">≥ 50%</Badge>
+                      <span className="text-gray-400">Counted as &quot;similar pair&quot; in reports</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-orange-500/20 text-orange-400">≥ 70%</Badge>
+                      <span className="text-gray-400">Fraud alert created + suspicion score updated (+30 points each user)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-red-500/20 text-red-400">≥ 90%</Badge>
+                      <span className="text-gray-400">Severity escalated to &quot;high&quot;</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-pink-500/10 border border-pink-500/30 rounded p-3">
+                <p className="text-pink-300 text-xs">
+                  <strong>When it runs:</strong> Profiles update automatically after each trade close.
+                  Similarity comparison runs on-demand: Admin Panel → Fraud → Behavioral Analysis → &quot;Run Full Analysis&quot;.
+                  It compares up to 200 most recently active profiles (users with ≥5 trades).
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ),
+    },
+    {
+      id: "fraud-competition-kyc",
+      title: "Competition Fraud & KYC",
+      icon: Trophy,
+      category: "Fraud Detection",
+      tags: ["coordinated", "entry", "competition", "kyc", "document", "identity"],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-blue-400 mb-3">
+              Coordinated Entry &amp; KYC Document Reuse
+            </h2>
+            <p className="text-gray-300 mb-4">
+              These methods detect organized fraud where multiple accounts enter the
+              same competition to gain an unfair advantage, or where the same identity
+              documents are reused across accounts.
+            </p>
+          </div>
+
+          <Card className="bg-gray-800 border-blue-500/30">
+            <CardHeader>
+              <CardTitle className="text-lg text-blue-400 flex items-center gap-2">
+                <Target className="h-5 w-5" />
+                7. Coordinated Entry Detection
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-300 space-y-3">
+              <p><strong>What it detects:</strong> Multiple accounts that are already linked (by device, payment, IP, or trading similarity) joining the same competition.</p>
+              <p><strong>How it works:</strong></p>
+              <ul className="list-disc list-inside space-y-1 text-gray-400">
+                <li>When a user joins a competition, the system checks if any previously flagged/linked accounts are already in that competition</li>
+                <li>If linked accounts are found in the same competition, a &quot;coordinated entry&quot; alert is created</li>
+                <li>The alert is competition-specific (separate alert per competition)</li>
+                <li>This is the strongest signal of manipulation — it means linked accounts are actively trying to game a specific event</li>
+              </ul>
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded p-3">
+                <p className="text-blue-300 text-xs">
+                  <strong>Example:</strong> Account A and Account B share the same device fingerprint. Both enter &quot;Weekly EUR/USD Championship&quot;. → Coordinated entry alert created for that competition.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-green-500/30">
+            <CardHeader>
+              <CardTitle className="text-lg text-green-400 flex items-center gap-2">
+                <FileCheck className="h-5 w-5" />
+                8. KYC Document Reuse
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-300 space-y-3">
+              <p><strong>What it detects:</strong> The same identity document (passport, ID card, driver&apos;s license) submitted by multiple accounts during KYC verification.</p>
+              <p><strong>How it works:</strong></p>
+              <ul className="list-disc list-inside space-y-1 text-gray-400">
+                <li>When KYC verification completes, the system checks if the same document has been used before</li>
+                <li>If a duplicate is found, a <strong>critical</strong> severity alert is created</li>
+                <li>The account may be automatically suspended depending on settings</li>
+                <li>Withdrawals remain enabled so the user can retrieve their funds</li>
+              </ul>
+              <div className="bg-green-500/10 border border-green-500/30 rounded p-3">
+                <p className="text-green-300 text-xs">
+                  <strong>Important:</strong> This is one of the strongest signals. If two accounts submit the same passport, it&apos;s almost certainly the same person. Consider banning both accounts.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ),
+    },
+    {
+      id: "fraud-settings-config",
+      title: "Fraud Settings & Configuration",
+      icon: Settings,
+      category: "Fraud Detection",
+      tags: ["settings", "threshold", "config", "vpn", "block", "whitelist", "risk"],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-yellow-400 mb-3">
+              Fraud Settings &amp; Configuration
+            </h2>
+            <p className="text-gray-300 mb-4">
+              All fraud detection thresholds and behaviors can be configured from
+              <strong> Admin Panel → Fraud Tab → Settings</strong>.
+            </p>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-yellow-400">
+                Risk Thresholds
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-gray-300">
@@ -689,12 +1098,13 @@ export default function AdminWikiSection() {
                 <h4 className="font-semibold text-white mb-2">
                   Entry Block Threshold
                 </h4>
+                <p className="text-xs text-gray-400 mb-2">
+                  Users with a suspicion score above this value are blocked from entering competitions.
+                </p>
                 <div className="bg-gray-900 p-3 rounded space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Lenient (85):</span>
-                    <span className="text-green-400">
-                      Few blocks, some fraud may pass
-                    </span>
+                    <span className="text-green-400">Few blocks, some fraud may pass</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Balanced (70):</span>
@@ -702,35 +1112,70 @@ export default function AdminWikiSection() {
                   </div>
                   <div className="flex justify-between">
                     <span>Strict (50):</span>
-                    <span className="text-red-400">
-                      Catches most fraud, some false positives
-                    </span>
+                    <span className="text-red-400">Catches most fraud, some false positives</span>
                   </div>
                 </div>
               </div>
 
               <div>
-                <h4 className="font-semibold text-white mb-2">
-                  Actions You Can Take
-                </h4>
-                <div className="text-sm space-y-2">
-                  <div className="bg-gray-900 p-2 rounded">
-                    <strong className="text-yellow-400">Investigate:</strong>{" "}
-                    Mark alert for review, gather more evidence
-                  </div>
-                  <div className="bg-gray-900 p-2 rounded">
-                    <strong className="text-orange-400">Suspend:</strong>{" "}
-                    Temporarily block user from competitions
-                  </div>
-                  <div className="bg-gray-900 p-2 rounded">
-                    <strong className="text-red-400">Ban:</strong> Permanently
-                    block user from platform
-                  </div>
-                  <div className="bg-gray-900 p-2 rounded">
-                    <strong className="text-green-400">Dismiss:</strong> Mark as
-                    false positive, clear alert
-                  </div>
-                </div>
+                <h4 className="font-semibold text-white mb-2">Alert Threshold</h4>
+                <p className="text-xs text-gray-400">
+                  Suspicion score above this value creates an admin alert. Default: 40.
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-white mb-2">Auto-Suspend</h4>
+                <p className="text-xs text-gray-400">
+                  If enabled, accounts with suspicion score above the threshold (default: 90)
+                  are automatically suspended. Toggle this carefully — high risk of false positives
+                  on strict thresholds.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-cyan-400">
+                VPN &amp; Proxy Settings
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-300 space-y-2">
+              <p>Toggle independently: Block VPN / Block Proxy / Block Tor</p>
+              <p>Risk point values: VPN (+30), Proxy (+25), Tor (+50)</p>
+              <p>Whitelisted IPs and fingerprints bypass all checks</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-green-400">
+                Suspicion Score Breakdown
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-300">
+              <p className="mb-3">Each detection method adds points to the user&apos;s suspicion score:</p>
+              <div className="bg-gray-900 rounded overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-700">
+                    <tr>
+                      <th className="text-left p-2 text-gray-300">Method</th>
+                      <th className="text-left p-2 text-gray-300">Points</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-gray-400">
+                    <tr className="border-t border-gray-700"><td className="p-2">Device Fingerprint Match</td><td className="p-2 text-red-400">+10 to +30</td></tr>
+                    <tr className="border-t border-gray-700"><td className="p-2">Payment Method Sharing</td><td className="p-2 text-red-400">+20 to +40</td></tr>
+                    <tr className="border-t border-gray-700"><td className="p-2">IP/Browser Match</td><td className="p-2 text-yellow-400">+10 to +20</td></tr>
+                    <tr className="border-t border-gray-700"><td className="p-2">VPN Usage</td><td className="p-2 text-yellow-400">+30</td></tr>
+                    <tr className="border-t border-gray-700"><td className="p-2">Proxy/Tor Usage</td><td className="p-2 text-orange-400">+25 to +50</td></tr>
+                    <tr className="border-t border-gray-700"><td className="p-2">Trading Similarity (≥70%)</td><td className="p-2 text-pink-400">+30</td></tr>
+                    <tr className="border-t border-gray-700"><td className="p-2">Mirror Trading</td><td className="p-2 text-purple-400">+30</td></tr>
+                    <tr className="border-t border-gray-700"><td className="p-2">KYC Document Reuse</td><td className="p-2 text-red-400">+50</td></tr>
+                    <tr className="border-t border-gray-700"><td className="p-2">Coordinated Competition Entry</td><td className="p-2 text-blue-400">+20 to +40</td></tr>
+                  </tbody>
+                </table>
               </div>
             </CardContent>
           </Card>
