@@ -9,6 +9,7 @@ import {
   TrendingUp,
   TrendingDown,
   ChevronRight,
+  ChevronDown,
   Crown,
   Target,
 } from "lucide-react";
@@ -216,6 +217,113 @@ function TimeLeft({ endTime }: { endTime: Date }) {
     <span className="text-yellow-400 text-[10px]">
       {h}h {m}m left
     </span>
+  );
+}
+
+/**
+ * Reason: Separate component to encapsulate the vertical scrollable challenges list.
+ * Shows up to ~5 items with a scroll arrow indicator when more are available.
+ */
+function ChallengesList({ challenges }: { challenges: ChallengeData[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showScrollArrow, setShowScrollArrow] = useState(false);
+
+  // Reason: Detect whether the list is scrollable (has overflow)
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const check = () => {
+      const hasOverflow = el.scrollHeight > el.clientHeight + 4;
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 4;
+      setShowScrollArrow(hasOverflow && !atBottom);
+    };
+
+    check();
+    el.addEventListener("scroll", check);
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+
+    return () => {
+      el.removeEventListener("scroll", check);
+      ro.disconnect();
+    };
+  }, [challenges.length]);
+
+  const handleScrollDown = () => {
+    scrollRef.current?.scrollBy({ top: 120, behavior: "smooth" });
+  };
+
+  return (
+    <div className="relative">
+      <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5 px-0.5">
+        Active Challenges ({challenges.length})
+      </p>
+      {/* Reason: max-h-[340px] shows roughly 5 compact cards before scrolling */}
+      <div
+        ref={scrollRef}
+        className="space-y-2 overflow-y-auto hide-scrollbar"
+        style={{ maxHeight: 340, WebkitOverflowScrolling: "touch" }}
+      >
+        {challenges.map((ch, i) => (
+          <Link
+            key={ch.id}
+            href={`/challenges/${ch.id}`}
+            className="block"
+          >
+            <motion.div
+              className="rounded-lg border border-gray-700/30 bg-gray-800/40 p-2.5 hover:border-purple-500/30 transition-all cursor-pointer group"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 * i }}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-white truncate group-hover:text-purple-400">
+                  {ch.name}
+                </span>
+                {ch.isLeading ? (
+                  <TrendingUp className="w-3 h-3 text-green-400" />
+                ) : (
+                  <TrendingDown className="w-3 h-3 text-red-400" />
+                )}
+              </div>
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-gray-400 truncate">
+                  vs {ch.opponent?.name || "Waiting..."}
+                </span>
+                <span
+                  className={
+                    isChallengeMetricPositive(ch)
+                      ? "text-green-400"
+                      : "text-red-400"
+                  }
+                  title={`Ranked by ${getCompMetricLabel(ch.rankingMethod)}`}
+                >
+                  {formatChallengeMetric(ch)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between mt-0.5">
+                <span className="text-[9px] text-gray-500">
+                  ⚔️ ${ch.stakeAmount.toLocaleString()}
+                </span>
+                <TimeLeft endTime={ch.endTime} />
+              </div>
+            </motion.div>
+          </Link>
+        ))}
+      </div>
+
+      {/* Scroll arrow indicator */}
+      {showScrollArrow && (
+        <button
+          onClick={handleScrollDown}
+          className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 z-10 flex items-center justify-center w-7 h-7 rounded-full bg-purple-500/80 hover:bg-purple-500 text-white shadow-lg transition-all animate-bounce cursor-pointer"
+          aria-label="Scroll down for more challenges"
+        >
+          <ChevronDown className="w-4 h-4" />
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -473,69 +581,13 @@ export default function ContestsSidebar({
             </div>
           </div>
 
-          {/* Active challenges — horizontal scroll */}
+          {/* Active challenges — vertical list with scroll */}
           {activeChallenges.length > 0 && (
-            <div>
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5 px-0.5">
-                Active Challenges ({activeChallenges.length})
-              </p>
-              <div
-                className="flex gap-2 overflow-x-auto pb-1.5 hide-scrollbar snap-x snap-mandatory"
-                style={{ WebkitOverflowScrolling: "touch" }}
-              >
-                {activeChallenges.map((ch, i) => (
-                  <Link
-                    key={ch.id}
-                    href={`/challenges/${ch.id}`}
-                    className="block flex-shrink-0 snap-start"
-                    style={{ width: "85%" }}
-                  >
-                    <motion.div
-                      className="rounded-lg border border-gray-700/30 bg-gray-800/40 p-2.5 hover:border-purple-500/30 transition-all cursor-pointer group"
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.1 * i }}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-semibold text-white truncate group-hover:text-purple-400">
-                          {ch.name}
-                        </span>
-                        {ch.isLeading ? (
-                          <TrendingUp className="w-3 h-3 text-green-400" />
-                        ) : (
-                          <TrendingDown className="w-3 h-3 text-red-400" />
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-gray-400 truncate">
-                          vs {ch.opponent?.name || "Waiting..."}
-                        </span>
-                        <span
-                          className={
-                            isChallengeMetricPositive(ch)
-                              ? "text-green-400"
-                              : "text-red-400"
-                          }
-                          title={`Ranked by ${getCompMetricLabel(ch.rankingMethod)}`}
-                        >
-                          {formatChallengeMetric(ch)}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between mt-0.5">
-                        <span className="text-[9px] text-gray-500">
-                          ⚔️ ${ch.stakeAmount.toLocaleString()}
-                        </span>
-                        <TimeLeft endTime={ch.endTime} />
-                      </div>
-                    </motion.div>
-                  </Link>
-                ))}
-              </div>
-            </div>
+            <ChallengesList challenges={activeChallenges} />
           )}
 
           {/* Matchmaking Cards — reuse existing component */}
-          <div className="border-t border-gray-700/30 pt-3">
+          <div className="mt-4 border-t border-gray-700/30 pt-4">
             <MatchmakingCards />
           </div>
         </div>
