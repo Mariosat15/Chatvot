@@ -7,7 +7,8 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import {
   detectVPNProxy,
-  isHighRiskIP,
+  // isHighRiskIP is imported for potential future use in IP risk detection
+  isHighRiskIP as _isHighRiskIP,
 } from "@/lib/services/ip-detection.service";
 import { getFraudSettings } from "@/lib/services/fraud-settings.service";
 import { SuspicionScoringService } from "@/lib/services/fraud/suspicion-scoring.service";
@@ -18,26 +19,39 @@ import { AlertManagerService } from "@/lib/services/fraud/alert-manager.service"
  * Returns object with:
  * - shouldSuppress: true if alerts should be completely suppressed (restricted users)
  * - hasActiveAlert: true if there's an existing alert we should merge into
+ *
+ * @param triggeringUserId - The user who triggered the detection (the NEW user)
+ * @param allLinkedUserIds - All users linked to this detection
+ *
+ * Reason: We only suppress if the TRIGGERING user is restricted. If old linked users
+ * are restricted but the triggering user is new and unrestricted, we MUST still create
+ * an alert — otherwise new fraudulent accounts linked to banned users slip through.
  */
-async function checkAlertStatus(userIds: string[]): Promise<{
+async function checkAlertStatus(
+  triggeringUserId: string,
+  allLinkedUserIds: string[],
+): Promise<{
   shouldSuppress: boolean;
   hasActiveAlert: boolean;
   existingAlertStatus?: string;
 }> {
-  // Check if any users are restricted (banned/suspended) - COMPLETELY suppress for these
-  const restrictions = await UserRestriction.find({
-    userId: { $in: userIds },
+  // Only suppress if the TRIGGERING user themselves is restricted
+  const triggeringUserRestriction = await UserRestriction.findOne({
+    userId: triggeringUserId,
     isActive: true,
   });
 
-  if (restrictions.length > 0) {
+  if (triggeringUserRestriction) {
     return { shouldSuppress: true, hasActiveAlert: false };
   }
 
   // Check if any of these users already have active alerts (pending or investigating)
   // We DON'T suppress these - we MERGE new evidence into them via AlertManagerService
   const existingAlerts = await FraudAlert.findOne({
-    suspiciousUserIds: { $in: userIds },
+    $or: [
+      { suspiciousUserIds: { $in: allLinkedUserIds } },
+      { primaryUserId: { $in: allLinkedUserIds } },
+    ],
     status: { $in: ["pending", "investigating"] },
   });
 
@@ -86,7 +100,15 @@ export async function POST(request: Request) {
       : headersList.get("x-real-ip") || "unknown";
 
     // Detect VPN/Proxy (if enabled)
-    let ipDetection: any = {
+    let ipDetection: {
+      isVPN: boolean;
+      isProxy: boolean;
+      isTor: boolean;
+      isHosting: boolean;
+      riskScore: number;
+      country?: string;
+      city?: string;
+    } = {
       isVPN: false,
       isProxy: false,
       isTor: false,
@@ -366,7 +388,7 @@ export async function POST(request: Request) {
 
       // 🔥 CRITICAL FIX: Create a NEW fingerprint for THIS user with THEIR browser data
       // This ensures each user has their own device record with correct browser/timestamps
-      const newUserFingerprint = await DeviceFingerprint.create({
+      const _newUserFingerprint = await DeviceFingerprint.create({
         fingerprintId: fingerprintData.fingerprintId,
         userId: userId,
         deviceType: fingerprintData.deviceType,
@@ -544,7 +566,7 @@ export async function POST(request: Request) {
 
         } else {
           // Check if we should suppress alerts for these accounts
-          const alertStatus = await checkAlertStatus(allLinkedUsers);
+          const alertStatus = await checkAlertStatus(userId, allLinkedUsers);
 
           if (alertStatus.shouldSuppress) {
             return NextResponse.json({
@@ -664,7 +686,7 @@ export async function POST(request: Request) {
           allLinkedUserIds.length > fraudSettings.maxAccountsPerDevice;
 
         // Create new fingerprint for current user first
-        const newFingerprint = await DeviceFingerprint.create({
+        const _newFingerprint = await DeviceFingerprint.create({
           fingerprintId: fingerprintData.fingerprintId || "unknown",
           userId: userId,
           deviceType: fingerprintData.deviceType || "unknown",
@@ -727,7 +749,7 @@ export async function POST(request: Request) {
 
           // Check if alert already exists for these users (ANY alert type)
           // This ensures we MERGE into existing alerts from other fraud types
-          const existingAlert = await FraudAlert.findOne({
+          const _existingAlert = await FraudAlert.findOne({
             status: { $in: ["pending", "investigating"] },
             $or: [
               { suspiciousUserIds: { $in: allLinkedUserIds } },
@@ -736,7 +758,7 @@ export async function POST(request: Request) {
           }).sort({ updatedAt: -1 }); // Get most recently updated
 
           // Check if we should suppress alerts for these accounts (only for restricted users)
-          const alertStatus = await checkAlertStatus(allLinkedUserIds);
+          const alertStatus = await checkAlertStatus(userId, allLinkedUserIds);
 
           if (alertStatus.shouldSuppress) {
             return NextResponse.json({
@@ -745,10 +767,6 @@ export async function POST(request: Request) {
               message:
                 "Fraud detected but alert suppressed (accounts restricted)",
             });
-          }
-
-          // Log if merging into existing alert
-          if (existingAlert) {
           }
 
           // Get all devices for evidence
@@ -916,7 +934,7 @@ export async function POST(request: Request) {
         }
 
         // Check if we should suppress alerts for this user
-        const alertStatus = await checkAlertStatus([userId]);
+        const alertStatus = await checkAlertStatus(userId, [userId]);
 
         if (alertStatus.shouldSuppress) {
           return NextResponse.json({

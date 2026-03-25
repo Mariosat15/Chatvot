@@ -102,6 +102,22 @@ export async function POST(
       );
     }
 
+    // Reason: Invalidate all sessions for this user so they are immediately
+    // logged out everywhere. better-auth stores sessions in "session" collection.
+    try {
+      const deleteResult = await db
+        .collection("session")
+        .deleteMany({ userId });
+      console.log(
+        `🔒 Deleted ${deleteResult.deletedCount} sessions for admin-deactivated user ${userId}`,
+      );
+    } catch (sessionError) {
+      console.error(
+        "⚠️ Failed to delete sessions after admin deactivation:",
+        sessionError,
+      );
+    }
+
     return NextResponse.json({
       success: true,
       message: `Account deactivated successfully`,

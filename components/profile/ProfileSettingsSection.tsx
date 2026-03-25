@@ -190,17 +190,21 @@ export default function ProfileSettingsSection() {
       const data = await response.json();
       if (response.ok && data.success) {
         toast.success("Account deactivated. You will be signed out.");
-        // Reason: Sign the user out after deactivation — redirect to home
+        // Reason: Immediate redirect to sign-in. The backend has already deleted
+        // all sessions from the DB, so the auth cookie is now invalid. A hard
+        // navigation ensures the client state is fully cleared.
         setTimeout(() => {
           window.location.href = "/sign-in";
-        }, 1500);
+        }, 1000);
       } else {
         toast.error(data.error || "Failed to deactivate account");
+        setDeactivating(false);
+        setShowDeactivateConfirm(false);
+        setDeactivateConfirmText("");
       }
     } catch (error) {
       console.error("Error deactivating account:", error);
       toast.error("Something went wrong. Please contact support.");
-    } finally {
       setDeactivating(false);
       setShowDeactivateConfirm(false);
       setDeactivateConfirmText("");

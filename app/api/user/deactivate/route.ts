@@ -3,12 +3,21 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { connectToDatabase } from "@/database/mongoose";
 import AuditLog from "@/database/models/audit-log.model";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
 
 /**
  * POST /api/user/deactivate
  *
  * Allows a user to deactivate their own account.
  * The account is NOT deleted — data is preserved but login is blocked.
+ *
+ * Pre-conditions (all must pass):
+ *  1. Credit balance must be 0
+ *  2. No pending/approved/processing withdrawals
+ *  3. No active competition participations
+ *  4. No active challenge participations (or pending/accepted challenges)
  */
 export async function POST() {
   try {
@@ -31,9 +40,93 @@ export async function POST() {
       );
     }
 
+    // ── Pre-condition checks ────────────────────────────────────────
+
+    // 1. Check credit balance
+    const wallet = await CreditWallet.findOne({ userId }).lean();
+    if (wallet && wallet.creditBalance > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "You must withdraw all funds before deactivating your account. Your current balance is €" +
+            wallet.creditBalance.toFixed(2) +
+            ".",
+        },
+        { status: 400 },
+      );
+    }
+
+    // 2. Check pending/approved/processing withdrawals
+    const pendingWithdrawals = await db
+      .collection("withdrawalrequests")
+      .countDocuments({
+        userId,
+        status: { $in: ["pending", "approved", "processing"] },
+      });
+    if (pendingWithdrawals > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "You have pending withdrawal requests. Please wait for them to complete or cancel them before deactivating.",
+        },
+        { status: 400 },
+      );
+    }
+
+    // 3. Check active competition participations
+    const activeCompetitions = await CompetitionParticipant.countDocuments({
+      userId,
+      status: "active",
+    });
+    if (activeCompetitions > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `You are currently participating in ${activeCompetitions} active competition${activeCompetitions > 1 ? "s" : ""}. Please wait for them to end before deactivating.`,
+        },
+        { status: 400 },
+      );
+    }
+
+    // 4. Check active challenge participations
+    const activeChallenges = await ChallengeParticipant.countDocuments({
+      userId,
+      status: "active",
+    });
+    // Reason: Also check Challenge documents where this user is involved and the
+    // challenge is still pending or accepted (not yet started/finalized).
+    const pendingOrAcceptedChallenges = await db
+      .collection("challenges")
+      .countDocuments({
+        $or: [{ challengerId: userId }, { challengedId: userId }],
+        status: { $in: ["pending", "accepted"] },
+      });
+    const totalActiveChallenges = activeChallenges + pendingOrAcceptedChallenges;
+    if (totalActiveChallenges > 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `You have ${totalActiveChallenges} active or pending challenge${totalActiveChallenges > 1 ? "s" : ""}. Please wait for them to complete or decline them before deactivating.`,
+        },
+        { status: 400 },
+      );
+    }
+
+    // ── All checks passed — proceed with deactivation ───────────────
+
     // Reason: Set isDeactivated and record the timestamp and reason.
+    const { ObjectId } = require("mongodb");
+    let userIdQuery: unknown[];
+    try {
+      userIdQuery = [userId, new ObjectId(userId)];
+    } catch {
+      userIdQuery = [userId];
+    }
+
     const result = await db.collection("user").updateOne(
-      { _id: { $in: [userId, (() => { try { return new (require("mongodb").ObjectId)(userId); } catch { return userId; } })()] } },
+      { _id: { $in: userIdQuery } },
       {
         $set: {
           isDeactivated: true,
@@ -81,6 +174,24 @@ export async function POST() {
         fraudError,
       );
       // Don't fail the deactivation if fraud resolution fails
+    }
+
+    // Reason: Invalidate all sessions for this user so they are immediately logged out
+    // everywhere. better-auth stores sessions in the "session" collection with a
+    // "userId" field.
+    try {
+      const deleteResult = await db
+        .collection("session")
+        .deleteMany({ userId });
+      console.log(
+        `🔒 Deleted ${deleteResult.deletedCount} sessions for deactivated user ${userId}`,
+      );
+    } catch (sessionError) {
+      console.error(
+        "⚠️ Failed to delete sessions after deactivation:",
+        sessionError,
+      );
+      // Non-fatal — the user will still be blocked at login
     }
 
     return NextResponse.json({

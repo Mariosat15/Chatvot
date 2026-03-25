@@ -48,7 +48,7 @@ export class AlertManagerService {
     const {
       alertType,
       userIds,
-      title,
+      title: _title,
       description: _description,
       severity,
       confidence,
@@ -108,23 +108,27 @@ export class AlertManagerService {
       // If investigationClearedAt is set, it means the user was unbanned/unsuspended
       // In that case, NEW fraud activity should create a NEW alert
       if (resolvedAlertOfSameType.investigationClearedAt) {
-        const clearanceDate = new Date(
-          resolvedAlertOfSameType.investigationClearedAt,
-        );
-        // console.log(
-          // `   ✅ User was CLEARED on: ${clearanceDate.toISOString()}`,
-        // );
-        // console.log(
-          // `   → NEW fraud activity after clearance will create a NEW alert`,
-        // );
         shouldBlockNewAlert = false; // Allow new alert since user was cleared
       } else {
-        // User was NOT cleared (still banned/suspended or alert was just dismissed)
-        // Don't create new alert for the same type of fraud
-        // console.log(
-          // `   ⚠️ User was NOT cleared - blocking new alert of same type`,
-        // );
-        shouldBlockNewAlert = true;
+        // Reason: Check if there's a NEW user in the current detection that was NOT
+        // part of the dismissed alert. If a new account (e.g., testuser3) was created
+        // and linked to previously-dismissed users (testuser1+testuser2), we must NOT
+        // block the alert — the new user needs investigation.
+        const dismissedUserIds = new Set<string>([
+          ...(resolvedAlertOfSameType.suspiciousUserIds || []).map((id: { toString: () => string }) => id.toString()),
+          resolvedAlertOfSameType.primaryUserId?.toString(),
+        ].filter(Boolean));
+
+        const hasNewUserNotInDismissed = userIdStrings.some(
+          (uid) => !dismissedUserIds.has(uid),
+        );
+
+        if (hasNewUserNotInDismissed) {
+          shouldBlockNewAlert = false; // New user detected — allow alert
+        } else {
+          // All current users were in the dismissed alert — block
+          shouldBlockNewAlert = true;
+        }
       }
 
       // console.log(`   Continuing to check for active alerts...`);
@@ -167,10 +171,11 @@ export class AlertManagerService {
         .lean();
       if (allAlertsForUsers.length > 0) {
         // console.log(`   📊 All alerts for these users:`);
+        // Debug logging disabled — forEach retained for potential future re-enable
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        allAlertsForUsers.forEach((a: any, i: number) => {
+        allAlertsForUsers.forEach((_a: any, _i: number) => {
           // console.log(
-            // `      ${i + 1}. ID: ${a._id}, Status: ${a.status}, Type: ${a.alertType}`,
+            // `      ${_i + 1}. ID: ${_a._id}, Status: ${_a.status}, Type: ${_a.alertType}`,
           // );
         });
       } else {
@@ -214,7 +219,7 @@ export class AlertManagerService {
    * ALWAYS adds new evidence with timestamps - allows tracking multiple detections
    * ALL detections for same users are MERGED into ONE alert
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   private static async updateExistingAlert(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     existingAlert: any,
@@ -283,8 +288,26 @@ export class AlertManagerService {
       (e) => !isDuplicateEvidence(e),
     );
 
-    if (newUniqueEvidence.length === 0) {
-      // console.log(`⏭️ [ALERT] All evidence already exists, skipping update`);
+    // Reason: Even if all evidence is duplicate, we still need to add any NEW user IDs
+    // to suspiciousUserIds. Otherwise a new account linked to the same payment/device
+    // won't be tracked at the alert level.
+    let hasNewUsers = false;
+    for (const uid of userIds) {
+      const uidStr = uid.toString();
+      if (!existingAlert.suspiciousUserIds.includes(uidStr)) {
+        existingAlert.suspiciousUserIds.push(uidStr);
+        hasNewUsers = true;
+      }
+    }
+
+    if (newUniqueEvidence.length === 0 && !hasNewUsers) {
+      // console.log(`⏭️ [ALERT] All evidence already exists and no new users, skipping update`);
+      return;
+    }
+
+    if (newUniqueEvidence.length === 0 && hasNewUsers) {
+      // Only new users, no new evidence — just save the updated suspiciousUserIds
+      await existingAlert.save();
       return;
     }
 
@@ -325,14 +348,22 @@ export class AlertManagerService {
       .join(", ");
 
     // Update title to show multiple methods and evidence count
+    // Reason: Use suspiciousUserIds.length (not userIds.length) because suspiciousUserIds
+    // now includes ALL accounts ever linked to this alert, not just the current trigger set.
+    const totalAccountsInvolved = existingAlert.suspiciousUserIds.length;
     existingAlert.title = `Multiple Fraud Indicators (${methodCount} methods, ${existingAlert.evidence.length} detections)`;
-    existingAlert.description = `${userIds.length} accounts flagged for: ${methodNames}`;
+    existingAlert.description = `${totalAccountsInvolved} accounts flagged for: ${methodNames}`;
 
     // Upgrade severity if new detection is higher
-    const severityLevels = { low: 1, medium: 2, high: 3, critical: 4 };
+    const severityLevels = new Map<string, number>([
+      ["low", 1],
+      ["medium", 2],
+      ["high", 3],
+      ["critical", 4],
+    ]);
     if (
-      severityLevels[severity] >
-      severityLevels[existingAlert.severity as keyof typeof severityLevels]
+      (severityLevels.get(severity) ?? 1) >
+      (severityLevels.get(existingAlert.severity) ?? 1)
     ) {
       // console.log(
         // `⬆️ [ALERT] Upgrading severity: ${existingAlert.severity} → ${severity}`,
@@ -529,12 +560,12 @@ export class AlertManagerService {
    * Helper: Get severity level as number for comparison
    */
   private static getSeverityLevel(severity: string): number {
-    const levels: Record<string, number> = {
-      low: 1,
-      medium: 2,
-      high: 3,
-      critical: 4,
-    };
-    return levels[severity] || 1;
+    const levels = new Map<string, number>([
+      ["low", 1],
+      ["medium", 2],
+      ["high", 3],
+      ["critical", 4],
+    ]);
+    return levels.get(severity) ?? 1;
   }
 }
