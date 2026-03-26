@@ -1,6 +1,8 @@
 import FraudAlert from "@/database/models/fraud/fraud-alert.model";
+import { ISuspicionScore } from "@/database/models/fraud/suspicion-score.model";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
+import { SuspicionScoringService } from "./suspicion-scoring.service";
 
 /**
  * Unified Fraud Alert Manager
@@ -38,6 +40,51 @@ export interface CreateOrUpdateAlertParams {
 }
 
 export class AlertManagerService {
+  // Reason: Maps alert types to their corresponding suspicion score method names.
+  // Used by propagateScoresToLinkedUsers to update scores for all users in an alert.
+  private static readonly ALERT_TYPE_TO_SCORE_METHOD: Record<
+    string,
+    keyof ISuspicionScore["scoreBreakdown"]
+  > = {
+    same_device: "deviceMatch",
+    same_payment: "samePayment",
+    same_ip: "ipMatch",
+    mirror_trading: "mirrorTrading",
+    trading_similarity: "tradingSimilarity",
+    coordinated_entry: "coordinatedEntry",
+    rapid_creation: "rapidCreation",
+    vpn_usage: "ipMatch",
+    ip_browser_match: "ipBrowserMatch",
+    timezone_language: "timezoneLanguage",
+    device_switching: "deviceSwitching",
+    kyc_duplicate: "kycDuplicate",
+    brute_force: "bruteForce",
+    rate_limit_exceeded: "rateLimitExceeded",
+  };
+
+  // Reason: Reduced percentages for linked users who are indirectly associated
+  // with the fraud alert. Primary users get full scores from detection services;
+  // linked users get these smaller propagated scores.
+  private static readonly LINKED_SCORE_PERCENTAGES: Record<
+    keyof ISuspicionScore["scoreBreakdown"],
+    number
+  > = {
+    deviceMatch: 10,
+    ipMatch: 10,
+    ipBrowserMatch: 10,
+    sameCity: 5,
+    samePayment: 10,
+    rapidCreation: 5,
+    coordinatedEntry: 10,
+    tradingSimilarity: 10,
+    mirrorTrading: 10,
+    timezoneLanguage: 5,
+    deviceSwitching: 5,
+    kycDuplicate: 15,
+    bruteForce: 10,
+    rateLimitExceeded: 5,
+  };
+
   /**
    * Create new alert OR update existing alert with additional evidence
    *
@@ -55,7 +102,7 @@ export class AlertManagerService {
       alertType,
       userIds,
       title,
-      description,
+      description: _description,
       severity,
       confidence,
       evidence,
@@ -227,7 +274,7 @@ export class AlertManagerService {
    * ALWAYS adds new evidence with timestamps - allows tracking multiple detections
    * ALL detections for same users are MERGED into ONE alert
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   private static async updateExistingAlert(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     existingAlert: any,
@@ -342,10 +389,10 @@ export class AlertManagerService {
     existingAlert.description = `${userIds.length} accounts flagged for: ${methodNames}`;
 
     // Upgrade severity if new detection is higher
-    const severityLevels = { low: 1, medium: 2, high: 3, critical: 4 };
+    const severityLevels = new Map([["low", 1], ["medium", 2], ["high", 3], ["critical", 4]]);
     if (
-      severityLevels[severity] >
-      severityLevels[existingAlert.severity as keyof typeof severityLevels]
+      (severityLevels.get(severity) ?? 1) >
+      (severityLevels.get(existingAlert.severity) ?? 1)
     ) {
       console.log(
         `⬆️ [ALERT] Upgrading severity: ${existingAlert.severity} → ${severity}`,
@@ -392,6 +439,14 @@ export class AlertManagerService {
       console.log(`   Detection Count: ${existingAlert.detectionCount}`);
       console.log(`   Severity: ${existingAlert.severity}`);
       console.log(`   Status: ${existingAlert.status}`);
+
+      // Reason: Propagate reduced suspicion scores to all linked users in this alert
+      // so their SuspicionScore reflects all detection methods, not just direct ones.
+      await this.propagateScoresToLinkedUsers(
+        existingAlert.suspiciousUserIds,
+        userIds,
+        alertType,
+      );
     } catch (saveError) {
       console.error(`❌ [ALERT] FAILED to save merged alert:`, saveError);
       throw saveError;
@@ -481,6 +536,70 @@ export class AlertManagerService {
   }
 
   /**
+   * Propagate reduced suspicion scores to all linked users in a fraud alert.
+   *
+   * When evidence is merged into an existing alert, the primary users already
+   * get scored by the detection service (e.g. SimilarityDetectionService).
+   * But OTHER users in the same alert who are only indirectly linked won't
+   * have that score method updated. This method fills that gap by giving
+   * all non-primary users a smaller "linked" percentage for the detection.
+   *
+   * @param allSuspiciousUserIds - All user IDs currently in the alert
+   * @param primaryUserIds - The user IDs directly involved in THIS detection
+   * @param alertType - The type of fraud detection (maps to a score method)
+   */
+  private static async propagateScoresToLinkedUsers(
+    allSuspiciousUserIds: string[],
+    primaryUserIds: string[],
+    alertType: string,
+  ): Promise<void> {
+    const alertTypeMap = new Map(Object.entries(this.ALERT_TYPE_TO_SCORE_METHOD));
+    const scoreMethod = alertTypeMap.get(alertType);
+    if (!scoreMethod) {
+      console.log(
+        `⏭️ [SCORE PROPAGATION] No score method mapping for alertType="${alertType}", skipping`,
+      );
+      return;
+    }
+
+    const percentageMap = new Map(Object.entries(this.LINKED_SCORE_PERCENTAGES));
+    const linkedPercentage = percentageMap.get(scoreMethod);
+    if (!linkedPercentage) {
+      return;
+    }
+
+    // Find users who are in the alert but NOT the primary detection users
+    const primarySet = new Set(primaryUserIds.map((id) => id.toString()));
+    const linkedUsers = allSuspiciousUserIds
+      .map((id) => id.toString())
+      .filter((id) => !primarySet.has(id));
+
+    if (linkedUsers.length === 0) {
+      return;
+    }
+
+    console.log(
+      `📊 [SCORE PROPAGATION] Propagating ${scoreMethod} (+${linkedPercentage}%) to ${linkedUsers.length} linked users`,
+    );
+
+    for (const linkedUserId of linkedUsers) {
+      try {
+        await SuspicionScoringService.updateScore(linkedUserId, {
+          method: scoreMethod,
+          percentage: linkedPercentage,
+          evidence: `Linked account detected via ${alertType} (propagated from alert)`,
+          linkedUserIds: primaryUserIds,
+        });
+      } catch (err) {
+        console.error(
+          `❌ [SCORE PROPAGATION] Failed to update score for user ${linkedUserId}:`,
+          err,
+        );
+      }
+    }
+  }
+
+  /**
    * Check if alert can be created for these users
    * Returns false if there's already a resolved/dismissed alert
    */
@@ -538,12 +657,7 @@ export class AlertManagerService {
    * Helper: Get severity level as number for comparison
    */
   private static getSeverityLevel(severity: string): number {
-    const levels: Record<string, number> = {
-      low: 1,
-      medium: 2,
-      high: 3,
-      critical: 4,
-    };
-    return levels[severity] || 1;
+    const levels = new Map([["low", 1], ["medium", 2], ["high", 3], ["critical", 4]]);
+    return levels.get(severity) ?? 1;
   }
 }

@@ -1,5 +1,7 @@
 import FraudAlert from "@/database/models/fraud/fraud-alert.model";
 import { connectToDatabase } from "@/database/mongoose";
+import { SuspicionScoringService } from "./suspicion-scoring.service";
+import { ISuspicionScore } from "@/database/models/fraud/suspicion-score.model";
 
 /**
  * Unified Fraud Alert Manager
@@ -32,6 +34,43 @@ export interface CreateOrUpdateAlertParams {
 }
 
 export class AlertManagerService {
+  /**
+   * Maps alert types to SuspicionScore breakdown methods.
+   * Reason: When a detection is merged into an alert, we need to propagate
+   * reduced scores to ALL users in the alert who were not directly detected.
+   */
+  private static readonly ALERT_TYPE_TO_SCORE_METHOD: Record<
+    string,
+    keyof ISuspicionScore["scoreBreakdown"] | null
+  > = {
+    same_payment: "samePayment",
+    mirror_trading: "mirrorTrading",
+    trading_similarity: "tradingSimilarity",
+    coordinated_entry: "coordinatedEntry",
+    same_device: "deviceMatch",
+    same_ip: "ipMatch",
+    rapid_creation: "rapidCreation",
+    vpn_usage: null, // No direct score method
+  };
+
+  /**
+   * Reduced percentages for linked (indirectly involved) accounts.
+   * Reason: Users linked through fraud network but not directly involved
+   * in a specific detection should still get a reduced score to reflect
+   * the elevated risk from their association.
+   * Values are ~50% of the direct detection percentages.
+   */
+  private static readonly LINKED_SCORE_PERCENTAGES: Record<string, number> = {
+    samePayment: 15,
+    mirrorTrading: 18,
+    tradingSimilarity: 15,
+    coordinatedEntry: 13,
+    deviceMatch: 20,
+    ipMatch: 15,
+    ipBrowserMatch: 18,
+    rapidCreation: 10,
+  };
+
   /**
    * Create new alert OR update existing alert with additional evidence
    *
@@ -410,9 +449,66 @@ export class AlertManagerService {
       // console.log(`   Detection Count: ${existingAlert.detectionCount}`);
       // console.log(`   Severity: ${existingAlert.severity}`);
       // console.log(`   Status: ${existingAlert.status}`);
+
+      // Reason: Propagate reduced suspicion scores to ALL users in the alert
+      // who were NOT directly involved in this specific detection. This ensures
+      // that a user linked through payment sharing also gets (reduced) scores
+      // for mirror trading, coordinated entry, etc. detected in their network.
+      await this.propagateScoresToLinkedUsers(
+        existingAlert.suspiciousUserIds,
+        userIds,
+        alertType,
+      );
     } catch (saveError) {
       console.error(`❌ [ALERT] FAILED to save merged alert:`, saveError);
       throw saveError;
+    }
+  }
+
+  /**
+   * Propagate reduced suspicion scores to linked users in an alert.
+   *
+   * When fraud is detected between users B and C (e.g., mirror trading),
+   * user A (who is in the same alert via payment sharing) should also get
+   * a reduced score for mirror trading to reflect their network risk.
+   */
+  private static async propagateScoresToLinkedUsers(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    allAlertUserIds: any[],
+    directUserIds: string[],
+    alertType: string,
+  ): Promise<void> {
+    const alertTypeMap = new Map(Object.entries(this.ALERT_TYPE_TO_SCORE_METHOD));
+    const scoreMethod = alertTypeMap.get(alertType);
+    if (!scoreMethod) return; // No score method for this alert type
+
+    const percentageMap = new Map(Object.entries(this.LINKED_SCORE_PERCENTAGES));
+    const reducedPercentage = percentageMap.get(scoreMethod);
+    if (!reducedPercentage) return;
+
+    const directSet = new Set(directUserIds.map((id) => id.toString()));
+    const linkedUserIds = allAlertUserIds
+      .map((id: { toString: () => string }) => id.toString())
+      .filter((uid: string) => !directSet.has(uid));
+
+    if (linkedUserIds.length === 0) return;
+
+    // Reason: Update scores for linked users with a reduced percentage.
+    // This is fire-and-forget style — errors are logged but don't block.
+    for (const linkedUserId of linkedUserIds) {
+      try {
+        await SuspicionScoringService.updateScore(linkedUserId, {
+          method: scoreMethod,
+          percentage: reducedPercentage,
+          evidence: `Linked to accounts detected for ${alertType.replace(/_/g, " ")}`,
+          linkedUserIds: Array.from(directSet),
+        });
+      } catch (err) {
+        console.error(
+          `⚠️ [ALERT] Failed to propagate ${scoreMethod} score to linked user ${linkedUserId}:`,
+          err,
+        );
+      }
     }
   }
 
