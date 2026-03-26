@@ -2342,7 +2342,17 @@ export default function FraudMonitoringSection() {
             const scoreData = selectedScoreUserId ? getFraudScore(selectedScoreUserId) : null;
             return scoreData ? (
             <>
-              <SuspicionScoreCard score={scoreData} />
+              <SuspicionScoreCard
+                score={scoreData}
+                onScoreUpdated={(newScore) => {
+                  if (selectedScoreUserId) {
+                    setFraudScores((prev) => ({
+                      ...prev,
+                      [selectedScoreUserId]: newScore as FraudScore,
+                    }));
+                  }
+                }}
+              />
 
               {/* Close Button */}
               <div className="flex justify-end mt-6 pt-6 border-t border-gray-700">

@@ -157,6 +157,59 @@ export async function POST(request: Request) {
 }
 
 /**
+ * PUT /api/fraud/suspicion-score
+ * Recalculate suspicion score from existing alert evidence (admin only)
+ * Body: { userId: string } or { alertId: string }
+ */
+export async function PUT(request: Request) {
+  try {
+    const admin = await verifyAdminAuth();
+    if (!admin.isAuthenticated) {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized" },
+        { status: 401 },
+      );
+    }
+
+    const body = await request.json();
+    const { userId, alertId } = body;
+
+    if (!userId && !alertId) {
+      return NextResponse.json(
+        { success: false, message: "userId or alertId is required" },
+        { status: 400 },
+      );
+    }
+
+    if (alertId) {
+      // Recalculate for all users in a specific alert
+      const updatedCount =
+        await SuspicionScoringService.recalculateScoresForAlert(alertId);
+      return NextResponse.json({
+        success: true,
+        message: `Recalculated scores for ${updatedCount} users in alert`,
+        updatedCount,
+      });
+    }
+
+    // Recalculate for a single user
+    const score =
+      await SuspicionScoringService.recalculateScoresFromAlerts(userId);
+    return NextResponse.json({
+      success: true,
+      message: "Score recalculated from alert evidence",
+      score,
+    });
+  } catch (error) {
+    console.error("Error recalculating suspicion score:", error);
+    return NextResponse.json(
+      { success: false, message: "Failed to recalculate score" },
+      { status: 500 },
+    );
+  }
+}
+
+/**
  * DELETE /api/fraud/suspicion-score
  * Reset suspicion score (admin only)
  */

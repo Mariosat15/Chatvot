@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -9,7 +11,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { AlertTriangle, Shield, TrendingUp, Users, Clock } from "lucide-react";
+import {
+  AlertTriangle,
+  Shield,
+  TrendingUp,
+  Users,
+  Clock,
+  RefreshCw,
+} from "lucide-react";
 
 interface ScoreBreakdown {
   percentage?: number; // Model stores 'percentage'
@@ -54,9 +63,30 @@ interface SuspicionScoreData {
 
 interface Props {
   score: SuspicionScoreData;
+  onScoreUpdated?: (newScore: SuspicionScoreData) => void;
 }
 
-export default function SuspicionScoreCard({ score }: Props) {
+export default function SuspicionScoreCard({ score, onScoreUpdated }: Props) {
+  const [isRecalculating, setIsRecalculating] = useState(false);
+
+  const handleRecalculate = async () => {
+    setIsRecalculating(true);
+    try {
+      const res = await fetch("/api/fraud/suspicion-score", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: score.userId }),
+      });
+      const data = await res.json();
+      if (data.success && data.score && onScoreUpdated) {
+        onScoreUpdated(data.score);
+      }
+    } catch (err) {
+      console.error("Failed to recalculate score:", err);
+    } finally {
+      setIsRecalculating(false);
+    }
+  };
   const getRiskColor = (level: string) => {
     switch (level) {
       case "critical":
@@ -200,9 +230,23 @@ export default function SuspicionScoreCard({ score }: Props) {
             </span>
           </p>
         </div>
-        <Badge className={`${getRiskColor(score.riskLevel)} text-lg px-4 py-2`}>
-          {getRiskIcon(score.riskLevel)} {score.riskLevel.toUpperCase()} RISK
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRecalculate}
+            disabled={isRecalculating}
+            className="border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+          >
+            <RefreshCw
+              className={`h-4 w-4 mr-2 ${isRecalculating ? "animate-spin" : ""}`}
+            />
+            {isRecalculating ? "Recalculating..." : "Recalculate"}
+          </Button>
+          <Badge className={`${getRiskColor(score.riskLevel)} text-lg px-4 py-2`}>
+            {getRiskIcon(score.riskLevel)} {score.riskLevel.toUpperCase()} RISK
+          </Badge>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

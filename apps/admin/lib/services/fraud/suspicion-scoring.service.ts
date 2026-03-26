@@ -419,6 +419,7 @@ export class SuspicionScoringService {
     | "resetScore"
   > | null> {
     await connectToDatabase();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (await SuspicionScore.findOne({ userId }).lean()) as any;
   }
 
@@ -440,6 +441,7 @@ export class SuspicionScoringService {
       riskLevel: { $in: ["high", "critical"] },
     })
       .sort({ totalScore: -1 })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .lean()) as any;
   }
 
@@ -461,6 +463,7 @@ export class SuspicionScoringService {
     await connectToDatabase();
     return (await SuspicionScore.find({ riskLevel: level })
       .sort({ totalScore: -1 })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .lean()) as any;
   }
 
@@ -569,7 +572,7 @@ export class SuspicionScoringService {
       await score.save();
 
       // Create fraud alert for admin review
-      const alert = await FraudAlert.create({
+      const _alert = await FraudAlert.create({
         alertType: "high_risk_device",
         severity: "critical",
         status: "investigating",
@@ -625,6 +628,162 @@ export class SuspicionScoringService {
     } catch (error) {
       console.error("❌ Failed to check/auto-restrict user", userId, ":", error);
     }
+  }
+
+  /**
+   * Recalculate a user's suspicion score by backfilling from existing fraud alerts.
+   *
+   * Reason: When alerts are merged with multiple evidence types, older evidence
+   * may not have been scored for all linked users. This reads all active alerts
+   * for the user and ensures each evidence type is reflected in their score.
+   */
+  static async recalculateScoresFromAlerts(userId: string): Promise<ISuspicionScore> {
+    await connectToDatabase();
+
+    // Reason: Import FraudAlert locally to avoid circular dependency issues
+    const FraudAlertModel = (await import("@/database/models/fraud/fraud-alert.model")).default;
+
+    // Find all active/pending/investigating alerts that include this user
+    const alerts = await FraudAlertModel.find({
+      $or: [
+        { suspiciousUserIds: userId },
+        { primaryUserId: userId },
+      ],
+      status: { $in: ["pending", "investigating"] },
+    }).lean();
+
+    if (alerts.length === 0) {
+      console.log(`📊 [RECALC] No active alerts found for user ${userId}`);
+      return this.getOrCreateScore(userId);
+    }
+
+    console.log(`📊 [RECALC] Found ${alerts.length} active alerts for user ${userId}`);
+
+    // Maps evidence type strings to score method keys
+    const evidenceTypeToMethod = new Map<string, keyof ISuspicionScore["scoreBreakdown"]>([
+      ["payment_fingerprint", "samePayment"],
+      ["same_payment", "samePayment"],
+      ["device_fingerprint", "deviceMatch"],
+      ["same_device", "deviceMatch"],
+      ["ip_browser_match", "ipBrowserMatch"],
+      ["ip_match", "ipMatch"],
+      ["same_ip", "ipMatch"],
+      ["mirror_trading", "mirrorTrading"],
+      ["trading_similarity", "tradingSimilarity"],
+      ["coordinated_entry", "coordinatedEntry"],
+      ["rapid_creation", "rapidCreation"],
+      ["timezone_language", "timezoneLanguage"],
+      ["kyc_duplicate", "kycDuplicate"],
+      ["device_switching", "deviceSwitching"],
+    ]);
+
+    // Reduced percentages for backfill (same as LINKED_SCORE_PERCENTAGES in AlertManagerService)
+    const backfillPercentages = new Map<string, number>([
+      ["samePayment", 15],
+      ["mirrorTrading", 18],
+      ["tradingSimilarity", 15],
+      ["coordinatedEntry", 13],
+      ["deviceMatch", 20],
+      ["ipMatch", 15],
+      ["ipBrowserMatch", 18],
+      ["rapidCreation", 10],
+      ["timezoneLanguage", 5],
+      ["deviceSwitching", 5],
+      ["kycDuplicate", 15],
+    ]);
+
+    // Get current score to check which methods already have scores
+    const currentScore = await this.getOrCreateScore(userId);
+
+    // Collect all evidence types across all alerts for this user
+    const allEvidenceTypes = new Set<string>();
+    const otherUserIds = new Set<string>();
+
+    for (const alert of alerts) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const evidence = (alert as any).evidence || [];
+      for (const e of evidence) {
+        if (e.type) allEvidenceTypes.add(e.type);
+      }
+      // Also add the alertType itself
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const alertType = (alert as any).alertType;
+      if (alertType) allEvidenceTypes.add(alertType);
+
+      // Collect other user IDs for linkedAccounts
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const suspiciousIds: string[] = (alert as any).suspiciousUserIds || [];
+      for (const id of suspiciousIds) {
+        if (id.toString() !== userId) otherUserIds.add(id.toString());
+      }
+    }
+
+    console.log(`📊 [RECALC] Evidence types found: ${Array.from(allEvidenceTypes).join(", ")}`);
+
+    let updatesApplied = 0;
+
+    for (const evidenceType of allEvidenceTypes) {
+      const scoreMethod = evidenceTypeToMethod.get(evidenceType);
+      if (!scoreMethod) continue;
+
+      // Check if this method already has a score
+      const breakdownMap = new Map(Object.entries(currentScore.scoreBreakdown));
+      const existingBreakdown = breakdownMap.get(scoreMethod) as { percentage?: number } | undefined;
+      if (existingBreakdown && (existingBreakdown.percentage || 0) > 0) {
+        console.log(`   ✅ ${scoreMethod} already has ${existingBreakdown.percentage}%, skipping`);
+        continue;
+      }
+
+      const percentage = backfillPercentages.get(scoreMethod);
+      if (!percentage) continue;
+
+      // Apply the score
+      try {
+        await this.updateScore(userId, {
+          method: scoreMethod,
+          percentage,
+          evidence: `Backfilled from fraud alert evidence (${evidenceType})`,
+          linkedUserIds: Array.from(otherUserIds),
+        });
+        updatesApplied++;
+        console.log(`   📈 Added ${scoreMethod} +${percentage}% (from ${evidenceType})`);
+      } catch (err) {
+        console.error(`   ❌ Failed to update ${scoreMethod} for user ${userId}:`, err);
+      }
+    }
+
+    console.log(`📊 [RECALC] Completed: ${updatesApplied} new score methods applied for user ${userId}`);
+
+    // Return the updated score
+    return this.getOrCreateScore(userId);
+  }
+
+  /**
+   * Recalculate scores for ALL users in a specific fraud alert.
+   * Called from admin panel to backfill scores for existing alerts.
+   */
+  static async recalculateScoresForAlert(alertId: string): Promise<number> {
+    await connectToDatabase();
+
+    const FraudAlertModel = (await import("@/database/models/fraud/fraud-alert.model")).default;
+
+    const alert = await FraudAlertModel.findById(alertId).lean();
+    if (!alert) {
+      throw new Error(`Alert ${alertId} not found`);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const userIds: string[] = ((alert as any).suspiciousUserIds || []).map((id: { toString: () => string }) => id.toString());
+
+    console.log(`📊 [RECALC-ALERT] Recalculating scores for ${userIds.length} users in alert ${alertId}`);
+
+    let totalUpdates = 0;
+    for (const userId of userIds) {
+      const result = await this.recalculateScoresFromAlerts(userId);
+      if (result.totalScore > 0) totalUpdates++;
+    }
+
+    return totalUpdates;
   }
 
   /**
