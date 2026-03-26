@@ -436,26 +436,41 @@ export default function SuspicionScoreCard({ score, onScoreUpdated }: Props) {
 
       {/* Bottom Row: Linked Accounts & Score History */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Linked Accounts */}
+        {/* Linked Accounts — Reason: count includes the user themselves so it
+            matches "Accounts Involved" shown in fraud alert views. */}
         {score.linkedAccounts.length > 0 && (
           <Card className="bg-gray-900 border-gray-700">
             <CardHeader>
               <CardTitle className="text-gray-100 flex items-center gap-2">
                 <Users className="h-5 w-5 text-yellow-500" />
-                Linked Suspicious Accounts
+                Accounts Involved
                 <Badge
                   variant="outline"
                   className="border-yellow-500/30 text-yellow-400 ml-2"
                 >
-                  {score.linkedAccounts.length}
+                  {score.linkedAccounts.length + 1}
                 </Badge>
               </CardTitle>
               <CardDescription className="text-gray-400">
-                Accounts connected to this user through fraud detection
+                This user + accounts connected through fraud detection
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3 max-h-60 overflow-y-auto">
+                {/* Show the user themselves first */}
+                <div className="p-3 bg-blue-900/20 rounded-lg border border-blue-500/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-mono text-sm text-blue-300 break-all">
+                      #1 {score.userId}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className="text-xs border-blue-500/30 text-blue-400"
+                    >
+                      This User
+                    </Badge>
+                  </div>
+                </div>
                 {score.linkedAccounts.map((account, idx) => (
                   <div
                     key={idx}
@@ -463,7 +478,7 @@ export default function SuspicionScoreCard({ score, onScoreUpdated }: Props) {
                   >
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-mono text-sm text-gray-300 break-all">
-                        #{idx + 1} {account.userId}
+                        #{idx + 2} {account.userId}
                       </span>
                       <Badge
                         variant="outline"
