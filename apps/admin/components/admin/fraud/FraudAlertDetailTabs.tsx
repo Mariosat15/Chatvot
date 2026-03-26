@@ -308,7 +308,7 @@ export default function FraudAlertDetailTabs({
       {/* ─── Overview Tab ─────────────────────────────────── */}
       <TabsContent value="overview" className="mt-4 space-y-5">
         {/* Alert Summary */}
-        <div className="p-4 bg-gradient-to-br from-gray-800/60 to-gray-900/60 rounded-lg border border-gray-700">
+        <div className="p-4 bg-linear-to-br from-gray-800/60 to-gray-900/60 rounded-lg border border-gray-700">
           <h4 className="text-sm font-semibold text-gray-200 mb-3 flex items-center gap-2">
             <Shield className="h-4 w-4 text-blue-400" />
             Investigation Summary
