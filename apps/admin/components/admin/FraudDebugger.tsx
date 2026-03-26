@@ -18,9 +18,11 @@ import {
   Info,
 } from "lucide-react";
 import { toast } from "sonner";
+import { computeAlertTitle, computeAlertDescription } from "@/components/admin/fraud/alert-display-helpers";
 
 export default function FraudDebugger() {
   const [loading, setLoading] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [debugData, setDebugData] = useState<any>(null);
 
   const fetchDebugData = async () => {
@@ -172,7 +174,7 @@ export default function FraudDebugger() {
                 Database Statistics
               </CardTitle>
               <CardDescription>
-                What's actually in your database
+                What&apos;s actually in your database
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -346,11 +348,11 @@ export default function FraudDebugger() {
                               {alert.severity.toUpperCase()}
                             </Badge>
                             <span className="font-semibold text-white">
-                              {alert.title}
+                              {computeAlertTitle(alert)}
                             </span>
                           </div>
                           <div className="text-sm text-gray-300">
-                            {alert.description}
+                            {computeAlertDescription(alert)}
                           </div>
                           <div className="text-xs text-gray-500 mt-1">
                             Users: {alert.suspiciousUserIds.join(", ")}

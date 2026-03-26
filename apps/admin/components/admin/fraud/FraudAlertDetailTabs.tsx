@@ -27,6 +27,7 @@ import EvidenceGroupedPanel from "./EvidenceGroupedPanel";
 import FraudNetworkGraph from "./FraudNetworkGraph";
 import ConnectedAccountsPanel from "./ConnectedAccountsPanel";
 import AIInvestigationReport from "./AIInvestigationReport";
+import { computeAlertDescription } from "./alert-display-helpers";
 
 // ─── Types ──────────────────────────────────────────────────
 interface EvidenceItem {
@@ -313,7 +314,7 @@ export default function FraudAlertDetailTabs({
             Investigation Summary
           </h4>
           <p className="text-sm text-gray-300 leading-relaxed mb-4">
-            {alert.description}
+            {computeAlertDescription(alert)}
           </p>
 
           {/* Key stats */}

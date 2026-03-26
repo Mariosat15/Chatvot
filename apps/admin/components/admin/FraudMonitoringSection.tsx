@@ -57,6 +57,11 @@ import SuspicionScoreCard from "@/components/admin/fraud/SuspicionScoreCard";
 import FraudAlertDetailTabs from "@/components/admin/fraud/FraudAlertDetailTabs";
 import FraudHistorySection from "@/components/admin/FraudHistorySection";
 import { History } from "lucide-react";
+import {
+  computeAlertTitle,
+  computeAlertDescription,
+  getAccountsInvolved,
+} from "@/components/admin/fraud/alert-display-helpers";
 
 
 // Reason: Matches SuspicionScoreData in SuspicionScoreCard.tsx — needed for typed fraud score state.
@@ -1076,17 +1081,17 @@ export default function FraudMonitoringSection() {
                         </div>
 
                         <h3 className="text-lg font-semibold text-gray-100 mb-1">
-                          {alert.title}
+                          {computeAlertTitle(alert)}
                         </h3>
 
                         <p className="text-sm text-gray-400 mb-3">
-                          {alert.description}
+                          {computeAlertDescription(alert)}
                         </p>
 
                         <div className="flex items-center gap-4 text-xs text-gray-500">
                           <span className="flex items-center gap-1">
                             <Users className="h-3 w-3" />
-                            {alert.suspiciousUserIds.length} accounts
+                            {getAccountsInvolved(alert)} accounts
                           </span>
                           <span className="flex items-center gap-1">
                             <TrendingUp className="h-3 w-3" />
@@ -1227,18 +1232,18 @@ export default function FraudMonitoringSection() {
                                 </div>
 
                                 <h3 className="text-xl font-semibold text-gray-100 mb-2">
-                                  {alert.title}
+                                  {computeAlertTitle(alert)}
                                 </h3>
 
                                 <p className="text-sm text-gray-400 mb-4">
-                                  {alert.description}
+                                  {computeAlertDescription(alert)}
                                 </p>
 
                                 <div className="flex items-center gap-6 text-sm text-gray-500">
                                   <span className="flex items-center gap-2">
                                     <Users className="h-4 w-4" />
                                     <strong className="text-gray-100">
-                                      {alert.suspiciousUserIds.length}
+                                      {getAccountsInvolved(alert)}
                                     </strong>{" "}
                                     suspicious accounts
                                   </span>
@@ -1472,16 +1477,16 @@ export default function FraudMonitoringSection() {
                             )}
                           </div>
                           <h4 className="text-lg font-semibold text-gray-100">
-                            {alert.title}
+                            {computeAlertTitle(alert)}
                           </h4>
                           <p className="text-sm text-gray-400 mt-1">
-                            {alert.description}
+                            {computeAlertDescription(alert)}
                           </p>
 
                           <div className="flex items-center gap-4 mt-3 text-xs text-gray-500 flex-wrap">
                             <span className="flex items-center gap-1">
                               <Users className="h-3 w-3" />
-                              {alert.suspiciousUserIds.length} accounts
+                              {getAccountsInvolved(alert)} accounts
                             </span>
                             <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
@@ -1737,10 +1742,10 @@ export default function FraudMonitoringSection() {
               <DialogHeader>
                 <DialogTitle className="text-2xl text-gray-100 flex items-center gap-3">
                   <AlertTriangle className="h-6 w-6 text-red-500" />
-                  {selectedAlert.title}
+                  {computeAlertTitle(selectedAlert)}
                 </DialogTitle>
                 <DialogDescription className="text-gray-400">
-                  {selectedAlert.description}
+                  {computeAlertDescription(selectedAlert)}
                 </DialogDescription>
               </DialogHeader>
 
