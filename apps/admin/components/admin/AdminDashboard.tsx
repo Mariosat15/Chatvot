@@ -66,6 +66,7 @@ import {
   Map as MapIcon,
   Trash2,
   Eye,
+  Cookie,
 } from "lucide-react";
 import { toast } from "sonner";
 import CredentialsSection from "@/components/admin/CredentialsSection";
@@ -129,6 +130,7 @@ import JourneyMapEditorSection from "@/components/admin/JourneyMapEditorSection"
 import GamificationWizardSection from "@/components/admin/GamificationWizardSection";
 import SitePagesSection from "@/components/admin/SitePagesSection";
 import LandingPagesSection from "@/components/admin/LandingPagesSection";
+import CookieConsentSection from "@/components/admin/CookieConsentSection";
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -201,6 +203,13 @@ const menuGroups: MenuGroup[] = [
         icon: <Sparkles className="h-5 w-5" />,
         color: "text-cyan-400",
         bgColor: "bg-cyan-500/10 hover:bg-cyan-500/20",
+      },
+      {
+        id: "cookie-consent",
+        label: "Cookie Consent",
+        icon: <Cookie className="h-5 w-5" />,
+        color: "text-amber-400",
+        bgColor: "bg-amber-500/10 hover:bg-amber-500/20",
       },
       {
         id: "visitors",
@@ -973,6 +982,8 @@ export default function AdminDashboard({
         return <SitePagesSection key={currentRefreshKey} />;
       case "landing-pages":
         return <LandingPagesSection key={currentRefreshKey} />;
+      case "cookie-consent":
+        return <CookieConsentSection key={currentRefreshKey} />;
       case "visitors":
         return <VisitorAnalyticsSection key={currentRefreshKey} />;
       case "competitions":

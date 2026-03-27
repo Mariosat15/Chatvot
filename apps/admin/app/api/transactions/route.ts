@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { requireAdminAuth } from "@/lib/admin/auth";
 import { connectToDatabase } from "@/database/mongoose";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
@@ -7,6 +8,14 @@ import { PlatformTransaction } from "@/database/models/platform-financials.model
 import VATPayment from "@/database/models/vat-payment.model";
 import VendorPayment from "@/database/models/vendor-payment.model";
 import { getUsersByIds } from "@/lib/utils/user-lookup";
+
+// Reason: MongoDB $regex treats the search string as a regular expression.
+// Characters like +, ., *, ?, (, ), [, ], {, }, ^, $, |, \ are regex metacharacters.
+// Unescaped, they cause MongoServerError or unintended wildcard matches.
+// Example: "user+tag@example.com" → + means "one or more" → parse error → 500 crash.
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 /**
  * GET /api/admin/transactions
@@ -35,6 +44,7 @@ export async function GET(request: NextRequest) {
     const sortOrder = searchParams.get("sortOrder") || "desc";
 
     // Build query
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const query: any = {};
 
     if (type && type !== "all") {
@@ -53,15 +63,65 @@ export async function GET(request: NextRequest) {
       query.competitionId = competitionId;
     }
 
-    if (search) {
-      // Don't use regex on _id (ObjectId) - only search text fields
-      query.$or = [
-        { description: { $regex: search, $options: "i" } },
-        { userId: { $regex: search, $options: "i" } },
-        { "metadata.paymentIntentId": { $regex: search, $options: "i" } },
-        { "userInfo.name": { $regex: search, $options: "i" } },
-        { "userInfo.email": { $regex: search, $options: "i" } },
+    if (search && search.trim()) {
+      // Reason: userInfo.email/name are NOT stored in WalletTransaction – they're enriched after fetch.
+      // Pre-resolve matching userIds from the user collection first, then query by userId.
+      // Reason: Escape the raw search string before using in $regex to prevent MongoServerError
+      // from special regex characters (e.g. + in "user+tag@example.com").
+      const safeSearch = escapeRegex(search.trim());
+      const db = mongoose.connection.db;
+      const resolvedUserIds: string[] = [];
+
+      if (db) {
+        try {
+          const matchingUsers = await db
+            .collection("user")
+            .find(
+              {
+                $or: [
+                  { email: { $regex: safeSearch, $options: "i" } },
+                  { name: { $regex: safeSearch, $options: "i" } },
+                  // Exact match on id field (better-auth string ID)
+                  { id: search.trim() },
+                ],
+              },
+              // Reason: Fetch both id (better-auth string) and _id (ObjectId) so we can
+              // match against WalletTransaction.userId regardless of which format was stored.
+              { projection: { id: 1, _id: 1 } },
+            )
+            .limit(500)
+            .toArray();
+
+          matchingUsers.forEach((u) => {
+            // Collect better-auth string id
+            if (u.id) resolvedUserIds.push(String(u.id));
+            // Also collect ObjectId string in case transactions stored it that way
+            if (u._id) resolvedUserIds.push(u._id.toString());
+          });
+        } catch (userLookupError) {
+          // Reason: Don't fail the whole request if user lookup has an error.
+          // Fall back to text-only search below.
+          console.warn("⚠️ Transaction search: user lookup error:", userLookupError);
+        }
+      }
+
+      // Build $or: text fields + pre-resolved userIds
+      const searchConditions: Record<string, unknown>[] = [
+        { description: { $regex: safeSearch, $options: "i" } },
+        { "metadata.paymentIntentId": { $regex: safeSearch, $options: "i" } },
       ];
+
+      if (resolvedUserIds.length > 0) {
+        // Deduplicate IDs before querying
+        const uniqueIds = [...new Set(resolvedUserIds)];
+        searchConditions.push({ userId: { $in: uniqueIds } });
+      } else {
+        // Reason: No users found by name/email/id — try a direct regex on userId
+        // as a last resort (handles partial ID searches).
+        searchConditions.push({ userId: { $regex: safeSearch, $options: "i" } });
+      }
+
+      query.$or = searchConditions;
     }
 
     if (startDate || endDate) {
@@ -79,9 +139,10 @@ export async function GET(request: NextRequest) {
     // Calculate skip for pagination
     const skip = (page - 1) * limit;
 
-    // Build sort object
-    const sort: any = {};
-    sort[sortBy] = sortOrder === "asc" ? 1 : -1;
+    // Reason: Mongoose sort requires a dynamic key — use allowlist to prevent injection
+    const allowedSortFields = new Set(["createdAt", "amount", "transactionType", "status", "userId"]);
+    const safeSortBy = allowedSortFields.has(sortBy) ? sortBy : "createdAt";
+    const sort: Record<string, 1 | -1> = { [safeSortBy]: sortOrder === "asc" ? 1 : -1 };
 
     // Check if we should include admin/platform transactions
     const includeAdminTx =
@@ -101,16 +162,19 @@ export async function GET(request: NextRequest) {
     // For very large result sets, use date filters to narrow down
     const maxRecords = 1000; // Safety limit
 
-    const [walletTransactions, walletTotal] = await Promise.all([
+    const [walletTransactions, _walletTransactionTotal] = await Promise.all([
       WalletTransaction.find(query).sort(sort).limit(maxRecords).lean(),
       WalletTransaction.countDocuments(query),
     ]);
 
     // Also fetch platform transactions (admin withdrawals, fees, unclaimed pools)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let platformTransactions: any[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let vatPayments: any[] = [];
 
     if (includeAdminTx) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const platformQuery: any = {};
       if (type && type !== "all") {
         if (
@@ -140,6 +204,7 @@ export async function GET(request: NextRequest) {
 
       // Fetch VAT payments if type is 'all' or 'vat_payment'
       if (type === "all" || type === "vat_payment" || !type) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const vatQuery: any = { status: "paid" };
         if (startDate || endDate) {
           vatQuery.paidAt = {};
@@ -154,8 +219,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch vendor payments if type is 'all' or 'vendor_payment'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let vendorPayments: any[] = [];
     if (type === "all" || type === "vendor_payment" || !type) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const vendorQuery: any = { status: "paid" };
       if (startDate || endDate) {
         vendorQuery.paidAt = {};
@@ -200,6 +267,7 @@ export async function GET(request: NextRequest) {
 
     // Enrich wallet transactions with user info and withdrawal details
     const enrichedWalletTransactions = walletTransactions.map((t) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const enriched: any = {
         ...t,
         source: "wallet" as const,
@@ -339,7 +407,9 @@ export async function GET(request: NextRequest) {
       ...enrichedVatPayments,
       ...enrichedVendorPayments,
     ].sort((a, b) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const dateA = new Date((a as any).createdAt).getTime();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const dateB = new Date((b as any).createdAt).getTime();
       return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
     });
@@ -400,6 +470,7 @@ export async function GET(request: NextRequest) {
               };
               return acc;
             },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             {} as Record<string, any>,
           ),
           byStatus: statusBreakdown.reduce(
@@ -451,6 +522,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user info
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const txUserId = (transaction as any).userId;
     let userInfo = { id: txUserId, name: "Unknown", email: "Unknown" };
     if (txUserId !== "platform") {

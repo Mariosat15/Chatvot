@@ -56,6 +56,7 @@ import RestrictedUsersSection from "@/components/admin/RestrictedUsersSection";
 import SuspicionScoreCard from "@/components/admin/fraud/SuspicionScoreCard";
 import FraudAlertDetailTabs from "@/components/admin/fraud/FraudAlertDetailTabs";
 import FraudHistorySection from "@/components/admin/FraudHistorySection";
+import ManualCheckResultPanel from "@/components/admin/fraud/ManualCheckResultPanel";
 import { History } from "lucide-react";
 import {
   computeAlertTitle,
@@ -1684,39 +1685,8 @@ export default function FraudMonitoringSection() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-gray-800 border-gray-700">
-                <CardHeader>
-                  <CardTitle className="text-base text-gray-100">
-                    Suspicion Score
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="text-sm text-gray-300">
-                  {manualResult.suspicionScore ? (
-                    <pre className="bg-gray-900/50 p-3 rounded text-xs overflow-auto max-h-60">
-                      {JSON.stringify(manualResult.suspicionScore, null, 2)}
-                    </pre>
-                  ) : (
-                    <span className="text-gray-500">No score found</span>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="bg-gray-800 border-gray-700">
-                <CardHeader>
-                  <CardTitle className="text-base text-gray-100">
-                    Full Data (Raw JSON)
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">
-                    All available data for this user (alerts, devices,
-                    restrictions, lockouts, payment fingerprints, history).
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <pre className="bg-gray-900/50 p-3 rounded text-xs overflow-auto max-h-[400px] text-gray-200">
-                    {JSON.stringify(manualResult, null, 2)}
-                  </pre>
-                </CardContent>
-              </Card>
+              {/* Structured manual check result — replaces raw JSON */}
+              <ManualCheckResultPanel result={manualResult} />
             </div>
           )}
         </TabsContent>

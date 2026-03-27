@@ -7,6 +7,10 @@ export const ADMIN_SECTIONS = [
   "overview",
   // Content
   "hero-page",
+  "site-pages",
+  "landing-pages",
+  "cookie-consent",
+  "visitors",
   "marketplace",
   // Trading
   "competitions",

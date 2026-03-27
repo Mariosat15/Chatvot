@@ -25,7 +25,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   History,
   Search,
@@ -35,7 +34,7 @@ import {
   Clock,
   Shield,
   User,
-  Calendar,
+  Users,
   ChevronLeft,
   ChevronRight,
   RefreshCw,
@@ -43,13 +42,10 @@ import {
   FileWarning,
   CheckCircle2,
   XCircle,
-  UserX,
   UserCheck,
   Gavel,
   Scale,
   Activity,
-  TrendingUp,
-  TrendingDown,
 } from "lucide-react";
 
 interface FraudHistoryEntry {
@@ -227,12 +223,14 @@ export default function FraudHistorySection() {
   const [actionTypeFilter, setActionTypeFilter] = useState<string>("all");
   const [severityFilter, setSeverityFilter] = useState<string>("all");
   const [performedByFilter, setPerformedByFilter] = useState<string>("all");
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
     start: "",
     end: "",
   });
 
   // User detail dialog
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [userHistory, setUserHistory] = useState<UserHistorySummary | null>(
     null,
@@ -245,6 +243,10 @@ export default function FraudHistorySection() {
     null,
   );
   const [entryDialogOpen, setEntryDialogOpen] = useState(false);
+
+  // Linked accounts for an investigation alert
+  const [linkedEntries, setLinkedEntries] = useState<FraudHistoryEntry[]>([]);
+  const [loadingLinked, setLoadingLinked] = useState(false);
 
   const fetchHistory = useCallback(async () => {
     setLoading(true);
@@ -312,9 +314,33 @@ export default function FraudHistorySection() {
     fetchUserHistory(userId);
   };
 
+  const fetchLinkedEntries = async (alertId: string) => {
+    setLoadingLinked(true);
+    setLinkedEntries([]);
+    try {
+      const res = await fetch(
+        `/api/fraud/history?relatedAlertId=${alertId}&limit=50`,
+      );
+      const data = await res.json();
+      if (data.success) {
+        setLinkedEntries(data.data.history);
+      }
+    } catch (err) {
+      console.error("Error fetching linked entries:", err);
+    } finally {
+      setLoadingLinked(false);
+    }
+  };
+
   const handleEntryClick = (entry: FraudHistoryEntry) => {
     setSelectedEntry(entry);
     setEntryDialogOpen(true);
+    // Fetch all history entries for the same alert to show linked accounts
+    if (entry.relatedAlertId?._id) {
+      fetchLinkedEntries(entry.relatedAlertId._id);
+    } else {
+      setLinkedEntries([]);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -329,6 +355,7 @@ export default function FraudHistorySection() {
       suspended: "bg-orange-500",
       banned: "bg-red-600",
     };
+    // eslint-disable-next-line security/detect-object-injection
     return colors[status] || "bg-gray-500";
   };
 
@@ -549,6 +576,15 @@ export default function FraudHistorySection() {
                             >
                               {entry.userName || entry.userEmail}
                             </button>
+                            {entry.relatedAlertId && (
+                              <span
+                                className="ml-2 inline-flex items-center gap-1 text-xs text-purple-400 cursor-pointer"
+                                title="Multi-account investigation"
+                              >
+                                <Users className="h-3 w-3" />
+                                investigation
+                              </span>
+                            )}
                             <span className="mx-2">•</span>
                             <span>{entry.reason}</span>
                           </div>
@@ -788,6 +824,88 @@ export default function FraudHistorySection() {
                     {formatDate(selectedEntry.createdAt)}
                   </p>
                 </div>
+
+                {/* Linked Accounts in Same Investigation */}
+                {selectedEntry.relatedAlertId && (
+                  <div className="bg-zinc-800 rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-zinc-400 mb-3 flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      All Accounts in This Investigation
+                      {loadingLinked && (
+                        <RefreshCw className="h-3 w-3 animate-spin ml-1" />
+                      )}
+                    </h4>
+                    {loadingLinked ? (
+                      <p className="text-xs text-zinc-500">Loading…</p>
+                    ) : linkedEntries.length === 0 ? (
+                      <p className="text-xs text-zinc-500">
+                        No linked accounts found
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {/* Deduplicate by userId to get unique investigated accounts */}
+                        {Array.from(
+                          new Map(
+                            linkedEntries.map((e) => [e.userId, e]),
+                          ).values(),
+                        ).map((e) => {
+                          const isCurrent =
+                            e.userId === selectedEntry.userId;
+                          return (
+                            <div
+                              key={e.userId}
+                              className={`flex items-center justify-between p-2 rounded ${isCurrent ? "bg-blue-900/40 border border-blue-700" : "bg-zinc-700"}`}
+                            >
+                              <div>
+                                <p className="text-sm text-white font-medium">
+                                  {e.userName || e.userEmail}
+                                </p>
+                                <p className="text-xs text-zinc-400">
+                                  {e.userEmail}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {isCurrent && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-blue-400 border-blue-500 text-xs"
+                                  >
+                                    Viewing
+                                  </Badge>
+                                )}
+                                <Badge
+                                  className={`${ACTION_TYPE_CONFIG[e.actionType]?.color || "bg-gray-500"} text-white text-xs`}
+                                >
+                                  {ACTION_TYPE_CONFIG[e.actionType]?.label ||
+                                    e.actionType}
+                                </Badge>
+                                <button
+                                  className="text-blue-400 hover:underline text-xs"
+                                  onClick={() => {
+                                    setEntryDialogOpen(false);
+                                    handleUserClick(e.userId);
+                                  }}
+                                >
+                                  View history
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <p className="text-xs text-zinc-500 mt-2">
+                      Alert:{" "}
+                      <span className="text-zinc-300">
+                        {selectedEntry.relatedAlertId.title}
+                      </span>{" "}
+                      —{" "}
+                      <span className="uppercase">
+                        {selectedEntry.relatedAlertId.status}
+                      </span>
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -970,6 +1088,7 @@ export default function FraudHistorySection() {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                         {Object.entries(userHistory.actionCounts).map(
                           ([type, count]) => {
+                            // eslint-disable-next-line security/detect-object-injection
                             const config = ACTION_TYPE_CONFIG[type];
                             return (
                               <div

@@ -52,12 +52,9 @@ import {
   Edit,
   RefreshCw,
   CheckCircle,
-  XCircle,
-  Clock,
   Copy,
   Send,
   FileText,
-  Settings,
   Crown,
   User,
   Briefcase,
@@ -66,7 +63,6 @@ import {
   Scale,
   Ban,
   UserCheck,
-  LogOut,
   Lock,
   Unlock,
 } from "lucide-react";
@@ -119,6 +115,9 @@ const SECTION_LABELS: Record<string, string> = {
   // Content
   "hero-page": "Hero Page",
   "site-pages": "Site Pages",
+  "landing-pages": "Landing Pages",
+  "cookie-consent": "Cookie Consent",
+  visitors: "Visitor Analytics",
   marketplace: "Marketplace",
   // Trading
   competitions: "Competitions",
@@ -189,7 +188,7 @@ const SECTION_LABELS: Record<string, string> = {
 
 const SECTION_GROUPS = {
   Dashboard: ["overview"],
-  Content: ["hero-page", "site-pages", "marketplace"],
+  Content: ["hero-page", "site-pages", "landing-pages", "cookie-consent", "visitors", "marketplace"],
   Trading: [
     "competitions",
     "challenges",
@@ -255,11 +254,17 @@ const ROLE_ICONS: Record<string, React.ReactNode> = {
   Custom: <User className="h-4 w-4 text-gray-400" />,
 };
 
+// Reason: SECTION_LABELS is a trusted compile-time constant — no injection risk.
+/* eslint-disable security/detect-object-injection */
+const getSectionLabel = (section: string): string =>
+  SECTION_LABELS[section] || section;
+/* eslint-enable security/detect-object-injection */
+
 export default function EmployeesSection() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [roleTemplates, setRoleTemplates] = useState<RoleTemplate[]>([]);
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>([]);
-  const [availableSections, setAvailableSections] = useState<string[]>([]);
+  const [_availableSections, setAvailableSections] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("employees");
   const [accessError, setAccessError] = useState<string | null>(null);
@@ -315,8 +320,8 @@ export default function EmployeesSection() {
   });
 
   // Email template dialog
-  const [showEmailTemplateDialog, setShowEmailTemplateDialog] = useState(false);
-  const [editingEmailTemplate, setEditingEmailTemplate] =
+  const [_showEmailTemplateDialog, setShowEmailTemplateDialog] = useState(false);
+  const [_editingEmailTemplate, setEditingEmailTemplate] =
     useState<EmailTemplate | null>(null);
 
   useEffect(() => {
@@ -1177,7 +1182,7 @@ export default function EmployeesSection() {
                                 variant="outline"
                                 className="text-xs border-gray-600 text-gray-400"
                               >
-                                {SECTION_LABELS[section] || section}
+                                {getSectionLabel(section)}
                               </Badge>
                             ))}
                           {template.allowedSections.length > 5 && (
@@ -1380,7 +1385,7 @@ export default function EmployeesSection() {
                               }}
                             />
                             <span className="text-sm text-gray-400">
-                              {SECTION_LABELS[section] || section}
+                              {getSectionLabel(section)}
                             </span>
                           </label>
                         ))}
@@ -1586,7 +1591,7 @@ export default function EmployeesSection() {
                               }}
                             />
                             <span className="text-sm text-gray-400">
-                              {SECTION_LABELS[section] || section}
+                              {getSectionLabel(section)}
                             </span>
                           </label>
                         ))}
@@ -1771,7 +1776,7 @@ export default function EmployeesSection() {
                             }}
                           />
                           <span className="text-sm text-gray-400">
-                            {SECTION_LABELS[section] || section}
+                            {getSectionLabel(section)}
                           </span>
                         </label>
                       ))}

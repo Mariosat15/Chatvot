@@ -320,7 +320,8 @@ type TabType =
   | "audit"
   | "conversations"
   | "gamemaster"
-  | "history";
+  | "history"
+  | "transactions";
 
 export default function UserFullDetailPanel({
   open,
@@ -452,6 +453,93 @@ export default function UserFullDetailPanel({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Transactions Tab State
+  interface UserTransaction {
+    _id: string;
+    transactionType: string;
+    amount: number;
+    amountEUR?: number;
+    status: string;
+    description?: string;
+    createdAt: string;
+    metadata?: Record<string, unknown>;
+  }
+  const [userTxs, setUserTxs] = useState<UserTransaction[]>([]);
+  const [userTxsTotal, setUserTxsTotal] = useState(0);
+  const [userTxsPage, setUserTxsPage] = useState(1);
+  const [userTxsLoading, setUserTxsLoading] = useState(false);
+  const [userTxFilters, setUserTxFilters] = useState({
+    type: "all",
+    status: "all",
+    search: "",
+    startDate: "",
+    endDate: "",
+    minAmount: "",
+    maxAmount: "",
+  });
+  const userTxsPerPage = 25;
+
+  const fetchUserTransactions = useCallback(
+    async (page = 1) => {
+      if (!user.id) return;
+      setUserTxsLoading(true);
+      try {
+        const params = new URLSearchParams({
+          userId: user.id,
+          page: String(page),
+          limit: String(userTxsPerPage),
+        });
+        if (userTxFilters.type !== "all") params.set("type", userTxFilters.type);
+        if (userTxFilters.status !== "all") params.set("status", userTxFilters.status);
+        if (userTxFilters.search) params.set("search", userTxFilters.search);
+        if (userTxFilters.startDate) params.set("startDate", userTxFilters.startDate);
+        if (userTxFilters.endDate) params.set("endDate", userTxFilters.endDate);
+        if (userTxFilters.minAmount) params.set("minAmount", userTxFilters.minAmount);
+        if (userTxFilters.maxAmount) params.set("maxAmount", userTxFilters.maxAmount);
+
+        const res = await fetch(`/api/transactions?${params}`);
+        const data = await res.json();
+        if (data.success) {
+          setUserTxs(data.data.transactions);
+          setUserTxsTotal(data.data.pagination.total);
+          setUserTxsPage(page);
+        }
+      } catch {
+        toast.error("Failed to load transactions");
+      } finally {
+        setUserTxsLoading(false);
+      }
+    },
+     
+    [user.id, userTxFilters],
+  );
+
+  useEffect(() => {
+    if (activeTab === "transactions" && user.id) {
+      fetchUserTransactions(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, user.id]);
+
+  // Fraud Investigation State
+  interface FraudStatus {
+    underInvestigation: boolean;
+    investigationReasons: string[];
+    activeAlerts: Array<{
+      _id: string;
+      alertType?: string;
+      status?: string;
+      severity?: string;
+      detectedAt?: string;
+    }>;
+    suspicionScore: { totalScore?: number; riskLevel?: string } | null;
+    alertsTotal: number;
+    alertsInvestigating: number;
+    alertsPending: number;
+  }
+  const [fraudStatus, setFraudStatus] = useState<FraudStatus | null>(null);
+  const [loadingFraudStatus, setLoadingFraudStatus] = useState(false);
+
   // Password verification state
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
@@ -467,6 +555,20 @@ export default function UserFullDetailPanel({
   const [loadingAssignment, setLoadingAssignment] = useState(false);
   const [showTransferDialog, setShowTransferDialog] = useState(false);
   const [assigningToSelf, setAssigningToSelf] = useState(false);
+
+  const fetchFraudStatus = useCallback(async () => {
+    if (!user.id) return;
+    setLoadingFraudStatus(true);
+    try {
+      const res = await fetch(`/api/fraud/user-status?userId=${encodeURIComponent(user.id)}`);
+      const data = await res.json();
+      if (data.success) setFraudStatus(data.data);
+    } catch {
+      // Non-critical – silently fail
+    } finally {
+      setLoadingFraudStatus(false);
+    }
+  }, [user.id]);
 
   const fetchAssignment = useCallback(async () => {
     if (!user.id) return;
@@ -624,6 +726,7 @@ export default function UserFullDetailPanel({
       fetchUserData();
       fetchAssignment();
       fetchGamificationStatus();
+      fetchFraudStatus();
       // Reset edit form
       setEditName(user.name);
       setEditEmail(user.email);
@@ -643,7 +746,7 @@ export default function UserFullDetailPanel({
       setHistoryFilters({ type: "all", status: "all", dateFrom: "", dateTo: "", search: "" });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, user, fetchUserData, fetchAssignment]);
+  }, [open, user, fetchUserData, fetchAssignment, fetchFraudStatus]);
 
   // Fetch history when tab is selected (lazy loading)
   useEffect(() => {
@@ -1260,6 +1363,7 @@ export default function UserFullDetailPanel({
     { id: "audit", label: "Audit Trail", icon: ClipboardList },
     { id: "notes", label: `Notes (${notes.length})`, icon: Send },
     { id: "restrictions", label: "Restrictions", icon: Ban },
+    { id: "transactions", label: "Transactions", icon: CreditCard },
     { id: "invoices", label: `Invoices (${invoices.length})`, icon: FileText },
   ];
 
@@ -1444,6 +1548,51 @@ export default function UserFullDetailPanel({
                 {/* Overview Tab */}
                 {activeTab === "overview" && (
                   <div className="space-y-6">
+                    {/* ── Investigation Banner ── */}
+                    {!loadingFraudStatus && fraudStatus && fraudStatus.alertsTotal > 0 && (
+                      <div
+                        className={`rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 border ${fraudStatus.underInvestigation ? "bg-red-950/40 border-red-700" : "bg-yellow-950/40 border-yellow-700"}`}
+                      >
+                        <AlertTriangle
+                          className={`h-5 w-5 flex-shrink-0 ${fraudStatus.underInvestigation ? "text-red-400" : "text-yellow-400"}`}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <span
+                              className={`font-semibold text-sm ${fraudStatus.underInvestigation ? "text-red-300" : "text-yellow-300"}`}
+                            >
+                              {fraudStatus.underInvestigation
+                                ? "🔍 Under Investigation"
+                                : "⚠️ Pending Fraud Review"}
+                            </span>
+                            <Badge
+                              className={`text-xs ${fraudStatus.underInvestigation ? "bg-red-600" : "bg-yellow-600"} text-white`}
+                            >
+                              {fraudStatus.alertsTotal} alert
+                              {fraudStatus.alertsTotal !== 1 ? "s" : ""}
+                            </Badge>
+                            {fraudStatus.suspicionScore?.totalScore != null && (
+                              <Badge className="bg-gray-700 text-white text-xs">
+                                Score: {fraudStatus.suspicionScore.totalScore}
+                              </Badge>
+                            )}
+                          </div>
+                          {fraudStatus.investigationReasons.length > 0 && (
+                            <p className="text-xs text-gray-300">
+                              Reason:{" "}
+                              {fraudStatus.investigationReasons.join(", ")}
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {fraudStatus.alertsInvestigating > 0 &&
+                              `${fraudStatus.alertsInvestigating} investigating · `}
+                            {fraudStatus.alertsPending > 0 &&
+                              `${fraudStatus.alertsPending} pending`}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Stats Grid */}
                     <div className="grid grid-cols-4 gap-4">
                       <Card className="bg-gray-800/50 border-gray-700">
@@ -2491,6 +2640,28 @@ export default function UserFullDetailPanel({
                 {/* Restrictions Tab */}
                 {activeTab === "restrictions" && (
                   <div className="space-y-6">
+                    {/* Investigation Notice in Restrictions Tab */}
+                    {fraudStatus && fraudStatus.underInvestigation && (
+                      <div className="rounded-lg p-3 bg-blue-950/40 border border-blue-700 flex items-start gap-3">
+                        <AlertTriangle className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-semibold text-blue-300">
+                            User is under investigation
+                          </p>
+                          {fraudStatus.investigationReasons.length > 0 && (
+                            <p className="text-xs text-gray-300 mt-0.5">
+                              Reason:{" "}
+                              {fraudStatus.investigationReasons.join(", ")}
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {fraudStatus.alertsInvestigating} active
+                            investigation(s) · Score:{" "}
+                            {fraudStatus.suspicionScore?.totalScore ?? 0}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     {/* Account Deactivation Toggle */}
                     <Card
                       className={
@@ -2799,6 +2970,23 @@ export default function UserFullDetailPanel({
                 {/* History Tab */}
                 {activeTab === "history" && (
                   <div className="space-y-6">
+                    {/* Investigation Notice */}
+                    {fraudStatus && fraudStatus.underInvestigation && (
+                      <div className="rounded-lg p-3 bg-red-950/40 border border-red-700 flex items-start gap-3">
+                        <AlertTriangle className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-semibold text-red-300">
+                            Under Investigation —{" "}
+                            {fraudStatus.investigationReasons.join(", ")}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {fraudStatus.alertsTotal} active alert(s) ·
+                            Suspicion score:{" "}
+                            {fraudStatus.suspicionScore?.totalScore ?? 0}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     {/* Filters */}
                     <Card className="bg-gray-800/50 border-gray-700">
                       <CardHeader className="pb-3">
@@ -3269,6 +3457,291 @@ export default function UserFullDetailPanel({
                               of {history.length} activities
                             </div>
                           </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* ── Transactions Tab ── */}
+                {activeTab === "transactions" && (
+                  <div className="space-y-4">
+                    {/* Investigation banner */}
+                    {fraudStatus && fraudStatus.underInvestigation && (
+                      <div className="rounded-lg p-3 bg-red-950/40 border border-red-700 flex items-start gap-3">
+                        <AlertTriangle className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
+                        <p className="text-sm text-red-300">
+                          Under Investigation —{" "}
+                          {fraudStatus.investigationReasons.join(", ")}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Filters */}
+                    <Card className="bg-gray-800/50 border-gray-700">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-white text-base flex items-center gap-2">
+                          <CreditCard className="h-4 w-4 text-cyan-400" />
+                          Transactions
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => fetchUserTransactions(1)}
+                            disabled={userTxsLoading}
+                            className="ml-auto border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700"
+                          >
+                            <RefreshCw
+                              className={`h-4 w-4 mr-1 ${userTxsLoading ? "animate-spin" : ""}`}
+                            />
+                            Refresh
+                          </Button>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+                          {/* Type filter */}
+                          <Select
+                            value={userTxFilters.type}
+                            onValueChange={(v) =>
+                              setUserTxFilters((p) => ({ ...p, type: v }))
+                            }
+                          >
+                            <SelectTrigger className="bg-gray-900 border-gray-700 text-white">
+                              <SelectValue placeholder="Type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Types</SelectItem>
+                              <SelectItem value="deposit">Deposit</SelectItem>
+                              <SelectItem value="withdrawal">Withdrawal</SelectItem>
+                              <SelectItem value="competition_reward">Competition Reward</SelectItem>
+                              <SelectItem value="competition_entry">Competition Entry</SelectItem>
+                              <SelectItem value="admin_credit">Admin Credit</SelectItem>
+                              <SelectItem value="admin_debit">Admin Debit</SelectItem>
+                              <SelectItem value="refund">Refund</SelectItem>
+                              <SelectItem value="fee">Fee</SelectItem>
+                            </SelectContent>
+                          </Select>
+
+                          {/* Status filter */}
+                          <Select
+                            value={userTxFilters.status}
+                            onValueChange={(v) =>
+                              setUserTxFilters((p) => ({ ...p, status: v }))
+                            }
+                          >
+                            <SelectTrigger className="bg-gray-900 border-gray-700 text-white">
+                              <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Statuses</SelectItem>
+                              <SelectItem value="completed">Completed</SelectItem>
+                              <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="failed">Failed</SelectItem>
+                              <SelectItem value="cancelled">Cancelled</SelectItem>
+                            </SelectContent>
+                          </Select>
+
+                          {/* Start date */}
+                          <div>
+                            <Label className="text-xs text-gray-400 mb-1 block">From</Label>
+                            <Input
+                              type="date"
+                              value={userTxFilters.startDate}
+                              onChange={(e) =>
+                                setUserTxFilters((p) => ({ ...p, startDate: e.target.value }))
+                              }
+                              className="bg-gray-900 border-gray-700 text-white text-sm"
+                            />
+                          </div>
+
+                          {/* End date */}
+                          <div>
+                            <Label className="text-xs text-gray-400 mb-1 block">To</Label>
+                            <Input
+                              type="date"
+                              value={userTxFilters.endDate}
+                              onChange={(e) =>
+                                setUserTxFilters((p) => ({ ...p, endDate: e.target.value }))
+                              }
+                              className="bg-gray-900 border-gray-700 text-white text-sm"
+                            />
+                          </div>
+
+                          {/* Min amount */}
+                          <Input
+                            type="number"
+                            placeholder="Min amount"
+                            value={userTxFilters.minAmount}
+                            onChange={(e) =>
+                              setUserTxFilters((p) => ({ ...p, minAmount: e.target.value }))
+                            }
+                            className="bg-gray-900 border-gray-700 text-white text-sm"
+                          />
+
+                          {/* Max amount */}
+                          <Input
+                            type="number"
+                            placeholder="Max amount"
+                            value={userTxFilters.maxAmount}
+                            onChange={(e) =>
+                              setUserTxFilters((p) => ({ ...p, maxAmount: e.target.value }))
+                            }
+                            className="bg-gray-900 border-gray-700 text-white text-sm"
+                          />
+
+                          {/* Search */}
+                          <Input
+                            placeholder="Search description, ID..."
+                            value={userTxFilters.search}
+                            onChange={(e) =>
+                              setUserTxFilters((p) => ({ ...p, search: e.target.value }))
+                            }
+                            className="bg-gray-900 border-gray-700 text-white text-sm"
+                          />
+
+                          {/* Apply / Reset */}
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => fetchUserTransactions(1)}
+                              disabled={userTxsLoading}
+                              className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white"
+                              size="sm"
+                            >
+                              Apply
+                            </Button>
+                            <Button
+                              onClick={() => {
+                                setUserTxFilters({
+                                  type: "all",
+                                  status: "all",
+                                  search: "",
+                                  startDate: "",
+                                  endDate: "",
+                                  minAmount: "",
+                                  maxAmount: "",
+                                });
+                              }}
+                              variant="outline"
+                              size="sm"
+                              className="border-gray-600 text-gray-300"
+                            >
+                              Reset
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Transactions Table */}
+                    <Card className="bg-gray-800/50 border-gray-700">
+                      <CardContent className="p-0">
+                        {userTxsLoading ? (
+                          <div className="flex items-center justify-center py-12">
+                            <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+                          </div>
+                        ) : userTxs.length === 0 ? (
+                          <div className="text-center py-12 text-gray-400">
+                            <CreditCard className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                            <p>No transactions found</p>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="border-b border-gray-700 text-left">
+                                    <th className="px-4 py-3 text-gray-400 font-medium">Date</th>
+                                    <th className="px-4 py-3 text-gray-400 font-medium">Type</th>
+                                    <th className="px-4 py-3 text-gray-400 font-medium">Amount</th>
+                                    <th className="px-4 py-3 text-gray-400 font-medium">Status</th>
+                                    <th className="px-4 py-3 text-gray-400 font-medium">Description</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {userTxs.map((tx) => {
+                                    const amtPositive = tx.amount > 0;
+                                    return (
+                                      <tr
+                                        key={tx._id}
+                                        className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors"
+                                      >
+                                        <td className="px-4 py-3 text-gray-300 whitespace-nowrap">
+                                          {new Date(tx.createdAt).toLocaleString()}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          <Badge className="bg-gray-700 text-white text-xs">
+                                            {tx.transactionType.replace(/_/g, " ")}
+                                          </Badge>
+                                        </td>
+                                        <td
+                                          className={`px-4 py-3 font-semibold whitespace-nowrap ${amtPositive ? "text-green-400" : "text-red-400"}`}
+                                        >
+                                          {amtPositive ? "+" : ""}
+                                          {tx.amount.toFixed(2)}{" "}
+                                          {cs}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          <Badge
+                                            className={`text-xs text-white ${
+                                              tx.status === "completed"
+                                                ? "bg-green-600"
+                                                : tx.status === "pending"
+                                                  ? "bg-yellow-600"
+                                                  : tx.status === "failed"
+                                                    ? "bg-red-600"
+                                                    : "bg-gray-600"
+                                            }`}
+                                          >
+                                            {tx.status}
+                                          </Badge>
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-400 max-w-xs truncate">
+                                          {tx.description || "—"}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+
+                            {/* Pagination */}
+                            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-700">
+                              <p className="text-xs text-gray-400">
+                                {userTxsTotal} total · page {userTxsPage} of{" "}
+                                {Math.ceil(userTxsTotal / userTxsPerPage)}
+                              </p>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={userTxsPage <= 1 || userTxsLoading}
+                                  onClick={() =>
+                                    fetchUserTransactions(userTxsPage - 1)
+                                  }
+                                  className="border-gray-600 text-gray-300"
+                                >
+                                  Prev
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={
+                                    userTxsPage >=
+                                      Math.ceil(
+                                        userTxsTotal / userTxsPerPage,
+                                      ) || userTxsLoading
+                                  }
+                                  onClick={() =>
+                                    fetchUserTransactions(userTxsPage + 1)
+                                  }
+                                  className="border-gray-600 text-gray-300"
+                                >
+                                  Next
+                                </Button>
+                              </div>
+                            </div>
+                          </>
                         )}
                       </CardContent>
                     </Card>

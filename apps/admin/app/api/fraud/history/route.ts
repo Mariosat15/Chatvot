@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import mongoose from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
 import {
   FraudHistory,
@@ -17,6 +18,7 @@ export async function GET(request: NextRequest) {
 
     // Parse query parameters
     const userId = searchParams.get("userId");
+    const relatedAlertId = searchParams.get("relatedAlertId"); // fetch all history for an alert
     const actionType = searchParams.get("actionType") as FraudActionType | null;
     const severity = searchParams.get("severity") as ActionSeverity | null;
     const performedByType = searchParams.get("performedByType");
@@ -31,6 +33,11 @@ export async function GET(request: NextRequest) {
 
     if (userId) {
       query.userId = userId;
+    }
+
+    // Filter by alert ID – returns ALL history entries linked to that investigation
+    if (relatedAlertId && mongoose.Types.ObjectId.isValid(relatedAlertId)) {
+      query.relatedAlertId = new mongoose.Types.ObjectId(relatedAlertId);
     }
 
     if (actionType) {

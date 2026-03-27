@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -350,6 +350,10 @@ export default function FinancialDashboard() {
     startDate: "",
     endDate: "",
   });
+  // Reason: Debounce the search term so we don't fire an API request on every
+  // keystroke. 400 ms gives the user time to finish typing before fetching.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [exportingTransactions, setExportingTransactions] = useState(false);
 
   // Admin Funds states
@@ -662,6 +666,36 @@ export default function FinancialDashboard() {
     fetchAdminFundsData,
   ]);
 
+  // Reason: When non-pagination filters change (type, status, search, dates), reset to page 1
+  // so the user always sees the first page of filtered results instead of an empty page N.
+  const prevFiltersRef = useRef({ type: "all", status: "all", startDate: "", endDate: "" });
+  useEffect(() => {
+    const prev = prevFiltersRef.current;
+    const filterChanged =
+      prev.type !== txFilters.type ||
+      prev.status !== txFilters.status ||
+      prev.startDate !== txFilters.startDate ||
+      prev.endDate !== txFilters.endDate;
+    if (filterChanged) {
+      setTxPage(1);
+      prevFiltersRef.current = {
+        type: txFilters.type,
+        status: txFilters.status,
+        startDate: txFilters.startDate,
+        endDate: txFilters.endDate,
+      };
+    }
+  }, [txFilters.type, txFilters.status, txFilters.startDate, txFilters.endDate]);
+
+  // Reason: Also reset to page 1 when the debounced search changes.
+  const prevSearchRef = useRef("");
+  useEffect(() => {
+    if (prevSearchRef.current !== debouncedSearch) {
+      setTxPage(1);
+      prevSearchRef.current = debouncedSearch;
+    }
+  }, [debouncedSearch]);
+
   const fetchTransactions = useCallback(async () => {
     setTxLoading(true);
     try {
@@ -670,8 +704,10 @@ export default function FinancialDashboard() {
         limit: "50",
         type: txFilters.type,
         status: txFilters.status,
-        search: txFilters.search,
       });
+      // Reason: Use debouncedSearch (not txFilters.search) so we only query the API
+      // after the user stops typing, avoiding a flood of requests and race conditions.
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
       if (txFilters.startDate) params.set("startDate", txFilters.startDate);
       if (txFilters.endDate) params.set("endDate", txFilters.endDate);
 
@@ -687,7 +723,7 @@ export default function FinancialDashboard() {
     } finally {
       setTxLoading(false);
     }
-  }, [txPage, txFilters]);
+  }, [txPage, txFilters.type, txFilters.status, txFilters.startDate, txFilters.endDate, debouncedSearch]);
 
   // Handle transaction click - fetch details and invoice if deposit
   const handleTransactionClick = async (tx: Transaction) => {
@@ -4005,12 +4041,21 @@ export default function FinancialDashboard() {
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
                       type="text"
-                      placeholder="Search..."
+                      placeholder="Name, email, or user ID…"
                       value={txFilters.search}
-                      onChange={(e) =>
-                        setTxFilters((f) => ({ ...f, search: e.target.value }))
-                      }
-                      className="pl-10 bg-gray-800 border-gray-700 text-white w-48"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setTxFilters((f) => ({ ...f, search: val }));
+                        // Reason: Debounce the API call — fire only 400 ms after the
+                        // user stops typing so we don't flood the server.
+                        if (searchDebounceRef.current) {
+                          clearTimeout(searchDebounceRef.current);
+                        }
+                        searchDebounceRef.current = setTimeout(() => {
+                          setDebouncedSearch(val);
+                        }, 400);
+                      }}
+                      className="pl-10 bg-gray-800 border-gray-700 text-white w-56"
                     />
                   </div>
                   <Select
@@ -4154,15 +4199,19 @@ export default function FinancialDashboard() {
                     txFilters.status !== "all" ||
                     txFilters.search) && (
                     <Button
-                      onClick={() =>
+                      onClick={() => {
+                        if (searchDebounceRef.current) {
+                          clearTimeout(searchDebounceRef.current);
+                        }
+                        setDebouncedSearch("");
                         setTxFilters({
                           type: "all",
                           status: "all",
                           search: "",
                           startDate: "",
                           endDate: "",
-                        })
-                      }
+                        });
+                      }}
                       variant="ghost"
                       className="text-gray-400 hover:text-white"
                     >

@@ -6,6 +6,7 @@ import DynamicFavicon from "@/components/DynamicFavicon";
 import SiteTracker from "@/components/tracking/SiteTracker";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
+import CookieConsentBanner from "@/components/CookieConsentBanner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -103,6 +104,7 @@ export default function RootLayout({
           <DynamicFavicon />
           <SiteTracker />
           {children}
+          <CookieConsentBanner />
           <Toaster />
         </AppSettingsProvider>
       </body>
