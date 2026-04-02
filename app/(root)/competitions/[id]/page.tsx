@@ -23,7 +23,7 @@ import CompetitionStatusMonitor from "@/components/trading/CompetitionStatusMoni
 import UTCClock from "@/components/trading/UTCClock";
 import LiveCountdown from "@/components/trading/LiveCountdown";
 import InlineCountdown from "@/components/trading/InlineCountdown";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
@@ -80,6 +80,13 @@ const CompetitionDetailsPage = async ({
     const isCancelled = competition.status === "cancelled";
     const isFull =
       competition.currentParticipants >= competition.maxParticipants;
+
+    // Reason: Participants of completed competitions should always land on
+    // the results page. Non-participants stay on the detail page to view
+    // the leaderboard and competition info.
+    if (isCompleted && isUserIn) {
+      redirect(`/competitions/${id}/results`);
+    }
 
     const formatUTCDate = (date: Date) => {
       const year = date.getUTCFullYear();
@@ -685,7 +692,7 @@ const CompetitionDetailsPage = async ({
                       <span className="text-gray-400">Ranking:</span>
                       <span className="font-semibold text-blue-400">
                         {
-                          // eslint-disable-next-line security/detect-object-injection
+                           
                           ({
                             pnl: "Highest P&L",
                             roi: "Highest ROI %",
@@ -699,7 +706,7 @@ const CompetitionDetailsPage = async ({
                     </div>
                     <p className="text-[11px] text-gray-500 mt-0.5">
                       {
-                        // eslint-disable-next-line security/detect-object-injection
+                         
                         ({
                           pnl: "Winner is determined by total profit & loss (realized + unrealized).",
                           roi: "Winner is determined by the highest return on investment percentage.",
@@ -719,7 +726,7 @@ const CompetitionDetailsPage = async ({
                         <span className="text-gray-400">Tie Breaker 1:</span>
                         <span className="font-semibold text-purple-400">
                           {
-                            // eslint-disable-next-line security/detect-object-injection
+                             
                             ({
                               trades_count: "Most Trades",
                               win_rate: "Higher Win Rate",
@@ -733,7 +740,7 @@ const CompetitionDetailsPage = async ({
                       </div>
                       <p className="text-[11px] text-gray-500 mt-0.5">
                         {
-                          // eslint-disable-next-line security/detect-object-injection
+                           
                           ({
                             trades_count: "If tied, the trader with more completed trades wins.",
                             win_rate: "If tied, the trader with a higher win rate wins.",
@@ -754,7 +761,7 @@ const CompetitionDetailsPage = async ({
                         <span className="text-gray-400">Tie Breaker 2:</span>
                         <span className="font-semibold text-purple-400">
                           {
-                            // eslint-disable-next-line security/detect-object-injection
+                             
                             ({
                               trades_count: "Most Trades",
                               win_rate: "Higher Win Rate",
@@ -768,7 +775,7 @@ const CompetitionDetailsPage = async ({
                       </div>
                       <p className="text-[11px] text-gray-500 mt-0.5">
                         {
-                          // eslint-disable-next-line security/detect-object-injection
+                           
                           ({
                             trades_count: "If still tied, the trader with more completed trades wins.",
                             win_rate: "If still tied, the trader with a higher win rate wins.",

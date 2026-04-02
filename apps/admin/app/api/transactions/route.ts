@@ -63,6 +63,11 @@ export async function GET(request: NextRequest) {
       query.competitionId = competitionId;
     }
 
+    // Reason: Track whether the search resolved to specific user IDs so we can
+    // skip platform/VAT/vendor queries that are not user-specific and would
+    // otherwise flood the results, hiding user-level transactions like admin_adjustment.
+    let searchIsUserScoped = false;
+
     if (search && search.trim()) {
       // Reason: userInfo.email/name are NOT stored in WalletTransaction – they're enriched after fetch.
       // Pre-resolve matching userIds from the user collection first, then query by userId.
@@ -112,9 +117,9 @@ export async function GET(request: NextRequest) {
       ];
 
       if (resolvedUserIds.length > 0) {
-        // Deduplicate IDs before querying
         const uniqueIds = [...new Set(resolvedUserIds)];
         searchConditions.push({ userId: { $in: uniqueIds } });
+        searchIsUserScoped = true;
       } else {
         // Reason: No users found by name/email/id — try a direct regex on userId
         // as a last resort (handles partial ID searches).
@@ -144,19 +149,24 @@ export async function GET(request: NextRequest) {
     const safeSortBy = allowedSortFields.has(sortBy) ? sortBy : "createdAt";
     const sort: Record<string, 1 | -1> = { [safeSortBy]: sortOrder === "asc" ? 1 : -1 };
 
-    // Check if we should include admin/platform transactions
+    // Reason: When the search resolved to specific user IDs, the admin is looking
+    // for that user's transactions. Platform-level records (admin withdrawals, VAT,
+    // vendor payments) are not user-specific and would flood/hide user transactions
+    // like admin_adjustment. Skip them when a user search is active.
     const includeAdminTx =
-      type === "all" ||
-      type === "admin_withdrawal" ||
-      type === "vat_payment" ||
-      type === "platform_fee" ||
-      type === "unclaimed_pool" ||
-      type === "deposit_fee" ||
-      type === "withdrawal_fee" ||
-      type === "admin_balance_add" ||
-      type === "custom_expense" ||
-      type === "vendor_payment" ||
-      !type;
+      !searchIsUserScoped &&
+      !userId &&
+      (type === "all" ||
+        type === "admin_withdrawal" ||
+        type === "vat_payment" ||
+        type === "platform_fee" ||
+        type === "unclaimed_pool" ||
+        type === "deposit_fee" ||
+        type === "withdrawal_fee" ||
+        type === "admin_balance_add" ||
+        type === "custom_expense" ||
+        type === "vendor_payment" ||
+        !type);
 
     // OPTIMIZATION: Limit max records to prevent memory issues
     // For very large result sets, use date filters to narrow down
@@ -218,10 +228,10 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch vendor payments if type is 'all' or 'vendor_payment'
+    // Fetch vendor payments if type is 'all' or 'vendor_payment' and not user-scoped
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let vendorPayments: any[] = [];
-    if (type === "all" || type === "vendor_payment" || !type) {
+    if (!searchIsUserScoped && !userId && (type === "all" || type === "vendor_payment" || !type)) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const vendorQuery: any = { status: "paid" };
       if (startDate || endDate) {

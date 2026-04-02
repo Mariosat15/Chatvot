@@ -4137,6 +4137,15 @@ export default function FinancialDashboard() {
                       <SelectItem value="challenge_platform_fee">
                         Challenge Fees
                       </SelectItem>
+                      <SelectItem value="admin_adjustment">
+                        Admin Adjustments
+                      </SelectItem>
+                      <SelectItem value="incident_compensation">
+                        Incident Compensation
+                      </SelectItem>
+                      <SelectItem value="manual_deposit_credit">
+                        Manual Deposit Credit
+                      </SelectItem>
                       <SelectItem value="retained_gm_fee">
                         Retained GM Fees
                       </SelectItem>

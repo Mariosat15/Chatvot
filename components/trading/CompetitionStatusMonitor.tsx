@@ -151,8 +151,11 @@ export default function CompetitionStatusMonitor({
             });
           }
 
+          // Reason: Send ALL users to results page on completion.
+          // Non-participants are handled by the results page itself
+          // (it redirects them back to the detail page).
           setTimeout(() => {
-            router.push(`/competitions/${competitionId}`);
+            router.push(`/competitions/${competitionId}/results`);
             router.refresh();
           }, 2000);
           return;
@@ -164,7 +167,7 @@ export default function CompetitionStatusMonitor({
     } catch {
       // Fail silently
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [competitionId, userId, router]);
 
   // Reason: Schedule the next poll with the current adaptive interval.

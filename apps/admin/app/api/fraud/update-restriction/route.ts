@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdminAuth } from "@/lib/admin/auth";
 import { connectToDatabase } from "@/database/mongoose";
 import UserRestriction from "@/database/models/user-restriction.model";
+import { Admin } from "@/database/models/admin.model";
 import bcrypt from "bcryptjs";
 
 /**
@@ -9,6 +11,8 @@ import bcrypt from "bcryptjs";
  */
 export async function PUT(request: NextRequest) {
   try {
+    const auth = await requireAdminAuth();
+
     const {
       restrictionId,
       reason,
@@ -27,56 +31,40 @@ export async function PUT(request: NextRequest) {
       hasPassword: !!adminPassword,
     });
 
-    // Validate input
     if (!restrictionId) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Restriction ID required",
-        },
+        { success: false, message: "Restriction ID required" },
         { status: 400 },
       );
     }
 
     if (!adminPassword) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Admin password required",
-        },
+        { success: false, message: "Admin password required" },
         { status: 400 },
       );
     }
 
-    // Verify admin password
-    const envPassword = process.env.ADMIN_PASSWORD;
-    if (!envPassword) {
+    await connectToDatabase();
+
+    // Reason: Verify against the logged-in admin's DB password, not the env var,
+    // so password changes take effect immediately for all sensitive operations.
+    const admin = await Admin.findById(auth.adminId).select("password");
+    if (!admin) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Admin password not configured",
-        },
-        { status: 500 },
+        { success: false, message: "Admin account not found" },
+        { status: 404 },
       );
     }
 
-    const isPasswordValid =
-      envPassword.startsWith("$2a$") || envPassword.startsWith("$2b$")
-        ? await bcrypt.compare(adminPassword, envPassword)
-        : adminPassword === envPassword;
-
+    const isPasswordValid = await bcrypt.compare(adminPassword, admin.password);
     if (!isPasswordValid) {
       console.error("❌ Invalid admin password");
       return NextResponse.json(
-        {
-          success: false,
-          message: "Invalid admin password",
-        },
+        { success: false, message: "Invalid admin password" },
         { status: 401 },
       );
     }
-
-    await connectToDatabase();
 
     // Find and update the restriction
     const restriction = await UserRestriction.findById(restrictionId);

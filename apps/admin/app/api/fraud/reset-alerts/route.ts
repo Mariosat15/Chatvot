@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminAuth } from "@/lib/admin/auth";
 import { connectToDatabase } from "@/database/mongoose";
+import { Admin } from "@/database/models/admin.model";
 import FraudAlert from "@/database/models/fraud/fraud-alert.model";
 import DeviceFingerprint from "@/database/models/fraud/device-fingerprint.model";
 import UserRestriction from "@/database/models/user-restriction.model";
@@ -41,43 +42,30 @@ export async function POST(request: NextRequest) {
 
     if (!password) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Admin password is required",
-        },
+        { success: false, message: "Admin password is required" },
         { status: 400 },
       );
     }
 
-    // Verify admin password
-    const adminPassword = process.env.ADMIN_PASSWORD;
-    if (!adminPassword) {
+    await connectToDatabase();
+
+    // Reason: Verify against the logged-in admin's DB password, not the env var,
+    // so password changes take effect immediately for all sensitive operations.
+    const admin = await Admin.findById(adminAuth.adminId).select("password");
+    if (!admin) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Admin password not configured",
-        },
-        { status: 500 },
+        { success: false, message: "Admin account not found" },
+        { status: 404 },
       );
     }
 
-    // Check if password is hashed or plain text
-    const isPasswordValid =
-      adminPassword.startsWith("$2a$") || adminPassword.startsWith("$2b$")
-        ? await bcrypt.compare(password, adminPassword)
-        : password === adminPassword;
-
+    const isPasswordValid = await bcrypt.compare(password, admin.password);
     if (!isPasswordValid) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Invalid password",
-        },
+        { success: false, message: "Invalid password" },
         { status: 401 },
       );
     }
-
-    await connectToDatabase();
 
     // Count before reset
     const alertCountBefore = await FraudAlert.countDocuments();

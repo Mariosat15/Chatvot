@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdminAuth } from "@/lib/admin/auth";
 import { connectToDatabase } from "@/database/mongoose";
 import UserRestriction from "@/database/models/user-restriction.model";
+import { Admin } from "@/database/models/admin.model";
 import bcrypt from "bcryptjs";
 
 /**
@@ -9,6 +11,8 @@ import bcrypt from "bcryptjs";
  */
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireAdminAuth();
+
     const { userIds, adminPassword } = await request.json();
 
     console.log("🔓 Unrestrict request:", {
@@ -16,7 +20,6 @@ export async function POST(request: NextRequest) {
       hasPassword: !!adminPassword,
     });
 
-    // Validate input
     if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
       return NextResponse.json(
         { success: false, message: "User IDs required (must be an array)" },
@@ -31,34 +34,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify admin password
-    const envPassword = process.env.ADMIN_PASSWORD;
-    if (!envPassword) {
+    await connectToDatabase();
+
+    // Reason: Verify against the logged-in admin's DB password, not the env var,
+    // so password changes take effect immediately for all sensitive operations.
+    const admin = await Admin.findById(auth.adminId).select("password");
+    if (!admin) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Admin password not configured",
-        },
-        { status: 500 },
+        { success: false, message: "Admin account not found" },
+        { status: 404 },
       );
     }
 
-    const isPasswordValid =
-      envPassword.startsWith("$2a$") || envPassword.startsWith("$2b$")
-        ? await bcrypt.compare(adminPassword, envPassword)
-        : adminPassword === envPassword;
-
+    const isPasswordValid = await bcrypt.compare(adminPassword, admin.password);
     if (!isPasswordValid) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Invalid admin password",
-        },
+        { success: false, message: "Invalid admin password" },
         { status: 401 },
       );
     }
-
-    await connectToDatabase();
 
     // Unrestrict all specified users by marking restrictions as inactive
     const result = await UserRestriction.updateMany(

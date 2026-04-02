@@ -1,12 +1,21 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { requireAdminAuth } from "@/lib/admin/auth";
+import { connectToDatabase } from "@/database/mongoose";
+import { Admin } from "@/database/models/admin.model";
 
 /**
  * POST /api/admin/verify-password
- * Verify admin password for sensitive operations
+ * Verify admin password for sensitive operations.
+ *
+ * Reason: Password is verified against the logged-in admin's hash stored in
+ * MongoDB (not the ADMIN_PASSWORD env var). This ensures that after a password
+ * change, all sensitive-operation confirmations use the current password.
  */
 export async function POST(request: Request) {
   try {
+    const auth = await requireAdminAuth();
+
     const { password } = await request.json();
 
     if (!password) {
@@ -16,29 +25,18 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get admin password from environment
-    const adminPassword = process.env.ADMIN_PASSWORD;
+    await connectToDatabase();
 
-    if (!adminPassword) {
-      console.error("❌ ADMIN_PASSWORD not set in environment variables");
+    const admin = await Admin.findById(auth.adminId).select("password");
+
+    if (!admin) {
       return NextResponse.json(
-        { success: false, message: "Admin password not configured" },
-        { status: 500 },
+        { success: false, message: "Admin account not found" },
+        { status: 404 },
       );
     }
 
-    // Check if the password is hashed or plain text
-    const isHashed =
-      adminPassword.startsWith("$2a$") || adminPassword.startsWith("$2b$");
-
-    let isValid = false;
-    if (isHashed) {
-      // Compare with hashed password
-      isValid = await bcrypt.compare(password, adminPassword);
-    } else {
-      // Compare with plain text password
-      isValid = password === adminPassword;
-    }
+    const isValid = await bcrypt.compare(password, admin.password);
 
     if (!isValid) {
       return NextResponse.json(
@@ -52,6 +50,12 @@ export async function POST(request: Request) {
       message: "Password verified",
     });
   } catch (error) {
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json(
+        { success: false, message: "Unauthorized" },
+        { status: 401 },
+      );
+    }
     console.error("❌ Error verifying password:", error);
     return NextResponse.json(
       {
