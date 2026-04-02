@@ -163,10 +163,9 @@ async function handleSessionEvent(payload: any) {
   // Try to find session by veriffSessionId first, then by vendorData (userId)
   let session = await KYCSession.findOne({ veriffSessionId: sessionId });
   
-  if (!session && vendorData) {
-    // If session not found by veriffSessionId, try to find by userId and update it
+  if (!session && vendorData && typeof vendorData === "string" && vendorData.trim()) {
     session = await KYCSession.findOne({ 
-      userId: vendorData, 
+      userId: { $eq: vendorData.trim() }, 
       status: { $in: ["created", "started"] } 
     }).sort({ createdAt: -1 });
     

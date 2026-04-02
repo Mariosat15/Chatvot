@@ -317,7 +317,7 @@ export async function awardActivityXP(
   try {
     await awardXP(userId, xpAmount, "competition", activity);
   } catch (err) {
-    console.error(`[Activity XP] Error awarding ${activity} XP:`, err);
+    console.error(`[Activity XP] Error awarding ${activity} XP: ${err}`);
   }
 
   return { xpAwarded: xpAmount, dailyXPUsed: 0, dailyCapped: false };
