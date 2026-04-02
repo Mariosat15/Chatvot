@@ -4,6 +4,22 @@ import { aiKnowledgeService } from "@/lib/services/ai-knowledge.service";
 import { isValidSsrfUrl } from "@/lib/utils/url-validator";
 import DOMPurify from "isomorphic-dompurify";
 
+// Reason: CodeQL requires an in-file hostname check to confirm the SSRF taint
+// chain is broken. isValidSsrfUrl (external) is not visible to the analyser.
+function isBlockedHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  if (h === "localhost" || h === "127.0.0.1" || h === "::1") return true;
+  if (h.endsWith(".internal") || h === "metadata.google.internal") return true;
+  if (
+    h.startsWith("10.") ||
+    h.startsWith("192.168.") ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(h)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 // POST - Scrape a URL and add to knowledge base
 export async function POST(request: NextRequest) {
   try {
@@ -49,6 +65,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (isBlockedHost(parsedUrl.hostname)) {
+      return NextResponse.json(
+        { error: "Requests to internal or private hosts are not allowed" },
+        { status: 400 },
+      );
+    }
+
     // Reason: Normalize the URL via the parsed URL object, then validate and
     // fetch using the same canonical string so the taint chain is clearly broken.
     const safeUrl = parsedUrl.toString();
@@ -77,7 +100,7 @@ export async function POST(request: NextRequest) {
     const html = await response.text();
 
     // Extract text content from HTML
-    const content = extractTextFromHtml(html, url);
+    const content = extractTextFromHtml(html, safeUrl);
 
     if (!content || content.trim().length < 50) {
       return NextResponse.json(
@@ -88,11 +111,11 @@ export async function POST(request: NextRequest) {
 
     // Create knowledge source with audience
     const source = await aiKnowledgeService.createSource({
-      name: name || extractTitleFromHtml(html) || new URL(url).hostname,
+      name: name || extractTitleFromHtml(html) || parsedUrl.hostname,
       type: "url",
       audience: audience as "customer" | "admin" | "both", // Include audience
       content,
-      websiteUrl: url,
+      websiteUrl: safeUrl,
       metadata: {
         title: extractTitleFromHtml(html),
         description: description || extractDescriptionFromHtml(html),
