@@ -8,6 +8,7 @@ import UserSidebar from "@/components/UserSidebar";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import { connectToDatabase } from "@/database/mongoose";
 import { ObjectId } from "mongodb";
+import AnnouncementBanner from "@/components/AnnouncementBanner";
 
 const emailVerifiedCache = new Map<string, { verified: boolean; ts: number }>();
 const EMAIL_VERIFIED_TTL_MS = 5 * 60 * 1000;
@@ -71,6 +72,7 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
 
           {/* Page Content - Responsive padding */}
           <div className="px-3 py-3 sm:px-4 sm:py-4 md:px-5 lg:px-6 pb-20 lg:pb-6">
+            <AnnouncementBanner />
             {children}
           </div>
 

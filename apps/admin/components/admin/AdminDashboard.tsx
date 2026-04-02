@@ -67,6 +67,7 @@ import {
   Trash2,
   Eye,
   Cookie,
+  Megaphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import CredentialsSection from "@/components/admin/CredentialsSection";
@@ -131,6 +132,7 @@ import GamificationWizardSection from "@/components/admin/GamificationWizardSect
 import SitePagesSection from "@/components/admin/SitePagesSection";
 import LandingPagesSection from "@/components/admin/LandingPagesSection";
 import CookieConsentSection from "@/components/admin/CookieConsentSection";
+import SystemAnnouncementsSection from "@/components/admin/SystemAnnouncementsSection";
 
 interface AdminDashboardProps {
   isFirstLogin: boolean;
@@ -564,6 +566,11 @@ const menuGroups: MenuGroup[] = [
             id: "notifications",
             label: "Notifications",
             icon: <Bell className="h-4 w-4" />,
+          },
+          {
+            id: "system-announcements",
+            label: "System Announcements",
+            icon: <Megaphone className="h-4 w-4" />,
           },
           {
             id: "trading-risk",
@@ -1055,6 +1062,8 @@ export default function AdminDashboard({
         return <EmailTemplatesSection key={currentRefreshKey} />;
       case "notifications":
         return <NotificationSystemSection key={currentRefreshKey} />;
+      case "system-announcements":
+        return <SystemAnnouncementsSection key={currentRefreshKey} />;
       case "trading":
       case "trading-risk":
         return <TradingRiskSection key={currentRefreshKey} />;

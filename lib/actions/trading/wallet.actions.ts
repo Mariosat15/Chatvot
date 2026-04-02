@@ -210,8 +210,9 @@ export const initiateDeposit = async (
       feeSettings.bankDepositFeePercentage || 2.9;
     const bankDepositFeeFixed = feeSettings.bankDepositFeeFixed || 0.3;
 
-    // User receives FULL credits (fees are charged to their card, not deducted)
-    const creditsToReceive = amount; // 1 EUR = 1 Credit - FULL amount
+    // Reason: Convert EUR base to credits using configured rate from DB.
+    const eurToCreditsRate = feeSettings.eurToCreditsRate || 1;
+    const creditsToReceive = Math.round(amount * eurToCreditsRate * 100) / 100;
     const platformFeeAmount = (amount * platformDepositFeePercentage) / 100;
 
     // Calculate bank fees (what Stripe takes from the total charged)
@@ -223,9 +224,9 @@ export const initiateDeposit = async (
     const netPlatformEarning = platformFeeAmount - bankFeeTotal;
 
     console.log(`💰 Deposit calculation (fees charged to card):`);
-    console.log(`   Credits Value: €${amount}`);
+    console.log(`   EUR Base: €${amount} → Credits: ${creditsToReceive} (rate: ${eurToCreditsRate})`);
     console.log(
-      `   Credits to User: ${creditsToReceive} (FULL - fees charged to card)`,
+      `   Credits to User: ${creditsToReceive} (fees charged to card)`,
     );
     console.log(
       `   Platform Fee (${platformDepositFeePercentage}%): +€${platformFeeAmount.toFixed(2)} charged to card`,
@@ -244,12 +245,13 @@ export const initiateDeposit = async (
       balanceBefore: wallet.creditBalance,
       balanceAfter: wallet.creditBalance + creditsToReceive,
       currency: currency,
-      exchangeRate: 1, // 1 EUR = 1 Credit
+      exchangeRate: eurToCreditsRate,
       status: "pending",
       description: `Purchase of ${creditsToReceive} credits`, // Updated with fees when charged
       metadata: {
-        eurAmount: amount, // Base credits value
+        eurAmount: amount,
         creditsReceived: creditsToReceive,
+        exchangeRate: eurToCreditsRate,
         // Platform fees (charged to card)
         platformDepositFeePercentage: platformDepositFeePercentage,
         platformFeeAmount: parseFloat(platformFeeAmount.toFixed(2)),

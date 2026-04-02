@@ -209,6 +209,7 @@ export async function POST(req: NextRequest) {
     const feeSettings = await CreditConversionSettings.getSingleton();
     const serverPlatformFeePercent =
       feeSettings.platformDepositFeePercentage || 0;
+    const eurToCreditsRate = feeSettings.eurToCreditsRate || 1;
 
     // Reason: Clamp vatPercentage to 0-30% to prevent manipulation. VAT is
     // jurisdiction-dependent so we accept it from the client but within bounds.
@@ -242,14 +243,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const creditsToReceive = serverBaseAmount;
+    // Reason: Convert EUR base amount to credits using the configured rate.
+    // serverBaseAmount is in EUR; eurToCreditsRate converts to platform credits.
+    const creditsToReceive = Math.round(serverBaseAmount * eurToCreditsRate * 100) / 100;
 
-    // Recompute fee amounts server-side so metadata is consistent
+    // Reason: Fee amounts must be in EUR (not credits) for financial records.
     const serverVatAmount =
-      Math.round(creditsToReceive * clampedVatPercent) / 100;
+      Math.round(serverBaseAmount * clampedVatPercent) / 100;
     const serverPlatformFeeAmount =
       Math.round(
-        (creditsToReceive + serverVatAmount) * serverPlatformFeePercent,
+        (serverBaseAmount + serverVatAmount) * serverPlatformFeePercent,
       ) / 100;
 
     const bankDepositFeePercentage =
@@ -271,7 +274,7 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`💰 Nuvei Deposit calculation (server-verified):`);
-    console.log("   Credits Value: €", creditsToReceive);
+    console.log("   EUR Base:", serverBaseAmount, "→ Credits:", creditsToReceive, `(rate: ${eurToCreditsRate})`);
     console.log("   Total Charged: €", amountNum);
     console.log("   VAT (%):", clampedVatPercent, "€", serverVatAmount);
     console.log("   Platform Fee (%):", serverPlatformFeePercent, "€", serverPlatformFeeAmount);
@@ -294,8 +297,9 @@ export async function POST(req: NextRequest) {
         walletId: wallet._id.toString(),
         initiatedAt: new Date().toISOString(),
         paymentProvider: "nuvei",
-        eurAmount: creditsToReceive,
+        eurAmount: serverBaseAmount,
         creditsReceived: creditsToReceive,
+        exchangeRate: eurToCreditsRate,
         totalCharged: amountNum,
         vatAmount: serverVatAmount,
         vatPercentage: clampedVatPercent,

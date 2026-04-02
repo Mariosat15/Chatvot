@@ -130,11 +130,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Use server-verified base amount for credit calculation
-    const verifiedCredits = expectedBase;
+    // Reason: initiateDeposit receives EUR and converts to credits internally
+    // using eurToCreditsRate from the DB. We pass the verified EUR base.
+    const eurToCreditsRate = feeSettings.eurToCreditsRate || 1;
+    const verifiedCredits = Math.round(expectedBase * eurToCreditsRate * 100) / 100;
 
     const transaction = await initiateDeposit(
-      verifiedCredits,
+      expectedBase,
       currencyCode.toUpperCase(),
     );
 

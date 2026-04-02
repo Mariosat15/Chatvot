@@ -65,6 +65,7 @@ const ALL_ADMIN_SECTIONS = [
   "whitelabel",
   "audit-logs",
   "employees",
+  "system-announcements",
 ];
 
 // Check if admin is the original/super admin
