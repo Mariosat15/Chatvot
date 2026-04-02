@@ -88,10 +88,15 @@ function verifyDmnSignature(
   const checksum = params.advanceResponseChecksum;
 
   if (!checksum) {
-    // No checksum in DMN - this is suspicious but might happen for some DMN types
-    console.warn("⚠️ No advanceResponseChecksum in DMN - verification skipped");
-    // In production, you might want to reject DMNs without checksums
-    // For now, we'll allow them but log a warning
+    // Reason: In production, unsigned DMNs must be rejected to prevent forged
+    // webhooks. In development we allow them for easier testing.
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "🚨 SECURITY: DMN without advanceResponseChecksum rejected in production",
+      );
+      return false;
+    }
+    console.warn("⚠️ No advanceResponseChecksum in DMN - verification skipped (dev only)");
     return true;
   }
 
@@ -353,6 +358,25 @@ export async function POST(req: NextRequest) {
     console.log(
       `📦 Processing DMN for transaction ${transaction._id}, user: ${transaction.userId}, amount: ${transaction.amount} credits`,
     );
+
+    // SECURITY: Reconcile — verify Nuvei charged the expected amount
+    const storedTotalCharged = transaction.metadata?.totalCharged;
+    if (storedTotalCharged && Math.abs(amount - storedTotalCharged) > 0.01) {
+      console.error(
+        `🚨 AMOUNT MISMATCH: Nuvei reports ${amount} ${currency} but we expected ${storedTotalCharged}. Transaction ${transaction._id} flagged.`,
+      );
+      await WalletTransaction.findByIdAndUpdate(transaction._id, {
+        $set: {
+          status: "failed",
+          failureReason: `Amount mismatch: charged ${amount}, expected ${storedTotalCharged}`,
+          processedAt: new Date(),
+        },
+      });
+      return NextResponse.json({
+        status: "OK",
+        message: "Amount mismatch — transaction flagged for review",
+      });
+    }
 
     // Update transaction based on status
     if (status === "APPROVED" && errCode === 0) {

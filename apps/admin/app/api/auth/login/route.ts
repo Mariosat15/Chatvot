@@ -5,10 +5,31 @@ import { SignJWT } from "jose";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
 
-// Log when this module loads
-console.log("🔐 Admin login route module loaded at:", new Date().toISOString());
-
 const SECRET_KEY = new TextEncoder().encode(getAdminJwtSecret());
+
+// Reason: In-memory rate limiter for brute-force protection. Resets on
+// server restart which is acceptable — persistent rate limiting would need
+// Redis, which is optional in this stack.
+const LOGIN_ATTEMPTS = new Map<string, { count: number; resetAt: number }>();
+const MAX_ATTEMPTS = 5;
+const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+function checkLoginRateLimit(ip: string): { allowed: boolean; retryAfterMs: number } {
+  const now = Date.now();
+  const entry = LOGIN_ATTEMPTS.get(ip);
+
+  if (!entry || now > entry.resetAt) {
+    LOGIN_ATTEMPTS.set(ip, { count: 1, resetAt: now + WINDOW_MS });
+    return { allowed: true, retryAfterMs: 0 };
+  }
+
+  if (entry.count >= MAX_ATTEMPTS) {
+    return { allowed: false, retryAfterMs: entry.resetAt - now };
+  }
+
+  entry.count++;
+  return { allowed: true, retryAfterMs: 0 };
+}
 
 // All available admin sections for super admin
 const ALL_ADMIN_SECTIONS = [
@@ -57,31 +78,39 @@ async function isOriginalAdmin(admin: any): Promise<boolean> {
     .sort({ createdAt: 1 })
     .select("_id");
   const isFirstAdmin =
-    oldestAdmin && oldestAdmin._id.toString() === admin._id.toString();
+    !!oldestAdmin && oldestAdmin._id.toString() === admin._id.toString();
 
   return isDefaultEmail || isFirstAdmin;
 }
 
 export async function POST(request: NextRequest) {
-  console.log("🔐 ========== ADMIN LOGIN ATTEMPT ==========");
   try {
+    // SECURITY: Rate limit login attempts by IP
+    const ip =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      request.headers.get("x-real-ip") ||
+      "unknown";
+    const rateLimit = checkLoginRateLimit(ip);
+    if (!rateLimit.allowed) {
+      const retryAfterSec = Math.ceil(rateLimit.retryAfterMs / 1000);
+      return NextResponse.json(
+        { error: "Too many login attempts. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(retryAfterSec) } },
+      );
+    }
+
     await connectToDatabase();
 
     const { email, password } = await request.json();
-    console.log(`🔐 Login attempt for: ${email}`);
 
     if (!email || !password) {
-      console.log("❌ Missing email or password");
       return NextResponse.json(
         { error: "Email and password are required" },
         { status: 400 },
       );
     }
 
-    // Find admin
-    console.log(`🔐 Looking up admin: ${email.toLowerCase()}`);
     let admin = await Admin.findOne({ email: email.toLowerCase() });
-    console.log(`🔐 Admin found: ${admin ? "YES" : "NO"}`);
 
     // If no admin exists, create default admin (first time setup)
     if (!admin) {
@@ -151,18 +180,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify password
-    console.log(`🔐 Verifying password for ${admin.email}`);
-    console.log(
-      `🔐 Input password: "${password}" (length: ${password.length})`,
-    );
-    console.log(`🔐 Stored hash: ${admin.password}`);
-    console.log(`🔐 Hash length: ${admin.password.length}`);
-
-    // Check if the stored password looks like a bcrypt hash
+    // Verify password — SECURITY: never log plaintext passwords or hashes
     const isBcryptHash =
       admin.password.startsWith("$2a$") || admin.password.startsWith("$2b$");
-    console.log(`🔐 Is bcrypt hash: ${isBcryptHash}`);
 
     if (!isBcryptHash) {
       console.error(
@@ -171,7 +191,6 @@ export async function POST(request: NextRequest) {
     }
 
     const isValidPassword = await admin.comparePassword(password);
-    console.log(`🔐 Password valid: ${isValidPassword}`);
 
     if (!isValidPassword) {
       console.log(`❌ Invalid password for ${admin.email}`);

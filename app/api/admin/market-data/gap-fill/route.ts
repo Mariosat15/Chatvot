@@ -36,10 +36,25 @@ const TIMEFRAME_CONFIG: Record<string, { apiTf: Timeframe; minutes: number }> =
     "1M": { apiTf: "M", minutes: 43200 },
   };
 
+// Reason: Backward-compatible auth — when INTERNAL_API_KEY is configured,
+// only requests with a matching x-internal-key header are allowed. When the
+// key is not configured the route stays open (admin panel uses its own
+// proxy route behind admin JWT for the UI).
+function verifyInternalKey(request: NextRequest): NextResponse | null {
+  const requiredKey = process.env.INTERNAL_API_KEY;
+  if (!requiredKey) return null;
+  const provided = request.headers.get("x-internal-key");
+  if (provided === requiredKey) return null;
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+}
+
 /**
  * GET - Detect gaps in candle data
  */
 export async function GET(request: NextRequest) {
+  const authError = verifyInternalKey(request);
+  if (authError) return authError;
+
   try {
     await connectToDatabase();
 
@@ -96,6 +111,9 @@ export async function GET(request: NextRequest) {
  * Note: Can only fill gaps where Massive.com still has data available
  */
 export async function POST(request: NextRequest) {
+  const authError = verifyInternalKey(request);
+  if (authError) return authError;
+
   try {
     await connectToDatabase();
 

@@ -103,12 +103,8 @@ export async function POST(req: NextRequest) {
     const {
       amount, // Total amount to charge (includes VAT + platform fee)
       currency = "EUR",
-      // Fee breakdown from client (same as Stripe)
-      baseAmount, // Credits value (what user receives)
-      vatAmount = 0,
+      baseAmount,
       vatPercentage = 0,
-      platformFeeAmount = 0,
-      platformFeePercentage = 0,
     } = body;
 
     // SECURITY: Strict amount validation
@@ -206,38 +202,79 @@ export async function POST(req: NextRequest) {
 
     const currentBalance = wallet.creditBalance || 0;
 
-    // Credits user will receive (base amount, not total charged)
-    const creditsToReceive = baseAmount || amountNum;
-
-    // Get fee settings for bank fee calculation (same as Stripe)
+    // Get fee settings from DB (server-side source of truth)
     const CreditConversionSettings = (
       await import("@/database/models/credit-conversion-settings.model")
     ).default;
     const feeSettings = await CreditConversionSettings.getSingleton();
+    const serverPlatformFeePercent =
+      feeSettings.platformDepositFeePercentage || 0;
+
+    // Reason: Clamp vatPercentage to 0-30% to prevent manipulation. VAT is
+    // jurisdiction-dependent so we accept it from the client but within bounds.
+    const clampedVatPercent = Math.max(
+      0,
+      Math.min(30, parseFloat(vatPercentage) || 0),
+    );
+
+    // Reason: Compute credits server-side using the same formula as the
+    // frontend (DepositModal.tsx):
+    //   total = base * (1 + vat%) * (1 + platformFee%)
+    //   base  = total / ((1 + vat%) * (1 + platformFee%))
+    const divisor =
+      (1 + clampedVatPercent / 100) * (1 + serverPlatformFeePercent / 100);
+    const serverBaseAmount =
+      Math.round((amountNum / divisor) * 100) / 100;
+
+    // SECURITY: Reject if the client's baseAmount diverges from the server
+    // computation by more than €0.50 (allows minor rounding differences).
+    if (
+      baseAmount !== undefined &&
+      baseAmount !== null &&
+      Math.abs(parseFloat(baseAmount) - serverBaseAmount) > 0.5
+    ) {
+      console.error(
+        `🚨 SECURITY: baseAmount mismatch — client sent ${baseAmount}, server computed ${serverBaseAmount}`,
+      );
+      return NextResponse.json(
+        { error: "Invalid fee calculation. Please refresh and try again." },
+        { status: 400 },
+      );
+    }
+
+    const creditsToReceive = serverBaseAmount;
+
+    // Recompute fee amounts server-side so metadata is consistent
+    const serverVatAmount =
+      Math.round(creditsToReceive * clampedVatPercent) / 100;
+    const serverPlatformFeeAmount =
+      Math.round(
+        (creditsToReceive + serverVatAmount) * serverPlatformFeePercent,
+      ) / 100;
 
     const bankDepositFeePercentage =
       feeSettings.bankDepositFeePercentage || 2.9;
     const bankDepositFeeFixed = feeSettings.bankDepositFeeFixed || 0.3;
     const bankFeePercentage = (amountNum * bankDepositFeePercentage) / 100;
     const bankFeeTotal = bankFeePercentage + bankDepositFeeFixed;
-    const netPlatformEarning = (platformFeeAmount || 0) - bankFeeTotal;
+    const netPlatformEarning = serverPlatformFeeAmount - bankFeeTotal;
 
     // Build description (same format as Stripe)
     let txDescription = `${creditsToReceive} credits`;
     const feeParts = [];
-    if (vatAmount && vatAmount > 0)
-      feeParts.push(`VAT €${vatAmount.toFixed(2)}`);
-    if (platformFeeAmount && platformFeeAmount > 0)
-      feeParts.push(`Fee €${platformFeeAmount.toFixed(2)}`);
+    if (serverVatAmount > 0)
+      feeParts.push(`VAT €${serverVatAmount.toFixed(2)}`);
+    if (serverPlatformFeeAmount > 0)
+      feeParts.push(`Fee €${serverPlatformFeeAmount.toFixed(2)}`);
     if (feeParts.length > 0) {
       txDescription = `${creditsToReceive} credits (Total paid: €${amountNum.toFixed(2)} incl. ${feeParts.join(", ")})`;
     }
 
-    console.log(`💰 Nuvei Deposit calculation:`);
+    console.log(`💰 Nuvei Deposit calculation (server-verified):`);
     console.log("   Credits Value: €", creditsToReceive);
     console.log("   Total Charged: €", amountNum);
-    console.log("   VAT (%):", vatPercentage, "€", vatAmount);
-    console.log("   Platform Fee (%):", platformFeePercentage, "€", platformFeeAmount);
+    console.log("   VAT (%):", clampedVatPercent, "€", serverVatAmount);
+    console.log("   Platform Fee (%):", serverPlatformFeePercent, "€", serverPlatformFeeAmount);
     console.log("   Bank Fee: €", bankFeeTotal.toFixed(2));
     console.log("   Net Platform Earning: €", netPlatformEarning.toFixed(2));
 
@@ -257,21 +294,16 @@ export async function POST(req: NextRequest) {
         walletId: wallet._id.toString(),
         initiatedAt: new Date().toISOString(),
         paymentProvider: "nuvei",
-        // Same metadata as Stripe for financial tracking
         eurAmount: creditsToReceive,
         creditsReceived: creditsToReceive,
         totalCharged: amountNum,
-        // VAT info
-        vatAmount: vatAmount || 0,
-        vatPercentage: vatPercentage || 0,
-        // Platform fees
-        platformDepositFeePercentage: platformFeePercentage || 0,
-        platformFeeAmount: platformFeeAmount || 0,
-        // Bank fees
+        vatAmount: serverVatAmount,
+        vatPercentage: clampedVatPercent,
+        platformDepositFeePercentage: serverPlatformFeePercent,
+        platformFeeAmount: serverPlatformFeeAmount,
         bankDepositFeePercentage: bankDepositFeePercentage,
         bankDepositFeeFixed: bankDepositFeeFixed,
         bankFeeTotal: parseFloat(bankFeeTotal.toFixed(2)),
-        // Net calculations
         netPlatformEarning: parseFloat(netPlatformEarning.toFixed(2)),
       },
     });
@@ -292,7 +324,7 @@ export async function POST(req: NextRequest) {
     // Note: Don't specify userCountry - let Nuvei determine from card BIN for proper 3DS handling
     const userTokenId = `user_${userId}`;
     const result = await nuveiService.openOrder({
-      amount: amount.toFixed(2),
+      amount: amountNum.toFixed(2),
       currency,
       clientUniqueId,
       userEmail: session.user.email || "",

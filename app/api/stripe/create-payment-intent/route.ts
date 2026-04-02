@@ -103,10 +103,38 @@ export async function POST(req: NextRequest) {
     const chargeAmount =
       totalAmount && typeof totalAmount === "number" ? totalAmount : amount;
 
-    // Create pending transaction in database (base amount for credits calculation)
-    // User receives FULL credits based on base amount (fees charged to card)
+    // SECURITY: Validate that client's base amount matches server-side
+    // computation to prevent amount tampering (same formula as DepositModal.tsx).
+    const CreditConversionSettings = (
+      await import("@/database/models/credit-conversion-settings.model")
+    ).default;
+    const feeSettings = await CreditConversionSettings.getSingleton();
+    const serverPlatformFeePercent =
+      feeSettings.platformDepositFeePercentage || 0;
+    const clampedVatPercent = Math.max(
+      0,
+      Math.min(30, parseFloat(vatPercentage) || 0),
+    );
+    const divisor =
+      (1 + clampedVatPercent / 100) * (1 + serverPlatformFeePercent / 100);
+    const expectedBase =
+      Math.round((chargeAmount / divisor) * 100) / 100;
+
+    if (Math.abs(amount - expectedBase) > 0.5) {
+      console.error(
+        `🚨 SECURITY: Stripe amount mismatch — client base ${amount}, server computed ${expectedBase} from charge ${chargeAmount}`,
+      );
+      return NextResponse.json(
+        { error: "Invalid fee calculation. Please refresh and try again." },
+        { status: 400 },
+      );
+    }
+
+    // Use server-verified base amount for credit calculation
+    const verifiedCredits = expectedBase;
+
     const transaction = await initiateDeposit(
-      amount,
+      verifiedCredits,
       currencyCode.toUpperCase(),
     );
 
@@ -114,7 +142,7 @@ export async function POST(req: NextRequest) {
     const stripe = await getStripeClient();
 
     // Build description
-    let description = `Purchase of ${cs}${amount} credits`;
+    let description = `Purchase of ${cs}${verifiedCredits} credits`;
     const feeDetails = [];
     if (vatAmount && vatAmount > 0)
       feeDetails.push(`VAT ${cs}${vatAmount.toFixed(2)}`);
@@ -134,7 +162,7 @@ export async function POST(req: NextRequest) {
         userId: session.user.id,
         transactionId: transaction._id.toString(),
         type: "deposit",
-        baseAmount: amount.toString(), // Credits value (user receives full)
+        baseAmount: verifiedCredits.toString(),
         vatAmount: (vatAmount || 0).toString(),
         vatPercentage: (vatPercentage || 0).toString(),
         platformFeeAmount: (platformFeeAmount || 0).toString(),
@@ -147,37 +175,36 @@ export async function POST(req: NextRequest) {
     // Update transaction with payment intent ID, fee info, and accurate description
     await connectToDatabase();
 
-    // Build accurate description showing actual total charged
-    let txDescription = `Purchase of ${amount} credits`;
+    let txDescription = `Purchase of ${verifiedCredits} credits`;
     const feeParts = [];
     if (vatAmount && vatAmount > 0)
       feeParts.push(`VAT ${cs}${vatAmount.toFixed(2)}`);
     if (platformFeeAmount && platformFeeAmount > 0)
       feeParts.push(`Fee ${cs}${platformFeeAmount.toFixed(2)}`);
     if (feeParts.length > 0) {
-      txDescription = `${amount} credits (Total paid: ${cs}${chargeAmount.toFixed(2)} incl. ${feeParts.join(", ")})`;
+      txDescription = `${verifiedCredits} credits (Total paid: ${cs}${chargeAmount.toFixed(2)} incl. ${feeParts.join(", ")})`;
     }
 
     await WalletTransaction.findByIdAndUpdate(transaction._id, {
       paymentIntentId: paymentIntent.id,
       description: txDescription,
       "metadata.vatAmount": vatAmount || 0,
-      "metadata.vatPercentage": vatPercentage || 0,
+      "metadata.vatPercentage": clampedVatPercent,
       "metadata.platformFeeAmount": platformFeeAmount || 0,
-      "metadata.platformFeePercentage": platformFeePercentage || 0,
+      "metadata.platformFeePercentage": serverPlatformFeePercent,
       "metadata.totalCharged": chargeAmount,
     });
 
     console.log("✅ Payment Intent created:", paymentIntent.id);
     console.log(
-      `   Total charge: ${cs}${chargeAmount} (Credits: ${cs}${amount}, VAT: ${cs}${vatAmount || 0}, Platform Fee: ${cs}${platformFeeAmount || 0})`,
+      `   Total charge: ${cs}${chargeAmount} (Credits: ${cs}${verifiedCredits}, VAT: ${cs}${vatAmount || 0}, Platform Fee: ${cs}${platformFeeAmount || 0})`,
     );
 
     // Send deposit initiated notification
     try {
       const { notificationService } =
         await import("@/lib/services/notification.service");
-      await notificationService.notifyDepositInitiated(session.user.id, amount);
+      await notificationService.notifyDepositInitiated(session.user.id, verifiedCredits);
       console.log(
         `🔔 Deposit initiated notification sent to user ${session.user.id}`,
       );

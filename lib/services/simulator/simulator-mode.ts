@@ -7,10 +7,21 @@
 import { NextRequest } from "next/server";
 
 /**
- * Check if the request is from the simulator
+ * Check if the request is from the simulator.
+ * When INTERNAL_API_SECRET is configured, the caller must also send
+ * X-Internal-Secret to prove it is a trusted internal service.
  */
 export function isSimulatorRequest(request: NextRequest): boolean {
-  return request.headers.get("X-Simulator-Mode") === "true";
+  const hasSimHeader = request.headers.get("X-Simulator-Mode") === "true";
+  if (!hasSimHeader) return false;
+
+  const requiredSecret = process.env.INTERNAL_API_SECRET;
+  if (requiredSecret) {
+    return request.headers.get("X-Internal-Secret") === requiredSecret;
+  }
+  // Reason: Backward-compatible — if the secret isn't configured, accept the
+  // header alone so existing deployments without the env var keep working.
+  return true;
 }
 
 /**
@@ -35,7 +46,8 @@ export function isSimulatorEnabled(): boolean {
 }
 
 /**
- * Create headers for simulator requests
+ * Create headers for simulator requests. Includes INTERNAL_API_SECRET
+ * when available so the target route can verify the caller.
  */
 export function createSimulatorHeaders(
   userId?: string,
@@ -44,6 +56,11 @@ export function createSimulatorHeaders(
     "X-Simulator-Mode": "true",
     "Content-Type": "application/json",
   };
+
+  const secret = process.env.INTERNAL_API_SECRET;
+  if (secret) {
+    headers["X-Internal-Secret"] = secret;
+  }
 
   if (userId) {
     headers["X-Simulator-User-Id"] = userId;

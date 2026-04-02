@@ -25,11 +25,12 @@ async function getSimulatorPasswordHash(password: string): Promise<string> {
 }
 
 export async function POST(request: NextRequest) {
-  // Only allow in development or with simulator mode header
-  const isSimulatorMode = request.headers.get("X-Simulator-Mode") === "true";
+  const { isSimulatorRequest } = await import(
+    "@/lib/services/simulator/simulator-mode"
+  );
   const isDev = process.env.NODE_ENV === "development";
 
-  if (!isSimulatorMode && !isDev) {
+  if (!isSimulatorRequest(request) && !isDev) {
     return NextResponse.json(
       { success: false, error: "Simulator mode not enabled" },
       { status: 403 },

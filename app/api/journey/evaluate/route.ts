@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
 import { connectToDatabase } from "@/database/mongoose";
 import JourneyMilestone from "@/database/models/journey-milestone.model";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
@@ -14,18 +16,19 @@ import UserBadge from "@/database/models/user-badge.model";
  * POST /api/journey/evaluate
  * Evaluate user's progress and auto-complete milestones they've already achieved
  */
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
-    await connectToDatabase();
-    
-    const { userId } = await request.json();
-    
-    if (!userId) {
+    // SECURITY: Require authenticated session — userId comes from session, not body
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user?.id) {
       return NextResponse.json(
-        { success: false, error: "User ID is required" },
-        { status: 400 }
+        { success: false, error: "Not authenticated" },
+        { status: 401 },
       );
     }
+    const userId = session.user.id;
+
+    await connectToDatabase();
 
     // Gather user's actual stats (this also validates the user exists via wallet/trades)
     const userStats = await getUserStats(userId);

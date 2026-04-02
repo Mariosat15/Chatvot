@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
 import { connectToDatabase } from "@/database/mongoose";
 import UserJourneyProgress from "@/database/models/user-journey-progress.model";
 import JourneyMilestone from "@/database/models/journey-milestone.model";
@@ -10,18 +12,27 @@ interface RouteParams {
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    await connectToDatabase();
-
-    const { userId } = await params;
-    const searchParams = request.nextUrl.searchParams;
-    const whitelabelId = searchParams.get("whitelabelId");
-
-    if (!userId) {
+    // SECURITY: Require authenticated session and verify user owns this data
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user?.id) {
       return NextResponse.json(
-        { success: false, error: "User ID is required" },
-        { status: 400 }
+        { success: false, error: "Not authenticated" },
+        { status: 401 },
       );
     }
+
+    const { userId } = await params;
+    if (!userId || userId !== session.user.id) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 },
+      );
+    }
+
+    await connectToDatabase();
+
+    const searchParams = request.nextUrl.searchParams;
+    const whitelabelId = searchParams.get("whitelabelId");
 
     // Get user's journey progress
     const userProgress = await UserJourneyProgress.findOne({ userId }).lean();
@@ -110,7 +121,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     // Format completed milestones for frontend (always as objects)
-    const formattedCompletedMilestones = (userProgress.completedMilestones || []).map((item: any) => {
+    const _formattedCompletedMilestones = (userProgress.completedMilestones || []).map((item: any) => {
       if (typeof item === "string") {
         return { milestoneId: item, completedAt: new Date(), rewards: { xp: 0 } };
       }
@@ -122,16 +133,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     try {
       const { checkAndCompleteMilestones, getFirstActiveMapId } = await import("@/lib/services/journey-progress.service");
       const activeMapId = userProgress.mapId || await getFirstActiveMapId();
-      // #region agent log
-      const mapIdCounts: Record<string, number> = {};
-      for (const m of milestones) { mapIdCounts[(m as any).mapId] = (mapIdCounts[(m as any).mapId] || 0) + 1; }
-      fetch('http://127.0.0.1:7242/ingest/cdeeb214-56c4-42f5-af3d-c63a29f02716',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'journey-progress-api:120',message:'JOURNEY DATA MISMATCH DEBUG',data:{userId,userProgressMapId:userProgress.mapId,resolvedMapId:activeMapId,mapConfigMapIds:maps.map((m:any)=>m.mapId),milestonesByMapId:mapIdCounts,completedMilestoneIds:completedMilestoneIds.slice(0,20),totalMaps:maps.length,totalMilestones:milestones.length},timestamp:Date.now(),hypothesisId:'HA-HB-HC',runId:'unified'})}).catch(()=>{});
-      console.log(`🔍 [JOURNEY-RETRO] Triggering retroactive milestone check for user ${userId} mapId=${activeMapId}`);
-      // #endregion
-      const retroResult = await checkAndCompleteMilestones(userId, activeMapId);
-      // #region agent log
-      console.log(`🔍 [JOURNEY-RETRO] Result: completed=${JSON.stringify(retroResult.completed)} unlocked=${JSON.stringify(retroResult.unlocked)} xp=${retroResult.totalXPEarned}`);
-      // #endregion
+      await checkAndCompleteMilestones(userId, activeMapId);
     } catch (err) {
       // Non-critical -- don't block page load
       console.warn("Failed to retroactively check milestones:", err);
@@ -197,7 +199,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       success: true,
       currentMapIndex: activeProgress.currentMapIndex || currentMapIndex,
       mapProgress: finalMapProgress,
-      totalXP: activeProgress.totalXPFromJourney || activeProgress.allMapsXP || activeProgress.totalXP || 0,
+      totalXP: activeProgress.totalXPFromJourney || (activeProgress as any).allMapsXP || (activeProgress as any).totalXP || 0,
       mapsCompleted: activeProgress.totalMapsCompleted || finalMapProgress.filter((p: any) => p.isComplete).length,
       completedMilestones: finalCompletedMilestones,
       unlockedMilestones: activeProgress.unlockedMilestones || [],
