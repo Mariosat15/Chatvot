@@ -121,6 +121,13 @@ interface LiabilityMetrics {
   totalUserCreditsEUR: number;
   pendingWithdrawals: number;
   pendingWithdrawalsEUR: number;
+  activeCompetitionPoolsCredits: number;
+  activeCompetitionPoolObligationEUR: number;
+  activeCompetitionCount: number;
+  activeChallengePoolsCredits: number;
+  activeChallengePoolObligationEUR: number;
+  activeChallengeCount: number;
+  totalPoolObligationEUR: number;
   totalLiability: number;
   theoreticalBankBalance: number;
   coverageRatio: number;
@@ -1304,7 +1311,10 @@ export default function FinancialDashboard() {
             const userCreditsEUR = liabilityMetrics?.totalUserCreditsEUR || 0;
             const outstandingVAT = vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0;
             const pendingWdEUR = liabilityMetrics?.pendingWithdrawalsEUR || 0;
-            const totalObligations = userCreditsEUR + outstandingVAT + pendingWdEUR;
+            // Reason: Active competition/challenge pools are money owed to future
+            // winners (minus platform fee). Must be reserved, not "safe to spend".
+            const poolObligationEUR = liabilityMetrics?.totalPoolObligationEUR || 0;
+            const totalObligations = userCreditsEUR + outstandingVAT + pendingWdEUR + poolObligationEUR;
             // Reason: Allow negative so admin sees the deficit clearly.
             const safeToSpend = bankBalance - totalObligations;
             const isPositive = safeToSpend >= 0;
@@ -1343,6 +1353,11 @@ export default function FinancialDashboard() {
                           <span className="block">
                             👥 {currencySymbol}{userCreditsEUR.toFixed(2)} user balances
                           </span>
+                          {poolObligationEUR > 0 && (
+                            <span className="block">
+                              🏆 {currencySymbol}{poolObligationEUR.toFixed(2)} active pool prizes
+                            </span>
+                          )}
                           {outstandingVAT > 0 && (
                             <span className="block">
                               📋 {currencySymbol}{outstandingVAT.toFixed(2)} VAT owed
@@ -1723,7 +1738,8 @@ export default function FinancialDashboard() {
                 const uCred = liabilityMetrics?.totalUserCreditsEUR || 0;
                 const oVAT = vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0;
                 const pWd = liabilityMetrics?.pendingWithdrawalsEUR || 0;
-                const totalReserve = uCred + oVAT + pWd;
+                const poolObl = liabilityMetrics?.totalPoolObligationEUR || 0;
+                const totalReserve = uCred + oVAT + pWd + poolObl;
                 const netSafe = bBal - totalReserve;
                 return (
                   <div className="mt-4 p-4 bg-gradient-to-r from-cyan-900/30 to-emerald-900/30 border border-cyan-500/30 rounded-lg">
@@ -1747,7 +1763,7 @@ export default function FinancialDashboard() {
                           -{currencySymbol}{totalReserve.toFixed(2)}
                         </p>
                         <p className="text-xs text-gray-500">
-                          Users{oVAT > 0 ? " + VAT" : ""}{pWd > 0 ? " + pending WD" : ""}
+                          Users{poolObl > 0 ? " + pools" : ""}{oVAT > 0 ? " + VAT" : ""}{pWd > 0 ? " + pending WD" : ""}
                         </p>
                       </div>
                       <div>
@@ -1920,6 +1936,7 @@ export default function FinancialDashboard() {
                 (liabilityMetrics?.theoreticalBankBalance || 0) -
                   (liabilityMetrics?.totalUserCreditsEUR || 0) -
                   (liabilityMetrics?.pendingWithdrawalsEUR || 0) -
+                  (liabilityMetrics?.totalPoolObligationEUR || 0) -
                   (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0);
               const isPositive = availableToSpend >= 0;
               return (
@@ -2135,8 +2152,10 @@ export default function FinancialDashboard() {
               {/* Bottom Summary */}
               {(() => {
                 const bb = liabilityMetrics?.theoreticalBankBalance || 0;
+                const poolOblLib = liabilityMetrics?.totalPoolObligationEUR || 0;
                 const totalObl = (liabilityMetrics?.totalUserCreditsEUR || 0) +
                   (liabilityMetrics?.pendingWithdrawalsEUR || 0) +
+                  poolOblLib +
                   (vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0);
                 const avail = bb - totalObl;
                 return (
@@ -2155,7 +2174,7 @@ export default function FinancialDashboard() {
                           -{currencySymbol}{totalObl.toFixed(2)}
                         </p>
                         <p className="text-xs text-gray-500">
-                          Users + pending WD{vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0 ? " + VAT" : ""}
+                          Users{poolOblLib > 0 ? " + pools" : ""} + pending WD{vatEnabled && (platformFinancials?.outstandingVAT || 0) > 0 ? " + VAT" : ""}
                         </p>
                       </div>
                       <div>
@@ -2608,6 +2627,7 @@ export default function FinancialDashboard() {
             const userCredEUR = liabilityMetrics?.totalUserCreditsEUR || 0;
             const vatOwed = vatEnabled ? platformFinancials?.outstandingVAT || 0 : 0;
             const pendingWd = liabilityMetrics?.pendingWithdrawalsEUR || 0;
+            const poolObl = liabilityMetrics?.totalPoolObligationEUR || 0;
             const gmFees = platformFinancials?.totalGameMasterFees || 0;
             const vendorPay = platformFinancials?.totalVendorPayments || 0;
             const customExp = platformFinancials?.totalCustomExpenses || 0;
@@ -2621,7 +2641,8 @@ export default function FinancialDashboard() {
             // Vendor payments, bank fees, admin withdrawals etc. are already
             // deducted from theoreticalBankBalance, so they are NOT current
             // obligations. Only unpaid liabilities count.
-            const currentObligations = userCredEUR + vatOwed + pendingWd;
+            // Pool obligation = winners' share of active competition/challenge pools.
+            const currentObligations = userCredEUR + vatOwed + pendingWd + poolObl;
             const netAvailable = bankBal - currentObligations;
             const isNetPositive = netAvailable >= 0;
 
@@ -2676,6 +2697,22 @@ export default function FinancialDashboard() {
                           </div>
                           <span className="text-orange-400 font-semibold">
                             -{currencySymbol}{pendingWd.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                      {poolObl > 0 && (
+                        <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                          <div>
+                            <span className="text-gray-300">🏆 Active Pool Prizes</span>
+                            <p className="text-[10px] text-gray-500">
+                              Winners&apos; share of {liabilityMetrics?.activeCompetitionCount || 0} competition(s)
+                              {(liabilityMetrics?.activeChallengeCount || 0) > 0
+                                ? ` + ${liabilityMetrics?.activeChallengeCount} challenge(s)`
+                                : ""}
+                            </p>
+                          </div>
+                          <span className="text-orange-400 font-semibold">
+                            -{currencySymbol}{poolObl.toFixed(2)}
                           </span>
                         </div>
                       )}
@@ -2798,6 +2835,12 @@ export default function FinancialDashboard() {
                             <span className="text-gray-400">👥 Users</span>
                             <span className="text-red-400">{currencySymbol}{userCredEUR.toFixed(2)}</span>
                           </div>
+                          {poolObl > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-400">🏆 Pool Prizes</span>
+                              <span className="text-orange-400">{currencySymbol}{poolObl.toFixed(2)}</span>
+                            </div>
+                          )}
                           {pendingWd > 0 && (
                             <div className="flex justify-between text-sm">
                               <span className="text-gray-400">⏳ Pending WD</span>

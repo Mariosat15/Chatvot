@@ -10,6 +10,8 @@ import { PlatformFinancialsService } from "@/lib/services/platform-financials.se
 import {
   PlatformTransaction,
 } from "@/database/models/platform-financials.model";
+import Competition from "@/database/models/trading/competition.model";
+import Challenge from "@/database/models/trading/challenge.model";
 import { getUsersByIds } from "@/lib/utils/user-lookup";
 import mongoose from "mongoose";
 
@@ -360,9 +362,60 @@ export async function GET(request: NextRequest) {
       else if (row._id.type === "admin_adjustment") entry.adminAdjust = row.total;
     }
 
+    // Reason: Active competition/challenge prize pools are obligations — that money
+    // is owed to future winners (minus the platform fee percentage).  Without this,
+    // "Safe to Spend" is inflated because user creditBalance drops on entry but the
+    // pool money isn't tracked as a liability.
+    const [activeCompPoolAgg, activeChalPoolAgg] = await Promise.all([
+      Competition.aggregate([
+        { $match: { status: { $in: ["upcoming", "active", "finalizing"] } } },
+        {
+          $group: {
+            _id: null,
+            totalPool: { $sum: "$prizePool" },
+            totalWinnersShare: {
+              $sum: {
+                $multiply: [
+                  "$prizePool",
+                  { $subtract: [1, { $divide: ["$platformFeePercentage", 100] }] },
+                ],
+              },
+            },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+      Challenge.aggregate([
+        { $match: { status: { $in: ["accepted", "active", "finalizing"] } } },
+        {
+          $group: {
+            _id: null,
+            totalPool: { $sum: "$prizePool" },
+            totalWinnersShare: {
+              $sum: {
+                $multiply: [
+                  "$prizePool",
+                  { $subtract: [1, { $divide: ["$platformFeePercentage", 100] }] },
+                ],
+              },
+            },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+    ]);
+
+    const activeCompPools = activeCompPoolAgg[0] || { totalPool: 0, totalWinnersShare: 0, count: 0 };
+    const activeChalPools = activeChalPoolAgg[0] || { totalPool: 0, totalWinnersShare: 0, count: 0 };
+
     // Calculate liability metrics
     const conversionRate = conversionSettings.eurToCreditsRate;
     const totalLiabilityEUR = totalCreditsInCirculation / conversionRate;
+
+    const activeCompPoolObligationEUR = activeCompPools.totalWinnersShare / conversionRate;
+    const activeChalPoolObligationEUR = activeChalPools.totalWinnersShare / conversionRate;
+    const totalPoolObligationEUR = activeCompPoolObligationEUR + activeChalPoolObligationEUR;
+
     // Use WithdrawalRequest for accurate pending amounts (in EUR)
     const pendingWithdrawalsEUR = pendingWithdrawalRequests.reduce(
       (sum, w) => sum + (w.amountEUR || 0),
@@ -458,7 +511,16 @@ export async function GET(request: NextRequest) {
           totalUserCreditsEUR: totalLiabilityEUR,
           pendingWithdrawals: pendingWithdrawalsTotal,
           pendingWithdrawalsEUR: pendingWithdrawalsEUR,
-          totalLiability: totalLiabilityEUR + pendingWithdrawalsEUR,
+          // Reason: Active competition/challenge pools are money owed to future winners.
+          // Only the winners' share (pool minus platform fee %) is an obligation.
+          activeCompetitionPoolsCredits: activeCompPools.totalPool,
+          activeCompetitionPoolObligationEUR: activeCompPoolObligationEUR,
+          activeCompetitionCount: activeCompPools.count,
+          activeChallengePoolsCredits: activeChalPools.totalPool,
+          activeChallengePoolObligationEUR: activeChalPoolObligationEUR,
+          activeChallengeCount: activeChalPools.count,
+          totalPoolObligationEUR,
+          totalLiability: totalLiabilityEUR + pendingWithdrawalsEUR + totalPoolObligationEUR,
           // What should be in bank: User Deposits - User Withdrawals - Admin Withdrawals
           theoreticalBankBalance: platformFinancialStats.theoreticalBankBalance,
           // Coverage ratio: Can we pay all users if they withdraw?
