@@ -12,16 +12,6 @@ import mongoose, { Document, Model } from "mongoose";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 
-// Input validation helpers to prevent NoSQL injection
-function isValidEmail(email: unknown): email is string {
-  if (typeof email !== "string") return false;
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email) && email.length <= 254;
-}
-
-function isSafeString(value: unknown): value is string {
-  return typeof value === "string";
-}
 
 const router = Router();
 
@@ -158,9 +148,8 @@ router.post("/register", async (req: Request, res: Response) => {
       return;
     }
 
-    // Email format validation - use a ReDoS-safe pattern
-    // Limit the length and use atomic grouping pattern
-    if (email.length > 254 || !/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(email)) {
+    // Reason: Simple ReDoS-safe email check — real validation happens via confirmation email
+    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       res.status(400).json({ error: "Invalid email format" });
       return;
     }
@@ -350,7 +339,7 @@ router.post("/register", async (req: Request, res: Response) => {
       verificationEmailSent = true;
       console.log(`📧 Verification email sent to ${email}`);
     } catch (emailError) {
-      console.error("⚠️ Failed to send verification email:", emailError);
+      console.error(`⚠️ Failed to send verification email: ${emailError}`);
       // Don't fail registration if email fails, but log it
     }
 
@@ -409,7 +398,7 @@ router.post("/register", async (req: Request, res: Response) => {
           "⚠️ Customer auto-assign timed out (5s) - will be assigned later",
         );
       } else {
-        console.error("⚠️ Failed to auto-assign customer:", autoAssignError);
+        console.error(`⚠️ Failed to auto-assign customer: ${autoAssignError}`);
       }
       // Don't fail registration if auto-assign fails
     }
@@ -432,7 +421,7 @@ router.post("/register", async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error("❌ Registration error:", error);
+    console.error(`❌ Registration error: ${error}`);
 
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
@@ -625,11 +614,11 @@ router.post("/login", async (req: Request, res: Response) => {
           `,
           })
           .catch((err) =>
-            console.error("Failed to send verification reminder:", err),
+            console.error(`Failed to send verification reminder: ${err}`),
           );
       } catch (emailError) {
         // Don't fail login flow due to email error, just log it
-        console.error("Error sending verification reminder:", emailError);
+        console.error(`Error sending verification reminder: ${emailError}`);
       }
 
       // Return specific error only after password is validated
@@ -683,7 +672,7 @@ router.post("/login", async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error("❌ Login error:", error);
+    console.error(`❌ Login error: ${error}`);
 
     // Don't expose internal error details to clients
     res.status(500).json({
@@ -796,7 +785,7 @@ router.post("/register-batch", async (req: Request, res: Response) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     for (let i = 0; i < users.length; i++) {
-      const userData = users[i];
+      const userData = users[i]; // eslint-disable-line security/detect-object-injection
 
       // Validate that element is an object (not null, undefined, or primitive)
       if (
@@ -804,7 +793,7 @@ router.post("/register-batch", async (req: Request, res: Response) => {
         typeof userData !== "object" ||
         Array.isArray(userData)
       ) {
-        results[i] = {
+        results[i] = { // eslint-disable-line security/detect-object-injection
           success: false,
           email: "unknown",
           error: `Invalid user data at index ${i}: expected an object`,
@@ -819,7 +808,7 @@ router.post("/register-batch", async (req: Request, res: Response) => {
         typeof userData.email !== "string" ||
         !emailRegex.test(userData.email)
       ) {
-        results[i] = {
+        results[i] = { // eslint-disable-line security/detect-object-injection
           success: false,
           email: userData.email || "unknown",
           error: "Invalid or missing email",
@@ -834,7 +823,7 @@ router.post("/register-batch", async (req: Request, res: Response) => {
         typeof userData.password !== "string" ||
         userData.password.length < 6
       ) {
-        results[i] = {
+        results[i] = { // eslint-disable-line security/detect-object-injection
           success: false,
           email: userData.email,
           error: "Invalid or missing password (min 6 characters)",
@@ -843,7 +832,6 @@ router.post("/register-batch", async (req: Request, res: Response) => {
         continue;
       }
 
-      // Store original index to preserve order in results
       validUsers.push({ ...userData, originalIndex: i });
     }
 
@@ -867,7 +855,7 @@ router.post("/register-batch", async (req: Request, res: Response) => {
       const { originalIndex } = userData;
 
       if (!userData.hashedPassword) {
-        results[originalIndex] = {
+        results[originalIndex] = { // eslint-disable-line security/detect-object-injection
           success: false,
           email: userData.email,
           error: "Hash failed",
@@ -896,7 +884,7 @@ router.post("/register-batch", async (req: Request, res: Response) => {
               existingAccount.providerId === "credential"
                 ? "Already exists"
                 : `Already registered via ${existingAccount.providerId}`;
-            results[originalIndex] = {
+            results[originalIndex] = { // eslint-disable-line security/detect-object-injection
               success: false,
               email: userData.email,
               error: errorMsg,
@@ -970,7 +958,7 @@ router.post("/register-batch", async (req: Request, res: Response) => {
           );
         });
 
-        results[originalIndex] = {
+        results[originalIndex] = { // eslint-disable-line security/detect-object-injection
           success: true,
           email: userData.email,
           userId: createdUserId || userId,
@@ -993,7 +981,7 @@ router.post("/register-batch", async (req: Request, res: Response) => {
           cleanError = "Registration failed";
         }
 
-        results[originalIndex] = {
+        results[originalIndex] = { // eslint-disable-line security/detect-object-injection
           success: false,
           email: userData.email,
           error: cleanError,
@@ -1025,7 +1013,7 @@ router.post("/register-batch", async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error("❌ Batch registration error:", error);
+    console.error(`❌ Batch registration error: ${error}`);
 
     // Don't expose internal error details
     res.status(500).json({
@@ -1077,7 +1065,7 @@ router.get("/benchmark", async (req: Request, res: Response) => {
       note: "Main thread was NOT blocked during these operations",
     });
   } catch (error) {
-    console.error("❌ Benchmark error:", error);
+    console.error(`❌ Benchmark error: ${error}`);
     res.status(500).json({
       error: "Benchmark failed",
       message:

@@ -748,7 +748,7 @@ export class SuspicionScoringService {
         updatesApplied++;
         console.log(`   📈 Added ${scoreMethod} +${percentage}% (from ${evidenceType})`);
       } catch (err) {
-        console.error(`   ❌ Failed to update ${scoreMethod} for user ${userId}:`, err);
+        console.error(`   ❌ Failed to update ${scoreMethod} for user ${userId}: ${err}`);
       }
     }
 

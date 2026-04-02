@@ -63,7 +63,7 @@ async function getOpenAIConfig(): Promise<{
         enabled: true,
       };
     }
-  } catch (error) {
+  } catch {
     console.log("AI config not found in database");
   }
 
@@ -191,8 +191,15 @@ Return ONLY the JSON, no additional text.`;
     const content = response.choices[0]?.message?.content;
     if (!content) return undefined;
 
-    // Parse JSON response
-    const analysis = JSON.parse(content.trim());
+    // Reason: LLMs frequently wrap JSON in markdown code fences (```json ... ```).
+    // Strip them before parsing to prevent SyntaxError.
+    let cleaned = content.trim();
+    if (cleaned.startsWith("```")) {
+      cleaned = cleaned
+        .replace(/^```(?:json)?\s*\n?/, "")
+        .replace(/\n?```\s*$/, "");
+    }
+    const analysis = JSON.parse(cleaned);
     return {
       riskLevel: analysis.riskLevel || "medium",
       summary: analysis.summary || "No summary available",
@@ -201,7 +208,7 @@ Return ONLY the JSON, no additional text.`;
       estimatedEffort: analysis.estimatedEffort || "Unknown",
     };
   } catch (error) {
-    console.error(`Error analyzing ${pkg.name} with AI:`, error);
+    console.error(`Error analyzing ${pkg.name} with AI: ${error}`);
     return undefined;
   }
 }
@@ -329,7 +336,7 @@ export async function POST(request: Request) {
           (p) => p.name === packageName,
         );
         if (idx >= 0) {
-          cachedResult.packages[idx] = pkg;
+          cachedResult.packages[idx] = pkg; // eslint-disable-line security/detect-object-injection
         }
       }
 

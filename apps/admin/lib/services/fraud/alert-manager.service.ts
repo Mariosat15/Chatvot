@@ -448,7 +448,7 @@ export class AlertManagerService {
         alertType,
       );
     } catch (saveError) {
-      console.error(`❌ [ALERT] FAILED to save merged alert:`, saveError);
+      console.error(`❌ [ALERT] FAILED to save merged alert: ${saveError}`);
       throw saveError;
     }
   }
@@ -591,9 +591,10 @@ export class AlertManagerService {
           linkedUserIds: primaryUserIds,
         });
       } catch (err) {
+        // Reason: Single-argument console.error avoids format-string interpretation
+        // when linkedUserId contains user-controlled data (CodeQL: externally-controlled format string).
         console.error(
-          `❌ [SCORE PROPAGATION] Failed to update score for user ${linkedUserId}:`,
-          err,
+          `❌ [SCORE PROPAGATION] Failed to update score for user ${linkedUserId}: ${err}`,
         );
       }
     }
