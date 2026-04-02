@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  BarChart3,
 } from "lucide-react";
 import { GameIcon } from "@/components/ui/GameIcon";
 import {
@@ -30,15 +31,18 @@ import { headers } from "next/headers";
 
 interface CompetitionDetailsPageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 const CompetitionDetailsPage = async ({
   params,
+  searchParams,
 }: CompetitionDetailsPageProps) => {
   // CRITICAL: Disable cache to always show fresh competition data
   noStore();
 
   const { id } = await params;
+  const query = await searchParams;
 
   // Get session for user identification
   const session = await auth.api.getSession({ headers: await headers() });
@@ -81,10 +85,10 @@ const CompetitionDetailsPage = async ({
     const isFull =
       competition.currentParticipants >= competition.maxParticipants;
 
-    // Reason: Participants of completed competitions should always land on
-    // the results page. Non-participants stay on the detail page to view
-    // the leaderboard and competition info.
-    if (isCompleted && isUserIn) {
+    // Reason: Participants of completed competitions land on the results
+    // page by default. ?view=details bypasses this so users can revisit
+    // the competition detail view (leaderboard, chart, etc.) from results.
+    if (isCompleted && isUserIn && query.view !== "details") {
       redirect(`/competitions/${id}/results`);
     }
 
@@ -269,15 +273,28 @@ const CompetitionDetailsPage = async ({
 
         {/* Header with Back Button and UTC Clock */}
         <div className="flex items-center justify-between flex-wrap gap-4">
-          <Link href="/competitions">
-            <Button
-              variant="ghost"
-              className="w-fit gap-2 text-gray-400 hover:text-gray-100"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Competitions
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/competitions">
+              <Button
+                variant="ghost"
+                className="w-fit gap-2 text-gray-400 hover:text-gray-100"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Competitions
+              </Button>
+            </Link>
+            {isCompleted && isUserIn && (
+              <Link href={`/competitions/${id}/results`}>
+                <Button
+                  size="sm"
+                  className="gap-2 bg-purple-600 hover:bg-purple-700"
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  View Results
+                </Button>
+              </Link>
+            )}
+          </div>
           <UTCClock />
         </div>
 

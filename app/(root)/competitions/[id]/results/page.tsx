@@ -12,6 +12,7 @@ import {
   ArrowLeft,
   ChevronRight,
   Eye,
+  LayoutDashboard,
 } from "lucide-react";
 import { GameIcon } from "@/components/ui/GameIcon";
 
@@ -122,13 +123,23 @@ const CompetitionResultsPage = async ({
     <div className="flex min-h-screen flex-col gap-6 p-4 md:p-8 bg-gradient-to-br from-gray-900 via-gray-900 to-purple-900/20">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <Link href={`/competitions/${competitionId}`}>
+        <Link href="/competitions">
           <Button
             variant="ghost"
             className="w-fit gap-2 text-gray-400 hover:text-gray-100"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Competition
+            Back to Competitions
+          </Button>
+        </Link>
+        <Link href={`/competitions/${competitionId}?view=details`}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            View Competition Details
           </Button>
         </Link>
       </div>
@@ -455,10 +466,10 @@ const CompetitionResultsPage = async ({
 
       {/* Action Buttons */}
       <div className="flex flex-wrap gap-4 justify-center">
-        <Link href={`/competitions/${competitionId}`}>
+        <Link href={`/competitions/${competitionId}?view=details`}>
           <Button variant="outline" className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Competition
+            <LayoutDashboard className="h-4 w-4" />
+            View Competition Details
           </Button>
         </Link>
         <Link href={`/competitions/${competitionId}/trade?viewOnly=true`}>
