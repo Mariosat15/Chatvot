@@ -58,25 +58,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // SECURITY: This endpoint is admin-only and protected by requireAdminAuth()
-    // The URL has been validated by isValidSsrfUrl() which blocks:
-    // - Private IP ranges (10.x, 172.16-31.x, 192.168.x, 127.x, etc.)
-    // - Cloud metadata endpoints (169.254.169.254, metadata.google.internal)
-    // - Non-HTTP(S) protocols
-    // This is an intentional feature allowing admins to scrape external documentation
-    
-    // Build URL from validated components - protocol and host are verified safe
-    const safeProtocol = parsedUrl.protocol === "https:" ? "https:" : "http:";
-    const safeHost = String(parsedUrl.host); // Host validated by isValidSsrfUrl
-    const safePath = String(parsedUrl.pathname || "/");
-    const safeSearch = String(parsedUrl.search || "");
-    
-    // Construct final URL from validated parts
-    const fetchUrl = `${safeProtocol}//${safeHost}${safePath}${safeSearch}`;
-    
-    // Fetch the webpage - URL is validated by isValidSsrfUrl() above
-    // CodeQL: This is intentional - admin-only endpoint for scraping external docs
-    const response = await fetch(fetchUrl, { // codeql[js/request-forgery]
+    // Reason: Use the already-validated URL object directly instead of manual
+    // string reconstruction. isValidSsrfUrl() blocks private IPs, metadata
+    // endpoints, credentials, and non-HTTP(S) protocols. requireAdminAuth()
+    // ensures only admins can reach this endpoint.
+    const response = await fetch(parsedUrl.toString(), {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (compatible; ChartVolt-Bot/1.0; Knowledge Indexer)",

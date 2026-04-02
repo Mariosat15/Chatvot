@@ -361,7 +361,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate inputs to prevent NoSQL injection
+    // Reason: Explicit typeof guards prevent NoSQL injection via objects like { $gt: "" }
+    // that could bypass truthy checks above. JSON.parse can return any type regardless
+    // of TypeScript annotations.
+    if (typeof userId !== "string" || typeof issueType !== "string") {
+      await session.abortTransaction();
+      return NextResponse.json(
+        { success: false, error: "Invalid input types" },
+        { status: 400 },
+      );
+    }
+
     if (!isSafeMongoString(issueType)) {
       await session.abortTransaction();
       return NextResponse.json(

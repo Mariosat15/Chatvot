@@ -267,6 +267,10 @@ const STATS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
  * PERF: Results cached for 5 minutes per user
  */
 export async function gatherUserStats(userId: string): Promise<UserStats> {
+  // Reason: Runtime typeof guard prevents NoSQL injection via objects like { $ne: null }
+  if (typeof userId !== "string" || !userId.trim()) {
+    throw new Error("Invalid userId");
+  }
   // Check cache first
   const cached = _statsCache.get(userId);
   if (cached && Date.now() < cached.expiresAt) {

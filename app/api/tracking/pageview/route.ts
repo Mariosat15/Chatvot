@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import SiteVisit from "@/database/models/site-visit.model";
 import BlockedVisitor from "@/database/models/blocked-visitor.model";
+import crypto from "crypto";
 
 // ─── Bot detection patterns ─────────────────────────────────────────────────
 const BOT_PATTERNS: [RegExp, string][] = [
@@ -265,7 +266,7 @@ export async function POST(req: NextRequest) {
     const region = req.headers.get("cf-region") || "";
 
     const visitorId = `${ip}-${ua.slice(0, 50)}`;
-    const sessionId = body.sessionId || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const sessionId = body.sessionId || `${Date.now()}-${crypto.randomBytes(6).toString("base64url")}`;
     const resolution = screenWidth && screenHeight ? `${screenWidth}x${screenHeight}` : "";
     const utmSource = (body.utmSource || "").slice(0, 200);
     const utmMedium = (body.utmMedium || "").slice(0, 200);

@@ -364,7 +364,7 @@ Include a "_changes" field on badges you modified, describing what changed and w
             results.created++;
           }
         } catch (err) {
-          console.error(`Error applying badge ${badge.id}:`, err);
+          console.error(`Error applying badge ${badge.id}: ${err}`);
           results.errors++;
         }
       }

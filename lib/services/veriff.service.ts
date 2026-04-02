@@ -311,16 +311,16 @@ class VeriffService {
       code: verification?.code,
     });
 
-    const userId = verification.vendorData as string;
+    const userId = verification.vendorData;
 
-    if (!userId) {
-      console.error("❌ [KYC] Veriff webhook missing vendorData (userId)");
+    // Reason: vendorData comes from an external webhook — must validate type before DB use
+    if (!userId || typeof userId !== "string") {
+      console.error("❌ [KYC] Veriff webhook missing or invalid vendorData (userId)");
       return;
     }
     
-    // Validate userId to prevent NoSQL injection
     if (!isValidObjectId(userId)) {
-      console.error("❌ [KYC] Invalid userId format:", userId);
+      console.error(`❌ [KYC] Invalid userId format: ${userId}`);
       return;
     }
     

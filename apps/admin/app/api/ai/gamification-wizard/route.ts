@@ -188,7 +188,7 @@ const dbTools = {
           results.created++;
         }
       } catch (err) {
-        console.error(`[Wizard] Badge write error for ${badge.id}:`, err);
+        console.error(`[Wizard] Badge write error for ${badge.id}: ${err}`);
         results.errors++;
       }
     }
@@ -208,7 +208,7 @@ const dbTools = {
           results.created++;
         }
       } catch (err) {
-        console.error(`[Wizard] Milestone write error for ${ms.id}:`, err);
+        console.error(`[Wizard] Milestone write error for ${ms.id}: ${err}`);
         results.errors++;
       }
     }
@@ -710,7 +710,7 @@ Return JSON:
               notFound++;
             }
           } catch (err: any) {
-            console.error(`[Wizard] auto_fix badge error for ${badgeId}:`, err);
+            console.error(`[Wizard] auto_fix badge error for ${badgeId}: ${err}`);
             errors++;
           }
         }
@@ -736,7 +736,7 @@ Return JSON:
               notFound++;
             }
           } catch (err: any) {
-            console.error(`[Wizard] auto_fix milestone error for ${fix.id}:`, err);
+            console.error(`[Wizard] auto_fix milestone error for ${fix.id}: ${err}`);
             errors++;
           }
         }

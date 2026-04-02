@@ -733,7 +733,7 @@ function handleConnection(ws: WebSocket, req: any) {
   ws.on("error", (error) => {
     // Sanitize error message to prevent format string injection
     const safeMessage = String(error.message || "unknown error").slice(0, 200);
-    console.error(`WebSocket error for ${participantId}:`, safeMessage);
+    console.error(`WebSocket error for ${participantId}: ${safeMessage}`);
     handleDisconnect(connectionId);
   });
 

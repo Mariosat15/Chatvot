@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import LandingPageVisit from "@/database/models/landing-page-visit.model";
 import LandingPage from "@/database/models/landing-page.model";
+import { randomBytes } from "crypto";
 
 /**
  * POST /api/lp/track — Record a landing page visit.
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
       landingPageId: page._id,
       trackingId,
       visitorId,
-      sessionId: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      sessionId: `${Date.now()}-${randomBytes(6).toString("base64url")}`,
       ip,
       userAgent: (userAgent || "").slice(0, 500), // Limit UA string length
       referrer: (referrer || "").slice(0, 500),

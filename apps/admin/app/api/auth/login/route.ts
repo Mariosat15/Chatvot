@@ -195,8 +195,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`🔐 Is super admin: ${isSuperAdmin}`);
     console.log(
-      `🔐 Allowed sections (${allowedSections.length}):`,
-      allowedSections,
+      `🔐 Allowed sections (${allowedSections.length}): ${JSON.stringify(allowedSections)}`,
     );
 
     // Update last login

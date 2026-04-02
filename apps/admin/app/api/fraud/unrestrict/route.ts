@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       },
     );
 
-    console.log(`✅ Unrestricted ${result.modifiedCount} user(s):`, userIds);
+    console.log(`✅ Unrestricted ${result.modifiedCount} user(s): ${JSON.stringify(userIds)}`);
 
     if (result.modifiedCount === 0) {
       return NextResponse.json(

@@ -129,7 +129,9 @@ export async function GET(request: NextRequest) {
     let matchingUserIds: string[] | null = null; // null = no filter
 
     if (search) {
-      const regex = new RegExp(search, "i");
+      // Reason: Escape user input to prevent ReDoS via crafted regex patterns
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(escaped, "i");
       const matchedUsers = await db
         .collection("user")
         .find(

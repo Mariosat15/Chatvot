@@ -1142,8 +1142,8 @@ export async function POST(request: Request) {
       report += "All badges passed! No issues found.\n";
     }
 
-    // Group by category
-    const byCategory: Record<string, { passed: number; failed: number; total: number; issues: number }> = {};
+    // Reason: Object.create(null) prevents prototype pollution via keys like "__proto__"
+    const byCategory: Record<string, { passed: number; failed: number; total: number; issues: number }> = Object.create(null);
     for (const result of results) {
       if (!byCategory[result.category]) {
         byCategory[result.category] = { passed: 0, failed: 0, total: 0, issues: 0 };

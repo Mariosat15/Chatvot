@@ -100,7 +100,7 @@ async function syncUserGamification(userId: string) {
     const level = await getUserLevel(userId);
     results.newLevel = level.currentLevel;
 
-    console.log(`✅ [SYNC] Sync complete for user ${userId}:`, results);
+    console.log(`✅ [SYNC] Sync complete for user ${userId}: ${JSON.stringify(results)}`);
     return results;
   } catch (error) {
     console.error(`❌ [SYNC] Error syncing user ${userId}:`, error);

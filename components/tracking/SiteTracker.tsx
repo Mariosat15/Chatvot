@@ -5,6 +5,12 @@ import { usePathname } from "next/navigation";
 
 // ─── Session helpers ─────────────────────────────────────────────────────────
 
+function secureRandomId(length: number): string {
+  const array = new Uint32Array(length);
+  crypto.getRandomValues(array);
+  return Array.from(array, (v) => v.toString(36)).join("").slice(0, length);
+}
+
 function getOrCreateSessionId(): string {
   const KEY = "cv_session_id";
   const TS_KEY = "cv_session_ts";
@@ -19,7 +25,7 @@ function getOrCreateSessionId(): string {
     return existing;
   }
 
-  const newId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const newId = `${Date.now()}-${secureRandomId(8)}`;
   sessionStorage.setItem(KEY, newId);
   sessionStorage.setItem(TS_KEY, Date.now().toString());
   return newId;

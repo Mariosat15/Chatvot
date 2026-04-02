@@ -52,6 +52,10 @@ export async function initializeUserJourney(
   userId: string,
   mapId?: string
 ): Promise<IUserJourneyProgress> {
+  // Reason: Runtime typeof guard prevents NoSQL injection via objects like { $ne: null }
+  if (typeof userId !== "string" || !userId.trim()) {
+    throw new Error("Invalid userId");
+  }
   // Dynamically resolve mapId if not provided
   if (!mapId) mapId = await getFirstActiveMapId();
   console.log(`🗺️ [JOURNEY] Initializing journey for user ${userId} on map ${mapId}`);
@@ -103,7 +107,7 @@ export async function initializeUserJourney(
 
     if (hasBadgeGates) {
       const UserBadgeInit = (await import("@/database/models/user-badge.model")).default;
-      const earned = await UserBadgeInit.find({ userId }).select("badgeId").lean();
+      const earned = await UserBadgeInit.find({ userId: { $eq: userId } }).select("badgeId").lean();
       const badgeSet = new Set(earned.map((b: any) => b.badgeId));
 
       for (const cm of connectedMilestones) {
@@ -285,7 +289,7 @@ export async function getUserJourneyProgress(
   let progress = await UserJourneyProgress.findOne({ userId, mapId }).lean();
   
   if (!progress) {
-    progress = await initializeUserJourney(userId, mapId);
+    await initializeUserJourney(userId, mapId);
     progress = await UserJourneyProgress.findOne({ userId, mapId }).lean();
   }
 
@@ -309,7 +313,7 @@ export async function getUserJourneyProgress(
   return {
     progress: progress as IUserJourneyProgress | null,
     mapConfig,
-    milestones: milestones as IJourneyMilestone[],
+    milestones: milestones as unknown as IJourneyMilestone[],
     completedIds,
     unlockedIds,
   };
@@ -328,7 +332,10 @@ export async function checkConditionMet(
 ): Promise<{ met: boolean; currentValue?: number }> {
   await connectToDatabase();
 
-  const { type, value, comparison = "gte" } = condition;
+  const { type, value: rawValue, comparison = "gte" } = condition;
+  // Reason: value can be string | number | undefined per IMilestoneCondition,
+  // but numeric comparisons require number. Coerce safely for arithmetic checks.
+  const value = typeof rawValue === "number" ? rawValue : typeof rawValue === "string" ? parseFloat(rawValue) || undefined : undefined;
 
   // Use preloaded stats if provided, otherwise gather them
   let stats: Record<string, any>;
@@ -617,20 +624,17 @@ export async function checkConditionMet(
       currentValue = stats.alwaysUsesTP ? 1 : 0;
       break;
 
-    case "max_drawdown_under":
-      // For "under" conditions, we check if current is LESS than target
-      currentValue = stats.maxDrawdown || 0;
-      return { 
-        met: value !== undefined && currentValue <= value, 
-        currentValue 
-      };
+    case "max_drawdown_under": {
+      const cv = stats.maxDrawdown || 0;
+      currentValue = cv;
+      return { met: value !== undefined && cv <= value, currentValue };
+    }
 
-    case "position_size_under":
-      currentValue = stats.maxPositionSize || 0;
-      return { 
-        met: value !== undefined && currentValue <= value, 
-        currentValue 
-      };
+    case "position_size_under": {
+      const cv = stats.maxPositionSize || 0;
+      currentValue = cv;
+      return { met: value !== undefined && cv <= value, currentValue };
+    }
 
     // ============================================
     // Time-based
@@ -764,7 +768,7 @@ export async function checkMilestoneCompletion(
   const msAny = milestone as any;
   if (msAny.requiredBadgeIds && msAny.requiredBadgeIds.length > 0) {
     const UserBadgeCheck = (await import("@/database/models/user-badge.model")).default;
-    const earnedBadges = await UserBadgeCheck.find({ userId }).select("badgeId").lean();
+    const earnedBadges = await UserBadgeCheck.find({ userId: { $eq: userId } }).select("badgeId").lean();
     const userBadges = new Set(earnedBadges.map((b: any) => b.badgeId));
     const hasAllBadges = msAny.requiredBadgeIds.every((bid: string) => userBadges.has(bid));
     if (!hasAllBadges) {
@@ -781,7 +785,7 @@ export async function checkMilestoneCompletion(
     isUnlocked: true,
     canUnlock: true,
     currentValue,
-    targetValue: milestone.completeCondition.value,
+    targetValue: typeof milestone.completeCondition.value === "number" ? milestone.completeCondition.value : undefined,
   };
 }
 
@@ -853,7 +857,7 @@ export async function completeMilestone(
   );
   if (nextHasBadgeGate) {
     const UserBadgeModel = (await import("@/database/models/user-badge.model")).default;
-    const earned = await UserBadgeModel.find({ userId }).select("badgeId").lean();
+    const earned = await UserBadgeModel.find({ userId: { $eq: userId } }).select("badgeId").lean();
     userBadgeIdsForNext = new Set(earned.map((b: any) => b.badgeId));
   }
 
@@ -1013,7 +1017,11 @@ export async function checkAndUnlockMilestones(
   // Get user's progress
   let progress = await UserJourneyProgress.findOne({ userId, mapId });
   if (!progress) {
-    progress = await initializeUserJourney(userId, mapId);
+    await initializeUserJourney(userId, mapId);
+    progress = await UserJourneyProgress.findOne({ userId, mapId });
+  }
+  if (!progress) {
+    return { newlyUnlocked: [] };
   }
 
   // Get all milestones for this map
@@ -1130,6 +1138,9 @@ export async function checkAndCompleteMilestones(
   unlocked: string[];
   totalXPEarned: number;
 }> {
+  if (typeof userId !== "string" || !userId.trim()) {
+    throw new Error("Invalid userId");
+  }
   await connectToDatabase();
   if (!mapId) mapId = await getFirstActiveMapId();
 
@@ -1139,14 +1150,18 @@ export async function checkAndCompleteMilestones(
   // Get user's progress
   let progress = await UserJourneyProgress.findOne({ userId, mapId });
   if (!progress) {
-    progress = await initializeUserJourney(userId, mapId);
+    await initializeUserJourney(userId, mapId);
+    progress = await UserJourneyProgress.findOne({ userId, mapId });
+  }
+  if (!progress) {
+    return { completed: [], unlocked: [], totalXPEarned: 0 };
   }
 
   // STEP 1: First check if any new milestones can be unlocked
   const { newlyUnlocked } = await checkAndUnlockMilestones(userId, mapId);
 
   // Refresh progress after unlocks
-  progress = await UserJourneyProgress.findOne({ userId, mapId }).lean();
+  progress = await UserJourneyProgress.findOne({ userId, mapId });
   if (!progress) {
     return { completed: [], unlocked: newlyUnlocked, totalXPEarned: 0 };
   }

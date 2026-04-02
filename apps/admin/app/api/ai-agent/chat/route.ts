@@ -4539,7 +4539,7 @@ export async function POST(request: NextRequest) {
         const functionArgs = JSON.parse(toolCall.function.arguments);
         const toolStartTime = Date.now();
 
-        console.log(`🤖 AI Agent calling tool: ${functionName}`, functionArgs);
+        console.log(`🤖 AI Agent calling tool: ${functionName}`, JSON.stringify(functionArgs));
 
         toolCalls.push({
           id: toolCall.id,
@@ -4576,7 +4576,7 @@ export async function POST(request: NextRequest) {
             success: true,
           });
         } catch (error) {
-          console.error(`Tool execution error (${functionName}):`, error);
+          console.error(`Tool execution error (${functionName}): ${error}`);
           toolCalls[toolCalls.length - 1].status = "error";
 
           toolResults.push({

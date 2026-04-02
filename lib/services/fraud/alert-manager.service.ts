@@ -505,8 +505,7 @@ export class AlertManagerService {
         });
       } catch (err) {
         console.error(
-          `⚠️ [ALERT] Failed to propagate ${scoreMethod} score to linked user ${linkedUserId}:`,
-          err,
+          `⚠️ [ALERT] Failed to propagate ${scoreMethod} score to linked user ${linkedUserId}: ${err}`,
         );
       }
     }

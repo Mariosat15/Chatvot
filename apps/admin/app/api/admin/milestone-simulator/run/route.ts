@@ -677,7 +677,8 @@ export async function POST(request: Request) {
     }
 
     // Group by map
-    const byMap: Record<string, { passed: number; failed: number; total: number; issues: number }> = {};
+    // Reason: Object.create(null) prevents prototype pollution via keys like "__proto__"
+    const byMap: Record<string, { passed: number; failed: number; total: number; issues: number }> = Object.create(null);
     for (const r of results) {
       if (!byMap[r.mapId]) byMap[r.mapId] = { passed: 0, failed: 0, total: 0, issues: 0 };
       byMap[r.mapId].total++;
@@ -685,7 +686,7 @@ export async function POST(request: Request) {
       if (r.passed) byMap[r.mapId].passed++; else byMap[r.mapId].failed++;
     }
 
-    const byConditionType: Record<string, { passed: number; failed: number; total: number }> = {};
+    const byConditionType: Record<string, { passed: number; failed: number; total: number }> = Object.create(null);
     for (const r of results) {
       if (!byConditionType[r.conditionType]) byConditionType[r.conditionType] = { passed: 0, failed: 0, total: 0 };
       byConditionType[r.conditionType].total++;
