@@ -49,8 +49,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // SSRF Protection: Block requests to internal/private addresses
-    const ssrfValidation = isValidSsrfUrl(url);
+    // Reason: Normalize the URL via the parsed URL object, then validate and
+    // fetch using the same canonical string so the taint chain is clearly broken.
+    const safeUrl = parsedUrl.toString();
+    const ssrfValidation = isValidSsrfUrl(safeUrl);
     if (!ssrfValidation.valid) {
       return NextResponse.json(
         { error: `URL validation failed: ${ssrfValidation.reason}` },
@@ -58,11 +60,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Reason: Use the already-validated URL object directly instead of manual
-    // string reconstruction. isValidSsrfUrl() blocks private IPs, metadata
-    // endpoints, credentials, and non-HTTP(S) protocols. requireAdminAuth()
-    // ensures only admins can reach this endpoint.
-    const response = await fetch(parsedUrl.toString(), {
+    const response = await fetch(safeUrl, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (compatible; ChartVolt-Bot/1.0; Knowledge Indexer)",
