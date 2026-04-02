@@ -1144,6 +1144,12 @@ const CompetitionDetailsPage = async ({
       </div>
     );
   } catch (error) {
+    // Reason: Next.js implements redirect() by throwing a NEXT_REDIRECT error.
+    // We must re-throw it so the redirect actually happens instead of showing 404.
+    if (error && typeof error === "object" && "digest" in error) {
+      const digest = (error as { digest?: string }).digest;
+      if (digest?.startsWith("NEXT_REDIRECT")) throw error;
+    }
     console.error("Error loading competition:", error);
     notFound();
   }
