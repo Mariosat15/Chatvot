@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { connectToDatabase } from "@/database/mongoose";
+import { connectToDatabase } from "../../../../../../database/mongoose";
 import SimulatorRun from "../../../../../../database/models/simulator/simulator-run.model";
 import {
   startSimulation,

@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { connectToDatabase } from "@/database/mongoose";
+// Reason: Simulator models are registered on ROOT's mongoose (imported via
+// relative paths from database/models/simulator/). We MUST use root's
+// connectToDatabase to connect root's mongoose, not admin's.
+import { connectToDatabase } from "../../../../../../database/mongoose";
 import SimulatorConfig from "../../../../../../database/models/simulator/simulator-config.model";
 
 /**
