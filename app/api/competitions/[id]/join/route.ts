@@ -90,7 +90,8 @@ export async function POST(
     // (code 112, TransientTransactionError) because multiple transactions try to
     // $inc currentParticipants on the same document simultaneously.
     // MongoDB recommends retrying the entire transaction on TransientTransactionError.
-    const MAX_RETRIES = 3;
+    // 5 retries with exponential backoff handles bursts of 50+ concurrent joins.
+    const MAX_RETRIES = 5;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       const mongoSession = await mongoose.startSession();
       mongoSession.startTransaction();
@@ -278,14 +279,21 @@ export async function POST(
         try { await mongoSession.abortTransaction(); } catch { /* already aborted */ }
         mongoSession.endSession();
 
-        const isWriteConflict =
-          txError instanceof Error &&
-          "code" in txError &&
-          (txError as { code: number }).code === 112;
+        // Reason: MongoDB marks WriteConflict (code 112) with TransientTransactionError
+        // label. Check both the error code and the label for robustness.
+        const mongoErr = txError as { code?: number; hasErrorLabel?: (l: string) => boolean; errorLabels?: string[] };
+        const isTransient =
+          mongoErr.code === 112 ||
+          mongoErr.hasErrorLabel?.("TransientTransactionError") ||
+          mongoErr.errorLabels?.includes("TransientTransactionError");
 
-        if (isWriteConflict && attempt < MAX_RETRIES) {
-          const jitter = Math.floor(Math.random() * 100) + 50 * (attempt + 1);
-          await new Promise((r) => setTimeout(r, jitter));
+        if (isTransient && attempt < MAX_RETRIES) {
+          // Exponential backoff with wide jitter to spread out concurrent retries
+          const baseDelay = 100 * Math.pow(2, attempt); // 100, 200, 400, 800, 1600
+          const jitter = Math.floor(Math.random() * baseDelay);
+          const delay = baseDelay + jitter;
+          console.warn(`⚠️ Competition join WriteConflict for ${competitionId}, retry ${attempt + 1}/${MAX_RETRIES} in ${delay}ms`);
+          await new Promise((r) => setTimeout(r, delay));
           continue;
         }
 
