@@ -43,6 +43,12 @@ export async function GET(request: NextRequest) {
       "deposit_completed",
       "withdrawal_completed",
       "email_verification",
+      "account_manager_assigned",
+      "account_manager_changed",
+      "competition_starting",
+      "competition_ended",
+      "margin_warning",
+      "challenge_received",
     ];
 
     const existingTypes = new Set(templates.map((t) => t.templateType));
@@ -172,6 +178,17 @@ export async function POST(request: NextRequest) {
     } else if (templateType === "account_manager_changed") {
       await sendTestAccountManagerChangedEmail(testEmail);
       emailSent = true;
+    } else if (
+      templateType === "competition_starting" ||
+      templateType === "competition_ended" ||
+      templateType === "margin_warning" ||
+      templateType === "challenge_received"
+    ) {
+      const { sendTestNotificationEmail } = await import(
+        "@/lib/services/email-notification-bridge"
+      );
+      await sendTestNotificationEmail(templateType, testEmail);
+      emailSent = true;
     }
 
     if (emailSent) {
@@ -221,6 +238,12 @@ function getDefaultName(type: string): string {
     deposit_completed: "Deposit Completed Email",
     withdrawal_completed: "Withdrawal Completed Email",
     email_verification: "Email Verification",
+    account_manager_assigned: "Account Manager Assigned",
+    account_manager_changed: "Account Manager Changed",
+    competition_starting: "Competition Starting Soon",
+    competition_ended: "Competition Ended — Results Available",
+    margin_warning: "Margin Warning Alert",
+    challenge_received: "Challenge Received",
   };
-  return names[type] || "Email Template";
+  return names[type] || "Email Template"; // eslint-disable-line security/detect-object-injection
 }

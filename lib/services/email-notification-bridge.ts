@@ -194,4 +194,38 @@ export const emailNotificationBridge = {
   },
 };
 
+/**
+ * Sends a test notification email for admin preview.
+ * Uses sample placeholder values so the admin can see how the template looks.
+ */
+export async function sendTestNotificationEmail(
+  templateType: "competition_starting" | "competition_ended" | "margin_warning" | "challenge_received",
+  toEmail: string,
+): Promise<void> {
+  const sampleVars: Record<string, Record<string, string>> = {
+    competition_starting: {
+      name: "Test User",
+      competitionName: "Weekly Pro Championship",
+      startTime: new Date(Date.now() + 3600000).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }),
+    },
+    competition_ended: {
+      name: "Test User",
+      competitionName: "Weekly Pro Championship",
+      competitionId: "test-id",
+    },
+    margin_warning: {
+      name: "Test User",
+      marginLevel: "45.2",
+      competitionName: "Weekly Pro Championship",
+    },
+    challenge_received: {
+      name: "Test User",
+      challengerName: "ProTrader99",
+      stakeAmount: "500",
+    },
+  };
+  // eslint-disable-next-line security/detect-object-injection
+  await sendTemplateEmail(templateType, toEmail, sampleVars[templateType] || {});
+}
+
 export default emailNotificationBridge;

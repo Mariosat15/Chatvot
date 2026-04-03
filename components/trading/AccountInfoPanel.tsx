@@ -376,8 +376,9 @@ export function AccountInfoPanel({
           <div className="grid grid-cols-2 gap-3">
             {/* Balance */}
             <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/10 border border-yellow-500/30 rounded-lg p-3">
-              <p className="text-xs text-yellow-400 font-semibold mb-1 uppercase">
+              <p className="text-xs text-yellow-400 font-semibold mb-1 uppercase flex items-center gap-1">
                 💰 Your Money
+                <InfoTooltip text={TRADING_TERMS.balance} side="right" iconSize={11} />
               </p>
               <p className="text-2xl font-black text-yellow-400 tabular-nums">
                 ${balance.toFixed(2)}
@@ -386,8 +387,9 @@ export function AccountInfoPanel({
 
             {/* Available */}
             <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-lg p-3">
-              <p className="text-xs text-blue-400 font-semibold mb-1 uppercase">
+              <p className="text-xs text-blue-400 font-semibold mb-1 uppercase flex items-center gap-1">
                 ⚡ Can Trade
+                <InfoTooltip text={TRADING_TERMS.availableCapital} side="right" iconSize={11} />
               </p>
               <p className="text-2xl font-black text-blue-400 tabular-nums">
                 ${availableCapital.toFixed(2)}
@@ -497,8 +499,9 @@ export function AccountInfoPanel({
           <div className="grid grid-cols-2 gap-3">
             {/* Used Margin */}
             <div className="bg-dark-400/50 rounded-lg p-3 border border-dark-500">
-              <p className="text-xs text-dark-600 font-semibold mb-1 uppercase">
+              <p className="text-xs text-dark-600 font-semibold mb-1 uppercase flex items-center gap-1">
                 🎲 In Play
+                <InfoTooltip text={TRADING_TERMS.marginUsed} iconSize={11} />
               </p>
               <p className="text-lg font-bold text-purple-400 tabular-nums">
                 ${usedMargin.toFixed(2)}
@@ -507,8 +510,9 @@ export function AccountInfoPanel({
 
             {/* Free Margin */}
             <div className="bg-dark-400/50 rounded-lg p-3 border border-dark-500">
-              <p className="text-xs text-dark-600 font-semibold mb-1 uppercase">
+              <p className="text-xs text-dark-600 font-semibold mb-1 uppercase flex items-center gap-1">
                 🆓 Free Cash
+                <InfoTooltip text={TRADING_TERMS.freeMargin} iconSize={11} />
               </p>
               <p className="text-lg font-bold text-cyan-400 tabular-nums">
                 ${freeMargin.toFixed(2)}
@@ -517,8 +521,9 @@ export function AccountInfoPanel({
 
             {/* Equity */}
             <div className="bg-dark-400/50 rounded-lg p-3 border border-dark-500">
-              <p className="text-xs text-dark-600 font-semibold mb-1 uppercase">
+              <p className="text-xs text-dark-600 font-semibold mb-1 uppercase flex items-center gap-1">
                 💎 Total Value
+                <InfoTooltip text={TRADING_TERMS.equity} iconSize={11} />
               </p>
               <p className="text-lg font-bold text-amber-400 tabular-nums">
                 ${equity.toFixed(2)}
@@ -540,8 +545,9 @@ export function AccountInfoPanel({
                   "bg-red-500/10 border-red-500/50",
               )}
             >
-              <p className="text-xs text-dark-600 font-semibold mb-1 uppercase">
+              <p className="text-xs text-dark-600 font-semibold mb-1 uppercase flex items-center gap-1">
                 🛡️ Health
+                <InfoTooltip text={TRADING_TERMS.marginLevel} iconSize={11} />
               </p>
               <p
                 className={cn(

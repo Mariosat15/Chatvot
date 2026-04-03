@@ -19,6 +19,10 @@ import {
   MailCheck,
   UserCog,
   ArrowLeftRight,
+  Trophy,
+  Target,
+  AlertTriangle,
+  Swords,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,7 +78,11 @@ type TemplateType =
   | "withdrawal_completed"
   | "email_verification"
   | "account_manager_assigned"
-  | "account_manager_changed";
+  | "account_manager_changed"
+  | "competition_starting"
+  | "competition_ended"
+  | "margin_warning"
+  | "challenge_received";
 
 const TEMPLATE_CONFIG: Record<
   TemplateType,
@@ -274,6 +282,124 @@ const TEMPLATE_CONFIG: Record<
       ctaButtonUrl: "{{baseUrl}}/messaging",
     },
   },
+  competition_starting: {
+    title: "Competition Starting",
+    description: "Sent to registered participants when a competition is about to start",
+    icon: Trophy,
+    variables: [
+      "{{name}}",
+      "{{competitionName}}",
+      "{{startTime}}",
+      "{{platformName}}",
+      "{{baseUrl}}",
+    ],
+    defaults: {
+      templateType: "competition_starting",
+      name: "Competition Starting Soon",
+      subject: "🏆 {{competitionName}} starts soon — get ready!",
+      headingText: "🏆 Competition Alert",
+      introText:
+        "The competition {{competitionName}} is starting at {{startTime}} UTC. Make sure you're ready to trade!",
+      featureListLabel: "Quick Tips",
+      featureItems: [
+        "Review your trading strategy before the competition begins",
+        "Check the competition rules and prize pool",
+        "Make sure you have enough balance to participate",
+      ],
+      closingText: "Good luck! May the best trader win.",
+      ctaButtonText: "View Competition",
+      ctaButtonUrl: "{{baseUrl}}/competitions",
+    },
+  },
+  competition_ended: {
+    title: "Competition Ended",
+    description: "Sent to participants when a competition ends and results are available",
+    icon: Target,
+    variables: [
+      "{{name}}",
+      "{{competitionName}}",
+      "{{competitionId}}",
+      "{{platformName}}",
+      "{{baseUrl}}",
+    ],
+    defaults: {
+      templateType: "competition_ended",
+      name: "Competition Ended — Results Available",
+      subject: "🎯 {{competitionName}} has ended — check your results!",
+      headingText: "🎯 Competition Results",
+      introText:
+        "The competition {{competitionName}} has ended. Check your final ranking and see how you performed!",
+      featureListLabel: "What's Next?",
+      featureItems: [
+        "View your final ranking and performance stats",
+        "Check if you've won any prizes",
+        "Join the next competition to keep improving",
+      ],
+      closingText: "",
+      ctaButtonText: "See Results",
+      ctaButtonUrl: "{{baseUrl}}/competitions",
+    },
+  },
+  margin_warning: {
+    title: "Margin Warning",
+    description: "Sent when a user's margin level drops below warning threshold",
+    icon: AlertTriangle,
+    variables: [
+      "{{name}}",
+      "{{marginLevel}}",
+      "{{competitionName}}",
+      "{{platformName}}",
+      "{{baseUrl}}",
+    ],
+    defaults: {
+      templateType: "margin_warning",
+      name: "Margin Warning Alert",
+      subject: "⚠️ Margin Warning — {{marginLevel}}% in {{competitionName}}",
+      headingText: "⚠️ Margin Level Warning",
+      introText:
+        "Your margin level in {{competitionName}} has dropped to {{marginLevel}}%. Consider closing some positions to avoid liquidation.",
+      featureListLabel: "Recommended Actions",
+      featureItems: [
+        "Close some of your losing positions to free up margin",
+        "Reduce position sizes on your open trades",
+        "Add stop-loss orders to limit further losses",
+      ],
+      closingText:
+        "Act quickly — if your margin level drops further, your positions may be automatically liquidated.",
+      ctaButtonText: "Manage Positions",
+      ctaButtonUrl: "{{baseUrl}}/competitions",
+    },
+  },
+  challenge_received: {
+    title: "Challenge Received",
+    description: "Sent when another user challenges this user to a 1v1 battle",
+    icon: Swords,
+    variables: [
+      "{{name}}",
+      "{{challengerName}}",
+      "{{stakeAmount}}",
+      "{{platformName}}",
+      "{{baseUrl}}",
+    ],
+    defaults: {
+      templateType: "challenge_received",
+      name: "Challenge Received",
+      subject: "⚔️ {{challengerName}} challenged you to a 1v1 battle!",
+      headingText: "⚔️ New Challenge",
+      introText:
+        "{{challengerName}} has challenged you to a 1v1 trading battle with a stake of {{stakeAmount}} credits. Do you accept?",
+      featureListLabel: "Challenge Details",
+      featureItems: [
+        "Stake: {{stakeAmount}} credits",
+        "You'll trade head-to-head with {{challengerName}}",
+        "The winner takes the combined prize pool",
+      ],
+      closingText:
+        "Log in to accept or decline the challenge before it expires.",
+      ctaButtonText: "View Challenge",
+      ctaButtonUrl: "{{baseUrl}}/challenges",
+    },
+  },
 };
 
 const DEFAULT_TEMPLATE: EmailTemplate = {
@@ -344,7 +470,7 @@ export default function EmailTemplatesSection() {
       if (response.ok) {
         const data = await response.json();
         if (data.template) {
-          const config = TEMPLATE_CONFIG[type];
+          const config = TEMPLATE_CONFIG[type]; // eslint-disable-line security/detect-object-injection
           setTemplate({
             ...DEFAULT_TEMPLATE,
             ...config.defaults,
@@ -352,8 +478,7 @@ export default function EmailTemplatesSection() {
             templateType: type,
           });
         } else {
-          // Use defaults for this template type
-          const config = TEMPLATE_CONFIG[type];
+          const config = TEMPLATE_CONFIG[type]; // eslint-disable-line security/detect-object-injection
           setTemplate({
             ...DEFAULT_TEMPLATE,
             ...config.defaults,
@@ -383,12 +508,12 @@ export default function EmailTemplatesSection() {
 
       if (response.ok) {
         toast.success(
-          `${TEMPLATE_CONFIG[selectedTemplateType].title} template updated successfully`,
+          `${TEMPLATE_CONFIG[selectedTemplateType].title} template updated successfully`, // eslint-disable-line security/detect-object-injection
         );
       } else {
         throw new Error("Failed to save");
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to save email template");
     } finally {
       setSaving(false);
@@ -434,7 +559,7 @@ export default function EmailTemplatesSection() {
   };
 
   const handleResetToDefault = () => {
-    const config = TEMPLATE_CONFIG[selectedTemplateType];
+    const config = TEMPLATE_CONFIG[selectedTemplateType]; // eslint-disable-line security/detect-object-injection
     setTemplate({
       ...DEFAULT_TEMPLATE,
       ...config.defaults,
@@ -462,11 +587,11 @@ export default function EmailTemplatesSection() {
 
   const updateFeatureItem = (index: number, value: string) => {
     const newItems = [...template.featureItems];
-    newItems[index] = value;
+    newItems[index] = value; // eslint-disable-line security/detect-object-injection
     setTemplate({ ...template, featureItems: newItems });
   };
 
-  const currentConfig = TEMPLATE_CONFIG[selectedTemplateType];
+  const currentConfig = TEMPLATE_CONFIG[selectedTemplateType]; // eslint-disable-line security/detect-object-injection
   const TemplateIcon = currentConfig.icon;
 
   if (loading) {
@@ -480,23 +605,23 @@ export default function EmailTemplatesSection() {
   return (
     <div className="space-y-6">
       {/* Template Type Selector */}
-      <div className="flex gap-2 p-1 bg-gray-900 rounded-lg border border-gray-800">
+      <div className="flex flex-wrap gap-2 p-1.5 bg-gray-900 rounded-lg border border-gray-800">
         {(Object.keys(TEMPLATE_CONFIG) as TemplateType[]).map((type) => {
-          const config = TEMPLATE_CONFIG[type];
+          const config = TEMPLATE_CONFIG[type]; // eslint-disable-line security/detect-object-injection
           const Icon = config.icon;
           const isActive = selectedTemplateType === type;
           return (
             <button
               key={type}
               onClick={() => setSelectedTemplateType(type)}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-all ${
+              className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg transition-all text-sm ${
                 isActive
                   ? "bg-yellow-500 text-black font-medium"
                   : "text-gray-400 hover:text-white hover:bg-gray-800"
               }`}
             >
-              <Icon className="h-4 w-4" />
-              <span>{config.title}</span>
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="whitespace-nowrap">{config.title}</span>
             </button>
           );
         })}
