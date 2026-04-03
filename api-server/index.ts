@@ -21,6 +21,8 @@
  * - POST /api/auth/login
  * - POST /api/auth/register-batch (simulator)
  * - GET  /api/health
+ * - GET  /api/docs (Swagger UI)
+ * - GET  /api/docs/openapi.json
  */
 
 import express, { Request, Response, NextFunction } from "express";
@@ -47,6 +49,7 @@ import { connectToDatabase, disconnectFromDatabase } from "./config/database";
 // Import routes - ONLY auth and health (minimal dependencies)
 import authRoutes from "./routes/auth.routes";
 import healthRoutes from "./routes/health.routes";
+import docsRoutes from "./routes/docs.routes";
 
 const app = express();
 const PORT = process.env.API_PORT || 4000;
@@ -129,6 +132,9 @@ app.use("/api/health", healthRoutes);
 // Auth routes (bcrypt worker threads for password hashing)
 app.use("/api/auth", authRoutes);
 
+// OpenAPI + Swagger UI (no auth)
+app.use("/api/docs", docsRoutes);
+
 // 404 handler
 app.use((req: Request, res: Response) => {
   res.status(404).json({
@@ -138,7 +144,7 @@ app.use((req: Request, res: Response) => {
 });
 
 // Error handler
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error("❌ API Error:", err);
 
   res.status(500).json({
@@ -193,7 +199,7 @@ function autoGenerateSecret(): string | null {
 
         fs.writeFileSync(ROOT_ENV_PATH, content);
       }
-    } catch (_fileError) {
+    } catch {
       // File operations failed, but secret is already in memory - server can still function
       console.warn(
         "⚠️  Could not persist secret to .env file (server will still work)",
@@ -202,7 +208,7 @@ function autoGenerateSecret(): string | null {
 
     console.log("🔐 Auto-generated BETTER_AUTH_SECRET (development only)");
     return newSecret;
-  } catch (_error) {
+  } catch {
     console.warn("⚠️  Could not auto-generate secret");
     return null;
   }
@@ -323,6 +329,7 @@ async function startServer() {
       console.log("   POST /api/auth/register");
       console.log("   POST /api/auth/login");
       console.log("   POST /api/auth/register-batch (simulator)");
+      console.log(`   Docs:   http://localhost:${PORT}/api/docs`);
       console.log("\n");
     });
   } catch (error) {

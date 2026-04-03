@@ -12,6 +12,7 @@ import StreaksShowcase from "./StreaksShowcase";
 import MarketHolidaysCard from "./MarketHolidaysCard";
 import AccountStatusCard from "./AccountStatusCard";
 import CreditBreakdownChart from "./CreditBreakdownChart";
+import GettingStartedCard from "./GettingStartedCard";
 
 // Reason: These charts use Lightweight Charts (browser-only) so must load client-side only
 const EquityChart = dynamic(() => import("./EquityChart"), { ssr: false });
@@ -28,6 +29,15 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
 
   return (
     <div className="w-full space-y-4 p-3 sm:p-4 lg:p-6">
+      {/* Onboarding — shows only for users who haven't completed all steps */}
+      <GettingStartedCard
+        hasFundedWallet={overview.totalDeposited > 0}
+        hasJoinedCompetition={competitions.stats.total > 0}
+        hasPlacedTrade={overview.totalTrades > 0}
+        hasCompletedMilestone={journey?.completedMilestones > 0}
+        hasChallengedUser={challenges.stats.total > 0}
+      />
+
       {/* Row 1: Hero Stats */}
       <HeroStatsBar
         creditBalance={overview.creditBalance}

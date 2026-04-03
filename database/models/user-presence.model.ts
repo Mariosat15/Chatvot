@@ -114,6 +114,10 @@ const UserPresenceSchema = new Schema<IUserPresence>(
 UserPresenceSchema.index({ status: 1 });
 UserPresenceSchema.index({ lastHeartbeat: 1 });
 UserPresenceSchema.index({ status: 1, acceptingChallenges: 1 });
+// Reason: The stale cleanup query filters status != "offline" AND lastHeartbeat < threshold.
+// The challengeable query filters status + acceptingChallenges + lastHeartbeat.
+UserPresenceSchema.index({ status: 1, lastHeartbeat: 1 });
+UserPresenceSchema.index({ status: 1, acceptingChallenges: 1, lastHeartbeat: 1 });
 
 // Static method to update heartbeat and check for stale sessions
 UserPresenceSchema.statics.updateHeartbeat = async function (

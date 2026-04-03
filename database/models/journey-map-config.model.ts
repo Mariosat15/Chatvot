@@ -179,6 +179,9 @@ const JourneyMapConfigSchema = new Schema<IJourneyMapConfig>(
 );
 
 
+// Reason: Multi-map flows filter by isActive + sort by sequenceOrder.
+JourneyMapConfigSchema.index({ isActive: 1, sequenceOrder: 1 });
+
 const JourneyMapConfig: Model<IJourneyMapConfig> =
   mongoose.models.JourneyMapConfig ||
   mongoose.model<IJourneyMapConfig>("JourneyMapConfig", JourneyMapConfigSchema);

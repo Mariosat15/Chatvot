@@ -12,32 +12,34 @@ const router = (0, express_1.Router)();
 /**
  * Basic health check
  */
-router.get('/', (req, res) => {
+router.get("/", (req, res) => {
     res.json({
-        status: 'healthy',
-        server: 'chartvolt-api',
+        status: "healthy",
+        server: "chartvolt-api",
         timestamp: new Date().toISOString(),
     });
 });
 /**
  * Detailed health check with dependencies
  */
-router.get('/detailed', (req, res) => {
+router.get("/detailed", (req, res) => {
     const workerStats = worker_pool_1.bcryptPool.getStats();
     const dbConnected = (0, database_1.getConnectionStatus)();
-    const status = dbConnected && workerStats.initialized ? 'healthy' : 'degraded';
+    // Use isReady instead of initialized - isReady verifies workers.length > 0
+    // initialized can be true even when zero workers were created
+    const status = dbConnected && workerStats.isReady ? "healthy" : "degraded";
     res.json({
         status,
-        server: 'chartvolt-api',
+        server: "chartvolt-api",
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         memory: {
             used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
             total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
-            unit: 'MB',
+            unit: "MB",
         },
         dependencies: {
-            database: dbConnected ? 'connected' : 'disconnected',
+            database: dbConnected ? "connected" : "disconnected",
             workerPool: workerStats,
         },
     });
@@ -45,24 +47,28 @@ router.get('/detailed', (req, res) => {
 /**
  * Readiness check (for Kubernetes/load balancers)
  */
-router.get('/ready', (req, res) => {
+router.get("/ready", (req, res) => {
     const dbConnected = (0, database_1.getConnectionStatus)();
     const workerStats = worker_pool_1.bcryptPool.getStats();
-    if (dbConnected && workerStats.initialized) {
+    // Use isReady instead of initialized - isReady verifies workers.length > 0
+    // initialized can be true even when zero workers were created
+    if (dbConnected && workerStats.isReady) {
         res.status(200).json({ ready: true });
     }
     else {
         res.status(503).json({
             ready: false,
             database: dbConnected,
-            workers: workerStats.initialized,
+            workers: workerStats.isReady,
+            workersInitialized: workerStats.initialized,
+            totalWorkers: workerStats.totalWorkers,
         });
     }
 });
 /**
  * Liveness check (for Kubernetes)
  */
-router.get('/live', (req, res) => {
+router.get("/live", (req, res) => {
     res.status(200).json({ alive: true });
 });
 exports.default = router;

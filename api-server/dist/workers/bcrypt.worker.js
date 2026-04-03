@@ -15,18 +15,18 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const worker_threads_1 = require("worker_threads");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 if (worker_threads_1.parentPort) {
-    worker_threads_1.parentPort.on('message', async (message) => {
+    worker_threads_1.parentPort.on("message", async (message) => {
         const result = { id: message.id, success: false };
         try {
-            if (message.type === 'hash') {
+            if (message.type === "hash") {
                 const rounds = message.rounds || 12;
                 const hash = await bcryptjs_1.default.hash(message.password, rounds);
                 result.success = true;
                 result.result = hash;
             }
-            else if (message.type === 'compare') {
+            else if (message.type === "compare") {
                 if (!message.hash) {
-                    throw new Error('Hash required for compare operation');
+                    throw new Error("Hash required for compare operation");
                 }
                 const isValid = await bcryptjs_1.default.compare(message.password, message.hash);
                 result.success = true;
@@ -38,7 +38,7 @@ if (worker_threads_1.parentPort) {
         }
         catch (error) {
             result.success = false;
-            result.error = error instanceof Error ? error.message : 'Unknown error';
+            result.error = error instanceof Error ? error.message : "Unknown error";
         }
         worker_threads_1.parentPort?.postMessage(result);
     });

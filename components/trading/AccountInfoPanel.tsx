@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 import { getMarginStatus } from "@/lib/services/risk-manager.service";
 import { MarginStatusIndicator } from "./MarginStatusIndicator";
 import { GameIcon } from "@/components/ui/GameIcon";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
+import { TRADING_TERMS } from "@/lib/constants/trading-terms";
 
 interface AccountInfoPanelProps {
   balance: number;
@@ -111,6 +113,7 @@ export function AccountInfoPanel({
                   <p className="text-xs font-semibold text-dark-600 uppercase tracking-wide">
                     Balance
                   </p>
+                  <InfoTooltip text={TRADING_TERMS.balance} side="right" />
                 </div>
                 <p className="text-xl md:text-2xl font-bold text-white tabular-nums">
                   ${balance.toFixed(2)}
@@ -129,6 +132,7 @@ export function AccountInfoPanel({
                   <p className="text-xs font-semibold text-dark-600 uppercase tracking-wide">
                     Equity
                   </p>
+                  <InfoTooltip text={TRADING_TERMS.equity} side="right" />
                 </div>
                 <p className="text-xl md:text-2xl font-bold text-blue-400 tabular-nums">
                   ${equity.toFixed(2)}
@@ -147,6 +151,7 @@ export function AccountInfoPanel({
                   <p className="text-xs font-semibold text-dark-600 uppercase tracking-wide">
                     Available
                   </p>
+                  <InfoTooltip text={TRADING_TERMS.availableCapital} side="right" />
                 </div>
                 <p className="text-xl md:text-2xl font-bold text-emerald-400 tabular-nums">
                   ${availableCapital.toFixed(2)}
@@ -295,8 +300,9 @@ export function AccountInfoPanel({
           <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-dark-400/30">
             {/* Margin Used */}
             <div className="text-center">
-              <p className="text-xs text-dark-600 mb-1.5 font-medium uppercase tracking-wide">
+              <p className="text-xs text-dark-600 mb-1.5 font-medium uppercase tracking-wide flex items-center justify-center gap-1">
                 Margin Used
+                <InfoTooltip text={TRADING_TERMS.marginUsed} />
               </p>
               <p className="text-base md:text-lg font-bold text-orange-400 tabular-nums">
                 ${usedMargin.toFixed(2)}
@@ -305,8 +311,9 @@ export function AccountInfoPanel({
 
             {/* Free Margin */}
             <div className="text-center">
-              <p className="text-xs text-dark-600 mb-1.5 font-medium uppercase tracking-wide">
+              <p className="text-xs text-dark-600 mb-1.5 font-medium uppercase tracking-wide flex items-center justify-center gap-1">
                 Free Margin
+                <InfoTooltip text={TRADING_TERMS.freeMargin} />
               </p>
               <p className="text-base md:text-lg font-bold text-purple-400 tabular-nums">
                 ${freeMargin.toFixed(2)}
@@ -315,8 +322,9 @@ export function AccountInfoPanel({
 
             {/* Margin Level */}
             <div className="text-center">
-              <p className="text-xs text-dark-600 mb-1.5 font-medium uppercase tracking-wide">
+              <p className="text-xs text-dark-600 mb-1.5 font-medium uppercase tracking-wide flex items-center justify-center gap-1">
                 Margin Level
+                <InfoTooltip text={TRADING_TERMS.marginLevel} />
               </p>
               <p
                 className={cn(
@@ -581,7 +589,7 @@ export function AccountInfoPanel({
                   )}
                   {marginStatus.status === "safe" && (
                     <span className="block mt-1 text-green-300">
-                      ✅ You're safe! Keep trading!
+                      ✅ You&apos;re safe! Keep trading!
                     </span>
                   )}
                 </>

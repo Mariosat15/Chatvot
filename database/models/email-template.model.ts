@@ -11,7 +11,11 @@ export interface IEmailTemplate extends Document {
     | "withdrawal_completed"
     | "email_verification"
     | "account_manager_assigned"
-    | "account_manager_changed";
+    | "account_manager_changed"
+    | "competition_starting"
+    | "competition_ended"
+    | "margin_warning"
+    | "challenge_received";
   name: string;
   subject: string;
   fromName: string;
@@ -60,6 +64,10 @@ const EmailTemplateSchema = new Schema<IEmailTemplate>(
         "email_verification",
         "account_manager_assigned",
         "account_manager_changed",
+        "competition_starting",
+        "competition_ended",
+        "margin_warning",
+        "challenge_received",
       ],
       required: true,
       unique: true,
@@ -307,6 +315,85 @@ function getTemplateDefaults(type: string): Partial<IEmailTemplate> {
           "{{newManagerFirstName}} is excited to work with you and help you achieve your trading goals!",
         ctaButtonText: "Say Hello",
         ctaButtonUrl: "{{baseUrl}}/messaging",
+        useAIPersonalization: false,
+      };
+
+    case "competition_starting":
+      return {
+        name: "Competition Starting Soon",
+        subject: "🏆 {{competitionName}} starts soon — get ready!",
+        headingText: "🏆 Competition Alert",
+        introText:
+          "The competition {{competitionName}} is starting at {{startTime}} UTC. Make sure you're ready to trade!",
+        featureListLabel: "Quick Tips",
+        featureItems: [
+          "Review your trading strategy before the competition begins",
+          "Check the competition rules and prize pool",
+          "Make sure you have enough balance to participate",
+        ],
+        closingText:
+          "Good luck! May the best trader win.",
+        ctaButtonText: "View Competition",
+        ctaButtonUrl: "{{baseUrl}}/competitions",
+        useAIPersonalization: false,
+      };
+
+    case "competition_ended":
+      return {
+        name: "Competition Ended — Results Available",
+        subject: "🎯 {{competitionName}} has ended — check your results!",
+        headingText: "🎯 Competition Results",
+        introText:
+          "The competition {{competitionName}} has ended. Check your final ranking and see how you performed!",
+        featureListLabel: "What's Next?",
+        featureItems: [
+          "View your final ranking and performance stats",
+          "Check if you've won any prizes",
+          "Join the next competition to keep improving",
+        ],
+        closingText: "",
+        ctaButtonText: "See Results",
+        ctaButtonUrl: "{{baseUrl}}/competitions",
+        useAIPersonalization: false,
+      };
+
+    case "margin_warning":
+      return {
+        name: "Margin Warning Alert",
+        subject: "⚠️ Margin Warning — {{marginLevel}}% in {{competitionName}}",
+        headingText: "⚠️ Margin Level Warning",
+        introText:
+          "Your margin level in {{competitionName}} has dropped to {{marginLevel}}%. Consider closing some positions to avoid liquidation.",
+        featureListLabel: "Recommended Actions",
+        featureItems: [
+          "Close some of your losing positions to free up margin",
+          "Reduce position sizes on your open trades",
+          "Add stop-loss orders to limit further losses",
+        ],
+        closingText:
+          "Act quickly — if your margin level drops further, your positions may be automatically liquidated.",
+        ctaButtonText: "Manage Positions",
+        ctaButtonUrl: "{{baseUrl}}/competitions",
+        useAIPersonalization: false,
+      };
+
+    case "challenge_received":
+      return {
+        name: "Challenge Received",
+        subject: "⚔️ {{challengerName}} challenged you to a 1v1 battle!",
+        headingText: "⚔️ New Challenge",
+        introText:
+          "{{challengerName}} has challenged you to a 1v1 trading battle with a stake of {{stakeAmount}} credits. Do you accept?",
+        featureListLabel: "Challenge Details",
+        featureItems: [
+          "Stake: {{stakeAmount}} credits",
+          "You'll trade head-to-head with {{challengerName}}",
+          "The winner takes the combined prize pool",
+        ],
+        closingText:
+          "Log in to accept or decline the challenge before it expires.",
+        ctaButtonText: "View Challenge",
+        ctaButtonUrl: "{{baseUrl}}/challenges",
         useAIPersonalization: false,
       };
 

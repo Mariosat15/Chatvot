@@ -12,12 +12,40 @@ exports.authenticateToken = authenticateToken;
 exports.optionalAuth = optionalAuth;
 exports.getSessionUser = getSessionUser;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+/**
+ * Safely extract Authorization header value
+ * HTTP spec allows multiple headers with same name, resulting in string[]
+ * This prevents TypeError when calling .split() on an array
+ */
+function getAuthorizationHeader(req) {
+    const authHeader = req.headers["authorization"];
+    // Handle array case (multiple Authorization headers sent)
+    if (Array.isArray(authHeader)) {
+        return authHeader[0]; // Use first header
+    }
+    return authHeader;
+}
+/**
+ * Extract Bearer token from Authorization header
+ */
+function extractBearerToken(req) {
+    const authHeader = getAuthorizationHeader(req);
+    if (!authHeader || typeof authHeader !== "string") {
+        return null;
+    }
+    // Expected format: "Bearer <token>"
+    const parts = authHeader.split(" ");
+    if (parts.length !== 2 || parts[0].toLowerCase() !== "bearer") {
+        return null;
+    }
+    return parts[1];
+}
 // SECURITY: No fallback - must be configured via environment
 function getJwtSecret() {
     const secret = process.env.JWT_SECRET || process.env.BETTER_AUTH_SECRET;
     if (!secret) {
-        throw new Error('CRITICAL: JWT_SECRET or BETTER_AUTH_SECRET must be set. ' +
-            'Without a secret, authentication is disabled for security.');
+        throw new Error("CRITICAL: JWT_SECRET or BETTER_AUTH_SECRET must be set. " +
+            "Without a secret, authentication is disabled for security.");
     }
     return secret;
 }
@@ -25,10 +53,9 @@ function getJwtSecret() {
  * Verify JWT token and attach user to request
  */
 function authenticateToken(req, res, next) {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    const token = extractBearerToken(req);
     if (!token) {
-        res.status(401).json({ error: 'Authentication required' });
+        res.status(401).json({ error: "Authentication required" });
         return;
     }
     try {
@@ -38,22 +65,21 @@ function authenticateToken(req, res, next) {
     }
     catch (error) {
         if (error instanceof jsonwebtoken_1.default.TokenExpiredError) {
-            res.status(401).json({ error: 'Token expired' });
+            res.status(401).json({ error: "Token expired" });
             return;
         }
         if (error instanceof jsonwebtoken_1.default.JsonWebTokenError) {
-            res.status(401).json({ error: 'Invalid token' });
+            res.status(401).json({ error: "Invalid token" });
             return;
         }
-        res.status(500).json({ error: 'Authentication failed' });
+        res.status(500).json({ error: "Authentication failed" });
     }
 }
 /**
  * Optional authentication - doesn't fail if no token
  */
 function optionalAuth(req, res, next) {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = extractBearerToken(req);
     if (!token) {
         next();
         return;

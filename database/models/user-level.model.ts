@@ -63,6 +63,11 @@ const UserLevelSchema = new Schema<IUserLevel>(
   },
 );
 
+// Reason: Leaderboard queries sort/filter by level and XP across all users.
+// Without these indexes, such queries would require a full collection scan.
+UserLevelSchema.index({ currentLevel: -1, currentXP: -1 });
+UserLevelSchema.index({ currentXP: -1 });
+
 const UserLevel =
   models.UserLevel || model<IUserLevel>("UserLevel", UserLevelSchema);
 
