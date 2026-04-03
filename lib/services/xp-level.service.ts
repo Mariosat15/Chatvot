@@ -42,26 +42,16 @@ export async function awardXPForBadge(
   const xpGained = await getXPForBadge(badge.rarity);
   console.log(`⭐ [XP AWARD] XP to be gained: ${xpGained}`);
 
-  // Get or create user level
-  let userLevel = await UserLevel.findOne({ userId });
-
-  if (!userLevel) {
-    console.log(
-      `📝 [XP AWARD] Creating new UserLevel document for user ${userId}`,
-    );
-    userLevel = await UserLevel.create({
-      userId,
-      currentXP: 0,
-      currentLevel: 1,
-      currentTitle: "Novice Trader",
-      totalBadgesEarned: 0,
-    });
-    console.log(`✅ [XP AWARD] UserLevel created:`, userLevel._id);
-  } else {
-    console.log(
-      `📊 [XP AWARD] Current user stats: XP=${userLevel.currentXP}, Level=${userLevel.currentLevel}, Badges=${userLevel.totalBadgesEarned}`,
-    );
-  }
+  // Reason: Atomic upsert prevents E11000 duplicate key when concurrent XP awards
+  // race to create the same UserLevel document (e.g., challenge_completed + challenge_won).
+  let userLevel = await UserLevel.findOneAndUpdate(
+    { userId },
+    { $setOnInsert: { userId, currentXP: 0, currentLevel: 1, currentTitle: "Novice Trader", totalBadgesEarned: 0 } },
+    { upsert: true, new: true }
+  );
+  console.log(
+    `📊 [XP AWARD] User stats: XP=${userLevel.currentXP}, Level=${userLevel.currentLevel}, Badges=${userLevel.totalBadgesEarned}`,
+  );
 
   const oldXP = userLevel.currentXP;
   const oldLevel = userLevel.currentLevel;
@@ -164,19 +154,13 @@ export async function awardXP(
     throw new Error("XP amount must be positive");
   }
 
-  // Get or create user level
-  let userLevel = await UserLevel.findOne({ userId });
-
-  if (!userLevel) {
-    console.log(`📝 [XP AWARD] Creating new UserLevel document for user ${userId}`);
-    userLevel = await UserLevel.create({
-      userId,
-      currentXP: 0,
-      currentLevel: 1,
-      currentTitle: "Novice Trader",
-      totalBadgesEarned: 0,
-    });
-  }
+  // Reason: Atomic upsert prevents E11000 duplicate key when concurrent XP awards
+  // race to create the same UserLevel document (e.g., challenge_completed + challenge_won).
+  let userLevel = await UserLevel.findOneAndUpdate(
+    { userId },
+    { $setOnInsert: { userId, currentXP: 0, currentLevel: 1, currentTitle: "Novice Trader", totalBadgesEarned: 0 } },
+    { upsert: true, new: true }
+  );
 
   const oldXP = userLevel.currentXP;
   const oldLevel = userLevel.currentLevel;
@@ -274,17 +258,11 @@ export async function awardActivityXP(
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
 
-    let userLevel = await UserLevel.findOne({ userId });
-    if (!userLevel) {
-      // Create user level if doesn't exist
-      userLevel = await UserLevel.create({
-        userId,
-        currentXP: 0,
-        currentLevel: 1,
-        currentTitle: "Novice Trader",
-        totalBadgesEarned: 0,
-      });
-    }
+    let userLevel = await UserLevel.findOneAndUpdate(
+      { userId },
+      { $setOnInsert: { userId, currentXP: 0, currentLevel: 1, currentTitle: "Novice Trader", totalBadgesEarned: 0 } },
+      { upsert: true, new: true }
+    );
 
     // Calculate today's trade XP from history
     const todayTradeXP = (userLevel.xpHistory || [])
@@ -444,17 +422,11 @@ export async function getUsersWithTitles(userIds: string[]) {
 export async function ensureUserLevel(userId: string): Promise<void> {
   await connectToDatabase();
 
-  const existing = await UserLevel.findOne({ userId });
-  if (!existing) {
-    console.log(`📝 [USER LEVEL] Creating UserLevel for user ${userId}`);
-    await UserLevel.create({
-      userId,
-      currentXP: 0,
-      currentLevel: 1,
-      currentTitle: "Novice Trader",
-      totalBadgesEarned: 0,
-    });
-  }
+  await UserLevel.findOneAndUpdate(
+    { userId },
+    { $setOnInsert: { userId, currentXP: 0, currentLevel: 1, currentTitle: "Novice Trader", totalBadgesEarned: 0 } },
+    { upsert: true }
+  );
 }
 
 /**
@@ -512,14 +484,12 @@ export async function syncMissingUserLevels(): Promise<{
 
   for (const userId of missingUserIds) {
     try {
-      // Create UserLevel
-      await UserLevel.create({
-        userId,
-        currentXP: 0,
-        currentLevel: 1,
-        currentTitle: "Novice Trader",
-        totalBadgesEarned: 0,
-      });
+      // Reason: Atomic upsert handles edge case where another process created the document between our distinct() query and this insert.
+      await UserLevel.findOneAndUpdate(
+        { userId },
+        { $setOnInsert: { userId, currentXP: 0, currentLevel: 1, currentTitle: "Novice Trader", totalBadgesEarned: 0 } },
+        { upsert: true }
+      );
       synced++;
       console.log(`✅ [SYNC] Created UserLevel for user ${userId}`);
 

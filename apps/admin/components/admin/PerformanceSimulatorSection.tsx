@@ -59,6 +59,7 @@ import {
   Loader2,
   Award,
   Flag,
+  FlaskConical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import EndLogicTestsTab from "./EndLogicTestsTab";
@@ -66,6 +67,7 @@ import TradingTestsTab from "./TradingTestsTab";
 import DatabaseIndexesTab from "./DatabaseIndexesTab";
 import BadgeSimulatorTab from "./BadgeSimulatorTab";
 import MilestoneSimulatorTab from "./MilestoneSimulatorTab";
+import UnitTestsTab from "./UnitTestsTab";
 import {
   LineChart,
   Line,
@@ -876,6 +878,13 @@ export default function PerformanceSimulatorSection() {
           >
             <Flag className="h-4 w-4 mr-2" />
             Milestone Simulator
+          </TabsTrigger>
+          <TabsTrigger
+            value="unit-tests"
+            className="data-[state=active]:bg-gray-700"
+          >
+            <FlaskConical className="h-4 w-4 mr-2" />
+            Unit Tests
           </TabsTrigger>
         </TabsList>
 
@@ -3055,6 +3064,11 @@ export default function PerformanceSimulatorSection() {
         {/* Milestone Simulator Tab */}
         <TabsContent value="milestone-simulator">
           <MilestoneSimulatorTab />
+        </TabsContent>
+
+        {/* Unit Tests Tab */}
+        <TabsContent value="unit-tests">
+          <UnitTestsTab />
         </TabsContent>
       </Tabs>
     </div>

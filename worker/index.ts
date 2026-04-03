@@ -52,6 +52,7 @@ import { runKYCExpiryCheck } from "./jobs/kyc-expiry-check.job";
 import { runMarketDataMaintenance } from "./jobs/market-data-maintenance.job";
 import { runEarlyEndCheck } from "./jobs/early-end-check.job";
 import { runGameMasterRenewalJob } from "./jobs/gamemaster-renewal.job";
+import { runScheduledTests } from "./jobs/scheduled-test-run.job";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -330,6 +331,17 @@ agenda.define("early-end-check", async () => {
   }
 });
 
+agenda.define("scheduled-test-run", async () => {
+  try {
+    const result = await runScheduledTests();
+    if (result.ran) {
+      console.log(`🧪 [SCHEDULED TEST] ${result.status}: ${result.passed}/${result.totalTests} passed`);
+    }
+  } catch (error) {
+    console.error(`🧪 [SCHEDULED TEST] Failed:`, error);
+  }
+});
+
 // Define withdrawal processing jobs
 defineWithdrawalProcessJob(agenda);
 
@@ -382,6 +394,7 @@ async function startWorker(): Promise<void> {
     await agenda.every("1 day", "kyc-expiry-check");
     await agenda.every("5 minutes", "market-data-maintenance");
     await agenda.every("1 day", "gamemaster-renewal");
+    await agenda.every("5 minutes", "scheduled-test-run");
 
     // Schedule withdrawal processing jobs
     await scheduleWithdrawalJobs(agenda);

@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import UpcomingPaymentsWidget from "@/components/admin/UpcomingPaymentsWidget";
+import TestStatusWidget from "@/components/admin/TestStatusWidget";
 
 interface DashboardStats {
   users: {
@@ -879,10 +880,13 @@ export default function AdminOverviewDashboard({
         </Card>
       </div>
 
-      {/* Vendor Payments Widget */}
+      {/* Vendor Payments & Test Status Widgets */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
           <UpcomingPaymentsWidget onNavigate={onNavigate} daysAhead={30} />
+        </div>
+        <div className="lg:col-span-1">
+          <TestStatusWidget onNavigate={onNavigate} />
         </div>
       </div>
 
