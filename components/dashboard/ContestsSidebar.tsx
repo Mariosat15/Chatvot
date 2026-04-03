@@ -356,7 +356,7 @@ export default function ContestsSidebar({
       if (data.challenges && Array.isArray(data.challenges)) {
         setLiveChallenges((prev) => {
           // Merge live data into existing challenges, preserving any that aren't active
-          const liveMap = new Map(
+          const liveMap = new Map<string, ChallengeData>(
             data.challenges.map((c: ChallengeData) => [c.id, c]),
           );
 

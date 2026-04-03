@@ -279,7 +279,7 @@ export default function JourneyClient({ userId }: JourneyClientProps) {
           userLevel={1}
           milestoneProgress={milestoneProgress}
           onMilestoneClick={handleMilestoneClick}
-          sequenceInfo={sequenceInfo}
+          sequenceInfo={sequenceInfo ?? undefined}
           onNavigateMap={handleNavigateMap}
           showMapNavigation={true}
         />

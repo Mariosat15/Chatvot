@@ -1013,7 +1013,6 @@ export default function GMCreateCompetitionPage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  return false;
                 }
               }}
               className="space-y-6"

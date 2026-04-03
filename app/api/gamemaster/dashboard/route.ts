@@ -147,8 +147,8 @@ export async function GET() {
       .sort({ createdAt: -1 })
       .limit(50)
       .lean()
-      .then((comps) =>
-        comps.map((c: { _id: { toString(): string }; name: string; status: string; currentParticipants?: number; maxParticipants?: number; prizePool?: number; entryFee?: number; startTime: string; endTime: string; createdAt: string }) => ({
+      .then((comps: any[]) =>
+        comps.map((c: any) => ({
           id: c._id.toString(),
           name: c.name,
           status: c.status,
@@ -169,8 +169,8 @@ export async function GET() {
       .sort({ createdAt: -1 })
       .limit(100)
       .lean()
-      .then((earnings) =>
-        earnings.map((e: { _id: { toString(): string }; sourceType?: string; sourceName?: string; referredUserName?: string; entryFeeAmount?: number; netEarning?: number; status?: string; createdAt: string }) => ({
+      .then((earnings: any[]) =>
+        earnings.map((e: any) => ({
           id: e._id.toString(),
           sourceType: e.sourceType || "competition",
           sourceName: e.sourceName || "Unknown",

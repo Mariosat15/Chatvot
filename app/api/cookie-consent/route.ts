@@ -10,15 +10,12 @@ export async function GET() {
   try {
     await connectToDatabase();
 
-    let settings = await CookieConsent.findOne().lean();
+    const existing = await CookieConsent.findOne().lean();
 
     // Reason: Auto-create default settings on first request so the admin
     // doesn't have to manually initialize. Defaults are comprehensive and
     // GDPR-compliant out of the box.
-    if (!settings) {
-      const created = await CookieConsent.create({});
-      settings = created.toObject();
-    }
+    const settings = existing ?? (await CookieConsent.create({})).toObject();
 
     return NextResponse.json({
       success: true,

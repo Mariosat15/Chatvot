@@ -40,6 +40,7 @@ function KYCCallbackContent() {
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [status, countdown]);
 
   const handleClose = () => {

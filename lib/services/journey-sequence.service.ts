@@ -54,7 +54,7 @@ export async function getMapSequence(): Promise<IJourneyMapConfig[]> {
   
   const maps = await JourneyMapConfig.find({ isActive: true })
     .sort({ sequenceOrder: 1 })
-    .lean() as IJourneyMapConfig[];
+    .lean() as unknown as IJourneyMapConfig[];
   
   return maps;
 }
@@ -144,7 +144,7 @@ export async function checkMapCompletion(
   
   // Get all milestones for this map
   const milestones = await JourneyMilestone.find({ mapId, isActive: true, isRequired: true })
-    .lean() as IJourneyMilestone[];
+    .lean() as unknown as IJourneyMilestone[];
   
   const totalMilestones = milestones.length;
   if (totalMilestones === 0) {

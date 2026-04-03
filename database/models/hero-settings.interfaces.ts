@@ -12,7 +12,7 @@ export interface IThemePreset {
   gradientFrom: string;
   gradientTo: string;
   fontFamily: string;
-  buttonStyle: "solid" | "gradient" | "outline" | "glow";
+  buttonStyle: "solid" | "gradient" | "outline" | "glow" | "neon";
   cardStyle: "glassmorphism" | "solid" | "gradient" | "neon";
   animationStyle: "minimal" | "dynamic" | "cinematic";
 }

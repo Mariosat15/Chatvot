@@ -938,7 +938,7 @@ function TestimonialsSection({ content }: { content: Record<string, unknown> }) 
                   </div>
                   <div>
                     <span className="text-white font-semibold text-lg block">{String(item.name || "Trader")}</span>
-                    {item.role && <span className="text-gray-500 text-sm">{String(item.role)}</span>}
+                    {!!item.role && <span className="text-gray-500 text-sm">{String(item.role)}</span>}
                   </div>
                   <div className="ml-auto flex gap-1">
                     {Array.from({ length: 5 }).map((_, si) => (
@@ -985,7 +985,7 @@ function TestimonialsSection({ content }: { content: Record<string, unknown> }) 
                 </div>
                 <div>
                   <span className="text-white font-semibold block">{String(item.name || "Trader")}</span>
-                  {item.role && <span className="text-gray-500 text-sm">{String(item.role)}</span>}
+                  {!!item.role && <span className="text-gray-500 text-sm">{String(item.role)}</span>}
                 </div>
               </div>
             </div>
@@ -1200,11 +1200,11 @@ function GallerySection({ content }: { content: Record<string, unknown> }) {
                 alt={String(item.title || item.alt || "")}
                 className="w-full h-72 object-cover group-hover:scale-110 transition-transform duration-700"
               />
-              {(item.title || item.description) && (
+              {!!(item.title || item.description) && (
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-6">
                   <div>
-                    {item.title && <h3 className="text-white font-bold text-lg">{String(item.title)}</h3>}
-                    {item.description && <p className="text-gray-300 text-sm mt-1">{String(item.description)}</p>}
+                    {!!item.title && <h3 className="text-white font-bold text-lg">{String(item.title)}</h3>}
+                    {!!item.description && <p className="text-gray-300 text-sm mt-1">{String(item.description)}</p>}
                   </div>
                 </div>
               )}

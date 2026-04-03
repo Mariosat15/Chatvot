@@ -411,6 +411,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         wsUnsubscribe(selectedConversation.id);
       };
     }
+    return undefined;
   }, [selectedConversation?.id, wsConnected, wsSubscribe, wsUnsubscribe]);
 
   // Clear stale typing indicators

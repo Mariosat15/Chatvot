@@ -122,7 +122,8 @@ export async function GET() {
     }> = [];
 
     // Try to get stored UPOs for card refunds (Nuvei)
-    let storedUPOs: Record<string, unknown>[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let storedUPOs: any[] = [];
     try {
       const NuveiUserPaymentOption = (
         await import("@/database/models/nuvei-user-payment-option.model")

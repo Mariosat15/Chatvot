@@ -98,7 +98,7 @@ export function sanitizeHtml(
   }
 
   // Configure DOMPurify
-  const config: DOMPurify.Config = {
+  const config = {
     ALLOWED_TAGS: tags,
     ALLOWED_ATTR: attrs,
     // Prevent script injection via data URLs
@@ -112,7 +112,7 @@ export function sanitizeHtml(
       /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
   };
 
-  return DOMPurify.sanitize(dirty, config);
+  return DOMPurify.sanitize(dirty, config) as string;
 }
 
 /**

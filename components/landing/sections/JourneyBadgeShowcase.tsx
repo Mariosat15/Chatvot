@@ -79,6 +79,12 @@ interface JourneyBadgeShowcaseProps {
     border?: string;
   };
   effectiveHeadingFont: string;
+  title?: string;
+  subtitle?: string;
+  description?: string;
+  features?: Array<{ id: string; icon: string; gameIcon?: string; title: string; description: string; enabled: boolean; order: number }>;
+  ctaText?: string;
+  ctaLink?: string;
 }
 
 export default function JourneyBadgeShowcase({

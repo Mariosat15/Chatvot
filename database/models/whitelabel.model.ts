@@ -78,6 +78,8 @@ export interface WhiteLabelDocument extends Document {
   priceFeedApiConcurrency: number; // max parallel API requests
   priceFeedFallbackEnabled: boolean; // auto-fallback to API if WebSocket fails
 
+  arenaEnabled: boolean;
+
   updatedAt: Date;
   createdAt: Date;
 }
@@ -302,6 +304,10 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
     priceFeedFallbackEnabled: {
       type: Boolean,
       default: true, // auto-fallback to API if WebSocket fails
+    },
+    arenaEnabled: {
+      type: Boolean,
+      default: true,
     },
   },
   {

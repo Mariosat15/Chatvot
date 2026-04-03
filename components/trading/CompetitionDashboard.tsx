@@ -177,11 +177,11 @@ export default function CompetitionDashboard({
   useEffect(() => {
     fetchStats();
 
-    // Auto-refresh every 30 seconds for active competitions
     if (isActive) {
       const interval = setInterval(fetchStats, 30000);
       return () => clearInterval(interval);
     }
+    return undefined;
   }, [fetchStats, isActive]);
 
   // Calculate equity curve chart points

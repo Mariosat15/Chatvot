@@ -14,7 +14,7 @@ import {
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { connectToDatabase } from "@/database/mongoose";
-import Challenge from "@/database/models/trading/challenge.model";
+import Challenge, { type IChallenge } from "@/database/models/trading/challenge.model";
 import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
 import { getTradingRiskSettings } from "@/lib/actions/trading/risk-settings.actions";
 import { Button } from "@/components/ui/button";
@@ -82,7 +82,7 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
     await connectToDatabase();
 
     // Fetch challenge with potential auto-finalization
-    let challenge = await Challenge.findById(id).lean();
+    let challenge = await Challenge.findById(id).lean() as (IChallenge & { _id: string }) | null;
 
     if (!challenge) {
       notFound();
@@ -107,10 +107,14 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
         const { finalizeChallenge } =
           await import("@/lib/actions/trading/challenge-finalize.actions");
         await finalizeChallenge(id);
-        challenge = await Challenge.findById(id).lean();
+        challenge = await Challenge.findById(id).lean() as (IChallenge & { _id: string }) | null;
       } catch (error) {
         console.error(`Failed to auto-finalize challenge ${id}:`, error);
       }
+    }
+
+    if (!challenge) {
+      notFound();
     }
 
     // Get participants and risk settings in parallel (both independent after challenge validation)
@@ -285,7 +289,7 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
                   ) : (
                     <InlineCountdown
                       targetDate={
-                        isActive ? challenge.endTime : challenge.acceptDeadline
+                        (isActive ? challenge.endTime?.toISOString() : challenge.acceptDeadline?.toISOString()) ?? new Date().toISOString()
                       }
                       type={isActive ? "end" : "start"}
                     />
@@ -593,7 +597,7 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
             )}
             {isActive && (
               <LiveCountdown
-                targetDate={new Date(challenge.endTime)}
+                targetDate={challenge.endTime ? new Date(challenge.endTime) : new Date()}
                 label="⏱️ Time Remaining"
                 type="end"
                 status="active"

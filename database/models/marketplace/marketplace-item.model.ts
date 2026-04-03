@@ -148,6 +148,9 @@ export interface IMarketplaceItem extends Document {
   shortDescription: string;
   fullDescription: string;
   category: ItemCategory;
+  subcategory?: string;
+  pricingModel?: string;
+  currency?: string;
 
   // Pricing
   price: number; // In credits

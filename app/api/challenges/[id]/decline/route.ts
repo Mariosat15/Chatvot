@@ -54,9 +54,10 @@ export async function POST(
     // the decline in their wallet/transaction history. No credits were taken
     // at challenge creation — the entry fee is only charged when both accept.
     try {
-      const challengerWallet = await CreditWallet.findOne({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const challengerWallet = await CreditWallet.findOne({
         userId: challenge.challengerId,
-      }).lean();
+      }).lean() as any;
 
       if (challengerWallet) {
         await WalletTransaction.create({

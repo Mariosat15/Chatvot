@@ -19,7 +19,7 @@ const FALLBACK_ITEMS = [
 
 // Lucide icon map for rendering dynamic icon names
 const lucideMap = new Map(
-  Object.entries(LucideIcons as Record<string, React.FC<{ className?: string; size?: number }>>),
+  Object.entries(LucideIcons as unknown as Record<string, React.FC<{ className?: string; size?: number }>>),
 );
 
 interface MarketplaceItem {
@@ -227,7 +227,7 @@ export default function MarketplaceShowcase({
                       whileHover={{ scale: 1.15, rotate: 5 }}
                       transition={{ type: "spring", stiffness: 300 }}
                     >
-                      <LucideIcon className="h-10 w-10" style={{ color: effectiveColors.primary }} />
+                      <LucideIcon className="h-10 w-10" {...{ style: { color: effectiveColors.primary } } as any} />
                     </motion.div>
                   ) : (
                     <div className="text-5xl">🎁</div>

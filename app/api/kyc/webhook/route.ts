@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
             decisionTime: new Date().toISOString(),
           },
         };
-        await veriffService.handleDecision(decisionPayload, signature);
+        await veriffService.handleDecision(decisionPayload as any, signature);
         console.log("✅ [KYC Webhook] Finished event processed successfully");
       }
     } else if (payload.action) {

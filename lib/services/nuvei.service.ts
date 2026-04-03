@@ -189,7 +189,7 @@ class NuveiService {
       const provider = await PaymentProvider.findOne({
         slug: "nuvei",
         isActive: true,
-      }).lean() as Record<string, unknown> | null;
+      }).lean() as any;
 
       console.log("💳 Nuvei provider lookup:", {
         found: !!provider,

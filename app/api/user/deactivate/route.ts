@@ -43,7 +43,8 @@ export async function POST() {
     // ── Pre-condition checks ────────────────────────────────────────
 
     // 1. Check credit balance
-    const wallet = await CreditWallet.findOne({ userId }).lean();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const wallet = await CreditWallet.findOne({ userId }).lean() as any;
     if (wallet && wallet.creditBalance > 0) {
       return NextResponse.json(
         {
@@ -118,7 +119,8 @@ export async function POST() {
 
     // Reason: Set isDeactivated and record the timestamp and reason.
     const { ObjectId } = require("mongodb");
-    let userIdQuery: unknown[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let userIdQuery: any[];
     try {
       userIdQuery = [userId, new ObjectId(userId)];
     } catch {
@@ -154,7 +156,7 @@ export async function POST() {
         userEmail: session.user.email || "unknown",
         userRole: "user",
         action: "account_deactivated",
-        actionCategory: "account_management",
+        actionCategory: "user_management",
         description: `User self-deactivated their account.`,
         targetType: "user",
         targetId: userId,

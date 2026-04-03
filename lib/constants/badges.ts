@@ -7,6 +7,7 @@ export type BadgeCategory =
   | "Risk"
   | "Speed"
   | "Consistency"
+  | "Volume"
   | "Strategy"
   | "Social"
   | "Legendary";

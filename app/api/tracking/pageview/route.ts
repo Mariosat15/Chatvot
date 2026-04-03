@@ -212,11 +212,11 @@ export async function POST(req: NextRequest) {
       await connectToDatabase();
 
       // Reason: Update the most recent visit for this session+path with duration
-      await SiteVisit.updateOne(
+      await SiteVisit.findOneAndUpdate(
         { sessionId, path },
         {
           $set: {
-            duration: Math.min(duration, 3600), // Cap at 1 hour
+            duration: Math.min(duration, 3600),
             scrollDepth: Math.min(Math.round(scrollDepth || 0), 100),
           },
         },

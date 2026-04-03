@@ -2,7 +2,7 @@
 
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
-import PaymentProvider from "@/database/models/payment-provider.model";
+import PaymentProvider, { type IPaymentProvider } from "@/database/models/payment-provider.model";
 
 // Cache for settings to avoid repeated database queries
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,11 +30,12 @@ export async function getSettings() {
 
     // Create default settings if none exist
     if (!settings) {
-      settings = await WhiteLabel.create({
+      const created = await WhiteLabel.create({
         companyName: "ChartVolt",
         nodeEnv: "development",
         nextPublicBaseUrl: "http://localhost:3000",
       });
+      settings = created.toObject() as unknown as typeof settings;
     }
 
     settingsCache = settings;
@@ -112,7 +113,7 @@ export async function getPaymentProviderCredentials(slug: string) {
   try {
     await connectToDatabase();
 
-    const provider = await PaymentProvider.findOne({ slug, isActive: true }).lean();
+    const provider = await PaymentProvider.findOne({ slug, isActive: true }).lean() as IPaymentProvider | null;
 
     if (!provider) {
       return null;
@@ -197,9 +198,9 @@ export async function getEnv(
     ]);
 
     const dbKey = dbKeyMap.get(key);
-    const settingsMap = new Map(Object.entries(settings));
+    const settingsMap = new Map<string, unknown>(Object.entries(settings));
     if (dbKey && settingsMap.get(dbKey)) {
-      return settingsMap.get(dbKey);
+      return settingsMap.get(dbKey) as string;
     }
 
     // Fall back to process.env

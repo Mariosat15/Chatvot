@@ -233,7 +233,7 @@ export function getAllConditionTypeKeys(): string[] {
 
 // Check if a condition type requires a value
 export function conditionRequiresValue(type: string): boolean {
-  const config = ALL_CONDITION_TYPES[type as MilestoneConditionType];
+  const config = ALL_CONDITION_TYPES[type as MilestoneConditionType] as { hasValue?: boolean } | undefined;
   return config?.hasValue === true;
 }
 

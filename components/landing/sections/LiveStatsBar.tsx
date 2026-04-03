@@ -83,6 +83,7 @@ function AnimatedCounter({
 
       return () => clearInterval(timer);
     }
+    return undefined;
   }, [isInView, value]);
 
   return (

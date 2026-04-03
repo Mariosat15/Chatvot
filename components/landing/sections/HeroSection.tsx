@@ -94,7 +94,7 @@ export default function HeroSection({
 }: HeroSectionProps) {
   return (
     <section className="relative min-h-screen flex items-center justify-center pt-16 overflow-hidden">
-      <ThemedBackground theme={theme} />
+      <ThemedBackground theme={theme ?? undefined} />
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center py-20">
         <motion.div

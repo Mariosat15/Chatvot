@@ -107,7 +107,8 @@ export interface ValidationResult {
  */
 export function calculateDifficultyScore(condition: IMilestoneCondition): number {
   const baseScore = CONDITION_DIFFICULTY[condition.type] || 25;
-  const valueMultiplier = condition.value ? Math.log10(condition.value + 1) : 0;
+  const numValue = typeof condition.value === "number" ? condition.value : 0;
+  const valueMultiplier = numValue ? Math.log10(numValue + 1) : 0;
   return baseScore + (valueMultiplier * 10);
 }
 
@@ -125,7 +126,7 @@ export async function validateJourneyProgression(
   
   const milestones = await JourneyMilestone.find({ mapId, isActive: true })
     .sort({ order: 1 })
-    .lean() as IJourneyMilestone[];
+    .lean() as unknown as IJourneyMilestone[];
   
   const errors: ValidationError[] = [];
   const warnings: ValidationError[] = [];
@@ -175,7 +176,7 @@ export async function validateJourneyProgression(
         suggestion: "Use a different condition type or increase the value",
       });
     }
-    seenConditions.set(conditionKey, { milestoneId: milestone.id, value: milestone.completeCondition.value });
+    seenConditions.set(conditionKey, { milestoneId: milestone.id, value: typeof milestone.completeCondition.value === "number" ? milestone.completeCondition.value : undefined });
     
     // 4. Check prerequisite chain (connectedFrom should include previous milestone)
     if (i > 0) {
@@ -362,7 +363,7 @@ export function suggestNextMilestone(
     const increment = MIN_VALUE_INCREMENTS[lastCondition.type] || 5;
     nextCondition = {
       type: lastCondition.type,
-      value: (lastCondition.value || 0) + increment,
+      value: (typeof lastCondition.value === "number" ? lastCondition.value : 0) + increment,
       comparison: "gte",
     };
     explanation = `Increase ${lastCondition.type} requirement for continued challenge`;
@@ -488,7 +489,7 @@ export async function validateMapXPBudget(mapId: string): Promise<{
   await connectToDatabase();
   
   const mapConfig = await JourneyMapConfig.findOne({ mapId }).lean();
-  const milestones = await JourneyMilestone.find({ mapId, isActive: true }).lean() as IJourneyMilestone[];
+  const milestones = await JourneyMilestone.find({ mapId, isActive: true }).lean() as unknown as IJourneyMilestone[];
   
   const totalXP = milestones.reduce((sum, m) => sum + (m.rewards?.xp || 0), 0);
   const budget = (mapConfig as any)?.estimatedXP || 150;
@@ -533,7 +534,7 @@ export async function validateCrossMapProgression(): Promise<{
     
     const milestones = await JourneyMilestone.find({ mapId, isActive: true })
       .sort({ order: 1 })
-      .lean() as IJourneyMilestone[];
+      .lean() as unknown as IJourneyMilestone[];
     
     let mapTotalXP = 0;
     let mapLastDifficulty = 0;
@@ -660,7 +661,7 @@ export async function validateDifficultyProgression(): Promise<{
   
   for (const mapConfig of mapConfigs) {
     const mapId = (mapConfig as any).mapId;
-    const milestones = await JourneyMilestone.find({ mapId, isActive: true }).lean() as IJourneyMilestone[];
+    const milestones = await JourneyMilestone.find({ mapId, isActive: true }).lean() as unknown as IJourneyMilestone[];
     
     if (milestones.length === 0) {
       difficultyByMap.push({ mapId, avgDifficulty: 0, minDifficulty: 0, maxDifficulty: 0 });
@@ -700,7 +701,7 @@ export async function validateNoGlobalDuplicates(): Promise<{
   
   const conditionMap = new Map<string, string[]>();
   
-  const milestones = await JourneyMilestone.find({ isActive: true }).lean() as IJourneyMilestone[];
+  const milestones = await JourneyMilestone.find({ isActive: true }).lean() as unknown as IJourneyMilestone[];
   
   for (const milestone of milestones) {
     // Skip map_completed conditions as they're allowed to be repeated

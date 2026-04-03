@@ -212,6 +212,7 @@ export default function KYCVerification({
     } else {
       setCountdown(null);
     }
+    return undefined;
   }, [status?.userStatus?.status, status?.latestSession?.createdAt]);
 
   const cancelVerification = async () => {

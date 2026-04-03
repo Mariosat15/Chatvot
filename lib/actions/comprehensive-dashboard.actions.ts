@@ -1151,7 +1151,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
         // Each evidence item stores which users are connected via
         // data.connectedAccountIds or data.accountsDetails[].userId.
         evidenceTypes: [
-          ...new Set(
+          ...new Set<string>(
             (a.evidence || [])
               .filter((ev: { type: string; data?: { connectedAccountIds?: string[]; accountsDetails?: Array<{ userId: string }> } }) => {
                 const connectedIds = ev.data?.connectedAccountIds;

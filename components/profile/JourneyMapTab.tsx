@@ -905,7 +905,7 @@ export default function JourneyMapTab({ userId }: JourneyMapTabProps) {
               userLevel={userLevel}
               milestoneProgress={milestoneProgressData}
               onMilestoneClick={handleMilestoneClick}
-              sequenceInfo={sequenceInfo}
+              sequenceInfo={sequenceInfo ?? undefined}
               onNavigateMap={handleNavigateMap}
               showMapNavigation={false}
               className="min-h-[500px]"

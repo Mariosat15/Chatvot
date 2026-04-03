@@ -56,9 +56,10 @@ async function getMarketSettings(): Promise<IMarketSettings | null> {
 
   try {
     await connectToDatabase();
-    let settings = await MarketSettings.findOne().lean();
+    let settings = await MarketSettings.findOne().lean() as IMarketSettings | null;
     if (!settings) {
-      settings = await MarketSettings.create({});
+      const created = await MarketSettings.create({});
+      settings = created.toObject() as unknown as IMarketSettings;
     }
 
     settingsCache = { settings, timestamp: Date.now() };

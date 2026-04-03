@@ -56,7 +56,10 @@ export type IndicatorType =
   | "kinetic_pressure_zones"
   | "nova_resonance_field"
   | "spectre_liquidity_matrix"
-  | "radiant_fibonacci_matrix";
+  | "radiant_fibonacci_matrix"
+  | "nexus_trend_matrix"
+  | "phantom_flow_zones"
+  | "fractal_pulse_grid";
 
 // Indicator configuration that matches the chart's CustomIndicator interface
 export interface ArsenalIndicator {

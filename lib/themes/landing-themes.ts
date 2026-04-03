@@ -109,8 +109,8 @@ export interface LandingTheme {
     buttonPrimary: string;
     buttonSecondary: string;
     textGradient: string;
-    glowEffect: string;
-    borderGlow: string;
+    glowEffect?: string;
+    borderGlow?: string;
   };
 
   // Theme-specific default content — unique wording per template

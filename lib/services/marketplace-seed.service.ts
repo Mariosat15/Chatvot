@@ -3823,7 +3823,8 @@ export async function seedMarketplaceItems(
   const mergedItems: any[] = [];
   const processedSlugs = new Set<string>();
 
-  for (const hardcoded of ALL_ITEMS) {
+  for (const _hardcoded of ALL_ITEMS) {
+    const hardcoded = _hardcoded as Partial<IMarketplaceItem>;
     const slug = hardcoded.slug as string;
     if (!slug) { mergedItems.push(hardcoded); continue; }
     const jsonData = savedDefaults[slug];

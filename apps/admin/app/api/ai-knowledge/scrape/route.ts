@@ -1,11 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
+import dns from "dns/promises";
 import { requireAdminAuth } from "@/lib/admin/auth";
 import { aiKnowledgeService } from "@/lib/services/ai-knowledge.service";
 import { isValidSsrfUrl } from "@/lib/utils/url-validator";
 import DOMPurify from "isomorphic-dompurify";
 
-// Reason: CodeQL requires an in-file hostname check to confirm the SSRF taint
-// chain is broken. isValidSsrfUrl (external) is not visible to the analyser.
+// Reason: SSRF protection must check the *resolved* IP, not just the hostname,
+// to prevent DNS rebinding attacks (e.g. attacker.com → 169.254.169.254).
+function isPrivateIp(ip: string): boolean {
+  if (ip === "127.0.0.1" || ip === "::1" || ip === "0.0.0.0") return true;
+  if (ip.startsWith("10.")) return true;
+  if (ip.startsWith("192.168.")) return true;
+  if (ip.startsWith("169.254.")) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(ip)) return true;
+  if (ip.startsWith("fc00:") || ip.startsWith("fe80:")) return true;
+  if (ip.startsWith("0.") || ip.startsWith("224.") || ip.startsWith("255."))
+    return true;
+  return false;
+}
+
 function isBlockedHost(hostname: string): boolean {
   const h = hostname.toLowerCase();
   if (h === "localhost" || h === "127.0.0.1" || h === "::1") return true;
@@ -72,13 +85,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Reason: Normalize the URL via the parsed URL object, then validate and
-    // fetch using the same canonical string so the taint chain is clearly broken.
     const safeUrl = parsedUrl.toString();
     const ssrfValidation = isValidSsrfUrl(safeUrl);
     if (!ssrfValidation.valid) {
       return NextResponse.json(
         { error: `URL validation failed: ${ssrfValidation.reason}` },
+        { status: 400 },
+      );
+    }
+
+    // Reason: Resolve DNS and verify the IP is not private/internal.
+    // Hostname-only checks are vulnerable to DNS rebinding (attacker.com → 169.254.169.254).
+    try {
+      const { address } = await dns.lookup(parsedUrl.hostname);
+      if (isPrivateIp(address)) {
+        return NextResponse.json(
+          { error: "URL resolves to a private/internal IP address" },
+          { status: 400 },
+        );
+      }
+    } catch {
+      return NextResponse.json(
+        { error: "Could not resolve hostname" },
         { status: 400 },
       );
     }

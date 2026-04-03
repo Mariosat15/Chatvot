@@ -274,9 +274,10 @@ export const signUpWithEmail = async ({
 
       // Send welcome email (separate from verification)
       try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const template = await EmailTemplate.findOne({
           templateType: "welcome",
-        }).lean();
+        }).lean() as any;
         if (template?.isActive !== false) {
           const introText =
             template?.introText ||
@@ -473,6 +474,7 @@ export const signInWithEmail = async ({ email, password }: SignInFormData) => {
 export const signOut = async () => {
   try {
     await auth.api.signOut({ headers: await headers() });
+    return { success: true };
   } catch (e) {
     console.log("Sign out failed", e);
     return { success: false, error: "Sign out failed" };

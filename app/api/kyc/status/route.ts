@@ -67,7 +67,7 @@ export async function GET() {
           wallet = await CreditWallet.findOne({ userId: session.user.id });
           latestSession = await KYCSession.findOne({ userId: session.user.id })
             .sort({ createdAt: -1 })
-            .lean() as typeof latestSession;
+            .lean() as unknown as typeof latestSession;
         }
       } catch (error: any) {
         console.log("⚠️ [KYC Status] Could not fetch decision from Veriff:", error.message);

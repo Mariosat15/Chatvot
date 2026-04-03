@@ -143,6 +143,7 @@ export default function ChallengeCard({
       }, 1000);
       return () => clearInterval(interval);
     }
+    return undefined;
   }, [isActive, isPending, challenge.endTime, challenge.acceptDeadline]);
 
   // Format date helper
