@@ -150,10 +150,11 @@ if [ -z "$ADMIN_PASSWORD" ]; then
   exit 1
 fi
 
-# Secondary server: ask for primary Redis connection
+# Secondary server: collect Redis + shared secrets from primary
 REDIS_HOST=""
 REDIS_PORT=""
 REDIS_PASSWORD=""
+PRIMARY_ENV_CONTENT=""
 if [ "$IS_SECONDARY" = true ]; then
   echo ""
   echo -e "${YELLOW}Secondary server needs to connect to the primary server's Redis:${NC}"
@@ -169,6 +170,60 @@ if [ "$IS_SECONDARY" = true ]; then
   if [ -z "$REDIS_PASSWORD" ]; then
     print_error "Redis password is required for secondary servers"
     exit 1
+  fi
+
+  # Reason: All servers in a fleet MUST share the same auth/API secrets.
+  # Generating new ones (the old behavior) causes session validation failures,
+  # internal API 401s, and KYC signature mismatches when Cloudflare routes
+  # a user to a different server.
+  echo ""
+  echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${YELLOW}  SHARED SECRETS — must match the primary server${NC}"
+  echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo ""
+  echo "The secondary .env must be identical to the primary's except for"
+  echo "SERVER_ID, IS_PRIMARY, and REDIS connection details."
+  echo ""
+  echo "You can either:"
+  echo "  1) Auto-copy from primary server via SSH (recommended)"
+  echo "  2) Manually paste each shared secret"
+  echo ""
+  read -p "Copy secrets from primary via SSH? (y/n) [y]: " COPY_MODE
+  COPY_MODE=${COPY_MODE:-y}
+
+  if [ "$COPY_MODE" = "y" ] || [ "$COPY_MODE" = "Y" ]; then
+    read -p "Primary server SSH address [root@${REDIS_HOST}]: " PRIMARY_SSH
+    PRIMARY_SSH=${PRIMARY_SSH:-root@${REDIS_HOST}}
+    echo ""
+    echo "Fetching .env from primary server (${PRIMARY_SSH})..."
+    PRIMARY_ENV_CONTENT=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 "${PRIMARY_SSH}" "cat /var/www/chartvolt/.env" 2>/dev/null)
+
+    if [ -z "$PRIMARY_ENV_CONTENT" ]; then
+      print_warning "Could not fetch .env via SSH. Falling back to manual entry."
+      COPY_MODE="n"
+    else
+      print_success "Primary .env fetched successfully"
+    fi
+  fi
+
+  if [ "$COPY_MODE" != "y" ] && [ "$COPY_MODE" != "Y" ]; then
+    echo ""
+    echo "On your PRIMARY server, run:"
+    echo ""
+    echo -e "  ${GREEN}grep -E 'BETTER_AUTH_SECRET|ADMIN_JWT_SECRET|INTERNAL_API_SECRET|INTERNAL_API_KEY' /var/www/chartvolt/.env${NC}"
+    echo ""
+    echo "Then paste each value below:"
+    echo ""
+    read -p "  BETTER_AUTH_SECRET: " MANUAL_BETTER_AUTH_SECRET
+    read -p "  ADMIN_JWT_SECRET:   " MANUAL_ADMIN_JWT_SECRET
+    read -p "  INTERNAL_API_SECRET:" MANUAL_INTERNAL_API_SECRET
+    read -p "  INTERNAL_API_KEY:   " MANUAL_INTERNAL_API_KEY
+
+    if [ -z "$MANUAL_BETTER_AUTH_SECRET" ] || [ -z "$MANUAL_ADMIN_JWT_SECRET" ] || \
+       [ -z "$MANUAL_INTERNAL_API_SECRET" ] || [ -z "$MANUAL_INTERNAL_API_KEY" ]; then
+      print_error "All four secrets are required for a secondary server."
+      exit 1
+    fi
   fi
 fi
 
@@ -191,11 +246,30 @@ if [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ]; then
   exit 0
 fi
 
-# Generate secrets
-BETTER_AUTH_SECRET=$(openssl rand -hex 32)
-ADMIN_JWT_SECRET=$(openssl rand -hex 32)
-INTERNAL_API_SECRET=$(openssl rand -hex 32)
-INTERNAL_API_KEY=$(openssl rand -hex 32)
+# Generate or reuse secrets
+if [ "$IS_SECONDARY" = true ] && [ -n "$PRIMARY_ENV_CONTENT" ]; then
+  # Reason: Extract shared secrets from primary's .env so they match exactly.
+  extract_env_val() {
+    echo "$PRIMARY_ENV_CONTENT" | grep "^${1}=" | head -1 | cut -d'=' -f2-
+  }
+  BETTER_AUTH_SECRET=$(extract_env_val "BETTER_AUTH_SECRET")
+  ADMIN_JWT_SECRET=$(extract_env_val "ADMIN_JWT_SECRET")
+  INTERNAL_API_SECRET=$(extract_env_val "INTERNAL_API_SECRET")
+  INTERNAL_API_KEY=$(extract_env_val "INTERNAL_API_KEY")
+  print_success "Reusing shared secrets from primary server"
+elif [ "$IS_SECONDARY" = true ] && [ -n "$MANUAL_BETTER_AUTH_SECRET" ]; then
+  BETTER_AUTH_SECRET="$MANUAL_BETTER_AUTH_SECRET"
+  ADMIN_JWT_SECRET="$MANUAL_ADMIN_JWT_SECRET"
+  INTERNAL_API_SECRET="$MANUAL_INTERNAL_API_SECRET"
+  INTERNAL_API_KEY="$MANUAL_INTERNAL_API_KEY"
+  print_success "Using manually provided shared secrets"
+else
+  # Primary server: generate fresh secrets
+  BETTER_AUTH_SECRET=$(openssl rand -hex 32)
+  ADMIN_JWT_SECRET=$(openssl rand -hex 32)
+  INTERNAL_API_SECRET=$(openssl rand -hex 32)
+  INTERNAL_API_KEY=$(openssl rand -hex 32)
+fi
 
 # ============================================
 # STEP 1: SERVER SETUP
@@ -701,25 +775,28 @@ echo "  Redis Password:  ${REDIS_PASSWORD}"
 echo ""
 echo "  Auth Secret:     ${BETTER_AUTH_SECRET}"
 echo "  Admin JWT:       ${ADMIN_JWT_SECRET}"
-  echo "  Internal Secret: ${INTERNAL_API_SECRET}"
-  echo "  Internal Key:    ${INTERNAL_API_KEY}"
+echo "  Internal Secret: ${INTERNAL_API_SECRET}"
+echo "  Internal Key:    ${INTERNAL_API_KEY}"
 echo ""
 echo "============================================================"
 echo ""
 echo "NEXT STEPS:"
 echo ""
 if [ "$IS_SECONDARY" = true ]; then
-echo "  1. Add this server's IP to Cloudflare origin pool"
-echo "     (for load balancing across multiple servers)"
+echo "  1. Add 3 Cloudflare DNS A records for this server's IP (${SERVER_IP}):"
+echo "     @     → ${SERVER_IP}  (Proxied)"
+echo "     www   → ${SERVER_IP}  (Proxied)"
+echo "     admin → ${SERVER_IP}  (Proxied)"
 echo ""
-echo "  2. Add this server's IP to MongoDB Atlas whitelist:"
-echo "     Atlas > Network Access > Add IP: ${SERVER_IP}"
+echo "  2. Install Cloudflare Origin SSL certificate on this server"
+echo "     (see deploy/README.md for step-by-step instructions)"
 echo ""
 echo "  3. Verify this server appears in admin panel:"
-echo "     ${ADMIN_DOMAIN} > Server Fleet"
+echo "     https://${ADMIN_DOMAIN} > Settings > Server Fleet"
 echo ""
-echo "  4. Redis is already configured (connecting to primary at ${REDIS_HOST}:${REDIS_PORT})"
-echo "     Worker is disabled on this server (runs on primary only)."
+echo "  4. Shared secrets: $(if [ -n "$PRIMARY_ENV_CONTENT" ] || [ -n "$MANUAL_BETTER_AUTH_SECRET" ]; then echo "✅ Copied from primary"; else echo "⚠️  Check manually"; fi)"
+echo "     Redis: connecting to primary at ${REDIS_HOST}:${REDIS_PORT}"
+echo "     Worker: disabled on this server (runs on primary only)"
 else
 echo "  1. Configure Redis in admin panel:"
 echo "     Go to ${ADMIN_DOMAIN} > Settings > Redis"

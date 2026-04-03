@@ -64,6 +64,12 @@ git pull origin main
 echo "📁 Ensuring logs directory exists..."
 mkdir -p logs
 
+# Ensure admin .env symlink exists
+if [ ! -L "apps/admin/.env" ]; then
+  echo "🔗 Creating .env symlink for admin app..."
+  ln -sf /var/www/chartvolt/.env /var/www/chartvolt/apps/admin/.env
+fi
+
 # Install dependencies
 echo "📦 Installing main app dependencies..."
 npm install
@@ -106,6 +112,11 @@ NGINX_CHANGED=false
 if grep -q "listen 443" "$NGINX_CONF" 2>/dev/null; then
   echo "🔒 SSL detected in nginx config - preserving certbot settings"
   echo "   Checking for missing directives..."
+
+  # Reason: Back up the live nginx config before modifying so we can restore on failure.
+  # The old code ran `git checkout deploy/nginx.conf` which reverted the repo template,
+  # not the live /etc/nginx config.
+  cp "$NGINX_CONF" "${NGINX_CONF}.bak"
   
   # Check if admin block has client_max_body_size
   if ! grep -A20 "server_name admin" "$NGINX_CONF" | grep -q "client_max_body_size"; then
@@ -119,8 +130,6 @@ if grep -q "listen 443" "$NGINX_CONF" 2>/dev/null; then
   # Check if AI timeout block exists (needed for OpenAI calls >60s)
   if ! grep -q "location /api/ai/" "$NGINX_CONF" 2>/dev/null; then
     echo "📝 Adding AI route timeout blocks (proxy_read_timeout 180s)..."
-    # Insert AI timeout block before the admin root "location / {" block
-    # Find the admin server block's "location / {" (after the admin server_name)
     sudo sed -i '/# Root - proxy to admin app/i\
     # AI routes need longer timeout (OpenAI calls can take 30-120s)\
     location /api/ai/ {\
@@ -169,11 +178,13 @@ if grep -q "listen 443" "$NGINX_CONF" 2>/dev/null; then
       sudo systemctl reload nginx
     else
       echo "❌ Nginx config invalid after modification!"
-      echo "   Please check $NGINX_CONF manually."
-      echo "   Reverting changes..."
-      cd /var/www/chartvolt && git checkout deploy/nginx.conf
+      echo "   Restoring previous nginx config..."
+      cp "${NGINX_CONF}.bak" "$NGINX_CONF"
+      sudo nginx -t && sudo systemctl reload nginx
     fi
+    rm -f "${NGINX_CONF}.bak"
   else
+    rm -f "${NGINX_CONF}.bak"
     echo "  ✅ All nginx directives already up to date"
   fi
 else

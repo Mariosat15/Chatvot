@@ -88,6 +88,12 @@ deploy_to_server() {
     
     echo "📁 Ensuring logs directory exists..."
     mkdir -p logs
+
+    # Ensure admin .env symlink exists
+    if [ ! -L "apps/admin/.env" ]; then
+      echo "🔗 Creating .env symlink for admin app..."
+      ln -sf /var/www/chartvolt/.env /var/www/chartvolt/apps/admin/.env
+    fi
     
     echo "📦 Installing main app dependencies..."
     npm install
