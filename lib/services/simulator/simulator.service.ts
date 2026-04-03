@@ -16,6 +16,7 @@ import SimulatorRun, {
   TestStatus,
 } from "../../../database/models/simulator/simulator-run.model";
 import { connectToDatabase } from "../../../database/mongoose";
+import { createSimulatorHeaders } from "./simulator-mode";
 
 // Test case definition
 interface TestCase {
@@ -163,10 +164,7 @@ const TEST_CASES: TestCase[] = [
             try {
               const response = await fetch(url, {
                 method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "X-Simulator-Mode": "true",
-                },
+                headers: createSimulatorHeaders(),
                 body: JSON.stringify({ batch: batchUsers }),
               });
 
@@ -244,10 +242,7 @@ const TEST_CASES: TestCase[] = [
             // Use the dedicated simulator users endpoint
             const response = await fetch(url, {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "X-Simulator-Mode": "true",
-              },
+              headers: createSimulatorHeaders(),
               body: JSON.stringify({ batch: batchUsers }),
             });
 
@@ -416,10 +411,7 @@ const TEST_CASES: TestCase[] = [
                 `${ctx.baseUrl}/api/simulator/deposit`,
                 {
                   method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "X-Simulator-Mode": "true",
-                  },
+                  headers: createSimulatorHeaders(),
                   body: JSON.stringify({ userId: user.id, amount }),
                 },
               );
@@ -457,10 +449,7 @@ const TEST_CASES: TestCase[] = [
               `${ctx.baseUrl}/api/simulator/deposit`,
               {
                 method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "X-Simulator-Mode": "true",
-                },
+                headers: createSimulatorHeaders(),
                 body: JSON.stringify({ userId: user.id, amount }),
               },
             );
@@ -538,10 +527,7 @@ const TEST_CASES: TestCase[] = [
                 `${ctx.baseUrl}/api/simulator/competitions`,
                 {
                   method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "X-Simulator-Mode": "true",
-                  },
+                  headers: createSimulatorHeaders(),
                   body: JSON.stringify({
                     name: comp.name,
                     description: `Simulator test competition (${comp.type})`,
@@ -598,14 +584,11 @@ const TEST_CASES: TestCase[] = [
               `${ctx.baseUrl}/api/simulator/competitions`,
               {
                 method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "X-Simulator-Mode": "true",
-                },
+                headers: createSimulatorHeaders(),
                 body: JSON.stringify({
-                  name: comp.name,
-                  description: `Simulator test competition (${comp.type})`,
-                  type: comp.type,
+                    name: comp.name,
+                    description: `Simulator test competition (${comp.type})`,
+                    type: comp.type,
                   entryFee: comp.entryFee,
                   maxParticipants: ctx.config.tradersPerCompetition,
                   startDate: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
@@ -700,11 +683,7 @@ const TEST_CASES: TestCase[] = [
                 `${ctx.baseUrl}/api/competitions/${join.compId}/join`,
                 {
                   method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "X-Simulator-User-Id": join.userId,
-                    "X-Simulator-Mode": "true",
-                  },
+                  headers: createSimulatorHeaders(join.userId),
                 },
               );
               results.responseTimes.push(Date.now() - start);
@@ -734,11 +713,7 @@ const TEST_CASES: TestCase[] = [
               `${ctx.baseUrl}/api/competitions/${join.compId}/join`,
               {
                 method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "X-Simulator-User-Id": join.userId,
-                  "X-Simulator-Mode": "true",
-                },
+                headers: createSimulatorHeaders(join.userId),
               },
             );
             results.responseTimes.push(Date.now() - start);
@@ -850,10 +825,7 @@ const TEST_CASES: TestCase[] = [
             `${ctx.baseUrl}/api/simulator/challenges`,
             {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "X-Simulator-Mode": "true",
-              },
+              headers: createSimulatorHeaders(),
               body: JSON.stringify({ challenges: batchChallenges }),
             },
           );
@@ -891,11 +863,7 @@ const TEST_CASES: TestCase[] = [
                   `${ctx.baseUrl}/api/challenges`,
                   {
                     method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                      "X-Simulator-User-Id": c.challengerId,
-                      "X-Simulator-Mode": "true",
-                    },
+                    headers: createSimulatorHeaders(c.challengerId),
                     body: JSON.stringify(c),
                   },
                 );
@@ -1036,10 +1004,7 @@ const TEST_CASES: TestCase[] = [
                 `${ctx.baseUrl}/api/simulator/orders`,
                 {
                   method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "X-Simulator-Mode": "true",
-                  },
+                  headers: createSimulatorHeaders(),
                   body: JSON.stringify(tradeParams),
                 },
               );
@@ -1112,10 +1077,7 @@ const TEST_CASES: TestCase[] = [
                 `${ctx.baseUrl}/api/simulator/orders`,
                 {
                   method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "X-Simulator-Mode": "true",
-                  },
+                  headers: createSimulatorHeaders(),
                   body: JSON.stringify({
                     userId: user.id,
                     ...tradeParams,
@@ -1198,11 +1160,7 @@ const TEST_CASES: TestCase[] = [
                 `${ctx.baseUrl}/api/simulator/positions/tpsl`,
                 {
                   method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "X-Simulator-User-Id": user.id,
-                    "X-Simulator-Mode": "true",
-                  },
+                  headers: createSimulatorHeaders(user.id),
                   body: JSON.stringify({
                     userId: user.id,
                     takeProfit: 1.01,
@@ -1238,11 +1196,7 @@ const TEST_CASES: TestCase[] = [
               `${ctx.baseUrl}/api/simulator/positions/tpsl`,
               {
                 method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "X-Simulator-User-Id": user.id,
-                  "X-Simulator-Mode": "true",
-                },
+                headers: createSimulatorHeaders(user.id),
                 body: JSON.stringify({
                   userId: user.id,
                   takeProfit: 1.01,
@@ -1308,11 +1262,7 @@ const TEST_CASES: TestCase[] = [
                 `${ctx.baseUrl}/api/simulator/payments/approve`,
                 {
                   method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "X-Admin-Token": ctx.adminToken || "",
-                    "X-Simulator-Mode": "true",
-                  },
+                  headers: { ...createSimulatorHeaders(), "X-Admin-Token": ctx.adminToken || "" },
                   body: JSON.stringify({
                     userId: user.id,
                     simulatorMode: true,
@@ -1346,11 +1296,7 @@ const TEST_CASES: TestCase[] = [
               `${ctx.baseUrl}/api/simulator/payments/approve`,
               {
                 method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "X-Admin-Token": ctx.adminToken || "",
-                  "X-Simulator-Mode": "true",
-                },
+                headers: { ...createSimulatorHeaders(), "X-Admin-Token": ctx.adminToken || "" },
                 body: JSON.stringify({
                   userId: ctx.testUsers[i].id,
                   simulatorMode: true,
@@ -1420,10 +1366,7 @@ const TEST_CASES: TestCase[] = [
             // Use simulator endpoint for admin actions
             const response = await fetch(`${ctx.baseUrl}/api/simulator/admin`, {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "X-Simulator-Mode": "true",
-              },
+              headers: createSimulatorHeaders(),
               body: JSON.stringify({
                 action,
                 userId: user.id,
@@ -1493,10 +1436,7 @@ const TEST_CASES: TestCase[] = [
           // Use simulator endpoint for fraud testing
           const response = await fetch(`${ctx.baseUrl}/api/simulator/fraud`, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Simulator-Mode": "true",
-            },
+            headers: createSimulatorHeaders(),
             body: JSON.stringify({
               userId: user.id,
               fingerprintId: sharedFingerprint, // All fraud users share same fingerprint
@@ -1686,7 +1626,7 @@ const TEST_CASES: TestCase[] = [
               try {
                 const response = await fetch(`${ctx.baseUrl}/api/health/db`, {
                   method: "GET",
-                  headers: { "X-Simulator-Mode": "true" },
+                  headers: createSimulatorHeaders(),
                 });
 
                 const elapsed = Date.now() - start;
