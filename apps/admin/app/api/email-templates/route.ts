@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
       templateType === "challenge_received"
     ) {
       const { sendTestNotificationEmail } = await import(
-        "@/lib/services/email-notification-bridge"
+        "../../../../../lib/services/email-notification-bridge"
       );
       await sendTestNotificationEmail(templateType, testEmail);
       emailSent = true;
