@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { connectToDatabase, rootMongoose as mongoose } from "../../../../../../../database/mongoose";
+import { connectToDatabase } from "@/database/mongoose";
+import mongoose from "mongoose";
 
 /**
  * Cleanup endpoint for end logic tests

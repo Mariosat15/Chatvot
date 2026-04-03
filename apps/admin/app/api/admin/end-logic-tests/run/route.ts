@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-// Reason: End-logic tests call root production code (finalizeCompetition,
-// finalizeChallenge) which creates transaction sessions on ROOT's mongoose.
-// Using root's connectToDatabase + rootMongoose ensures session consistency.
-import { connectToDatabase, rootMongoose as mongoose } from "../../../../../../../database/mongoose";
+import { connectToDatabase } from "@/database/mongoose";
+import mongoose from "mongoose";
 import { nanoid } from "nanoid";
 
 /**

@@ -1,12 +1,6 @@
 import mongoose from "mongoose";
 import { MongoClient } from "mongodb";
 
-// Reason: Admin routes that call root production code (e.g., end-logic tests
-// calling finalizeCompetition) need the ROOT mongoose instance for sessions,
-// since the production code creates transactions on this instance. Exporting
-// it allows admin routes to import the correct mongoose for startSession().
-export { mongoose as rootMongoose };
-
 // NOTE: Don't capture MONGODB_URI at module load time!
 // It must be read at runtime because the worker loads .env after imports are resolved.
 // See: worker/index.ts dotenv.config() runs after all imports are hoisted.
