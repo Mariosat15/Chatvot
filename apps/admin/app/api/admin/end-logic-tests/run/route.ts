@@ -2683,9 +2683,16 @@ async function runRealCompetitionTest(
         );
 
         console.log(`🧪 [JOURNEY TEST] Step 2: Running finalizeCompetition`);
-        const finalizeResult = await finalizeCompetition(
-          competitionId.toString(),
-        );
+        let finalizeResult: Record<string, unknown> | null = null;
+        let finalizeError: string | null = null;
+        try {
+          finalizeResult = await finalizeCompetition(
+            competitionId.toString(),
+          ) as Record<string, unknown>;
+        } catch (finErr) {
+          finalizeError = finErr instanceof Error ? finErr.message : String(finErr);
+          console.error(`🧪 [JOURNEY TEST] finalizeCompetition threw:`, finalizeError);
+        }
         console.log(
           `🧪 [TEST] finalizeCompetition result:`,
           JSON.stringify(finalizeResult, null, 2),
@@ -2779,7 +2786,7 @@ async function runRealCompetitionTest(
           passed,
           message: passed
             ? "✅ Test PASSED - Journey test completed correctly"
-            : `❌ Test FAILED: ${issues.join(", ")}`,
+            : `❌ Test FAILED: ${issues.join(", ")}${finalizeError ? ` [Error: ${finalizeError}]` : ""}`,
           actualOutcome: `Journey: Early check ✓ → Finalize → Status: ${actualStatus}, Winner: participant ${winnerIndex}, Prize: $${winnerBalance}`,
           prizeDistribution: winnerFound
             ? { winnerId: winnerUserId, winnerPrize: winnerBalance }
@@ -2794,6 +2801,7 @@ async function runRealCompetitionTest(
             ],
             earlyEndResult,
             finalizeResult,
+            finalizeError,
             competitionStatus: actualStatus,
             winnerIndex,
             winnerBalance,
@@ -2810,9 +2818,16 @@ async function runRealCompetitionTest(
       console.log(
         `\n🧪 [TEST] Running finalizeCompetition for ${competitionId}`,
       );
-      const finalizeResult = await finalizeCompetition(
-        competitionId.toString(),
-      );
+      let finalizeResult: Record<string, unknown> | null = null;
+      let finalizeError: string | null = null;
+      try {
+        finalizeResult = await finalizeCompetition(
+          competitionId.toString(),
+        ) as Record<string, unknown>;
+      } catch (finErr) {
+        finalizeError = finErr instanceof Error ? finErr.message : String(finErr);
+        console.error(`🧪 [TEST] finalizeCompetition threw:`, finalizeError);
+      }
       console.log(
         `🧪 [TEST] finalizeCompetition result:`,
         JSON.stringify(finalizeResult, null, 2),
@@ -3163,7 +3178,7 @@ async function runRealCompetitionTest(
         passed,
         message: passed
           ? "✅ Test PASSED - Real finalization executed correctly"
-          : `❌ Test FAILED: ${issues.join(", ")}`,
+          : `❌ Test FAILED: ${issues.join(", ")}${finalizeError ? ` [Error: ${finalizeError}]` : ""}`,
         actualOutcome: `Status: ${actualStatus}, Winners: ${winnerSummary}`,
         prizeDistribution:
           walletBalances.length > 0
@@ -3177,6 +3192,7 @@ async function runRealCompetitionTest(
               : undefined,
         details: {
           finalizeResult,
+          finalizeError,
           finalizeSuccess: finalizeResult?.success,
           finalizeMessage: finalizeResult?.message,
           competitionStatus: actualStatus,
@@ -3523,7 +3539,14 @@ async function runRealChallengeTest(
         await import("../../../../../../../lib/actions/trading/challenge-finalize.actions");
 
       console.log(`\n🧪 [TEST] Running finalizeChallenge for ${challengeId}`);
-      const finalizeResult = await finalizeChallenge(challengeId.toString());
+      let finalizeResult: Record<string, unknown> | null = null;
+      let finalizeError: string | null = null;
+      try {
+        finalizeResult = await finalizeChallenge(challengeId.toString()) as Record<string, unknown>;
+      } catch (finErr) {
+        finalizeError = finErr instanceof Error ? finErr.message : String(finErr);
+        console.error(`🧪 [TEST] finalizeChallenge threw:`, finalizeError);
+      }
       console.log(
         `🧪 [TEST] finalizeChallenge result:`,
         JSON.stringify(finalizeResult, null, 2),
@@ -3716,7 +3739,7 @@ async function runRealChallengeTest(
         passed,
         message: passed
           ? "✅ Test PASSED - Real finalization executed correctly"
-          : `❌ Test FAILED: ${issues.join(", ")}`,
+          : `❌ Test FAILED: ${issues.join(", ")}${finalizeError ? ` [Error: ${finalizeError}]` : ""}`,
         actualOutcome: `Status: ${actualStatus}, Winner: ${actualWinner || "none"}${gmFeeVerification.length > 0 ? `, GM fees: ${gmFeeVerification.map((g) => `${g.gmId}=$${g.actual}`).join(", ")}` : ""}`,
         prizeDistribution:
           actualWinner === "tie"
@@ -3732,6 +3755,7 @@ async function runRealChallengeTest(
               : undefined,
         details: {
           finalizeResult,
+          finalizeError,
           finalizeSuccess: finalizeResult?.success,
           challengeStatus: actualStatus,
           challengerBalance: challengerWallet?.creditBalance,

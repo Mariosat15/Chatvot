@@ -1607,9 +1607,22 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
   } catch (error) {
     // Only abort and release lock if the transaction was NOT committed.
     // If the transaction committed (prizes already distributed), we must NOT reset to "active".
-    if (session.inTransaction()) {
-      await session.abortTransaction();
-      // Release the optimistic lock ONLY when the transaction was aborted (not committed)
+    let aborted = false;
+    try {
+      if (session.inTransaction()) {
+        await session.abortTransaction();
+        aborted = true;
+      }
+    } catch (abortErr) {
+      // Reason: abortTransaction can throw if MongoDB already auto-aborted the
+      // session (e.g. timeout or write conflict). We still need to release the
+      // optimistic lock below, so catch and log rather than letting it propagate.
+      console.warn("⚠️ session.abortTransaction() failed:", abortErr);
+      aborted = true;
+    }
+
+    // Release the optimistic lock when the transaction was NOT committed
+    if (aborted) {
       try {
         await Competition.updateOne(
           { _id: competitionId, status: "finalizing" },
@@ -1619,6 +1632,7 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
         // Best effort
       }
     }
+
     console.error("❌ Error finalizing competition:", error);
     throw error;
   } finally {

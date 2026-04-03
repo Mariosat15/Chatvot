@@ -1483,9 +1483,22 @@ async function _finalizeChallengeAttempt(challengeId: string) {
     // Only abort and release lock if the transaction was NOT committed.
     // If the transaction committed (status is "completed" in DB), we must NOT reset to "active"
     // because the prize has already been distributed.
-    if (session.inTransaction()) {
-      await session.abortTransaction();
-      // Release the optimistic lock ONLY when the transaction was aborted (not committed)
+    let aborted = false;
+    try {
+      if (session.inTransaction()) {
+        await session.abortTransaction();
+        aborted = true;
+      }
+    } catch (abortErr) {
+      // Reason: abortTransaction can throw if MongoDB already auto-aborted the
+      // session (e.g. timeout or write conflict). We still need to release the
+      // optimistic lock below, so catch and log rather than letting it propagate.
+      console.warn("⚠️ session.abortTransaction() failed:", abortErr);
+      aborted = true;
+    }
+
+    // Release the optimistic lock when the transaction was NOT committed
+    if (aborted) {
       try {
         await Challenge.updateOne(
           { _id: challengeId, status: "finalizing" },
@@ -1495,8 +1508,7 @@ async function _finalizeChallengeAttempt(challengeId: string) {
         // Best effort - if this fails, worker recovery will handle stuck "finalizing" after 5 min
       }
     }
-    // If session is NOT in transaction, the transaction was either committed or already aborted.
-    // Don't reset to "active" — the challenge is already "completed" (committed) or will be retried.
+
     console.error("Error finalizing challenge", challengeId, ":", error);
     throw error;
   } finally {
