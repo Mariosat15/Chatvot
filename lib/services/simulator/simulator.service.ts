@@ -1987,6 +1987,23 @@ async function runSimulation(
     },
   };
 
+  // Diagnostic: log connection details for debugging failed simulator runs
+  const hasSecret = !!process.env.INTERNAL_API_SECRET;
+  console.log(`🧪 [SIMULATOR] baseUrl: ${baseUrl}`);
+  console.log(`🧪 [SIMULATOR] INTERNAL_API_SECRET configured: ${hasSecret}`);
+
+  // Quick connectivity check before starting tests
+  try {
+    const probe = await fetch(`${baseUrl}/api/health`, {
+      method: "GET",
+      headers: createSimulatorHeaders(),
+      signal: AbortSignal.timeout(5000),
+    });
+    console.log(`🧪 [SIMULATOR] Connectivity probe: ${probe.status} ${probe.statusText}`);
+  } catch (probeErr) {
+    console.error(`🧪 [SIMULATOR] Connectivity probe FAILED:`, probeErr);
+  }
+
   // Start hardware metrics collection
   activeSimulation!.metricsInterval = setInterval(async () => {
     try {
