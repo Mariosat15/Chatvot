@@ -108,17 +108,19 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Determine base URL for the WEB app
+      // Reason: Simulator makes internal HTTP calls to the web app on the same
+      // server. Using the public URL (e.g. https://chartvolt.com) routes traffic
+      // through Cloudflare/NGINX which can fail (SSL, 404, redirects). Always
+      // prefer the internal localhost URL set by PM2 (MAIN_APP_URL).
       let baseUrl =
-        process.env.NEXT_PUBLIC_BASE_URL ||
-        process.env.BETTER_AUTH_URL ||
+        process.env.MAIN_APP_URL ||
         "http://localhost:3000";
 
-      // Fix IPv6 resolution issues in local development only
-      // Production URLs with custom domains are unaffected
+      // Fix IPv6 resolution issues
       if (
         baseUrl.includes("://localhost:") ||
-        baseUrl.includes("://localhost/")
+        baseUrl.includes("://localhost/") ||
+        baseUrl === "http://localhost"
       ) {
         baseUrl = baseUrl.replace("://localhost", "://127.0.0.1");
       }
