@@ -10,7 +10,7 @@ import TradingPosition from "@/database/models/trading/trading-position.model";
 import { PlatformTransaction } from "@/database/models/platform-financials.model";
 import { fetchRealForexPrices } from "@/lib/services/real-forex-prices.service";
 import type { ForexSymbol } from "@/lib/services/pnl-calculator.service";
-import mongoose from "mongoose";
+import { Types } from "mongoose";
 
 /**
  * Finalize a single challenge - close positions, determine winner and distribute prizes
@@ -78,7 +78,10 @@ async function _finalizeChallengeAttempt(challengeId: string) {
     return null;
   }
 
-  const session = await mongoose.startSession();
+  // Reason: Use the model's own connection for session creation to avoid
+  // "ClientSession must be from the same MongoClient" when this file is
+  // imported into the admin bundle (dual mongoose instances).
+  const session = await Challenge.db.startSession();
   session.startTransaction();
 
   try {
@@ -735,7 +738,7 @@ async function _finalizeChallengeAttempt(challengeId: string) {
     }[] = [];
 
     try {
-      const db = mongoose.connection.db;
+      const db = Challenge.db.db;
       if (db) {
         // Get user records to check for referrals
         const userIds = [challenger.userId, challenged.userId];
@@ -844,7 +847,7 @@ async function _finalizeChallengeAttempt(challengeId: string) {
               const currentPackage = await db
                 .collection("marketplaceitems")
                 .findOne({
-                  _id: new mongoose.Types.ObjectId(
+                  _id: new Types.ObjectId(
                     subscriptionToCheck.packageId,
                   ),
                 });
@@ -1198,7 +1201,7 @@ async function _finalizeChallengeAttempt(challengeId: string) {
 
       // Pay GM referral fees (with idempotency guards)
       if (deferredFeeData.gmPayments.length > 0) {
-        const db = mongoose.connection.db;
+        const db = Challenge.db.db;
         if (db) {
           const allGmIds = deferredFeeData.gmPayments.map((p: { gmId: string }) => p.gmId);
           const [allGmSubs, allGmWallets] = await Promise.all([

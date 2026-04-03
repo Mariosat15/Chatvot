@@ -8,7 +8,7 @@ import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import { fetchRealForexPrices } from "@/lib/services/real-forex-prices.service";
 import type { ForexSymbol } from "@/lib/services/pnl-calculator.service";
-import mongoose from "mongoose";
+import { Types } from "mongoose";
 
 /**
  * End a competition and distribute prizes
@@ -71,7 +71,11 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
 
   console.log(`🏁 Starting competition finalization for: ${competitionId}`);
 
-  const session = await mongoose.startSession();
+  // Reason: Use the model's own connection to create the session, not the
+  // top-level `mongoose` import. In the admin bundle, `mongoose` may resolve
+  // to a different instance than the one models are registered on (dual
+  // node_modules), causing "ClientSession must be from the same MongoClient".
+  const session = await Competition.db.startSession();
   session.startTransaction();
 
   try {
@@ -860,7 +864,7 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
     }> = [];
 
     try {
-      const db = mongoose.connection.db;
+      const db = Competition.db.db;
       if (db) {
         // Get participant user IDs
         const participantUserIds = participants.map((p) => p.userId);
@@ -1021,7 +1025,7 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
               const currentPackage = await db
                 .collection("marketplaceitems")
                 .findOne({
-                  _id: new mongoose.Types.ObjectId(gmSubscription.packageId),
+                  _id: new Types.ObjectId(gmSubscription.packageId),
                 });
               if (
                 currentPackage?.gameMasterConfig?.referralFeePercentage !==
@@ -1193,7 +1197,7 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
     // STEP 4.7: Distribute Game Master referral fees (now that we've calculated and recorded platform fee)
     console.log(`🎮 Distributing Game Master referral fees...`);
     try {
-      const db = mongoose.connection.db;
+      const db = Competition.db.db;
       if (db && gmPayments.length > 0) {
         for (const payment of gmPayments) {
           const { gmId, gmSubscription, users, feePercentage, totalEarning } =
