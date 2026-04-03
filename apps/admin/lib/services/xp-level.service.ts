@@ -213,6 +213,74 @@ export async function awardXP(
   };
 }
 
+export async function awardActivityXP(
+  userId: string,
+  activity: "trade_completed" | "winning_trade" | "competition_completed" | "competition_podium_1" | "competition_podium_2" | "competition_podium_3" | "challenge_completed" | "challenge_won",
+): Promise<{ xpAwarded: number; dailyXPUsed: number; dailyCapped: boolean }> {
+  await connectToDatabase();
+
+  const XP_AMOUNTS: Record<string, number> = {
+    trade_completed: 2,
+    winning_trade: 3,
+    competition_completed: 25,
+    competition_podium_1: 50,
+    competition_podium_2: 35,
+    competition_podium_3: 20,
+    challenge_completed: 15,
+    challenge_won: 30,
+  };
+
+  const DAILY_TRADE_XP_CAP = 100;
+
+  const xpAmount = XP_AMOUNTS[activity] || 0;
+  if (xpAmount <= 0) return { xpAwarded: 0, dailyXPUsed: 0, dailyCapped: false };
+
+  const isTradeActivity = activity === "trade_completed" || activity === "winning_trade";
+
+  if (isTradeActivity) {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+
+    const userLevel = await UserLevel.findOneAndUpdate(
+      { userId },
+      { $setOnInsert: { userId, currentXP: 0, currentLevel: 1, currentTitle: "Novice Trader", totalBadgesEarned: 0 } },
+      { upsert: true, new: true }
+    );
+
+    const todayTradeXP = (userLevel.xpHistory || [])
+      .filter((h: any) => {
+        const ts = new Date(h.timestamp);
+        return ts >= today && (h.source === "trade_activity");
+      })
+      .reduce((sum: number, h: any) => sum + (h.amount || 0), 0);
+
+    if (todayTradeXP >= DAILY_TRADE_XP_CAP) {
+      return { xpAwarded: 0, dailyXPUsed: todayTradeXP, dailyCapped: true };
+    }
+
+    const remaining = DAILY_TRADE_XP_CAP - todayTradeXP;
+    const actualXP = Math.min(xpAmount, remaining);
+
+    if (actualXP > 0) {
+      try {
+        await awardXP(userId, actualXP, "action", `trade_activity:${activity}`);
+      } catch (err) {
+        console.error(`[Activity XP] Error awarding trade XP:`, err);
+      }
+    }
+
+    return { xpAwarded: actualXP, dailyXPUsed: todayTradeXP + actualXP, dailyCapped: todayTradeXP + actualXP >= DAILY_TRADE_XP_CAP };
+  }
+
+  try {
+    await awardXP(userId, xpAmount, "competition", activity);
+  } catch (err) {
+    console.error(`[Activity XP] Error awarding ${activity} XP: ${err}`);
+  }
+
+  return { xpAwarded: xpAmount, dailyXPUsed: 0, dailyCapped: false };
+}
+
 /**
  * Get user's current level and XP
  * Always fetches title, icon, and description from database configuration
