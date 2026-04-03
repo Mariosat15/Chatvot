@@ -11,9 +11,10 @@ import GameModeSimpleOrderForm from "./GameModeSimpleOrderForm";
 import GameModePositions from "./GameModePositions";
 import GameMarketWatchSidebar from "./GameMarketWatchSidebar";
 import GameLiveRankingPanel from "./GameLiveRankingPanel";
-import { ArrowLeft, Users, Monitor, Gamepad2, Trophy, Clock, Coins, TrendingUp, TrendingDown } from "lucide-react";
+import { ArrowLeft, Users, Monitor, Gamepad2, TrendingUp, TrendingDown } from "lucide-react";
 import { MarginStatusIndicator } from "./MarginStatusIndicator";
 import { getMarginStatus } from "@/lib/services/risk-manager.service";
+import { useLiveAccountStats } from "@/hooks/useLiveAccountStats";
 
 interface Position {
   _id: string;
@@ -76,18 +77,25 @@ export default function GameModeTradingPage({
   const { symbol } = useChartSymbol();
   const { marketOpen } = usePrices();
 
-  const equity = participant.currentCapital + participant.unrealizedPnl;
+  // Reason: Use the same live PnL calculation as pro mode so stats update on every price tick.
+  const {
+    liveUnrealizedPnl,
+    liveEquity,
+    liveAvailableCapital,
+    liveMarginLevel,
+  } = useLiveAccountStats({
+    balance: participant.currentCapital,
+    usedMargin: participant.usedMargin,
+    positions,
+    liquidationThreshold: marginThresholds?.LIQUIDATION ?? 50,
+    marginCallThreshold: marginThresholds?.MARGIN_CALL ?? 100,
+  });
 
-  // Calculate margin level
-  const marginLevel =
-    participant.usedMargin > 0
-      ? (equity / participant.usedMargin) * 100
-      : Infinity;
+  const marginLevel = liveMarginLevel;
 
-  // Get margin status for warning banner
   const marginStatus = getMarginStatus(
     participant.currentCapital,
-    participant.unrealizedPnl,
+    liveUnrealizedPnl,
     participant.usedMargin,
     marginThresholds
       ? {
@@ -231,11 +239,11 @@ export default function GameModeTradingPage({
                 {positions.length > 0 && (
                   <div className={cn(
                     "px-3 py-1 rounded-full text-sm font-bold",
-                    participant.unrealizedPnl >= 0 
+                    liveUnrealizedPnl >= 0 
                       ? "bg-green-500/20 text-green-400" 
                       : "bg-red-500/20 text-red-400"
                   )}>
-                    {participant.unrealizedPnl >= 0 ? "+" : ""}{participant.unrealizedPnl.toFixed(2)}
+                    {liveUnrealizedPnl >= 0 ? "+" : ""}{liveUnrealizedPnl.toFixed(2)}
                   </div>
                 )}
               </div>
@@ -257,28 +265,28 @@ export default function GameModeTradingPage({
                 {/* Main P&L Display - Big & Clear */}
                 <div className={cn(
                   "rounded-xl p-4 text-center border-2",
-                  participant.currentCapital >= startingCapital
+                  liveEquity >= startingCapital
                     ? "bg-gradient-to-br from-green-500/20 to-emerald-600/10 border-green-500/50"
                     : "bg-gradient-to-br from-red-500/20 to-rose-600/10 border-red-500/50"
                 )}>
                   <div className="text-gray-300 text-sm mb-2">Total Profit/Loss</div>
                   <div className={cn(
                     "text-3xl font-black flex items-center justify-center gap-2",
-                    participant.currentCapital >= startingCapital ? "text-green-400" : "text-red-400"
+                    liveEquity >= startingCapital ? "text-green-400" : "text-red-400"
                   )}>
-                    {participant.currentCapital >= startingCapital ? (
+                    {liveEquity >= startingCapital ? (
                       <TrendingUp className="w-8 h-8" />
                     ) : (
                       <TrendingDown className="w-8 h-8" />
                     )}
-                    {participant.currentCapital >= startingCapital ? "+" : ""}
-                    ${(participant.currentCapital - startingCapital).toFixed(2)}
+                    {liveEquity >= startingCapital ? "+" : ""}
+                    ${(liveEquity - startingCapital).toFixed(2)}
                   </div>
                   <div className={cn(
                     "text-sm mt-1",
-                    participant.currentCapital >= startingCapital ? "text-green-300" : "text-red-300"
+                    liveEquity >= startingCapital ? "text-green-300" : "text-red-300"
                   )}>
-                    {((participant.currentCapital - startingCapital) / startingCapital * 100).toFixed(2)}% from start
+                    {((liveEquity - startingCapital) / startingCapital * 100).toFixed(2)}% from start
                   </div>
                 </div>
 
@@ -290,11 +298,11 @@ export default function GameModeTradingPage({
                   </div>
                   <div className="bg-blue-500/10 rounded-xl p-3 text-center border border-blue-500/20">
                     <div className="text-blue-300 text-xs mb-1">💎 Now</div>
-                    <div className="text-white font-bold">${participant.currentCapital.toFixed(2)}</div>
+                    <div className="text-white font-bold">${liveEquity.toFixed(2)}</div>
                   </div>
                   <div className="bg-cyan-500/10 rounded-xl p-3 text-center border border-cyan-500/20">
                     <div className="text-cyan-300 text-xs mb-1">💵 Free</div>
-                    <div className="text-white font-bold">${participant.availableCapital.toFixed(2)}</div>
+                    <div className="text-white font-bold">${liveAvailableCapital.toFixed(2)}</div>
                   </div>
                 </div>
 
@@ -339,11 +347,11 @@ export default function GameModeTradingPage({
             {/* Simplified Order Form for Beginners */}
             <GameModeSimpleOrderForm
               competitionId={competitionId}
-              availableCapital={participant.availableCapital}
+              availableCapital={liveAvailableCapital}
               defaultLeverage={defaultLeverage}
               currentBalance={participant.currentCapital}
               startingCapital={startingCapital}
-              currentEquity={equity}
+              currentEquity={liveEquity}
               usedMargin={participant.usedMargin}
               openPositionsCount={positions.length}
               maxPositions={10}

@@ -1,18 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { AccountInfoPanel } from "./AccountInfoPanel";
-import { usePrices } from "@/contexts/PriceProvider";
-import {
-  calculateUnrealizedPnL,
-  type ForexSymbol,
-} from "@/lib/services/pnl-calculator.service";
 import { useTradingMode } from "./TradingInterface";
 import {
   executeLiquidation,
   backupMarginCheck,
 } from "@/lib/actions/trading/liquidation.actions";
 import { useRouter } from "next/navigation";
+import { useLiveAccountStats } from "@/hooks/useLiveAccountStats";
 
 // Default margin thresholds (will be overridden by server values)
 const DEFAULT_THRESHOLDS = {
@@ -57,110 +53,42 @@ interface LiveAccountInfoProps {
 export function LiveAccountInfo({
   competitionId,
   initialBalance,
-  initialEquity,
-  initialUnrealizedPnl,
+  initialEquity: _initialEquity,
+  initialUnrealizedPnl: _initialUnrealizedPnl,
   initialUsedMargin,
-  initialAvailableCapital,
+  initialAvailableCapital: _initialAvailableCapital,
   positions: initialPositions,
   marginThresholds,
   startingCapital = 0,
   dailyRealizedPnl = 0,
 }: LiveAccountInfoProps) {
-  const { prices } = usePrices();
   const { mode } = useTradingMode();
   const router = useRouter();
 
-  // Thresholds from props or defaults
   const thresholds = marginThresholds || DEFAULT_THRESHOLDS;
 
-  // Reason: liveEquity/liveUnrealizedPnl/liveAvailableCapital are now derived
-  // directly from calculatedData (useMemo) below, not from state.
-  // This eliminates the double-render delay that useEffect+setState caused.
+  // Shared hook: recalculates PnL/equity/margin from live prices on every tick
+  const {
+    liveUnrealizedPnl,
+    liveEquity,
+    liveAvailableCapital,
+    liveMarginLevel,
+    isBelowLiquidation,
+  } = useLiveAccountStats({
+    balance: initialBalance,
+    usedMargin: initialUsedMargin,
+    positions: initialPositions,
+    liquidationThreshold: thresholds.LIQUIDATION,
+    marginCallThreshold: thresholds.MARGIN_CALL,
+  });
 
   // Liquidation state management
   const [liquidationState, setLiquidationState] = useState<
     "idle" | "pending" | "executing" | "completed"
   >("idle");
-  const liquidationRequestedRef = useRef(false); // Prevents duplicate requests
+  const liquidationRequestedRef = useRef(false);
   const lastBackupCheckRef = useRef<number>(0);
   const backupIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Calculate PnL and margin level locally using real-time prices
-  const calculatedData = useMemo(() => {
-    // No positions = infinite margin (safe)
-    if (initialPositions.length === 0) {
-      return {
-        totalUnrealizedPnl: 0,
-        newEquity: initialBalance,
-        newAvailableCapital: initialBalance - initialUsedMargin,
-        marginLevel: Infinity,
-        isBelowLiquidation: false,
-        isBelowMarginCall: false,
-      };
-    }
-
-    let totalUnrealizedPnl = 0;
-    let hasAllPrices = true;
-
-    for (const position of initialPositions) {
-      const currentPrice = prices.get(position.symbol as ForexSymbol);
-      if (!currentPrice) {
-        // Use cached P&L if no live price available
-        totalUnrealizedPnl += position.unrealizedPnl;
-        hasAllPrices = false;
-        continue;
-      }
-
-      // Use correct price based on position side (bid for longs, ask for shorts)
-      const marketPrice =
-        position.side === "long" ? currentPrice.bid : currentPrice.ask;
-      const pnl = calculateUnrealizedPnL(
-        position.side,
-        position.entryPrice,
-        marketPrice,
-        position.quantity,
-        position.symbol as ForexSymbol,
-      );
-
-      totalUnrealizedPnl += pnl;
-    }
-
-    const newEquity = initialBalance + totalUnrealizedPnl;
-    const newAvailableCapital = Math.max(0, newEquity - initialUsedMargin);
-
-    // FORMULA: Margin Level = (Equity / Used Margin) * 100
-    const marginLevel =
-      initialUsedMargin > 0 ? (newEquity / initialUsedMargin) * 100 : Infinity;
-
-    // Check thresholds
-    const isBelowLiquidation = marginLevel < thresholds.LIQUIDATION;
-    const isBelowMarginCall = marginLevel < thresholds.MARGIN_CALL;
-
-    return {
-      totalUnrealizedPnl,
-      newEquity,
-      newAvailableCapital,
-      marginLevel,
-      isBelowLiquidation,
-      isBelowMarginCall,
-      hasAllPrices,
-    };
-  }, [
-    prices,
-    initialPositions,
-    initialBalance,
-    initialUsedMargin,
-    thresholds.LIQUIDATION,
-    thresholds.MARGIN_CALL,
-  ]);
-
-  // Reason: Derive display values directly from calculatedData (useMemo).
-  // Previously this was a useEffect+setState which caused a double-render:
-  //   Render1 (stale values on screen) → useEffect → setState → Render2 (correct values)
-  // Now the computed values are available in the SAME render cycle as the price change.
-  const liveEquity = calculatedData.newEquity;
-  const liveUnrealizedPnl = calculatedData.totalUnrealizedPnl;
-  const liveAvailableCapital = calculatedData.newAvailableCapital;
 
   // PRIMARY: Formula-based liquidation trigger
   // When local calculation shows margin below liquidation threshold, execute immediately
@@ -185,7 +113,7 @@ export function LiveAccountInfo({
       // Call server to validate and execute liquidation
       const result = await executeLiquidation(
         competitionId,
-        calculatedData.marginLevel,
+        liveMarginLevel,
       );
 
       if (result.liquidated) {
@@ -203,7 +131,7 @@ export function LiveAccountInfo({
     }
   }, [
     competitionId,
-    calculatedData.marginLevel,
+    liveMarginLevel,
     initialPositions.length,
     liquidationState,
     router,
@@ -212,13 +140,13 @@ export function LiveAccountInfo({
   // TRIGGER: When margin drops below liquidation threshold
   useEffect(() => {
     if (
-      calculatedData.isBelowLiquidation &&
+      isBelowLiquidation &&
       liquidationState === "idle" &&
       !liquidationRequestedRef.current
     ) {
       triggerLiquidation();
     }
-  }, [calculatedData.isBelowLiquidation, liquidationState, triggerLiquidation]);
+  }, [isBelowLiquidation, liquidationState, triggerLiquidation]);
 
   // SAFETY NET: Backup periodic check (catches edge cases)
   // Runs every 60 seconds as a fallback if local calculation misses something
