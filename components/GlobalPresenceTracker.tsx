@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 
@@ -17,45 +17,53 @@ import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
  * - They close the browser/tab completely
  * - They log out
  * - Session expires (server-side timeout)
+ *
+ * Reason: Browsers throttle setInterval in background tabs (often to ~60-120s).
+ * The visibilitychange listener sends an immediate heartbeat when the user
+ * returns to the tab, preventing false "offline" status in the admin panel.
  */
 export default function GlobalPresenceTracker({ userId }: { userId?: string }) {
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
   const pathname = usePathname();
-  // Keep pathname in a ref so the interval always sends the latest page
   const pathnameRef = useRef(pathname);
   pathnameRef.current = pathname;
+
+  const sendHeartbeat = useCallback(async () => {
+    try {
+      await fetch("/api/user/presence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "online",
+          currentPage: pathnameRef.current,
+        }),
+      });
+    } catch {
+      // Silently fail - presence is non-critical
+    }
+  }, []);
 
   useEffect(() => {
     if (!userId) return;
 
-    const sendHeartbeat = async () => {
-      // Always send heartbeat - user is online as long as they're logged in
-      // Include currentPage so the server knows which page the user is viewing
-      try {
-        await fetch("/api/user/presence", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            status: "online",
-            currentPage: pathnameRef.current,
-          }),
-        });
-      } catch {
-        // Silently fail - presence is non-critical
-      }
-    };
-
-    // Send initial heartbeat immediately
     sendHeartbeat();
 
-    // Set up interval for heartbeats - keeps user online even in background tabs
-    // The heartbeat continues regardless of tab visibility
     heartbeatRef.current = setInterval(
       sendHeartbeat,
       PERFORMANCE_INTERVALS.PRESENCE_HEARTBEAT,
     );
 
-    // Handle page unload - mark as offline ONLY when browser/tab is closed
+    // Reason: When the user returns to this tab after it was backgrounded,
+    // the interval may have been throttled past the offline threshold.
+    // Sending an immediate heartbeat re-establishes "online" status.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        sendHeartbeat();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     const handleBeforeUnload = () => {
       navigator.sendBeacon(
         "/api/user/presence",
@@ -65,14 +73,13 @@ export default function GlobalPresenceTracker({ userId }: { userId?: string }) {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
 
-    // Cleanup
     return () => {
       if (heartbeatRef.current) {
         clearInterval(heartbeatRef.current);
       }
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("beforeunload", handleBeforeUnload);
 
-      // Send offline status on cleanup (component unmount = likely logout or navigation away)
       try {
         navigator.sendBeacon(
           "/api/user/presence",
@@ -82,8 +89,7 @@ export default function GlobalPresenceTracker({ userId }: { userId?: string }) {
         // Ignore errors on cleanup
       }
     };
-  }, [userId]);
+  }, [userId, sendHeartbeat]);
 
-  // This component doesn't render anything visible
   return null;
 }

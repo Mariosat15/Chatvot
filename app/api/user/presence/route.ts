@@ -3,6 +3,7 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { connectToDatabase } from "@/database/mongoose";
 import UserPresence from "@/database/models/user-presence.model";
+import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 
 // ── Stale-cleanup throttle ─────────────────────────────────────────────
 // Before this fix, every heartbeat (POST) ran updateMany to mark stale
@@ -25,9 +26,9 @@ export async function GET(request: NextRequest) {
     const listOnline = searchParams.get("online") === "true";
 
     if (listOnline) {
-      // Return list of online users who accept challenges
-      // Use 45 second threshold - user must have heartbeat within last 45 seconds
-      const threshold = new Date(Date.now() - 45 * 1000); // 45 seconds
+      const threshold = new Date(
+        Date.now() - PERFORMANCE_INTERVALS.PRESENCE_OFFLINE_THRESHOLD,
+      );
 
       const onlineUsers = await UserPresence.find({
         status: "online",
@@ -80,7 +81,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse body safely - default to empty object if no body
-    let body: { currentPage?: string; acceptingChallenges?: boolean } = {};
+    let body: {
+      status?: string;
+      currentPage?: string;
+      acceptingChallenges?: boolean;
+    } = {};
     try {
       const text = await request.text();
       if (text) {
@@ -88,6 +93,16 @@ export async function POST(request: NextRequest) {
       }
     } catch {
       // Empty body or invalid JSON - that's okay, use defaults
+    }
+
+    // Reason: sendBeacon on beforeunload sends { status: "offline" }.
+    // Handle this explicitly so users go offline immediately on tab close.
+    if (body.status === "offline") {
+      await UserPresence.findOneAndUpdate(
+        { userId: session.user.id },
+        { $set: { status: "offline", lastSeen: new Date() } },
+      );
+      return NextResponse.json({ success: true, status: "offline" });
     }
 
     const { currentPage, acceptingChallenges } = body;
@@ -128,7 +143,11 @@ export async function POST(request: NextRequest) {
       await UserPresence.updateMany(
         {
           status: { $ne: "offline" },
-          lastHeartbeat: { $lt: new Date(nowMs - 45 * 1000) },
+          lastHeartbeat: {
+            $lt: new Date(
+              nowMs - PERFORMANCE_INTERVALS.PRESENCE_OFFLINE_THRESHOLD,
+            ),
+          },
         },
         { $set: { status: "offline" } },
       );
@@ -192,7 +211,7 @@ export async function PUT(request: NextRequest) {
 }
 
 // DELETE - Go offline
-export async function DELETE(request: NextRequest) {
+export async function DELETE(_request: NextRequest) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {

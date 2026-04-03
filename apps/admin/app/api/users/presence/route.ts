@@ -33,16 +33,20 @@ export async function GET(request: Request) {
       .find(query)
       .toArray();
 
-    // Define threshold for "offline" (45 seconds without heartbeat)
-    const offlineThreshold = new Date(Date.now() - 45 * 1000);
+    // Reason: 120s threshold matches the user-facing route and accommodates
+    // browser background-tab throttling (intervals can be delayed to ~60-120s).
+    const offlineThreshold = new Date(Date.now() - 120 * 1000);
 
-    // Map presence data with online status
-    // Note: The main UserPresence model uses 'userId' not 'participantId'
+    // Reason: Use lastHeartbeat freshness as the sole source of truth.
+    // The stored `status` field can be stale (e.g. "offline" from a previous
+    // cleanup) even after the user sent a fresh heartbeat. Checking only
+    // lastHeartbeat avoids the bug where `p.status || "online"` keeps showing
+    // "offline" because "offline" is a truthy string that skips the fallback.
     const presenceData = presences.map((p) => ({
-      participantId: p.userId, // Map userId to participantId for consistency with frontend
+      participantId: p.userId,
       status:
         p.lastHeartbeat && new Date(p.lastHeartbeat) > offlineThreshold
-          ? p.status || "online"
+          ? "online"
           : "offline",
       lastSeen: p.lastHeartbeat || p.lastSeen || p.updatedAt || p.createdAt,
       lastHeartbeat: p.lastHeartbeat,

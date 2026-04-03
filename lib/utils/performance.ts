@@ -269,6 +269,7 @@ export const PERFORMANCE_INTERVALS = {
   // Admin/Background
   NOTIFICATION_POLL: 60000, // 60 seconds (was 30 seconds)
   PRESENCE_HEARTBEAT: 30000, // 30 seconds (was 10 seconds)
+  PRESENCE_OFFLINE_THRESHOLD: 120000, // 120 seconds — accommodates browser background-tab throttling
   FRAUD_MONITORING: 60000, // 60 seconds (was 30 seconds)
   REDIS_STATS: 30000, // 30 seconds (was 10 seconds)
   WEBSOCKET_STATUS: 15000, // 15 seconds (was 5 seconds)
