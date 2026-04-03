@@ -86,206 +86,211 @@ export async function POST(
       }
     }
 
-    // Start MongoDB transaction for atomic operations
-    const mongoSession = await mongoose.startSession();
-    mongoSession.startTransaction();
+    // Reason: Concurrent joins on the same competition cause MongoDB WriteConflict
+    // (code 112, TransientTransactionError) because multiple transactions try to
+    // $inc currentParticipants on the same document simultaneously.
+    // MongoDB recommends retrying the entire transaction on TransientTransactionError.
+    const MAX_RETRIES = 3;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const mongoSession = await mongoose.startSession();
+      mongoSession.startTransaction();
 
-    try {
-      // Check if competition exists and is joinable
-      const competition =
-        await Competition.findById(competitionId).session(mongoSession);
-      if (!competition) {
-        await mongoSession.abortTransaction();
-        mongoSession.endSession();
-        return NextResponse.json(
-          { success: false, error: "Competition not found" },
-          { status: 404 },
-        );
-      }
+      try {
+        const competition =
+          await Competition.findById(competitionId).session(mongoSession);
+        if (!competition) {
+          await mongoSession.abortTransaction();
+          mongoSession.endSession();
+          return NextResponse.json(
+            { success: false, error: "Competition not found" },
+            { status: 404 },
+          );
+        }
 
-      if (
-        competition.status !== "upcoming" &&
-        competition.status !== "active"
-      ) {
-        await mongoSession.abortTransaction();
-        mongoSession.endSession();
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Competition is not accepting participants",
-          },
-          { status: 400 },
-        );
-      }
-
-      // Reason: Enforce registrationDeadline — once it has passed, no new entries are allowed.
-      // Legacy guard: deadline is never earlier than startTime (old bug set it to -1hr).
-      const now = new Date();
-      if (competition.registrationDeadline) {
-        const deadline = new Date(competition.registrationDeadline);
-        const start = new Date(competition.startTime);
-        const effectiveDeadline = deadline < start ? start : deadline;
-        if (now > effectiveDeadline) {
+        if (
+          competition.status !== "upcoming" &&
+          competition.status !== "active"
+        ) {
           await mongoSession.abortTransaction();
           mongoSession.endSession();
           return NextResponse.json(
             {
               success: false,
-              error: "Registration for this competition has closed. No new entries are accepted.",
+              error: "Competition is not accepting participants",
             },
             { status: 400 },
           );
         }
-      }
 
-      if (competition.currentParticipants >= competition.maxParticipants) {
-        await mongoSession.abortTransaction();
-        mongoSession.endSession();
-        return NextResponse.json(
-          { success: false, error: "Competition is full" },
-          { status: 400 },
-        );
-      }
+        const now = new Date();
+        if (competition.registrationDeadline) {
+          const deadline = new Date(competition.registrationDeadline);
+          const start = new Date(competition.startTime);
+          const effectiveDeadline = deadline < start ? start : deadline;
+          if (now > effectiveDeadline) {
+            await mongoSession.abortTransaction();
+            mongoSession.endSession();
+            return NextResponse.json(
+              {
+                success: false,
+                error: "Registration for this competition has closed. No new entries are accepted.",
+              },
+              { status: 400 },
+            );
+          }
+        }
 
-      // Check if already joined
-      const existingParticipant = await CompetitionParticipant.findOne({
-        competitionId,
-        userId,
-      }).session(mongoSession);
-
-      if (existingParticipant) {
-        await mongoSession.abortTransaction();
-        mongoSession.endSession();
-        return NextResponse.json({
-          success: true,
-          message: "Already joined",
-          participantId: existingParticipant._id.toString(),
-        });
-      }
-
-      // Check and deduct entry fee
-      if (competition.entryFee > 0) {
-        const wallet = await CreditWallet.findOne({ userId }).session(
-          mongoSession,
-        );
-        if (!wallet || wallet.creditBalance < competition.entryFee) {
+        if (competition.currentParticipants >= competition.maxParticipants) {
           await mongoSession.abortTransaction();
           mongoSession.endSession();
           return NextResponse.json(
-            { success: false, error: "Insufficient balance" },
+            { success: false, error: "Competition is full" },
             { status: 400 },
           );
         }
 
-        const balanceBefore = wallet.creditBalance;
-        // Reason: Use atomic $inc instead of .save() to prevent lost-update bugs
-        // where the transaction record commits but the wallet balance doesn't decrement.
-        const updatedWallet = await CreditWallet.findOneAndUpdate(
-          { userId },
-          {
-            $inc: {
-              creditBalance: -competition.entryFee,
-              totalSpentOnCompetitions: competition.entryFee,
-            },
-          },
-          { session: mongoSession, new: true },
-        );
-        if (!updatedWallet) {
-          throw new Error("Failed to update wallet for competition entry");
+        const existingParticipant = await CompetitionParticipant.findOne({
+          competitionId,
+          userId,
+        }).session(mongoSession);
+
+        if (existingParticipant) {
+          await mongoSession.abortTransaction();
+          mongoSession.endSession();
+          return NextResponse.json({
+            success: true,
+            message: "Already joined",
+            participantId: existingParticipant._id.toString(),
+          });
         }
 
-        // Record transaction
-        await WalletTransaction.create(
+        if (competition.entryFee > 0) {
+          const wallet = await CreditWallet.findOne({ userId }).session(
+            mongoSession,
+          );
+          if (!wallet || wallet.creditBalance < competition.entryFee) {
+            await mongoSession.abortTransaction();
+            mongoSession.endSession();
+            return NextResponse.json(
+              { success: false, error: "Insufficient balance" },
+              { status: 400 },
+            );
+          }
+
+          const balanceBefore = wallet.creditBalance;
+          const updatedWallet = await CreditWallet.findOneAndUpdate(
+            { userId },
+            {
+              $inc: {
+                creditBalance: -competition.entryFee,
+                totalSpentOnCompetitions: competition.entryFee,
+              },
+            },
+            { session: mongoSession, new: true },
+          );
+          if (!updatedWallet) {
+            throw new Error("Failed to update wallet for competition entry");
+          }
+
+          await WalletTransaction.create(
+            [
+              {
+                userId,
+                transactionType: "competition_entry",
+                amount: -competition.entryFee,
+                balanceBefore,
+                balanceAfter: updatedWallet.creditBalance,
+                currency: "EUR",
+                exchangeRate: 1,
+                status: "completed",
+                competitionId,
+                description: `Entry fee for ${competition.name}`,
+                processedAt: new Date(),
+              },
+            ],
+            { session: mongoSession },
+          );
+        }
+
+        const [participant] = await CompetitionParticipant.create(
           [
             {
-              userId,
-              transactionType: "competition_entry",
-              amount: -competition.entryFee,
-              balanceBefore,
-              balanceAfter: updatedWallet.creditBalance,
-              currency: "EUR",
-              exchangeRate: 1,
-              status: "completed",
               competitionId,
-              description: `Entry fee for ${competition.name}`,
-              processedAt: new Date(),
+              userId,
+              username: userName,
+              email: userEmail,
+              startingCapital: competition.startingCapital,
+              currentCapital: competition.startingCapital,
+              availableCapital: competition.startingCapital,
+              usedMargin: 0,
+              pnl: 0,
+              pnlPercentage: 0,
+              realizedPnl: 0,
+              unrealizedPnl: 0,
+              totalTrades: 0,
+              winningTrades: 0,
+              losingTrades: 0,
+              winRate: 0,
+              averageWin: 0,
+              averageLoss: 0,
+              largestWin: 0,
+              largestLoss: 0,
+              currentOpenPositions: 0,
+              maxDrawdown: 0,
+              maxDrawdownPercentage: 0,
+              currentRank: 0,
+              highestRank: 0,
+              status: "active",
+              marginCallWarnings: 0,
+              enteredAt: new Date(),
             },
           ],
           { session: mongoSession },
         );
-      }
 
-      // Create participant
-      const [participant] = await CompetitionParticipant.create(
-        [
-          {
-            competitionId,
-            userId,
-            username: userName,
-            email: userEmail,
-            startingCapital: competition.startingCapital,
-            currentCapital: competition.startingCapital,
-            availableCapital: competition.startingCapital,
-            usedMargin: 0,
-            pnl: 0,
-            pnlPercentage: 0,
-            realizedPnl: 0,
-            unrealizedPnl: 0,
-            totalTrades: 0,
-            winningTrades: 0,
-            losingTrades: 0,
-            winRate: 0,
-            averageWin: 0,
-            averageLoss: 0,
-            largestWin: 0,
-            largestLoss: 0,
-            currentOpenPositions: 0,
-            maxDrawdown: 0,
-            maxDrawdownPercentage: 0,
-            currentRank: 0,
-            highestRank: 0,
-            status: "active",
-            marginCallWarnings: 0,
-            enteredAt: new Date(),
-          },
-        ],
-        { session: mongoSession },
-      );
-
-      // Update competition participant count
-      await Competition.findByIdAndUpdate(
-        competitionId,
-        { $inc: { currentParticipants: 1 } },
-        { session: mongoSession },
-      );
-
-      // Commit transaction - all operations succeed or all fail
-      await mongoSession.commitTransaction();
-      mongoSession.endSession();
-
-      // Reason: Leaderboard includes competitionsEntered, so invalidate after a new join.
-      try {
-        const { clearLeaderboardCache } = await import(
-          "@/lib/actions/leaderboard/global-leaderboard.actions"
+        await Competition.findByIdAndUpdate(
+          competitionId,
+          { $inc: { currentParticipants: 1 } },
+          { session: mongoSession },
         );
-        await clearLeaderboardCache();
-      } catch {
-        // Best effort — leaderboard will rebuild on next request anyway
-      }
 
-      return NextResponse.json({
-        success: true,
-        participantId: participant._id.toString(),
-        competition: {
-          name: competition.name,
-          startingCapital: competition.startingCapital,
-        },
-      });
-    } catch (txError) {
-      // Rollback on any error - no credits lost
-      await mongoSession.abortTransaction();
-      mongoSession.endSession();
-      throw txError;
+        await mongoSession.commitTransaction();
+        mongoSession.endSession();
+
+        try {
+          const { clearLeaderboardCache } = await import(
+            "@/lib/actions/leaderboard/global-leaderboard.actions"
+          );
+          await clearLeaderboardCache();
+        } catch {
+          // Best effort
+        }
+
+        return NextResponse.json({
+          success: true,
+          participantId: participant._id.toString(),
+          competition: {
+            name: competition.name,
+            startingCapital: competition.startingCapital,
+          },
+        });
+      } catch (txError: unknown) {
+        try { await mongoSession.abortTransaction(); } catch { /* already aborted */ }
+        mongoSession.endSession();
+
+        const isWriteConflict =
+          txError instanceof Error &&
+          "code" in txError &&
+          (txError as { code: number }).code === 112;
+
+        if (isWriteConflict && attempt < MAX_RETRIES) {
+          const jitter = Math.floor(Math.random() * 100) + 50 * (attempt + 1);
+          await new Promise((r) => setTimeout(r, jitter));
+          continue;
+        }
+
+        throw txError;
+      }
     }
   } catch (error) {
     console.error("Competition join error:", error);
