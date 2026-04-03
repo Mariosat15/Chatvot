@@ -1,22 +1,34 @@
 import mongoose from "mongoose";
 import { MongoClient } from "mongodb";
 
+// Reason: Admin routes that call root production code (e.g., end-logic tests
+// calling finalizeCompetition) need the ROOT mongoose instance for sessions,
+// since the production code creates transactions on this instance. Exporting
+// it allows admin routes to import the correct mongoose for startSession().
+export { mongoose as rootMongoose };
+
 // NOTE: Don't capture MONGODB_URI at module load time!
 // It must be read at runtime because the worker loads .env after imports are resolved.
 // See: worker/index.ts dotenv.config() runs after all imports are hoisted.
 
+// Reason: The admin app (apps/admin/) has its own mongoose in node_modules,
+// creating a SEPARATE mongoose instance from the root's. Both modules must use
+// DIFFERENT global cache keys; otherwise the first to connect "poisons" the
+// cache and the second module's mongoose never actually connects — causing
+// "buffering timed out" on its models and "ClientSession must be from the
+// same MongoClient" when transactions mix instances.
 declare global {
-  var mongooseCache: {
+  var __rootMongooseCache: {
     conn: typeof mongoose | null;
     promise: Promise<typeof mongoose> | null;
   };
   var mongooseProfilingEnabled: boolean;
 }
 
-let cached = global.mongooseCache;
+let cached = global.__rootMongooseCache;
 
 if (!cached) {
-  cached = global.mongooseCache = { conn: null, promise: null };
+  cached = global.__rootMongooseCache = { conn: null, promise: null };
 }
 
 // =============================================================================

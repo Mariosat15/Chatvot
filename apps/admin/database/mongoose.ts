@@ -3,17 +3,20 @@ import { MongoClient } from "mongodb";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
+// Reason: Separate cache key from root module (database/mongoose.ts) to
+// avoid cross-contamination when both mongoose instances coexist in the
+// admin process. See root module for full explanation.
 declare global {
-  var mongooseCache: {
+  var __adminMongooseCache: {
     conn: typeof mongoose | null;
     promise: Promise<typeof mongoose> | null;
   };
 }
 
-let cached = global.mongooseCache;
+let cached = global.__adminMongooseCache;
 
 if (!cached) {
-  cached = global.mongooseCache = { conn: null, promise: null };
+  cached = global.__adminMongooseCache = { conn: null, promise: null };
 }
 
 /**
