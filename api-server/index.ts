@@ -54,6 +54,11 @@ import docsRoutes from "./routes/docs.routes";
 const app = express();
 const PORT = process.env.API_PORT || 4000;
 
+// Reason: The app sits behind Cloudflare/NGINX which set X-Forwarded-For.
+// Without this, express-rate-limit throws ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
+// and cannot identify clients by their real IP.
+app.set("trust proxy", 1);
+
 // ============================================
 // MIDDLEWARE
 // ============================================
