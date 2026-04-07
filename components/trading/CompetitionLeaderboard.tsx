@@ -153,17 +153,18 @@ export default function CompetitionLeaderboard({
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
+      <div className="min-w-[640px]">
       {/* Header */}
       <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto_auto_auto] gap-2 md:gap-3 px-3 md:px-4 pb-2 border-b border-gray-700 text-xs font-medium text-gray-500 uppercase tracking-wider">
         <div className="flex-shrink-0">Rank</div>
         <div className="min-w-0">Trader</div>
-        <div className="text-right flex-shrink-0 min-w-[100px]">Capital</div>
-        <div className="text-right flex-shrink-0 min-w-[80px]">P&L</div>
-        <div className="text-right flex-shrink-0 min-w-[70px]">ROI %</div>
-        <div className="text-right flex-shrink-0 min-w-[70px]">Win Rate</div>
-        <div className="text-right flex-shrink-0 min-w-[50px]">Trades</div>
-        <div className="text-right flex-shrink-0 min-w-[60px]">P.Factor</div>
+        <div className="text-right flex-shrink-0 min-w-[80px]">Capital</div>
+        <div className="text-right flex-shrink-0 min-w-[70px]">P&L</div>
+        <div className="text-right flex-shrink-0 min-w-[60px]">ROI %</div>
+        <div className="text-right flex-shrink-0 min-w-[60px]">Win Rate</div>
+        <div className="text-right flex-shrink-0 min-w-[45px]">Trades</div>
+        <div className="text-right flex-shrink-0 min-w-[55px]">P.Factor</div>
       </div>
 
       {/* Leaderboard Entries */}
@@ -274,7 +275,7 @@ export default function CompetitionLeaderboard({
               </div>
 
               {/* Capital */}
-              <div className="flex items-center justify-end gap-1 flex-shrink-0 min-w-[100px]">
+              <div className="flex items-center justify-end gap-1 flex-shrink-0 min-w-[80px]">
                 <p
                   className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
                     isDisqualified
@@ -288,7 +289,7 @@ export default function CompetitionLeaderboard({
               </div>
 
               {/* P&L */}
-              <div className="flex flex-col items-end justify-center flex-shrink-0 min-w-[80px]">
+              <div className="flex flex-col items-end justify-center flex-shrink-0 min-w-[70px]">
                 <p
                   className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
                     isDisqualified
@@ -304,7 +305,7 @@ export default function CompetitionLeaderboard({
               </div>
 
               {/* ROI % */}
-              <div className="flex items-center justify-end flex-shrink-0 min-w-[70px]">
+              <div className="flex items-center justify-end flex-shrink-0 min-w-[60px]">
                 <p
                   className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
                     isDisqualified
@@ -320,7 +321,7 @@ export default function CompetitionLeaderboard({
               </div>
 
               {/* Win Rate */}
-              <div className="flex flex-col items-end justify-center flex-shrink-0 min-w-[70px]">
+              <div className="flex flex-col items-end justify-center flex-shrink-0 min-w-[60px]">
                 <p
                   className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
                     isDisqualified
@@ -336,7 +337,7 @@ export default function CompetitionLeaderboard({
               </div>
 
               {/* Trades */}
-              <div className="flex items-center justify-end flex-shrink-0 min-w-[50px]">
+              <div className="flex items-center justify-end flex-shrink-0 min-w-[45px]">
                 <p
                   className={`text-sm font-semibold tabular-nums ${
                     isDisqualified
@@ -370,7 +371,7 @@ export default function CompetitionLeaderboard({
               </div>
 
               {/* Profit Factor */}
-              <div className="flex items-center justify-end flex-shrink-0 min-w-[60px]">
+              <div className="flex items-center justify-end flex-shrink-0 min-w-[55px]">
                 <p
                   className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
                     isDisqualified
@@ -417,6 +418,7 @@ export default function CompetitionLeaderboard({
             </div>
           );
         })}
+      </div>
       </div>
 
       {/* Profile Card Popup */}

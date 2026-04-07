@@ -322,44 +322,44 @@ export default function CompetitionCard({
           className={`group relative overflow-hidden rounded-xl ${theme.bgPattern} border border-gray-700/50 hover:border-yellow-500/50 transition-all duration-300 hover:shadow-xl hover:${theme.glow}`}
         >
           <div className="flex flex-col">
-            {/* Main Row */}
-            <div className="flex items-center gap-4 p-4">
+            {/* Main Row - stack on mobile, horizontal on lg */}
+            <div className="flex items-start sm:items-center gap-3 sm:gap-4 p-3 sm:p-4">
               {/* Icon */}
               <div
-                className={`flex-shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br ${theme.gradient} flex items-center justify-center text-2xl shadow-lg ${theme.glow}`}
+                className={`flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br ${theme.gradient} flex items-center justify-center text-xl sm:text-2xl shadow-lg ${theme.glow}`}
               >
                 {theme.icon}
               </div>
 
               {/* Main Info */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="font-bold text-gray-100 truncate group-hover:text-yellow-400 transition-colors">
+                <div className="flex items-center gap-1.5 sm:gap-2 mb-1 flex-wrap">
+                  <h3 className="font-bold text-sm sm:text-base text-gray-100 truncate max-w-[160px] sm:max-w-none group-hover:text-yellow-400 transition-colors">
                     {competition.name}
                   </h3>
                   {isActive && (
-                    <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-blue-500 text-white text-[11px] font-bold animate-pulse">
+                    <span className="flex-shrink-0 px-1.5 sm:px-2 py-0.5 rounded-full bg-blue-500 text-white text-[11px] font-bold animate-pulse">
                       LIVE
                     </span>
                   )}
                   {isCompleted && (
-                    <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-green-600 text-white text-[11px] font-bold">
+                    <span className="flex-shrink-0 px-1.5 sm:px-2 py-0.5 rounded-full bg-green-600 text-white text-[11px] font-bold">
                       COMPLETED
                     </span>
                   )}
                   {isCancelled && (
-                    <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-red-500 text-white text-[11px] font-bold">
+                    <span className="flex-shrink-0 px-1.5 sm:px-2 py-0.5 rounded-full bg-red-500 text-white text-[11px] font-bold">
                       CANCELLED
                     </span>
                   )}
                   {isUserIn && !isCompleted && !isCancelled && (
-                    <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-[11px] font-bold border border-green-500/40">
+                    <span className="flex-shrink-0 px-1.5 sm:px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-[11px] font-bold border border-green-500/40">
                       ✓ ENTERED
                     </span>
                   )}
                   {/* Creator Badge */}
                   <span
-                    className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+                    className={`flex-shrink-0 px-1.5 sm:px-2 py-0.5 rounded-full text-[11px] font-bold border ${
                       isGmCreated
                         ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
                         : "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
@@ -368,7 +368,7 @@ export default function CompetitionCard({
                     {isGmCreated ? "🎮" : "🛡️"} {creatorLabel}
                   </span>
                 </div>
-                <div className="flex items-center gap-3 text-sm text-gray-400">
+                <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-gray-400 flex-wrap">
                   <span className="flex items-center gap-1">
                     <span
                       className={`w-2 h-2 rounded-full bg-gradient-to-r ${theme.gradient}`}
@@ -392,72 +392,90 @@ export default function CompetitionCard({
                 </div>
               </div>
 
-              {/* Dates */}
-              <div className="flex-shrink-0 text-right px-3 border-l border-gray-700/50">
-                <div className="text-xs text-gray-500 mb-0.5">Start</div>
-                <div className="text-sm font-medium text-gray-300">
-                  {formatDateTime(competition.startTime)}
-                </div>
-              </div>
-              <div className="flex-shrink-0 text-right px-3 border-l border-gray-700/50">
-                <div className="text-xs text-gray-500 mb-0.5">End</div>
-                <div className="text-sm font-medium text-gray-300">
-                  {formatDateTime(competition.endTime)}
-                </div>
-              </div>
-
-              {/* Prize */}
-              <div className="flex-shrink-0 text-right px-3 border-l border-gray-700">
-                <div className="flex items-center gap-1 text-yellow-500">
-                  <GameIcon name="trophy" size={18} />
-                  <span className="text-xl font-black">
-                    {getPrizePool().toFixed(0)}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-500">Prize Pool</p>
-              </div>
-
-              {/* Entry Fee */}
-              <div className="flex-shrink-0 text-right px-4 border-l border-gray-700">
-                <div className="text-lg font-bold text-gray-100">
-                  {getEntryFee()}
-                </div>
-                <p className="text-xs text-gray-500">Entry</p>
-              </div>
-
-              {/* Countdown/Status */}
-              <div className="flex-shrink-0 w-24 text-center">
-                {isUpcoming && (
-                  <div className="px-3 py-1.5 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
-                    <p className="text-xs text-yellow-400 font-mono font-bold">
-                      {liveCountdown}
-                    </p>
+              {/* Desktop-only columns: Dates, Prize, Entry Fee, Status */}
+              <div className="hidden lg:flex items-center">
+                <div className="flex-shrink-0 text-right px-3 border-l border-gray-700/50">
+                  <div className="text-xs text-gray-500 mb-0.5">Start</div>
+                  <div className="text-sm font-medium text-gray-300">
+                    {formatDateTime(competition.startTime)}
                   </div>
-                )}
-                {isActive && (
-                  <div className="px-3 py-1.5 rounded-lg bg-blue-500/20 border border-blue-500/30">
-                    <p className="text-xs text-blue-400 font-bold">TRADING</p>
+                </div>
+                <div className="flex-shrink-0 text-right px-3 border-l border-gray-700/50">
+                  <div className="text-xs text-gray-500 mb-0.5">End</div>
+                  <div className="text-sm font-medium text-gray-300">
+                    {formatDateTime(competition.endTime)}
                   </div>
-                )}
-                {isCompleted && (
-                  <div className="px-3 py-1.5 rounded-lg bg-green-500/20 border border-green-500/30">
-                    <p className="text-xs text-green-400 font-bold">ENDED</p>
+                </div>
+                <div className="flex-shrink-0 text-right px-3 border-l border-gray-700">
+                  <div className="flex items-center gap-1 text-yellow-500">
+                    <GameIcon name="trophy" size={18} />
+                    <span className="text-xl font-black">
+                      {getPrizePool().toFixed(0)}
+                    </span>
                   </div>
-                )}
-                {isCancelled && (
-                  <div className="px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/30">
-                    <p className="text-xs text-red-400 font-bold">CANCELLED</p>
+                  <p className="text-xs text-gray-500">Prize Pool</p>
+                </div>
+                <div className="flex-shrink-0 text-right px-4 border-l border-gray-700">
+                  <div className="text-lg font-bold text-gray-100">
+                    {getEntryFee()}
                   </div>
-                )}
+                  <p className="text-xs text-gray-500">Entry</p>
+                </div>
+                <div className="flex-shrink-0 w-24 text-center">
+                  {isUpcoming && (
+                    <div className="px-3 py-1.5 rounded-lg bg-yellow-500/20 border border-yellow-500/30">
+                      <p className="text-xs text-yellow-400 font-mono font-bold">
+                        {liveCountdown}
+                      </p>
+                    </div>
+                  )}
+                  {isActive && (
+                    <div className="px-3 py-1.5 rounded-lg bg-blue-500/20 border border-blue-500/30">
+                      <p className="text-xs text-blue-400 font-bold">TRADING</p>
+                    </div>
+                  )}
+                  {isCompleted && (
+                    <div className="px-3 py-1.5 rounded-lg bg-green-500/20 border border-green-500/30">
+                      <p className="text-xs text-green-400 font-bold">ENDED</p>
+                    </div>
+                  )}
+                  {isCancelled && (
+                    <div className="px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/30">
+                      <p className="text-xs text-red-400 font-bold">CANCELLED</p>
+                    </div>
+                  )}
+                </div>
+                <ChevronRight className="h-5 w-5 text-gray-500 group-hover:text-yellow-500 transition-colors" />
               </div>
-
-              {/* Arrow */}
-              <ChevronRight className="h-5 w-5 text-gray-500 group-hover:text-yellow-500 transition-colors" />
             </div>
 
-            {/* Additional Info Row */}
-            <div className="flex items-center gap-3 px-4 pb-3 pt-0 -mt-1">
-              {/* Starting Capital */}
+            {/* Mobile-only compact stats row */}
+            <div className="lg:hidden flex items-center gap-2 px-3 pb-2 flex-wrap">
+              <div className="flex items-center gap-1 text-yellow-500">
+                <GameIcon name="trophy" size={14} />
+                <span className="text-sm font-black">{getPrizePool().toFixed(0)}</span>
+                <span className="text-[11px] text-gray-500">{settings?.credits.symbol}</span>
+              </div>
+              <span className="text-gray-600">·</span>
+              <span className="text-[11px] text-gray-400">
+                Fee: <span className="text-gray-200 font-bold">{getEntryFee()}</span>
+              </span>
+              <span className="text-gray-600">·</span>
+              <span className="text-[11px] text-gray-400">
+                {formatDateTime(competition.startTime)}
+              </span>
+              {isUpcoming && liveCountdown && (
+                <>
+                  <span className="text-gray-600">·</span>
+                  <span className="text-[11px] text-yellow-400 font-mono font-bold">
+                    {liveCountdown}
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* Additional Info Row - hidden on small mobile, visible on sm+ */}
+            <div className="hidden sm:flex items-center gap-3 px-4 pb-3 pt-0 -mt-1 flex-wrap">
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20">
                 <GameIcon name="target" size={12} />
                 <span className="text-[11px] text-purple-300 font-medium">
@@ -470,7 +488,6 @@ export default function CompetitionCard({
                 </span>
               </div>
 
-              {/* Leverage */}
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/20">
                 <GameIcon name="fireSpell" size={12} />
                 <span className="text-[11px] text-orange-300 font-medium">
@@ -478,7 +495,6 @@ export default function CompetitionCard({
                 </span>
               </div>
 
-              {/* Minimum Trades */}
               {competition.rules?.minimumTrades &&
                 competition.rules.minimumTrades > 1 && (
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
@@ -489,7 +505,6 @@ export default function CompetitionCard({
                   </div>
                 )}
 
-              {/* Liquidation Risk */}
               {competition.rules?.disqualifyOnLiquidation && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/20">
                   <GameIcon name="skull" size={12} />
@@ -499,7 +514,6 @@ export default function CompetitionCard({
                 </div>
               )}
 
-              {/* Level Requirement */}
               {competition.levelRequirement?.enabled && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20">
                   <GameIcon name="crown" size={14} />
@@ -509,7 +523,6 @@ export default function CompetitionCard({
                 </div>
               )}
 
-              {/* Risk Limits */}
               {competition.riskLimits?.enabled && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20">
                   <GameIcon name="shield1" size={12} />
@@ -519,7 +532,6 @@ export default function CompetitionCard({
                 </div>
               )}
 
-              {/* Asset Classes */}
               <div className="flex items-center gap-1 ml-auto">
                 {competition.assetClasses?.slice(0, 3).map((asset: string) => (
                   <span

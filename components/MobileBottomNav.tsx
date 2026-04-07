@@ -20,21 +20,21 @@ interface NavItem {
 const navItems: NavItem[] = [
   {
     href: "/dashboard",
-    label: "Dashboard",
+    label: "Home",
     iconName: "headset",
     color: "text-blue-400",
     activeColor: "bg-blue-500/20",
   },
   {
     href: "/competitions",
-    label: "Competitions",
+    label: "Compete",
     iconName: "trophy",
     color: "text-yellow-400",
     activeColor: "bg-yellow-500/20",
   },
   {
     href: "/challenges",
-    label: "Challenges",
+    label: "Battle",
     iconName: "sword",
     color: "text-red-400",
     activeColor: "bg-red-500/20",
@@ -151,7 +151,7 @@ export default function MobileBottomNav() {
             <LogOut className="w-5 h-5 text-gray-500 opacity-60" />
           </div>
           <span className="text-[10px] font-medium mt-0.5 text-gray-500 truncate max-w-full px-0.5">
-            Sign Out
+            Logout
           </span>
         </button>
       </div>
