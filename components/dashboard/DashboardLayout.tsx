@@ -155,18 +155,9 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
 
         {/* ── Tab 3: Trading Performance ── */}
         <TabsContent value="performance" className="space-y-4 mt-4">
-          <HeroStatsBar
-            creditBalance={overview.creditBalance}
-            totalSpent={overview.totalSpent}
-            winRate={overview.winRate}
-            roi={overview.roi}
-            gmEarnings={overview.gmEarnings}
-            totalPrizesWon={overview.totalPrizesWon}
-            variant="performance"
-          />
-
           <PerformanceRings
             winRate={overview.winRate}
+            roi={overview.roi}
             profitFactor={overview.profitFactor}
             avgWin={overview.averageWin}
             avgLoss={overview.averageLoss}

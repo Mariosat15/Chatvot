@@ -259,22 +259,48 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="p-4 border-b border-gray-800/50">
-        <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="relative">
-            <div className="absolute inset-0 bg-yellow-500/20 blur-xl rounded-full" />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={images.appLogo}
-              alt="logo"
-              width={isCollapsed ? 40 : 140}
-              height={32}
-              className="relative z-10 cursor-pointer"
-              style={{ width: "auto", height: "32px" }}
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = "/assets/icons/logo.svg";
-              }}
-            />
-          </div>
+        <Link
+          href="/dashboard"
+          className={cn(
+            "flex items-center",
+            isCollapsed ? "justify-center" : "gap-3",
+          )}
+        >
+          {isCollapsed ? (
+            /* Reason: When collapsed, show the square favicon/icon instead of the
+               full text logo to prevent squishing in the narrow w-20 sidebar. */
+            <div className="relative w-10 h-10 flex items-center justify-center">
+              <div className="absolute inset-0 bg-yellow-500/20 blur-xl rounded-full" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={images.favicon}
+                alt="logo"
+                width={32}
+                height={32}
+                className="relative z-10 cursor-pointer rounded-lg object-contain"
+                style={{ width: "32px", height: "32px" }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "/assets/icons/logo.svg";
+                }}
+              />
+            </div>
+          ) : (
+            <div className="relative">
+              <div className="absolute inset-0 bg-yellow-500/20 blur-xl rounded-full" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={images.appLogo}
+                alt="logo"
+                width={140}
+                height={32}
+                className="relative z-10 cursor-pointer"
+                style={{ width: "auto", height: "32px" }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "/assets/icons/logo.svg";
+                }}
+              />
+            </div>
+          )}
         </Link>
       </div>
 

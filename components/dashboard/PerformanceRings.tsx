@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 
 interface PerformanceRingsProps {
   winRate: number;
+  roi?: number;
   profitFactor: number;
   avgWin: number;
   avgLoss: number;
@@ -82,6 +83,7 @@ function AnimatedRing({
 
 export default function PerformanceRings({
   winRate,
+  roi,
   profitFactor,
   avgWin,
   avgLoss,
@@ -97,6 +99,20 @@ export default function PerformanceRings({
       color: "#22C55E",
       glow: "rgba(34,197,94,0.5)",
     },
+    ...(roi !== undefined
+      ? [
+          {
+            label: "ROI",
+            // Reason: ROI can be negative; use absolute value for ring fill,
+            // capped at 100% for visual consistency. Color switches red/cyan.
+            value: Math.min(Math.abs(roi), 100),
+            max: 100,
+            displayValue: `${roi >= 0 ? "+" : ""}${roi.toFixed(1)}%`,
+            color: roi >= 0 ? "#06B6D4" : "#EF4444",
+            glow: roi >= 0 ? "rgba(6,182,212,0.5)" : "rgba(239,68,68,0.5)",
+          },
+        ]
+      : []),
     {
       label: "Profit Factor",
       value: Math.min(profitFactor, 5),
@@ -149,7 +165,7 @@ export default function PerformanceRings({
       <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
         ⚡ Performance Metrics
       </h3>
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 sm:gap-4">
+      <div className={`grid gap-3 sm:gap-4 ${rings.length <= 6 ? "grid-cols-3 sm:grid-cols-6" : "grid-cols-3 sm:grid-cols-4 lg:grid-cols-7"}`}>
         {rings.map((datum, i) => (
           <AnimatedRing
             key={datum.label}
