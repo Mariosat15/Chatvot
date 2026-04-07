@@ -323,15 +323,27 @@ export default function CreditBreakdownChart({ data, allTimeTotals }: CreditBrea
       )}
 
       {/* Summary totals — all-time from SSOT (getUserFinancialSummary) */}
-      {/* Reason: The chart only shows the last 7/30 days, but summary chips should
+      {/* Reason: The chart only shows the last 7/30 days, but summary cards should
           reflect the user's all-time activity to avoid confusion (e.g. marketplace
           showing 20 when the user has spent 500+ all-time). */}
-      <div className="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-2">
-        <SummaryChip label="Deposits" value={allTimeTotals?.deposits ?? totals.deposits} color="#22c55e" />
-        <SummaryChip label="Wins" value={allTimeTotals?.wins ?? totals.wins} color="#facc15" />
-        <SummaryChip label="Entries" value={allTimeTotals?.entries ?? totals.entries} color="#ef4444" />
-        <SummaryChip label="Withdrawals" value={allTimeTotals?.withdrawals ?? totals.withdrawals} color="#fb923c" />
-        <SummaryChip label="Marketplace" value={allTimeTotals?.marketplace ?? totals.marketplace} color="#f472b6" />
+      <div className="mt-4 space-y-3">
+        <div>
+          <p className="text-[10px] text-green-400/70 uppercase tracking-wider font-semibold mb-1.5 px-1">Income</p>
+          <div className="grid grid-cols-2 gap-2">
+            <SummaryCard label="Deposits" value={allTimeTotals?.deposits ?? totals.deposits} color="#22c55e" />
+            <SummaryCard label="Wins" value={allTimeTotals?.wins ?? totals.wins} color="#facc15" />
+            <SummaryCard label="GM Earnings" value={allTimeTotals?.gmEarnings ?? totals.gmEarnings} color="#a78bfa" />
+            <SummaryCard label="Refunds" value={allTimeTotals?.refunds ?? totals.refunds} color="#60a5fa" />
+          </div>
+        </div>
+        <div>
+          <p className="text-[10px] text-red-400/70 uppercase tracking-wider font-semibold mb-1.5 px-1">Spending</p>
+          <div className="grid grid-cols-2 gap-2">
+            <SummaryCard label="Entries" value={allTimeTotals?.entries ?? totals.entries} color="#ef4444" />
+            <SummaryCard label="Withdrawals" value={allTimeTotals?.withdrawals ?? totals.withdrawals} color="#fb923c" />
+            <SummaryCard label="Marketplace" value={allTimeTotals?.marketplace ?? totals.marketplace} color="#f472b6" />
+          </div>
+        </div>
       </div>
     </motion.div>
   );
@@ -403,13 +415,16 @@ function niceNum(range: number, round: boolean): number {
   return niceFraction * Math.pow(10, exponent);
 }
 
-function SummaryChip({ label, value, color }: { label: string; value: number; color: string }) {
+function SummaryCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div className="bg-gray-800/50 rounded-lg px-3 py-2 text-center">
-      <p className="text-[10px] text-gray-500 uppercase tracking-wider">{label}</p>
-      <p className="text-sm font-bold" style={{ color, fontFamily: "var(--font-geist-mono), monospace" }}>
-        {value.toFixed(2)}
-      </p>
+    <div className="rounded-lg border border-gray-700/30 bg-gray-800/30 px-3 py-2.5 flex items-center gap-2.5">
+      <div className="w-1.5 h-8 rounded-full flex-shrink-0" style={{ backgroundColor: `${color}66` }} />
+      <div className="min-w-0">
+        <p className="text-[10px] text-gray-500 uppercase tracking-wider truncate">{label}</p>
+        <p className="text-sm font-bold truncate" style={{ color, fontFamily: "var(--font-geist-mono), monospace" }}>
+          {value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value.toFixed(2)} ⚡
+        </p>
+      </div>
     </div>
   );
 }

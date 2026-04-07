@@ -1,10 +1,13 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any, security/detect-object-injection */
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import { motion } from "framer-motion";
 
 // Reason: Lightweight Charts is a browser-only library. This component
 // must be imported with next/dynamic { ssr: false } in the parent layout.
+// The `any` types are necessary because chart instances are created via
+// dynamic import() and Lightweight Charts doesn't export usable ref types.
 
 interface EquityChartProps {
   data: { date: string; balance: number; change: number }[];
@@ -52,7 +55,7 @@ export default function EquityChart({ data }: EquityChartProps) {
 
       chart = mod.createChart(containerRef.current, {
         width: containerRef.current.clientWidth,
-        height: 220,
+        height: 260,
         layout: {
           background: { color: "transparent" },
           textColor: "#6B7280",
@@ -231,7 +234,7 @@ export default function EquityChart({ data }: EquityChartProps) {
       </div>
 
       {/* Chart container */}
-      <div ref={containerRef} className="w-full" style={{ minHeight: 220 }} />
+      <div ref={containerRef} className="w-full" style={{ minHeight: 260 }} />
     </motion.div>
   );
 }

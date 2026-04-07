@@ -146,12 +146,25 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
           />
 
           <EquityChart data={charts.walletBalanceHistory} />
-          <DailyCreditFlow data={charts.dailyCreditFlow} />
-          <CreditBreakdownChart data={charts.dailyCreditBreakdown} allTimeTotals={charts.allTimeTotals} />
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <DailyCreditFlow data={charts.dailyCreditFlow} />
+            <CreditBreakdownChart data={charts.dailyCreditBreakdown} allTimeTotals={charts.allTimeTotals} />
+          </div>
         </TabsContent>
 
         {/* ── Tab 3: Trading Performance ── */}
         <TabsContent value="performance" className="space-y-4 mt-4">
+          <HeroStatsBar
+            creditBalance={overview.creditBalance}
+            totalSpent={overview.totalSpent}
+            winRate={overview.winRate}
+            roi={overview.roi}
+            gmEarnings={overview.gmEarnings}
+            totalPrizesWon={overview.totalPrizesWon}
+            variant="performance"
+          />
+
           <PerformanceRings
             winRate={overview.winRate}
             profitFactor={overview.profitFactor}

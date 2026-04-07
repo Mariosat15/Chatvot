@@ -22,8 +22,9 @@ interface HeroStatsBarProps {
   totalPrizesWon: number;
   // Reason: "compact" = 4 key cards for Overview tab (balance, win rate, ROI, prizes)
   // "wallet" = 4 financial cards for Wallet tab (balance, spent, GM, prizes)
+  // "performance" = 2 cards for Performance tab (win rate, ROI)
   // "full" (default) = all 6 cards
-  variant?: "compact" | "wallet" | "full";
+  variant?: "compact" | "wallet" | "performance" | "full";
 }
 
 // Reason: Each stat card has its own glow color and icon, configured here for consistency.
@@ -97,10 +98,11 @@ const STAT_CONFIG = [
 ];
 
 // Reason: Maps variant to which STAT_CONFIG keys to show in each dashboard tab.
-function getVisibleKeys(variant: "compact" | "wallet" | "full"): string[] {
+function getVisibleKeys(variant: "compact" | "wallet" | "performance" | "full"): string[] {
   switch (variant) {
     case "compact": return ["balance", "winrate", "roi", "prizes"];
     case "wallet": return ["balance", "spent", "gm", "prizes"];
+    case "performance": return ["winrate", "roi"];
     default: return ["balance", "spent", "winrate", "roi", "gm", "prizes"];
   }
 }
@@ -159,9 +161,11 @@ export default function HeroStatsBar({
   const stats = allStats.filter((s) => visibleKeys.includes(s.key));
 
   const gridCols =
-    stats.length <= 4
-      ? "grid-cols-2 lg:grid-cols-4"
-      : "grid-cols-2 lg:grid-cols-3 xl:grid-cols-6";
+    stats.length <= 2
+      ? "grid-cols-2 max-w-lg"
+      : stats.length <= 4
+        ? "grid-cols-2 lg:grid-cols-4"
+        : "grid-cols-2 lg:grid-cols-3 xl:grid-cols-6";
 
   return (
     <div className={`grid ${gridCols} gap-3`}>

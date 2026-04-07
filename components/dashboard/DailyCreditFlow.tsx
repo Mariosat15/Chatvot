@@ -1,10 +1,13 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any, security/detect-object-injection */
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import { motion } from "framer-motion";
 
 // Reason: Lightweight Charts is a browser-only library. This component
 // must be imported with next/dynamic { ssr: false } in the parent layout.
+// The `any` types are necessary because chart instances are created via
+// dynamic import() and Lightweight Charts doesn't export usable ref types.
 
 interface DailyCreditFlowProps {
   data: {
@@ -191,7 +194,7 @@ export default function DailyCreditFlow({ data }: DailyCreditFlowProps) {
             💰 Daily Credit Flow
           </h3>
           {hoveredPoint ? (
-            <div className="flex items-center gap-2 mt-1">
+            <div className="mt-1">
               <span
                 className={`text-lg font-bold ${
                   hoveredPoint.net >= 0 ? "text-yellow-400" : "text-red-400"
@@ -201,14 +204,20 @@ export default function DailyCreditFlow({ data }: DailyCreditFlowProps) {
                 {hoveredPoint.net >= 0 ? "+" : ""}
                 {hoveredPoint.net.toFixed(2)} ⚡
               </span>
-              <span className="text-xs text-gray-500 font-[var(--font-geist-mono)]">
-                ↑{hoveredPoint.inflow.toFixed(0)} ↓
-                {hoveredPoint.outflow.toFixed(0)} · {hoveredPoint.transactions}{" "}
-                txns
-              </span>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[10px] text-green-400/80">
+                  ↑ {hoveredPoint.inflow.toFixed(0)}
+                </span>
+                <span className="text-[10px] text-red-400/80">
+                  ↓ {hoveredPoint.outflow.toFixed(0)}
+                </span>
+                <span className="text-[10px] text-gray-500">
+                  {hoveredPoint.transactions} txns
+                </span>
+              </div>
             </div>
           ) : (
-            <div className="flex items-center gap-3 mt-1">
+            <div className="mt-1">
               <span
                 className={`text-lg font-bold ${
                   totalNet >= 0 ? "text-yellow-400" : "text-red-400"
@@ -218,12 +227,14 @@ export default function DailyCreditFlow({ data }: DailyCreditFlowProps) {
                 {totalNet >= 0 ? "+" : ""}
                 {totalNet.toFixed(2)} ⚡
               </span>
-              <span className="text-xs text-gray-500">
-                <span className="text-green-400">
-                  ↑{totalInflow.toFixed(0)}
-                </span>{" "}
-                <span className="text-red-400">↓{totalOutflow.toFixed(0)}</span>
-              </span>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[10px] text-green-400/80">
+                  ↑ {totalInflow.toFixed(0)}
+                </span>
+                <span className="text-[10px] text-red-400/80">
+                  ↓ {totalOutflow.toFixed(0)}
+                </span>
+              </div>
             </div>
           )}
         </div>
