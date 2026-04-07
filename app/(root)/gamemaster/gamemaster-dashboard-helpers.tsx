@@ -94,7 +94,7 @@ export function RefField({
         </div>
         <button
           onClick={onCopy}
-          className="p-2.5 bg-gray-800 hover:bg-gray-700 rounded-xl transition-colors shrink-0"
+          className="p-2.5 bg-gray-800 hover:bg-gray-700 rounded-xl transition-colors shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center"
         >
           {copied ? (
             <Check className="h-4 w-4 text-emerald-400" />
@@ -138,16 +138,16 @@ export function KPI({
     ["red", "text-red-400"],
   ]);
   return (
-    <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50">
-      <div className="flex items-center gap-2 mb-2">
+    <div className="bg-gray-800/50 rounded-xl p-3 sm:p-4 border border-gray-700/50">
+      <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
         <div className={`p-1.5 rounded-lg ${bgMap.get(color) ?? ""}`}>
           <Icon className={`h-4 w-4 ${textMap.get(color) ?? ""}`} />
         </div>
-        <span className="text-xs text-gray-400">{label}</span>
+        <span className="text-[11px] sm:text-xs text-gray-400">{label}</span>
       </div>
       <p
         className={cn(
-          "text-xl font-bold text-white",
+          "text-lg sm:text-xl font-bold text-white",
           pulse && "animate-pulse text-red-400",
         )}
       >
@@ -188,9 +188,9 @@ export function SubscriptionPanel({
     <div className="bg-gray-800/50 rounded-2xl border border-gray-700/50 overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between p-5 text-left"
+        className="w-full flex items-center justify-between p-4 sm:p-5 text-left min-h-[44px]"
       >
-        <span className="text-lg font-semibold text-white flex items-center gap-2">
+        <span className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
           <Shield className="h-5 w-5 text-yellow-400" /> Subscription Management
         </span>
         <ChevronRight
@@ -201,7 +201,7 @@ export function SubscriptionPanel({
         />
       </button>
       {open && (
-        <div className="px-5 pb-5 space-y-3">
+        <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-3">
           <Row label="Package" value={sub.packageName || "N/A"} />
           <Row
             label="Create Competitions"

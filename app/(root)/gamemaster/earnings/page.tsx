@@ -158,27 +158,27 @@ export default function GMEarningsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f]">
+    <div className="min-h-screen bg-[#0a0a0f] pb-16 lg:pb-0">
       {/* Header */}
       <div className="border-b border-gray-800 bg-gradient-to-r from-emerald-500/10 to-green-500/10">
-        <div className="max-w-6xl mx-auto px-4 py-6">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
           <Link
             href="/gamemaster"
-            className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-4 transition-colors"
+            className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-3 sm:mb-4 transition-colors min-h-[44px]"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
           </Link>
 
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-green-500/20 flex items-center justify-center">
-              <TrendingUp className="h-7 w-7 text-emerald-400" />
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-green-500/20 flex items-center justify-center flex-shrink-0">
+              <TrendingUp className="h-6 w-6 sm:h-7 sm:w-7 text-emerald-400" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">
+              <h1 className="text-xl sm:text-2xl font-bold text-white">
                 Earnings History
               </h1>
-              <p className="text-gray-400">
+              <p className="text-gray-400 text-sm">
                 Track your referral earnings in detail
               </p>
             </div>
@@ -186,43 +186,43 @@ export default function GMEarningsPage() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
         {/* Summary Cards */}
         {data && (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-            <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
-              <div className="text-sm text-gray-400 mb-1">Total Earned</div>
-              <div className="text-2xl font-bold text-emerald-400">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4 mb-4 sm:mb-8">
+            <div className="bg-gray-800/50 rounded-2xl p-3 sm:p-5 border border-gray-700/50">
+              <div className="text-xs sm:text-sm text-gray-400 mb-1">Total Earned</div>
+              <div className="text-lg sm:text-2xl font-bold text-emerald-400">
                 ⚡ {(data.totals?.totalEarnings ?? 0).toLocaleString()}
               </div>
             </div>
-            <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
-              <div className="text-sm text-gray-400 mb-1">Paid Out</div>
-              <div className="text-2xl font-bold text-white">
+            <div className="bg-gray-800/50 rounded-2xl p-3 sm:p-5 border border-gray-700/50">
+              <div className="text-xs sm:text-sm text-gray-400 mb-1">Paid Out</div>
+              <div className="text-lg sm:text-2xl font-bold text-white">
                 ⚡ {(data.totals?.paidEarnings ?? 0).toLocaleString()}
               </div>
             </div>
-            <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
-              <div className="text-sm text-gray-400 mb-1">Pending</div>
-              <div className="text-2xl font-bold text-yellow-400">
+            <div className="bg-gray-800/50 rounded-2xl p-3 sm:p-5 border border-gray-700/50">
+              <div className="text-xs sm:text-sm text-gray-400 mb-1">Pending</div>
+              <div className="text-lg sm:text-2xl font-bold text-yellow-400">
                 ⚡ {(data.totals?.pendingEarnings ?? 0).toLocaleString()}
               </div>
             </div>
-            <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
-              <div className="text-sm text-gray-400 mb-1 flex items-center gap-1">
+            <div className="bg-gray-800/50 rounded-2xl p-3 sm:p-5 border border-gray-700/50">
+              <div className="text-xs sm:text-sm text-gray-400 mb-1 flex items-center gap-1">
                 <Trophy className="h-3 w-3 text-yellow-400" />
-                From Competitions
+                Competitions
               </div>
-              <div className="text-xl font-bold text-white">
+              <div className="text-base sm:text-xl font-bold text-white">
                 ⚡ {(data.totals?.fromCompetitions ?? 0).toLocaleString()}
               </div>
             </div>
-            <div className="bg-gray-800/50 rounded-2xl p-5 border border-gray-700/50">
-              <div className="text-sm text-gray-400 mb-1 flex items-center gap-1">
+            <div className="bg-gray-800/50 rounded-2xl p-3 sm:p-5 border border-gray-700/50 col-span-2 sm:col-span-1">
+              <div className="text-xs sm:text-sm text-gray-400 mb-1 flex items-center gap-1">
                 <Swords className="h-3 w-3 text-red-400" />
-                From Challenges
+                Challenges
               </div>
-              <div className="text-xl font-bold text-white">
+              <div className="text-base sm:text-xl font-bold text-white">
                 ⚡ {(data.totals?.fromChallenges ?? 0).toLocaleString()}
               </div>
             </div>
@@ -248,7 +248,7 @@ export default function GMEarningsPage() {
                     setPage(1);
                   }}
                   className={cn(
-                    "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+                    "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors min-h-[36px]",
                     filter === f.value
                       ? "bg-emerald-500/20 text-emerald-400"
                       : "text-gray-400 hover:text-white hover:bg-gray-800",
@@ -435,8 +435,8 @@ export default function GMEarningsPage() {
 
               {/* Pagination */}
               {data.pagination.totalPages > 1 && (
-                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-700/50">
-                  <p className="text-sm text-gray-400">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-4 sm:px-6 py-3 sm:py-4 border-t border-gray-700/50">
+                  <p className="text-xs sm:text-sm text-gray-400">
                     Showing{" "}
                     {(data.pagination.page - 1) * data.pagination.limit + 1} -{" "}
                     {Math.min(
@@ -449,11 +449,11 @@ export default function GMEarningsPage() {
                     <button
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
                       disabled={page === 1}
-                      className="p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed min-w-[44px] min-h-[44px] flex items-center justify-center"
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </button>
-                    <span className="text-sm text-gray-400">
+                    <span className="text-xs sm:text-sm text-gray-400">
                       Page {data.pagination.page} of{" "}
                       {data.pagination.totalPages}
                     </span>
@@ -464,7 +464,7 @@ export default function GMEarningsPage() {
                         )
                       }
                       disabled={page === data.pagination.totalPages}
-                      className="p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed min-w-[44px] min-h-[44px] flex items-center justify-center"
                     >
                       <ChevronRight className="h-4 w-4" />
                     </button>

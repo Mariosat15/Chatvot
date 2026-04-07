@@ -161,34 +161,34 @@ export default function GameMasterDashboardContent() {
 
   // ── Active Dashboard ──────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#0a0a0f]">
+    <div className="min-h-screen bg-[#0a0a0f] pb-16 lg:pb-0">
       {/* Header */}
       <div className="relative overflow-hidden border-b border-gray-800">
         <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 via-transparent to-amber-500/10" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-yellow-500/20 to-amber-500/20 flex items-center justify-center">
-                <Crown className="h-7 w-7 text-yellow-400" />
+        <div className="relative max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8">
+          <div className="flex items-center justify-between flex-wrap gap-3 sm:gap-4">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+              <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-yellow-500/20 to-amber-500/20 flex items-center justify-center flex-shrink-0">
+                <Crown className="h-6 w-6 sm:h-7 sm:w-7 text-yellow-400" />
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-                  Game Master Dashboard
-                  <span className={cn("px-3 py-1 rounded-full text-xs font-semibold", isExpired ? "bg-red-500/20 text-red-400" : "bg-emerald-500/20 text-emerald-400")}>
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-2xl font-bold text-white flex items-center gap-2 sm:gap-3 flex-wrap">
+                  <span className="truncate">Game Master Dashboard</span>
+                  <span className={cn("px-2 sm:px-3 py-1 rounded-full text-[11px] sm:text-xs font-semibold flex-shrink-0", isExpired ? "bg-red-500/20 text-red-400" : "bg-emerald-500/20 text-emerald-400")}>
                     {isExpired ? "Expired" : isPaused ? "Paused" : "Active"}
                   </span>
                 </h1>
-                <p className="text-gray-400 text-sm mt-0.5">{sub.packageName}</p>
+                <p className="text-gray-400 text-xs sm:text-sm mt-0.5 truncate">{sub.packageName}</p>
               </div>
             </div>
-            <button onClick={fetchGameMasterData} className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl transition-colors text-sm">
+            <button onClick={fetchGameMasterData} className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl transition-colors text-sm min-h-[44px]">
               <RefreshCw className="h-4 w-4" /> Refresh
             </button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* Banners */}
         {isExpired && <WarningBanner icon={AlertCircle} color="red" title="Subscription expired" desc="Renew to continue creating competitions and earning." link="/marketplace?category=gamemaster" linkText="Renew Subscription" />}
         {isPaused && !isExpired && (
@@ -207,19 +207,19 @@ export default function GameMasterDashboardContent() {
         )}
 
         {/* Referral Link */}
-        <div className={cn("rounded-2xl p-5 border", isPaused ? "bg-gray-800/50 border-gray-700/50 opacity-75" : "bg-gradient-to-br from-yellow-500/10 to-amber-500/10 border-yellow-500/20")}>
-          <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+        <div className={cn("rounded-2xl p-4 sm:p-5 border", isPaused ? "bg-gray-800/50 border-gray-700/50 opacity-75" : "bg-gradient-to-br from-yellow-500/10 to-amber-500/10 border-yellow-500/20")}>
+          <h2 className="text-base sm:text-lg font-bold text-white mb-3 flex items-center gap-2">
             <Link2 className={isPaused ? "h-5 w-5 text-gray-400" : "h-5 w-5 text-yellow-400"} /> Your Referral Link
             {isPaused && <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">PAUSED</span>}
           </h2>
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-2 gap-3 sm:gap-4">
             <RefField label="Referral Code" value={sub.referralCode || ""} copied={copiedCode} onCopy={() => copyToClipboard(sub.referralCode || "", "code")} mono />
             <RefField label="Full Referral Link" value={referralLink} copied={copiedLink} onCopy={() => copyToClipboard(referralLink, "link")} />
           </div>
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
           <KPI icon={TrendingUp} color="emerald" label="Total Earnings" value={`⚡ ${(stats?.totalEarnings ?? 0).toFixed(2)}`} />
           <KPI icon={Clock} color="yellow" label="Pending" value={`⚡ ${(stats?.pendingEarnings ?? 0).toFixed(2)}`} />
           <KPI icon={Users} color="blue" label="Total Referrals" value={String(stats?.totalReferredUsers ?? 0)} />
@@ -229,9 +229,9 @@ export default function GameMasterDashboardContent() {
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 bg-gray-900/50 rounded-xl p-1 border border-gray-800">
+        <div className="flex items-center gap-1 bg-gray-900/50 rounded-xl p-1 border border-gray-800 overflow-x-auto">
           {TABS.map((tab) => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={cn("flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors", activeTab === tab ? "bg-yellow-500 text-black shadow" : "text-gray-400 hover:text-white hover:bg-gray-800")}>
+            <button key={tab} onClick={() => setActiveTab(tab)} className={cn("flex-1 px-2 sm:px-4 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-colors min-h-[44px] whitespace-nowrap", activeTab === tab ? "bg-yellow-500 text-black shadow" : "text-gray-400 hover:text-white hover:bg-gray-800")}>
               {tab}
             </button>
           ))}
@@ -253,28 +253,28 @@ export default function GameMasterDashboardContent() {
 // ─── Not a Game Master View ───────────────────────────────────────────
 function NotGameMasterView() {
   return (
-    <div className="min-h-screen bg-[#0a0a0f]">
-      <div className="max-w-4xl mx-auto px-4 py-20 text-center">
-        <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-br from-yellow-500/20 to-amber-500/20 mb-8">
-          <Crown className="h-12 w-12 text-yellow-400" />
+    <div className="min-h-screen bg-[#0a0a0f] pb-16 lg:pb-0">
+      <div className="max-w-4xl mx-auto px-4 py-12 sm:py-20 text-center">
+        <div className="inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-yellow-500/20 to-amber-500/20 mb-6 sm:mb-8">
+          <Crown className="h-10 w-10 sm:h-12 sm:w-12 text-yellow-400" />
         </div>
-        <h1 className="text-4xl font-bold text-white mb-4">Become a Game Master</h1>
-        <p className="text-xl text-gray-400 mb-8 max-w-2xl mx-auto">Create competitions, build your trading community, and earn from referrals.</p>
-        <div className="grid md:grid-cols-3 gap-6 mb-12">
+        <h1 className="text-2xl sm:text-4xl font-bold text-white mb-3 sm:mb-4">Become a Game Master</h1>
+        <p className="text-base sm:text-xl text-gray-400 mb-6 sm:mb-8 max-w-2xl mx-auto">Create competitions, build your trading community, and earn from referrals.</p>
+        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-12">
           {[
             { icon: Trophy, color: "text-yellow-400", t: "Create Competitions", d: "Host your own trading competitions" },
             { icon: Users, color: "text-emerald-400", t: "Grow Community", d: "Refer traders and build your network" },
             { icon: TrendingUp, color: "text-blue-400", t: "Earn Rewards", d: "Percentage of entry fees from referrals" },
           ].map((item) => (
-            <div key={item.t} className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-              <item.icon className={`h-10 w-10 ${item.color} mx-auto mb-4`} />
-              <h3 className="text-lg font-semibold text-white mb-2">{item.t}</h3>
+            <div key={item.t} className="bg-gray-800/50 rounded-2xl p-4 sm:p-6 border border-gray-700/50">
+              <item.icon className={`h-8 w-8 sm:h-10 sm:w-10 ${item.color} mx-auto mb-3 sm:mb-4`} />
+              <h3 className="text-base sm:text-lg font-semibold text-white mb-2">{item.t}</h3>
               <p className="text-gray-400 text-sm">{item.d}</p>
             </div>
           ))}
         </div>
-        <Link href="/marketplace?category=gamemaster" className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-black font-bold text-lg rounded-2xl transition-all shadow-lg shadow-yellow-500/20">
-          <ShoppingBag className="h-6 w-6" /> View Game Master Packages <ChevronRight className="h-5 w-5" />
+        <Link href="/marketplace?category=gamemaster" className="inline-flex items-center gap-2 sm:gap-3 px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-black font-bold text-base sm:text-lg rounded-2xl transition-all shadow-lg shadow-yellow-500/20 min-h-[44px]">
+          <ShoppingBag className="h-5 w-5 sm:h-6 sm:w-6" /> View Game Master Packages <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
         </Link>
       </div>
     </div>

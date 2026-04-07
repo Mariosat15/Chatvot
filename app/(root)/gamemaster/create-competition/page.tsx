@@ -699,12 +699,12 @@ export default function GMCreateCompetitionPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
-        <div className="max-w-2xl w-full rounded-2xl bg-gradient-to-br from-gray-800 to-gray-900 border border-green-500/50 shadow-2xl shadow-green-500/20 p-12 text-center">
+      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4 pb-20 lg:pb-4">
+        <div className="max-w-2xl w-full rounded-2xl bg-gradient-to-br from-gray-800 to-gray-900 border border-green-500/50 shadow-2xl shadow-green-500/20 p-6 sm:p-12 text-center">
           <div className="mx-auto w-24 h-24 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-green-500/50">
             <CheckCircle className="h-12 w-12 text-white" />
           </div>
-          <h2 className="text-3xl font-bold text-gray-100 mb-3">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-100 mb-3">
             Competition Created Successfully!
           </h2>
           <p className="text-gray-400 text-lg mb-2">
@@ -725,28 +725,28 @@ export default function GMCreateCompetitionPage() {
   const canCreate = remainingToday > 0;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f]">
+    <div className="min-h-screen bg-[#0a0a0f] pb-16 lg:pb-0">
       {/* Header */}
       <div className="border-b border-gray-800 bg-gradient-to-r from-yellow-500/10 to-amber-500/10">
-        <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
           <Link
             href="/gamemaster"
-            className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-4 transition-colors"
+            className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-3 sm:mb-4 transition-colors min-h-[44px]"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
           </Link>
 
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-yellow-500/20 to-amber-500/20 flex items-center justify-center">
-                <Crown className="h-7 w-7 text-yellow-400" />
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+              <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-yellow-500/20 to-amber-500/20 flex items-center justify-center flex-shrink-0">
+                <Crown className="h-6 w-6 sm:h-7 sm:w-7 text-yellow-400" />
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white">
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl font-bold text-white">
                   Create Competition
                 </h1>
-                <p className="text-gray-400">
+                <p className="text-gray-400 text-sm truncate">
                   {subscription.packageName} • {remainingToday} /{" "}
                   {subscription.limits.maxCompetitionsPerDay} remaining today
                 </p>
@@ -773,8 +773,8 @@ export default function GMCreateCompetitionPage() {
 
       {/* Daily Limit Warning */}
       {!canCreate && (
-        <div className="max-w-7xl mx-auto px-4 mt-8">
-          <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-start gap-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 mt-4 sm:mt-8">
+          <div className="p-3 sm:p-4 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-start gap-3 sm:gap-4">
             <AlertCircle className="h-6 w-6 text-red-400 flex-shrink-0" />
             <div>
               <h3 className="font-semibold text-red-400">
@@ -790,13 +790,13 @@ export default function GMCreateCompetitionPage() {
       )}
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8">
           {/* Progress Sidebar */}
           <div className="lg:col-span-1">
-            <div className="sticky top-8 space-y-6">
+            <div className="sticky top-20 space-y-4 sm:space-y-6">
               {/* Progress Steps */}
-              <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700/50 rounded-2xl p-6 shadow-2xl">
+              <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700/50 rounded-2xl p-4 sm:p-6 shadow-2xl">
                 <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-6">
                   Creation Progress
                 </h3>
@@ -870,7 +870,7 @@ export default function GMCreateCompetitionPage() {
               </div>
 
               {/* Quick Stats Preview */}
-              <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700/50 rounded-2xl p-6 shadow-2xl">
+              <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700/50 rounded-2xl p-4 sm:p-6 shadow-2xl">
                 <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
                   Quick Preview
                 </h3>
@@ -1026,7 +1026,7 @@ export default function GMCreateCompetitionPage() {
                         <FileText className="h-6 w-6 text-white" />
                       </div>
                       <div>
-                        <h2 className="text-2xl font-bold text-white">
+                        <h2 className="text-xl sm:text-2xl font-bold text-white">
                           Basic Information
                         </h2>
                         <p className="text-blue-100 text-sm">
@@ -1160,7 +1160,7 @@ export default function GMCreateCompetitionPage() {
                         <DollarSign className="h-6 w-6 text-white" />
                       </div>
                       <div>
-                        <h2 className="text-2xl font-bold text-white">
+                        <h2 className="text-xl sm:text-2xl font-bold text-white">
                           Financial Settings
                         </h2>
                         <p className="text-green-100 text-sm">
@@ -1420,7 +1420,7 @@ export default function GMCreateCompetitionPage() {
                         <Calendar className="h-6 w-6 text-white" />
                       </div>
                       <div>
-                        <h2 className="text-2xl font-bold text-white">
+                        <h2 className="text-xl sm:text-2xl font-bold text-white">
                           Schedule
                         </h2>
                         <p className="text-purple-100 text-sm">
@@ -1689,7 +1689,7 @@ export default function GMCreateCompetitionPage() {
                         <TrendingUp className="h-6 w-6 text-white" />
                       </div>
                       <div>
-                        <h2 className="text-2xl font-bold text-white">
+                        <h2 className="text-xl sm:text-2xl font-bold text-white">
                           Trading Settings
                         </h2>
                         <p className="text-orange-100 text-sm">
@@ -1902,7 +1902,7 @@ export default function GMCreateCompetitionPage() {
                         <Trophy className="h-6 w-6 text-white" />
                       </div>
                       <div>
-                        <h2 className="text-2xl font-bold text-white">
+                        <h2 className="text-xl sm:text-2xl font-bold text-white">
                           Prize Distribution
                         </h2>
                         <p className="text-yellow-100 text-sm">
@@ -2024,7 +2024,7 @@ export default function GMCreateCompetitionPage() {
                         <Shield className="h-6 w-6 text-white" />
                       </div>
                       <div>
-                        <h2 className="text-2xl font-bold text-white">
+                        <h2 className="text-xl sm:text-2xl font-bold text-white">
                           Competition Rules
                         </h2>
                         <p className="text-red-100 text-sm">
@@ -2507,7 +2507,7 @@ export default function GMCreateCompetitionPage() {
                         <Zap className="h-6 w-6 text-white" />
                       </div>
                       <div>
-                        <h2 className="text-2xl font-bold text-white">
+                        <h2 className="text-xl sm:text-2xl font-bold text-white">
                           Review & Launch
                         </h2>
                         <p className="text-green-100 text-sm">
@@ -2662,7 +2662,7 @@ export default function GMCreateCompetitionPage() {
                       router.push("/gamemaster");
                     }
                   }}
-                  className="px-6 py-3 border border-gray-600 text-gray-300 hover:bg-gray-700 rounded-xl font-semibold flex items-center gap-2 transition-colors"
+                  className="px-4 sm:px-6 py-3 border border-gray-600 text-gray-300 hover:bg-gray-700 rounded-xl font-semibold flex items-center gap-2 transition-colors min-h-[44px] text-sm sm:text-base"
                 >
                   <ChevronLeft className="h-4 w-4" />
                   {currentStep === 1 ? "Cancel" : "Previous"}
@@ -2758,7 +2758,7 @@ export default function GMCreateCompetitionPage() {
                       setCurrentStep(currentStep + 1);
                     }}
                     disabled={!canCreate}
-                    className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-gray-900 rounded-xl font-semibold flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 sm:px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-gray-900 rounded-xl font-semibold flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] text-sm sm:text-base"
                   >
                     Next Step
                     <ChevronRight className="h-4 w-4" />
@@ -2773,7 +2773,7 @@ export default function GMCreateCompetitionPage() {
                       getTotalPrizePercentage() !== 100 ||
                       !marketStatus.isOpen
                     }
-                    className="px-8 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl font-bold shadow-lg shadow-green-500/50 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-5 sm:px-8 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-xl font-bold shadow-lg shadow-green-500/50 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] text-sm sm:text-base"
                   >
                     {submitting ? (
                       <>

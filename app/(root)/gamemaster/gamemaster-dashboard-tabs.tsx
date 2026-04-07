@@ -45,9 +45,9 @@ function MiniStat({ label, value, color }: { label: string; value: string; color
     ["purple", "text-purple-400"],
   ]);
   return (
-    <div className={`rounded-xl p-4 border ${bgMap.get(color) ?? ""} bg-gray-800/50`}>
-      <p className="text-gray-400 text-xs">{label}</p>
-      <p className={`text-lg font-bold ${txMap.get(color) ?? ""}`}>{value}</p>
+    <div className={`rounded-xl p-3 sm:p-4 border ${bgMap.get(color) ?? ""} bg-gray-800/50`}>
+      <p className="text-gray-400 text-[11px] sm:text-xs">{label}</p>
+      <p className={`text-base sm:text-lg font-bold ${txMap.get(color) ?? ""}`}>{value}</p>
     </div>
   );
 }
@@ -61,11 +61,11 @@ export function OverviewTab({ stats, subscription, earningsChartData, compStatus
   compStats: { active: number; completed: number; upcoming: number; cancelled: number; totalParticipants: number; totalPrizePool: number } | null;
 }) {
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Earnings Chart */}
-        <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+        <div className="bg-gray-800/50 rounded-2xl p-4 sm:p-6 border border-gray-700/50">
+          <h3 className="text-base sm:text-lg font-semibold text-white mb-3 sm:mb-4 flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-emerald-400" /> Earnings Over Time
           </h3>
           {earningsChartData.length === 0 ? (
@@ -83,23 +83,23 @@ export function OverviewTab({ stats, subscription, earningsChartData, compStatus
         </div>
 
         {/* Competition Status Pie */}
-        <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+        <div className="bg-gray-800/50 rounded-2xl p-4 sm:p-6 border border-gray-700/50">
+          <h3 className="text-base sm:text-lg font-semibold text-white mb-3 sm:mb-4 flex items-center gap-2">
             <Trophy className="h-5 w-5 text-yellow-400" /> Competition Breakdown
           </h3>
           {compStatusPieData.length === 0 ? (
             <div className="flex items-center justify-center h-40 text-gray-500">No competitions yet</div>
           ) : (
-            <div className="flex items-center gap-6">
-              <ResponsiveContainer width={160} height={180}>
+            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+              <ResponsiveContainer width={140} height={160} className="flex-shrink-0">
                 <PieChart>
-                  <Pie data={compStatusPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={40} outerRadius={70} strokeWidth={2} stroke="#0a0a0f">
+                  <Pie data={compStatusPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={35} outerRadius={60} strokeWidth={2} stroke="#0a0a0f">
                     {compStatusPieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                   </Pie>
                   <Tooltip contentStyle={{ background: "#1f2937", border: "1px solid #374151", borderRadius: "8px", color: "#fff" }} />
                 </PieChart>
               </ResponsiveContainer>
-              <div className="space-y-2 text-sm">
+              <div className="space-y-2 text-sm w-full sm:w-auto">
                 {compStatusPieData.map((d, i) => (
                   <div key={d.name} className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
@@ -120,11 +120,11 @@ export function OverviewTab({ stats, subscription, earningsChartData, compStatus
       </div>
 
       {/* Subscription Overview */}
-      <div className="bg-gray-800/50 rounded-2xl p-6 border border-gray-700/50">
-        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+      <div className="bg-gray-800/50 rounded-2xl p-4 sm:p-6 border border-gray-700/50">
+        <h3 className="text-base sm:text-lg font-semibold text-white mb-3 sm:mb-4 flex items-center gap-2">
           <Shield className="h-5 w-5 text-blue-400" /> Subscription Details
         </h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 text-sm">
           <InfoBlock label="Status">
             <span className={subscription.status === "active" ? "text-emerald-400" : "text-red-400"}>
               {subscription.status === "active" ? "Active" : "Inactive"}
@@ -151,7 +151,7 @@ export function OverviewTab({ stats, subscription, earningsChartData, compStatus
       </div>
 
       {/* Quick Earnings Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
         <MiniStat label="Total Earned" value={`⚡ ${(stats.totalEarnings ?? 0).toFixed(2)}`} color="emerald" />
         <MiniStat label="Paid Out" value={`⚡ ${(stats.paidEarnings ?? 0).toFixed(2)}`} color="emerald" />
         <MiniStat label="Pending" value={`⚡ ${(stats.pendingEarnings ?? 0).toFixed(2)}`} color="yellow" />
@@ -167,19 +167,19 @@ export function CompetitionsTab({ competitions, filter, onFilterChange, subscrip
 }) {
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
           <Filter className="h-4 w-4 text-gray-400" />
           {["all", "active", "upcoming", "completed", "cancelled"].map((f) => (
             <button key={f} onClick={() => onFilterChange(f)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${filter === f ? "bg-yellow-500 text-black" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}>
+              className={`px-2.5 sm:px-3 py-1.5 rounded-full text-xs font-medium transition-colors min-h-[36px] ${filter === f ? "bg-yellow-500 text-black" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}>
               {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}
         </div>
         {subscription.canCreateCompetitions && (
           <Link href={isExpired ? "#" : "/gamemaster/create-competition"} onClick={(e) => isExpired && e.preventDefault()}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${isExpired ? "bg-gray-700 text-gray-500 cursor-not-allowed" : "bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-600 hover:to-amber-600"}`}>
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors min-h-[44px] ${isExpired ? "bg-gray-700 text-gray-500 cursor-not-allowed" : "bg-gradient-to-r from-yellow-500 to-amber-500 text-black hover:from-yellow-600 hover:to-amber-600"}`}>
             <Plus className="h-4 w-4" /> Create Competition
           </Link>
         )}
@@ -232,12 +232,12 @@ export function ReferralsTab({ referrals, search, onSearchChange, total }: {
 }) {
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <span className="text-sm text-gray-400">Total: <span className="text-white font-medium">{total}</span> referred users</span>
-        <div className="relative w-72">
+        <div className="relative w-full sm:w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input type="text" placeholder="Search name or email..." value={search} onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder-gray-500 focus:border-yellow-500/50 focus:outline-none transition-colors" />
+            className="w-full pl-10 pr-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder-gray-500 focus:border-yellow-500/50 focus:outline-none transition-colors min-h-[44px]" />
         </div>
       </div>
       {referrals.length === 0 ? (
@@ -278,7 +278,7 @@ export function EarningsTab({ earnings, filter, onFilterChange, stats }: {
 }) {
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
         <MiniStat label="Total Earned" value={`⚡ ${(stats.totalEarnings ?? 0).toFixed(2)}`} color="emerald" />
         <MiniStat label="Paid Out" value={`⚡ ${(stats.paidEarnings ?? 0).toFixed(2)}`} color="emerald" />
         <MiniStat label="Pending" value={`⚡ ${(stats.pendingEarnings ?? 0).toFixed(2)}`} color="yellow" />
@@ -288,7 +288,7 @@ export function EarningsTab({ earnings, filter, onFilterChange, stats }: {
         <Filter className="h-4 w-4 text-gray-400" />
         {["all", "paid", "pending"].map((f) => (
           <button key={f} onClick={() => onFilterChange(f)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${filter === f ? "bg-yellow-500 text-black" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}>
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors min-h-[36px] ${filter === f ? "bg-yellow-500 text-black" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}>
             {f.charAt(0).toUpperCase() + f.slice(1)}
           </button>
         ))}
