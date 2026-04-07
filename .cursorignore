@@ -59,7 +59,7 @@ npm-debug.log*
 *.wav
 
 # ── IDE & OS ──
-
+.vscode
 .idea
 *.swp
 *.swo

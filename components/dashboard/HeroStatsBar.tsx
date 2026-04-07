@@ -20,6 +20,10 @@ interface HeroStatsBarProps {
   roi: number;
   gmEarnings: number;
   totalPrizesWon: number;
+  // Reason: "compact" = 4 key cards for Overview tab (balance, win rate, ROI, prizes)
+  // "wallet" = 4 financial cards for Wallet tab (balance, spent, GM, prizes)
+  // "full" (default) = all 6 cards
+  variant?: "compact" | "wallet" | "full";
 }
 
 // Reason: Each stat card has its own glow color and icon, configured here for consistency.
@@ -92,6 +96,15 @@ const STAT_CONFIG = [
   },
 ];
 
+// Reason: Maps variant to which STAT_CONFIG keys to show in each dashboard tab.
+function getVisibleKeys(variant: "compact" | "wallet" | "full"): string[] {
+  switch (variant) {
+    case "compact": return ["balance", "winrate", "roi", "prizes"];
+    case "wallet": return ["balance", "spent", "gm", "prizes"];
+    default: return ["balance", "spent", "winrate", "roi", "gm", "prizes"];
+  }
+}
+
 export default function HeroStatsBar({
   creditBalance,
   totalSpent,
@@ -99,12 +112,13 @@ export default function HeroStatsBar({
   roi,
   gmEarnings,
   totalPrizesWon,
+  variant = "full",
 }: HeroStatsBarProps) {
   const { settings } = useAppSettings();
   const decimals = settings?.credits?.decimals ?? 2;
   const symbol = settings?.credits?.symbol ?? "⚡";
 
-  const stats = useMemo(
+  const allStats = useMemo(
     () => [
       {
         ...STAT_CONFIG[0],
@@ -141,8 +155,16 @@ export default function HeroStatsBar({
     [creditBalance, totalSpent, winRate, roi, gmEarnings, totalPrizesWon, decimals, symbol],
   );
 
+  const visibleKeys = getVisibleKeys(variant);
+  const stats = allStats.filter((s) => visibleKeys.includes(s.key));
+
+  const gridCols =
+    stats.length <= 4
+      ? "grid-cols-2 lg:grid-cols-4"
+      : "grid-cols-2 lg:grid-cols-3 xl:grid-cols-6";
+
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+    <div className={`grid ${gridCols} gap-3`}>
       {stats.map((stat, i) => {
         const Icon = stat.icon;
         const isNeg = "isNeg" in stat && stat.isNeg;

@@ -94,6 +94,9 @@ interface ContestsSidebarProps {
       totalWon: number;
     };
   };
+  // Reason: When rendered in the dedicated Contests tab, the component gets full
+  // page width instead of 1/3 sidebar. Competition cards use a 2-col grid layout.
+  fullWidth?: boolean;
 }
 
 /**
@@ -330,6 +333,7 @@ function ChallengesList({ challenges }: { challenges: ChallengeData[] }) {
 export default function ContestsSidebar({
   competitions,
   challenges,
+  fullWidth = false,
 }: ContestsSidebarProps) {
   // Reason: Default to challenges tab per user request — challenges and
   // matchmaking are the primary engagement feature on the dashboard.
@@ -507,7 +511,8 @@ export default function ContestsSidebar({
               </Link>
             </div>
           ) : (
-            activeComps.map((comp, i) => (
+            <div className={fullWidth ? "grid grid-cols-1 md:grid-cols-2 gap-2" : "space-y-2"}>
+            {activeComps.map((comp, i) => (
               <Link
                 key={comp.id}
                 href={`/competitions/${comp.id}`}
@@ -554,7 +559,8 @@ export default function ContestsSidebar({
                   </div>
                 </motion.div>
               </Link>
-            ))
+            ))}
+            </div>
           )}
         </div>
       ) : (
