@@ -65,6 +65,7 @@ import {
   FileWarning,
   Map as MapIcon,
   Trash2,
+  Wrench,
   Eye,
   Cookie,
   Megaphone,
@@ -113,6 +114,7 @@ import MarketSettingsSection from "@/components/admin/MarketSettingsSection";
 import MarketDataSection from "@/components/admin/MarketDataSection";
 import DependencyUpdatesSection from "@/components/admin/DependencyUpdatesSection";
 import DataCleanupSection from "@/components/admin/DataCleanupSection";
+import DataMaintenanceSection from "@/components/admin/DataMaintenanceSection";
 import AdminOverviewDashboard from "@/components/admin/AdminOverviewDashboard";
 import AIAgentSection from "@/components/admin/AIAgentSection";
 import AIKnowledgeSection from "@/components/admin/AIKnowledgeSection";
@@ -670,6 +672,11 @@ const menuGroups: MenuGroup[] = [
             label: "Data Cleanup",
             icon: <Trash2 className="h-4 w-4" />,
           },
+          {
+            id: "data-maintenance",
+            label: "Data Maintenance",
+            icon: <Wrench className="h-4 w-4" />,
+          },
         ],
       },
     ],
@@ -1097,6 +1104,8 @@ export default function AdminDashboard({
         return <ImageOptimizerSection key={currentRefreshKey} />;
       case "data-cleanup":
         return <DataCleanupSection key={currentRefreshKey} />;
+      case "data-maintenance":
+        return <DataMaintenanceSection key={currentRefreshKey} />;
       case "ai-agent":
         return <AIAgentSection key={currentRefreshKey} />;
       case "ai-knowledge":
