@@ -222,29 +222,29 @@ const ChallengeTradingPage = async ({
                 <div className="relative bg-gradient-to-r from-dark-200 via-dark-200/95 to-dark-300/90 border-b border-orange-500/30 shadow-lg">
                   <div className="absolute inset-0 bg-gradient-to-r from-orange-500/5 to-transparent pointer-events-none" />
 
-                  <div className="container-custom py-4 md:py-6 relative z-10">
-                    <div className="flex flex-col gap-5 md:gap-6">
+                  <div className="container-custom py-3 sm:py-4 md:py-6 relative z-10">
+                    <div className="flex flex-col gap-3 sm:gap-5 md:gap-6">
                       {/* Back & Title */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+                        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
                           <Link
                             href={`/challenges/${challengeId}`}
-                            className="group flex items-center gap-2 px-3 py-2 rounded-lg bg-dark-300/50 hover:bg-dark-300 border border-dark-400/30 hover:border-orange-500/30 transition-all duration-200"
+                            className="group flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-lg bg-dark-300/50 hover:bg-dark-300 border border-dark-400/30 hover:border-orange-500/30 transition-all duration-200 flex-shrink-0"
                           >
                             <ArrowLeft className="size-4 group-hover:-translate-x-0.5 transition-transform" />
                             <span className="text-sm font-medium text-light-900">
                               Back
                             </span>
                           </Link>
-                          <div className="border-l border-dark-400/30 pl-4 h-10 flex flex-col justify-center">
+                          <div className="hidden sm:flex border-l border-dark-400/30 pl-4 h-10 flex-col justify-center min-w-0">
                             <div className="flex items-center gap-2">
-                              <Swords className="size-5 text-orange-500" />
-                              <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-light-900 tracking-tight">
+                              <Swords className="size-5 text-orange-500 flex-shrink-0" />
+                              <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-light-900 tracking-tight truncate">
                                 1v1 Challenge
                               </h1>
                             </div>
                             <div className="flex items-center gap-2 mt-0.5">
-                              <span className="text-sm text-gray-400">
+                              <span className="text-sm text-gray-400 truncate">
                                 vs{" "}
                                 <span className="text-orange-400 font-medium">
                                   {opponent?.username || "Opponent"}
@@ -259,6 +259,28 @@ const ChallengeTradingPage = async ({
                                 <span className="inline-flex items-center gap-1 text-xs font-medium text-green-400 ml-2">
                                   <span className="size-1.5 bg-green-400 rounded-full animate-pulse" />
                                   Live Trading
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {/* Mobile title */}
+                          <div className="sm:hidden min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <Swords className="size-4 text-orange-500 flex-shrink-0" />
+                              <h1 className="text-base font-bold text-light-900 tracking-tight truncate">
+                                vs {opponent?.username || "Opponent"}
+                              </h1>
+                            </div>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              {isViewOnly ? (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-orange-400">
+                                  <span className="size-1.5 bg-orange-400 rounded-full" />
+                                  Results
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-400">
+                                  <span className="size-1.5 bg-green-400 rounded-full animate-pulse" />
+                                  Live
                                 </span>
                               )}
                             </div>
@@ -422,7 +444,7 @@ const ChallengeTradingPage = async ({
                       {/* Positions & Trade History Tabs */}
                       <div className="bg-gradient-to-br from-dark-200 to-dark-300/50 rounded-2xl p-4 md:p-6 border border-dark-400/30 shadow-2xl">
                         <Tabs defaultValue="positions" className="w-full">
-                          <TabsList className="bg-dark-300/80 border border-dark-400/50 mb-5 p-1 rounded-xl backdrop-blur-sm shadow-lg">
+                          <TabsList className="bg-dark-300/80 border border-dark-400/50 mb-5 p-1 rounded-xl backdrop-blur-sm shadow-lg w-full overflow-x-auto flex-nowrap">
                             <TabsTrigger
                               value="positions"
                               className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-emerald-500/50 rounded-lg font-semibold transition-all duration-200"

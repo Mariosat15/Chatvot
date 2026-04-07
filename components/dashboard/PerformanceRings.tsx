@@ -21,62 +21,73 @@ interface RingDatum {
   glow: string;
 }
 
-function AnimatedRing({
-  datum,
-  size = 100,
-  strokeWidth = 8,
-  delay = 0,
-}: {
-  datum: RingDatum;
-  size?: number;
-  strokeWidth?: number;
-  delay?: number;
-}) {
+function RingSVG({ datum, size, strokeWidth, delay }: { datum: RingDatum; size: number; strokeWidth: number; delay: number }) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const pct = Math.min(datum.value / datum.max, 1);
 
   return (
+    <svg width={size} height={size} className="-rotate-90">
+      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={strokeWidth} />
+      <motion.circle
+        cx={size / 2} cy={size / 2} r={radius} fill="none"
+        stroke={datum.color} strokeWidth={strokeWidth} strokeLinecap="round"
+        strokeDasharray={circumference}
+        initial={{ strokeDashoffset: circumference }}
+        animate={{ strokeDashoffset: circumference * (1 - pct) }}
+        transition={{ duration: 1.2, delay: delay + 0.2, ease: "easeOut" }}
+      />
+    </svg>
+  );
+}
+
+function RingCenter({ displayValue }: { displayValue: string }) {
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center">
+      <span className="text-xs sm:text-base font-bold text-white" style={{ fontFamily: "var(--font-geist-mono), monospace" }}>
+        {displayValue}
+      </span>
+    </div>
+  );
+}
+
+// Reason: Renders ring at `size` on mobile and `smSize` on sm+ breakpoint
+// using CSS classes to swap visibility, avoiding JS resize listeners.
+function AnimatedRing({
+  datum,
+  size = 100,
+  smSize,
+  strokeWidth = 8,
+  delay = 0,
+}: {
+  datum: RingDatum;
+  size?: number;
+  smSize?: number;
+  strokeWidth?: number;
+  delay?: number;
+}) {
+  const actualSmSize = smSize || size;
+
+  return (
     <motion.div
-      className="flex flex-col items-center gap-2"
+      className="flex flex-col items-center gap-1.5 sm:gap-2"
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5, delay }}
     >
-      <div className="relative animate-neon-ring" style={{ "--ring-glow": datum.glow } as React.CSSProperties}>
-        <svg width={size} height={size} className="-rotate-90">
-          {/* Background track */}
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke="rgba(255,255,255,0.06)"
-            strokeWidth={strokeWidth}
-          />
-          {/* Animated arc */}
-          <motion.circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke={datum.color}
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            initial={{ strokeDashoffset: circumference }}
-            animate={{ strokeDashoffset: circumference * (1 - pct) }}
-            transition={{ duration: 1.2, delay: delay + 0.2, ease: "easeOut" }}
-          />
-        </svg>
-        {/* Center value */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-sm sm:text-base font-bold text-white" style={{ fontFamily: "var(--font-geist-mono), monospace" }}>
-            {datum.displayValue}
-          </span>
-        </div>
+      {/* Mobile ring */}
+      <div className={`relative animate-neon-ring ${smSize ? "sm:hidden" : ""}`} style={{ "--ring-glow": datum.glow } as React.CSSProperties}>
+        <RingSVG datum={datum} size={size} strokeWidth={strokeWidth} delay={delay} />
+        <RingCenter displayValue={datum.displayValue} />
       </div>
-      <span className="text-[11px] text-gray-400 text-center leading-tight">{datum.label}</span>
+      {/* Desktop ring (only rendered when smSize differs) */}
+      {smSize && (
+        <div className="relative animate-neon-ring hidden sm:block" style={{ "--ring-glow": datum.glow } as React.CSSProperties}>
+          <RingSVG datum={datum} size={actualSmSize} strokeWidth={strokeWidth + 1} delay={delay} />
+          <RingCenter displayValue={datum.displayValue} />
+        </div>
+      )}
+      <span className="text-xs text-gray-400 text-center leading-tight">{datum.label}</span>
     </motion.div>
   );
 }
@@ -165,13 +176,14 @@ export default function PerformanceRings({
       <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
         ⚡ Performance Metrics
       </h3>
-      <div className={`grid gap-3 sm:gap-4 ${rings.length <= 6 ? "grid-cols-3 sm:grid-cols-6" : "grid-cols-3 sm:grid-cols-4 lg:grid-cols-7"}`}>
+      <div className={`grid gap-3 sm:gap-4 ${rings.length <= 6 ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6" : "grid-cols-2 sm:grid-cols-4 lg:grid-cols-7"}`}>
         {rings.map((datum, i) => (
           <AnimatedRing
             key={datum.label}
             datum={datum}
-            size={90}
-            strokeWidth={7}
+            size={70}
+            smSize={90}
+            strokeWidth={6}
             delay={i * 0.08}
           />
         ))}

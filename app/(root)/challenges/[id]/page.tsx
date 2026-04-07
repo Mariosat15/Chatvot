@@ -155,7 +155,7 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
     };
 
     return (
-      <div className="flex min-h-screen flex-col gap-8 p-4 md:p-8">
+      <div className="flex min-h-screen flex-col gap-4 sm:gap-6 lg:gap-8 p-3 sm:p-4 md:p-8 overflow-x-hidden">
         {/* Auto-refresh when challenge status changes */}
         <ChallengeStatusMonitor
           challengeId={id}
@@ -164,21 +164,22 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
         />
 
         {/* Header with Back Button and UTC Clock */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center justify-between flex-wrap gap-2 sm:gap-4">
           <Link href="/challenges">
             <Button
               variant="ghost"
-              className="w-fit gap-2 text-gray-400 hover:text-gray-100"
+              className="w-fit gap-2 text-gray-400 hover:text-gray-100 min-h-[44px]"
             >
               <ArrowLeft className="h-4 w-4" />
-              Back to Challenges
+              <span className="hidden sm:inline">Back to Challenges</span>
+              <span className="sm:hidden">Back</span>
             </Button>
           </Link>
           <UTCClock />
         </div>
 
         {/* Header */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500/20 via-gray-800 to-gray-900 p-8 shadow-xl border border-orange-500/20">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500/20 via-gray-800 to-gray-900 p-4 sm:p-6 md:p-8 shadow-xl border border-orange-500/20">
           <div className="absolute top-0 right-0 opacity-10">
             <Swords className="h-48 w-48 text-orange-500" />
           </div>
@@ -225,9 +226,9 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
               </span>
             )}
 
-            <h1 className="text-4xl font-bold text-gray-100 mb-2 flex items-center gap-3">
-              <Swords className="h-10 w-10 text-orange-500" />
-              Challenge vs {opponentName}
+            <h1 className="text-xl sm:text-2xl md:text-4xl font-bold text-gray-100 mb-2 flex items-center gap-2 sm:gap-3">
+              <Swords className="h-6 w-6 sm:h-8 sm:w-8 md:h-10 md:w-10 text-orange-500 flex-shrink-0" />
+              <span className="truncate">Challenge vs {opponentName}</span>
             </h1>
             <p className="text-gray-400 mb-6">
               {isChallenger ? "You challenged" : "Challenged you"} •{" "}
@@ -240,24 +241,24 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
                 <p className="text-xs text-gray-500 uppercase tracking-wider">
                   Winner Prize
                 </p>
-                <p className="text-3xl font-bold text-yellow-500">
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-yellow-500">
                   {challenge.winnerPrize?.toFixed(0) || 0} ⚡
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">
+                <p className="text-[11px] sm:text-xs text-gray-500 uppercase tracking-wider">
                   Entry Fee
                 </p>
-                <p className="text-3xl font-bold text-gray-100">
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-100">
                   {challenge.entryFee} ⚡
                 </p>
-                <p className="text-xs text-gray-500">each player</p>
+                <p className="text-[11px] sm:text-xs text-gray-500">each player</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">
+                <p className="text-[11px] sm:text-xs text-gray-500 uppercase tracking-wider">
                   Platform Fee
                 </p>
-                <p className="text-3xl font-bold text-gray-100">
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-100">
                   {challenge.platformFeePercentage || 0}%
                 </p>
                 <p className="text-xs text-gray-500">
@@ -272,7 +273,7 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
                       ? "Accept By"
                       : "Status"}
                 </p>
-                <div className="text-3xl font-bold text-gray-100">
+                <div className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-100">
                   {isCompleted || isDeclined || isExpired || isCancelled ? (
                     <span
                       className={
@@ -300,7 +301,7 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Your Results Card (if completed) */}
@@ -605,50 +606,50 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
             )}
 
             {/* Schedule */}
-            <div className="rounded-xl bg-gradient-to-br from-orange-500/20 to-amber-500/10 border border-orange-500/30 p-6">
-              <div className="flex items-center gap-2 mb-4">
+            <div className="rounded-xl bg-gradient-to-br from-orange-500/20 to-amber-500/10 border border-orange-500/30 p-4 sm:p-6">
+              <div className="flex items-center gap-2 mb-3 sm:mb-4">
                 <Calendar className="h-5 w-5 text-orange-400" />
-                <h3 className="text-lg font-semibold text-gray-100">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-100">
                   Schedule (UTC)
                 </h3>
               </div>
 
-              <div className="space-y-4">
-                <div className="p-4 bg-gray-900/50 rounded-xl border border-gray-700">
+              <div className="space-y-3 sm:space-y-4">
+                <div className="p-3 sm:p-4 bg-gray-900/50 rounded-xl border border-gray-700">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
                     <span className="text-sm font-semibold text-yellow-400">
                       CREATED
                     </span>
                   </div>
-                  <p className="text-xl font-black text-white">
+                  <p className="text-sm sm:text-lg md:text-xl font-black text-white break-all sm:break-normal">
                     {formatUTCDate(new Date(challenge.createdAt))}
                   </p>
                 </div>
 
                 {challenge.startTime && (
-                  <div className="p-4 bg-gray-900/50 rounded-xl border border-gray-700">
+                  <div className="p-3 sm:p-4 bg-gray-900/50 rounded-xl border border-gray-700">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                      <span className="text-sm font-semibold text-green-400">
+                      <span className="text-xs sm:text-sm font-semibold text-green-400">
                         START TIME
                       </span>
                     </div>
-                    <p className="text-xl font-black text-white">
+                    <p className="text-sm sm:text-lg md:text-xl font-black text-white break-all sm:break-normal">
                       {formatUTCDate(new Date(challenge.startTime))}
                     </p>
                   </div>
                 )}
 
                 {challenge.endTime && (
-                  <div className="p-4 bg-gray-900/50 rounded-xl border border-gray-700">
+                  <div className="p-3 sm:p-4 bg-gray-900/50 rounded-xl border border-gray-700">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                      <span className="text-sm font-semibold text-red-400">
+                      <span className="text-xs sm:text-sm font-semibold text-red-400">
                         END TIME
                       </span>
                     </div>
-                    <p className="text-xl font-black text-white">
+                    <p className="text-sm sm:text-lg md:text-xl font-black text-white break-all sm:break-normal">
                       {formatUTCDate(new Date(challenge.endTime))}
                     </p>
                   </div>
@@ -657,8 +658,8 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
             </div>
 
             {/* Challenge Details */}
-            <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-6">
-              <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
+            <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-100 mb-3 sm:mb-4 flex items-center gap-2">
                 <Info className="h-5 w-5 text-blue-400" />
                 Trading Settings
               </h3>
@@ -739,10 +740,10 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
             </div>
 
             {/* Trading Restrictions */}
-            <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-6">
-              <div className="flex items-center gap-2 mb-4">
+            <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4 sm:p-6">
+              <div className="flex items-center gap-2 mb-3 sm:mb-4">
                 <Shield className="h-5 w-5 text-blue-400" />
-                <h3 className="text-lg font-semibold text-gray-100">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-100">
                   Trading Restrictions
                 </h3>
               </div>
@@ -775,8 +776,8 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
             </div>
 
             {/* Prize Pool */}
-            <div className="rounded-xl bg-gradient-to-br from-yellow-500/10 to-gray-800/50 border border-yellow-500/30 p-6">
-              <h3 className="text-lg font-semibold text-gray-100 flex items-center gap-2 mb-4">
+            <div className="rounded-xl bg-gradient-to-br from-yellow-500/10 to-gray-800/50 border border-yellow-500/30 p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-100 flex items-center gap-2 mb-3 sm:mb-4">
                 <Trophy className="h-5 w-5 text-yellow-500" />
                 Prize Breakdown
               </h3>

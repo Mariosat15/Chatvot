@@ -648,19 +648,19 @@ export default function CompetitionsPageContent({
             <button
               onClick={() => refreshData(true)}
               disabled={isRefreshing}
-              className="p-2 bg-gray-800 rounded-lg border border-gray-700"
+              className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center bg-gray-800 rounded-lg border border-gray-700"
             >
               <RefreshCw
-                className={`h-4 w-4 text-gray-400 ${isRefreshing ? "animate-spin" : ""}`}
+                className={`h-5 w-5 text-gray-400 ${isRefreshing ? "animate-spin" : ""}`}
               />
             </button>
             <button
               onClick={() => setShowMobileFilters(!showMobileFilters)}
-              className="relative p-2 bg-gray-800 rounded-lg border border-gray-700"
+              className="relative p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center bg-gray-800 rounded-lg border border-gray-700"
             >
-              <Filter className="h-4 w-4 text-gray-400" />
+              <Filter className="h-5 w-5 text-gray-400" />
               {activeFiltersCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-500 text-gray-900 text-[10px] font-bold rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-500 text-gray-900 text-[11px] font-bold rounded-full flex items-center justify-center">
                   {activeFiltersCount}
                 </span>
               )}
@@ -702,7 +702,7 @@ export default function CompetitionsPageContent({
         <div className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-blue-600/20 via-blue-500/10 to-transparent border border-blue-500/30 p-3 sm:p-6 group hover:border-blue-500/50 transition-colors">
           <div className="absolute top-0 right-0 w-16 sm:w-32 h-16 sm:h-32 bg-blue-500/10 rounded-full blur-2xl sm:blur-3xl group-hover:scale-150 transition-transform"></div>
           <div className="relative">
-            <p className="text-[10px] sm:text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1">
+            <p className="text-[11px] sm:text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1">
               <GameIcon name="fireSpell" size={12} />
               <span className="hidden sm:inline">Live Now</span>
               <span className="sm:hidden">Live</span>
@@ -710,7 +710,7 @@ export default function CompetitionsPageContent({
             <p className="mt-1 sm:mt-2 text-2xl sm:text-4xl font-black text-gray-100 tabular-nums">
               {activeCount}
             </p>
-            <p className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">
+            <p className="text-[11px] sm:text-xs text-gray-500 hidden sm:block">
               Active competitions
             </p>
           </div>
@@ -719,7 +719,7 @@ export default function CompetitionsPageContent({
         <div className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-yellow-600/20 via-yellow-500/10 to-transparent border border-yellow-500/30 p-3 sm:p-6 group hover:border-yellow-500/50 transition-colors">
           <div className="absolute top-0 right-0 w-16 sm:w-32 h-16 sm:h-32 bg-yellow-500/10 rounded-full blur-2xl sm:blur-3xl group-hover:scale-150 transition-transform"></div>
           <div className="relative">
-            <p className="text-[10px] sm:text-xs font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-1">
+            <p className="text-[11px] sm:text-xs font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-1">
               <GameIcon name="timer" size={12} />
               <span className="hidden sm:inline">Starting Soon</span>
               <span className="sm:hidden">Soon</span>
@@ -727,7 +727,7 @@ export default function CompetitionsPageContent({
             <p className="mt-1 sm:mt-2 text-2xl sm:text-4xl font-black text-gray-100 tabular-nums">
               {upcomingCount}
             </p>
-            <p className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">
+            <p className="text-[11px] sm:text-xs text-gray-500 hidden sm:block">
               Reserve your spot
             </p>
           </div>
@@ -736,7 +736,7 @@ export default function CompetitionsPageContent({
         <div className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-green-600/20 via-green-500/10 to-transparent border border-green-500/30 p-3 sm:p-6 group hover:border-green-500/50 transition-colors">
           <div className="absolute top-0 right-0 w-16 sm:w-32 h-16 sm:h-32 bg-green-500/10 rounded-full blur-2xl sm:blur-3xl group-hover:scale-150 transition-transform"></div>
           <div className="relative">
-            <p className="text-[10px] sm:text-xs font-bold text-green-400 uppercase tracking-wider flex items-center gap-1">
+            <p className="text-[11px] sm:text-xs font-bold text-green-400 uppercase tracking-wider flex items-center gap-1">
               <GameIcon name="crown" size={12} />
               <span className="hidden sm:inline">Prize Pool</span>
               <span className="sm:hidden">Prize</span>
@@ -747,7 +747,7 @@ export default function CompetitionsPageContent({
               </span>
               <span className="text-green-400 text-lg sm:text-2xl">{settings?.credits.symbol || "⚡"}</span>
             </div>
-            <p className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">
+            <p className="text-[11px] sm:text-xs text-gray-500 hidden sm:block">
               Available to win
             </p>
           </div>
@@ -782,7 +782,7 @@ export default function CompetitionsPageContent({
                       setStatusFilter([...statusFilter, status]);
                     }
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  className={`px-3 py-2.5 min-h-[44px] rounded-lg text-xs font-medium transition-all flex items-center justify-center ${
                     statusFilter.includes(status)
                       ? "bg-yellow-500 text-gray-900"
                       : "bg-gray-700 text-gray-300"
@@ -815,7 +815,7 @@ export default function CompetitionsPageContent({
                         setDifficultyFilter([...difficultyFilter, level]);
                       }
                     }}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-medium transition-all ${
+                    className={`px-2.5 py-2 min-h-[40px] rounded-lg text-[11px] font-medium transition-all flex items-center justify-center ${
                       difficultyFilter.includes(level)
                         ? `${DIFFICULTY_LABELS[level].color.replace("text-", "bg-").replace("-400", "-500").replace("-300", "-400")} ${level === "Novice" || level === "Apprentice" || level === "Elite" || level === "Master" ? "text-gray-900" : "text-white"}`
                         : "bg-gray-700 text-gray-300"
@@ -846,7 +846,7 @@ export default function CompetitionsPageContent({
                         setLevelFilter([...levelFilter, level]);
                       }
                     }}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-medium transition-all ${
+                    className={`px-2.5 py-2 min-h-[40px] rounded-lg text-[11px] font-medium transition-all flex items-center justify-center ${
                       levelFilter.includes(level)
                         ? "bg-amber-500 text-gray-900"
                         : "bg-gray-700 text-gray-300"
@@ -946,7 +946,7 @@ export default function CompetitionsPageContent({
                 <Filter className="h-4 w-4 mr-2" />
                 Status
                 {statusFilter.length > 0 && statusFilter.length < 4 && (
-                  <Badge className="ml-2 bg-yellow-500/20 text-yellow-400 text-[10px]">
+                  <Badge className="ml-2 bg-yellow-500/20 text-yellow-400 text-[11px]">
                     {statusFilter.length}
                   </Badge>
                 )}
@@ -994,7 +994,7 @@ export default function CompetitionsPageContent({
                   <GameIcon name="target" size={16} className="mr-2" />
                   Type
                   {rankingFilter.length > 0 && (
-                    <Badge className="ml-2 bg-blue-500/20 text-blue-400 text-[10px]">
+                    <Badge className="ml-2 bg-blue-500/20 text-blue-400 text-[11px]">
                       {rankingFilter.length}
                     </Badge>
                   )}
@@ -1041,7 +1041,7 @@ export default function CompetitionsPageContent({
                   <SlidersHorizontal className="h-4 w-4 mr-2" />
                   Assets
                   {assetFilter.length > 0 && (
-                    <Badge className="ml-2 bg-purple-500/20 text-purple-400 text-[10px]">
+                    <Badge className="ml-2 bg-purple-500/20 text-purple-400 text-[11px]">
                       {assetFilter.length}
                     </Badge>
                   )}
@@ -1085,7 +1085,7 @@ export default function CompetitionsPageContent({
                 <GameIcon name="skull" size={16} className="mr-2" />
                 Difficulty
                 {difficultyFilter.length > 0 && (
-                  <Badge className="ml-2 bg-red-500/20 text-red-400 text-[10px]">
+                  <Badge className="ml-2 bg-red-500/20 text-red-400 text-[11px]">
                     {difficultyFilter.length}
                   </Badge>
                 )}
@@ -1133,7 +1133,7 @@ export default function CompetitionsPageContent({
                   <GameIcon name="star1" size={16} className="mr-2" />
                   Level
                   {levelFilter.length > 0 && (
-                    <Badge className="ml-2 bg-amber-500/20 text-amber-400 text-[10px]">
+                    <Badge className="ml-2 bg-amber-500/20 text-amber-400 text-[11px]">
                       {levelFilter.length}
                     </Badge>
                   )}
@@ -1266,7 +1266,7 @@ export default function CompetitionsPageContent({
               <h2 className="text-base sm:text-xl font-bold text-gray-100">
                 Starting Soon
               </h2>
-              <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-[10px] sm:text-xs">
+              <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-[11px] sm:text-xs">
                 {upcomingCompetitions.length}
               </Badge>
             </div>
@@ -1311,7 +1311,7 @@ export default function CompetitionsPageContent({
                         ? "Completed"
                         : "Other Competitions"}
                 </h2>
-                <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-[10px] sm:text-xs">
+                <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-[11px] sm:text-xs">
                   {otherCompetitions.length}
                 </Badge>
               </div>

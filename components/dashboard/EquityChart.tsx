@@ -53,9 +53,11 @@ export default function EquityChart({ data }: EquityChartProps) {
         chartRef.current = null;
       }
 
+      // Reason: Shorter chart on narrow screens to save vertical space
+      const chartHeight = containerRef.current.clientWidth < 500 ? 200 : 260;
       chart = mod.createChart(containerRef.current, {
         width: containerRef.current.clientWidth,
-        height: 260,
+        height: chartHeight,
         layout: {
           background: { color: "transparent" },
           textColor: "#6B7280",
@@ -177,8 +179,8 @@ export default function EquityChart({ data }: EquityChartProps) {
       transition={{ duration: 0.5, delay: 0.35 }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div>
+      <div className="flex items-start justify-between flex-wrap gap-2 mb-3">
+        <div className="min-w-0">
           <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
             ⚡ Wallet Balance
           </h3>
@@ -216,12 +218,12 @@ export default function EquityChart({ data }: EquityChartProps) {
         </div>
 
         {/* Range selector */}
-        <div className="flex items-center gap-1 bg-gray-700/40 rounded-lg p-0.5">
+        <div className="flex items-center gap-1 bg-gray-700/40 rounded-lg p-0.5 flex-shrink-0">
           {(["7d", "30d", "90d", "all"] as const).map((r) => (
             <button
               key={r}
               onClick={() => setRange(r)}
-              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer ${
+              className={`px-3 py-2 text-xs font-medium rounded-md transition-all cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center ${
                 range === r
                   ? "bg-gray-600 text-white"
                   : "text-gray-400 hover:text-white"
@@ -234,7 +236,7 @@ export default function EquityChart({ data }: EquityChartProps) {
       </div>
 
       {/* Chart container */}
-      <div ref={containerRef} className="w-full" style={{ minHeight: 260 }} />
+      <div ref={containerRef} className="w-full" style={{ minHeight: 200 }} />
     </motion.div>
   );
 }

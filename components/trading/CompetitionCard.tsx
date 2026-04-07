@@ -338,28 +338,28 @@ export default function CompetitionCard({
                     {competition.name}
                   </h3>
                   {isActive && (
-                    <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-blue-500 text-white text-[10px] font-bold animate-pulse">
+                    <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-blue-500 text-white text-[11px] font-bold animate-pulse">
                       LIVE
                     </span>
                   )}
                   {isCompleted && (
-                    <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-green-600 text-white text-[10px] font-bold">
+                    <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-green-600 text-white text-[11px] font-bold">
                       COMPLETED
                     </span>
                   )}
                   {isCancelled && (
-                    <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                    <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-red-500 text-white text-[11px] font-bold">
                       CANCELLED
                     </span>
                   )}
                   {isUserIn && !isCompleted && !isCancelled && (
-                    <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-[10px] font-bold border border-green-500/40">
+                    <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-[11px] font-bold border border-green-500/40">
                       ✓ ENTERED
                     </span>
                   )}
                   {/* Creator Badge */}
                   <span
-                    className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                    className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[11px] font-bold border ${
                       isGmCreated
                         ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
                         : "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
@@ -460,7 +460,7 @@ export default function CompetitionCard({
               {/* Starting Capital */}
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/10 border border-purple-500/20">
                 <GameIcon name="target" size={12} />
-                <span className="text-[10px] text-purple-300 font-medium">
+                <span className="text-[11px] text-purple-300 font-medium">
                   $
                   {(
                     competition.startingCapital ||
@@ -473,7 +473,7 @@ export default function CompetitionCard({
               {/* Leverage */}
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/20">
                 <GameIcon name="fireSpell" size={12} />
-                <span className="text-[10px] text-orange-300 font-medium">
+                <span className="text-[11px] text-orange-300 font-medium">
                   1:{maxLeverage}
                 </span>
               </div>
@@ -483,7 +483,7 @@ export default function CompetitionCard({
                 competition.rules.minimumTrades > 1 && (
                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
                     <GameIcon name="sword" size={14} />
-                    <span className="text-[10px] text-cyan-300 font-medium">
+                    <span className="text-[11px] text-cyan-300 font-medium">
                       Min {competition.rules.minimumTrades} trades
                     </span>
                   </div>
@@ -493,7 +493,7 @@ export default function CompetitionCard({
               {competition.rules?.disqualifyOnLiquidation && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/20">
                   <GameIcon name="skull" size={12} />
-                  <span className="text-[10px] text-red-300 font-medium">
+                  <span className="text-[11px] text-red-300 font-medium">
                     Liquidation = DQ
                   </span>
                 </div>
@@ -503,7 +503,7 @@ export default function CompetitionCard({
               {competition.levelRequirement?.enabled && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20">
                   <GameIcon name="crown" size={14} />
-                  <span className="text-[10px] text-amber-300 font-medium">
+                  <span className="text-[11px] text-amber-300 font-medium">
                     Level {competition.levelRequirement.minLevel}+
                   </span>
                 </div>
@@ -513,7 +513,7 @@ export default function CompetitionCard({
               {competition.riskLimits?.enabled && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20">
                   <GameIcon name="shield1" size={12} />
-                  <span className="text-[10px] text-blue-300 font-medium">
+                  <span className="text-[11px] text-blue-300 font-medium">
                     Max DD: {competition.riskLimits.maxDrawdownPercent}%
                   </span>
                 </div>
@@ -524,7 +524,7 @@ export default function CompetitionCard({
                 {competition.assetClasses?.slice(0, 3).map((asset: string) => (
                   <span
                     key={asset}
-                    className="px-2 py-0.5 rounded bg-gray-800/80 text-[10px] font-bold text-gray-400 uppercase border border-gray-700/50"
+                    className="px-2 py-0.5 rounded bg-gray-800/80 text-[11px] font-bold text-gray-400 uppercase border border-gray-700/50"
                   >
                     {asset === "forex" && "💱"} {asset === "crypto" && "₿"}{" "}
                     {asset === "stocks" && "📊"} {asset}
@@ -582,7 +582,7 @@ export default function CompetitionCard({
       {/* Status Badges - Only for upcoming and entered status */}
       <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
         {isUserIn && !isCompleted && !isCancelled && (
-          <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/20 text-green-400 text-[10px] font-bold border border-green-500/40">
+          <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/20 text-green-400 text-[11px] font-bold border border-green-500/40">
             <GameIcon name="starBadge" size={12} />
             ENTERED
           </span>
@@ -607,7 +607,7 @@ export default function CompetitionCard({
                 >
                   {rankingInfo.name}
                 </p>
-                <p className="text-[10px] text-gray-400">
+                <p className="text-[11px] text-gray-400">
                   {rankingInfo.description}
                 </p>
               </div>
@@ -623,7 +623,7 @@ export default function CompetitionCard({
         {/* Creator Badge */}
         <div className="flex justify-center mb-2">
           <span
-            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
               isGmCreated
                 ? "bg-purple-500/15 text-purple-300 border-purple-500/30"
                 : "bg-cyan-500/15 text-cyan-300 border-cyan-500/30"
@@ -720,7 +720,7 @@ export default function CompetitionCard({
                 <GameIcon name="coin" size={16} />
               </div>
               <div>
-                <p className="text-[10px] text-gray-500 uppercase">Entry Fee</p>
+                <p className="text-[11px] text-gray-500 uppercase">Entry Fee</p>
                 <p
                   className={`text-sm font-bold ${isCancelled ? "text-red-400 line-through" : "text-gray-100"}`}
                 >
@@ -737,7 +737,7 @@ export default function CompetitionCard({
                 <GameIcon name="war" size={16} />
               </div>
               <div>
-                <p className="text-[10px] text-gray-500 uppercase">Players</p>
+                <p className="text-[11px] text-gray-500 uppercase">Players</p>
                 <p className="text-sm font-bold text-gray-100">
                   {competition.currentParticipants}
                   <span className="text-gray-500">
@@ -755,7 +755,7 @@ export default function CompetitionCard({
                 <GameIcon name="target" size={18} />
               </div>
               <div>
-                <p className="text-[10px] text-gray-500 uppercase">Capital</p>
+                <p className="text-[11px] text-gray-500 uppercase">Capital</p>
                 <p className="text-sm font-bold text-gray-100">
                   ${(competition.startingCapital || 10000).toLocaleString()}
                 </p>
@@ -770,7 +770,7 @@ export default function CompetitionCard({
                 <GameIcon name="timer" size={18} />
               </div>
               <div>
-                <p className="text-[10px] text-gray-500 uppercase">Duration</p>
+                <p className="text-[11px] text-gray-500 uppercase">Duration</p>
                 <p className="text-sm font-bold text-gray-100">
                   {getDuration()}
                 </p>
@@ -788,7 +788,7 @@ export default function CompetitionCard({
                 <GameIcon name="fireSpell" size={16} />
               </div>
               <div>
-                <p className="text-[10px] text-gray-500 uppercase">Leverage</p>
+                <p className="text-[11px] text-gray-500 uppercase">Leverage</p>
                 <p className="text-sm font-bold text-yellow-400">
                   1:{maxLeverage}
                 </p>
@@ -805,7 +805,7 @@ export default function CompetitionCard({
                   <GameIcon name="sword" size={18} />
                 </div>
                 <div>
-                  <p className="text-[10px] text-gray-500 uppercase">
+                  <p className="text-[11px] text-gray-500 uppercase">
                     Min Trades
                   </p>
                   <p className="text-sm font-bold text-cyan-400">
@@ -822,7 +822,7 @@ export default function CompetitionCard({
                   <GameIcon name="skull" size={16} />
                 </div>
                 <div>
-                  <p className="text-[10px] text-gray-500 uppercase">
+                  <p className="text-[11px] text-gray-500 uppercase">
                     Liquidation
                   </p>
                   <p className="text-sm font-bold text-red-400">= DQ</p>
@@ -837,7 +837,7 @@ export default function CompetitionCard({
                   <GameIcon name="starBadge" size={16} />
                 </div>
                 <div>
-                  <p className="text-[10px] text-gray-500 uppercase">Status</p>
+                  <p className="text-[11px] text-gray-500 uppercase">Status</p>
                   <p className="text-sm font-bold text-green-400">Open</p>
                 </div>
               </div>
@@ -853,7 +853,7 @@ export default function CompetitionCard({
                 <GameIcon name="timer" size={16} />
               </div>
               <div>
-                <p className="text-[10px] text-gray-500 uppercase">Starts</p>
+                <p className="text-[11px] text-gray-500 uppercase">Starts</p>
                 <p className="text-xs font-bold text-gray-100">
                   {formatDateTime(competition.startTime)}
                 </p>
@@ -867,7 +867,7 @@ export default function CompetitionCard({
                 <GameIcon name="timer" size={16} />
               </div>
               <div>
-                <p className="text-[10px] text-gray-500 uppercase">Ends</p>
+                <p className="text-[11px] text-gray-500 uppercase">Ends</p>
                 <p className="text-xs font-bold text-gray-100">
                   {formatDateTime(competition.endTime)}
                 </p>
@@ -1008,7 +1008,7 @@ export default function CompetitionCard({
           {competition.assetClasses?.map((asset: string) => (
             <span
               key={asset}
-              className="px-2 py-1 rounded-lg bg-gray-800/80 text-[10px] font-bold text-gray-300 uppercase border border-gray-700/50"
+              className="px-2 py-1 rounded-lg bg-gray-800/80 text-[11px] font-bold text-gray-300 uppercase border border-gray-700/50"
             >
               {asset === "forex" && "💱"} {asset === "crypto" && "₿"}{" "}
               {asset === "stocks" && "📊"} {asset === "indices" && "📈"} {asset}

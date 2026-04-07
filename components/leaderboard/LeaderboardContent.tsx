@@ -328,7 +328,7 @@ export default function LeaderboardContent({
               </div>
             </div>
             <div>
-              <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-200 to-gray-400">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-200 to-gray-400">
                 GLOBAL LEADERBOARD
               </h1>
               <p className="text-sm text-gray-500 font-medium">
@@ -343,7 +343,7 @@ export default function LeaderboardContent({
               <button
                 onClick={() => setViewMode("table")}
                 className={cn(
-                  "px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2",
+                  "px-3 sm:px-4 py-2.5 sm:py-2 min-h-[44px] rounded-lg font-semibold text-sm transition-all flex items-center gap-1.5 sm:gap-2",
                   viewMode === "table"
                     ? "bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-lg shadow-primary-500/25"
                     : "text-gray-500 hover:text-white",
@@ -355,7 +355,7 @@ export default function LeaderboardContent({
               <button
                 onClick={() => setViewMode("cards")}
                 className={cn(
-                  "px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2",
+                  "px-3 sm:px-4 py-2.5 sm:py-2 min-h-[44px] rounded-lg font-semibold text-sm transition-all flex items-center gap-1.5 sm:gap-2",
                   viewMode === "cards"
                     ? "bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-purple-500/25"
                     : "text-gray-500 hover:text-white",
@@ -382,11 +382,11 @@ export default function LeaderboardContent({
           <div className="absolute inset-0 bg-gradient-to-r from-primary-500/20 via-transparent to-cyan-500/20 opacity-50" />
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary-500 to-transparent" />
 
-          <div className="relative p-6 flex items-center justify-between">
-            <div className="flex items-center gap-5">
+          <div className="relative p-4 sm:p-6 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 sm:gap-5">
               <div
                 className={cn(
-                  "relative w-20 h-20 rounded-2xl flex items-center justify-center",
+                  "relative w-14 h-14 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center",
                   myPosition.rank === 1 &&
                     "bg-gradient-to-br from-yellow-500/30 to-amber-500/30 border-2 border-yellow-500/50",
                   myPosition.rank === 2 &&
@@ -400,16 +400,16 @@ export default function LeaderboardContent({
                 {myPosition.rank <= 3 ? (
                   <RankIcon rank={myPosition.rank} size={40} />
                 ) : (
-                  <span className="text-3xl font-black text-primary-400">
+                  <span className="text-xl sm:text-3xl font-black text-primary-400">
                     #{myPosition.rank}
                   </span>
                 )}
               </div>
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
                   Your Rank
                 </p>
-                <p className="text-4xl font-black text-white">
+                <p className="text-2xl sm:text-4xl font-black text-white">
                   #{myPosition.rank}
                 </p>
                 <p className="text-sm text-gray-500">
@@ -421,7 +421,7 @@ export default function LeaderboardContent({
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
                 Percentile
               </p>
-              <p className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">
+              <p className="text-2xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">
                 {myPosition.percentile.toFixed(1)}%
               </p>
               <p className="text-sm text-gray-500">
@@ -690,7 +690,7 @@ export default function LeaderboardContent({
                           />
                           {isCurrentUser && (
                             <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-primary-500 rounded-full flex items-center justify-center">
-                              <span className="text-[8px] text-white font-bold">
+                              <span className="text-[10px] text-white font-bold">
                                 YOU
                               </span>
                             </div>
@@ -715,7 +715,7 @@ export default function LeaderboardContent({
                             {entry.userTitle && (
                               <span
                                 className={cn(
-                                  "px-2 py-0.5 rounded-md text-[10px] font-bold flex-shrink-0 bg-gray-800 border border-gray-700 inline-flex items-center gap-1",
+                                  "px-2 py-0.5 rounded-md text-[11px] font-bold flex-shrink-0 bg-gray-800 border border-gray-700 inline-flex items-center gap-1",
                                   entry.userTitleColor || "text-purple-400",
                                 )}
                               >
@@ -926,7 +926,7 @@ export default function LeaderboardContent({
                       />
                       {isCurrentUser && (
                         <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-primary-500 rounded-full flex items-center justify-center">
-                          <span className="text-[8px] text-white font-bold">YOU</span>
+                          <span className="text-[10px] text-white font-bold">YOU</span>
                         </div>
                       )}
                     </div>
@@ -947,7 +947,7 @@ export default function LeaderboardContent({
                           {entry.username}
                         </button>
                         {isCurrentUser && (
-                          <span className="px-1.5 py-0.5 text-[10px] bg-primary-500/20 text-primary-400 rounded font-bold">
+                          <span className="px-1.5 py-0.5 text-[11px] bg-primary-500/20 text-primary-400 rounded font-bold">
                             YOU
                           </span>
                         )}
@@ -994,7 +994,7 @@ export default function LeaderboardContent({
                         {entry.totalPnl >= 0 ? "+" : ""}
                         {entry.totalPnl.toFixed(0)}
                       </p>
-                      <p className="text-[10px] text-gray-500">P&L</p>
+                      <p className="text-[11px] text-gray-500">P&L</p>
                     </div>
                     <div className="text-center p-2 rounded-lg bg-gray-800/50">
                       <p
@@ -1007,19 +1007,19 @@ export default function LeaderboardContent({
                       >
                         {entry.totalPnlPercentage.toFixed(1)}%
                       </p>
-                      <p className="text-[10px] text-gray-500">ROI</p>
+                      <p className="text-[11px] text-gray-500">ROI</p>
                     </div>
                     <div className="text-center p-2 rounded-lg bg-gray-800/50">
                       <p className="font-bold text-xs text-white">
                         {entry.winRate.toFixed(1)}%
                       </p>
-                      <p className="text-[10px] text-gray-500">Win Rate</p>
+                      <p className="text-[11px] text-gray-500">Win Rate</p>
                     </div>
                     <div className="text-center p-2 rounded-lg bg-gray-800/50">
                       <p className="font-bold text-xs text-white">
                         {entry.totalTrades}
                       </p>
-                      <p className="text-[10px] text-gray-500">Trades</p>
+                      <p className="text-[11px] text-gray-500">Trades</p>
                     </div>
                   </div>
 

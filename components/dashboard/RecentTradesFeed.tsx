@@ -168,17 +168,17 @@ export default function RecentTradesFeed({
                     {item.symbol}
                   </span>
                   {item.isOpen && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-medium">
+                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-medium">
                       LIVE
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-1 text-[10px] text-gray-500">
-                  <span>{item.side.toUpperCase()}</span>
-                  <span>•</span>
-                  <span>{item.contest}</span>
-                  <span>•</span>
-                  <span>{formatTimeAgo(item.time)}</span>
+                <div className="flex items-center gap-1 text-[11px] text-gray-500 min-w-0">
+                  <span className="flex-shrink-0">{item.side.toUpperCase()}</span>
+                  <span className="flex-shrink-0">•</span>
+                  <span className="truncate">{item.contest}</span>
+                  <span className="flex-shrink-0">•</span>
+                  <span className="flex-shrink-0">{formatTimeAgo(item.time)}</span>
                 </div>
               </div>
 
@@ -192,7 +192,7 @@ export default function RecentTradesFeed({
                   {isProfit ? "+" : ""}${item.pnl.toFixed(2)}
                 </div>
                 <div
-                  className={`text-[10px] ${
+                  className={`text-[11px] ${
                     isProfit ? "text-green-500/70" : "text-red-500/70"
                   }`}
                 >

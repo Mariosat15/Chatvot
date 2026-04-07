@@ -172,7 +172,7 @@ export default function ModernProfileTabs({
         {canScrollLeft && (
           <button
             onClick={() => scroll("left")}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-gray-900/90 backdrop-blur rounded-full flex items-center justify-center text-gray-400 hover:text-white transition-colors shadow-lg border border-gray-700"
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-9 h-9 min-w-[36px] min-h-[36px] bg-gray-900/90 backdrop-blur rounded-full flex items-center justify-center text-gray-400 hover:text-white transition-colors shadow-lg border border-gray-700"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -180,7 +180,7 @@ export default function ModernProfileTabs({
         {canScrollRight && (
           <button
             onClick={() => scroll("right")}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-gray-900/90 backdrop-blur rounded-full flex items-center justify-center text-gray-400 hover:text-white transition-colors shadow-lg border border-gray-700"
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-9 h-9 min-w-[36px] min-h-[36px] bg-gray-900/90 backdrop-blur rounded-full flex items-center justify-center text-gray-400 hover:text-white transition-colors shadow-lg border border-gray-700"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -200,7 +200,7 @@ export default function ModernProfileTabs({
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
                 className={`
-                  relative flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm 
+                  relative flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 min-h-[44px] rounded-xl font-medium text-xs sm:text-sm 
                   transition-all duration-200 whitespace-nowrap min-w-fit
                   ${
                     isActive

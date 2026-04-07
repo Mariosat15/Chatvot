@@ -103,7 +103,7 @@ export default function PlayerProfileCard({
             <GameIcon name={titleIcon as GameIconName} size={28} alt={title} />
           </div>
           <div
-            className="absolute -bottom-1 -right-1 w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold bg-gray-900 border-2"
+            className="absolute -bottom-1 -right-1 w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-[11px] sm:text-xs font-bold bg-gray-900 border-2"
             style={{ borderColor: titleColor, color: titleColor }}
           >
             {level}
@@ -123,7 +123,7 @@ export default function PlayerProfileCard({
               <Crown className="w-4 h-4 text-yellow-400 flex-shrink-0" />
             )}
             {globalRank > 0 && (
-              <span className="text-[10px] sm:text-xs text-gray-500 whitespace-nowrap shrink-0">
+              <span className="text-[11px] sm:text-xs text-gray-500 whitespace-nowrap shrink-0">
                 • Rank #{globalRank}
                 <span className="text-gray-600"> / {totalUsers}</span>
               </span>
@@ -154,7 +154,7 @@ export default function PlayerProfileCard({
             >
               #{globalRank.toLocaleString()}
             </div>
-            <span className="text-[10px] text-gray-500 uppercase tracking-wider">
+            <span className="text-[11px] text-gray-500 uppercase tracking-wider">
               Global Rank
             </span>
           </div>
@@ -202,7 +202,7 @@ export default function PlayerProfileCard({
                 {hasOverflow && (
                   <button
                     onClick={() => setBadgesExpanded((v) => !v)}
-                    className="flex items-center gap-0.5 text-[10px] text-purple-400 hover:text-purple-300 transition-colors"
+                    className="flex items-center gap-0.5 text-[11px] text-purple-400 hover:text-purple-300 transition-colors min-h-[44px]"
                   >
                     {badgesExpanded ? "Collapse" : `+${recentBadges.length - COLLAPSED_LIMIT} more`}
                     <ChevronDown
@@ -250,7 +250,7 @@ export default function PlayerProfileCard({
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Map className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">
+              <span className="text-xs text-gray-400 uppercase tracking-wider font-medium truncate">
                 Journey — {journey.currentMapName}
               </span>
             </div>
@@ -304,7 +304,7 @@ export default function PlayerProfileCard({
                   <div className="flex items-center mb-2">
                     <button
                       onClick={() => setMilestonesExpanded((v) => !v)}
-                      className="flex items-center gap-0.5 text-[10px] text-amber-400 hover:text-amber-300 transition-colors"
+                      className="flex items-center gap-0.5 text-[11px] text-amber-400 hover:text-amber-300 transition-colors min-h-[44px]"
                     >
                       {milestonesExpanded ? "Collapse" : `+${ms.length - COLLAPSED_LIMIT} more`}
                       <ChevronDown

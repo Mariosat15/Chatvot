@@ -248,32 +248,32 @@ export default function ChallengeCard({
                   vs {opponentName}
                 </h3>
                 {isActive && (
-                  <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-blue-500 text-white text-[10px] font-bold animate-pulse">
+                  <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-blue-500 text-white text-[11px] font-bold animate-pulse">
                     LIVE
                   </span>
                 )}
                 {isCompleted && isNoWinner && (
-                  <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-gray-600 text-white text-[10px] font-bold">
+                  <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-gray-600 text-white text-[11px] font-bold">
                     NO WINNER
                   </span>
                 )}
                 {isCompleted && !isNoWinner && challenge.isTie && (
-                  <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-yellow-600 text-white text-[10px] font-bold">
+                  <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-yellow-600 text-white text-[11px] font-bold">
                     TIE
                   </span>
                 )}
                 {isCompleted && !isNoWinner && !challenge.isTie && isWinner && (
-                  <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-green-600 text-white text-[10px] font-bold">
+                  <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-green-600 text-white text-[11px] font-bold">
                     WON
                   </span>
                 )}
                 {isCompleted && !isNoWinner && !challenge.isTie && isLoser && (
-                  <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                  <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-red-500 text-white text-[11px] font-bold">
                     LOST
                   </span>
                 )}
                 {isPending && (
-                  <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-yellow-500 text-black text-[10px] font-bold">
+                  <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-yellow-500 text-black text-[11px] font-bold">
                     PENDING
                   </span>
                 )}
@@ -409,13 +409,13 @@ export default function ChallengeCard({
       {/* Status Badges */}
       <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
         {canRespond && (
-          <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-400 text-[10px] font-bold border border-yellow-500/40 animate-pulse">
+          <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-400 text-[11px] font-bold border border-yellow-500/40 animate-pulse">
             <Sparkles className="h-3 w-3" />
             RESPOND
           </span>
         )}
         {isChallenger && isPending && (
-          <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/20 text-blue-400 text-[10px] font-bold border border-blue-500/40">
+          <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-blue-500/20 text-blue-400 text-[11px] font-bold border border-blue-500/40">
             <GameIcon name="sword" size={14} />
             SENT
           </span>
@@ -438,7 +438,7 @@ export default function ChallengeCard({
                 >
                   1v1 Challenge
                 </p>
-                <p className="text-[10px] text-gray-400">{rankingInfo.name}</p>
+                <p className="text-[11px] text-gray-400">{rankingInfo.name}</p>
               </div>
             </div>
           </div>
@@ -506,7 +506,7 @@ export default function ChallengeCard({
                 <Zap className="h-4 w-4 text-green-400" />
               </div>
               <div>
-                <p className="text-[10px] text-gray-500 uppercase">Entry Fee</p>
+                <p className="text-[11px] text-gray-500 uppercase">Entry Fee</p>
                 <p className="text-sm font-bold text-gray-100">
                   {challenge.entryFee} {settings?.credits.symbol}
                 </p>
@@ -521,7 +521,7 @@ export default function ChallengeCard({
                 <Users className="h-4 w-4 text-blue-400" />
               </div>
               <div>
-                <p className="text-[10px] text-gray-500 uppercase">Players</p>
+                <p className="text-[11px] text-gray-500 uppercase">Players</p>
                 <p className="text-sm font-bold text-gray-100">1v1</p>
               </div>
             </div>
@@ -534,7 +534,7 @@ export default function ChallengeCard({
                 <GameIcon name="target" size={18} />
               </div>
               <div>
-                <p className="text-[10px] text-gray-500 uppercase">Capital</p>
+                <p className="text-[11px] text-gray-500 uppercase">Capital</p>
                 <p className="text-sm font-bold text-gray-100">
                   ${(challenge.startingCapital || 10000).toLocaleString()}
                 </p>
@@ -549,7 +549,7 @@ export default function ChallengeCard({
                 <GameIcon name="timer" size={18} />
               </div>
               <div>
-                <p className="text-[10px] text-gray-500 uppercase">Duration</p>
+                <p className="text-[11px] text-gray-500 uppercase">Duration</p>
                 <p className="text-sm font-bold text-gray-100">
                   {challenge.duration}m
                 </p>

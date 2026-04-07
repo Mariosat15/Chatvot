@@ -144,7 +144,7 @@ export default function StreaksShowcase({
               >
                 {streak.value}{streak.suffix || ""}
               </div>
-              <div className="text-[10px] text-gray-500 mt-0.5 leading-tight">
+              <div className="text-[11px] text-gray-500 mt-0.5 leading-tight">
                 {streak.label}
               </div>
             </motion.div>

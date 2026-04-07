@@ -57,19 +57,20 @@ export function CompetitionInfoHeader({
   }, [endTime]);
 
   return (
-    <div className="flex items-stretch gap-3 md:gap-4 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
+    <div className="flex items-stretch gap-2 sm:gap-3 md:gap-4 overflow-x-auto pb-2 md:pb-0 scrollbar-hide -mx-1 px-1">
       {/* Time Remaining Card */}
-      <div className="group relative bg-gradient-to-br from-dark-300 to-dark-300/80 px-4 md:px-6 py-3 md:py-4 rounded-xl border border-dark-400/30 hover:border-primary/30 transition-all duration-300 flex-shrink-0 shadow-lg hover:shadow-primary/20 min-w-[180px]">
+      <div className="group relative bg-gradient-to-br from-dark-300 to-dark-300/80 px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 md:py-4 rounded-xl border border-dark-400/30 hover:border-primary/30 transition-all duration-300 flex-shrink-0 shadow-lg hover:shadow-primary/20 min-w-[140px] sm:min-w-[180px]">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
-        <div className="relative flex items-center gap-3">
-          <GameIcon name="timer" size={32} />
+        <div className="relative flex items-center gap-2 sm:gap-3">
+          <GameIcon name="timer" size={24} className="sm:hidden" />
+          <GameIcon name="timer" size={32} className="hidden sm:block" />
           <div>
-            <p className="text-xs font-medium text-dark-600 uppercase tracking-wider mb-0.5">
-              Time Remaining
+            <p className="text-[11px] sm:text-xs font-medium text-dark-600 uppercase tracking-wider mb-0.5">
+              Time Left
             </p>
             <p
               className={cn(
-                "text-lg md:text-xl font-bold tabular-nums",
+                "text-base sm:text-lg md:text-xl font-bold tabular-nums",
                 timeRemaining === "Competition Ended"
                   ? "text-red-400"
                   : "text-light-900",
@@ -82,15 +83,16 @@ export function CompetitionInfoHeader({
       </div>
 
       {/* Participants Card */}
-      <div className="group relative bg-gradient-to-br from-dark-300 to-dark-300/80 px-4 md:px-6 py-3 md:py-4 rounded-xl border border-dark-400/30 hover:border-blue-500/30 transition-all duration-300 flex-shrink-0 shadow-lg hover:shadow-blue-500/20 min-w-[180px]">
+      <div className="group relative bg-gradient-to-br from-dark-300 to-dark-300/80 px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 md:py-4 rounded-xl border border-dark-400/30 hover:border-blue-500/30 transition-all duration-300 flex-shrink-0 shadow-lg hover:shadow-blue-500/20 min-w-[140px] sm:min-w-[180px]">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
-        <div className="relative flex items-center gap-3">
-          <GameIcon name="war" size={32} />
+        <div className="relative flex items-center gap-2 sm:gap-3">
+          <GameIcon name="war" size={24} className="sm:hidden" />
+          <GameIcon name="war" size={32} className="hidden sm:block" />
           <div>
-            <p className="text-xs font-medium text-dark-600 uppercase tracking-wider mb-0.5">
+            <p className="text-[11px] sm:text-xs font-medium text-dark-600 uppercase tracking-wider mb-0.5">
               Participants
             </p>
-            <p className="text-lg md:text-xl font-bold text-blue-400 tabular-nums">
+            <p className="text-base sm:text-lg md:text-xl font-bold text-blue-400 tabular-nums">
               {currentParticipants}
             </p>
           </div>
@@ -98,15 +100,16 @@ export function CompetitionInfoHeader({
       </div>
 
       {/* Prize Pool Card */}
-      <div className="group relative bg-gradient-to-br from-amber-500/10 to-amber-500/5 px-4 md:px-6 py-3 md:py-4 rounded-xl border border-amber-500/30 hover:border-amber-500/50 transition-all duration-300 flex-shrink-0 shadow-lg hover:shadow-amber-500/20 min-w-[200px]">
+      <div className="group relative bg-gradient-to-br from-amber-500/10 to-amber-500/5 px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 md:py-4 rounded-xl border border-amber-500/30 hover:border-amber-500/50 transition-all duration-300 flex-shrink-0 shadow-lg hover:shadow-amber-500/20 min-w-[160px] sm:min-w-[200px]">
         <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
-        <div className="relative flex items-center gap-3">
-          <GameIcon name="trophy" size={32} />
+        <div className="relative flex items-center gap-2 sm:gap-3">
+          <GameIcon name="trophy" size={24} className="sm:hidden" />
+          <GameIcon name="trophy" size={32} className="hidden sm:block" />
           <div>
-            <p className="text-xs font-medium text-dark-600 uppercase tracking-wider mb-0.5">
+            <p className="text-[11px] sm:text-xs font-medium text-dark-600 uppercase tracking-wider mb-0.5">
               Prize Pool
             </p>
-            <p className="text-lg md:text-xl font-bold text-amber-400 tabular-nums">
+            <p className="text-base sm:text-lg md:text-xl font-bold text-amber-400 tabular-nums">
               <span className="mr-1">{settings?.credits?.symbol || "⚡"}</span>
               {prizePool.toLocaleString()} {settings?.credits?.name || "Credits"}
             </p>

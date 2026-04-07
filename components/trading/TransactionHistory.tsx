@@ -1107,7 +1107,7 @@ function TransactionItem({
           {/* Show "Not charged" for failed/cancelled */}
           {(transaction.status === "failed" ||
             transaction.status === "cancelled") && (
-            <p className="text-[10px] text-gray-500 mt-0.5">
+            <p className="text-[11px] text-gray-500 mt-0.5">
               {transaction.status === "cancelled"
                 ? "Cancelled"
                 : "Not processed"}

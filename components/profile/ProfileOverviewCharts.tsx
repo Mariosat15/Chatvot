@@ -77,35 +77,35 @@ export default function ProfileOverviewCharts({
       <div className="grid lg:grid-cols-2 gap-4">
         {/* Competition Stats */}
         <motion.div
-          className="bg-gray-800/30 rounded-2xl p-6 border border-gray-700/50"
+          className="bg-gray-800/30 rounded-2xl p-4 sm:p-6 border border-gray-700/50"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.7 }}
         >
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-3 sm:mb-4">
             <Trophy className="w-5 h-5 text-yellow-400" />
-            <h3 className="text-lg font-semibold text-white">Competitions</h3>
+            <h3 className="text-base sm:text-lg font-semibold text-white">Competitions</h3>
           </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-yellow-500/10 rounded-xl border border-yellow-500/20">
-              <div className="flex items-center gap-3">
-                <Crown className="w-8 h-8 text-yellow-400" />
+          <div className="space-y-3 sm:space-y-4">
+            <div className="flex items-center justify-between p-2.5 sm:p-3 bg-yellow-500/10 rounded-xl border border-yellow-500/20">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Crown className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-400 flex-shrink-0" />
                 <div>
-                  <p className="text-2xl font-bold text-white">
+                  <p className="text-xl sm:text-2xl font-bold text-white">
                     {competitionStats?.competitionsWon || 0}
                   </p>
-                  <p className="text-xs text-gray-400">Victories</p>
+                  <p className="text-[11px] sm:text-xs text-gray-400">Victories</p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-lg font-bold text-yellow-400">
+              <div className="text-right min-w-0">
+                <p className="text-sm sm:text-lg font-bold text-yellow-400 truncate">
                   {(competitionStats?.totalCreditsWon || 0).toFixed(
                     settings.credits.decimals,
                   )}{" "}
                   {settings.credits.symbol}
                 </p>
-                <p className="text-xs text-gray-400">Total Prizes</p>
+                <p className="text-[11px] sm:text-xs text-gray-400">Total Prizes</p>
               </div>
             </div>
 
@@ -141,35 +141,35 @@ export default function ProfileOverviewCharts({
 
         {/* Challenge Stats */}
         <motion.div
-          className="bg-gray-800/30 rounded-2xl p-6 border border-gray-700/50"
+          className="bg-gray-800/30 rounded-2xl p-4 sm:p-6 border border-gray-700/50"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.8 }}
         >
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-3 sm:mb-4">
             <Swords className="w-5 h-5 text-orange-400" />
-            <h3 className="text-lg font-semibold text-white">1v1 Challenges</h3>
+            <h3 className="text-base sm:text-lg font-semibold text-white">1v1 Challenges</h3>
           </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-orange-500/10 rounded-xl border border-orange-500/20">
-              <div className="flex items-center gap-3">
-                <Award className="w-8 h-8 text-orange-400" />
+          <div className="space-y-3 sm:space-y-4">
+            <div className="flex items-center justify-between p-2.5 sm:p-3 bg-orange-500/10 rounded-xl border border-orange-500/20">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Award className="w-6 h-6 sm:w-8 sm:h-8 text-orange-400 flex-shrink-0" />
                 <div>
-                  <p className="text-2xl font-bold text-white">
+                  <p className="text-xl sm:text-2xl font-bold text-white">
                     {challengeStats?.totalChallengesWon || 0}
                   </p>
-                  <p className="text-xs text-gray-400">Victories</p>
+                  <p className="text-[11px] sm:text-xs text-gray-400">Victories</p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-lg font-bold text-yellow-400">
+              <div className="text-right min-w-0">
+                <p className="text-sm sm:text-lg font-bold text-yellow-400 truncate">
                   {(challengeStats?.totalCreditsWon || 0).toFixed(
                     settings.credits.decimals,
                   )}{" "}
                   {settings.credits.symbol}
                 </p>
-                <p className="text-xs text-gray-400">Total Won</p>
+                <p className="text-[11px] sm:text-xs text-gray-400">Total Won</p>
               </div>
             </div>
 
@@ -212,23 +212,23 @@ export default function ProfileOverviewCharts({
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-500/20 to-blue-500/20 flex items-center justify-center">
             <Trophy className="w-8 h-8 text-gray-500" />
           </div>
-          <h3 className="text-xl font-bold text-white mb-2">
+          <h3 className="text-lg sm:text-xl font-bold text-white mb-2">
             Ready to Start Trading?
           </h3>
-          <p className="text-gray-400 mb-6 max-w-md mx-auto">
+          <p className="text-gray-400 mb-4 sm:mb-6 max-w-md mx-auto text-sm sm:text-base">
             Join competitions or challenge other traders to start building your
             trading record and climb the leaderboard!
           </p>
-          <div className="flex justify-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
             <Link
               href="/competitions"
-              className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-gray-900 rounded-xl font-semibold transition-all shadow-lg shadow-yellow-500/20"
+              className="px-5 sm:px-6 py-3 min-h-[44px] flex items-center justify-center bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-gray-900 rounded-xl font-semibold transition-all shadow-lg shadow-yellow-500/20"
             >
               Browse Competitions
             </Link>
             <Link
               href="/challenges"
-              className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-semibold transition-all"
+              className="px-5 sm:px-6 py-3 min-h-[44px] flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-semibold transition-all"
             >
               Find Challengers
             </Link>

@@ -87,7 +87,7 @@ export default function MarketHolidaysCard() {
       <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl" />
 
       {/* Header */}
-      <div className="relative p-5 border-b border-gray-700/50">
+      <div className="relative p-3 sm:p-5 border-b border-gray-700/50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-gradient-to-br from-red-500 to-rose-600 rounded-xl shadow-lg shadow-red-500/20">
@@ -97,7 +97,7 @@ export default function MarketHolidaysCard() {
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 Market Holidays
                 {data?.mode === "automatic" && (
-                  <Badge className="bg-emerald-500/20 text-emerald-400 text-[10px] font-medium ml-1">
+                  <Badge className="bg-emerald-500/20 text-emerald-400 text-[11px] font-medium ml-1">
                     <GameIcon name="gems" size={12} className="mr-1" />
                     Live
                   </Badge>
@@ -113,15 +113,15 @@ export default function MarketHolidaysCard() {
           <button
             onClick={fetchHolidays}
             disabled={loading}
-            className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800/50 transition-colors disabled:opacity-50"
+            className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800/50 transition-colors disabled:opacity-50 min-w-[44px] min-h-[44px] flex items-center justify-center"
           >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-5 w-5 ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>
       </div>
 
       {/* Content */}
-      <div className="relative p-5">
+      <div className="relative p-3 sm:p-5">
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
@@ -170,7 +170,7 @@ export default function MarketHolidaysCard() {
                       <span className="text-lg font-black">
                         {new Date(nextHoliday.date).getDate()}
                       </span>
-                      <span className="text-[10px] font-bold uppercase">
+                      <span className="text-[11px] font-bold uppercase">
                         {new Date(nextHoliday.date).toLocaleDateString(
                           "en-US",
                           { month: "short" },
@@ -199,7 +199,7 @@ export default function MarketHolidaysCard() {
                         {nextHoliday.type === "automatic" ? (
                           <Badge
                             variant="outline"
-                            className="text-[10px] border-emerald-500/30 text-emerald-400 px-1.5"
+                            className="text-[11px] border-emerald-500/30 text-emerald-400 px-1.5"
                           >
                             <GameIcon name="star1" size={10} className="mr-1" />
                             {nextHoliday.exchange || "API"}
@@ -207,7 +207,7 @@ export default function MarketHolidaysCard() {
                         ) : (
                           <Badge
                             variant="outline"
-                            className="text-[10px] border-blue-500/30 text-blue-400 px-1.5"
+                            className="text-[11px] border-blue-500/30 text-blue-400 px-1.5"
                           >
                             Custom
                           </Badge>
@@ -221,7 +221,7 @@ export default function MarketHolidaysCard() {
                                   <Badge
                                     key={asset}
                                     variant="secondary"
-                                    className="text-[10px] capitalize px-1.5"
+                                    className="text-[11px] capitalize px-1.5"
                                   >
                                     {asset}
                                   </Badge>
@@ -229,7 +229,7 @@ export default function MarketHolidaysCard() {
                               {nextHoliday.affectedAssets.length > 2 && (
                                 <Badge
                                   variant="secondary"
-                                  className="text-[10px] px-1.5"
+                                  className="text-[11px] px-1.5"
                                 >
                                   +{nextHoliday.affectedAssets.length - 2}
                                 </Badge>
@@ -264,7 +264,7 @@ export default function MarketHolidaysCard() {
                         <span className="text-sm font-bold text-white">
                           {new Date(holiday.date).getDate()}
                         </span>
-                        <span className="text-[9px] font-medium text-gray-400 uppercase">
+                        <span className="text-[11px] font-medium text-gray-400 uppercase">
                           {new Date(holiday.date).toLocaleDateString("en-US", {
                             month: "short",
                           })}

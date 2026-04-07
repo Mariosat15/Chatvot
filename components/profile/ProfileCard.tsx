@@ -136,7 +136,7 @@ export default function ProfileCard({
             className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md overflow-y-auto overscroll-contain"
             onClick={onClose}
           >
-          <div className="min-h-full flex items-start justify-center py-8 px-4">
+          <div className="min-h-full flex items-start justify-center py-4 sm:py-8 px-3 sm:px-4">
           {/* Pokemon-style Card */}
           <motion.div
             initial={{ opacity: 0, scale: 0.7, rotateY: -20 }}
@@ -167,7 +167,7 @@ export default function ProfileCard({
               {/* Close button */}
               <button
                 onClick={onClose}
-                className="absolute top-2 right-2 p-1.5 rounded-full bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-colors z-40"
+                className="absolute top-2 right-2 p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-colors z-40"
               >
                 <X className="h-4 w-4 text-white" />
               </button>
@@ -176,11 +176,11 @@ export default function ProfileCard({
               <div className="px-4 pt-3 pb-1">
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1.5">
-                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${config.tagBg}`}>
+                    <span className={`text-[11px] font-bold uppercase px-2 py-0.5 rounded ${config.tagBg}`}>
                       {config.tagLabel}
                     </span>
                     {stats?.userTitle && (
-                      <span className="text-[10px] text-gray-400 italic flex items-center gap-1">
+                      <span className="text-[11px] text-gray-400 italic flex items-center gap-1">
                         {stats.userTitleIcon && stats.userTitleIcon in GAME_ICONS ? (
                           <GameIcon name={stats.userTitleIcon as GameIconName} size={10} />
                         ) : null}
@@ -194,7 +194,7 @@ export default function ProfileCard({
                   <h2 className={`text-lg font-extrabold ${config.textColor} leading-tight`}>{username}</h2>
                   {stats?.rank && (
                     <div className="flex items-center gap-1">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase">Rank</span>
+                      <span className="text-[11px] font-bold text-gray-400 uppercase">Rank</span>
                       <span className={`text-lg font-extrabold ${config.textColor}`}>#{stats.rank}</span>
                       <Trophy className={`h-4 w-4 ${stats.rank <= 3 ? "text-yellow-500" : "text-gray-400"}`} />
                     </div>
@@ -257,7 +257,7 @@ export default function ProfileCard({
                 <div className="bg-gray-800/60 border border-gray-700 rounded-lg overflow-hidden">
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800/80 border-b border-gray-700">
                     <BarChart3 className="h-3.5 w-3.5 text-blue-400" />
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-blue-400">Trading Stats</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-blue-400">Trading Stats</span>
                   </div>
                   <div className="grid grid-cols-3 divide-x divide-gray-700">
                     <StatCell label="Win Rate" value={`${(stats?.winRate || 0).toFixed(1)}%`} color="text-green-400" />
@@ -274,7 +274,7 @@ export default function ProfileCard({
                 <div className="bg-gray-800/60 border border-gray-700 rounded-lg overflow-hidden">
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800/80 border-b border-gray-700">
                     <Trophy className="h-3.5 w-3.5 text-yellow-400" />
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-yellow-400">Battle Record</span>
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-yellow-400">Battle Record</span>
                   </div>
                   <div className="grid grid-cols-3 divide-x divide-gray-700">
                     <StatCell
@@ -295,19 +295,19 @@ export default function ProfileCard({
               {/* === BOTTOM STATS BAR === */}
               <div className="mx-3 mb-2 flex items-stretch divide-x divide-gray-700 bg-gray-800/50 border border-gray-700 rounded-lg overflow-hidden text-center">
                 <div className="flex-1 py-2 px-1">
-                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Score</p>
+                  <p className="text-[11px] text-gray-400 uppercase font-semibold">Score</p>
                   <p className={`text-xs font-bold ${config.textColor} mt-0.5`}>
                     {stats?.overallScore?.toFixed(0) || "0"}
                   </p>
                 </div>
                 <div className="flex-1 py-2 px-1">
-                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Rank</p>
+                  <p className="text-[11px] text-gray-400 uppercase font-semibold">Rank</p>
                   <p className={`text-xs font-bold ${config.textColor} mt-0.5`}>
                     #{stats?.rank || "-"}
                   </p>
                 </div>
                 <div className="flex-1 py-2 px-1">
-                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Badges</p>
+                  <p className="text-[11px] text-gray-400 uppercase font-semibold">Badges</p>
                   <p className="text-xs font-bold text-pink-400 mt-0.5">
                     {stats?.totalBadges || 0}
                   </p>
@@ -319,14 +319,14 @@ export default function ProfileCard({
                 <Button
                   variant="outline"
                   onClick={onClose}
-                  className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-700 bg-gray-800/60 text-xs h-9"
+                  className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-700 bg-gray-800/60 text-xs h-11 min-h-[44px]"
                 >
                   Close
                 </Button>
                 {showChallengeButton && onChallenge && (
                   <Button
                     onClick={onChallenge}
-                    className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white text-xs h-9"
+                    className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white text-xs h-11 min-h-[44px]"
                   >
                     <Swords className="h-3.5 w-3.5 mr-1.5" />
                     Challenge
@@ -336,8 +336,8 @@ export default function ProfileCard({
 
               {/* Card ID */}
               <div className="px-4 pb-2 flex items-center justify-between">
-                <span className="text-[8px] text-gray-500">Chartvolt Trader Card</span>
-                <span className="text-[8px] text-gray-500 font-mono">{userId.slice(-8)}</span>
+                <span className="text-[10px] text-gray-500">Chartvolt Trader Card</span>
+                <span className="text-[10px] text-gray-500 font-mono">{userId.slice(-8)}</span>
               </div>
             </div>
           </motion.div>
@@ -352,7 +352,7 @@ export default function ProfileCard({
 function StatCell({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div className="py-2 px-2 text-center">
-      <p className="text-[9px] text-gray-400 uppercase font-semibold">{label}</p>
+      <p className="text-[11px] text-gray-400 uppercase font-semibold">{label}</p>
       <p className={cn("text-sm font-bold mt-0.5", color)}>{value}</p>
     </div>
   );

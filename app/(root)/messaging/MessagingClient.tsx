@@ -1159,7 +1159,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-[#0a0a0f]">
+    <div className="flex h-[calc(100vh-4rem)] lg:h-[calc(100vh-4rem)] bg-[#0a0a0f] pb-16 lg:pb-0">
       {/* Sidebar */}
       <div
         className={`w-full md:w-[380px] bg-[#0d0d14] border-r border-white/5 flex flex-col ${showMobileChat ? "hidden md:flex" : "flex"}`}
@@ -1224,7 +1224,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                   <div className="w-10 h-10 bg-cyan-500/20 rounded-xl flex items-center justify-center group-hover:bg-cyan-500/30 transition-colors">
                     <MessageCircle className="w-5 h-5 text-cyan-400" />
                   </div>
-                  <span className="text-[9px] text-cyan-400 font-medium">
+                  <span className="text-[11px] text-cyan-400 font-medium">
                     CHAT
                   </span>
                 </div>
@@ -1255,7 +1255,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
-                className={`flex-1 py-2 px-2 rounded-lg text-xs font-medium transition-all relative ${
+                className={`flex-1 py-2.5 px-2 min-h-[44px] rounded-lg text-xs sm:text-sm font-medium transition-all relative ${
                   activeTab === tab
                     ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/25"
                     : "text-gray-400 hover:text-white"
@@ -1263,12 +1263,12 @@ export default function MessagingClient({ session }: MessagingClientProps) {
               >
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
                 {tab === "requests" && friendRequests.received.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[11px] w-5 h-5 rounded-full flex items-center justify-center">
                     {friendRequests.received.length}
                   </span>
                 )}
                 {tab === "blocked" && blockedUsers.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-gray-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 bg-gray-500 text-white text-[11px] w-5 h-5 rounded-full flex items-center justify-center">
                     {blockedUsers.length}
                   </span>
                 )}
@@ -1347,7 +1347,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                                 </span>
                                 {ticket.ticketNumber && (
                                   <span
-                                    className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
+                                    className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${
                                       isArchived
                                         ? "bg-gray-500/20 text-gray-500"
                                         : "bg-cyan-500/20 text-cyan-400"
@@ -1357,7 +1357,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                                   </span>
                                 )}
                                 {isArchived && (
-                                  <span className="text-[9px] px-1.5 py-0.5 bg-gray-500/20 text-gray-400 rounded font-medium">
+                                  <span className="text-[11px] px-1.5 py-0.5 bg-gray-500/20 text-gray-400 rounded font-medium">
                                     RESOLVED
                                   </span>
                                 )}
@@ -1448,7 +1448,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                             </div>
                             {conv.unreadCount > 0 && (
                               <div className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 rounded-full flex items-center justify-center px-1.5">
-                                <span className="text-white text-[10px] font-bold">
+                                <span className="text-white text-[11px] font-bold">
                                   {conv.unreadCount}
                                 </span>
                               </div>
@@ -1578,7 +1578,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                             ) : (
                               <button
                                 onClick={() => sendFriendRequest(user.id)}
-                                className="w-8 h-8 bg-cyan-500/20 text-cyan-400 rounded-lg flex items-center justify-center hover:bg-cyan-500/30 transition-colors"
+                                className="w-10 h-10 min-w-[44px] min-h-[44px] bg-cyan-500/20 text-cyan-400 rounded-lg flex items-center justify-center hover:bg-cyan-500/30 transition-colors"
                                 title="Send friend request"
                               >
                                 <UserPlus className="w-4 h-4" />
@@ -1639,7 +1639,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                           onClick={() =>
                             startConversationWithFriend(friend.friendId)
                           }
-                          className="w-8 h-8 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center hover:bg-emerald-500/30 transition-colors"
+                          className="w-10 h-10 min-w-[44px] min-h-[44px] bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center hover:bg-emerald-500/30 transition-colors"
                           title="Send message"
                         >
                           <Send className="w-4 h-4" />
@@ -1652,7 +1652,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                                 friendMenuOpen === friend.id ? null : friend.id,
                               );
                             }}
-                            className="w-8 h-8 bg-white/5 text-gray-400 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"
+                            className="w-10 h-10 min-w-[44px] min-h-[44px] bg-white/5 text-gray-400 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"
                             title="More options"
                           >
                             <MoreVertical className="w-4 h-4" />
@@ -1732,14 +1732,14 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                       <div className="flex gap-2">
                         <button
                           onClick={() => acceptFriendRequest(req.id)}
-                          className="w-8 h-8 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center hover:bg-emerald-500/30 transition-colors"
+                          className="w-10 h-10 min-w-[44px] min-h-[44px] bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center hover:bg-emerald-500/30 transition-colors"
                           title="Accept friend request"
                         >
                           <Check className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => declineFriendRequest(req.id)}
-                          className="w-8 h-8 bg-red-500/20 text-red-400 rounded-lg flex items-center justify-center hover:bg-red-500/30 transition-colors"
+                          className="w-10 h-10 min-w-[44px] min-h-[44px] bg-red-500/20 text-red-400 rounded-lg flex items-center justify-center hover:bg-red-500/30 transition-colors"
                           title="Decline friend request"
                         >
                           <X className="w-4 h-4" />
@@ -1850,10 +1850,10 @@ export default function MessagingClient({ session }: MessagingClientProps) {
         {selectedConversation ? (
           <>
             {/* Chat Header */}
-            <div className="px-5 py-4 border-b border-white/5 bg-[#0d0d14] flex items-center gap-4">
+            <div className="px-3 sm:px-5 py-3 sm:py-4 border-b border-white/5 bg-[#0d0d14] flex items-center gap-3 sm:gap-4">
               <button
                 onClick={() => setShowMobileChat(false)}
-                className="md:hidden w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center hover:bg-white/10 transition-colors"
+                className="md:hidden w-11 h-11 min-w-[44px] min-h-[44px] bg-white/5 rounded-xl flex items-center justify-center hover:bg-white/10 transition-colors flex-shrink-0"
               >
                 <ArrowLeft className="w-5 h-5 text-gray-400" />
               </button>
@@ -1919,7 +1919,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
               <div className="relative" ref={chatMenuRef}>
                 <button
                   onClick={() => setShowChatMenu(!showChatMenu)}
-                  className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center hover:bg-white/10 transition-colors"
+                  className="w-11 h-11 min-w-[44px] min-h-[44px] bg-white/5 rounded-xl flex items-center justify-center hover:bg-white/10 transition-colors flex-shrink-0"
                 >
                   <MoreVertical className="w-5 h-5 text-gray-400" />
                 </button>
@@ -2101,7 +2101,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
             )}
 
             {/* Message Input */}
-            <div className="p-4 border-t border-white/5 bg-[#0d0d14]">
+            <div className="p-3 sm:p-4 border-t border-white/5 bg-[#0d0d14]">
               {selectedConversation.isArchived ? (
                 // Archived ticket - read only with option to create new
                 <div className="bg-gray-500/10 border border-gray-500/30 rounded-xl p-4 text-center">
@@ -2160,7 +2160,7 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                   <button
                     onClick={sendMessage}
                     disabled={!messageInput.trim() || isSending}
-                    className="w-12 h-12 bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl flex items-center justify-center hover:shadow-lg hover:shadow-cyan-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    className="w-12 h-12 min-w-[44px] min-h-[44px] bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-xl flex items-center justify-center hover:shadow-lg hover:shadow-cyan-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex-shrink-0"
                   >
                     {isSending ? (
                       <Loader2 className="w-5 h-5 animate-spin" />

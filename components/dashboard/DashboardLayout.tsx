@@ -53,7 +53,7 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
   };
 
   return (
-    <div className="w-full p-3 sm:p-4 lg:p-6">
+    <div className="w-full p-3 sm:p-4 lg:p-6 overflow-x-hidden">
       {/* Onboarding — always visible above tabs */}
       <GettingStartedCard
         hasFundedWallet={overview.totalDeposited > 0}

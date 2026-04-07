@@ -74,7 +74,7 @@ function DonutChart({
         <span className="text-xl font-bold text-white font-[var(--font-geist-mono)]">
           {total}
         </span>
-        <span className="text-[10px] text-gray-500 uppercase">trades</span>
+        <span className="text-[11px] text-gray-500 uppercase">trades</span>
       </div>
     </div>
   );
@@ -147,7 +147,7 @@ export default function TradingAnalytics({
           <div className="flex items-center gap-1 mb-3">
             <button
               onClick={() => setTab("symbols")}
-              className={`px-3 py-1 text-xs font-medium rounded-lg transition-all cursor-pointer ${
+              className={`px-3 py-2 min-h-[44px] text-xs font-medium rounded-lg transition-all cursor-pointer flex items-center justify-center ${
                 tab === "symbols"
                   ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
                   : "text-gray-400 hover:text-white"
@@ -157,7 +157,7 @@ export default function TradingAnalytics({
             </button>
             <button
               onClick={() => setTab("hours")}
-              className={`px-3 py-1 text-xs font-medium rounded-lg transition-all cursor-pointer ${
+              className={`px-3 py-2 min-h-[44px] text-xs font-medium rounded-lg transition-all cursor-pointer flex items-center justify-center ${
                 tab === "hours"
                   ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
                   : "text-gray-400 hover:text-white"
@@ -238,7 +238,7 @@ export default function TradingAnalytics({
                       transition={{ duration: 0.5, delay: i * 0.02 }}
                     />
                     {i % 4 === 0 && (
-                      <span className="text-[8px] text-gray-600 mt-1">
+                      <span className="text-[10px] text-gray-600 mt-1">
                         {String(h.hour).padStart(2, "0")}
                       </span>
                     )}

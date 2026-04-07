@@ -120,41 +120,43 @@ const CompetitionResultsPage = async ({
   };
 
   return (
-    <div className="flex min-h-screen flex-col gap-6 p-4 md:p-8 bg-gradient-to-br from-gray-900 via-gray-900 to-purple-900/20">
+    <div className="flex min-h-screen flex-col gap-4 sm:gap-6 p-3 sm:p-4 md:p-8 bg-gradient-to-br from-gray-900 via-gray-900 to-purple-900/20 overflow-x-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="flex items-center justify-between flex-wrap gap-2 sm:gap-4">
         <Link href="/competitions">
           <Button
             variant="ghost"
-            className="w-fit gap-2 text-gray-400 hover:text-gray-100"
+            className="w-fit gap-2 text-gray-400 hover:text-gray-100 min-h-[44px]"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Competitions
+            <span className="hidden sm:inline">Back to Competitions</span>
+            <span className="sm:hidden">Back</span>
           </Button>
         </Link>
         <Link href={`/competitions/${competitionId}?view=details`}>
           <Button
             variant="outline"
             size="sm"
-            className="gap-2 border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
+            className="gap-2 border-blue-500/50 text-blue-400 hover:bg-blue-500/10 min-h-[44px]"
           >
             <LayoutDashboard className="h-4 w-4" />
-            View Competition Details
+            <span className="hidden sm:inline">View Competition Details</span>
+            <span className="sm:hidden">Details</span>
           </Button>
         </Link>
       </div>
 
       {/* Competition Info Header */}
-      <div className="rounded-2xl bg-gradient-to-br from-purple-500/20 via-gray-800 to-gray-900 p-6 md:p-8 border border-purple-500/30 shadow-xl">
+      <div className="rounded-xl sm:rounded-2xl bg-gradient-to-br from-purple-500/20 via-gray-800 to-gray-900 p-4 sm:p-6 md:p-8 border border-purple-500/30 shadow-xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2 mb-2">
               <GameIcon name="trophy" size={24} />
               <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-400 text-sm font-medium">
                 COMPLETED
               </span>
             </div>
-            <h1 className="text-3xl font-bold text-gray-100">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-100 truncate">
               {competition.name}
             </h1>
             <p className="text-gray-400 mt-1">{competition.description}</p>
@@ -181,16 +183,16 @@ const CompetitionResultsPage = async ({
       </div>
 
       {/* Final Performance Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Final Rank */}
-        <div className="rounded-xl bg-gradient-to-br from-yellow-500/10 to-gray-800/50 border border-yellow-500/30 p-5">
+        <div className="rounded-xl bg-gradient-to-br from-yellow-500/10 to-gray-800/50 border border-yellow-500/30 p-3 sm:p-5">
           <div className="flex items-center gap-2 mb-2">
             <GameIcon name="crown" size={20} />
-            <span className="text-sm font-medium text-gray-400">
+            <span className="text-xs sm:text-sm font-medium text-gray-400">
               Final Rank
             </span>
           </div>
-          <p className="text-4xl font-black text-yellow-500">#{finalRank}</p>
+          <p className="text-2xl sm:text-4xl font-black text-yellow-500">#{finalRank}</p>
           <p className="text-xs text-gray-500 mt-1">
             Out of {competition.currentParticipants} participants
           </p>
@@ -202,14 +204,14 @@ const CompetitionResultsPage = async ({
             totalPnl >= 0
               ? "from-green-500/10 border-green-500/30"
               : "from-red-500/10 border-red-500/30"
-          } to-gray-800/50 border p-5`}
+          } to-gray-800/50 border p-3 sm:p-5`}
         >
           <div className="flex items-center gap-2 mb-2">
             <GameIcon name={totalPnl >= 0 ? "profit" : "loss"} size={20} />
-            <span className="text-sm font-medium text-gray-400">Total P&L</span>
+            <span className="text-xs sm:text-sm font-medium text-gray-400">Total P&L</span>
           </div>
           <p
-            className={`text-4xl font-black ${totalPnl >= 0 ? "text-green-500" : "text-red-500"}`}
+            className={`text-2xl sm:text-4xl font-black ${totalPnl >= 0 ? "text-green-500" : "text-red-500"}`}
           >
             {totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)}
           </p>
@@ -224,12 +226,12 @@ const CompetitionResultsPage = async ({
         </div>
 
         {/* Win Rate */}
-        <div className="rounded-xl bg-gradient-to-br from-blue-500/10 to-gray-800/50 border border-blue-500/30 p-5">
+        <div className="rounded-xl bg-gradient-to-br from-blue-500/10 to-gray-800/50 border border-blue-500/30 p-3 sm:p-5">
           <div className="flex items-center gap-2 mb-2">
             <GameIcon name="target" size={20} />
-            <span className="text-sm font-medium text-gray-400">Win Rate</span>
+            <span className="text-xs sm:text-sm font-medium text-gray-400">Win Rate</span>
           </div>
-          <p className="text-4xl font-black text-blue-500">
+          <p className="text-2xl sm:text-4xl font-black text-blue-500">
             {winRate.toFixed(1)}%
           </p>
           <p className="text-xs text-gray-500 mt-1">
@@ -238,14 +240,14 @@ const CompetitionResultsPage = async ({
         </div>
 
         {/* Total Trades */}
-        <div className="rounded-xl bg-gradient-to-br from-purple-500/10 to-gray-800/50 border border-purple-500/30 p-5">
+        <div className="rounded-xl bg-gradient-to-br from-purple-500/10 to-gray-800/50 border border-purple-500/30 p-3 sm:p-5">
           <div className="flex items-center gap-2 mb-2">
             <GameIcon name="sword" size={20} />
-            <span className="text-sm font-medium text-gray-400">
+            <span className="text-xs sm:text-sm font-medium text-gray-400">
               Total Trades
             </span>
           </div>
-          <p className="text-4xl font-black text-purple-500">
+          <p className="text-2xl sm:text-4xl font-black text-purple-500">
             {tradeHistory.length}
           </p>
           <p className="text-xs text-gray-500 mt-1">
@@ -256,9 +258,9 @@ const CompetitionResultsPage = async ({
       </div>
 
       {/* Detailed Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Account Summary */}
-        <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-6">
+        <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4 sm:p-6">
           <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
             <GameIcon name="coin" size={20} />
             Account Summary
@@ -301,12 +303,12 @@ const CompetitionResultsPage = async ({
         </div>
 
         {/* Trading Stats */}
-        <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-6">
-          <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
+        <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4 sm:p-6">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
             <GameIcon name="target" size={20} />
             Trading Statistics
           </h3>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
             <div className="p-3 bg-gray-900/50 rounded-lg">
               <p className="text-xs text-gray-500">Winning Trades</p>
               <p className="text-xl font-bold text-green-500">
@@ -348,9 +350,9 @@ const CompetitionResultsPage = async ({
       </div>
 
       {/* Trade History */}
-      <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-100 flex items-center gap-2">
+      <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4 sm:p-6">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-100 flex items-center gap-2">
             <GameIcon name="timer" size={20} />
             Trade History
           </h3>
@@ -465,7 +467,7 @@ const CompetitionResultsPage = async ({
       </div>
 
       {/* Action Buttons */}
-      <div className="flex flex-wrap gap-4 justify-center">
+      <div className="flex flex-wrap gap-3 sm:gap-4 justify-center">
         <Link href={`/competitions/${competitionId}?view=details`}>
           <Button variant="outline" className="gap-2">
             <LayoutDashboard className="h-4 w-4" />

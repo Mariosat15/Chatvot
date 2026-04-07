@@ -534,10 +534,10 @@ export default function MatchmakingCards({
           onClick={() => handleSwipe("left")}
           className="group flex flex-col items-center gap-1"
         >
-          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-red-500/50 flex items-center justify-center shadow-lg shadow-red-500/20 group-hover:border-red-500 group-hover:shadow-red-500/40 transition-all">
+          <div className="w-14 h-14 min-w-[48px] min-h-[48px] rounded-full bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-red-500/50 flex items-center justify-center shadow-lg shadow-red-500/20 group-hover:border-red-500 group-hover:shadow-red-500/40 transition-all">
             <X className="h-7 w-7 text-red-500" />
           </div>
-          <span className="text-[10px] text-gray-500 font-semibold group-hover:text-red-400 transition-colors uppercase tracking-wide">
+          <span className="text-[11px] text-gray-500 font-semibold group-hover:text-red-400 transition-colors uppercase tracking-wide">
             Skip
           </span>
         </motion.button>
@@ -550,10 +550,10 @@ export default function MatchmakingCards({
           disabled={currentIndex === 0}
           className="group flex flex-col items-center gap-1 disabled:opacity-30 disabled:pointer-events-none"
         >
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-gray-600 flex items-center justify-center shadow-lg group-hover:border-gray-500 transition-all">
+          <div className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-gray-600 flex items-center justify-center shadow-lg group-hover:border-gray-500 transition-all">
             <RefreshCw className="h-4 w-4 text-gray-400" />
           </div>
-          <span className="text-[10px] text-gray-600 font-semibold uppercase tracking-wide">
+          <span className="text-[11px] text-gray-600 font-semibold uppercase tracking-wide">
             Undo
           </span>
         </motion.button>
@@ -571,7 +571,7 @@ export default function MatchmakingCards({
         >
           <div
             className={cn(
-              "w-16 h-16 rounded-full flex items-center justify-center shadow-xl transition-all ring-4",
+              "w-16 h-16 min-w-[48px] min-h-[48px] rounded-full flex items-center justify-center shadow-xl transition-all ring-4",
               canChallengeCurrentTrader
                 ? "bg-gradient-to-br from-green-500 via-emerald-500 to-teal-500 shadow-green-500/30 group-hover:shadow-green-500/50 ring-green-500/20 group-hover:ring-green-500/40"
                 : "bg-gray-700 shadow-gray-700/30 ring-gray-600/20",
@@ -586,7 +586,7 @@ export default function MatchmakingCards({
           </div>
           <span
             className={cn(
-              "text-[10px] font-bold transition-colors uppercase tracking-wide",
+              "text-[11px] font-bold transition-colors uppercase tracking-wide",
               canChallengeCurrentTrader
                 ? "text-gray-400 group-hover:text-green-400"
                 : "text-gray-600",
@@ -812,7 +812,7 @@ function TraderCard({
                 >
                   {trader.winRate.toFixed(1)}%
                 </p>
-                <span className="text-[8px] text-gray-500 uppercase">Win</span>
+                <span className="text-[10px] text-gray-500 uppercase">Win</span>
               </div>
 
               {/* P&L */}
@@ -827,7 +827,7 @@ function TraderCard({
                   {trader.totalPnl >= 0 ? "+" : ""}
                   {trader.totalPnl.toFixed(0)}
                 </p>
-                <span className="text-[8px] text-gray-500 uppercase">P&L</span>
+                <span className="text-[10px] text-gray-500 uppercase">P&L</span>
               </div>
 
               {/* Competitions */}
@@ -836,7 +836,7 @@ function TraderCard({
                 <p className="text-lg font-black text-yellow-400">
                   {trader.competitionsWon}/{trader.competitionsEntered}
                 </p>
-                <span className="text-[8px] text-gray-500 uppercase">
+                <span className="text-[10px] text-gray-500 uppercase">
                   Comps
                 </span>
               </div>
@@ -847,7 +847,7 @@ function TraderCard({
                 <p className="text-lg font-black text-purple-400">
                   {trader.challengesWon}/{trader.challengesEntered}
                 </p>
-                <span className="text-[8px] text-gray-500 uppercase">1v1</span>
+                <span className="text-[10px] text-gray-500 uppercase">1v1</span>
               </div>
             </div>
 
@@ -857,7 +857,7 @@ function TraderCard({
                 <p className="text-sm font-bold text-white">
                   {trader.totalTrades}
                 </p>
-                <p className="text-[8px] text-gray-500 uppercase">Trades</p>
+                <p className="text-[10px] text-gray-500 uppercase">Trades</p>
               </div>
               <div className="w-px h-8 bg-gray-700 self-center" />
               <div className="text-center">
@@ -873,28 +873,28 @@ function TraderCard({
                 >
                   {trader.profitFactor.toFixed(1)}
                 </p>
-                <p className="text-[8px] text-gray-500 uppercase">P.Factor</p>
+                <p className="text-[10px] text-gray-500 uppercase">P.Factor</p>
               </div>
               <div className="w-px h-8 bg-gray-700 self-center" />
               <div className="text-center">
                 <p className="text-sm font-bold text-white">
                   {trader.totalBadges}
                 </p>
-                <p className="text-[8px] text-gray-500 uppercase">Badges</p>
+                <p className="text-[10px] text-gray-500 uppercase">Badges</p>
               </div>
             </div>
 
             {/* Match Reasons */}
             {matchReasons.length > 0 && (
               <div>
-                <p className="text-[9px] text-gray-500 mb-1 uppercase tracking-wider font-medium text-center">
+                <p className="text-[11px] text-gray-500 mb-1 uppercase tracking-wider font-medium text-center">
                   Why you match
                 </p>
                 <div className="flex flex-wrap justify-center gap-1">
                   {matchReasons.slice(0, 3).map((reason, idx) => (
                     <span
                       key={idx}
-                      className="px-2 py-0.5 rounded text-[9px] font-medium bg-primary-500/10 text-primary-300 border border-primary-500/20"
+                      className="px-2 py-0.5 rounded text-[11px] font-medium bg-primary-500/10 text-primary-300 border border-primary-500/20"
                     >
                       ✓ {reason}
                     </span>
@@ -919,7 +919,7 @@ function TraderCard({
                 <span className="text-2xl font-black text-primary-400 drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]">
                   {trader.overallScore.toFixed(0)}
                 </span>
-                <span className="text-[10px] text-gray-500 font-medium">
+                <span className="text-[11px] text-gray-500 font-medium">
                   pts
                 </span>
               </div>
@@ -928,7 +928,7 @@ function TraderCard({
             {/* Availability Warning */}
             {!trader.acceptingChallenges && (
               <div className="mt-1.5 py-1.5 px-2 rounded-md bg-yellow-500/10 border border-yellow-500/30 text-center">
-                <p className="text-[10px] text-yellow-400 font-semibold">
+                <p className="text-[11px] text-yellow-400 font-semibold">
                   ⚠️ Not accepting challenges
                 </p>
               </div>

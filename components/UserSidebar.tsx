@@ -235,7 +235,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
               </span>
 
               {item.badge && (
-                <span className="px-2 py-0.5 text-[10px] font-bold bg-gradient-to-r from-yellow-500 to-orange-500 text-gray-900 rounded-full animate-pulse">
+                <span className="px-2 py-0.5 text-[11px] font-bold bg-gradient-to-r from-yellow-500 to-orange-500 text-gray-900 rounded-full animate-pulse">
                   {item.badge}
                 </span>
               )}
@@ -342,7 +342,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
                 <p className="text-xs text-gray-400 truncate">{user?.email}</p>
                 <div className="flex items-center gap-1 mt-1">
                   <GameIcon name="profit" size={12} />
-                  <span className="text-[10px] font-medium text-green-400">
+                  <span className="text-[11px] font-medium text-green-400">
                     Active Trader
                   </span>
                 </div>

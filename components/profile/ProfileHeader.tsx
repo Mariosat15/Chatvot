@@ -109,10 +109,10 @@ export default function ProfileHeader({
       </div>
 
       {/* Content */}
-      <div className="relative z-10 p-6 sm:p-8">
+      <div className="relative z-10 p-4 sm:p-6 md:p-8">
         <div className="max-w-6xl mx-auto">
           {/* Main Profile Row */}
-          <div className="flex flex-col lg:flex-row lg:items-center gap-6 lg:gap-8">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-4 sm:gap-6 lg:gap-8">
             {/* Avatar Section */}
             <div className="relative flex-shrink-0">
               <div className="relative group">
@@ -126,7 +126,7 @@ export default function ProfileHeader({
 
                 {/* Avatar with Frame */}
                 <div className="relative">
-                  <div className="w-28 h-28 sm:w-32 sm:h-32 ring-4 ring-gray-800 rounded-full">
+                  <div className="w-20 h-20 sm:w-28 sm:h-28 md:w-32 md:h-32 ring-4 ring-gray-800 rounded-full">
                     <AvatarWithFrame
                       avatarUrl={hasCustomImage ? profileImage : null}
                       frameUrl={frameUrl}
@@ -166,7 +166,7 @@ export default function ProfileHeader({
             {/* Info Section */}
             <div className="flex-1 min-w-0">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
-                <h1 className="text-2xl sm:text-3xl font-bold text-white truncate">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white truncate">
                   {displayName}
                 </h1>
 
@@ -202,7 +202,7 @@ export default function ProfileHeader({
               </p>
 
               {/* Meta Info */}
-              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-400">
                 <div className="flex items-center gap-1.5">
                   <GameIcon name="timer" size={16} />
                   <span>Member since {memberSince}</span>
@@ -234,7 +234,7 @@ export default function ProfileHeader({
                   Balance
                 </span>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-white tabular-nums">
+                  <span className="text-xl sm:text-2xl md:text-3xl font-bold text-white tabular-nums">
                     {(walletData?.currentBalance || 0).toLocaleString(
                       undefined,
                       {
@@ -243,7 +243,7 @@ export default function ProfileHeader({
                       },
                     )}
                   </span>
-                  <span className="text-yellow-500 text-xl">
+                  <span className="text-yellow-500 text-base sm:text-lg md:text-xl">
                     {settings?.credits.symbol || "⚡"}
                   </span>
                 </div>
@@ -254,7 +254,7 @@ export default function ProfileHeader({
           {/* Quick Stats Toggle */}
           <button
             onClick={() => setShowQuickStats(!showQuickStats)}
-            className="mt-6 flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm"
+            className="mt-4 sm:mt-6 flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm min-h-[44px] py-2"
           >
             <span>Quick Stats</span>
             <ChevronDown
@@ -264,7 +264,7 @@ export default function ProfileHeader({
 
           {/* Quick Stats Row */}
           <div
-            className={`grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 transition-all duration-300 ${
+            className={`grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mt-3 sm:mt-4 transition-all duration-300 ${
               showQuickStats
                 ? "opacity-100 max-h-40"
                 : "opacity-0 max-h-0 overflow-hidden"
@@ -313,12 +313,12 @@ function QuickStatCard({
   color: string;
 }) {
   return (
-    <div className="bg-gray-800/30 backdrop-blur-sm rounded-xl px-4 py-3 border border-gray-700/30 hover:border-gray-600/50 transition-colors">
-      <div className={`flex items-center gap-2 ${color} mb-1`}>
+    <div className="bg-gray-800/30 backdrop-blur-sm rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 border border-gray-700/30 hover:border-gray-600/50 transition-colors">
+      <div className={`flex items-center gap-1.5 sm:gap-2 ${color} mb-1`}>
         {icon}
-        <span className="text-xs text-gray-400">{label}</span>
+        <span className="text-[11px] sm:text-xs text-gray-400">{label}</span>
       </div>
-      <p className="text-lg font-bold text-white tabular-nums">{value}</p>
+      <p className="text-base sm:text-lg font-bold text-white tabular-nums">{value}</p>
     </div>
   );
 }

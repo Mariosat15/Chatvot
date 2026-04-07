@@ -207,17 +207,17 @@ function isCompMetricPositive(comp: CompetitionData): boolean {
 
 function TimeLeft({ endTime }: { endTime: Date }) {
   const ms = new Date(endTime).getTime() - Date.now();
-  if (ms <= 0) return <span className="text-red-400 text-[10px]">Ended</span>;
+  if (ms <= 0) return <span className="text-red-400 text-[11px]">Ended</span>;
   const h = Math.floor(ms / 3600000);
   const m = Math.floor((ms % 3600000) / 60000);
   if (h > 24) {
     const d = Math.floor(h / 24);
     return (
-      <span className="text-gray-400 text-[10px]">{d}d left</span>
+      <span className="text-gray-400 text-[11px]">{d}d left</span>
     );
   }
   return (
-    <span className="text-yellow-400 text-[10px]">
+    <span className="text-yellow-400 text-[11px]">
       {h}h {m}m left
     </span>
   );
@@ -259,7 +259,7 @@ function ChallengesList({ challenges }: { challenges: ChallengeData[] }) {
 
   return (
     <div className="relative">
-      <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5 px-0.5">
+      <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1.5 px-0.5">
         Active Challenges ({challenges.length})
       </p>
       {/* Reason: max-h-[340px] shows roughly 5 compact cards before scrolling */}
@@ -306,7 +306,7 @@ function ChallengesList({ challenges }: { challenges: ChallengeData[] }) {
                 </span>
               </div>
               <div className="flex items-center justify-between mt-0.5">
-                <span className="text-[9px] text-gray-500">
+                <span className="text-[11px] text-gray-500">
                   ⚔️ ${ch.stakeAmount.toLocaleString()}
                 </span>
                 <TimeLeft endTime={ch.endTime} />
@@ -320,7 +320,7 @@ function ChallengesList({ challenges }: { challenges: ChallengeData[] }) {
       {showScrollArrow && (
         <button
           onClick={handleScrollDown}
-          className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 z-10 flex items-center justify-center w-7 h-7 rounded-full bg-purple-500/80 hover:bg-purple-500 text-white shadow-lg transition-all animate-bounce cursor-pointer"
+          className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 z-10 flex items-center justify-center w-9 h-9 rounded-full bg-purple-500/80 hover:bg-purple-500 text-white shadow-lg transition-all animate-bounce cursor-pointer"
           aria-label="Scroll down for more challenges"
         >
           <ChevronDown className="w-4 h-4" />
@@ -441,7 +441,7 @@ export default function ContestsSidebar({
       <div className="flex items-center gap-1 mb-4 bg-gray-700/30 rounded-lg p-0.5">
         <button
           onClick={() => setTab("competitions")}
-          className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer ${
+          className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 min-h-[44px] text-xs font-medium rounded-md transition-all cursor-pointer ${
             tab === "competitions"
               ? "bg-yellow-500/15 text-yellow-400 border border-yellow-500/20"
               : "text-gray-400 hover:text-white"
@@ -450,14 +450,14 @@ export default function ContestsSidebar({
           <Trophy className="w-3.5 h-3.5" />
           Competitions
           {activeComps.length > 0 && (
-            <span className="w-4 h-4 rounded-full bg-yellow-500/20 text-yellow-400 text-[10px] flex items-center justify-center">
+            <span className="w-5 h-5 rounded-full bg-yellow-500/20 text-yellow-400 text-[11px] flex items-center justify-center">
               {activeComps.length}
             </span>
           )}
         </button>
         <button
           onClick={() => setTab("challenges")}
-          className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium rounded-md transition-all cursor-pointer ${
+          className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 min-h-[44px] text-xs font-medium rounded-md transition-all cursor-pointer ${
             tab === "challenges"
               ? "bg-purple-500/15 text-purple-400 border border-purple-500/20"
               : "text-gray-400 hover:text-white"
@@ -466,7 +466,7 @@ export default function ContestsSidebar({
           <Swords className="w-3.5 h-3.5" />
           Challenges
           {activeChallenges.length > 0 && (
-            <span className="w-4 h-4 rounded-full bg-purple-500/20 text-purple-400 text-[10px] flex items-center justify-center">
+            <span className="w-5 h-5 rounded-full bg-purple-500/20 text-purple-400 text-[11px] flex items-center justify-center">
               {activeChallenges.length}
             </span>
           )}
@@ -482,19 +482,19 @@ export default function ContestsSidebar({
               <div className="text-lg font-bold text-white">
                 {competitions.stats.total}
               </div>
-              <div className="text-[10px] text-gray-500">Entered</div>
+              <div className="text-[11px] text-gray-500">Entered</div>
             </div>
             <div>
               <div className="text-lg font-bold text-yellow-400">
                 {competitions.stats.won}
               </div>
-              <div className="text-[10px] text-gray-500">Won</div>
+              <div className="text-[11px] text-gray-500">Won</div>
             </div>
             <div>
               <div className="text-lg font-bold text-blue-400">
                 #{competitions.stats.averageRank.toFixed(0) || "–"}
               </div>
-              <div className="text-[10px] text-gray-500">Avg Rank</div>
+              <div className="text-[11px] text-gray-500">Avg Rank</div>
             </div>
           </div>
 
@@ -552,7 +552,7 @@ export default function ContestsSidebar({
                     </span>
                   </div>
                   <div className="flex items-center justify-between mt-1.5">
-                    <span className="text-[10px] text-gray-500">
+                    <span className="text-[11px] text-gray-500">
                       🏆 ${comp.prizePool.toLocaleString()}
                     </span>
                     <TimeLeft endTime={comp.endTime} />
@@ -571,19 +571,19 @@ export default function ContestsSidebar({
               <div className="text-base font-bold text-green-400">
                 {challenges.stats.wins}
               </div>
-              <div className="text-[9px] text-gray-500">Wins</div>
+              <div className="text-[11px] text-gray-500">Wins</div>
             </div>
             <div>
               <div className="text-base font-bold text-red-400">
                 {challenges.stats.losses}
               </div>
-              <div className="text-[9px] text-gray-500">Losses</div>
+              <div className="text-[11px] text-gray-500">Losses</div>
             </div>
             <div>
               <div className="text-base font-bold text-yellow-400">
                 ${challenges.stats.totalWon.toFixed(0)}
               </div>
-              <div className="text-[9px] text-gray-500">Won</div>
+              <div className="text-[11px] text-gray-500">Won</div>
             </div>
           </div>
 

@@ -250,26 +250,26 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                   <div className="relative bg-gradient-to-r from-dark-200 via-dark-200/95 to-dark-300/90 border-b border-dark-400/50 shadow-lg">
                     <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent pointer-events-none" />
 
-                    <div className="container-custom py-4 md:py-6 relative z-10">
-                      <div className="flex flex-col gap-5 md:gap-6">
+                    <div className="container-custom py-3 sm:py-4 md:py-6 relative z-10">
+                      <div className="flex flex-col gap-3 sm:gap-5 md:gap-6">
                         {/* Back & Title with Better Spacing */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+                          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
                             <Link
                               href={
                                 isViewOnly
                                   ? `/competitions/${competitionId}/results`
                                   : `/competitions/${competitionId}`
                               }
-                              className="group flex items-center gap-2 px-3 py-2 rounded-lg bg-dark-300/50 hover:bg-dark-300 border border-dark-400/30 hover:border-dark-400 transition-all duration-200"
+                              className="group flex items-center gap-2 px-3 py-2 rounded-lg bg-dark-300/50 hover:bg-dark-300 border border-dark-400/30 hover:border-dark-400 transition-all duration-200 min-h-[44px] flex-shrink-0"
                             >
                               <ArrowLeft className="size-4 group-hover:-translate-x-0.5 transition-transform" />
                               <span className="text-sm font-medium text-light-900">
-                                {isViewOnly ? "Back to Results" : "Back"}
+                                {isViewOnly ? "Back" : "Back"}
                               </span>
                             </Link>
-                            <div className="border-l border-dark-400/30 pl-4 h-10 flex flex-col justify-center">
-                              <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-light-900 tracking-tight">
+                            <div className="hidden sm:flex border-l border-dark-400/30 pl-4 h-10 flex-col justify-center min-w-0">
+                              <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-light-900 tracking-tight truncate">
                                 {competition.name}
                               </h1>
                               <div className="flex items-center gap-2 mt-0.5">
@@ -308,6 +308,34 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                                   <span className="inline-flex items-center gap-1 text-xs font-medium text-green-400">
                                     <span className="size-1.5 bg-green-400 rounded-full animate-pulse" />
                                     Live Trading
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {/* Mobile title - inline with back button */}
+                            <div className="sm:hidden min-w-0 flex-1">
+                              <h1 className="text-base font-bold text-light-900 tracking-tight truncate">
+                                {competition.name}
+                              </h1>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                {isViewOnly ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-purple-400">
+                                    <span className="size-1.5 bg-purple-400 rounded-full" />
+                                    Results
+                                  </span>
+                                ) : isPaused ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-yellow-400">
+                                    <span className="size-1.5 bg-yellow-400 rounded-full animate-pulse" />
+                                    Paused
+                                  </span>
+                                ) : isDisqualified ? (
+                                  <span className={cn("inline-flex items-center gap-1 text-[11px] font-medium", participantStatus === "liquidated" ? "text-red-400" : "text-orange-400")}>
+                                    {participantStatus === "liquidated" ? "Liquidated" : "Disqualified"}
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-400">
+                                    <span className="size-1.5 bg-green-400 rounded-full animate-pulse" />
+                                    Live
                                   </span>
                                 )}
                               </div>
@@ -401,13 +429,13 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                   </div>
 
                   {/* Professional Main Content */}
-                  <div className="container-custom py-5 md:py-8">
+                  <div className="container-custom py-3 sm:py-5 md:py-8">
                     {/* Market Status Banner with Better Styling */}
-                    <MarketStatusBanner className="mb-5 md:mb-7 shadow-lg" />
+                    <MarketStatusBanner className="mb-3 sm:mb-5 md:mb-7 shadow-lg" />
 
-                    <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 md:gap-5">
+                    <div className="grid grid-cols-1 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-5">
                       {/* Left Column: Chart + Account Info + Positions - Takes 3 of 5 columns on XL */}
-                      <div className="xl:col-span-3 space-y-4 md:space-y-5">
+                      <div className="xl:col-span-3 space-y-3 sm:space-y-4 md:space-y-5">
                         {/* Professional Chart Container */}
                         <div className="group relative bg-gradient-to-br from-dark-200 to-dark-300/50 rounded-2xl p-3 md:p-5 border border-dark-400/30 shadow-2xl hover:shadow-primary/10 transition-all duration-300">
                           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl pointer-events-none" />
@@ -434,9 +462,9 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                         </div>
 
                         {/* Professional Positions & Trade History Tabs - MOVED ABOVE TRADE STATS */}
-                        <div className="bg-gradient-to-br from-dark-200 to-dark-300/50 rounded-2xl p-4 md:p-6 border border-dark-400/30 shadow-2xl">
+                        <div className="bg-gradient-to-br from-dark-200 to-dark-300/50 rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 border border-dark-400/30 shadow-2xl">
                           <Tabs defaultValue="positions" className="w-full">
-                            <TabsList className="bg-dark-300/80 border border-dark-400/50 mb-5 p-1 rounded-xl backdrop-blur-sm shadow-lg">
+                            <TabsList className="bg-dark-300/80 border border-dark-400/50 mb-3 sm:mb-5 p-1 rounded-xl backdrop-blur-sm shadow-lg w-full overflow-x-auto flex-nowrap">
                               <TabsTrigger
                                 value="positions"
                                 className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-emerald-500/50 rounded-lg font-semibold transition-all duration-200"

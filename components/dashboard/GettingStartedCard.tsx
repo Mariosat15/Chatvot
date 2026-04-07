@@ -117,10 +117,10 @@ export default function GettingStartedCard({
           </div>
           <button
             onClick={handleDismiss}
-            className="text-gray-500 hover:text-gray-300 transition-colors p-1"
+            className="text-gray-500 hover:text-gray-300 transition-colors p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
             aria-label="Dismiss getting started guide"
           >
-            <X className="size-4" />
+            <X className="size-5" />
           </button>
         </div>
 

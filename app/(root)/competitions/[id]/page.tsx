@@ -262,7 +262,7 @@ const CompetitionDetailsPage = async ({
     const diffColors = colorMap[difficultyData.level];
 
     return (
-      <div className="flex min-h-screen flex-col gap-6 p-4 md:p-8">
+      <div className="flex min-h-screen flex-col gap-4 sm:gap-6 p-3 sm:p-4 md:p-8 overflow-x-hidden">
         {/* Auto-refresh when competition status changes */}
         <CompetitionStatusMonitor
           competitionId={id}
@@ -272,34 +272,38 @@ const CompetitionDetailsPage = async ({
         />
 
         {/* Header with Back Button and UTC Clock */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between flex-wrap gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 flex-wrap">
             <Link href="/competitions">
               <Button
                 variant="ghost"
-                className="w-fit gap-2 text-gray-400 hover:text-gray-100"
+                className="w-fit gap-2 text-gray-400 hover:text-gray-100 min-h-[44px]"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Back to Competitions
+                <span className="hidden sm:inline">Back to Competitions</span>
+                <span className="sm:hidden">Back</span>
               </Button>
             </Link>
             {isCompleted && isUserIn && (
               <Link href={`/competitions/${id}/results`}>
                 <Button
                   size="sm"
-                  className="gap-2 bg-purple-600 hover:bg-purple-700"
+                  className="gap-2 bg-purple-600 hover:bg-purple-700 min-h-[44px]"
                 >
                   <BarChart3 className="h-4 w-4" />
-                  View Results
+                  <span className="hidden sm:inline">View Results</span>
+                  <span className="sm:hidden">Results</span>
                 </Button>
               </Link>
             )}
           </div>
-          <UTCClock />
+          <div className="hidden sm:block">
+            <UTCClock />
+          </div>
         </div>
 
         {/* Competition Header */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-yellow-500/20 via-gray-800 to-gray-900 p-6 md:p-8 shadow-xl border border-yellow-500/20">
+        <div className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-yellow-500/20 via-gray-800 to-gray-900 p-4 sm:p-6 md:p-8 shadow-xl border border-yellow-500/20">
           <div className="absolute top-0 right-0 opacity-10">
             <GameIcon name="trophy" size={192} />
           </div>
@@ -325,7 +329,7 @@ const CompetitionDetailsPage = async ({
               </span>
             )}
 
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-100 mb-2">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-100 mb-2">
               {competition.name}
             </h1>
             <p className="text-gray-400 mb-6 max-w-2xl">
@@ -333,12 +337,12 @@ const CompetitionDetailsPage = async ({
             </p>
 
             {/* Key Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">
+                <p className="text-[11px] sm:text-xs text-gray-500 uppercase tracking-wider">
                   Prize Pool
                 </p>
-                <p className="text-2xl md:text-3xl font-bold text-yellow-500">
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-yellow-500">
                   €
                   {(
                     competition.prizePool ||
@@ -348,18 +352,18 @@ const CompetitionDetailsPage = async ({
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">
+                <p className="text-[11px] sm:text-xs text-gray-500 uppercase tracking-wider">
                   Entry Fee
                 </p>
-                <p className="text-2xl md:text-3xl font-bold text-gray-100">
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-100">
                   €{competition.entryFee || competition.entryFeeCredits || 0}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">
+                <p className="text-[11px] sm:text-xs text-gray-500 uppercase tracking-wider">
                   Participants
                 </p>
-                <p className="text-2xl md:text-3xl font-bold text-gray-100">
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-100">
                   {competition.currentParticipants}/
                   {competition.maxParticipants}
                 </p>
@@ -376,7 +380,7 @@ const CompetitionDetailsPage = async ({
                 )}
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">
+                <p className="text-[11px] sm:text-xs text-gray-500 uppercase tracking-wider">
                   {isCancelled
                     ? "Status"
                     : isActive
@@ -386,7 +390,7 @@ const CompetitionDetailsPage = async ({
                         : "Starts In"}
                 </p>
                 <div
-                  className={`text-2xl md:text-3xl font-bold ${isCancelled ? "text-red-500" : isActive ? "text-yellow-400" : "text-gray-100"}`}
+                  className={`text-xl sm:text-2xl md:text-3xl font-bold ${isCancelled ? "text-red-500" : isActive ? "text-yellow-400" : "text-gray-100"}`}
                 >
                   {isCancelled ? (
                     "Cancelled"
@@ -456,10 +460,10 @@ const CompetitionDetailsPage = async ({
             )}
 
             {/* Leaderboard */}
-            <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-6">
-              <div className="flex items-center gap-2 mb-6">
+            <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4 sm:p-6">
+              <div className="flex items-center gap-2 mb-4 sm:mb-6 flex-wrap">
                 <GameIcon name="trophy" size={20} />
-                <h2 className="text-xl font-bold text-gray-100">Leaderboard</h2>
+                <h2 className="text-lg sm:text-xl font-bold text-gray-100">Leaderboard</h2>
                 <span className="px-2 py-0.5 rounded-full bg-gray-700 text-gray-300 text-xs font-medium">
                   {leaderboard.length} traders
                 </span>
@@ -583,7 +587,7 @@ const CompetitionDetailsPage = async ({
                 {/* Quick Stats Grid */}
                 <div className="grid grid-cols-2 gap-2">
                   <div className="p-2.5 bg-gray-900/50 rounded-lg text-center">
-                    <p className="text-[10px] text-gray-500 uppercase">
+                    <p className="text-[11px] text-gray-500 uppercase">
                       Capital
                     </p>
                     <p className="text-sm font-bold text-green-400">
@@ -596,7 +600,7 @@ const CompetitionDetailsPage = async ({
                     </p>
                   </div>
                   <div className="p-2.5 bg-gray-900/50 rounded-lg text-center">
-                    <p className="text-[10px] text-gray-500 uppercase">
+                    <p className="text-[11px] text-gray-500 uppercase">
                       Leverage
                     </p>
                     <p className="text-sm font-bold text-purple-400">
@@ -607,7 +611,7 @@ const CompetitionDetailsPage = async ({
                     </p>
                   </div>
                   <div className="p-2.5 bg-gray-900/50 rounded-lg text-center">
-                    <p className="text-[10px] text-gray-500 uppercase">
+                    <p className="text-[11px] text-gray-500 uppercase">
                       Max Positions
                     </p>
                     <p className="text-sm font-bold text-cyan-400">
@@ -615,7 +619,7 @@ const CompetitionDetailsPage = async ({
                     </p>
                   </div>
                   <div className="p-2.5 bg-gray-900/50 rounded-lg text-center">
-                    <p className="text-[10px] text-gray-500 uppercase">
+                    <p className="text-[11px] text-gray-500 uppercase">
                       Position Size
                     </p>
                     <p className="text-sm font-bold text-cyan-400">
@@ -670,7 +674,7 @@ const CompetitionDetailsPage = async ({
                     style={{ width: `${difficultyData.score}%` }}
                   />
                 </div>
-                <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+                <div className="flex justify-between text-[11px] text-gray-500 mt-1">
                   <span>Easier</span>
                   <span className={diffColors.text}>
                     {difficultyData.score}/100
@@ -889,7 +893,7 @@ const CompetitionDetailsPage = async ({
                             {competition.rules.minimumTrades}
                           </span>
                         </div>
-                        <p className="text-[10px] text-gray-500">
+                        <p className="text-[11px] text-gray-500">
                           Complete {competition.rules.minimumTrades}+ trades or
                           be disqualified
                         </p>
@@ -902,11 +906,11 @@ const CompetitionDetailsPage = async ({
                           <span className="text-xs font-medium text-red-400">
                             Liquidation = DQ
                           </span>
-                          <span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-[10px] font-bold rounded animate-pulse">
+                          <span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-[11px] font-bold rounded animate-pulse">
                             ACTIVE
                           </span>
                         </div>
-                        <p className="text-[10px] text-gray-500">
+                        <p className="text-[11px] text-gray-500">
                           Getting liquidated = immediate disqualification
                         </p>
                       </div>
@@ -922,7 +926,7 @@ const CompetitionDetailsPage = async ({
                             {competition.rules.minimumWinRate}%
                           </span>
                         </div>
-                        <p className="text-[10px] text-gray-500">
+                        <p className="text-[11px] text-gray-500">
                           Win rate below {competition.rules.minimumWinRate}% =
                           disqualified
                         </p>
@@ -943,7 +947,7 @@ const CompetitionDetailsPage = async ({
                   Risk Limits
                 </h3>
                 <span
-                  className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${competition.riskLimits?.enabled ? "bg-red-500/20 text-red-400" : "bg-gray-700 text-gray-500"}`}
+                  className={`px-1.5 py-0.5 text-[11px] font-bold rounded ${competition.riskLimits?.enabled ? "bg-red-500/20 text-red-400" : "bg-gray-700 text-gray-500"}`}
                 >
                   {competition.riskLimits?.enabled ? "🛡️ ACTIVE" : "OFF"}
                 </span>
@@ -1037,7 +1041,7 @@ const CompetitionDetailsPage = async ({
                   <div className="bg-yellow-500" style={{ width: "20%" }} />
                   <div className="bg-green-500" style={{ width: "40%" }} />
                 </div>
-                <div className="flex justify-between text-[9px] text-gray-500 mt-1">
+                <div className="flex justify-between text-[11px] text-gray-500 mt-1">
                   <span>💀</span>
                   <span>🚨</span>
                   <span>⚠️</span>
@@ -1056,7 +1060,7 @@ const CompetitionDetailsPage = async ({
                   </h3>
                 </div>
                 {competition.platformFeePercentage > 0 && (
-                  <span className="text-[10px] text-blue-400">
+                  <span className="text-[11px] text-blue-400">
                     Fee: {competition.platformFeePercentage}%
                   </span>
                 )}
@@ -1129,11 +1133,11 @@ const CompetitionDetailsPage = async ({
                                 <span className="text-sm font-medium text-gray-300">
                                   #{prize.rank ?? index + 1}
                                 </span>
-                                <span className="px-1.5 py-0.5 text-[10px] rounded bg-yellow-500/20 text-yellow-400">
+                                <span className="px-1.5 py-0.5 text-[11px] rounded bg-yellow-500/20 text-yellow-400">
                                   {prize.percentage}%
                                 </span>
                                 {isFilled && bonusPerWinner > 0 && (
-                                  <span className="px-1.5 py-0.5 text-[10px] rounded bg-green-500/20 text-green-400">
+                                  <span className="px-1.5 py-0.5 text-[11px] rounded bg-green-500/20 text-green-400">
                                     +{bonusPerWinner.toFixed(1)}%
                                   </span>
                                 )}
@@ -1149,7 +1153,7 @@ const CompetitionDetailsPage = async ({
                       )}
                     </div>
 
-                    <p className="mt-3 text-[10px] text-gray-500">
+                    <p className="mt-3 text-[11px] text-gray-500">
                       🎁 Unclaimed positions split equally among winners
                     </p>
                   </>

@@ -261,26 +261,26 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6">
+    <div className="max-w-7xl mx-auto p-3 sm:p-4 md:p-6 overflow-x-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-yellow-600/20 to-orange-600/20 rounded-2xl p-6 sm:p-8 mb-6 shadow-2xl border border-yellow-500/20">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-full bg-yellow-500/20 flex items-center justify-center">
-              <Book className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-400" />
+      <div className="bg-gradient-to-r from-yellow-600/20 to-orange-600/20 rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 mb-4 sm:mb-6 shadow-2xl border border-yellow-500/20">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <div className="h-10 w-10 sm:h-12 sm:w-12 md:h-16 md:w-16 rounded-full bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
+              <Book className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-yellow-400" />
             </div>
-            <div>
-              <h1 className="text-2xl sm:text-4xl font-bold text-white">
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl md:text-4xl font-bold text-white truncate">
                 Help Center
               </h1>
-              <p className="text-gray-400 text-sm sm:text-base mt-1">
+              <p className="text-gray-400 text-xs sm:text-sm md:text-base mt-0.5 sm:mt-1 truncate">
                 Complete guide to mastering the platform
               </p>
             </div>
           </div>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-2 bg-yellow-500/20 rounded-lg text-white"
+            className="lg:hidden p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center bg-yellow-500/20 rounded-lg text-white flex-shrink-0"
           >
             {mobileMenuOpen ? (
               <X className="h-6 w-6" />
@@ -291,10 +291,10 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6">
+      <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
         {/* Left Menu - Desktop */}
         <nav className="hidden lg:block w-72 flex-shrink-0">
-          <div className="sticky top-6 bg-gray-800/50 rounded-xl p-4 border border-gray-700 max-h-[calc(100vh-6rem)] overflow-y-auto">
+          <div className="sticky top-20 bg-gray-800/50 rounded-xl p-4 border border-gray-700 max-h-[calc(100vh-6rem)] overflow-y-auto">
             <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">
               Topics
             </h2>
@@ -330,7 +330,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
             onClick={() => setMobileMenuOpen(false)}
           >
             <div
-              className="bg-gray-900 w-72 h-full p-4 overflow-y-auto"
+              className="bg-gray-900 w-[280px] max-w-[85vw] h-full p-4 overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">
@@ -343,7 +343,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                     <li key={section.id}>
                       <button
                         onClick={() => scrollToSection(section.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
+                        className={`w-full flex items-center gap-3 px-3 py-3 min-h-[44px] rounded-lg transition-all text-left ${
                           activeSection === section.id
                             ? "bg-yellow-500/20 text-yellow-400"
                             : "text-gray-400 hover:bg-gray-700/50 hover:text-white"
@@ -363,15 +363,15 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
         )}
 
         {/* Main Content */}
-        <div className="flex-1 space-y-6">
+        <div className="flex-1 space-y-4 sm:space-y-6 min-w-0">
           {/* Getting Started */}
           <section
             id="getting-started"
-            className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
           >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Book className="h-6 w-6 text-yellow-500" />
-              <h2 className="text-2xl font-bold text-white">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
                 🚀 Getting Started
               </h2>
             </div>
@@ -487,11 +487,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           {/* Dashboard */}
           <section
             id="dashboard"
-            className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
           >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <LayoutDashboard className="h-6 w-6 text-blue-500" />
-              <h2 className="text-2xl font-bold text-white">📊 Dashboard</h2>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">📊 Dashboard</h2>
             </div>
 
             <div className="space-y-4 text-gray-300">
@@ -548,11 +548,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           {/* Competitions */}
           <section
             id="competitions"
-            className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
           >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Trophy className="h-6 w-6 text-yellow-500" />
-              <h2 className="text-2xl font-bold text-white">🏆 Competitions</h2>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">🏆 Competitions</h2>
             </div>
 
             <div className="space-y-4 text-gray-300">
@@ -626,11 +626,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           {/* 1v1 Challenges */}
           <section
             id="challenges"
-            className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
           >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Swords className="h-6 w-6 text-red-500" />
-              <h2 className="text-2xl font-bold text-white">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
                 ⚔️ 1v1 Challenges
               </h2>
             </div>
@@ -665,11 +665,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           {/* Match Cards (Matchmaking) */}
           <section
             id="matchmaking"
-            className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
           >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Heart className="h-6 w-6 text-pink-500" />
-              <h2 className="text-2xl font-bold text-white">💖 Match Cards</h2>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">💖 Match Cards</h2>
             </div>
 
             <div className="space-y-4 text-gray-300">
@@ -800,11 +800,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           {/* Score System */}
           <section
             id="score-system"
-            className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
           >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Zap className="h-6 w-6 text-yellow-500" />
-              <h2 className="text-2xl font-bold text-white">⚡ Score System</h2>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">⚡ Score System</h2>
             </div>
 
             <div className="space-y-4 text-gray-300">
@@ -1065,11 +1065,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           {/* Trading Guide */}
           <section
             id="trading"
-            className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
           >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <TrendingUp className="h-6 w-6 text-green-500" />
-              <h2 className="text-2xl font-bold text-white">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
                 📈 Trading Guide
               </h2>
             </div>
@@ -1171,11 +1171,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           {/* Marketplace */}
           <section
             id="marketplace"
-            className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
           >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <ShoppingBag className="h-6 w-6 text-purple-500" />
-              <h2 className="text-2xl font-bold text-white">🛒 Marketplace</h2>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">🛒 Marketplace</h2>
             </div>
 
             <div className="space-y-4 text-gray-300">
@@ -1224,11 +1224,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           {/* Leaderboard */}
           <section
             id="leaderboard"
-            className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
           >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Medal className="h-6 w-6 text-amber-500" />
-              <h2 className="text-2xl font-bold text-white">🥇 Leaderboard</h2>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">🥇 Leaderboard</h2>
             </div>
 
             <div className="space-y-4 text-gray-300">
@@ -1261,11 +1261,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           {/* Credits & Wallet */}
           <section
             id="credits"
-            className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
           >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Coins className="h-6 w-6 text-yellow-500" />
-              <h2 className="text-2xl font-bold text-white">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
                 💰 {settings.credits.name} & Wallet
               </h2>
             </div>
@@ -1343,11 +1343,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           {/* Profile */}
           <section
             id="profile"
-            className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
           >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <User className="h-6 w-6 text-cyan-500" />
-              <h2 className="text-2xl font-bold text-white">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
                 👤 Profile & Stats
               </h2>
             </div>
@@ -1382,11 +1382,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           {/* Trading Arsenal */}
           <section
             id="arsenal"
-            className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
           >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Briefcase className="h-6 w-6 text-orange-500" />
-              <h2 className="text-2xl font-bold text-white">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
                 🎯 Trading Arsenal
               </h2>
             </div>
@@ -1414,11 +1414,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           {/* Game Master */}
           <section
             id="gamemaster"
-            className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
           >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Award className="h-6 w-6 text-purple-500" />
-              <h2 className="text-2xl font-bold text-white">👑 Game Master</h2>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">👑 Game Master</h2>
             </div>
 
             <div className="space-y-4 text-gray-300">
@@ -1587,11 +1587,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           {/* Notifications */}
           <section
             id="notifications"
-            className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
           >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Bell className="h-6 w-6 text-pink-500" />
-              <h2 className="text-2xl font-bold text-white">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
                 🔔 Notifications
               </h2>
             </div>
@@ -1630,11 +1630,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           {/* Trader Levels - DYNAMIC */}
           <section
             id="trader-levels"
-            className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
           >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Award className="h-6 w-6 text-yellow-500" />
-              <h2 className="text-2xl font-bold text-white">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
                 👑 Trader Levels & Titles
               </h2>
             </div>
@@ -1715,11 +1715,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           {/* Badge System - DYNAMIC */}
           <section
             id="badge-system"
-            className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
           >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Award className="h-6 w-6 text-purple-500" />
-              <h2 className="text-2xl font-bold text-white">🏅 Badge System</h2>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">🏅 Badge System</h2>
             </div>
 
             <div className="space-y-4 text-gray-300">
@@ -1815,11 +1815,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           {/* Risk Management - DYNAMIC */}
           <section
             id="risk-management"
-            className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
           >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Shield className="h-6 w-6 text-blue-500" />
-              <h2 className="text-2xl font-bold text-white">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
                 🛡️ Risk Management
               </h2>
             </div>
@@ -1944,11 +1944,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           {/* Account Security & Fair Play */}
           <section
             id="account-security"
-            className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
           >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Eye className="h-6 w-6 text-green-500" />
-              <h2 className="text-2xl font-bold text-white">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
                 🔒 Account Security &amp; Fair Play
               </h2>
             </div>
@@ -2176,11 +2176,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           {/* Invoices */}
           <section
             id="invoices"
-            className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
           >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <FileText className="h-6 w-6 text-teal-500" />
-              <h2 className="text-2xl font-bold text-white">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
                 📄 Invoices & Billing
               </h2>
             </div>
@@ -2218,11 +2218,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           {/* FAQ */}
           <section
             id="faq"
-            className="bg-gray-800/50 rounded-xl p-6 border border-gray-700 scroll-mt-6"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
           >
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <HelpCircle className="h-6 w-6 text-purple-500" />
-              <h2 className="text-2xl font-bold text-white">❓ FAQ</h2>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">❓ FAQ</h2>
             </div>
 
             <div className="space-y-4">

@@ -478,7 +478,7 @@ export default function MarketplaceContent() {
         {/* Grid pattern overlay */}
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:50px_50px]" />
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16 md:py-20">
           <div className="text-center max-w-3xl mx-auto">
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-emerald-500/10 to-orange-500/10 border border-white/10 mb-8">
@@ -488,14 +488,14 @@ export default function MarketplaceContent() {
               </span>
             </div>
 
-            <h1 className="text-5xl md:text-6xl font-black text-white mb-6 tracking-tight">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white mb-4 sm:mb-6 tracking-tight">
               Supercharge Your
               <span className="block bg-gradient-to-r from-emerald-400 via-cyan-400 to-orange-400 text-transparent bg-clip-text pb-2">
                 Trading Strategy
               </span>
             </h1>
 
-            <p className="text-xl text-gray-400 mb-10 leading-relaxed">
+            <p className="text-base sm:text-lg md:text-xl text-gray-400 mb-6 sm:mb-10 leading-relaxed px-2 sm:px-0">
               Professional indicators and automated strategies to give you the
               edge in competitions and challenges.
             </p>
@@ -529,8 +529,8 @@ export default function MarketplaceContent() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Category Navigation */}
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-12">
-          <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4 mb-8 sm:mb-12">
+          <div className="flex flex-wrap gap-2 sm:gap-3">
             {CATEGORIES.map((cat) => {
               const Icon = cat.icon;
               const isActive = category === cat.value;
@@ -539,7 +539,7 @@ export default function MarketplaceContent() {
                   key={cat.value}
                   onClick={() => setCategory(cat.value)}
                   className={cn(
-                    "flex items-center gap-2.5 px-5 py-3 rounded-xl font-medium transition-all",
+                    "flex items-center gap-2 sm:gap-2.5 px-3 sm:px-5 py-2.5 sm:py-3 min-h-[44px] rounded-xl font-medium text-sm sm:text-base transition-all",
                     isActive
                       ? `bg-gradient-to-br ${cat.bgGradient} border border-white/10 text-white shadow-lg`
                       : "text-gray-400 hover:text-white hover:bg-white/5",
@@ -1118,24 +1118,24 @@ function ItemCard({
             <h3 className="text-sm font-semibold text-white truncate group-hover:text-emerald-400 transition-colors">
               {item.name}
             </h3>
-            <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0", categoryBgColor)}>
+            <span className={cn("px-2 py-0.5 rounded-full text-[11px] font-medium flex-shrink-0", categoryBgColor)}>
               {categoryLabel}
             </span>
-            <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-medium border flex-shrink-0", riskStyle.bg, riskStyle.text, riskStyle.border)}>
+            <span className={cn("px-2 py-0.5 rounded-full text-[11px] font-medium border flex-shrink-0", riskStyle.bg, riskStyle.text, riskStyle.border)}>
               {item.riskLevel.replace("_", " ")}
             </span>
             {featured && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 flex-shrink-0">
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 flex-shrink-0">
                 Featured
               </span>
             )}
             {item.owned && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex-shrink-0">
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex-shrink-0">
                 Owned
               </span>
             )}
             {item.isFree && !item.owned && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-500/20 text-green-400 border border-green-500/30 flex-shrink-0">
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-500/20 text-green-400 border border-green-500/30 flex-shrink-0">
                 Free
               </span>
             )}
@@ -1457,16 +1457,16 @@ function CosmeticCard({
             <h3 className="text-sm font-semibold text-white truncate group-hover:text-pink-400 transition-colors">
               {item.name}
             </h3>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-pink-500/10 text-pink-400 border border-pink-500/20 flex-shrink-0">
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-pink-500/10 text-pink-400 border border-pink-500/20 flex-shrink-0">
               Avatar
             </span>
             {item.owned && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-pink-500/20 text-pink-400 border border-pink-500/30 flex-shrink-0">
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-pink-500/20 text-pink-400 border border-pink-500/30 flex-shrink-0">
                 Owned
               </span>
             )}
             {item.isFree && !item.owned && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-500/20 text-green-400 border border-green-500/30 flex-shrink-0">
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-500/20 text-green-400 border border-green-500/30 flex-shrink-0">
                 Free
               </span>
             )}
@@ -1646,11 +1646,11 @@ function GameMasterCard({
             <h3 className="text-sm font-semibold text-white truncate group-hover:text-yellow-400 transition-colors">
               {item.name}
             </h3>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 flex-shrink-0">
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 flex-shrink-0">
               Game Master
             </span>
             {item.owned && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 flex-shrink-0">
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 flex-shrink-0">
                 Active
               </span>
             )}
@@ -2001,7 +2001,7 @@ function ItemDetailModal({
       className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 overflow-y-auto overscroll-contain"
       onClick={onClose}
     >
-      <div className="min-h-full flex items-start justify-center py-8 px-4">
+      <div className="min-h-full flex items-start justify-center py-4 sm:py-8 px-3 sm:px-4">
       <div
         className={`relative border-[6px] ${borderColor} rounded-[18px] overflow-hidden shadow-2xl w-full max-w-[400px]`}
         style={{ background: "linear-gradient(135deg, #1a1d2e 0%, #131722 100%)" }}
@@ -2020,7 +2020,7 @@ function ItemDetailModal({
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-2 right-2 p-1.5 rounded-full bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-colors z-40"
+          className="absolute top-2 right-2 p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-colors z-40"
         >
           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -2031,15 +2031,15 @@ function ItemDetailModal({
         <div className="px-4 pt-3 pb-1">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-1.5">
-              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${tagBg}`}>
+              <span className={`text-[11px] font-bold uppercase px-2 py-0.5 rounded ${tagBg}`}>
                 {isGameMaster ? "Game Master" : isStrategy ? "Strategy" : "Indicator"}
               </span>
               {!isGameMaster && (
-                <span className="text-[10px] text-gray-400 italic">v{item.version}</span>
+                <span className="text-[11px] text-gray-400 italic">v{item.version}</span>
               )}
             </div>
             {item.owned && (
-              <span className="text-[10px] font-bold text-green-400 bg-green-500/20 px-2 py-0.5 rounded">
+              <span className="text-[11px] font-bold text-green-400 bg-green-500/20 px-2 py-0.5 rounded">
                 OWNED
               </span>
             )}
@@ -2093,11 +2093,11 @@ function ItemDetailModal({
           {/* Risk + Version badge row */}
           {!isGameMaster && (
             <div className="flex items-center gap-2 justify-center">
-              <span className={cn("px-2 py-0.5 rounded text-[10px] font-semibold", riskStyle.bg, riskStyle.text)}>
+              <span className={cn("px-2 py-0.5 rounded text-[11px] font-semibold", riskStyle.bg, riskStyle.text)}>
                 {item.riskLevel.replace("_", " ")} risk
               </span>
               {item.originalPrice && item.originalPrice > item.price && (
-                <span className="text-[10px] text-gray-500 line-through">{item.originalPrice.toLocaleString()} credits</span>
+                <span className="text-[11px] text-gray-500 line-through">{item.originalPrice.toLocaleString()} credits</span>
               )}
             </div>
           )}
@@ -2107,28 +2107,28 @@ function ItemDetailModal({
             <div className="bg-gray-800/60 border border-gray-700 rounded-lg overflow-hidden">
               <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800/80 border-b border-gray-700">
                 <Crown className="h-3.5 w-3.5 text-yellow-400" />
-                <span className="text-[10px] font-bold uppercase tracking-wide text-yellow-400">Package Features</span>
+                <span className="text-[11px] font-bold uppercase tracking-wide text-yellow-400">Package Features</span>
               </div>
               <div className={cn(
                 "grid divide-x divide-gray-700",
                 item.gameMasterConfig.canCreateCompetitions !== false ? "grid-cols-4" : "grid-cols-2"
               )}>
                 <div className="py-2 px-2 text-center">
-                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Duration</p>
+                  <p className="text-[11px] text-gray-400 uppercase font-semibold">Duration</p>
                   <p className="text-sm font-bold text-white mt-0.5">{item.gameMasterConfig.subscriptionDurationDays}d</p>
                 </div>
                 <div className="py-2 px-2 text-center">
-                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Referral</p>
+                  <p className="text-[11px] text-gray-400 uppercase font-semibold">Referral</p>
                   <p className="text-sm font-bold text-emerald-400 mt-0.5">{item.gameMasterConfig.referralFeePercentage}%</p>
                 </div>
                 {item.gameMasterConfig.canCreateCompetitions !== false && (
                   <>
                     <div className="py-2 px-2 text-center">
-                      <p className="text-[9px] text-gray-400 uppercase font-semibold">Comps/Day</p>
+                      <p className="text-[11px] text-gray-400 uppercase font-semibold">Comps/Day</p>
                       <p className="text-sm font-bold text-blue-400 mt-0.5">{item.gameMasterConfig.maxCompetitionsPerDay}</p>
                     </div>
                     <div className="py-2 px-2 text-center">
-                      <p className="text-[9px] text-gray-400 uppercase font-semibold">Max Users</p>
+                      <p className="text-[11px] text-gray-400 uppercase font-semibold">Max Users</p>
                       <p className="text-sm font-bold text-purple-400 mt-0.5">{item.gameMasterConfig.maxUsersPerCompetition}</p>
                     </div>
                   </>
@@ -2142,22 +2142,22 @@ function ItemDetailModal({
             <div className="bg-gray-800/60 border border-gray-700 rounded-lg overflow-hidden">
               <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800/80 border-b border-gray-700">
                 <BarChart3 className="h-3.5 w-3.5 text-blue-400" />
-                <span className="text-[10px] font-bold uppercase tracking-wide text-blue-400">Stats</span>
+                <span className="text-[11px] font-bold uppercase tracking-wide text-blue-400">Stats</span>
               </div>
               <div className="grid grid-cols-3 divide-x divide-gray-700">
                 <div className="py-2 px-2 text-center">
-                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Users</p>
+                  <p className="text-[11px] text-gray-400 uppercase font-semibold">Users</p>
                   <p className="text-sm font-bold text-white mt-0.5">{item.totalPurchases}</p>
                 </div>
                 <div className="py-2 px-2 text-center">
-                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Rating</p>
+                  <p className="text-[11px] text-gray-400 uppercase font-semibold">Rating</p>
                   <div className="flex items-center justify-center gap-0.5 mt-0.5">
                     <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
                     <span className="text-sm font-bold text-white">{item.averageRating > 0 ? item.averageRating.toFixed(1) : "—"}</span>
                   </div>
                 </div>
                 <div className="py-2 px-2 text-center">
-                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Reviews</p>
+                  <p className="text-[11px] text-gray-400 uppercase font-semibold">Reviews</p>
                   <p className="text-sm font-bold text-white mt-0.5">{item.totalRatings}</p>
                 </div>
               </div>
@@ -2168,7 +2168,7 @@ function ItemDetailModal({
           <div className="bg-gray-800/60 border border-gray-700 rounded-lg overflow-hidden">
             <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800/80 border-b border-gray-700">
               <Sparkles className={cn("h-3.5 w-3.5", accentText)} />
-              <span className={cn("text-[10px] font-bold uppercase tracking-wide", accentText)}>Description</span>
+              <span className={cn("text-[11px] font-bold uppercase tracking-wide", accentText)}>Description</span>
             </div>
             <div className="px-3 py-2">
               <div
@@ -2218,8 +2218,8 @@ function ItemDetailModal({
               <div className="flex items-start gap-2">
                 <Shield className={cn("h-3.5 w-3.5 flex-shrink-0 mt-0.5", riskStyle.text)} />
                 <div>
-                  <h4 className={cn("text-[10px] font-bold uppercase", riskStyle.text)}>Risk Warning</h4>
-                  <p className="text-[10px] text-gray-300 mt-0.5">{item.riskWarning}</p>
+                  <h4 className={cn("text-[11px] font-bold uppercase", riskStyle.text)}>Risk Warning</h4>
+                  <p className="text-[11px] text-gray-300 mt-0.5">{item.riskWarning}</p>
                 </div>
               </div>
             </div>
@@ -2231,7 +2231,7 @@ function ItemDetailModal({
               {item.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="px-2 py-0.5 bg-gray-800/50 rounded text-[10px] text-gray-400 border border-gray-700/30"
+                  className="px-2 py-0.5 bg-gray-800/50 rounded text-[11px] text-gray-400 border border-gray-700/30"
                 >
                   #{tag}
                 </span>
@@ -2276,8 +2276,8 @@ function ItemDetailModal({
 
         {/* Card ID */}
         <div className="px-4 pb-3 flex items-center justify-between">
-          <span className="text-[8px] text-gray-500">Chartvolt Marketplace</span>
-          <span className="text-[8px] text-gray-500 font-mono">{item.slug}</span>
+          <span className="text-[10px] text-gray-500">Chartvolt Marketplace</span>
+          <span className="text-[10px] text-gray-500 font-mono">{item.slug}</span>
         </div>
       </div>
       </div>

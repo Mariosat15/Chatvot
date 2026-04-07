@@ -137,8 +137,8 @@ export default function CreditBreakdownChart({ data, allTimeTotals }: CreditBrea
       transition={{ duration: 0.5, delay: 0.5 }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div>
+      <div className="flex items-start justify-between flex-wrap gap-2 mb-3">
+        <div className="min-w-0">
           <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
             📊 Credit Breakdown
           </h3>
@@ -156,12 +156,12 @@ export default function CreditBreakdownChart({ data, allTimeTotals }: CreditBrea
           </div>
         </div>
 
-        <div className="flex items-center gap-1 bg-gray-700/40 rounded-lg p-0.5">
+        <div className="flex items-center gap-1 bg-gray-700/40 rounded-lg p-0.5 flex-shrink-0">
           {(["7d", "30d"] as const).map((r) => (
             <button
               key={r}
               onClick={() => setRange(r)}
-              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer ${
+              className={`px-3 py-2 text-xs font-medium rounded-md transition-all cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center ${
                 range === r
                   ? "bg-gray-600 text-white"
                   : "text-gray-400 hover:text-white"
@@ -174,7 +174,7 @@ export default function CreditBreakdownChart({ data, allTimeTotals }: CreditBrea
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4 text-[10px]">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4 text-[11px]">
         {INCOME_CATEGORIES.map((c) => (
           <span key={c.key} className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: c.color }} />
@@ -232,6 +232,7 @@ export default function CreditBreakdownChart({ data, allTimeTotals }: CreditBrea
               <g
                 key={day.date}
                 onMouseEnter={() => setHoveredIdx(idx)}
+                onTouchStart={() => setHoveredIdx(idx)}
                 className="cursor-pointer"
                 opacity={dimmed ? 0.35 : 1}
               >
@@ -328,7 +329,7 @@ export default function CreditBreakdownChart({ data, allTimeTotals }: CreditBrea
           showing 20 when the user has spent 500+ all-time). */}
       <div className="mt-4 space-y-3">
         <div>
-          <p className="text-[10px] text-green-400/70 uppercase tracking-wider font-semibold mb-1.5 px-1">Income</p>
+          <p className="text-[11px] text-green-400/70 uppercase tracking-wider font-semibold mb-1.5 px-1">Income</p>
           <div className="grid grid-cols-2 gap-2">
             <SummaryCard label="Deposits" value={allTimeTotals?.deposits ?? totals.deposits} color="#22c55e" />
             <SummaryCard label="Wins" value={allTimeTotals?.wins ?? totals.wins} color="#facc15" />
@@ -337,7 +338,7 @@ export default function CreditBreakdownChart({ data, allTimeTotals }: CreditBrea
           </div>
         </div>
         <div>
-          <p className="text-[10px] text-red-400/70 uppercase tracking-wider font-semibold mb-1.5 px-1">Spending</p>
+          <p className="text-[11px] text-red-400/70 uppercase tracking-wider font-semibold mb-1.5 px-1">Spending</p>
           <div className="grid grid-cols-2 gap-2">
             <SummaryCard label="Entries" value={allTimeTotals?.entries ?? totals.entries} color="#ef4444" />
             <SummaryCard label="Withdrawals" value={allTimeTotals?.withdrawals ?? totals.withdrawals} color="#fb923c" />
@@ -420,7 +421,7 @@ function SummaryCard({ label, value, color }: { label: string; value: number; co
     <div className="rounded-lg border border-gray-700/30 bg-gray-800/30 px-3 py-2.5 flex items-center gap-2.5">
       <div className="w-1.5 h-8 rounded-full flex-shrink-0" style={{ backgroundColor: `${color}66` }} />
       <div className="min-w-0">
-        <p className="text-[10px] text-gray-500 uppercase tracking-wider truncate">{label}</p>
+        <p className="text-[11px] text-gray-500 uppercase tracking-wider truncate">{label}</p>
         <p className="text-sm font-bold truncate" style={{ color, fontFamily: "var(--font-geist-mono), monospace" }}>
           {value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value.toFixed(2)} ⚡
         </p>

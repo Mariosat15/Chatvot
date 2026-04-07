@@ -222,7 +222,7 @@ export default function ChallengesPageContent({
             <button
               onClick={() => fetchChallenges(true)}
               disabled={isRefreshing}
-              className="p-2 bg-gray-800 rounded-lg border border-gray-700 sm:hidden"
+              className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center bg-gray-800 rounded-lg border border-gray-700 sm:hidden"
             >
               <RefreshCw
                 className={`h-4 w-4 text-gray-400 ${isRefreshing ? "animate-spin" : ""}`}
@@ -300,7 +300,7 @@ export default function ChallengesPageContent({
           <p className="text-lg sm:text-2xl font-bold text-white tabular-nums">
             {stats.total}
           </p>
-          <p className="text-[9px] sm:text-xs text-gray-400">Total</p>
+          <p className="text-[11px] sm:text-xs text-gray-400">Total</p>
         </div>
         <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/30 rounded-xl p-2.5 sm:p-4 text-center">
           <div className="flex justify-center mb-1 sm:mb-2">
@@ -309,7 +309,7 @@ export default function ChallengesPageContent({
           <p className="text-lg sm:text-2xl font-bold text-blue-400 tabular-nums">
             {stats.active}
           </p>
-          <p className="text-[9px] sm:text-xs text-gray-400">Active</p>
+          <p className="text-[11px] sm:text-xs text-gray-400">Active</p>
         </div>
         <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 border border-green-500/30 rounded-xl p-2.5 sm:p-4 text-center">
           <div className="flex justify-center mb-1 sm:mb-2">
@@ -318,7 +318,7 @@ export default function ChallengesPageContent({
           <p className="text-lg sm:text-2xl font-bold text-green-400 tabular-nums">
             {stats.won}
           </p>
-          <p className="text-[9px] sm:text-xs text-gray-400">Won</p>
+          <p className="text-[11px] sm:text-xs text-gray-400">Won</p>
         </div>
         <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border border-yellow-500/30 rounded-xl p-2.5 sm:p-4 text-center">
           <div className="flex justify-center mb-1 sm:mb-2">
@@ -327,7 +327,7 @@ export default function ChallengesPageContent({
           <p className="text-lg sm:text-2xl font-bold text-yellow-400 tabular-nums">
             {stats.pending}
           </p>
-          <p className="text-[9px] sm:text-xs text-gray-400">Pending</p>
+          <p className="text-[11px] sm:text-xs text-gray-400">Pending</p>
         </div>
       </div>
 
@@ -358,7 +358,7 @@ export default function ChallengesPageContent({
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+              className={`px-3 sm:px-4 py-2 sm:py-2 min-h-[44px] flex items-center rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
                 activeTab === tab
                   ? "bg-orange-500 text-white"
                   : "text-gray-400 hover:text-white hover:bg-gray-800"
@@ -366,7 +366,7 @@ export default function ChallengesPageContent({
             >
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
               {tab === "pending" && pendingReceived.length > 0 && (
-                <span className="ml-1.5 sm:ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                <span className="ml-1.5 sm:ml-2 bg-red-500 text-white text-[11px] px-1.5 py-0.5 rounded-full">
                   {pendingReceived.length}
                 </span>
               )}

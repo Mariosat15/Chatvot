@@ -284,7 +284,7 @@ export default function WalletContent({
         <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-3 sm:p-4 md:p-6 hover:bg-gray-800/70 transition-all min-h-[120px]">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">
+              <p className="text-[11px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">
                 Total Bought
               </p>
               <div className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 flex-wrap">
@@ -298,7 +298,7 @@ export default function WalletContent({
                 </span>
               </div>
               {settings.credits.showEUREquivalent && (
-                <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-gray-500 truncate">
+                <p className="mt-0.5 sm:mt-1 text-[11px] sm:text-xs text-gray-500 truncate">
                   ≈ {settings.currency.symbol}
                   {creditsToEUR(displayStats.totalDeposited).toFixed(2)}
                 </p>
@@ -314,7 +314,7 @@ export default function WalletContent({
         <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-3 sm:p-4 md:p-6 hover:bg-gray-800/70 transition-all min-h-[120px]">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">
+              <p className="text-[11px] sm:text-xs font-medium text-gray-400 uppercase tracking-wider truncate">
                 Withdrawn
               </p>
               <div className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 flex-wrap">
@@ -328,7 +328,7 @@ export default function WalletContent({
                 </span>
               </div>
               {settings.credits.showEUREquivalent && (
-                <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-gray-500 truncate">
+                <p className="mt-0.5 sm:mt-1 text-[11px] sm:text-xs text-gray-500 truncate">
                   ≈ {settings.currency.symbol}
                   {creditsToEUR(displayStats.totalWithdrawn).toFixed(2)}
                 </p>
@@ -345,7 +345,7 @@ export default function WalletContent({
           <div className="rounded-xl bg-gradient-to-br from-amber-500/10 to-amber-600/5 border border-amber-500/30 p-3 sm:p-4 md:p-6 hover:bg-amber-500/15 transition-all min-h-[120px]">
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] sm:text-xs font-medium text-amber-400/80 uppercase tracking-wider truncate">
+                <p className="text-[11px] sm:text-xs font-medium text-amber-400/80 uppercase tracking-wider truncate">
                   Referral Earnings
                 </p>
                 <div className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 flex-wrap">
@@ -358,7 +358,7 @@ export default function WalletContent({
                     {settings.credits.symbol}
                   </span>
                 </div>
-                <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-amber-500/60 truncate">
+                <p className="mt-0.5 sm:mt-1 text-[11px] sm:text-xs text-amber-500/60 truncate">
                   From Game Master
                 </p>
               </div>
@@ -374,7 +374,7 @@ export default function WalletContent({
           <div className="rounded-xl bg-gradient-to-br from-purple-500/10 to-purple-600/5 border border-purple-500/30 p-3 sm:p-4 md:p-6 hover:bg-purple-500/15 transition-all min-h-[120px]">
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] sm:text-xs font-medium text-purple-400/80 uppercase tracking-wider truncate">
+                <p className="text-[11px] sm:text-xs font-medium text-purple-400/80 uppercase tracking-wider truncate">
                   Admin Adjustments
                 </p>
                 <div className="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 flex-wrap">
@@ -388,7 +388,7 @@ export default function WalletContent({
                     {settings.credits.symbol}
                   </span>
                 </div>
-                <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-purple-500/60 truncate">
+                <p className="mt-0.5 sm:mt-1 text-[11px] sm:text-xs text-purple-500/60 truncate">
                   {displayStats.totalAdminAdjustments > 0 ? "Credits added" : "Credits removed"}
                 </p>
               </div>

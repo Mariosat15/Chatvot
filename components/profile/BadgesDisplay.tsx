@@ -268,7 +268,7 @@ export default function BadgesDisplay({ badges, stats, userLevel = 1 }: BadgesDi
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/70 rounded-xl gap-1">
                   <Lock className={`h-8 w-8 ${isLevelLocked ? "text-purple-400" : "text-gray-500"}`} />
                   {isLevelLocked && (
-                    <span className="text-[10px] font-bold text-purple-300 bg-purple-900/60 px-2 py-0.5 rounded-full">
+                    <span className="text-[11px] font-bold text-purple-300 bg-purple-900/60 px-2 py-0.5 rounded-full">
                       Lv.{requiredLevel} Required
                     </span>
                   )}

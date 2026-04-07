@@ -289,14 +289,14 @@ export default function AccountStatusCard({
             className={`w-5 h-5 text-amber-400 ${hasActiveRestriction ? "animate-pulse" : ""}`}
           />
           <h3 className="text-sm font-semibold text-white">Account Status</h3>
-          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase bg-amber-500/10 text-amber-400">
+          <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full uppercase bg-amber-500/10 text-amber-400">
             {totalIssues} {totalIssues === 1 ? "issue" : "issues"}
           </span>
         </div>
 
         <button
           onClick={() => setExpanded((v) => !v)}
-          className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors"
+          className="flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors min-h-[44px] min-w-[44px] justify-center"
         >
           {expanded ? "Hide" : "Details"}
           <ChevronDown
@@ -417,7 +417,7 @@ export default function AccountStatusCard({
                               <span className="text-[11px] text-amber-300 font-medium">
                                 {info?.label || "Security Check"}
                               </span>
-                              <p className="text-[10px] text-gray-400 leading-relaxed mt-0.5">
+                              <p className="text-[11px] text-gray-400 leading-relaxed mt-0.5">
                                 {info?.explanation ||
                                   "Our system flagged this for a routine review. No action is needed from you at this time."}
                               </p>
@@ -426,7 +426,7 @@ export default function AccountStatusCard({
                         );
                       })}
                     </ul>
-                    <p className="text-[10px] text-gray-500 leading-relaxed pt-1 border-t border-amber-500/10">
+                    <p className="text-[11px] text-gray-500 leading-relaxed pt-1 border-t border-amber-500/10">
                       If you recognise any of the above and believe it may be
                       related to your activity, please{" "}
                       <Link
@@ -450,11 +450,11 @@ export default function AccountStatusCard({
                       <span className="text-xs font-medium text-gray-300">
                         {a.title}
                       </span>
-                      <span className="text-[10px] text-gray-500">
+                      <span className="text-[11px] text-gray-500">
                         {new Date(a.detectedAt).toLocaleDateString()}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                    <div className="flex items-center gap-2 text-[11px] text-gray-500">
                       <span>
                         Status:{" "}
                         {a.status === "investigating"
@@ -470,7 +470,7 @@ export default function AccountStatusCard({
                   <p className="text-[11px] text-gray-300 font-medium">
                     What happens next?
                   </p>
-                  <ul className="space-y-1 text-[10px] text-gray-400 leading-relaxed">
+                  <ul className="space-y-1 text-[11px] text-gray-400 leading-relaxed">
                     <li className="flex items-start gap-1.5">
                       <span className="text-gray-500 mt-0.5">1.</span>
                       <span>
@@ -514,7 +514,7 @@ export default function AccountStatusCard({
                           ? "Account Restricted"
                           : "Account Under Review"}
                       </span>
-                      <span className="text-[10px] text-gray-500">
+                      <span className="text-[11px] text-gray-500">
                         {new Date(r.restrictedAt).toLocaleDateString()}
                       </span>
                     </div>
@@ -525,7 +525,7 @@ export default function AccountStatusCard({
                         "Account review in progress"}
                     </p>
                     {r.expiresAt && (
-                      <p className="text-[10px] text-gray-500 flex items-center gap-1">
+                      <p className="text-[11px] text-gray-500 flex items-center gap-1">
                         <Clock className="w-3 h-3" />
                         This restriction will be lifted on{" "}
                         {new Date(r.expiresAt).toLocaleDateString()}
@@ -556,7 +556,7 @@ export default function AccountStatusCard({
                       ].map(({ blocked, label, icon: Icon }) => (
                         <span
                           key={label}
-                          className={`text-[10px] px-1.5 py-0.5 rounded flex items-center gap-0.5 ${
+                          className={`text-[11px] px-1.5 py-0.5 rounded flex items-center gap-0.5 ${
                             blocked
                               ? "bg-red-500/10 text-red-400"
                               : "bg-green-500/10 text-green-400"
@@ -587,7 +587,7 @@ export default function AccountStatusCard({
                       {LOCKOUT_REASON_LABELS.get(l.reason) ||
                         "Account temporarily locked"}
                     </span>
-                    <div className="flex items-center gap-3 text-[10px] text-gray-500">
+                    <div className="flex items-center gap-3 text-[11px] text-gray-500">
                       <span>
                         Since: {new Date(l.lockedAt).toLocaleDateString()}
                       </span>
@@ -624,7 +624,7 @@ export default function AccountStatusCard({
                       Reason: {kycDeclineReason}
                     </p>
                   )}
-                  <p className="text-[10px] text-gray-500">
+                  <p className="text-[11px] text-gray-500">
                     {kycStatus === "declined"
                       ? "Your identity verification could not be completed. Please contact our support team for guidance on next steps."
                       : "We need additional documents to complete your verification. Please resubmit your documents at your earliest convenience."}
@@ -656,7 +656,7 @@ export default function AccountStatusCard({
       {/* Collapsed support link — always visible */}
       {!expanded && (
         <div className="mt-3 pt-2 border-t border-gray-700/20">
-          <p className="text-[10px] text-gray-500 text-center">
+          <p className="text-[11px] text-gray-500 text-center">
             If you believe this is an error, please{" "}
             <Link
               href="/messaging"

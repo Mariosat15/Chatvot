@@ -130,13 +130,13 @@ export default function BadgeDetailCard({
                 {/* Rarity stage label */}
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1.5">
-                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${config.tagBg}`}>
+                    <span className={`text-[11px] font-bold uppercase px-2 py-0.5 rounded ${config.tagBg}`}>
                       {badge.rarity}
                     </span>
-                    <span className="text-[10px] text-gray-400 italic">{badge.category}</span>
+                    <span className="text-[11px] text-gray-400 italic">{badge.category}</span>
                   </div>
                   {badge.earned && (
-                    <span className="text-[10px] font-bold text-green-400 bg-green-500/20 px-2 py-0.5 rounded">
+                    <span className="text-[11px] font-bold text-green-400 bg-green-500/20 px-2 py-0.5 rounded">
                       EARNED
                     </span>
                   )}
@@ -147,7 +147,7 @@ export default function BadgeDetailCard({
                   <h2 className={`text-lg font-extrabold ${config.textColor} leading-tight`}>{badge.name}</h2>
                   <div className="flex items-center gap-1">
                     <span className="text-lg font-extrabold text-amber-400">{xpReward}</span>
-                    <span className="text-[10px] font-bold text-amber-400 uppercase">XP</span>
+                    <span className="text-[11px] font-bold text-amber-400 uppercase">XP</span>
                     <Star className="h-4 w-4 text-amber-500 fill-amber-400" />
                   </div>
                 </div>
@@ -221,7 +221,7 @@ export default function BadgeDetailCard({
                     {requirement.extras.length > 0 && (
                       <div className="mt-2 space-y-0.5">
                         {requirement.extras.map((extra, i) => (
-                          <div key={i} className="flex items-center gap-1.5 text-[10px] text-gray-400">
+                          <div key={i} className="flex items-center gap-1.5 text-[11px] text-gray-400">
                             <div className="w-1 h-1 rounded-full bg-gray-500" />
                             <span>{extra}</span>
                           </div>
@@ -233,7 +233,7 @@ export default function BadgeDetailCard({
                     {requirement.tip && (
                       <div className="mt-2 flex items-start gap-1.5 bg-amber-500/10 border border-amber-500/30 rounded px-2 py-1.5">
                         <Sparkles className="h-3 w-3 text-amber-400 mt-0.5 shrink-0" />
-                        <span className="text-[10px] text-amber-400">{requirement.tip}</span>
+                        <span className="text-[11px] text-amber-400">{requirement.tip}</span>
                       </div>
                     )}
                   </div>
@@ -243,11 +243,11 @@ export default function BadgeDetailCard({
               {/* === BOTTOM STATS BAR (like Weakness/Resistance/Retreat) === */}
               <div className="mx-3 mb-2 flex items-stretch divide-x divide-gray-700 bg-gray-800/50 border border-gray-700 rounded-lg overflow-hidden text-center">
                 <div className="flex-1 py-2 px-1">
-                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Category</p>
+                  <p className="text-[11px] text-gray-400 uppercase font-semibold">Category</p>
                   <p className={`text-xs font-bold ${config.textColor} mt-0.5`}>{badge.category}</p>
                 </div>
                 <div className="flex-1 py-2 px-1">
-                  <p className="text-[9px] text-gray-400 uppercase font-semibold">Rarity</p>
+                  <p className="text-[11px] text-gray-400 uppercase font-semibold">Rarity</p>
                   <div className="flex items-center justify-center gap-0.5 mt-0.5">
                     {Array.from({ length: config.starCount }).map((_, i) => (
                       <Star key={i} className={`h-3 w-3 ${badge.earned ? "text-amber-500" : "text-gray-400"} fill-current`} />
@@ -255,7 +255,7 @@ export default function BadgeDetailCard({
                   </div>
                 </div>
                 <div className="flex-1 py-2 px-1">
-                  <p className="text-[9px] text-gray-400 uppercase font-semibold">XP</p>
+                  <p className="text-[11px] text-gray-400 uppercase font-semibold">XP</p>
                   <p className="text-xs font-bold text-amber-400 mt-0.5">+{xpReward}</p>
                 </div>
               </div>
@@ -264,7 +264,7 @@ export default function BadgeDetailCard({
               <div className="mx-3 mb-3">
                 {/* Earned date */}
                 {badge.earned && badge.earnedAt && (
-                  <p className="text-[10px] text-gray-400 text-center italic mb-2">
+                  <p className="text-[11px] text-gray-400 text-center italic mb-2">
                     Earned on {new Date(badge.earnedAt).toLocaleDateString("en-US", {
                       year: "numeric",
                       month: "long",
@@ -295,8 +295,8 @@ export default function BadgeDetailCard({
 
               {/* Card ID at bottom */}
               <div className="px-4 pb-2 flex items-center justify-between">
-                <span className="text-[8px] text-gray-500">Chartvolt Trading Badge</span>
-                <span className="text-[8px] text-gray-500 font-mono">{badge.id}</span>
+                <span className="text-[10px] text-gray-500">Chartvolt Trading Badge</span>
+                <span className="text-[10px] text-gray-500 font-mono">{badge.id}</span>
               </div>
             </div>
           </motion.div>
