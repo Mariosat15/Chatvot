@@ -1,4 +1,5 @@
 "use server";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { connectToDatabase } from "@/database/mongoose";
 import Challenge from "@/database/models/trading/challenge.model";
@@ -9,7 +10,7 @@ import WalletTransaction from "@/database/models/trading/wallet-transaction.mode
 import TradingPosition from "@/database/models/trading/trading-position.model";
 import { PlatformTransaction } from "@/database/models/platform-financials.model";
 import {
-  getRealPrice,
+  getRealPrice as _getRealPrice,
   fetchRealForexPrices,
 } from "@/lib/services/real-forex-prices.service";
 import type { ForexSymbol } from "@/lib/services/pnl-calculator.service";
@@ -774,6 +775,9 @@ async function _finalizeChallengeAttempt(challengeId: string) {
               { session },
             );
 
+            // Reason: Both participants "won" a split tie — mark isWinner so
+            // dashboard, profile, and leaderboard correctly count these as wins.
+            participant.isWinner = true;
             participant.prizeReceived = splitPrize;
             participant.status = "completed";
             await participant.save({ session });

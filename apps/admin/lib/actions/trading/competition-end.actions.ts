@@ -7,7 +7,7 @@ import TradingPosition from "@/database/models/trading/trading-position.model";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import {
-  getRealPrice,
+  getRealPrice as _getRealPrice,
   fetchRealForexPrices,
 } from "@/lib/services/real-forex-prices.service";
 import type { ForexSymbol } from "@/lib/services/pnl-calculator.service";
@@ -276,7 +276,7 @@ export async function finalizeCompetition(competitionId: string) {
 
     // STEP 1.5: Update all participant records with calculated stats
     console.log(`🔄 Updating participant statistics...`);
-    for (const [userId, stats] of participantStats.entries()) {
+    for (const [_userId, stats] of participantStats.entries()) {
       const pnlPercentage =
         stats.participant.startingCapital > 0
           ? (stats.totalPnL / stats.participant.startingCapital) * 100
@@ -649,7 +649,7 @@ export async function finalizeCompetition(competitionId: string) {
     const participantUpdateResult = await CompetitionParticipant.updateMany(
       {
         competitionId: competition._id,
-        status: "active", // Only update active participants
+        status: "active",
       },
       {
         $set: { status: "completed" },
@@ -659,6 +659,30 @@ export async function finalizeCompetition(competitionId: string) {
     console.log(
       `   ✅ Updated ${participantUpdateResult.modifiedCount} participant statuses to 'completed'`,
     );
+
+    // Reason: Persist final rank on each CompetitionParticipant so that dashboard,
+    // profile, leaderboard, and matchmaking can count wins (currentRank === 1)
+    // and podium finishes (currentRank <= 3). Without this, currentRank stays 0
+    // from join time and all win stats read as zero.
+    if (leaderboard.length > 0) {
+      const rankBulkOps = leaderboard.map((entry: { rank: number; userId: string }) => ({
+        updateOne: {
+          filter: {
+            competitionId: competition._id,
+            userId: entry.userId,
+          },
+          update: {
+            $set: { currentRank: entry.rank },
+          },
+        },
+      }));
+      const rankResult = await CompetitionParticipant.bulkWrite(rankBulkOps, {
+        session,
+      });
+      console.log(
+        `   ✅ Updated final ranks for ${rankResult.modifiedCount} participants`,
+      );
+    }
 
     await session.commitTransaction();
     // End session immediately after commit to prevent "abortTransaction after commitTransaction" error

@@ -1394,7 +1394,7 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
     const participantUpdateResult = await CompetitionParticipant.updateMany(
       {
         competitionId: competition._id,
-        status: "active", // Only update active participants
+        status: "active",
       },
       {
         $set: { status: "completed" },
@@ -1404,6 +1404,30 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
     console.log(
       `   ✅ Updated ${participantUpdateResult.modifiedCount} participant statuses to 'completed'`,
     );
+
+    // Reason: Persist final rank on each CompetitionParticipant so that dashboard,
+    // profile, leaderboard, and matchmaking can count wins (currentRank === 1)
+    // and podium finishes (currentRank <= 3). Without this, currentRank stays 0
+    // from join time and all win stats read as zero.
+    if (leaderboard.length > 0) {
+      const rankBulkOps = leaderboard.map((entry) => ({
+        updateOne: {
+          filter: {
+            competitionId: competition._id,
+            userId: entry.userId,
+          },
+          update: {
+            $set: { currentRank: entry.rank },
+          },
+        },
+      }));
+      const rankResult = await CompetitionParticipant.bulkWrite(rankBulkOps, {
+        session,
+      });
+      console.log(
+        `   ✅ Updated final ranks for ${rankResult.modifiedCount} participants`,
+      );
+    }
 
     await session.commitTransaction();
     // End session immediately after commit to prevent "abortTransaction after commitTransaction" error

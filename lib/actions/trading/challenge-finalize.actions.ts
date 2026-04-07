@@ -1081,6 +1081,9 @@ async function _finalizeChallengeAttempt(challengeId: string) {
               { session },
             );
 
+            // Reason: Both participants "won" a split tie — mark isWinner so
+            // dashboard, profile, and leaderboard correctly count these as wins.
+            participant.isWinner = true;
             participant.prizeReceived = splitPrize;
             participant.status = "completed";
             await participant.save({ session });
