@@ -18,6 +18,8 @@ import { fetchRealForexPrices } from "@/lib/services/real-forex-prices.service";
 import {
   ForexSymbol,
   calculateUnrealizedPnL,
+  getQuoteToUsdRate,
+  getConversionPairSymbols,
 } from "@/lib/services/pnl-calculator.service";
 import { getUserLevel } from "@/lib/services/xp-level.service";
 import { calculateXPProgress } from "@/lib/services/xp-config.service";
@@ -898,9 +900,11 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   const uniqueSymbols = [
     ...new Set((openPositions as any[]).map((p: any) => p.symbol).filter(Boolean)),
   ] as ForexSymbol[];
+  const cdConv = getConversionPairSymbols(uniqueSymbols);
+  const cdAll = [...new Set([...uniqueSymbols, ...cdConv])] as ForexSymbol[];
   const pricesMap =
-    uniqueSymbols.length > 0
-      ? await fetchRealForexPrices(uniqueSymbols)
+    cdAll.length > 0
+      ? await fetchRealForexPrices(cdAll)
       : new Map<ForexSymbol, { bid: number; ask: number }>();
   const positionsWithPrices: PositionData[] = (openPositions as any[]).map(
     (pos: any) => {
@@ -910,12 +914,17 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
           ? price.bid
           : price.ask
         : pos.entryPrice;
+      const cdRate = getQuoteToUsdRate(
+        pos.symbol as ForexSymbol,
+        pricesMap as Map<string, { bid: number; ask: number }>,
+      );
       const unrealizedPnL = calculateUnrealizedPnL(
         pos.side,
         pos.entryPrice,
         currentPrice,
         pos.quantity,
         pos.symbol,
+        cdRate,
       );
       return {
         id: pos._id.toString(),

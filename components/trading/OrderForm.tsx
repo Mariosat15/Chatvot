@@ -11,6 +11,7 @@ import {
   FOREX_PAIRS,
   ForexSymbol,
   calculateMarginRequired,
+  getQuoteToUsdRate,
 } from "@/lib/services/pnl-calculator.service";
 import { usePrices } from "@/contexts/PriceProvider";
 import { useChartSymbol } from "@/contexts/ChartSymbolContext";
@@ -340,7 +341,10 @@ const OrderForm = ({
     }
   };
 
-  // Calculate margin required
+  // Reason: For non-USD-quoted pairs the raw margin/PnL is in quote currency.
+  // getQuoteToUsdRate converts by looking up USD/JPY, etc. from the live price map.
+  const quoteRate = getQuoteToUsdRate(symbol, prices);
+
   const marginRequired =
     quantity && displayPrice
       ? calculateMarginRequired(
@@ -348,6 +352,7 @@ const OrderForm = ({
           displayPrice,
           leverage,
           symbol,
+          quoteRate,
         )
       : 0;
 
@@ -396,8 +401,11 @@ const OrderForm = ({
     const contractSize = FOREX_PAIRS[symbol].contractSize;
     const priceDiff =
       side === "buy" ? targetPrice - displayPrice : displayPrice - targetPrice;
-    const pnl = priceDiff * contractSize * qty;
-    const percentage = (pnl / marginRequired) * 100;
+    let pnl = priceDiff * contractSize * qty;
+    if (quoteRate > 0 && quoteRate !== 1) {
+      pnl /= quoteRate;
+    }
+    const percentage = marginRequired > 0 ? (pnl / marginRequired) * 100 : 0;
 
     return { pnl, percentage };
   };

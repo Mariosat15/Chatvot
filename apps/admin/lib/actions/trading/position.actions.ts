@@ -16,6 +16,8 @@ import {
   calculateUnrealizedPnL,
   calculatePnLPercentage,
   ForexSymbol,
+  getQuoteToUsdRate,
+  getConversionPairSymbols,
 } from "@/lib/services/pnl-calculator.service";
 import {
   getRealPrice,
@@ -64,9 +66,13 @@ export const getUserPositions = async (competitionId: string) => {
     const uniqueSymbols = [
       ...new Set(positions.map((p) => p.symbol)),
     ] as ForexSymbol[];
+    const convSyms = getConversionPairSymbols(uniqueSymbols);
+    const allFetchSymbols = [
+      ...new Set([...uniqueSymbols, ...convSyms]),
+    ] as ForexSymbol[];
     const pricesMap =
-      uniqueSymbols.length > 0
-        ? await fetchRealForexPrices(uniqueSymbols)
+      allFetchSymbols.length > 0
+        ? await fetchRealForexPrices(allFetchSymbols)
         : new Map();
 
     // Update P&L for each position with current REAL prices (instant - from batch)
@@ -76,12 +82,17 @@ export const getUserPositions = async (competitionId: string) => {
       if (currentPrice) {
         const marketPrice =
           position.side === "long" ? currentPrice.bid : currentPrice.ask;
+        const rate = getQuoteToUsdRate(
+          position.symbol as ForexSymbol,
+          pricesMap as Map<string, { bid: number; ask: number }>,
+        );
         const pnl = calculateUnrealizedPnL(
           position.side,
           position.entryPrice,
           marketPrice,
           position.quantity,
           position.symbol as ForexSymbol,
+          rate,
         );
         const pnlPercentage = calculatePnLPercentage(pnl, position.marginUsed);
 
@@ -324,6 +335,20 @@ export const closePosition = async (
     const spreadCostInUSD =
       (entrySpread + exitSpread) * position.quantity * 100000; // Spread cost in USD
 
+    // Fetch conversion prices for this position's symbol
+    const posConvSyms = getConversionPairSymbols([
+      position.symbol as ForexSymbol,
+    ]);
+    let posConvPrices: Map<string, { bid: number; ask: number }> = new Map();
+    if (posConvSyms.length > 0) {
+      const m = await fetchRealForexPrices(posConvSyms);
+      posConvPrices = m as Map<string, { bid: number; ask: number }>;
+    }
+    const posRate = getQuoteToUsdRate(
+      position.symbol as ForexSymbol,
+      posConvPrices,
+    );
+
     // Calculate final P&L
     const realizedPnl = calculateUnrealizedPnL(
       position.side,
@@ -331,6 +356,7 @@ export const closePosition = async (
       exitPrice,
       position.quantity,
       position.symbol as ForexSymbol,
+      posRate,
     );
     const realizedPnlPercentage = calculatePnLPercentage(
       realizedPnl,
@@ -744,7 +770,11 @@ export const updateAllPositionsPnL = async (
     const uniqueSymbols = [
       ...new Set(positions.map((p) => p.symbol)),
     ] as ForexSymbol[];
-    const pricesMap = await fetchRealForexPrices(uniqueSymbols);
+    const updateConvSyms = getConversionPairSymbols(uniqueSymbols);
+    const updateAllSyms = [
+      ...new Set([...uniqueSymbols, ...updateConvSyms]),
+    ] as ForexSymbol[];
+    const pricesMap = await fetchRealForexPrices(updateAllSyms);
 
     let totalUnrealizedPnl = 0;
 
@@ -755,12 +785,17 @@ export const updateAllPositionsPnL = async (
 
       const marketPrice =
         position.side === "long" ? currentPrice.bid : currentPrice.ask;
+      const rate = getQuoteToUsdRate(
+        position.symbol as ForexSymbol,
+        pricesMap as Map<string, { bid: number; ask: number }>,
+      );
       const pnl = calculateUnrealizedPnL(
         position.side,
         position.entryPrice,
         marketPrice,
         position.quantity,
         position.symbol as ForexSymbol,
+        rate,
       );
       const pnlPercentage = calculatePnLPercentage(pnl, position.marginUsed);
 
@@ -829,7 +864,11 @@ export const checkStopLossTakeProfit = async (competitionId: string) => {
     const uniqueSymbols = [
       ...new Set(positions.map((p) => p.symbol)),
     ] as ForexSymbol[];
-    const pricesMap = await fetchRealForexPrices(uniqueSymbols);
+    const sltpConvSyms = getConversionPairSymbols(uniqueSymbols);
+    const sltpAllSyms = [
+      ...new Set([...uniqueSymbols, ...sltpConvSyms]),
+    ] as ForexSymbol[];
+    const pricesMap = await fetchRealForexPrices(sltpAllSyms);
 
     const now = Date.now();
     const MAX_PRICE_AGE_MS = 60000; // 60 seconds
@@ -924,12 +963,27 @@ export async function closePositionAutomatic(
       return;
     }
 
+    // Fetch conversion prices for this position's symbol
+    const autoConvSyms = getConversionPairSymbols([
+      position.symbol as ForexSymbol,
+    ]);
+    let autoConvPrices: Map<string, { bid: number; ask: number }> = new Map();
+    if (autoConvSyms.length > 0) {
+      const m = await fetchRealForexPrices(autoConvSyms);
+      autoConvPrices = m as Map<string, { bid: number; ask: number }>;
+    }
+    const autoRate = getQuoteToUsdRate(
+      position.symbol as ForexSymbol,
+      autoConvPrices,
+    );
+
     const realizedPnl = calculateUnrealizedPnL(
       position.side,
       position.entryPrice,
       exitPrice,
       position.quantity,
       position.symbol as ForexSymbol,
+      autoRate,
     );
     const realizedPnlPercentage = calculatePnLPercentage(
       realizedPnl,
@@ -1224,9 +1278,13 @@ export const checkMarginCalls = async (competitionId: string) => {
     const allSymbols = [
       ...new Set(allOpenPositions.map((p) => p.symbol)),
     ] as ForexSymbol[];
+    const mcConvSyms = getConversionPairSymbols(allSymbols);
+    const mcAllSyms = [
+      ...new Set([...allSymbols, ...mcConvSyms]),
+    ] as ForexSymbol[];
     const pricesMap =
-      allSymbols.length > 0
-        ? await fetchRealForexPrices(allSymbols)
+      mcAllSyms.length > 0
+        ? await fetchRealForexPrices(mcAllSyms)
         : new Map();
     console.log(`📊 Fetched ${pricesMap.size} prices for margin check`);
 
@@ -1266,12 +1324,17 @@ export const checkMarginCalls = async (competitionId: string) => {
 
         const marketPrice =
           position.side === "long" ? currentPrice.bid : currentPrice.ask;
+        const mcRate = getQuoteToUsdRate(
+          position.symbol as ForexSymbol,
+          pricesMap as Map<string, { bid: number; ask: number }>,
+        );
         const unrealizedPnl = calculateUnrealizedPnL(
           position.side,
           position.entryPrice,
           marketPrice,
           position.quantity,
           position.symbol as ForexSymbol,
+          mcRate,
         );
 
         totalUnrealizedPnl += unrealizedPnl;

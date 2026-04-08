@@ -11,6 +11,8 @@ import { fetchRealForexPrices } from "@/lib/services/real-forex-prices.service";
 import {
   calculateUnrealizedPnL,
   ForexSymbol,
+  getQuoteToUsdRate,
+  getConversionPairSymbols,
 } from "@/lib/services/pnl-calculator.service";
 import { closePositionAutomatic } from "@/lib/actions/trading/position.actions";
 
@@ -97,7 +99,11 @@ export const executeLiquidation = async (
     const uniqueSymbols = [
       ...new Set(openPositions.map((p) => p.symbol)),
     ] as ForexSymbol[];
-    const pricesMap = await fetchRealForexPrices(uniqueSymbols);
+    const convSyms = getConversionPairSymbols(uniqueSymbols);
+    const allFetchSymbols = [
+      ...new Set([...uniqueSymbols, ...convSyms]),
+    ] as ForexSymbol[];
+    const pricesMap = await fetchRealForexPrices(allFetchSymbols);
 
     // SERVER-SIDE VALIDATION: Recalculate margin with fresh prices
     let totalUnrealizedPnl = 0;
@@ -107,12 +113,17 @@ export const executeLiquidation = async (
 
       const marketPrice =
         position.side === "long" ? currentPrice.bid : currentPrice.ask;
+      const rate = getQuoteToUsdRate(
+        position.symbol as ForexSymbol,
+        pricesMap as Map<string, { bid: number; ask: number }>,
+      );
       const unrealizedPnl = calculateUnrealizedPnL(
         position.side,
         position.entryPrice,
         marketPrice,
         position.quantity,
         position.symbol as ForexSymbol,
+        rate,
       );
 
       totalUnrealizedPnl += unrealizedPnl;
@@ -231,7 +242,11 @@ export const backupMarginCheck = async (
     const uniqueSymbols = [
       ...new Set(openPositions.map((p) => p.symbol)),
     ] as ForexSymbol[];
-    const pricesMap = await fetchRealForexPrices(uniqueSymbols);
+    const backupConvSyms = getConversionPairSymbols(uniqueSymbols);
+    const backupAllSyms = [
+      ...new Set([...uniqueSymbols, ...backupConvSyms]),
+    ] as ForexSymbol[];
+    const pricesMap = await fetchRealForexPrices(backupAllSyms);
 
     let totalUnrealizedPnl = 0;
     for (const position of openPositions) {
@@ -240,12 +255,17 @@ export const backupMarginCheck = async (
 
       const marketPrice =
         position.side === "long" ? currentPrice.bid : currentPrice.ask;
+      const backupRate = getQuoteToUsdRate(
+        position.symbol as ForexSymbol,
+        pricesMap as Map<string, { bid: number; ask: number }>,
+      );
       totalUnrealizedPnl += calculateUnrealizedPnL(
         position.side,
         position.entryPrice,
         marketPrice,
         position.quantity,
         position.symbol as ForexSymbol,
+        backupRate,
       );
     }
 

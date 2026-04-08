@@ -23,6 +23,7 @@ import {
   calculateUnrealizedPnL,
   calculatePnLPercentage,
   ForexSymbol,
+  getQuoteToUsdRate,
 } from "@/lib/services/pnl-calculator.service";
 import { usePrices } from "@/contexts/PriceProvider";
 import {
@@ -385,12 +386,17 @@ const PositionsTable = ({
 
       const marketPrice =
         position.side === "long" ? currentPrice.bid : currentPrice.ask;
+      const ptRate = getQuoteToUsdRate(
+        position.symbol as ForexSymbol,
+        prices,
+      );
       const pnl = calculateUnrealizedPnL(
         position.side,
         position.entryPrice,
         marketPrice,
         position.quantity,
         position.symbol as ForexSymbol,
+        ptRate,
       );
       const pnlPercentage = calculatePnLPercentage(pnl, position.marginUsed);
 

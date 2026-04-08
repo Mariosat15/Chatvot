@@ -12,6 +12,8 @@ import { fetchRealForexPrices } from "@/lib/services/real-forex-prices.service";
 import {
   calculateUnrealizedPnL,
   ForexSymbol,
+  getQuoteToUsdRate,
+  getConversionPairSymbols,
 } from "@/lib/services/pnl-calculator.service";
 import { closePositionAutomatic } from "@/lib/actions/trading/position.actions";
 
@@ -104,13 +106,15 @@ export const executeLiquidation = async (
       warning: adminThresholds.WARNING,
     };
 
-    // CRITICAL: Fetch FRESH prices from API (not cached)
     const uniqueSymbols = [
       ...new Set(openPositions.map((p) => p.symbol)),
     ] as ForexSymbol[];
-    const pricesMap = await fetchRealForexPrices(uniqueSymbols);
+    const liqConvSyms = getConversionPairSymbols(uniqueSymbols);
+    const liqAllSyms = [
+      ...new Set([...uniqueSymbols, ...liqConvSyms]),
+    ] as ForexSymbol[];
+    const pricesMap = await fetchRealForexPrices(liqAllSyms);
 
-    // SERVER-SIDE VALIDATION: Recalculate margin with fresh prices
     let totalUnrealizedPnl = 0;
     for (const position of openPositions) {
       const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
@@ -118,12 +122,17 @@ export const executeLiquidation = async (
 
       const marketPrice =
         position.side === "long" ? currentPrice.bid : currentPrice.ask;
+      const liqRate = getQuoteToUsdRate(
+        position.symbol as ForexSymbol,
+        pricesMap as Map<string, { bid: number; ask: number }>,
+      );
       const unrealizedPnl = calculateUnrealizedPnL(
         position.side,
         position.entryPrice,
         marketPrice,
         position.quantity,
         position.symbol as ForexSymbol,
+        liqRate,
       );
 
       totalUnrealizedPnl += unrealizedPnl;
@@ -302,10 +311,14 @@ export const backupMarginCheck = async (
     }
 
     const adminThresholds = await getMarginThresholds();
-    const uniqueSymbols = [
+    const uniqueSymbols2 = [
       ...new Set(openPositions.map((p) => p.symbol)),
     ] as ForexSymbol[];
-    const pricesMap = await fetchRealForexPrices(uniqueSymbols);
+    const liq2Conv = getConversionPairSymbols(uniqueSymbols2);
+    const liq2All = [
+      ...new Set([...uniqueSymbols2, ...liq2Conv]),
+    ] as ForexSymbol[];
+    const pricesMap = await fetchRealForexPrices(liq2All);
 
     let totalUnrealizedPnl = 0;
     for (const position of openPositions) {
@@ -314,12 +327,17 @@ export const backupMarginCheck = async (
 
       const marketPrice =
         position.side === "long" ? currentPrice.bid : currentPrice.ask;
+      const r2 = getQuoteToUsdRate(
+        position.symbol as ForexSymbol,
+        pricesMap as Map<string, { bid: number; ask: number }>,
+      );
       totalUnrealizedPnl += calculateUnrealizedPnL(
         position.side,
         position.entryPrice,
         marketPrice,
         position.quantity,
         position.symbol as ForexSymbol,
+        r2,
       );
     }
 

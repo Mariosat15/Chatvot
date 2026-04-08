@@ -11,7 +11,11 @@ import TradingPosition from "@/database/models/trading/trading-position.model";
 import TradingOrder from "@/database/models/trading/trading-order.model";
 import TradeHistory from "@/database/models/trading/trade-history.model";
 import mongoose from "mongoose";
-import { ForexSymbol } from "@/lib/services/pnl-calculator.service";
+import {
+  ForexSymbol,
+  getQuoteToUsdRate,
+  getConversionPairSymbols,
+} from "@/lib/services/pnl-calculator.service";
 
 /**
  * Cancel a competition and refund ALL participants their FULL entry fee
@@ -327,6 +331,22 @@ export async function emergencyCancelActiveCompetition(
       console.log(`📈 Using current market prices for position closing`);
     }
 
+    // Fetch conversion pair prices for USD conversion
+    const { fetchRealForexPrices: fetchConvPrices } =
+      await import("@/lib/services/real-forex-prices.service");
+    const cancelUniqueSymbols = [
+      ...new Set(openPositions.map((p) => p.symbol)),
+    ] as ForexSymbol[];
+    const cancelConvSyms = getConversionPairSymbols(cancelUniqueSymbols);
+    if (cancelConvSyms.length > 0) {
+      const convFetched = await fetchConvPrices(cancelConvSyms);
+      convFetched.forEach((price, symbol) => {
+        if (!pricesMap.has(symbol)) {
+          pricesMap.set(symbol, { bid: price.bid, ask: price.ask });
+        }
+      });
+    }
+
     // Close each position
     for (const position of openPositions) {
       try {
@@ -346,7 +366,13 @@ export async function emergencyCancelActiveCompetition(
           position.side === "long"
             ? exitPrice - position.entryPrice
             : position.entryPrice - exitPrice;
-        const realizedPnl = priceDiff * position.quantity * 100000; // Standard lot size
+        const cancelRate = getQuoteToUsdRate(
+          position.symbol as ForexSymbol,
+          pricesMap as Map<string, { bid: number; ask: number }>,
+        );
+        const realizedPnl =
+          (priceDiff * position.quantity * 100000) /
+          (cancelRate > 0 ? cancelRate : 1);
 
         // Update position
         await TradingPosition.findByIdAndUpdate(

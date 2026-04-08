@@ -16,6 +16,8 @@ import {
   validateSLTP,
   ForexSymbol,
   FOREX_PAIRS,
+  getQuoteToUsdRate,
+  getConversionPairSymbols,
 } from "@/lib/services/pnl-calculator.service";
 import { validateNewOrder } from "@/lib/services/risk-manager.service";
 import {
@@ -164,7 +166,11 @@ async function checkCompetitionRiskLimits(
       const uniqueSymbols = [
         ...new Set(openPositions.map((p) => p.symbol)),
       ] as ForexSymbol[];
-      const pricesMap = await fetchRealForexPrices(uniqueSymbols);
+      const eqConvSyms = getConversionPairSymbols(uniqueSymbols);
+      const eqAllSyms = [
+        ...new Set([...uniqueSymbols, ...eqConvSyms]),
+      ] as ForexSymbol[];
+      const pricesMap = await fetchRealForexPrices(eqAllSyms);
 
       for (const position of openPositions) {
         try {
@@ -177,9 +183,14 @@ async function checkCompetitionRiskLimits(
                 ? exitPrice - position.entryPrice
                 : position.entryPrice - exitPrice;
 
+            const eqRate = getQuoteToUsdRate(
+              position.symbol as ForexSymbol,
+              pricesMap as Map<string, { bid: number; ask: number }>,
+            );
             // Standard lot size for forex is 100,000 units
             const positionUnrealizedPnL =
-              priceDiff * position.quantity * 100000;
+              (priceDiff * position.quantity * 100000) /
+              (eqRate > 0 ? eqRate : 1);
             totalUnrealizedPnL += positionUnrealizedPnL;
           }
         } catch (e) {
@@ -497,12 +508,22 @@ export const placeOrder = async (params: {
       }
     }
 
+    // Fetch conversion prices for margin calculation
+    const conversionSymbols = getConversionPairSymbols([symbol]);
+    let conversionPrices: Map<string, { bid: number; ask: number }> = new Map();
+    if (conversionSymbols.length > 0) {
+      const convMap = await fetchRealForexPrices(conversionSymbols);
+      conversionPrices = convMap as Map<string, { bid: number; ask: number }>;
+    }
+    const quoteToUsdRate = getQuoteToUsdRate(symbol, conversionPrices);
+
     // Calculate margin required
     const marginRequired = calculateMarginRequired(
       quantity,
       executionPrice,
       leverage,
       symbol,
+      quoteToUsdRate,
     );
 
     // Validate order can be placed

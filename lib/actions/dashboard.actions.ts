@@ -12,6 +12,8 @@ import { getRealPrice, fetchRealForexPrices } from "@/lib/services/real-forex-pr
 import {
   ForexSymbol,
   calculateUnrealizedPnL,
+  getQuoteToUsdRate,
+  getConversionPairSymbols,
 } from "@/lib/services/pnl-calculator.service";
 
 // Disable verbose logging in production
@@ -65,9 +67,10 @@ export const getUserDashboardDataForApi = async (userId: string) => {
             status: "open",
           }).lean();
 
-          // Batch-fetch all prices at once instead of per-position (N+1 fix)
           const uniqueSymbols = [...new Set(openPositions.map((p: any) => p.symbol as ForexSymbol))];
-          const pricesMap = uniqueSymbols.length > 0 ? await fetchRealForexPrices(uniqueSymbols) : new Map();
+          const dashConv = getConversionPairSymbols(uniqueSymbols);
+          const dashAll = [...new Set([...uniqueSymbols, ...dashConv])] as ForexSymbol[];
+          const pricesMap = dashAll.length > 0 ? await fetchRealForexPrices(dashAll) : new Map();
 
           let totalUnrealizedPnL = 0;
           const positionsWithPnL = openPositions.map((pos: any) => {
@@ -76,12 +79,17 @@ export const getUserDashboardDataForApi = async (userId: string) => {
               if (priceQuote) {
                 const currentPrice =
                   pos.side === "long" ? priceQuote.bid : priceQuote.ask;
+                const dRate = getQuoteToUsdRate(
+                  pos.symbol as ForexSymbol,
+                  pricesMap as Map<string, { bid: number; ask: number }>,
+                );
                 const unrealizedPnL = calculateUnrealizedPnL(
                   pos.side,
                   pos.entryPrice,
                   currentPrice,
                   pos.quantity,
                   pos.symbol as ForexSymbol,
+                  dRate,
                 );
                 totalUnrealizedPnL += unrealizedPnL;
                 return { ...pos, currentPrice, unrealizedPnL };
@@ -316,23 +324,28 @@ export const getUserDashboardData = async () => {
             status: "open",
           }).lean();
 
-          // Batch-fetch all prices at once (N+1 fix — single API call for all symbols)
           const posSymbols = [...new Set(openPositions.map((p: any) => p.symbol as ForexSymbol))];
-          const posPricesMap = posSymbols.length > 0 ? await fetchRealForexPrices(posSymbols) : new Map();
+          const posConv = getConversionPairSymbols(posSymbols);
+          const posAll = [...new Set([...posSymbols, ...posConv])] as ForexSymbol[];
+          const posPricesMap = posAll.length > 0 ? await fetchRealForexPrices(posAll) : new Map();
 
-          // Calculate total unrealized P&L from open positions
           let totalUnrealizedPnL = 0;
           for (const position of openPositions) {
             const currentPrice = posPricesMap.get(position.symbol as ForexSymbol);
             if (currentPrice) {
               const marketPrice =
                 position.side === "long" ? currentPrice.bid : currentPrice.ask;
+              const dRate2 = getQuoteToUsdRate(
+                position.symbol as ForexSymbol,
+                posPricesMap as Map<string, { bid: number; ask: number }>,
+              );
               const pnl = calculateUnrealizedPnL(
                 position.side,
                 position.entryPrice,
                 marketPrice,
                 position.quantity,
                 position.symbol as ForexSymbol,
+                dRate2,
               );
               totalUnrealizedPnL += pnl;
             }
@@ -357,12 +370,17 @@ export const getUserDashboardData = async () => {
                 : livePrices.ask
               : pos.entryPrice;
 
+            const dRate3 = getQuoteToUsdRate(
+              pos.symbol as ForexSymbol,
+              posPricesMap as Map<string, { bid: number; ask: number }>,
+            );
             const unrealizedPnl = calculateUnrealizedPnL(
               pos.side,
               pos.entryPrice,
               currentPrice,
               pos.quantity,
               pos.symbol as ForexSymbol,
+              dRate3,
             );
 
             const unrealizedPnlPercentage =

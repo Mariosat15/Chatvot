@@ -16,6 +16,8 @@ import {
   validateSLTP,
   ForexSymbol,
   FOREX_PAIRS,
+  getQuoteToUsdRate,
+  getConversionPairSymbols,
 } from "@/lib/services/pnl-calculator.service";
 import { validateNewOrder } from "@/lib/services/risk-manager.service";
 import {
@@ -163,11 +165,12 @@ async function checkCompetitionRiskLimits(
     let totalUnrealizedPnL = 0;
 
     if (openPositions.length > 0) {
-      // OPTIMIZATION: Fetch all prices at once (instead of one by one in loop!)
       const uniqueSymbols = [
         ...new Set(openPositions.map((p) => p.symbol)),
       ] as ForexSymbol[];
-      const pricesMap = await fetchRealForexPrices(uniqueSymbols);
+      const convSyms = getConversionPairSymbols(uniqueSymbols);
+      const allSyms = [...new Set([...uniqueSymbols, ...convSyms])];
+      const pricesMap = await fetchRealForexPrices(allSyms as ForexSymbol[]);
 
       for (const position of openPositions) {
         try {
@@ -180,9 +183,12 @@ async function checkCompetitionRiskLimits(
                 ? exitPrice - position.entryPrice
                 : position.entryPrice - exitPrice;
 
-            // Standard lot size for forex is 100,000 units
+            const rate = getQuoteToUsdRate(
+              position.symbol as ForexSymbol,
+              pricesMap as Map<string, { bid: number; ask: number }>,
+            );
             const positionUnrealizedPnL =
-              priceDiff * position.quantity * 100000;
+              (priceDiff * position.quantity * 100000) / (rate > 0 ? rate : 1);
             totalUnrealizedPnL += positionUnrealizedPnL;
           }
         } catch {
@@ -512,12 +518,22 @@ export const placeOrder = async (params: {
       }
     }
 
+    // Fetch USD conversion rate for non-USD-quoted pairs (e.g. NZD/JPY needs USD/JPY)
+    const conversionSymbols = getConversionPairSymbols([symbol]);
+    let conversionPrices: Map<string, { bid: number; ask: number }> = new Map();
+    if (conversionSymbols.length > 0) {
+      const convMap = await fetchRealForexPrices(conversionSymbols);
+      conversionPrices = convMap as Map<string, { bid: number; ask: number }>;
+    }
+    const quoteToUsdRate = getQuoteToUsdRate(symbol, conversionPrices);
+
     // Calculate margin required
     const marginRequired = calculateMarginRequired(
       quantity,
       executionPrice,
       leverage,
       symbol,
+      quoteToUsdRate,
     );
 
     // Validate order can be placed

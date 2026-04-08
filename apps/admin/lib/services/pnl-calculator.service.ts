@@ -175,18 +175,83 @@ export const FOREX_PAIRS = {
 
 export type ForexSymbol = keyof typeof FOREX_PAIRS;
 
+// Reason: PnL and margin for non-USD-quoted pairs (e.g. NZD/JPY) are denominated
+// in the quote currency. Without converting to USD the numbers are wildly wrong
+// (e.g. 92× too large for JPY pairs because 1 USD ≈ 149 JPY).
+
+interface PriceData {
+  bid: number;
+  ask: number;
+}
+
+/**
+ * Returns the number of quote-currency units per 1 USD (mid price).
+ * Used to convert raw PnL / margin from quote currency → USD.
+ *
+ * Example: NZD/JPY → quote is JPY → looks up USD/JPY ≈ 149.5 → returns 149.5
+ */
+export function getQuoteToUsdRate(
+  symbol: ForexSymbol | string,
+  prices?: Map<string, PriceData> | null,
+): number {
+  const quote = symbol.split("/")[1];
+  if (quote === "USD") return 1.0;
+  if (!prices || prices.size === 0) return 1.0;
+
+  // Try USD/QUOTE pair directly (USD/JPY, USD/CHF, USD/CAD, …)
+  const directPair = `USD/${quote}`;
+  const directPrice = prices.get(directPair);
+  if (directPrice && directPrice.bid > 0) {
+    return (directPrice.bid + directPrice.ask) / 2;
+  }
+
+  // Try QUOTE/USD pair and invert (GBP/USD, AUD/USD, NZD/USD, …)
+  const invertPair = `${quote}/USD`;
+  const invertPrice = prices.get(invertPair);
+  if (invertPrice && invertPrice.bid > 0) {
+    const mid = (invertPrice.bid + invertPrice.ask) / 2;
+    return mid > 0 ? 1 / mid : 1.0;
+  }
+
+  return 1.0;
+}
+
+/**
+ * Returns the additional forex symbols needed to compute USD conversion rates
+ * for a set of traded symbols. Merge these into your price fetch call.
+ */
+export function getConversionPairSymbols(
+  symbols: (ForexSymbol | string)[],
+): ForexSymbol[] {
+  const needed = new Set<ForexSymbol>();
+
+  for (const sym of symbols) {
+    const quote = sym.split("/")[1];
+    if (quote === "USD") continue;
+
+    const directPair = `USD/${quote}` as ForexSymbol;
+    if (directPair in FOREX_PAIRS) {
+      needed.add(directPair);
+      continue;
+    }
+    const invertPair = `${quote}/USD` as ForexSymbol;
+    if (invertPair in FOREX_PAIRS) {
+      needed.add(invertPair);
+    }
+  }
+
+  return [...needed];
+}
+
 /**
  * Calculate unrealized P&L for an open position
- *
- * Formula:
- * Long (Buy):  P&L = (Current Price - Entry Price) × Quantity × Contract Size
- * Short (Sell): P&L = (Entry Price - Current Price) × Quantity × Contract Size
  *
  * @param side - 'long' or 'short'
  * @param entryPrice - Price when position was opened
  * @param currentPrice - Current market price
  * @param quantity - Position size in lots
  * @param symbol - Forex pair symbol
+ * @param quoteToUsdRate - Quote-currency units per 1 USD (default 1 = USD-quoted pair)
  * @returns Unrealized profit/loss in USD
  */
 export function calculateUnrealizedPnL(
@@ -195,6 +260,7 @@ export function calculateUnrealizedPnL(
   currentPrice: number,
   quantity: number,
   symbol: ForexSymbol,
+  quoteToUsdRate: number = 1,
 ): number {
   const pairConfig = FOREX_PAIRS[symbol];
   if (!pairConfig) {
@@ -205,7 +271,12 @@ export function calculateUnrealizedPnL(
   const priceChange =
     side === "long" ? currentPrice - entryPrice : entryPrice - currentPrice;
 
-  const pnl = priceChange * quantity * contractSize;
+  let pnl = priceChange * quantity * contractSize;
+
+  // Reason: raw pnl is in quote currency; divide by quoteToUsdRate to get USD.
+  if (quoteToUsdRate > 0 && quoteToUsdRate !== 1) {
+    pnl /= quoteToUsdRate;
+  }
 
   return Number(pnl.toFixed(2));
 }
@@ -231,13 +302,11 @@ export function calculatePnLPercentage(
 /**
  * Calculate margin required to open a position
  *
- * Formula:
- * Margin = (Quantity × Contract Size × Entry Price) / Leverage
- *
  * @param quantity - Position size in lots
- * @param entryPrice - Entry price
+ * @param entryPrice - Entry price (in quote currency)
  * @param leverage - Leverage ratio (e.g., 100 for 1:100)
  * @param symbol - Forex pair symbol
+ * @param quoteToUsdRate - Quote-currency units per 1 USD (default 1 = USD-quoted pair)
  * @returns Required margin in USD
  */
 export function calculateMarginRequired(
@@ -245,6 +314,7 @@ export function calculateMarginRequired(
   entryPrice: number,
   leverage: number,
   symbol: ForexSymbol,
+  quoteToUsdRate: number = 1,
 ): number {
   const pairConfig = FOREX_PAIRS[symbol];
   if (!pairConfig) {
@@ -252,9 +322,14 @@ export function calculateMarginRequired(
   }
 
   const { contractSize } = pairConfig;
-  const positionValue = quantity * contractSize * entryPrice;
-  const margin = positionValue / leverage;
+  let positionValue = quantity * contractSize * entryPrice;
 
+  // Reason: positionValue is in quote currency; divide to get USD.
+  if (quoteToUsdRate > 0 && quoteToUsdRate !== 1) {
+    positionValue /= quoteToUsdRate;
+  }
+
+  const margin = positionValue / leverage;
   return Number(margin.toFixed(2));
 }
 
@@ -364,6 +439,7 @@ export function calculateLiquidationPrice(
   marginUsed: number,
   leverage: number,
   symbol: ForexSymbol,
+  quoteToUsdRate: number = 1,
 ): number {
   const pairConfig = FOREX_PAIRS[symbol];
   if (!pairConfig) {
@@ -372,11 +448,13 @@ export function calculateLiquidationPrice(
 
   const { contractSize } = pairConfig;
 
-  // Maximum loss before liquidation (margin used)
-  const maxLoss = marginUsed;
+  // Reason: marginUsed is in USD; convert to quote currency before computing price move.
+  const maxLossInQuote =
+    quoteToUsdRate > 0 && quoteToUsdRate !== 1
+      ? marginUsed * quoteToUsdRate
+      : marginUsed;
 
-  // Price move that would cause this loss
-  const priceMove = maxLoss / (quantity * contractSize);
+  const priceMove = maxLossInQuote / (quantity * contractSize);
 
   const liquidationPrice =
     side === "long" ? entryPrice - priceMove : entryPrice + priceMove;
@@ -385,18 +463,17 @@ export function calculateLiquidationPrice(
 }
 
 /**
- * Calculate pip value
- *
- * Formula:
- * Pip Value = (Pip Size × Quantity × Contract Size)
+ * Calculate pip value in USD
  *
  * @param quantity - Position size in lots
  * @param symbol - Forex pair symbol
+ * @param quoteToUsdRate - Quote-currency units per 1 USD (default 1)
  * @returns Pip value in USD
  */
 export function calculatePipValue(
   quantity: number,
   symbol: ForexSymbol,
+  quoteToUsdRate: number = 1,
 ): number {
   const pairConfig = FOREX_PAIRS[symbol];
   if (!pairConfig) {
@@ -404,9 +481,13 @@ export function calculatePipValue(
   }
 
   const { pip, contractSize } = pairConfig;
-  const pipValue = pip * quantity * contractSize;
+  let pipValue = pip * quantity * contractSize;
 
-  return Number(pipValue.toFixed(2));
+  if (quoteToUsdRate > 0 && quoteToUsdRate !== 1) {
+    pipValue /= quoteToUsdRate;
+  }
+
+  return Number(pipValue.toFixed(4));
 }
 
 /**
@@ -528,8 +609,16 @@ export function calculatePotentialPnL(
   exitPrice: number,
   quantity: number,
   symbol: ForexSymbol,
+  quoteToUsdRate: number = 1,
 ): number {
-  return calculateUnrealizedPnL(side, entryPrice, exitPrice, quantity, symbol);
+  return calculateUnrealizedPnL(
+    side,
+    entryPrice,
+    exitPrice,
+    quantity,
+    symbol,
+    quoteToUsdRate,
+  );
 }
 
 /**

@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { usePrices } from "@/contexts/PriceProvider";
 import {
   calculateUnrealizedPnL,
+  getQuoteToUsdRate,
   type ForexSymbol,
 } from "@/lib/services/pnl-calculator.service";
 import { TrendingUp, TrendingDown } from "lucide-react";
@@ -58,17 +59,17 @@ export function AccountStrip({
     // Calculate live unrealized P&L
     let totalPnl = 0;
     for (const pos of positions) {
-      // Reason: prices is a Map (from usePrices), use .get() not bracket access
       const quote = prices.get(pos.symbol as ForexSymbol);
       if (quote) {
-        // Use correct price based on side (bid for longs, ask for shorts)
         const marketPrice = pos.side === "long" ? quote.bid : quote.ask;
+        const rate = getQuoteToUsdRate(pos.symbol as ForexSymbol, prices);
         const pnl = calculateUnrealizedPnL(
           pos.side,
           pos.entryPrice,
           marketPrice,
           pos.quantity,
           pos.symbol as ForexSymbol,
+          rate,
         );
         totalPnl += pnl;
       } else {

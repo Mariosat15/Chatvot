@@ -14,6 +14,10 @@ import {
   fetchRealForexPrices,
 } from "@/lib/services/real-forex-prices.service";
 import type { ForexSymbol } from "@/lib/services/pnl-calculator.service";
+import {
+  getQuoteToUsdRate,
+  getConversionPairSymbols,
+} from "@/lib/services/pnl-calculator.service";
 import mongoose from "mongoose";
 
 /**
@@ -158,6 +162,22 @@ async function _finalizeChallengeAttempt(challengeId: string) {
       });
     }
 
+    // Fetch ALL prices for ALL position symbols (both open and closed - needed for USD conversion)
+    const cfAllPositionSymbols = [
+      ...new Set(allPositions.map((p) => p.symbol)),
+    ] as ForexSymbol[];
+    const cfConvSyms = getConversionPairSymbols(cfAllPositionSymbols);
+    const cfAllSyms = [
+      ...new Set([...cfAllPositionSymbols, ...cfConvSyms]),
+    ] as ForexSymbol[];
+    console.log(
+      `Fetching prices for ${cfAllSyms.length} symbols (including conversion pairs)...`,
+    );
+    const pricesMap = cfAllSyms.length > 0
+      ? await fetchRealForexPrices(cfAllSyms)
+      : new Map();
+    console.log(`Got ${pricesMap.size} prices in single batch`);
+
     // Process already-closed positions
     // NOTE: TradingPosition doesn't have 'profitLoss' field - calculate from entry/exit prices
     for (const position of allPositions) {
@@ -171,7 +191,13 @@ async function _finalizeChallengeAttempt(challengeId: string) {
             position.side === "long"
               ? position.currentPrice - position.entryPrice
               : position.entryPrice - position.currentPrice;
-          const positionPnL = priceDiff * position.quantity * 100000; // Fixed: was 10000
+          const cfRate = getQuoteToUsdRate(
+            position.symbol as ForexSymbol,
+            pricesMap as Map<string, { bid: number; ask: number }>,
+          );
+          const positionPnL =
+            (priceDiff * position.quantity * 100000) /
+            (cfRate > 0 ? cfRate : 1);
 
           console.log(
             `  Closed position: ${position.symbol} ${position.side}, Entry: ${position.entryPrice}, Exit: ${position.currentPrice}, P&L: $${positionPnL.toFixed(2)}`,
@@ -194,16 +220,6 @@ async function _finalizeChallengeAttempt(challengeId: string) {
     const openPositions = allPositions.filter((p) => p.status === "open");
     console.log(`Closing ${openPositions.length} open positions...`);
 
-    // OPTIMIZATION: Fetch all prices at once (instead of one by one in loop!)
-    const uniqueSymbols = [
-      ...new Set(openPositions.map((p) => p.symbol)),
-    ] as ForexSymbol[];
-    console.log(
-      `Fetching prices for ${uniqueSymbols.length} unique symbols...`,
-    );
-    const pricesMap = await fetchRealForexPrices(uniqueSymbols);
-    console.log(`Got ${pricesMap.size} prices in single batch`);
-
     for (const position of openPositions) {
       try {
         // Get price from pre-fetched batch (instant!)
@@ -222,7 +238,13 @@ async function _finalizeChallengeAttempt(challengeId: string) {
           position.side === "long"
             ? exitPrice - position.entryPrice
             : position.entryPrice - exitPrice;
-        const positionPnL = priceDiff * position.quantity * 100000; // Fixed: was 10000
+        const cfRate2 = getQuoteToUsdRate(
+          position.symbol as ForexSymbol,
+          pricesMap as Map<string, { bid: number; ask: number }>,
+        );
+        const positionPnL =
+          (priceDiff * position.quantity * 100000) /
+          (cfRate2 > 0 ? cfRate2 : 1);
 
         console.log(
           `  Closing ${position.symbol} ${position.side} for ${position.userId}: P&L $${positionPnL.toFixed(2)}`,

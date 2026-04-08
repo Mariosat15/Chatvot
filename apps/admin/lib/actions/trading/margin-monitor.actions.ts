@@ -14,6 +14,8 @@ import {
 import {
   calculateUnrealizedPnL,
   ForexSymbol,
+  getQuoteToUsdRate,
+  getConversionPairSymbols,
 } from "@/lib/services/pnl-calculator.service";
 import { closePositionAutomatic } from "@/lib/actions/trading/position.actions";
 
@@ -63,7 +65,11 @@ export const checkUserMargin = async (competitionId: string) => {
     const uniqueSymbols = [
       ...new Set(openPositions.map((p) => p.symbol)),
     ] as ForexSymbol[];
-    const pricesMap = await fetchRealForexPrices(uniqueSymbols);
+    const convSyms = getConversionPairSymbols(uniqueSymbols);
+    const allFetchSymbols = [
+      ...new Set([...uniqueSymbols, ...convSyms]),
+    ] as ForexSymbol[];
+    const pricesMap = await fetchRealForexPrices(allFetchSymbols);
 
     // Calculate REAL-TIME unrealized P&L
     let totalUnrealizedPnl = 0;
@@ -73,12 +79,17 @@ export const checkUserMargin = async (competitionId: string) => {
 
       const marketPrice =
         position.side === "long" ? currentPrice.bid : currentPrice.ask;
+      const rate = getQuoteToUsdRate(
+        position.symbol as ForexSymbol,
+        pricesMap as Map<string, { bid: number; ask: number }>,
+      );
       const unrealizedPnl = calculateUnrealizedPnL(
         position.side,
         position.entryPrice,
         marketPrice,
         position.quantity,
         position.symbol as ForexSymbol,
+        rate,
       );
 
       totalUnrealizedPnl += unrealizedPnl;
