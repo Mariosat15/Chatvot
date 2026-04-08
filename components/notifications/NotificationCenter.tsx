@@ -14,6 +14,9 @@ import {
   Settings,
   History,
   Clock,
+  UserPlus,
+  Users,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +47,19 @@ interface Notification {
   actionUrl?: string;
   actionText?: string;
   createdAt: string;
+}
+
+// Reason: Some older notifications stored Lucide icon names as strings instead of emojis.
+const LUCIDE_ICON_MAP: Record<string, React.ReactNode> = {
+  "user-plus": <UserPlus className="h-6 w-6" />,
+  "users": <Users className="h-6 w-6" />,
+  "message-circle": <MessageCircle className="h-6 w-6" />,
+  "bell": <Bell className="h-6 w-6" />,
+};
+
+function renderNotificationIcon(icon: string): React.ReactNode {
+  if (LUCIDE_ICON_MAP[icon]) return LUCIDE_ICON_MAP[icon];
+  return icon;
 }
 
 const PRIORITY_STYLES: Record<string, string> = {
@@ -474,7 +490,7 @@ export default function NotificationCenter() {
                             <div className="flex gap-4 pl-4">
                               {/* Icon */}
                               <div className="flex-shrink-0 text-2xl">
-                                {notification.icon}
+                                {renderNotificationIcon(notification.icon)}
                               </div>
 
                               {/* Content */}

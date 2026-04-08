@@ -207,15 +207,35 @@ export async function GET(
     const netPool = prizePool * (1 - platformFee);
     const prizeDistribution = competition.prizeDistribution || [];
 
+    // Reason: When fewer participants than prize positions, unclaimed prize
+    // slots are redistributed equally among filled positions — matching the
+    // logic in competition-ranking.service.ts and the details page display.
+    let unclaimedPct = 0;
+    let filledPositionCount = 0;
+    for (const dist of prizeDistribution as { rank: number; percentage: number }[]) {
+      const hasWinner = rankings.some(
+        (r) => r.rank === dist.rank && !r.isDisqualified,
+      );
+      if (hasWinner) {
+        filledPositionCount++;
+      } else {
+        unclaimedPct += dist.percentage;
+      }
+    }
+    const bonusPerPosition =
+      filledPositionCount > 0 ? unclaimedPct / filledPositionCount : 0;
+
     // Add prize and distance info
     const rankingsWithPrizes = rankings.map((r) => {
       const prizeInfo = prizeDistribution.find(
         (p: { rank: number; percentage: number }) => p.rank === r.rank,
       );
-      const prizePercent = prizeInfo?.percentage || 0;
+      const basePct = prizeInfo?.percentage || 0;
+      const adjustedPct =
+        basePct > 0 && !r.isDisqualified ? basePct + bonusPerPosition : basePct;
       const potentialReward = r.isDisqualified
         ? 0
-        : Math.floor(((netPool * prizePercent) / 100) * 100) / 100;
+        : Math.floor(((netPool * adjustedPct) / 100) * 100) / 100;
 
       // Distance to first based on ranking method
       const myValue = getRankingValue(r);

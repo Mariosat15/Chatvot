@@ -8,6 +8,9 @@ import {
   Trash2,
   ChevronRight,
   RefreshCw,
+  UserPlus,
+  Users,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +45,20 @@ const PRIORITY_STYLES: Record<string, string> = {
   high: "border-l-orange-500",
   urgent: "border-l-red-500 bg-red-500/5",
 };
+
+// Reason: Some older notifications stored Lucide icon names as strings instead of emojis.
+// This map converts them to actual React components so they render as icons, not text.
+const LUCIDE_ICON_MAP: Record<string, React.ReactNode> = {
+  "user-plus": <UserPlus className="h-5 w-5" />,
+  "users": <Users className="h-5 w-5" />,
+  "message-circle": <MessageCircle className="h-5 w-5" />,
+  "bell": <Bell className="h-5 w-5" />,
+};
+
+function renderNotificationIcon(icon: string): React.ReactNode {
+  if (LUCIDE_ICON_MAP[icon]) return LUCIDE_ICON_MAP[icon];
+  return icon;
+}
 
 const CATEGORY_COLORS: Record<string, string> = {
   purchase: "bg-blue-500/20 text-blue-400",
@@ -286,7 +303,7 @@ export default function NotificationDropdown() {
                   <div className="flex gap-3 pl-3">
                     {/* Icon */}
                     <div className="flex-shrink-0 text-xl">
-                      {notification.icon}
+                      {renderNotificationIcon(notification.icon)}
                     </div>
 
                     {/* Content */}

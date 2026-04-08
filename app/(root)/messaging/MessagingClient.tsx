@@ -186,6 +186,12 @@ export default function MessagingClient({ session }: MessagingClientProps) {
             if (isUserAtBottomRef.current) {
               setTimeout(() => scrollToBottom(), 100);
             }
+
+            // Reason: Mark as read immediately since the user is viewing this conversation.
+            fetch(
+              `/api/messaging/conversations/${message.data.conversationId}/read`,
+              { method: "POST" },
+            );
           }
           fetchConversations();
           break;
@@ -646,8 +652,21 @@ export default function MessagingClient({ session }: MessagingClientProps) {
             setTimeout(() => scrollToBottom(), 100);
           }
 
+          // Reason: The GET endpoint already marks messages as read server-side.
+          // We also fire the /read POST for any edge-case, then zero the local
+          // unread count immediately so the UI reflects the read state.
           fetch(`/api/messaging/conversations/${conversationId}/read`, {
             method: "POST",
+          });
+
+          setConversations((prev) => {
+            const updated = prev.map((c) =>
+              c.id === conversationId ? { ...c, unreadCount: 0 } : c,
+            );
+            setUnreadTotal(
+              updated.reduce((sum, c) => sum + c.unreadCount, 0),
+            );
+            return updated;
           });
         }
       } catch {

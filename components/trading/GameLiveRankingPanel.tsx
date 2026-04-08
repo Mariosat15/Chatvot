@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { Skull, Target, Swords, Crown, Loader2 } from "lucide-react";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 
 interface RankingEntry {
   rank: number;
@@ -31,6 +32,8 @@ export default function GameLiveRankingPanel({
   userId,
   className,
 }: GameLiveRankingPanelProps) {
+  const { settings } = useAppSettings();
+  const currSymbol = settings?.currency?.symbol || "€";
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
   const [userRank, setUserRank] = useState<number | null>(null);
   const [totalParticipants, setTotalParticipants] = useState(0);
@@ -117,7 +120,7 @@ export default function GameLiveRankingPanel({
       case "profit_factor":
         return value.toFixed(2);
       default:
-        return `${value >= 0 ? "+" : ""}$${Math.abs(value).toFixed(0)}`;
+        return `${value >= 0 ? "+" : "-"}${currSymbol}${Math.abs(value).toFixed(0)}`;
     }
   };
 
@@ -131,7 +134,7 @@ export default function GameLiveRankingPanel({
       case "total_wins":
         return value.toString();
       default:
-        return `$${Math.abs(value).toFixed(0)}`;
+        return `${currSymbol}${Math.abs(value).toFixed(0)}`;
     }
   };
 
@@ -235,6 +238,7 @@ export default function GameLiveRankingPanel({
                   distanceStr={distanceStr}
                   formatDisplayValue={formatDisplayValue}
                   getRankDisplay={getRankDisplay}
+                  currSymbol={currSymbol}
                 />
               </div>
             );
@@ -249,6 +253,7 @@ export default function GameLiveRankingPanel({
               distanceStr={distanceStr}
               formatDisplayValue={formatDisplayValue}
               getRankDisplay={getRankDisplay}
+              currSymbol={currSymbol}
             />
           );
         })}
@@ -289,7 +294,7 @@ export default function GameLiveRankingPanel({
               <span className="text-yellow-300 font-bold">Prize Pool</span>
             </div>
             <span className="text-2xl font-black text-yellow-400 drop-shadow-lg">
-              ${prizePool.toLocaleString()}
+              {currSymbol}{prizePool.toLocaleString()}
             </span>
           </div>
         </div>
@@ -306,6 +311,7 @@ function RankingRow({
   distanceStr,
   formatDisplayValue,
   getRankDisplay,
+  currSymbol,
 }: {
   entry: RankingEntry;
   isCurrentUser: boolean;
@@ -313,6 +319,7 @@ function RankingRow({
   distanceStr: string | null;
   formatDisplayValue: (value: number) => string;
   getRankDisplay: (rank: number, isDisqualified: boolean) => React.ReactNode;
+  currSymbol: string;
 }) {
   return (
     <div
@@ -364,7 +371,7 @@ function RankingRow({
       <div className="col-span-3 text-right">
         {entry.potentialReward > 0 ? (
           <span className="text-sm font-bold text-yellow-400 tabular-nums">
-            ${entry.potentialReward.toLocaleString()}
+            {currSymbol}{entry.potentialReward.toLocaleString()}
           </span>
         ) : (
           <span className="text-xs text-gray-600">—</span>

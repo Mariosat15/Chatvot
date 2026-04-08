@@ -3,15 +3,13 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Trophy,
-  TrendingUp,
-  TrendingDown,
   Target,
   Loader2,
-  Crown,
   Skull,
   MoreHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 
 interface RankingEntry {
   rank: number;
@@ -39,6 +37,8 @@ export default function LiveRankingPanel({
   userId,
   className,
 }: LiveRankingPanelProps) {
+  const { settings } = useAppSettings();
+  const currSymbol = settings?.currency?.symbol || "€";
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
   const [userRank, setUserRank] = useState<number | null>(null);
   const [totalParticipants, setTotalParticipants] = useState(0);
@@ -198,7 +198,7 @@ export default function LiveRankingPanel({
       case "profit_factor":
         return value.toFixed(2);
       default: // pnl, total_capital
-        return `${value >= 0 ? "+" : ""}$${Math.abs(value).toFixed(2)}`;
+        return `${value >= 0 ? "+" : "-"}${currSymbol}${Math.abs(value).toFixed(2)}`;
     }
   };
 
@@ -214,7 +214,7 @@ export default function LiveRankingPanel({
       case "profit_factor":
         return value.toFixed(2);
       default: // pnl, total_capital
-        return `$${Math.abs(value).toFixed(0)}`;
+        return `${currSymbol}${Math.abs(value).toFixed(0)}`;
     }
   };
 
@@ -262,6 +262,7 @@ export default function LiveRankingPanel({
                   getRankBgColor={getRankBgColor}
                   formatDisplayValue={formatDisplayValue}
                   formatDistance={formatDistance}
+                  currSymbol={currSymbol}
                 />
               </div>
             );
@@ -276,6 +277,7 @@ export default function LiveRankingPanel({
               getRankBgColor={getRankBgColor}
               formatDisplayValue={formatDisplayValue}
               formatDistance={formatDistance}
+              currSymbol={currSymbol}
             />
           );
         })}
@@ -307,7 +309,7 @@ export default function LiveRankingPanel({
               Prize Pool
             </span>
             <span className="font-bold text-yellow-400">
-              ${prizePool.toLocaleString()}
+              {currSymbol}{prizePool.toLocaleString()}
             </span>
           </div>
         </div>
@@ -324,6 +326,7 @@ function RankingRow({
   getRankBgColor,
   formatDisplayValue,
   formatDistance,
+  currSymbol,
 }: {
   entry: RankingEntry;
   isCurrentUser: boolean;
@@ -335,6 +338,7 @@ function RankingRow({
   ) => string;
   formatDisplayValue: (value: number) => string;
   formatDistance: (value: number) => string | null;
+  currSymbol: string;
 }) {
   const displayValue = entry.displayValue ?? entry.profitPercent;
   const distanceStr = formatDistance(entry.distanceToFirst);
@@ -385,7 +389,7 @@ function RankingRow({
       <div className="col-span-3 text-right">
         {entry.potentialReward > 0 ? (
           <span className="text-xs font-bold text-yellow-400 tabular-nums">
-            ${entry.potentialReward.toLocaleString()}
+            {currSymbol}{entry.potentialReward.toLocaleString()}
           </span>
         ) : (
           <span className="text-xs text-gray-600">—</span>

@@ -12,6 +12,7 @@ import { useUserProfileImage } from "@/hooks/useUserProfileImage";
 import { signOut } from "@/lib/actions/auth.actions";
 import NotificationDropdown from "@/components/notifications/NotificationDropdown";
 import { GameIcon } from "@/components/ui/GameIcon";
+import { useUnreadMessages } from "@/hooks/useUnreadMessages";
 import {
   LogOut,
   Menu,
@@ -36,6 +37,7 @@ interface NavItem {
   color: string;
   gradient: string;
   badge?: string;
+  numericBadge?: number;
 }
 
 const mainNavItems: NavItem[] = [
@@ -121,6 +123,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
   const router = useRouter();
   const { images } = useWhiteLabelImages();
   const { profileImage: userProfileImage } = useUserProfileImage();
+  const { unreadCount: unreadMessages } = useUnreadMessages();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isGameMaster, setIsGameMaster] = useState(false);
@@ -210,15 +213,22 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
             />
           )}
 
-          <div
-            className={cn(
-              "flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300",
-              active
-                ? `${item.color.replace("text-", "bg-")}/20 ${item.color}`
-                : "bg-gray-800/50 text-gray-400 group-hover:text-gray-200",
+          <div className="relative">
+            <div
+              className={cn(
+                "flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300",
+                active
+                  ? `${item.color.replace("text-", "bg-")}/20 ${item.color}`
+                  : "bg-gray-800/50 text-gray-400 group-hover:text-gray-200",
+              )}
+            >
+              {item.icon}
+            </div>
+            {item.numericBadge && item.numericBadge > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                {item.numericBadge > 9 ? "9+" : item.numericBadge}
+              </span>
             )}
-          >
-            {item.icon}
           </div>
 
           {!isCollapsed && (
@@ -364,7 +374,14 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
           {mainNavItems
             .filter((item) => item.href !== "/arena" || arenaEnabled)
             .map((item) => (
-              <NavLink key={item.href} item={item} />
+              <NavLink
+                key={item.href}
+                item={
+                  item.href === "/messaging"
+                    ? { ...item, numericBadge: unreadMessages }
+                    : item
+                }
+              />
             ))}
         </div>
 

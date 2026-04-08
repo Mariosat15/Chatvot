@@ -28,6 +28,7 @@ import { notFound, redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
+import AppSettingsModel from "@/database/models/app-settings.model";
 
 interface CompetitionDetailsPageProps {
   params: Promise<{ id: string }>;
@@ -50,14 +51,16 @@ const CompetitionDetailsPage = async ({
 
   try {
     // PERF: Fetch independent data in parallel instead of sequentially
-    const [competition, leaderboard, isUserIn, walletBalance, riskSettings] =
+    const [competition, leaderboard, isUserIn, walletBalance, riskSettings, appSettings] =
       await Promise.all([
         getCompetitionById(id),
         getCompetitionLeaderboard(id, 50),
         isUserInCompetition(id),
         getWalletBalance(),
         getTradingRiskSettings(),
+        AppSettingsModel.findById("app-settings").lean().catch(() => null),
       ]);
+    const currSymbol = (appSettings as any)?.currency?.symbol || "€";
     // getUserParticipant depends on isUserIn — must be sequential
     const userParticipant = isUserIn ? await getUserParticipant(id) : null;
 
@@ -343,7 +346,7 @@ const CompetitionDetailsPage = async ({
                   Prize Pool
                 </p>
                 <p className="text-xl sm:text-2xl md:text-3xl font-bold text-yellow-500">
-                  €
+                  {currSymbol}
                   {(
                     competition.prizePool ||
                     competition.prizePoolCredits ||
@@ -356,7 +359,7 @@ const CompetitionDetailsPage = async ({
                   Entry Fee
                 </p>
                 <p className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-100">
-                  €{competition.entryFee || competition.entryFeeCredits || 0}
+                  {currSymbol}{competition.entryFee || competition.entryFeeCredits || 0}
                 </p>
               </div>
               <div>
@@ -1145,7 +1148,7 @@ const CompetitionDetailsPage = async ({
                               <span
                                 className={`text-sm font-bold ${isFilled ? "text-yellow-500" : "text-gray-500"}`}
                               >
-                                {isFilled ? `€${netAmount.toFixed(2)}` : "—"}
+                                {isFilled ? `${currSymbol}${netAmount.toFixed(2)}` : "—"}
                               </span>
                             </div>
                           );
