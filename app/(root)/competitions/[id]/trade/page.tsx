@@ -270,8 +270,8 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                                 {isViewOnly ? "Back" : "Back"}
                               </span>
                             </Link>
-                            <div className="hidden sm:flex border-l border-dark-400/30 pl-4 h-10 flex-col justify-center min-w-0">
-                              <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-light-900 tracking-tight truncate">
+                            <div className="hidden sm:flex border-l border-dark-400/30 pl-4 flex-col justify-center min-w-0">
+                              <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-light-900 tracking-tight break-words">
                                 {competition.name}
                               </h1>
                               <div className="flex items-center gap-2 mt-0.5">
