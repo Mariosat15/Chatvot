@@ -24,6 +24,10 @@ import {
   fetchRealForexPrices,
   getMarketStatus,
 } from "@/lib/services/real-forex-prices.service";
+import {
+  getSymbolConfig,
+  getMultipleSymbolConfigs,
+} from "@/lib/services/symbol-config.service";
 import { isMarketOpen } from "@/lib/services/market-hours.service";
 import { getMarginStatus } from "@/lib/services/risk-manager.service";
 import PriceLog from "@/database/models/trading/price-log.model";
@@ -78,11 +82,14 @@ export const getUserPositions = async (competitionId: string) => {
         ? await fetchRealForexPrices(allFetchSymbols)
         : new Map();
 
+    const symConfigs = await getMultipleSymbolConfigs(uniqueSymbols);
+
     // Update P&L for each position with current REAL prices (instant - from batch)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const positionsWithCurrentPnL = positions.map((position: any) => {
       const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
       if (currentPrice) {
+        const symbolCfg = symConfigs.get(position.symbol)!;
         const marketPrice =
           position.side === "long" ? currentPrice.bid : currentPrice.ask;
         const rate = getQuoteToUsdRate(
@@ -96,6 +103,7 @@ export const getUserPositions = async (competitionId: string) => {
           position.quantity,
           position.symbol as ForexSymbol,
           rate,
+          symbolCfg,
         );
         const pnlPercentage = calculatePnLPercentage(pnl, position.marginUsed);
 
@@ -277,6 +285,8 @@ export const closePosition = async (
       throw new Error("Position not found or already closed");
     }
 
+    const symbolCfg = await getSymbolConfig(position.symbol);
+
     // 🚨 Check if competition is PAUSED (risk mitigation)
     // Users cannot close positions manually during pause - positions are frozen
     const Competition = (
@@ -390,7 +400,7 @@ export const closePosition = async (
     );
 
     const spreadCostInUSD =
-      ((entrySpread + exitSpread) * position.quantity * 100000) /
+      ((entrySpread + exitSpread) * position.quantity * symbolCfg.contractSize) /
       (posRate > 0 ? posRate : 1);
 
     // Calculate final P&L
@@ -401,6 +411,7 @@ export const closePosition = async (
       position.quantity,
       position.symbol as ForexSymbol,
       posRate,
+      symbolCfg,
     );
     const realizedPnlPercentage = calculatePnLPercentage(
       realizedPnl,
@@ -882,12 +893,15 @@ export const updateAllPositionsPnL = async (
     ] as ForexSymbol[];
     const pricesMap = await fetchRealForexPrices(allSymsB);
 
+    const symConfigsBatch = await getMultipleSymbolConfigs(uniqueSymbols);
+
     let totalUnrealizedPnl = 0;
 
     for (const position of positions) {
       const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
       if (!currentPrice) continue;
 
+      const symbolCfg = symConfigsBatch.get(position.symbol)!;
       const marketPrice =
         position.side === "long" ? currentPrice.bid : currentPrice.ask;
       const rate = getQuoteToUsdRate(
@@ -901,6 +915,7 @@ export const updateAllPositionsPnL = async (
         position.quantity,
         position.symbol as ForexSymbol,
         rate,
+        symbolCfg,
       );
       const pnlPercentage = calculatePnLPercentage(pnl, position.marginUsed);
 
@@ -1070,6 +1085,8 @@ export async function closePositionAutomatic(
       return; // Position already closed or doesn't exist - this is fine
     }
 
+    const symbolCfg = await getSymbolConfig(position.symbol);
+
     // Fetch conversion rate for non-USD-quoted pairs
     const autoConvSyms = getConversionPairSymbols([
       position.symbol as ForexSymbol,
@@ -1091,6 +1108,7 @@ export async function closePositionAutomatic(
       position.quantity,
       position.symbol as ForexSymbol,
       autoRate,
+      symbolCfg,
     );
     const realizedPnlPercentage = calculatePnLPercentage(
       realizedPnl,
@@ -1471,6 +1489,8 @@ export const checkMarginCalls = async (competitionId: string) => {
         : new Map();
     console.log(`📊 Fetched ${pricesMap.size} prices for margin check`);
 
+    const symConfigsMargin = await getMultipleSymbolConfigs(allSymbols);
+
     // Group positions by participant for processing
     const positionsByParticipant = new Map<string, typeof allOpenPositions>();
     for (const position of allOpenPositions) {
@@ -1504,6 +1524,7 @@ export const checkMarginCalls = async (competitionId: string) => {
         const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
         if (!currentPrice) continue;
 
+        const symbolCfg = symConfigsMargin.get(position.symbol)!;
         const marketPrice =
           position.side === "long" ? currentPrice.bid : currentPrice.ask;
         const mRate = getQuoteToUsdRate(
@@ -1517,6 +1538,7 @@ export const checkMarginCalls = async (competitionId: string) => {
           position.quantity,
           position.symbol as ForexSymbol,
           mRate,
+          symbolCfg,
         );
 
         totalUnrealizedPnl += unrealizedPnl;

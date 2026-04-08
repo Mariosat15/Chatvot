@@ -15,6 +15,10 @@ import {
   getQuoteToUsdRate,
   getConversionPairSymbols,
 } from "@/lib/services/pnl-calculator.service";
+import {
+  getSymbolConfig,
+  getMultipleSymbolConfigs,
+} from "@/lib/services/symbol-config.service";
 import { closePositionAutomatic } from "@/lib/actions/trading/position.actions";
 
 /**
@@ -75,6 +79,7 @@ export const checkUserMargin = async (competitionId: string) => {
       ...new Set([...uniqueSymbols, ...mmConvSyms]),
     ] as ForexSymbol[];
     const pricesMap = await fetchRealForexPrices(mmAllSyms);
+    const symbolCfgMap = await getMultipleSymbolConfigs(uniqueSymbols);
 
     let totalUnrealizedPnl = 0;
     for (const position of openPositions) {
@@ -87,6 +92,7 @@ export const checkUserMargin = async (competitionId: string) => {
         position.symbol as ForexSymbol,
         pricesMap as Map<string, { bid: number; ask: number }>,
       );
+      const symbolCfg = symbolCfgMap.get(position.symbol)!;
       const unrealizedPnl = calculateUnrealizedPnL(
         position.side,
         position.entryPrice,
@@ -94,6 +100,7 @@ export const checkUserMargin = async (competitionId: string) => {
         position.quantity,
         position.symbol as ForexSymbol,
         mmRate,
+        symbolCfg,
       );
 
       totalUnrealizedPnl += unrealizedPnl;

@@ -9,8 +9,10 @@ import WalletTransaction from "@/database/models/trading/wallet-transaction.mode
 import TradingPosition from "@/database/models/trading/trading-position.model";
 import { PlatformTransaction } from "@/database/models/platform-financials.model";
 import { fetchRealForexPrices } from "@/lib/services/real-forex-prices.service";
+import { getMultipleSymbolConfigs } from "@/lib/services/symbol-config.service";
 import {
   type ForexSymbol,
+  calculateUnrealizedPnL,
   getQuoteToUsdRate,
   getConversionPairSymbols,
 } from "@/lib/services/pnl-calculator.service";
@@ -185,6 +187,8 @@ async function _finalizeChallengeAttempt(challengeId: string) {
       cfConvPrices = m as Map<string, { bid: number; ask: number }>;
     }
 
+    const symConfigs = await getMultipleSymbolConfigs(cfAllPosSymbols);
+
     // Process already-closed positions
     for (const position of allPositions) {
       if (position.status === "closed" || position.status === "liquidated") {
@@ -201,9 +205,16 @@ async function _finalizeChallengeAttempt(challengeId: string) {
             position.symbol as ForexSymbol,
             cfConvPrices,
           );
-          const positionPnL =
-            (priceDiff * position.quantity * 100000) /
-            (cfRate > 0 ? cfRate : 1);
+          const sc = symConfigs.get(position.symbol);
+          const positionPnL = calculateUnrealizedPnL(
+            position.side,
+            position.entryPrice,
+            exitPrice,
+            position.quantity,
+            position.symbol,
+            cfRate > 0 ? cfRate : 1,
+            sc ? { pip: sc.pip, contractSize: sc.contractSize } : undefined,
+          );
 
           console.log(
             `  Closed position: ${position.symbol} ${position.side}, Entry: ${position.entryPrice}, Exit: ${exitPrice}, P&L: $${positionPnL.toFixed(2)}`,
@@ -260,9 +271,16 @@ async function _finalizeChallengeAttempt(challengeId: string) {
           position.symbol as ForexSymbol,
           pricesMap as Map<string, { bid: number; ask: number }>,
         );
-        const positionPnL =
-          (priceDiff * position.quantity * 100000) /
-          (cfRate2 > 0 ? cfRate2 : 1);
+        const sc2 = symConfigs.get(position.symbol);
+        const positionPnL = calculateUnrealizedPnL(
+          position.side,
+          position.entryPrice,
+          exitPrice,
+          position.quantity,
+          position.symbol,
+          cfRate2 > 0 ? cfRate2 : 1,
+          sc2 ? { pip: sc2.pip, contractSize: sc2.contractSize } : undefined,
+        );
 
         console.log(
           `  Closing ${position.symbol} ${position.side} for ${position.userId}: P&L $${positionPnL.toFixed(2)}`,

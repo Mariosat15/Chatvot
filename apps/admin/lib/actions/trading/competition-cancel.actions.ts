@@ -13,9 +13,11 @@ import TradeHistory from "@/database/models/trading/trade-history.model";
 import mongoose from "mongoose";
 import {
   ForexSymbol,
+  calculateUnrealizedPnL,
   getQuoteToUsdRate,
   getConversionPairSymbols,
 } from "@/lib/services/pnl-calculator.service";
+import { getMultipleSymbolConfigs } from "@/lib/services/symbol-config.service";
 
 /**
  * Cancel a competition and refund ALL participants their FULL entry fee
@@ -347,6 +349,8 @@ export async function emergencyCancelActiveCompetition(
       });
     }
 
+    const symCfgEmergency = await getMultipleSymbolConfigs(cancelUniqueSymbols);
+
     // Close each position
     for (const position of openPositions) {
       try {
@@ -361,18 +365,20 @@ export async function emergencyCancelActiveCompetition(
         // Determine exit price based on position side
         const exitPrice = position.side === "long" ? prices.bid : prices.ask;
 
-        // Calculate P&L
-        const priceDiff =
-          position.side === "long"
-            ? exitPrice - position.entryPrice
-            : position.entryPrice - exitPrice;
         const cancelRate = getQuoteToUsdRate(
           position.symbol as ForexSymbol,
           pricesMap as Map<string, { bid: number; ask: number }>,
         );
-        const realizedPnl =
-          (priceDiff * position.quantity * 100000) /
-          (cancelRate > 0 ? cancelRate : 1);
+        const scEm = symCfgEmergency.get(position.symbol);
+        const realizedPnl = calculateUnrealizedPnL(
+          position.side,
+          position.entryPrice,
+          exitPrice,
+          position.quantity,
+          position.symbol,
+          cancelRate > 0 ? cancelRate : 1,
+          scEm ? { pip: scEm.pip, contractSize: scEm.contractSize } : undefined,
+        );
 
         // Update position
         await TradingPosition.findByIdAndUpdate(

@@ -21,6 +21,7 @@ import InteractiveTPSL from "@/components/trading/InteractiveTPSL";
 import PendingOrders from "@/components/trading/PendingOrders";
 import { LiveAccountInfo } from "@/components/trading/LiveAccountInfo";
 import { PriceProvider } from "@/contexts/PriceProvider";
+import { SymbolConfigProvider } from "@/contexts/SymbolConfigContext";
 import { ChartSymbolProvider } from "@/contexts/ChartSymbolContext";
 import { TradingArsenalProvider } from "@/contexts/TradingArsenalContext";
 import { PositionEventsProvider } from "@/contexts/PositionEventsProvider";
@@ -141,6 +142,7 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
 
   return (
     <PriceProvider>
+      <SymbolConfigProvider>
       <ChartSymbolProvider>
         <TradingArsenalProvider>
           <PositionEventsProvider
@@ -768,6 +770,7 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
           </PositionEventsProvider>
         </TradingArsenalProvider>
       </ChartSymbolProvider>
+      </SymbolConfigProvider>
     </PriceProvider>
   );
 };

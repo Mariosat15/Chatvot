@@ -23,9 +23,9 @@ import {
   Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSymbolConfig } from "@/contexts/SymbolConfigContext";
 import {
   calculateUnrealizedPnL,
-  FOREX_PAIRS,
   ForexSymbol,
 } from "@/lib/services/pnl-calculator.service";
 
@@ -54,6 +54,7 @@ const EditPositionModal = ({
   onClose,
   onSuccess,
 }: EditPositionModalProps) => {
+  const { getConfig } = useSymbolConfig();
   const [loading, setLoading] = useState(false);
 
   // TP/SL Input Modes
@@ -76,7 +77,7 @@ const EditPositionModal = ({
       if (position.takeProfit) {
         setEnableTP(true);
         setTakeProfitPrice(position.takeProfit.toFixed(5));
-        const pipValue = FOREX_PAIRS[position.symbol].pip;
+        const pipValue = getConfig(position.symbol).pip;
         const pips = Math.abs(
           (position.takeProfit - position.entryPrice) / pipValue,
         );
@@ -91,7 +92,7 @@ const EditPositionModal = ({
       if (position.stopLoss) {
         setEnableSL(true);
         setStopLossPrice(position.stopLoss.toFixed(5));
-        const pipValue = FOREX_PAIRS[position.symbol].pip;
+        const pipValue = getConfig(position.symbol).pip;
         const pips = Math.abs(
           (position.stopLoss - position.entryPrice) / pipValue,
         );
@@ -102,11 +103,12 @@ const EditPositionModal = ({
         setStopLossPips("30"); // Default 30 pips
       }
     }
-  }, [position]);
+  }, [position, getConfig]);
 
   if (!position) return null;
 
-  const pipValue = FOREX_PAIRS[position.symbol].pip;
+  const symbolCfg = getConfig(position.symbol);
+  const pipValue = symbolCfg.pip;
 
   // Calculate TP price from pips (rounded to avoid floating point issues)
   const calculateTPFromPips = (pips: number): number => {

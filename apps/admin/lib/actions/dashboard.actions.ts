@@ -8,13 +8,17 @@ import CompetitionParticipant from "@/database/models/trading/competition-partic
 import Competition from "@/database/models/trading/competition.model";
 import TradingPosition from "@/database/models/trading/trading-position.model";
 import TradeHistory from "@/database/models/trading/trade-history.model";
-import { getRealPrice } from "@/lib/services/real-forex-prices.service";
+import {
+  getRealPrice,
+  fetchRealForexPrices,
+} from "@/lib/services/real-forex-prices.service";
 import {
   ForexSymbol,
   calculateUnrealizedPnL,
   getQuoteToUsdRate,
   getConversionPairSymbols,
 } from "@/lib/services/pnl-calculator.service";
+import { getMultipleSymbolConfigs } from "@/lib/services/symbol-config.service";
 
 // Disable verbose logging in production
 const DEBUG = false;
@@ -67,6 +71,12 @@ export const getUserDashboardDataForApi = async (userId: string) => {
             status: "open",
           }).lean();
 
+          const apiUniqueSymbols = [
+            ...new Set(openPositions.map((p: any) => p.symbol as ForexSymbol)),
+          ];
+          const symbolCfgMapApi =
+            await getMultipleSymbolConfigs(apiUniqueSymbols);
+
           // Calculate unrealized PnL for open positions
           let totalUnrealizedPnL = 0;
           const positionsWithPnL = await Promise.all(
@@ -95,6 +105,7 @@ export const getUserDashboardDataForApi = async (userId: string) => {
                     pos.symbol as ForexSymbol,
                     apiConvPrices,
                   );
+                  const symbolCfg = symbolCfgMapApi.get(pos.symbol)!;
                   const unrealizedPnL = calculateUnrealizedPnL(
                     pos.type,
                     pos.entryPrice,
@@ -102,6 +113,7 @@ export const getUserDashboardDataForApi = async (userId: string) => {
                     pos.size,
                     pos.symbol as ForexSymbol,
                     apiRate,
+                    symbolCfg,
                   );
                   totalUnrealizedPnL += unrealizedPnL;
                   return { ...pos, currentPrice, unrealizedPnL };
@@ -324,6 +336,8 @@ export const getUserDashboardData = async () => {
             const m = await fetchRealForexPrices(dashConvSyms);
             dashConvPrices = m as Map<string, { bid: number; ask: number }>;
           }
+          const symbolCfgMapDash =
+            await getMultipleSymbolConfigs(dashUniqueSymbols);
           for (const position of openPositions) {
             const currentPrice = await getRealPrice(
               position.symbol as ForexSymbol,
@@ -335,6 +349,7 @@ export const getUserDashboardData = async () => {
                 position.symbol as ForexSymbol,
                 dashConvPrices,
               );
+              const symbolCfg = symbolCfgMapDash.get(position.symbol)!;
               const pnl = calculateUnrealizedPnL(
                 position.side,
                 position.entryPrice,
@@ -342,6 +357,7 @@ export const getUserDashboardData = async () => {
                 position.quantity,
                 position.symbol as ForexSymbol,
                 dashRate,
+                symbolCfg,
               );
               totalUnrealizedPnL += pnl;
             }
@@ -370,6 +386,7 @@ export const getUserDashboardData = async () => {
               pos.symbol as ForexSymbol,
               dashConvPrices,
             );
+            const symbolCfg = symbolCfgMapDash.get(pos.symbol)!;
             const unrealizedPnl = calculateUnrealizedPnL(
               pos.side,
               pos.entryPrice,
@@ -377,6 +394,7 @@ export const getUserDashboardData = async () => {
               pos.quantity,
               pos.symbol as ForexSymbol,
               posRate,
+              symbolCfg,
             );
 
             const unrealizedPnlPercentage =

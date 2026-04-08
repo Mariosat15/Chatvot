@@ -13,11 +13,13 @@ import {
   getRealPrice as _getRealPrice,
   fetchRealForexPrices,
 } from "@/lib/services/real-forex-prices.service";
-import type { ForexSymbol } from "@/lib/services/pnl-calculator.service";
 import {
+  type ForexSymbol,
+  calculateUnrealizedPnL,
   getQuoteToUsdRate,
   getConversionPairSymbols,
 } from "@/lib/services/pnl-calculator.service";
+import { getMultipleSymbolConfigs } from "@/lib/services/symbol-config.service";
 import mongoose from "mongoose";
 
 /**
@@ -178,6 +180,8 @@ async function _finalizeChallengeAttempt(challengeId: string) {
       : new Map();
     console.log(`Got ${pricesMap.size} prices in single batch`);
 
+    const symConfigs = await getMultipleSymbolConfigs(cfAllPositionSymbols);
+
     // Process already-closed positions
     // NOTE: TradingPosition doesn't have 'profitLoss' field - calculate from entry/exit prices
     for (const position of allPositions) {
@@ -185,22 +189,27 @@ async function _finalizeChallengeAttempt(challengeId: string) {
         const userId = position.userId.toString();
         const stats = participantStats.get(userId);
         if (stats) {
-          // Calculate P&L from entry/exit prices (currentPrice = exitPrice for closed positions)
-          // FOREX: contractSize = 100,000 units per standard lot
-          const priceDiff =
-            position.side === "long"
-              ? position.currentPrice - position.entryPrice
-              : position.entryPrice - position.currentPrice;
+          const exitPrice =
+            position.exitPrice ??
+            position.currentPrice ??
+            position.entryPrice;
           const cfRate = getQuoteToUsdRate(
             position.symbol as ForexSymbol,
             pricesMap as Map<string, { bid: number; ask: number }>,
           );
-          const positionPnL =
-            (priceDiff * position.quantity * 100000) /
-            (cfRate > 0 ? cfRate : 1);
+          const sc = symConfigs.get(position.symbol);
+          const positionPnL = calculateUnrealizedPnL(
+            position.side,
+            position.entryPrice,
+            exitPrice,
+            position.quantity,
+            position.symbol,
+            cfRate > 0 ? cfRate : 1,
+            sc ? { pip: sc.pip, contractSize: sc.contractSize } : undefined,
+          );
 
           console.log(
-            `  Closed position: ${position.symbol} ${position.side}, Entry: ${position.entryPrice}, Exit: ${position.currentPrice}, P&L: $${positionPnL.toFixed(2)}`,
+            `  Closed position: ${position.symbol} ${position.side}, Entry: ${position.entryPrice}, Exit: ${exitPrice}, P&L: $${positionPnL.toFixed(2)}`,
           );
 
           stats.totalPnL += positionPnL;
@@ -233,18 +242,24 @@ async function _finalizeChallengeAttempt(challengeId: string) {
         const exitPrice =
           position.side === "long" ? priceData.bid : priceData.ask;
 
-        // Calculate P&L (FOREX: contractSize = 100,000 units per lot)
-        const priceDiff =
-          position.side === "long"
-            ? exitPrice - position.entryPrice
-            : position.entryPrice - exitPrice;
         const cfRate2 = getQuoteToUsdRate(
           position.symbol as ForexSymbol,
           pricesMap as Map<string, { bid: number; ask: number }>,
         );
-        const positionPnL =
-          (priceDiff * position.quantity * 100000) /
-          (cfRate2 > 0 ? cfRate2 : 1);
+        const sc2 = symConfigs.get(position.symbol);
+        const positionPnL = calculateUnrealizedPnL(
+          position.side,
+          position.entryPrice,
+          exitPrice,
+          position.quantity,
+          position.symbol,
+          cfRate2 > 0 ? cfRate2 : 1,
+          sc2 ? { pip: sc2.pip, contractSize: sc2.contractSize } : undefined,
+        );
+        const priceDiff =
+          position.side === "long"
+            ? exitPrice - position.entryPrice
+            : position.entryPrice - exitPrice;
 
         console.log(
           `  Closing ${position.symbol} ${position.side} for ${position.userId}: P&L $${positionPnL.toFixed(2)}`,

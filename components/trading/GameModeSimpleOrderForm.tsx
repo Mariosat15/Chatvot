@@ -3,10 +3,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { useChartSymbol } from "@/contexts/ChartSymbolContext";
 import { usePrices } from "@/contexts/PriceProvider";
-import {
-  ForexSymbol,
-  FOREX_PAIRS,
-} from "@/lib/services/pnl-calculator.service";
+import { useSymbolConfig } from "@/contexts/SymbolConfigContext";
+import { ForexSymbol } from "@/lib/services/pnl-calculator.service";
 import { placeOrder } from "@/lib/actions/trading/order.actions";
 import { cn } from "@/lib/utils";
 import {
@@ -87,6 +85,7 @@ export default function GameModeSimpleOrderForm({
 }: GameModeSimpleOrderFormProps) {
   const { symbol } = useChartSymbol();
   const { prices } = usePrices();
+  const { getConfig } = useSymbolConfig();
 
   const [selectedSize, setSelectedSize] = useState(0); // Index of TRADE_SIZES
   const [selectedRisk, setSelectedRisk] = useState(0); // Index of RISK_PRESETS
@@ -95,8 +94,8 @@ export default function GameModeSimpleOrderForm({
   const [showHelp, setShowHelp] = useState(false);
 
   const currentPrice = prices.get(symbol);
-  const symbolInfo = FOREX_PAIRS[symbol as ForexSymbol];
-  const pipValue = symbolInfo?.pip || 0.0001;
+  const symbolCfg = getConfig(symbol);
+  const pipValue = symbolCfg.pip;
   const leverage = defaultLeverage;
 
   // Rotate tips every 8 seconds
@@ -116,9 +115,10 @@ export default function GameModeSimpleOrderForm({
   const selectedLots = TRADE_SIZES[selectedSize].lots;
   const marginRequired = useMemo(() => {
     if (!currentPrice) return 0;
-    const notionalValue = selectedLots * (symbolInfo?.contractSize || 100000) * currentPrice.mid;
+    const notionalValue =
+      selectedLots * symbolCfg.contractSize * currentPrice.mid;
     return notionalValue / leverage;
-  }, [selectedLots, leverage, currentPrice, symbolInfo]);
+  }, [selectedLots, leverage, currentPrice, symbolCfg.contractSize]);
 
   // Account health check
   const currentMarginLevel = usedMargin > 0 ? (equity / usedMargin) * 100 : Infinity;

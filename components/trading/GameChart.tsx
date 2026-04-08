@@ -9,12 +9,9 @@ import {
   UTCTimestamp,
   PriceFormat,
 } from "lightweight-charts";
-import {
-  ForexSymbol,
-  FOREX_PAIRS,
-} from "@/lib/services/pnl-calculator.service";
 import { usePrices } from "@/contexts/PriceProvider";
 import { useChartSymbol } from "@/contexts/ChartSymbolContext";
+import { useSymbolConfig } from "@/contexts/SymbolConfigContext";
 import { cn } from "@/lib/utils";
 import { CandlestickChart, LineChart, Clock } from "lucide-react";
 
@@ -68,6 +65,7 @@ export default function GameChart({
 }: GameChartProps) {
   const { prices, subscribe, unsubscribe } = usePrices();
   const { symbol } = useChartSymbol();
+  const { getConfig } = useSymbolConfig();
 
   // Chart state
   const [timeframe, setTimeframe] = useState<string>("1");
@@ -112,7 +110,8 @@ export default function GameChart({
   const currentPrice = prices.get(symbol);
 
   // Get pip value for current symbol
-  const pipValue = FOREX_PAIRS[symbol as ForexSymbol]?.pip || 0.0001;
+  const symbolCfg = getConfig(symbol);
+  const pipValue = symbolCfg.pip;
 
   // Filter LIVE positions for current symbol (excludes closed ones)
   const symbolPositions = useMemo(

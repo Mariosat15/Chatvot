@@ -19,6 +19,7 @@ import {
   getQuoteToUsdRate,
   getConversionPairSymbols,
 } from "@/lib/services/pnl-calculator.service";
+import { getSymbolConfig } from "@/lib/services/symbol-config.service";
 import { validateNewOrder } from "@/lib/services/risk-manager.service";
 import {
   getRealPrice,
@@ -379,8 +380,14 @@ export const placeOrder = async (params: {
     }
     console.log(`   ✅ Risk limits check passed`);
 
+    const symbolCfg = await getSymbolConfig(symbol);
+
     // Validate quantity
-    const quantityValidation = validateQuantity(quantity);
+    const quantityValidation = validateQuantity(
+      quantity,
+      symbolCfg.minLotSize,
+      symbolCfg.maxLotSize,
+    );
     if (!quantityValidation.valid) {
       throw new Error(quantityValidation.error);
     }
@@ -534,6 +541,7 @@ export const placeOrder = async (params: {
       leverage,
       symbol,
       quoteToUsdRate,
+      symbolCfg,
     );
 
     // Validate order can be placed

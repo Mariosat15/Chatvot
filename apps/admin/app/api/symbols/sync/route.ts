@@ -19,7 +19,6 @@ export async function POST(request: NextRequest) {
     const { reset = false } = body;
 
     if (reset) {
-      // Delete all and re-seed
       await TradingSymbol.deleteMany({});
 
       const defaultSymbols = Object.entries(DEFAULT_FOREX_PAIRS).map(
@@ -27,16 +26,16 @@ export async function POST(request: NextRequest) {
           symbol,
           name: config.name,
           pip: config.pip,
+          contractSize: config.contractSize,
           category: config.category,
           popular: config.popular,
           sortOrder: config.sortOrder,
-          contractSize: 100000,
           enabled: true,
-          minLotSize: 0.01,
-          maxLotSize: 100,
-          lotStep: 0.01,
-          defaultSpread: symbol.includes("JPY") ? 1.5 : 1.2,
-          commission: 0,
+          minLotSize: config.minLotSize,
+          maxLotSize: config.maxLotSize,
+          lotStep: config.lotStep,
+          defaultSpread: config.defaultSpread,
+          commission: config.commission,
           icon: getSymbolIcon(symbol),
         }),
       );
@@ -51,7 +50,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Sync mode - add missing symbols only
     let added = 0;
     let skipped = 0;
 
@@ -63,16 +61,16 @@ export async function POST(request: NextRequest) {
           symbol,
           name: config.name,
           pip: config.pip,
+          contractSize: config.contractSize,
           category: config.category,
           popular: config.popular,
           sortOrder: config.sortOrder,
-          contractSize: 100000,
           enabled: true,
-          minLotSize: 0.01,
-          maxLotSize: 100,
-          lotStep: 0.01,
-          defaultSpread: symbol.includes("JPY") ? 1.5 : 1.2,
-          commission: 0,
+          minLotSize: config.minLotSize,
+          maxLotSize: config.maxLotSize,
+          lotStep: config.lotStep,
+          defaultSpread: config.defaultSpread,
+          commission: config.commission,
           icon: getSymbolIcon(symbol),
         });
         added++;

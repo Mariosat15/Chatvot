@@ -175,6 +175,26 @@ export const FOREX_PAIRS = {
 
 export type ForexSymbol = keyof typeof FOREX_PAIRS;
 
+/** Minimal config needed by calculation functions. */
+export interface SymbolPairConfig {
+  pip: number;
+  contractSize: number;
+}
+
+/**
+ * Resolve the pair config: use explicit override if provided, otherwise
+ * fall back to the hardcoded FOREX_PAIRS constant.
+ */
+function resolvePairConfig(
+  symbol: ForexSymbol | string,
+  override?: SymbolPairConfig,
+): { pip: number; contractSize: number } {
+  if (override) return override;
+  const hc = FOREX_PAIRS[symbol as ForexSymbol];
+  if (!hc) throw new Error(`Unknown forex pair: ${symbol}`);
+  return hc;
+}
+
 // Reason: PnL and margin for non-USD-quoted pairs (e.g. NZD/JPY) are denominated
 // in the quote currency. Without converting to USD the numbers are wildly wrong
 // (e.g. 92× too large for JPY pairs because 1 USD ≈ 149 JPY).
@@ -259,15 +279,11 @@ export function calculateUnrealizedPnL(
   entryPrice: number,
   currentPrice: number,
   quantity: number,
-  symbol: ForexSymbol,
+  symbol: ForexSymbol | string,
   quoteToUsdRate: number = 1,
+  symbolConfig?: SymbolPairConfig,
 ): number {
-  const pairConfig = FOREX_PAIRS[symbol];
-  if (!pairConfig) {
-    throw new Error(`Unknown forex pair: ${symbol}`);
-  }
-
-  const { contractSize } = pairConfig;
+  const { contractSize } = resolvePairConfig(symbol, symbolConfig);
   const priceChange =
     side === "long" ? currentPrice - entryPrice : entryPrice - currentPrice;
 
@@ -313,15 +329,11 @@ export function calculateMarginRequired(
   quantity: number,
   entryPrice: number,
   leverage: number,
-  symbol: ForexSymbol,
+  symbol: ForexSymbol | string,
   quoteToUsdRate: number = 1,
+  symbolConfig?: SymbolPairConfig,
 ): number {
-  const pairConfig = FOREX_PAIRS[symbol];
-  if (!pairConfig) {
-    throw new Error(`Unknown forex pair: ${symbol}`);
-  }
-
-  const { contractSize } = pairConfig;
+  const { contractSize } = resolvePairConfig(symbol, symbolConfig);
   let positionValue = quantity * contractSize * entryPrice;
 
   // Reason: positionValue is in quote currency; divide to get USD.
@@ -438,15 +450,11 @@ export function calculateLiquidationPrice(
   quantity: number,
   marginUsed: number,
   leverage: number,
-  symbol: ForexSymbol,
+  symbol: ForexSymbol | string,
   quoteToUsdRate: number = 1,
+  symbolConfig?: SymbolPairConfig,
 ): number {
-  const pairConfig = FOREX_PAIRS[symbol];
-  if (!pairConfig) {
-    throw new Error(`Unknown forex pair: ${symbol}`);
-  }
-
-  const { contractSize } = pairConfig;
+  const { contractSize } = resolvePairConfig(symbol, symbolConfig);
 
   // Reason: marginUsed is in USD; convert to quote currency before computing price move.
   const maxLossInQuote =
@@ -472,15 +480,11 @@ export function calculateLiquidationPrice(
  */
 export function calculatePipValue(
   quantity: number,
-  symbol: ForexSymbol,
+  symbol: ForexSymbol | string,
   quoteToUsdRate: number = 1,
+  symbolConfig?: SymbolPairConfig,
 ): number {
-  const pairConfig = FOREX_PAIRS[symbol];
-  if (!pairConfig) {
-    throw new Error(`Unknown forex pair: ${symbol}`);
-  }
-
-  const { pip, contractSize } = pairConfig;
+  const { pip, contractSize } = resolvePairConfig(symbol, symbolConfig);
   let pipValue = pip * quantity * contractSize;
 
   if (quoteToUsdRate > 0 && quoteToUsdRate !== 1) {
@@ -501,14 +505,10 @@ export function calculatePipValue(
 export function calculatePipsMoved(
   entryPrice: number,
   currentPrice: number,
-  symbol: ForexSymbol,
+  symbol: ForexSymbol | string,
+  symbolConfig?: SymbolPairConfig,
 ): number {
-  const pairConfig = FOREX_PAIRS[symbol];
-  if (!pairConfig) {
-    throw new Error(`Unknown forex pair: ${symbol}`);
-  }
-
-  const { pip } = pairConfig;
+  const { pip } = resolvePairConfig(symbol, symbolConfig);
   const priceChange = Math.abs(currentPrice - entryPrice);
   const pips = priceChange / pip;
 
@@ -608,8 +608,9 @@ export function calculatePotentialPnL(
   entryPrice: number,
   exitPrice: number,
   quantity: number,
-  symbol: ForexSymbol,
+  symbol: ForexSymbol | string,
   quoteToUsdRate: number = 1,
+  symbolConfig?: SymbolPairConfig,
 ): number {
   return calculateUnrealizedPnL(
     side,
@@ -618,6 +619,7 @@ export function calculatePotentialPnL(
     quantity,
     symbol,
     quoteToUsdRate,
+    symbolConfig,
   );
 }
 

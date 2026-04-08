@@ -20,6 +20,10 @@ import {
   getConversionPairSymbols,
 } from "@/lib/services/pnl-calculator.service";
 import {
+  getSymbolConfig,
+  getMultipleSymbolConfigs,
+} from "@/lib/services/symbol-config.service";
+import {
   getRealPrice,
   fetchRealForexPrices,
   isForexMarketOpen,
@@ -75,11 +79,14 @@ export const getUserPositions = async (competitionId: string) => {
         ? await fetchRealForexPrices(allFetchSymbols)
         : new Map();
 
+    const symConfigs = await getMultipleSymbolConfigs(uniqueSymbols);
+
     // Update P&L for each position with current REAL prices (instant - from batch)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const positionsWithCurrentPnL = positions.map((position: any) => {
       const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
       if (currentPrice) {
+        const symbolCfg = symConfigs.get(position.symbol)!;
         const marketPrice =
           position.side === "long" ? currentPrice.bid : currentPrice.ask;
         const rate = getQuoteToUsdRate(
@@ -93,6 +100,7 @@ export const getUserPositions = async (competitionId: string) => {
           position.quantity,
           position.symbol as ForexSymbol,
           rate,
+          symbolCfg,
         );
         const pnlPercentage = calculatePnLPercentage(pnl, position.marginUsed);
 
@@ -255,6 +263,8 @@ export const closePosition = async (
       throw new Error("Position not found or already closed");
     }
 
+    const symbolCfg = await getSymbolConfig(position.symbol);
+
     // Determine exit price - use locked price from frontend if provided and fresh
     let exitPrice: number;
     let currentPrice: {
@@ -332,8 +342,6 @@ export const closePosition = async (
     const entrySpread = position.entryPrice * 0.0001; // Approximate entry spread (we don't store it)
     const exitSpread = currentPrice.spread; // Current spread at exit
     const spreadCostInPips = (entrySpread + exitSpread) / 0.0001; // Total spread in pips
-    const spreadCostInUSD =
-      (entrySpread + exitSpread) * position.quantity * 100000; // Spread cost in USD
 
     // Fetch conversion prices for this position's symbol
     const posConvSyms = getConversionPairSymbols([
@@ -349,6 +357,10 @@ export const closePosition = async (
       posConvPrices,
     );
 
+    const spreadCostInUSD =
+      ((entrySpread + exitSpread) * position.quantity * symbolCfg.contractSize) /
+      (posRate > 0 ? posRate : 1);
+
     // Calculate final P&L
     const realizedPnl = calculateUnrealizedPnL(
       position.side,
@@ -357,6 +369,7 @@ export const closePosition = async (
       position.quantity,
       position.symbol as ForexSymbol,
       posRate,
+      symbolCfg,
     );
     const realizedPnlPercentage = calculatePnLPercentage(
       realizedPnl,
@@ -776,6 +789,8 @@ export const updateAllPositionsPnL = async (
     ] as ForexSymbol[];
     const pricesMap = await fetchRealForexPrices(updateAllSyms);
 
+    const symConfigsBatch = await getMultipleSymbolConfigs(uniqueSymbols);
+
     let totalUnrealizedPnl = 0;
 
     for (const position of positions) {
@@ -783,6 +798,7 @@ export const updateAllPositionsPnL = async (
       const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
       if (!currentPrice) continue;
 
+      const symbolCfg = symConfigsBatch.get(position.symbol)!;
       const marketPrice =
         position.side === "long" ? currentPrice.bid : currentPrice.ask;
       const rate = getQuoteToUsdRate(
@@ -796,6 +812,7 @@ export const updateAllPositionsPnL = async (
         position.quantity,
         position.symbol as ForexSymbol,
         rate,
+        symbolCfg,
       );
       const pnlPercentage = calculatePnLPercentage(pnl, position.marginUsed);
 
@@ -963,6 +980,8 @@ export async function closePositionAutomatic(
       return;
     }
 
+    const symbolCfg = await getSymbolConfig(position.symbol);
+
     // Fetch conversion prices for this position's symbol
     const autoConvSyms = getConversionPairSymbols([
       position.symbol as ForexSymbol,
@@ -984,6 +1003,7 @@ export async function closePositionAutomatic(
       position.quantity,
       position.symbol as ForexSymbol,
       autoRate,
+      symbolCfg,
     );
     const realizedPnlPercentage = calculatePnLPercentage(
       realizedPnl,
@@ -1288,6 +1308,8 @@ export const checkMarginCalls = async (competitionId: string) => {
         : new Map();
     console.log(`📊 Fetched ${pricesMap.size} prices for margin check`);
 
+    const symConfigsMargin = await getMultipleSymbolConfigs(allSymbols);
+
     // Group positions by participant for processing
     const positionsByParticipant = new Map<string, typeof allOpenPositions>();
     for (const position of allOpenPositions) {
@@ -1324,6 +1346,7 @@ export const checkMarginCalls = async (competitionId: string) => {
 
         const marketPrice =
           position.side === "long" ? currentPrice.bid : currentPrice.ask;
+        const symbolCfg = symConfigsMargin.get(position.symbol)!;
         const mcRate = getQuoteToUsdRate(
           position.symbol as ForexSymbol,
           pricesMap as Map<string, { bid: number; ask: number }>,
@@ -1335,6 +1358,7 @@ export const checkMarginCalls = async (competitionId: string) => {
           position.quantity,
           position.symbol as ForexSymbol,
           mcRate,
+          symbolCfg,
         );
 
         totalUnrealizedPnl += unrealizedPnl;

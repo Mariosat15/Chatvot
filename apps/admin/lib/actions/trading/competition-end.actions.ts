@@ -10,11 +10,13 @@ import {
   getRealPrice as _getRealPrice,
   fetchRealForexPrices,
 } from "@/lib/services/real-forex-prices.service";
-import type { ForexSymbol } from "@/lib/services/pnl-calculator.service";
 import {
+  type ForexSymbol,
+  calculateUnrealizedPnL,
   getQuoteToUsdRate,
   getConversionPairSymbols,
 } from "@/lib/services/pnl-calculator.service";
+import { getMultipleSymbolConfigs } from "@/lib/services/symbol-config.service";
 import mongoose from "mongoose";
 
 /**
@@ -95,6 +97,8 @@ export async function finalizeCompetition(competitionId: string) {
       : new Map();
     console.log(`Got ${pricesMap.size} prices in single batch`);
 
+    const symConfigs = await getMultipleSymbolConfigs(allPositionSymbols);
+
     // First, process already-closed positions
     // NOTE: TradingPosition doesn't have 'profitLoss' field - calculate from entry/exit prices
     for (const position of allPositions) {
@@ -102,19 +106,24 @@ export async function finalizeCompetition(competitionId: string) {
         const userId = position.userId.toString();
         const stats = participantStats.get(userId);
         if (stats) {
-          // Calculate P&L from entry/exit prices (currentPrice = exitPrice for closed positions)
-          // FOREX: contractSize = 100,000 units per standard lot
-          const priceDiff =
-            position.side === "long"
-              ? position.currentPrice - position.entryPrice
-              : position.entryPrice - position.currentPrice;
+          const exitPrice =
+            position.exitPrice ??
+            position.currentPrice ??
+            position.entryPrice;
           const ceRate = getQuoteToUsdRate(
             position.symbol as ForexSymbol,
             pricesMap as Map<string, { bid: number; ask: number }>,
           );
-          const positionPnL =
-            (priceDiff * position.quantity * 100000) /
-            (ceRate > 0 ? ceRate : 1);
+          const sc = symConfigs.get(position.symbol);
+          const positionPnL = calculateUnrealizedPnL(
+            position.side,
+            position.entryPrice,
+            exitPrice,
+            position.quantity,
+            position.symbol,
+            ceRate > 0 ? ceRate : 1,
+            sc ? { pip: sc.pip, contractSize: sc.contractSize } : undefined,
+          );
 
           stats.totalPnL += positionPnL;
           stats.currentCapital += positionPnL;
@@ -162,18 +171,24 @@ export async function finalizeCompetition(competitionId: string) {
           `  Closing ${position.symbol} ${position.side} for user ${position.userId} at ${exitPrice}`,
         );
 
-        // Calculate P&L for this position (FOREX: contractSize = 100,000 units per lot)
-        const priceDiff =
-          position.side === "long"
-            ? exitPrice - position.entryPrice
-            : position.entryPrice - exitPrice;
         const ceRate2 = getQuoteToUsdRate(
           position.symbol as ForexSymbol,
           pricesMap as Map<string, { bid: number; ask: number }>,
         );
-        const positionPnL =
-          (priceDiff * position.quantity * 100000) /
-          (ceRate2 > 0 ? ceRate2 : 1);
+        const sc2 = symConfigs.get(position.symbol);
+        const positionPnL = calculateUnrealizedPnL(
+          position.side,
+          position.entryPrice,
+          exitPrice,
+          position.quantity,
+          position.symbol,
+          ceRate2 > 0 ? ceRate2 : 1,
+          sc2 ? { pip: sc2.pip, contractSize: sc2.contractSize } : undefined,
+        );
+        const priceDiff =
+          position.side === "long"
+            ? exitPrice - position.entryPrice
+            : position.entryPrice - exitPrice;
 
         console.log(
           `    Entry: ${position.entryPrice}, Exit: ${exitPrice}, P&L: $${positionPnL.toFixed(2)}`,

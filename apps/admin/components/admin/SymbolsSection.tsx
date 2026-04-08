@@ -50,6 +50,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { DEFAULT_FOREX_PAIRS } from "@/database/models/trading/symbol-settings.model";
 
 interface TradingSymbol {
   _id: string;
@@ -399,6 +400,26 @@ export default function SymbolsSection() {
 
   const toggleCategory = (category: string) => {
     setExpandedCategories((prev) => ({ ...prev, [category]: !prev[category] }));
+  };
+
+  const resetToDefaults = () => {
+    if (!editSymbol) return;
+    const defaults = DEFAULT_FOREX_PAIRS[editSymbol.symbol];
+    if (!defaults) {
+      toast.error("No defaults available for this symbol");
+      return;
+    }
+    setEditForm((prev) => ({
+      ...prev,
+      pip: defaults.pip,
+      contractSize: defaults.contractSize,
+      minLotSize: defaults.minLotSize,
+      maxLotSize: defaults.maxLotSize,
+      lotStep: defaults.lotStep,
+      defaultSpread: defaults.defaultSpread,
+      commission: defaults.commission,
+    }));
+    toast.success("Default values loaded — click Save to apply");
   };
 
   const hasPendingChanges = Object.keys(pendingChanges).length > 0;
@@ -925,7 +946,17 @@ export default function SymbolsSection() {
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            {editSymbol && DEFAULT_FOREX_PAIRS[editSymbol.symbol] && (
+              <Button
+                variant="outline"
+                onClick={resetToDefaults}
+                className="border-blue-700 text-blue-400 hover:bg-blue-900/20 mr-auto"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Reset to Default
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setEditSymbol(null)}>
               Cancel
             </Button>

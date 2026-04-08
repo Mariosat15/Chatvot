@@ -8,12 +8,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { placeOrder } from "@/lib/actions/trading/order.actions";
 import {
-  FOREX_PAIRS,
-  ForexSymbol,
   calculateMarginRequired,
+  calculatePotentialPnL as calculatePotentialPnLUsd,
   getQuoteToUsdRate,
 } from "@/lib/services/pnl-calculator.service";
 import { usePrices } from "@/contexts/PriceProvider";
+import { useSymbolConfig } from "@/contexts/SymbolConfigContext";
 import { useChartSymbol } from "@/contexts/ChartSymbolContext";
 import { useRiskSettings } from "@/hooks/useRiskSettings";
 import { toast } from "sonner";
@@ -127,6 +127,8 @@ const OrderForm = ({
     usePrices();
   const { symbol, setSymbol: setChartSymbol } = useChartSymbol();
   const { settings: riskSettings } = useRiskSettings(10000); // Poll every 10 seconds
+  const { getConfig } = useSymbolConfig();
+  const symbolCfg = getConfig(symbol);
 
   // Form state
   const [orderType, setOrderType] = useState<"market" | "limit">("market");
@@ -194,7 +196,7 @@ const OrderForm = ({
         // In PIPS mode: calculate separate prices for buy and sell
         const pips = limitPricePips ? parseFloat(limitPricePips) : undefined;
         if (pips && !isNaN(pips)) {
-          const pip = FOREX_PAIRS[symbol].pip;
+          const pip = symbolCfg.pip;
           // BUY limit: below current ASK (subtract pips)
           buyLimitPrice = currentPrice.ask - pips * pip;
           // SELL limit: above current BID (add pips)
@@ -257,6 +259,7 @@ const OrderForm = ({
     limitPriceMode,
     side,
     symbol,
+    symbolCfg.pip,
     prices,
   ]);
 
@@ -269,7 +272,7 @@ const OrderForm = ({
     : 0;
 
   // TP/SL Helpers
-  const pipValue = FOREX_PAIRS[symbol].pip;
+  const pipValue = symbolCfg.pip;
 
   const calculateTPFromPips = (pips: number): number => {
     // Round to 5 decimal places to avoid floating point precision issues
@@ -353,6 +356,7 @@ const OrderForm = ({
           leverage,
           symbol,
           quoteRate,
+          symbolCfg,
         )
       : 0;
 
@@ -398,13 +402,15 @@ const OrderForm = ({
     const qty = parseFloat(quantity) || 0;
     if (!displayPrice || qty === 0) return { pnl: 0, percentage: 0 };
 
-    const contractSize = FOREX_PAIRS[symbol].contractSize;
-    const priceDiff =
-      side === "buy" ? targetPrice - displayPrice : displayPrice - targetPrice;
-    let pnl = priceDiff * contractSize * qty;
-    if (quoteRate > 0 && quoteRate !== 1) {
-      pnl /= quoteRate;
-    }
+    const pnl = calculatePotentialPnLUsd(
+      side === "buy" ? "long" : "short",
+      displayPrice,
+      targetPrice,
+      qty,
+      symbol,
+      quoteRate,
+      symbolCfg,
+    );
     const percentage = marginRequired > 0 ? (pnl / marginRequired) * 100 : 0;
 
     return { pnl, percentage };

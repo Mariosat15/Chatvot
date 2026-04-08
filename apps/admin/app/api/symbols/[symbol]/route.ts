@@ -65,10 +65,13 @@ export async function PUT(
       return NextResponse.json({ error: "Symbol not found" }, { status: 404 });
     }
 
-    // If enabled state changed, notify price health monitor to refresh
     if (isEnableChange) {
       await notifyPriceHealthMonitorRefresh();
     }
+
+    // Reason: Main app caches symbol configs in memory; notify it to clear
+    // so new pip/contractSize/lot values take effect immediately.
+    await notifySymbolConfigCacheRefresh();
 
     return NextResponse.json({
       success: true,
@@ -159,5 +162,21 @@ async function notifyPriceHealthMonitorRefresh(): Promise<void> {
     }
   } catch (error) {
     console.warn("⚠️ Could not notify price health monitor:", error);
+  }
+}
+
+async function notifySymbolConfigCacheRefresh(): Promise<void> {
+  try {
+    const mainAppUrl =
+      process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    await fetch(`${mainAppUrl}/api/internal/symbol-config-refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-internal-key": process.env.INTERNAL_API_KEY || "internal-key",
+      },
+    });
+  } catch {
+    // Non-critical — cache will expire naturally within 5 minutes
   }
 }

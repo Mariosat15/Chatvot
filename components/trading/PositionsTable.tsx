@@ -26,6 +26,7 @@ import {
   getQuoteToUsdRate,
 } from "@/lib/services/pnl-calculator.service";
 import { usePrices } from "@/contexts/PriceProvider";
+import { useSymbolConfig } from "@/contexts/SymbolConfigContext";
 import {
   usePositionSync,
   POSITION_EVENTS,
@@ -81,6 +82,7 @@ const PositionsTable = ({
 }: PositionsTableProps) => {
   const router = useRouter();
   const { prices, subscribe, unsubscribe, isStale, forceRefresh } = usePrices();
+  const { getConfig } = useSymbolConfig();
   const [closingPosition, setClosingPosition] = useState<string | null>(null);
   const [livePositions, setLivePositions] = useState<Position[]>(positions);
 
@@ -390,6 +392,7 @@ const PositionsTable = ({
         position.symbol as ForexSymbol,
         prices,
       );
+      const symbolCfg = getConfig(position.symbol);
       const pnl = calculateUnrealizedPnL(
         position.side,
         position.entryPrice,
@@ -397,6 +400,7 @@ const PositionsTable = ({
         position.quantity,
         position.symbol as ForexSymbol,
         ptRate,
+        symbolCfg,
       );
       const pnlPercentage = calculatePnLPercentage(pnl, position.marginUsed);
 
@@ -415,7 +419,7 @@ const PositionsTable = ({
         }),
       };
     });
-  }, [prices, livePositions]);
+  }, [prices, livePositions, getConfig]);
 
   const handleClosePosition = async (
     positionId: string,

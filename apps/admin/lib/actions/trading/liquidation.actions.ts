@@ -14,6 +14,7 @@ import {
   getQuoteToUsdRate,
   getConversionPairSymbols,
 } from "@/lib/services/pnl-calculator.service";
+import { getMultipleSymbolConfigs } from "@/lib/services/symbol-config.service";
 import { closePositionAutomatic } from "@/lib/actions/trading/position.actions";
 
 /**
@@ -104,6 +105,7 @@ export const executeLiquidation = async (
       ...new Set([...uniqueSymbols, ...convSyms]),
     ] as ForexSymbol[];
     const pricesMap = await fetchRealForexPrices(allFetchSymbols);
+    const symbolCfgMap = await getMultipleSymbolConfigs(uniqueSymbols);
 
     // SERVER-SIDE VALIDATION: Recalculate margin with fresh prices
     let totalUnrealizedPnl = 0;
@@ -117,6 +119,7 @@ export const executeLiquidation = async (
         position.symbol as ForexSymbol,
         pricesMap as Map<string, { bid: number; ask: number }>,
       );
+      const symbolCfg = symbolCfgMap.get(position.symbol)!;
       const unrealizedPnl = calculateUnrealizedPnL(
         position.side,
         position.entryPrice,
@@ -124,6 +127,7 @@ export const executeLiquidation = async (
         position.quantity,
         position.symbol as ForexSymbol,
         rate,
+        symbolCfg,
       );
 
       totalUnrealizedPnl += unrealizedPnl;
@@ -247,6 +251,7 @@ export const backupMarginCheck = async (
       ...new Set([...uniqueSymbols, ...backupConvSyms]),
     ] as ForexSymbol[];
     const pricesMap = await fetchRealForexPrices(backupAllSyms);
+    const symbolCfgMap2 = await getMultipleSymbolConfigs(uniqueSymbols);
 
     let totalUnrealizedPnl = 0;
     for (const position of openPositions) {
@@ -259,6 +264,7 @@ export const backupMarginCheck = async (
         position.symbol as ForexSymbol,
         pricesMap as Map<string, { bid: number; ask: number }>,
       );
+      const symbolCfg = symbolCfgMap2.get(position.symbol)!;
       totalUnrealizedPnl += calculateUnrealizedPnL(
         position.side,
         position.entryPrice,
@@ -266,6 +272,7 @@ export const backupMarginCheck = async (
         position.quantity,
         position.symbol as ForexSymbol,
         backupRate,
+        symbolCfg,
       );
     }
 

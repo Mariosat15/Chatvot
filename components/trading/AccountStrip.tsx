@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { usePrices } from "@/contexts/PriceProvider";
+import { useSymbolConfig } from "@/contexts/SymbolConfigContext";
 import {
   calculateUnrealizedPnL,
   getQuoteToUsdRate,
@@ -44,6 +45,7 @@ export function AccountStrip({
   className,
 }: AccountStripProps) {
   const { prices } = usePrices();
+  const { getConfig } = useSymbolConfig();
 
   // Calculate live P&L based on real-time prices
   const calculatedData = useMemo(() => {
@@ -63,6 +65,7 @@ export function AccountStrip({
       if (quote) {
         const marketPrice = pos.side === "long" ? quote.bid : quote.ask;
         const rate = getQuoteToUsdRate(pos.symbol as ForexSymbol, prices);
+        const symbolCfg = getConfig(pos.symbol);
         const pnl = calculateUnrealizedPnL(
           pos.side,
           pos.entryPrice,
@@ -70,6 +73,7 @@ export function AccountStrip({
           pos.quantity,
           pos.symbol as ForexSymbol,
           rate,
+          symbolCfg,
         );
         totalPnl += pnl;
       } else {
@@ -87,7 +91,7 @@ export function AccountStrip({
       freeMargin,
       marginLevel,
     };
-  }, [prices, positions, balance, usedMargin]);
+  }, [prices, positions, balance, usedMargin, getConfig]);
 
   // Use live data or fallback to initial
   const equity = positions.length > 0 ? calculatedData.equity : initialEquity;

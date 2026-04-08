@@ -3,10 +3,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { useChartSymbol } from "@/contexts/ChartSymbolContext";
 import { usePrices } from "@/contexts/PriceProvider";
-import {
-  ForexSymbol,
-  FOREX_PAIRS,
-} from "@/lib/services/pnl-calculator.service";
+import { useSymbolConfig } from "@/contexts/SymbolConfigContext";
+import { ForexSymbol } from "@/lib/services/pnl-calculator.service";
 import { placeOrder } from "@/lib/actions/trading/order.actions";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -65,6 +63,7 @@ export default function GameModeOrderForm({
 }: GameModeOrderFormProps) {
   const { symbol } = useChartSymbol();
   const { prices } = usePrices();
+  const { getConfig } = useSymbolConfig();
 
   const [lotSize, setLotSize] = useState(0.01);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -76,8 +75,8 @@ export default function GameModeOrderForm({
   const leverage = defaultLeverage;
 
   const currentPrice = prices.get(symbol);
-  const symbolInfo = FOREX_PAIRS[symbol as ForexSymbol];
-  const pipValue = symbolInfo?.pip || 0.0001;
+  const symbolCfg = getConfig(symbol);
+  const pipValue = symbolCfg.pip;
 
   // Use current equity or fallback to balance
   const equity = currentEquity ?? currentBalance;
@@ -93,9 +92,9 @@ export default function GameModeOrderForm({
   const marginRequired = useMemo(() => {
     if (!currentPrice) return 0;
     const notionalValue =
-      lotSize * (symbolInfo?.contractSize || 100000) * currentPrice.mid;
+      lotSize * symbolCfg.contractSize * currentPrice.mid;
     return notionalValue / leverage;
-  }, [lotSize, leverage, currentPrice, symbolInfo]);
+  }, [lotSize, leverage, currentPrice, symbolCfg.contractSize]);
 
   // Calculate CURRENT margin level
   const currentMarginLevel = useMemo(() => {

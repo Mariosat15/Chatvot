@@ -51,7 +51,6 @@ export async function GET(request: NextRequest) {
       .sort({ category: 1, sortOrder: 1 })
       .lean();
 
-    // Transform to format expected by frontend
     const formattedSymbols = symbols.map((sym) => ({
       symbol: sym.symbol as ForexSymbol,
       name: sym.name,
@@ -61,6 +60,7 @@ export async function GET(request: NextRequest) {
       category: sym.category,
       minLotSize: sym.minLotSize,
       maxLotSize: sym.maxLotSize,
+      lotStep: sym.lotStep,
       defaultSpread: sym.defaultSpread,
       popular: sym.popular,
       icon: sym.icon,
