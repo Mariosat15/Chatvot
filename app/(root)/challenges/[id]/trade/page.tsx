@@ -27,9 +27,11 @@ import { PositionEventsProvider } from "@/contexts/PositionEventsProvider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChallengeInfoHeader } from "@/components/trading/ChallengeInfoHeader";
 import ChallengeStatusMonitor from "@/components/trading/ChallengeStatusMonitor";
+import ParticipantStatusMonitor from "@/components/trading/ParticipantStatusMonitor";
 import TradingArsenalPanel from "@/components/trading/TradingArsenalPanel";
 import TradingPageContent from "@/components/trading/TradingPageContent";
-import { ArrowLeft, Swords } from "lucide-react";
+import { ArrowLeft, Swords, Skull, Ban } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -109,6 +111,11 @@ const ChallengeTradingPage = async ({
   const participant = JSON.parse(JSON.stringify(participantDoc));
   const opponent = opponentDoc ? JSON.parse(JSON.stringify(opponentDoc)) : null;
 
+  const isDisqualified =
+    participant.status === "liquidated" ||
+    participant.status === "disqualified";
+  const participantStatus = participant.status;
+
   // Fetch positions, trade history, pending orders, and risk settings in parallel
   const { getTradingRiskSettings } =
     await import("@/lib/actions/trading/risk-settings.actions");
@@ -178,6 +185,16 @@ const ChallengeTradingPage = async ({
                 />
               )}
 
+              {/* Disqualification / liquidation banner */}
+              {!isViewOnly && (
+                <ParticipantStatusMonitor
+                  competitionId={challengeId}
+                  initialParticipantStatus={participantStatus}
+                  userId={session.user.id}
+                  contestType="challenge"
+                />
+              )}
+
               <TradingPageContent
                 competition={{
                   _id: challengeId,
@@ -197,6 +214,7 @@ const ChallengeTradingPage = async ({
                 competitionId={challengeId}
                 defaultLeverage={defaultLeverage}
                 startingCapital={challenge.startingCapital || 10000}
+                isDisqualified={isDisqualified}
                 marginThresholds={marginThresholds}
               >
               <div className="min-h-screen bg-gradient-to-br from-dark-100 via-dark-100 to-dark-200">
@@ -257,6 +275,27 @@ const ChallengeTradingPage = async ({
                                   <span className="size-1.5 bg-orange-400 rounded-full" />
                                   Viewing Results
                                 </span>
+                              ) : isDisqualified ? (
+                                <span
+                                  className={cn(
+                                    "inline-flex items-center gap-1 text-xs font-medium ml-2",
+                                    participantStatus === "liquidated"
+                                      ? "text-red-400"
+                                      : "text-orange-400",
+                                  )}
+                                >
+                                  {participantStatus === "liquidated" ? (
+                                    <>
+                                      <Skull className="size-3.5" />
+                                      Liquidated - Trading Disabled
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Ban className="size-3.5" />
+                                      Disqualified - Trading Disabled
+                                    </>
+                                  )}
+                                </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 text-xs font-medium text-green-400 ml-2">
                                   <span className="size-1.5 bg-green-400 rounded-full animate-pulse" />
@@ -278,6 +317,10 @@ const ChallengeTradingPage = async ({
                                 <span className="inline-flex items-center gap-1 text-[11px] font-medium text-orange-400">
                                   <span className="size-1.5 bg-orange-400 rounded-full" />
                                   Results
+                                </span>
+                              ) : isDisqualified ? (
+                                <span className={cn("inline-flex items-center gap-1 text-[11px] font-medium", participantStatus === "liquidated" ? "text-red-400" : "text-orange-400")}>
+                                  {participantStatus === "liquidated" ? "Liquidated" : "Disqualified"}
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-400">
@@ -582,6 +625,110 @@ const ChallengeTradingPage = async ({
                             </div>
                           </div>
                         </div>
+                      ) : isDisqualified ? (
+                        /* Disqualified / Liquidated Mode */
+                        <div className="bg-gradient-to-br from-red-500/10 to-dark-300/50 rounded-2xl p-4 md:p-6 border border-red-500/30 shadow-2xl lg:sticky lg:top-6 backdrop-blur-sm">
+                          <div className="flex items-center justify-between mb-5">
+                            <h2 className="text-lg md:text-xl font-bold text-light-900 tracking-tight flex items-center gap-2">
+                              {participantStatus === "liquidated" ? (
+                                <>
+                                  <Skull className="size-6 text-red-400" />
+                                  Account Liquidated
+                                </>
+                              ) : (
+                                <>
+                                  <Ban className="size-6 text-orange-400" />
+                                  Disqualified
+                                </>
+                              )}
+                            </h2>
+                            <span
+                              className={cn(
+                                "px-2 py-1 text-xs font-bold rounded",
+                                participantStatus === "liquidated"
+                                  ? "bg-red-500/20 text-red-400"
+                                  : "bg-orange-500/20 text-orange-400",
+                              )}
+                            >
+                              {participantStatus === "liquidated"
+                                ? "LIQUIDATED"
+                                : "DISQUALIFIED"}
+                            </span>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div
+                              className={cn(
+                                "p-4 rounded-xl border",
+                                participantStatus === "liquidated"
+                                  ? "bg-red-500/10 border-red-500/30"
+                                  : "bg-orange-500/10 border-orange-500/30",
+                              )}
+                            >
+                              <p
+                                className={cn(
+                                  "text-sm font-medium mb-2",
+                                  participantStatus === "liquidated"
+                                    ? "text-red-300"
+                                    : "text-orange-300",
+                                )}
+                              >
+                                {participantStatus === "liquidated"
+                                  ? "💀 Your account was liquidated due to margin call."
+                                  : "🚫 You have been disqualified from this challenge."}
+                              </p>
+                              <p className="text-xs text-gray-400">
+                                You are no longer eligible for prizes in this
+                                challenge. You can still view your trade history.
+                              </p>
+                            </div>
+
+                            <div className="p-4 bg-dark-300/50 rounded-xl border border-dark-400/30">
+                              <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                                Final Capital
+                              </p>
+                              <p className="text-2xl font-bold text-gray-100">
+                                ${participant.currentCapital.toLocaleString()}
+                              </p>
+                            </div>
+
+                            <div className="p-4 bg-dark-300/50 rounded-xl border border-dark-400/30">
+                              <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                                Total P&L
+                              </p>
+                              <p
+                                className={`text-2xl font-bold ${participant.pnl >= 0 ? "text-green-500" : "text-red-500"}`}
+                              >
+                                {participant.pnl >= 0 ? "+" : ""}$
+                                {participant.pnl?.toFixed(2) || "0.00"}
+                              </p>
+                            </div>
+
+                            <div className="p-4 bg-dark-300/50 rounded-xl border border-dark-400/30">
+                              <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                                Total Trades
+                              </p>
+                              <p className="text-2xl font-bold text-blue-400">
+                                {tradeHistory.length}
+                              </p>
+                            </div>
+
+                            <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
+                              <p className="text-sm text-red-300 text-center mb-3">
+                                Trading is disabled — You are disqualified
+                              </p>
+                              <Link
+                                href={`/challenges/${challengeId}`}
+                                className="block"
+                              >
+                                <Button className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold gap-2">
+                                  <Swords className="size-4" />
+                                  Back to Challenge
+                                </Button>
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
                       ) : (
                         /* Active Challenge - Show Trading Interface */
                         <div className="space-y-4 lg:sticky lg:top-6">
@@ -613,6 +760,12 @@ const ChallengeTradingPage = async ({
                               currentBalance={participant.currentCapital}
                               marginThresholds={marginThresholds}
                               contestType="challenge"
+                              disabled={isDisqualified}
+                              disabledReason={
+                                participantStatus === "liquidated"
+                                  ? "Your account was liquidated"
+                                  : "You have been disqualified"
+                              }
                             />
                           </div>
                         </div>

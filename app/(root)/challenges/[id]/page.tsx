@@ -474,6 +474,18 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
                     )}
                   </div>
                 </div>
+
+                {/* View Trade History button */}
+                {(isChallenger || isChallenged) && (
+                  <div className="mt-4 flex justify-center">
+                    <Link href={`/challenges/${id}/trade?viewOnly=true`}>
+                      <Button variant="outline" className="gap-2 border-orange-500/30 hover:bg-orange-500/10 text-orange-400">
+                        <TrendingUp className="h-4 w-4" />
+                        Review Charts & Trades
+                      </Button>
+                    </Link>
+                  </div>
+                )}
               </div>
             )}
 

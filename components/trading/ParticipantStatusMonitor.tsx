@@ -13,20 +13,19 @@ interface ParticipantStatusMonitorProps {
 }
 
 /**
- * Displays a banner when the user is disqualified/liquidated
+ * Displays a banner when the user is disqualified/liquidated.
+ * Works for both competitions and challenges via the contestType prop.
  *
  * NOTE: This component does NOT poll the server for status changes.
  * Instead, it relies on:
  * 1. Server-rendered initial status (page refresh shows correct state)
  * 2. Trading buttons being disabled server-side when disqualified
  * 3. Notification service sending alerts when liquidation happens
- *
- * This approach avoids heavy server load from thousands of users polling.
- * If real-time updates are needed in the future, consider WebSockets or SSE.
  */
 export default function ParticipantStatusMonitor({
   competitionId,
   initialParticipantStatus,
+  contestType = "competition",
 }: ParticipantStatusMonitorProps) {
   const [isDismissed, setIsDismissed] = useState(false);
 
@@ -35,13 +34,14 @@ export default function ParticipantStatusMonitor({
     initialParticipantStatus === "liquidated" ||
     initialParticipantStatus === "disqualified";
 
+  const contestLabel = contestType === "challenge" ? "challenge" : "competition";
+
   const getDisqualificationInfo = () => {
     switch (initialParticipantStatus) {
       case "liquidated":
         return {
           title: "💀 Account Liquidated",
-          message:
-            "Your account was liquidated due to margin call. You are no longer eligible for prizes in this competition.",
+          message: `Your account was liquidated due to margin call. You are no longer eligible for prizes in this ${contestLabel}.`,
           icon: Skull,
           bgClass: "from-red-600/30 via-red-500/20 to-orange-600/30",
           borderClass: "border-red-500/50",
@@ -50,8 +50,7 @@ export default function ParticipantStatusMonitor({
       case "disqualified":
         return {
           title: "🚫 Disqualified",
-          message:
-            "You have been disqualified from this competition and are no longer eligible for prizes.",
+          message: `You have been disqualified from this ${contestLabel} and are no longer eligible for prizes.`,
           icon: Ban,
           bgClass: "from-orange-600/30 via-red-500/20 to-red-600/30",
           borderClass: "border-orange-500/50",
@@ -96,7 +95,7 @@ export default function ParticipantStatusMonitor({
           </div>
 
           <div className="flex items-center gap-3">
-            <Link href={`/competitions/${competitionId}/trade?viewOnly=true`}>
+            <Link href={`/${contestType === "challenge" ? "challenges" : "competitions"}/${competitionId}/trade?viewOnly=true`}>
               <Button
                 variant="outline"
                 size="sm"
