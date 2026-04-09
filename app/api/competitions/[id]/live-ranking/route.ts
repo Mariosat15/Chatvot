@@ -40,6 +40,8 @@ export async function GET(
         ),
         userRank: userRanking?.rank || null,
         userEquity: userRanking?.liveEquity || null,
+        isLastManStanding: cached.data.isLastManStanding || false,
+        lastManUserId: cached.data.lastManUserId || null,
       });
     }
 
@@ -260,6 +262,23 @@ export async function GET(
       };
     });
 
+    // Reason: Detect "last man standing" — exactly 1 active participant
+    // while all others are liquidated/disqualified. The remaining player
+    // gets a popup offering to claim victory early or continue trading.
+    const activeParticipants = rankings.filter(
+      (r) => r.status === "active" && !r.isDisqualified,
+    );
+    const eliminatedParticipants = rankings.filter(
+      (r) => r.status === "liquidated" || r.status === "disqualified" || r.isDisqualified,
+    );
+    const isLastManStanding =
+      activeParticipants.length === 1 &&
+      eliminatedParticipants.length >= 1 &&
+      rankings.length > 1;
+    const lastManUserId = isLastManStanding
+      ? activeParticipants[0].userId
+      : null;
+
     // Store full rankings in shared cache for all users to share
     const cachePayload = {
       allRankings: rankingsWithPrizes,
@@ -267,6 +286,8 @@ export async function GET(
       prizePool: netPool,
       firstPlaceValue,
       rankingMethod,
+      isLastManStanding,
+      lastManUserId,
     };
     setRankingCache(competitionId, cachePayload);
 
@@ -285,6 +306,8 @@ export async function GET(
       prizePool: netPool,
       firstPlaceValue,
       rankingMethod,
+      isLastManStanding,
+      lastManUserId,
     }, {
       headers: {
         "Cache-Control": "private, no-store",

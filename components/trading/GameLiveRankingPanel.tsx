@@ -63,13 +63,21 @@ export default function GameLiveRankingPanel({
       setPrizePool(data.prizePool || 0);
       setRankingMethod(data.rankingMethod || "pnl");
       setError(null);
+
+      if (data.isLastManStanding && data.lastManUserId === userId) {
+        window.dispatchEvent(
+          new CustomEvent("lastManStanding", {
+            detail: { competitionId, prizePool: data.prizePool || 0 },
+          }),
+        );
+      }
     } catch (err) {
       console.error("Error fetching rankings:", err);
       setError("Failed to load");
     } finally {
       setLoading(false);
     }
-  }, [competitionId]);
+  }, [competitionId, userId]);
 
   useEffect(() => {
     fetchRankings();

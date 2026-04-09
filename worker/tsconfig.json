@@ -4,7 +4,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "outDir": "../dist/worker",
-    "rootDir": ".",
+    "rootDir": "..",
     "baseUrl": "..",
     "paths": {
       "@/*": ["./*"]
@@ -18,7 +18,9 @@
     "forceConsistentCasingInFileNames": true
   },
   "include": [
-    "./**/*.ts"
+    "./**/*.ts",
+    "../lib/**/*.ts",
+    "../database/**/*.ts"
   ],
   "exclude": [
     "node_modules",

@@ -29,6 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CompetitionInfoHeader } from "@/components/trading/CompetitionInfoHeader";
 import CompetitionStatusMonitor from "@/components/trading/CompetitionStatusMonitor";
 import ParticipantStatusMonitor from "@/components/trading/ParticipantStatusMonitor";
+import LastManStandingListener from "@/components/trading/LastManStandingListener";
 import TradingArsenalPanel from "@/components/trading/TradingArsenalPanel";
 import TradingPageContent from "@/components/trading/TradingPageContent";
 import { ArrowLeft } from "lucide-react";
@@ -167,6 +168,11 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
                   initialParticipantStatus={participantStatus}
                   userId={session.user.id}
                 />
+              )}
+
+              {/* Last Man Standing popup — shown when all other players are eliminated */}
+              {!isViewOnly && (
+                <LastManStandingListener competitionId={competitionId} />
               )}
 
               <TradingPageContent

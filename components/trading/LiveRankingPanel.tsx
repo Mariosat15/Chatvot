@@ -64,13 +64,23 @@ export default function LiveRankingPanel({
       setPrizePool(data.prizePool || 0);
       setRankingMethod(data.rankingMethod || "pnl");
       setError(null);
+
+      // Reason: Fire a custom event when the API detects "last man standing"
+      // and the current user is that player, so the trade page can show a popup.
+      if (data.isLastManStanding && data.lastManUserId === userId) {
+        window.dispatchEvent(
+          new CustomEvent("lastManStanding", {
+            detail: { competitionId, prizePool: data.prizePool || 0 },
+          }),
+        );
+      }
     } catch (err) {
       console.error("Error fetching live rankings:", err);
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
       setLoading(false);
     }
-  }, [competitionId]);
+  }, [competitionId, userId]);
 
   // Initial fetch and polling
   useEffect(() => {
