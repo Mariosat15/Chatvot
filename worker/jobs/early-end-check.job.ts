@@ -390,6 +390,30 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
           continue;
         }
 
+        // Resolve winner/loser participant objects for final stats
+        const winnerParticipant = winnerId === challenger.userId.toString() ? challenger : opponent;
+        const loserParticipant = winnerId === challenger.userId.toString() ? opponent : challenger;
+
+        // Build final stats (same structure as challenge-finalize.actions.ts)
+        const challengerFinalStats = {
+          finalCapital: challenger.currentCapital || 0,
+          pnl: challenger.pnl || 0,
+          pnlPercentage: challenger.pnlPercentage || 0,
+          totalTrades: challenger.totalTrades || 0,
+          winRate: challenger.winRate || 0,
+          isDisqualified: challenger.status === "disqualified" || (disqualifyOnLiquidation && challenger.status === "liquidated"),
+          disqualificationReason: challenger.status === "liquidated" ? "Account liquidated" : challenger.status === "disqualified" ? "Disqualified by admin" : undefined,
+        };
+        const challengedFinalStats = {
+          finalCapital: opponent.currentCapital || 0,
+          pnl: opponent.pnl || 0,
+          pnlPercentage: opponent.pnlPercentage || 0,
+          totalTrades: opponent.totalTrades || 0,
+          winRate: opponent.winRate || 0,
+          isDisqualified: opponent.status === "disqualified" || (disqualifyOnLiquidation && opponent.status === "liquidated"),
+          disqualificationReason: opponent.status === "liquidated" ? "Account liquidated" : opponent.status === "disqualified" ? "Disqualified by admin" : undefined,
+        };
+
         // End the challenge early
         if (noWinner) {
           // Both disqualified - prize pool goes to platform (NO refund)
@@ -402,7 +426,7 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
             await platformTransactionsCollection.insertOne({
               transactionType: "unclaimed_pool",
               amount: prizePool,
-              amountEUR: prizePool, // Simplified - in production use conversion rate
+              amountEUR: prizePool,
               sourceType: "challenge",
               sourceId: challenge._id.toString(),
               sourceName: `${challenge.challengerName || "Challenger"} vs ${challenge.challengedName || "Opponent"}`,
@@ -427,6 +451,8 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
                 completedAt: now,
                 earlyEndReason: endReason,
                 noWinner: true,
+                challengerFinalStats,
+                challengedFinalStats,
               },
             },
           );
@@ -436,26 +462,37 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
           const walletsCollection = db.collection("creditwallets");
 
           await walletsCollection.updateOne(
-            { userId: winnerId }, // userId is stored as string in schema
+            { userId: winnerId },
             { $inc: { creditBalance: prizePool } },
           );
 
-          // Determine loser
           const loserId = winnerId === challenger.userId.toString()
             ? opponent.userId.toString()
             : challenger.userId.toString();
+          const winnerName = winnerParticipant.username || "Winner";
+          const loserName = loserParticipant.username || "Loser";
+          const winnerPnL = (winnerParticipant.pnl || 0);
+          const loserPnL = (loserParticipant.pnl || 0);
 
-          // Update challenge
+          // Reason: winnerId must be stored as String, not ObjectId,
+          // to match the schema and allow string equality comparison
+          // in the challenge details page (challenge.winnerId === session.user.id).
           await challengesCollection.updateOne(
             { _id: challenge._id },
             {
               $set: {
                 status: "completed",
                 completedAt: now,
-                winnerId: new mongoose.Types.ObjectId(winnerId),
-                winnerRole: winnerRole,
+                winnerId,
+                winnerRole,
+                winnerName,
+                winnerPnL,
                 loserId,
+                loserName,
+                loserPnL,
                 earlyEndReason: endReason,
+                challengerFinalStats,
+                challengedFinalStats,
               },
             },
           );
@@ -466,7 +503,7 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
             { $set: { isWinner: true } },
           );
 
-          console.log(`      💰 Awarded ${prizePool} credits to winner`);
+          console.log(`      💰 Awarded ${prizePool} credits to winner (${winnerName})`);
 
           // Send notifications
           try {
@@ -478,6 +515,14 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
               metadata: {
                 challengeId: challenge._id.toString(),
                 prize: prizePool,
+              },
+            });
+            await sendNotification({
+              userId: loserId,
+              type: "challenge_lost",
+              metadata: {
+                challengeId: challenge._id.toString(),
+                opponentName: winnerName,
               },
             });
           } catch {
@@ -745,6 +790,26 @@ export async function runEarlyEndCheckForTest(
 
         const prizePool = (challenge.entryFee || 0) * 2;
 
+        // Build final stats for test challenges too
+        const testChallengerStats = {
+          finalCapital: challenger.currentCapital || 0,
+          pnl: challenger.pnl || 0,
+          pnlPercentage: challenger.pnlPercentage || 0,
+          totalTrades: challenger.totalTrades || 0,
+          winRate: challenger.winRate || 0,
+          isDisqualified: challenger.status === "disqualified" || (disqualifyOnLiquidation && challenger.status === "liquidated"),
+          disqualificationReason: challenger.status === "liquidated" ? "Account liquidated" : challenger.status === "disqualified" ? "Disqualified" : undefined,
+        };
+        const testChallengedStats = {
+          finalCapital: opponent.currentCapital || 0,
+          pnl: opponent.pnl || 0,
+          pnlPercentage: opponent.pnlPercentage || 0,
+          totalTrades: opponent.totalTrades || 0,
+          winRate: opponent.winRate || 0,
+          isDisqualified: opponent.status === "disqualified" || (disqualifyOnLiquidation && opponent.status === "liquidated"),
+          disqualificationReason: opponent.status === "liquidated" ? "Account liquidated" : opponent.status === "disqualified" ? "Disqualified" : undefined,
+        };
+
         if (noWinner) {
           if (prizePool > 0) {
             const platformTransactionsCollection = db.collection(
@@ -762,7 +827,7 @@ export async function runEarlyEndCheckForTest(
               winnersCount: 0,
               expectedWinnersCount: 1,
               description: `Both players disqualified - pool goes to platform`,
-              testRunId, // Mark for cleanup
+              testRunId,
               createdAt: now,
               updatedAt: now,
             });
@@ -775,30 +840,40 @@ export async function runEarlyEndCheckForTest(
                 status: "completed",
                 completedAt: now,
                 noWinner: true,
+                challengerFinalStats: testChallengerStats,
+                challengedFinalStats: testChallengedStats,
               },
             },
           );
         } else if (winnerId && winnerRole) {
           const walletsCollection = db.collection("creditwallets");
           await walletsCollection.updateOne(
-            { userId: winnerId }, // userId is stored as string in schema
+            { userId: winnerId },
             { $inc: { creditBalance: prizePool } },
           );
 
-          // Determine loser
           const testLoserId = winnerId === challenger.userId.toString()
             ? opponent.userId.toString()
             : challenger.userId.toString();
+          const winnerP = winnerId === challenger.userId.toString() ? challenger : opponent;
+          const loserP = winnerId === challenger.userId.toString() ? opponent : challenger;
 
+          // Reason: winnerId stored as String to match schema and UI comparison
           await challengesCollection.updateOne(
             { _id: challenge._id },
             {
               $set: {
                 status: "completed",
                 completedAt: now,
-                winnerId: new mongoose.Types.ObjectId(winnerId),
+                winnerId,
                 winnerRole,
+                winnerName: winnerP.username || "Winner",
+                winnerPnL: winnerP.pnl || 0,
                 loserId: testLoserId,
+                loserName: loserP.username || "Loser",
+                loserPnL: loserP.pnl || 0,
+                challengerFinalStats: testChallengerStats,
+                challengedFinalStats: testChallengedStats,
               },
             },
           );
