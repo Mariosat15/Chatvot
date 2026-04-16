@@ -5521,9 +5521,23 @@ const LightweightTradingChart = ({
         const buildCalc = (tc: OHLCCandle[]) => {
           const p = _indParams;
           const calc: Record<string, () => {time:any,value:number}[]> = {
-            rsi:()=>calculateRSI(tc,p.period||14), williams_r:()=>calculateWilliamsR(tc,p.period||14), cci:()=>calculateCCI(tc,p.period||20),
+            rsi:()=>calculateRSI(tc,p.period||14), williams_r:()=>calculateWilliamsR(tc,p.period||14), williamsR:()=>calculateWilliamsR(tc,p.period||14), cci:()=>calculateCCI(tc,p.period||20),
             mfi:()=>calculateMFI(tc,p.period||14), momentum:()=>calculateMomentum(tc,p.period||10), roc:()=>calculateROC(tc,p.period||12),
             atr:()=>calculateATR(tc,p.period||14), cmf:()=>calculateCMF(tc,p.period||20), obv:()=>calculateOBV(tc), adx:()=>calculateADX(tc,p.period||14),
+            // Batch 2 simple-line oscillators
+            std_dev:()=>calculateStdDev(tc,p.period||20), hist_volatility:()=>calculateHistVolatility(tc,p.period||20),
+            mass_index:()=>calculateMassIndex(tc,p.emaPeriod||9,p.sumPeriod||25), ulcer_index:()=>calculateUlcerIndex(tc,p.period||14),
+            rvi:()=>calculateRVI(tc,p.period||10), nvi:()=>calculateNVI(tc), pvi:()=>calculatePVI(tc), ad_line:()=>calculateADLine(tc),
+            // Batch 2 zero-line oscillators
+            trix:()=>calculateTRIX(tc,p.period||15), dpo:()=>calculateDPO(tc,p.period||20),
+            kst:()=>calculateKST(tc), coppock:()=>calculateCoppock(tc,p.wmaPeriod||10,p.longROC||14,p.shortROC||11),
+            chaikin_volatility:()=>calculateChaikinVolatility(tc,p.emaPeriod||10,p.rocPeriod||10),
+            force_index:()=>calculateForceIndex(tc,p.period||13), eom:()=>calculateEOM(tc,p.period||14),
+            awesome_osc:()=>calculateAwesomeOscillator(tc), fisher:()=>calculateFisherTransform(tc,p.period||9),
+            tsi:()=>calculateTSI(tc,p.longPeriod||25,p.shortPeriod||13),
+            connors_rsi:()=>calculateConnorsRSI(tc,p.rsiPeriod||3,p.streakPeriod||2,p.rocPeriod||100),
+            ultimate_osc:()=>calculateUltimateOscillator(tc,p.period1||7,p.period2||14,p.period3||28),
+            // Premium bounded oscillators
             trend_pulse:()=>calculateTrendPulse(tc,p.adxPeriod||14,p.rsiPeriod||14), market_regime:()=>calculateMarketRegime(tc,p.period||20),
             trend_composite:()=>calculateTrendComposite(tc,p.period||14), composite_breadth:()=>calculateCompositeBreadth(tc),
             reversal_signal:()=>calculateReversalSignal(tc,p.rsiPeriod||14), breakout_prob:()=>calculateBreakoutProb(tc,p.bbPeriod||20,p.keltPeriod||20),
@@ -5576,16 +5590,46 @@ const LightweightTradingChart = ({
                   if (_seriesRefs[1]) _seriesRefs[1].update({ time: last.time as UTCTimestamp, value: last.macd });
                   if (_seriesRefs[2]) _seriesRefs[2].update({ time: last.time as UTCTimestamp, value: last.histogram, color: last.histogram >= 0 ? "rgba(38,166,154,0.6)" : "rgba(239,83,80,0.6)" } as any);
                 }
-              } else if (_indType === "stochastic") {
+              } else if (_indType === "stochastic" || _indType === "stoch") {
                 const d = calculateStochastic(tc, p.kPeriod||14, p.dPeriod||3);
                 if (_seriesRefs[0]) uLast(_seriesRefs[0], d.k);
                 if (_seriesRefs[1]) uLast(_seriesRefs[1], d.d);
-              } else if (_indType === "stoch_rsi") {
+              } else if (_indType === "stoch_rsi" || _indType === "stochrsi") {
                 const d = calculateStochRSI(tc, p.rsiPeriod||14, p.stochPeriod||14, p.kSmooth||3, p.dSmooth||3);
                 if (d.length > 0) {
                   const last = d[d.length - 1] as any;
                   if (_seriesRefs[0]) _seriesRefs[0].update({ time: last.time as UTCTimestamp, value: last.k });
                   if (_seriesRefs[1]) _seriesRefs[1].update({ time: last.time as UTCTimestamp, value: last.d });
+                }
+              } else if (_indType === "aroon") {
+                const d = calculateAroon(tc, p.period||25);
+                if (d.length > 0) {
+                  const last = d[d.length - 1];
+                  if (_seriesRefs[0]) _seriesRefs[0].update({ time: last.time as UTCTimestamp, value: last.up });
+                  if (_seriesRefs[1]) _seriesRefs[1].update({ time: last.time as UTCTimestamp, value: last.down });
+                }
+              } else if (_indType === "vortex") {
+                const d = calculateVortex(tc, p.period||14);
+                if (d.length > 0) {
+                  const last = d[d.length - 1];
+                  if (_seriesRefs[0]) _seriesRefs[0].update({ time: last.time as UTCTimestamp, value: last.plus });
+                  if (_seriesRefs[1]) _seriesRefs[1].update({ time: last.time as UTCTimestamp, value: last.minus });
+                }
+              } else if (_indType === "elder_ray") {
+                const d = calculateElderRay(tc, p.period||13);
+                if (d.length > 0) {
+                  const last = d[d.length - 1];
+                  if (_seriesRefs[0]) _seriesRefs[0].update({ time: last.time as UTCTimestamp, value: last.bull });
+                  if (_seriesRefs[1]) _seriesRefs[1].update({ time: last.time as UTCTimestamp, value: last.bear });
+                }
+              } else if (_indType === "ppo" || _indType === "smi_ergodic") {
+                const d = _indType === "ppo"
+                  ? calculatePPO(tc, p.fast||12, p.slow||26, p.signal||9)
+                  : calculateSMIErgodic(tc, p.shortPeriod||5, p.longPeriod||20, p.signalPeriod||5);
+                if (d.length > 0) {
+                  const last = d[d.length - 1];
+                  if (_seriesRefs[0]) _seriesRefs[0].update({ time: last.time as UTCTimestamp, value: last.macd });
+                  if (_seriesRefs[1]) _seriesRefs[1].update({ time: last.time as UTCTimestamp, value: last.signal });
                 }
               } else {
                 const calc = buildCalc(tc);
@@ -5607,14 +5651,32 @@ const LightweightTradingChart = ({
                 if (_seriesRefs[0]) _seriesRefs[0].setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.signal })));
                 if (_seriesRefs[1]) _seriesRefs[1].setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.macd })));
                 if (_seriesRefs[2]) _seriesRefs[2].setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.histogram, color: v.histogram >= 0 ? "rgba(38,166,154,0.6)" : "rgba(239,83,80,0.6)" } as any)));
-              } else if (_indType === "stochastic") {
+              } else if (_indType === "stochastic" || _indType === "stoch") {
                 const d = calculateStochastic(tc, p.kPeriod||14, p.dPeriod||3);
                 if (_seriesRefs[0]) _seriesRefs[0].setData(toTS(d.k));
                 if (_seriesRefs[1]) _seriesRefs[1].setData(toTS(d.d));
-              } else if (_indType === "stoch_rsi") {
+              } else if (_indType === "stoch_rsi" || _indType === "stochrsi") {
                 const d = calculateStochRSI(tc, p.rsiPeriod||14, p.stochPeriod||14, p.kSmooth||3, p.dSmooth||3);
                 if (_seriesRefs[0]) _seriesRefs[0].setData(d.map((v: any) => ({ time: v.time as UTCTimestamp, value: v.k })));
                 if (_seriesRefs[1]) _seriesRefs[1].setData(d.map((v: any) => ({ time: v.time as UTCTimestamp, value: v.d })));
+              } else if (_indType === "aroon") {
+                const d = calculateAroon(tc, p.period||25);
+                if (_seriesRefs[0]) _seriesRefs[0].setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.up })));
+                if (_seriesRefs[1]) _seriesRefs[1].setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.down })));
+              } else if (_indType === "vortex") {
+                const d = calculateVortex(tc, p.period||14);
+                if (_seriesRefs[0]) _seriesRefs[0].setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.plus })));
+                if (_seriesRefs[1]) _seriesRefs[1].setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.minus })));
+              } else if (_indType === "elder_ray") {
+                const d = calculateElderRay(tc, p.period||13);
+                if (_seriesRefs[0]) _seriesRefs[0].setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.bull })));
+                if (_seriesRefs[1]) _seriesRefs[1].setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.bear })));
+              } else if (_indType === "ppo" || _indType === "smi_ergodic") {
+                const d = _indType === "ppo"
+                  ? calculatePPO(tc, p.fast||12, p.slow||26, p.signal||9)
+                  : calculateSMIErgodic(tc, p.shortPeriod||5, p.longPeriod||20, p.signalPeriod||5);
+                if (_seriesRefs[0]) _seriesRefs[0].setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.macd })));
+                if (_seriesRefs[1]) _seriesRefs[1].setData(d.map(v => ({ time: v.time as UTCTimestamp, value: v.signal })));
               } else {
                 const calc = buildCalc(tc);
                 const fn = calc[_indType];
@@ -5834,9 +5896,10 @@ const LightweightTradingChart = ({
     generateSignals();
 
     // Set up interval for live updates
+    // Reason: Primary signal regen is event-driven (new candle period), this is a safety fallback
     const intervalId = setInterval(() => {
       setSignalUpdateTrigger((prev) => prev + 1);
-    }, 5000); // Update signals every 5 seconds
+    }, 15000);
 
     return () => clearInterval(intervalId);
   }, [
@@ -6760,10 +6823,11 @@ const LightweightTradingChart = ({
       // New candle period -> full refresh (accurate setData); forming update -> light refresh (fast series.update)
       const now = Date.now();
       if (isNewPeriod) {
-        // Always do a full refresh immediately when a new candle period starts
         lastOscRefreshRef.current = now;
         try { refreshOscillatorsFnRef.current?.("full"); } catch {}
         try { refreshOverlaysFnRef.current?.("full"); } catch {}
+        // Reason: Regenerate strategy signals on new candle period for timely marker updates
+        setSignalUpdateTrigger((prev) => prev + 1);
       } else if (now - lastOscRefreshRef.current > 250) {
         // Light refresh for forming candle updates (tail-slice + series.update, preserves zoom)
         lastOscRefreshRef.current = now;

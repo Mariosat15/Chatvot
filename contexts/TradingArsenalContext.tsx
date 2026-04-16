@@ -22,7 +22,7 @@ export type IndicatorType =
   | "supertrend" | "aroon" | "vortex" | "trix" | "dpo" | "kst" | "coppock" | "elder_ray"
   | "std_dev" | "hist_volatility" | "chaikin_volatility" | "mass_index" | "ulcer_index" | "rvi"
   | "vwap" | "vwma" | "ad_line" | "force_index" | "eom" | "nvi" | "pvi"
-  | "sar" | "pivots" | "support_resistance"
+  | "sar" | "pivot" | "support_resistance"
   // Premium Marketplace-Only
   | "trend_pulse" | "market_regime" | "trend_composite" | "composite_breadth"
   | "reversal_signal" | "predictive_range" | "breakout_prob" | "sentiment_osc"
@@ -300,8 +300,8 @@ const INDICATOR_TYPE_MAP: Record<
   "volume weighted": { type: "vwap", displayType: "overlay" },
   "parabolic sar": { type: "sar", displayType: "overlay" },
   sar: { type: "sar", displayType: "overlay" },
-  "pivot points": { type: "pivots", displayType: "overlay" },
-  pivots: { type: "pivots", displayType: "overlay" },
+  "pivot points": { type: "pivot", displayType: "overlay" },
+  pivots: { type: "pivot", displayType: "overlay" },
 
   // Support/Resistance
   support: { type: "support_resistance", displayType: "overlay" },
@@ -638,7 +638,7 @@ export function marketplaceItemToIndicator(
       break;
     case "vwap":
     case "obv":
-    case "pivots":
+    case "pivot":
     case "ad_line":
     case "nvi":
     case "pvi":
