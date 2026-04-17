@@ -128,7 +128,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isGameMaster, setIsGameMaster] = useState(false);
   const [arenaEnabled, setArenaEnabled] = useState(true);
-  const [userLevel, setUserLevel] = useState<{ title: string; level: number; color: string } | null>(null);
+  const [userLevel, setUserLevel] = useState<{ title: string; level: number; color: string; icon: string } | null>(null);
 
   // Fetch feature flags and game master status on mount
   useEffect(() => {
@@ -161,6 +161,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
             title: data.currentTitle || "Trader",
             level: data.currentLevel || 1,
             color: data.currentColor || "#22c55e",
+            icon: data.currentIcon || "⚔️",
           });
         }
       } catch { /* Silent fail */ }
@@ -366,7 +367,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
                 </h3>
                 <p className="text-xs text-gray-400 truncate">{user?.email}</p>
                 <div className="flex items-center gap-1 mt-1">
-                  <GameIcon name="profit" size={12} />
+                  <span className="text-xs leading-none">{userLevel?.icon || "⚔️"}</span>
                   <span className="text-[11px] font-medium" style={{ color: userLevel?.color || "#22c55e" }}>
                     {userLevel ? `${userLevel.title} • Lv ${userLevel.level}` : "Loading..."}
                   </span>
