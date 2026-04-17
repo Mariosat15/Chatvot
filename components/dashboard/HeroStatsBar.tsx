@@ -122,8 +122,8 @@ export default function HeroStatsBar({
     () => [
       {
         ...STAT_CONFIG[0],
-        value: creditBalance.toFixed(decimals),
-        sub: symbol,
+        value: `${symbol} ${creditBalance.toFixed(decimals)}`,
+        sub: "available credits",
       },
       {
         ...STAT_CONFIG[1],
