@@ -16,7 +16,6 @@ import { useAppSettings } from "@/contexts/AppSettingsContext";
 import CompetitionCard from "@/components/trading/CompetitionCard";
 import WalletBalanceDisplay from "@/components/trading/WalletBalanceDisplay";
 import UTCClock from "@/components/trading/UTCClock";
-import LiveStatusIndicator from "@/components/trading/LiveStatusIndicator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -672,12 +671,18 @@ export default function CompetitionsPageContent({
         <div className="hidden sm:flex items-center gap-3 flex-wrap">
           <UTCClock />
           <WalletBalanceDisplay balance={userBalance} />
-          <LiveStatusIndicator onRefresh={async () => refreshData(false)} />
           <Link href="/wallet">
-            <Button className="bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-gray-900 font-bold h-auto py-2 px-4 rounded-xl shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/40 hover:scale-105 transition-all">
-              <GameIcon name="coin" size={16} className="mr-2" />
-              Add Credits
-            </Button>
+            <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-gradient-to-br from-yellow-500/10 to-amber-600/5 border border-yellow-500/30 shadow-lg h-[72px] hover:border-yellow-500/50 hover:scale-105 transition-all cursor-pointer">
+              <span className="text-2xl">💰</span>
+              <div className="flex flex-col">
+                <span className="text-[10px] text-yellow-400/80 font-semibold uppercase tracking-wider">
+                  Top Up
+                </span>
+                <span className="text-base font-bold text-yellow-500">
+                  Add Credits
+                </span>
+              </div>
+            </div>
           </Link>
         </div>
 

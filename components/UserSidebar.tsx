@@ -128,6 +128,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isGameMaster, setIsGameMaster] = useState(false);
   const [arenaEnabled, setArenaEnabled] = useState(true);
+  const [userLevel, setUserLevel] = useState<{ title: string; level: number; color: string } | null>(null);
 
   // Fetch feature flags and game master status on mount
   useEffect(() => {
@@ -151,8 +152,22 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
         // Default to enabled if settings fetch fails
       }
     };
+    const fetchUserLevel = async () => {
+      try {
+        const response = await fetch("/api/user/level");
+        if (response.ok) {
+          const data = await response.json();
+          setUserLevel({
+            title: data.currentTitle || "Trader",
+            level: data.currentLevel || 1,
+            color: data.currentColor || "#22c55e",
+          });
+        }
+      } catch { /* Silent fail */ }
+    };
     checkGameMasterStatus();
     fetchFeatureFlags();
+    fetchUserLevel();
   }, []);
 
   // Close mobile menu on route change
@@ -352,8 +367,8 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
                 <p className="text-xs text-gray-400 truncate">{user?.email}</p>
                 <div className="flex items-center gap-1 mt-1">
                   <GameIcon name="profit" size={12} />
-                  <span className="text-[11px] font-medium text-green-400">
-                    Active Trader
+                  <span className="text-[11px] font-medium" style={{ color: userLevel?.color || "#22c55e" }}>
+                    {userLevel ? `${userLevel.title} • Lv ${userLevel.level}` : "Loading..."}
                   </span>
                 </div>
               </div>

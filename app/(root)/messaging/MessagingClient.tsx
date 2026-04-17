@@ -167,7 +167,16 @@ export default function MessagingClient({ session }: MessagingClientProps) {
   const messageInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isUserAtBottomRef = useRef(true);
-  const isInitialLoadRef = useRef(true); // Track if this is the first load of messages
+  const isInitialLoadRef = useRef(true);
+  const unreadBroadcastRef = useRef<BroadcastChannel | null>(null);
+
+  // Reason: BroadcastChannel syncs unread count instantly to sidebar/other tabs
+  useEffect(() => {
+    try {
+      unreadBroadcastRef.current = new BroadcastChannel("chartvolt-unread-messages");
+    } catch { /* Not supported */ }
+    return () => { try { unreadBroadcastRef.current?.close(); } catch {} };
+  }, []);
 
   // WebSocket for real-time messaging
   const handleWebSocketMessage = useCallback(
@@ -504,12 +513,12 @@ export default function MessagingClient({ session }: MessagingClientProps) {
       if (response.ok) {
         const data = await response.json();
         setConversations(data.conversations);
-        setUnreadTotal(
-          data.conversations.reduce(
-            (sum: number, c: Conversation) => sum + c.unreadCount,
-            0,
-          ),
+        const newTotal = data.conversations.reduce(
+          (sum: number, c: Conversation) => sum + c.unreadCount,
+          0,
         );
+        setUnreadTotal(newTotal);
+        try { unreadBroadcastRef.current?.postMessage({ unreadCount: newTotal }); } catch {}
       }
     } catch {
       // Silent fail
@@ -663,9 +672,9 @@ export default function MessagingClient({ session }: MessagingClientProps) {
             const updated = prev.map((c) =>
               c.id === conversationId ? { ...c, unreadCount: 0 } : c,
             );
-            setUnreadTotal(
-              updated.reduce((sum, c) => sum + c.unreadCount, 0),
-            );
+            const newTotal = updated.reduce((sum, c) => sum + c.unreadCount, 0);
+            setUnreadTotal(newTotal);
+            try { unreadBroadcastRef.current?.postMessage({ unreadCount: newTotal }); } catch {}
             return updated;
           });
         }
