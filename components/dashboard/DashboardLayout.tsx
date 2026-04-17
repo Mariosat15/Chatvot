@@ -18,6 +18,7 @@ import ContestsSidebar from "./ContestsSidebar";
 import RecentTradesFeed from "./RecentTradesFeed";
 import StreaksShowcase from "./StreaksShowcase";
 import MarketHolidaysCard from "./MarketHolidaysCard";
+import ContestStatsCards from "./ContestStatsCards";
 import AccountStatusCard from "./AccountStatusCard";
 import CreditBreakdownChart from "./CreditBreakdownChart";
 import GettingStartedCard from "./GettingStartedCard";
@@ -172,6 +173,11 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
             totalTrades={overview.totalTrades}
             winningTrades={overview.winningTrades}
             losingTrades={overview.losingTrades}
+          />
+
+          <ContestStatsCards
+            competitionStats={competitions.stats}
+            challengeStats={challenges.stats}
           />
 
           <MarketHolidaysCard />

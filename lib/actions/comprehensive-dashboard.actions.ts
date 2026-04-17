@@ -88,6 +88,8 @@ export interface ComprehensiveDashboardData {
       topThreeFinishes: number;
       averageRank: number;
       bestRank: number;
+      totalCreditsWon: number;
+      activeCount: number;
     };
   };
 
@@ -103,6 +105,7 @@ export interface ComprehensiveDashboardData {
       winRate: number;
       totalStaked: number;
       totalWon: number;
+      totalCreditsWon: number;
     };
   };
 
@@ -1239,8 +1242,21 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       roi: wROI,
       gmEarnings: wGMEarnings,
     },
-    competitions: processedCompetitions,
-    challenges: processedChallenges,
+    competitions: {
+      ...processedCompetitions,
+      stats: {
+        ...processedCompetitions.stats,
+        totalCreditsWon: wTrueCompWins,
+        activeCount: processedCompetitions.active.length,
+      },
+    },
+    challenges: {
+      ...processedChallenges,
+      stats: {
+        ...processedChallenges.stats,
+        totalCreditsWon: wTrueChalWins,
+      },
+    },
     charts: {
       ...charts,
       // Reason: All-time totals from getUserFinancialSummary() — SSOT.
