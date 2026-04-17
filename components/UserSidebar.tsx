@@ -203,6 +203,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
   };
 
   const handleSignOut = async () => {
+    if (!confirm("Are you sure you want to sign out?")) return;
     await signOut();
     router.push("/sign-in");
   };
@@ -381,7 +382,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
                 </h3>
                 <p className="text-xs text-gray-400 truncate">{user?.email}</p>
                 <div className="flex items-center gap-1 mt-1">
-                  <span className="text-xs leading-none">{userLevel?.icon || "⚔️"}</span>
+                  <GameIcon name={(userLevel?.icon as any) || "sword"} size={12} />
                   <span className="text-[11px] font-medium" style={{ color: userLevel?.color || "#22c55e" }}>
                     {userLevel ? `${userLevel.title} • Lv ${userLevel.level}` : "Loading..."}
                   </span>
@@ -492,6 +493,8 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
         {/* Collapse Toggle */}
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
+          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!isCollapsed}
           className="absolute -right-3 top-20 w-6 h-6 bg-gray-800 border border-gray-700 rounded-full flex items-center justify-center hover:bg-gray-700 transition-colors z-50"
         >
           <ChevronRight
@@ -525,6 +528,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
             variant="ghost"
             size="icon"
             onClick={() => setIsMobileMenuOpen(true)}
+            aria-label="Open navigation menu"
             className="h-10 w-10 rounded-xl bg-gray-800/50 border border-gray-700/50 hover:bg-gray-800 hover:border-yellow-500/30"
           >
             <Menu className="h-5 w-5 text-gray-300" />

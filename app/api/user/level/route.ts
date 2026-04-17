@@ -18,6 +18,7 @@ export async function GET() {
       currentIcon: levelData.currentIcon,
       currentColor: levelData.currentColor,
       currentXP: levelData.currentXP,
+      createdAt: session.user.createdAt || null,
     });
   } catch {
     return NextResponse.json(

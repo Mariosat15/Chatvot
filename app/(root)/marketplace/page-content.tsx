@@ -290,7 +290,7 @@ export default function MarketplaceContent() {
 
   const handlePurchase = async (item: MarketplaceItem) => {
     if (item.owned) {
-      router.push("/profile?tab=trading-arsenal");
+      router.push("/profile?tab=arsenal");
       return;
     }
 
@@ -444,7 +444,7 @@ export default function MarketplaceContent() {
         case "rating":
           return b.averageRating - a.averageRating;
         case "newest":
-          return 0; // Would need createdAt field, defaulting to original order
+          return (b._id || "").localeCompare(a._id || "");
         case "name":
           return a.name.localeCompare(b.name);
         case "popular":

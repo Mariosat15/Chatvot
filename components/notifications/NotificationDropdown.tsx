@@ -221,6 +221,7 @@ export default function NotificationDropdown() {
         <Button
           variant="ghost"
           size="icon"
+          aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
           className="relative text-gray-400 hover:text-white hover:bg-gray-800"
         >
           <Bell className="h-5 w-5" />
@@ -330,6 +331,7 @@ export default function NotificationDropdown() {
                             <Button
                               variant="ghost"
                               size="sm"
+                              aria-label="Mark as read"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleMarkAsRead(notification._id);
@@ -342,6 +344,7 @@ export default function NotificationDropdown() {
                           <Button
                             variant="ghost"
                             size="sm"
+                            aria-label="Delete notification"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDelete(notification._id);

@@ -40,7 +40,7 @@ export default function GettingStartedCard({
   hasCompletedMilestone,
   hasChallengedUser,
 }: GettingStartedCardProps) {
-  const [dismissed, setDismissed] = useState(true);
+  const [dismissed, setDismissed] = useState<boolean | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem(DISMISS_KEY);
@@ -94,7 +94,8 @@ export default function GettingStartedCard({
   const allComplete = completedCount === steps.length;
   const progressPercent = Math.round((completedCount / steps.length) * 100);
 
-  if (dismissed || allComplete) return null;
+  // Reason: dismissed starts null to avoid hydration flash; only render once client reads localStorage
+  if (dismissed === null || dismissed || allComplete) return null;
 
   const handleDismiss = () => {
     setDismissed(true);

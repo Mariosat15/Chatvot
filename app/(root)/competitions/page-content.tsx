@@ -795,7 +795,7 @@ export default function CompetitionsPageContent({
                 >
                   {status === "active" && "🔴 Live"}
                   {status === "upcoming" && "🟡 Soon"}
-                  {status === "completed" && "🟢 Done"}
+                  {status === "completed" && "🟢 Completed"}
                 </button>
               ))}
             </div>

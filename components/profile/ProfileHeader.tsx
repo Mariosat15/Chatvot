@@ -64,7 +64,18 @@ export default function ProfileHeader({
   const [gmPackageName, setGmPackageName] = useState("");
 
   const displayName = session.user.name || "Trader";
-  const memberSince = new Date().getFullYear(); // Would come from user data
+  const [memberSince, setMemberSince] = useState<string>("");
+
+  useEffect(() => {
+    fetch("/api/user/level")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.createdAt) {
+          setMemberSince(new Date(data.createdAt).getFullYear().toString());
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Calculate total wins
   const totalWins =

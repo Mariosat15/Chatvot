@@ -1516,7 +1516,16 @@ export default function MessagingClient({ session }: MessagingClientProps) {
                     <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center mb-4">
                       <MessageCircle className="w-10 h-10 text-gray-600" />
                     </div>
-                    <p className="text-gray-400 mb-4">No conversations yet</p>
+                    <p className="text-gray-400 mb-2">No conversations yet</p>
+                    <p className="text-xs text-gray-500 mb-4">
+                      Find traders on the leaderboard to start chatting
+                    </p>
+                    <a
+                      href="/leaderboard"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 transition-colors"
+                    >
+                      Browse Leaderboard
+                    </a>
                   </div>
                 )}
             </>

@@ -376,7 +376,7 @@ export default function LeaderboardContent({
       </div>
 
       {/* Your Rank Card */}
-      {myPosition && myPosition.rank > 0 && (
+      {myPosition && (myPosition.rank > 0 ? (
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-700/50 shadow-2xl">
           {/* Animated border gradient */}
           <div className="absolute inset-0 bg-gradient-to-r from-primary-500/20 via-transparent to-cyan-500/20 opacity-50" />
@@ -430,7 +430,14 @@ export default function LeaderboardContent({
             </div>
           </div>
         </div>
-      )}
+      ) : (
+        <div className="rounded-2xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-700/50 p-5 text-center">
+          <p className="text-lg font-bold text-gray-300 mb-1">Unranked</p>
+          <p className="text-sm text-gray-500">
+            Complete a competition to appear on the leaderboard
+          </p>
+        </div>
+      ))}
 
       {/* Match Cards View */}
       {viewMode === "cards" && (

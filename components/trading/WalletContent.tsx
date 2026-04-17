@@ -168,7 +168,16 @@ export default function WalletContent({
     fetchWithdrawalSettings();
   }, []);
 
-  if (!settings) return null;
+  if (!settings) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-yellow-500/30 border-t-yellow-500" />
+          <p className="text-sm text-gray-400">Loading wallet...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col gap-4 sm:gap-6 md:gap-8">

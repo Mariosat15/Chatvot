@@ -116,9 +116,16 @@ export default function RecentTradesFeed({
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
           ⚡ Recent Activity
         </h3>
-        <div className="text-center py-6 text-gray-500 text-sm">
-          <Activity className="w-6 h-6 mx-auto mb-2 text-gray-600" />
-          No recent activity
+        <div className="text-center py-8 text-gray-500 text-sm">
+          <Activity className="w-8 h-8 mx-auto mb-3 text-gray-600" />
+          <p className="mb-1 text-gray-400 font-medium">No recent activity</p>
+          <p className="text-xs text-gray-500 mb-4">Place your first trade in a competition or challenge</p>
+          <a
+            href="/competitions"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 transition-colors"
+          >
+            Join a Competition
+          </a>
         </div>
       </motion.div>
     );

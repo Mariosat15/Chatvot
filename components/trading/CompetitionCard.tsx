@@ -15,6 +15,7 @@ import ActionTermsDialog, {
   ACTION_TERM_SLUGS,
 } from "@/components/ActionTermsDialog";
 import { DifficultyBadge } from "@/components/ui/difficulty-badge";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 import {
   calculateCompetitionDifficulty,
   DifficultyAnalysis,
@@ -767,7 +768,7 @@ export default function CompetitionCard({
                 <GameIcon name="target" size={18} />
               </div>
               <div>
-                <p className="text-[11px] text-gray-500 uppercase">Capital</p>
+                <p className="text-[11px] text-gray-500 uppercase flex items-center gap-1">Capital <InfoTooltip text="Virtual starting balance for this competition. This is not real money." iconSize={10} /></p>
                 <p className="text-sm font-bold text-gray-100">
                   ${(competition.startingCapital || 10000).toLocaleString()}
                 </p>
@@ -834,8 +835,8 @@ export default function CompetitionCard({
                   <GameIcon name="skull" size={16} />
                 </div>
                 <div>
-                  <p className="text-[11px] text-gray-500 uppercase">
-                    Liquidation
+                  <p className="text-[11px] text-gray-500 uppercase flex items-center gap-1">
+                    Liquidation <InfoTooltip text="If your balance drops to zero, you are disqualified from the competition." iconSize={10} />
                   </p>
                   <p className="text-sm font-bold text-red-400">= DQ</p>
                 </div>
@@ -1073,7 +1074,7 @@ export default function CompetitionCard({
               ) : isUpcoming ? (
                 <span className="flex items-center gap-2">
                   <GameIcon name="sword" size={22} />
-                  Join Now
+                  View Details
                 </span>
               ) : (
                 <span className="flex items-center gap-2">

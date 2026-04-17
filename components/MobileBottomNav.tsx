@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -20,31 +19,38 @@ interface NavItem {
 const navItems: NavItem[] = [
   {
     href: "/dashboard",
-    label: "Home",
+    label: "Dashboard",
     iconName: "headset",
     color: "text-blue-400",
     activeColor: "bg-blue-500/20",
   },
   {
     href: "/competitions",
-    label: "Compete",
+    label: "Competitions",
     iconName: "trophy",
     color: "text-yellow-400",
     activeColor: "bg-yellow-500/20",
   },
   {
     href: "/challenges",
-    label: "Battle",
+    label: "Challenges",
     iconName: "sword",
     color: "text-red-400",
     activeColor: "bg-red-500/20",
   },
   {
-    href: "/arena",
-    label: "Arena",
-    iconName: "crown",
-    color: "text-cyan-300",
-    activeColor: "bg-cyan-500/20",
+    href: "/marketplace",
+    label: "Market",
+    iconName: "pouch1",
+    color: "text-purple-400",
+    activeColor: "bg-purple-500/20",
+  },
+  {
+    href: "/leaderboard",
+    label: "Leaderboard",
+    iconName: "goldMedal",
+    color: "text-amber-400",
+    activeColor: "bg-amber-500/20",
   },
   {
     href: "/wallet",
@@ -65,35 +71,21 @@ const navItems: NavItem[] = [
 export default function MobileBottomNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const [arenaEnabled, setArenaEnabled] = useState(true);
-
-  useEffect(() => {
-    fetch("/api/settings")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data?.settings?.arenaEnabled === false) setArenaEnabled(false);
-      })
-      .catch(() => {});
-  }, []);
-
   const isActive = (path: string) => {
     if (path === "/") return pathname === "/";
     return pathname.startsWith(path);
   };
 
   const handleSignOut = async () => {
+    if (!confirm("Are you sure you want to sign out?")) return;
     await signOut();
     router.push("/sign-in");
   };
 
-  const filteredItems = navItems.filter(
-    (item) => item.href !== "/arena" || arenaEnabled,
-  );
-
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-gray-900/95 backdrop-blur-xl border-t border-gray-800/50 safe-area-bottom">
       <div className="flex items-center justify-around h-16 px-1">
-        {filteredItems.map((item) => {
+        {navItems.map((item) => {
           const active = isActive(item.href);
 
           return (

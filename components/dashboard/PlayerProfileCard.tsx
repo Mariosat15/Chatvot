@@ -189,6 +189,17 @@ export default function PlayerProfileCard({
       </div>
 
       {/* Badges — show all with expandable row */}
+      {recentBadges.length === 0 && (
+        <div className="relative z-10 mt-4 pt-4 border-t border-gray-700/40">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">Badges</span>
+          </div>
+          <p className="text-xs text-gray-500 py-2">
+            No badges yet —{" "}
+            <Link href="/profile?tab=badges" className="text-purple-400 hover:text-purple-300 transition-colors">earn your first badge</Link>
+          </p>
+        </div>
+      )}
       {recentBadges.length > 0 && (() => {
         const hasOverflow = recentBadges.length > COLLAPSED_LIMIT;
         const visibleBadges = badgesExpanded ? recentBadges : recentBadges.slice(0, COLLAPSED_LIMIT);
@@ -245,6 +256,18 @@ export default function PlayerProfileCard({
       })()}
 
       {/* Recent Milestones + Journey Progress */}
+      {(!journey || journey.totalMilestones === 0) && (
+        <div className="relative z-10 mt-4 pt-4 border-t border-gray-700/40">
+          <div className="flex items-center gap-2 mb-2">
+            <Map className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">Journey</span>
+          </div>
+          <p className="text-xs text-gray-500 py-2">
+            Your journey awaits —{" "}
+            <Link href="/profile?tab=journey" className="text-amber-400 hover:text-amber-300 transition-colors">start exploring</Link>
+          </p>
+        </div>
+      )}
       {journey && journey.totalMilestones > 0 && (
         <div className="relative z-10 mt-4 pt-4 border-t border-gray-700/40">
           <div className="flex items-center justify-between mb-3">

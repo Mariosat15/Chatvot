@@ -166,6 +166,8 @@ export default function PerformanceRings({
     },
   ];
 
+  const hasData = winRate > 0 || profitFactor > 0 || avgWin > 0 || Math.abs(avgLoss) > 0 || largestWin > 0 || Math.abs(largestLoss) > 0;
+
   return (
     <motion.div
       className="rounded-xl border border-gray-700/50 bg-gradient-to-br from-gray-800/60 to-gray-900/60 p-4 sm:p-5"
@@ -176,18 +178,25 @@ export default function PerformanceRings({
       <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
         ⚡ Performance Metrics
       </h3>
-      <div className={`grid gap-3 sm:gap-4 ${rings.length <= 6 ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6" : "grid-cols-2 sm:grid-cols-4 lg:grid-cols-7"}`}>
-        {rings.map((datum, i) => (
-          <AnimatedRing
-            key={datum.label}
-            datum={datum}
-            size={70}
-            smSize={90}
-            strokeWidth={6}
-            delay={i * 0.08}
-          />
-        ))}
-      </div>
+      {!hasData ? (
+        <div className="text-center py-8">
+          <p className="text-sm text-gray-400 mb-1">No performance data yet</p>
+          <p className="text-xs text-gray-500">Complete trades to see your metrics here</p>
+        </div>
+      ) : (
+        <div className={`grid gap-3 sm:gap-4 ${rings.length <= 6 ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6" : "grid-cols-2 sm:grid-cols-4 lg:grid-cols-7"}`}>
+          {rings.map((datum, i) => (
+            <AnimatedRing
+              key={datum.label}
+              datum={datum}
+              size={70}
+              smSize={90}
+              strokeWidth={6}
+              delay={i * 0.08}
+            />
+          ))}
+        </div>
+      )}
     </motion.div>
   );
 }

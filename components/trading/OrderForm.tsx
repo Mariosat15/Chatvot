@@ -35,6 +35,7 @@ import {
 } from "@/lib/utils/limit-order-validation";
 import LiveRankingPanel from "./LiveRankingPanel";
 import { GameIcon } from "@/components/ui/GameIcon";
+import { InfoTooltip } from "@/components/ui/InfoTooltip";
 
 // Collapsible Section Component
 const CollapsibleSection = ({
@@ -43,12 +44,14 @@ const CollapsibleSection = ({
   children,
   defaultOpen = true,
   className = "",
+  titleExtra,
 }: {
   title: string;
   icon: React.ReactNode;
   children: React.ReactNode;
   defaultOpen?: boolean;
   className?: string;
+  titleExtra?: React.ReactNode;
 }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
@@ -65,7 +68,7 @@ const CollapsibleSection = ({
         className="w-full p-4 flex items-center justify-between hover:bg-dark-400/20 transition-colors"
       >
         <p className="text-xs font-bold text-light-900 uppercase tracking-wider flex items-center gap-2">
-          {icon} {title}
+          {icon} {title} {titleExtra}
         </p>
         {isOpen ? (
           <ChevronUp className="size-5 text-dark-600 transition-transform" />
@@ -576,6 +579,16 @@ const OrderForm = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
+      {/* Market Closed Banner */}
+      {marketOpen === false && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+          <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
+          <p className="text-xs font-medium text-amber-300">
+            Market is closed{marketStatus ? ` — ${marketStatus}` : ""}. Orders placed now may fail.
+          </p>
+        </div>
+      )}
+
       {/* Section 1: Live Ranking - Only show for competitions, not challenges */}
       {contestType === "competition" && (
         <CollapsibleSection title="Live Ranking" icon={<GameIcon name="trophy" size={16} />} defaultOpen={true}>
@@ -692,6 +705,7 @@ const OrderForm = ({
         <div>
           <Label className="text-xs font-semibold text-dark-600 mb-2 uppercase tracking-wide flex items-center gap-2">
             <GameIcon name="chest" size={14} className="inline" /> Quantity (Lots)
+            <InfoTooltip text="Lots = trade size. 1 standard lot = 100,000 units of the base currency. Use 0.01 for micro lots." />
           </Label>
           <Input
             type="number"
@@ -711,8 +725,9 @@ const OrderForm = ({
         {/* Leverage Display (Admin-controlled, read-only) */}
         <div className="bg-dark-300/50 border border-dark-400 rounded-lg p-3">
           <div className="flex items-center justify-between mb-1">
-            <Label className="text-xs text-dark-600">
+            <Label className="text-xs text-dark-600 flex items-center gap-1">
               Leverage (Admin-controlled)
+              <InfoTooltip text="Leverage amplifies your buying power. 1:100 means $1 controls $100 in the market. Higher leverage = higher risk." iconSize={12} />
             </Label>
             <div className="flex items-center gap-1">
               <RefreshCw
@@ -1043,7 +1058,7 @@ const OrderForm = ({
       )}
 
       {/* Margin Required */}
-      <CollapsibleSection title="Margin Required" icon={<GameIcon name="coin" size={16} />} defaultOpen={true}>
+      <CollapsibleSection title="Margin Required" icon={<GameIcon name="coin" size={16} />} defaultOpen={true} titleExtra={<InfoTooltip text="Margin is the collateral held by the platform to keep your trade open. If your margin level drops too low, you may be liquidated." />}>
         <div className="flex items-center justify-between">
           <span className="text-sm text-dark-600 flex items-center gap-1">
             Margin Required:
@@ -1066,8 +1081,9 @@ const OrderForm = ({
         {marginRequired > 0 && (
           <div className="mt-2 pt-2 border-t border-dark-400">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-dark-600">
+              <span className="text-xs text-dark-600 flex items-center gap-1">
                 Margin Level After Trade:
+                <InfoTooltip text="Margin level = (Equity / Used Margin) × 100%. Below 100% means you're at risk of liquidation." iconSize={11} />
               </span>
               <span
                 className={cn(
