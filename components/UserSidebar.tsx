@@ -243,7 +243,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
             >
               {item.icon}
             </div>
-            {item.numericBadge && item.numericBadge > 0 && (
+            {item.numericBadge != null && item.numericBadge > 0 && (
               <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
                 {item.numericBadge > 9 ? "9+" : item.numericBadge}
               </span>
@@ -394,7 +394,7 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-3 py-4">
+      <div className={cn("flex-1 overflow-y-auto custom-scrollbar py-4", isCollapsed ? "px-2" : "px-3")}>
         {/* Main Navigation */}
         <div className="space-y-1">
           {!isCollapsed && (
@@ -452,9 +452,12 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
       </div>
 
       {/* Footer Actions */}
-      <div className="p-4 border-t border-gray-800/50 space-y-2">
+      <div className={cn("border-t border-gray-800/50 space-y-2", isCollapsed ? "p-2" : "p-4")}>
         {/* Notifications - Desktop Only */}
-        <div className="hidden lg:flex items-center justify-between px-3 py-2 rounded-xl bg-gray-800/30 border border-gray-700/30">
+        <div className={cn(
+          "hidden lg:flex items-center rounded-xl bg-gray-800/30 border border-gray-700/30",
+          isCollapsed ? "justify-center px-1 py-1" : "justify-between px-3 py-2",
+        )}>
           {!isCollapsed && (
             <span className="text-sm text-gray-400">Notifications</span>
           )}
@@ -466,12 +469,15 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
           onClick={handleSignOut}
           variant="ghost"
           className={cn(
-            "w-full group flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition-all duration-300",
-            isCollapsed && "justify-center",
+            "w-full group flex items-center rounded-xl text-gray-400 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition-all duration-300",
+            isCollapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2.5",
           )}
         >
-          <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-gray-800/50 group-hover:bg-red-500/20 transition-colors">
-            <LogOut className="h-5 w-5" />
+          <div className={cn(
+            "flex items-center justify-center rounded-lg bg-gray-800/50 group-hover:bg-red-500/20 transition-colors",
+            isCollapsed ? "w-8 h-8" : "w-9 h-9",
+          )}>
+            <LogOut className={cn(isCollapsed ? "h-4 w-4" : "h-5 w-5")} />
           </div>
           {!isCollapsed && <span className="font-medium">Sign Out</span>}
         </Button>
