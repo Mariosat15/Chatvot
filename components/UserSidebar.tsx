@@ -213,7 +213,8 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
       <Link href={item.href}>
         <div
           className={cn(
-            "group relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300 cursor-pointer",
+            "group relative flex items-center rounded-xl transition-all duration-300 cursor-pointer",
+            isCollapsed ? "justify-center px-2 py-2" : "gap-3 px-3 py-2.5",
             active
               ? `bg-gradient-to-r ${item.gradient} border border-gray-700/50 shadow-lg`
               : "hover:bg-gray-800/50 border border-transparent hover:border-gray-700/30",
@@ -232,7 +233,8 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
           <div className="relative">
             <div
               className={cn(
-                "flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300",
+                "flex items-center justify-center rounded-lg transition-all duration-300",
+                isCollapsed ? "w-8 h-8 [&_img]:!w-[18px] [&_img]:!h-[18px]" : "w-9 h-9",
                 active
                   ? `${item.color.replace("text-", "bg-")}/20 ${item.color}`
                   : "bg-gray-800/50 text-gray-400 group-hover:text-gray-200",
@@ -331,11 +333,11 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
       </div>
 
       {/* User Profile Card */}
-      <div className="p-4 border-b border-gray-800/50">
+      <div className={cn("border-b border-gray-800/50", isCollapsed ? "p-2" : "p-4")}>
         <div
           className={cn(
-            "relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-800/80 via-gray-800/50 to-gray-900/80 border border-gray-700/50 p-4",
-            isCollapsed && "p-2",
+            "relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-800/80 via-gray-800/50 to-gray-900/80 border border-gray-700/50",
+            isCollapsed ? "p-2" : "p-4",
           )}
         >
           {/* Decorative elements */}
@@ -349,14 +351,26 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
             )}
           >
             <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full opacity-50 group-hover:opacity-75 blur transition-opacity" />
-              <Avatar className="relative h-12 w-12 ring-2 ring-gray-900">
+              <div className={cn(
+                "absolute bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full opacity-50 group-hover:opacity-75 blur transition-opacity",
+                isCollapsed ? "-inset-0.5" : "-inset-1",
+              )} />
+              <Avatar className={cn(
+                "relative ring-2 ring-gray-900 transition-all duration-300",
+                isCollapsed ? "h-9 w-9" : "h-12 w-12",
+              )}>
                 <AvatarImage src={userProfileImage} />
-                <AvatarFallback className="bg-gradient-to-br from-yellow-500 to-orange-500 text-gray-900 font-bold text-lg">
+                <AvatarFallback className={cn(
+                  "bg-gradient-to-br from-yellow-500 to-orange-500 text-gray-900 font-bold",
+                  isCollapsed ? "text-sm" : "text-lg",
+                )}>
                   {user?.name?.[0] || user?.email?.[0]?.toUpperCase() || "U"}
                 </AvatarFallback>
               </Avatar>
-              <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-gray-900" />
+              <div className={cn(
+                "absolute bg-green-500 rounded-full border-2 border-gray-900",
+                isCollapsed ? "-bottom-0.5 -right-0.5 w-3 h-3" : "-bottom-0.5 -right-0.5 w-4 h-4",
+              )} />
             </div>
 
             {!isCollapsed && (
