@@ -4,6 +4,7 @@ export type RestrictionType = "banned" | "suspended";
 export type RestrictionReason =
   | "multi_accounting"
   | "fraud"
+  | "fraud_detected"
   | "terms_violation"
   | "payment_fraud"
   | "suspicious_activity"
@@ -26,6 +27,9 @@ export interface IUserRestriction extends Document {
   canEnterCompetitions: boolean;
   canDeposit: boolean;
   canWithdraw: boolean;
+
+  // Visibility — when true, user is hidden from leaderboard, matchmaking, etc.
+  hideFromPublic: boolean;
 
   // Time-based restrictions (for suspensions)
   restrictedAt: Date;
@@ -60,6 +64,7 @@ const UserRestrictionSchema = new Schema<IUserRestriction>(
       enum: [
         "multi_accounting",
         "fraud",
+        "fraud_detected",
         "terms_violation",
         "payment_fraud",
         "suspicious_activity",
@@ -77,6 +82,9 @@ const UserRestrictionSchema = new Schema<IUserRestriction>(
     canEnterCompetitions: { type: Boolean, default: false },
     canDeposit: { type: Boolean, default: false },
     canWithdraw: { type: Boolean, default: false },
+
+    // Visibility — hide user from leaderboard, matchmaking, match cards
+    hideFromPublic: { type: Boolean, default: false },
 
     // Time-based restrictions
     restrictedAt: { type: Date, default: Date.now },
