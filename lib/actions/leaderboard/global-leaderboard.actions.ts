@@ -9,6 +9,7 @@ import UserBadge from "@/database/models/user-badge.model";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { getAllUsers } from "@/lib/utils/user-lookup";
+import { getHiddenUserIds } from "@/lib/services/user-restriction.service";
 // Titles are added per-page in the API to avoid loading 4000+ UserLevel docs on every cache build
 
 export interface GlobalLeaderboardEntry {
@@ -97,7 +98,10 @@ export async function getGlobalLeaderboard(
 
   try {
     const allUsersRaw = await getAllUsers();
-    const usersToProcess = allUsersRaw.slice(0, MAX_LEADERBOARD_USERS);
+    // Reason: Exclude users that admins have flagged as hidden from public
+    const hiddenIds = await getHiddenUserIds();
+    const visibleUsers = allUsersRaw.filter((u) => !hiddenIds.has(u.id));
+    const usersToProcess = visibleUsers.slice(0, MAX_LEADERBOARD_USERS);
     const userIds = usersToProcess.map((u) => u.id).filter(Boolean);
 
     if (userIds.length === 0) {

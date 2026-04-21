@@ -51,6 +51,7 @@ interface UserRestriction {
   canEnterCompetitions: boolean;
   canDeposit: boolean;
   canWithdraw: boolean;
+  hideFromPublic?: boolean;
   expiresAt?: string;
   restrictedAt: string;
   restrictedBy: string;
@@ -81,6 +82,7 @@ export default function RestrictedUsersSection() {
     useState(true);
   const [editCanDeposit, setEditCanDeposit] = useState(true);
   const [editCanWithdraw, setEditCanWithdraw] = useState(true);
+  const [editHideFromPublic, setEditHideFromPublic] = useState(false);
   const [editExpiresAt, setEditExpiresAt] = useState("");
 
   const fetchRestrictions = async () => {
@@ -115,6 +117,7 @@ export default function RestrictedUsersSection() {
     setEditCanEnterCompetitions(restriction.canEnterCompetitions);
     setEditCanDeposit(restriction.canDeposit);
     setEditCanWithdraw(restriction.canWithdraw);
+    setEditHideFromPublic(restriction.hideFromPublic ?? false);
     setEditExpiresAt(
       restriction.expiresAt
         ? new Date(restriction.expiresAt).toISOString().slice(0, 16)
@@ -146,6 +149,7 @@ export default function RestrictedUsersSection() {
           canEnterCompetitions: editCanEnterCompetitions,
           canDeposit: editCanDeposit,
           canWithdraw: editCanWithdraw,
+          hideFromPublic: editHideFromPublic,
           expiresAt: editExpiresAt || null,
           adminPassword,
         }),
@@ -448,6 +452,11 @@ export default function RestrictedUsersSection() {
                             >
                               {!restriction.canWithdraw ? "✗" : "✓"} Withdraw
                             </div>
+                            {restriction.hideFromPublic && (
+                              <div className="text-purple-400">
+                                ✗ Hidden from public
+                              </div>
+                            )}
                           </div>
 
                           <div className="text-sm">
@@ -625,6 +634,25 @@ export default function RestrictedUsersSection() {
                     className="text-sm cursor-pointer"
                   >
                     Allow Withdrawals
+                  </label>
+                </div>
+              </div>
+
+              {/* Visibility */}
+              <div className="mt-3 pt-3 border-t border-gray-700">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="hideFromPublic"
+                    checked={editHideFromPublic}
+                    onCheckedChange={(checked) =>
+                      setEditHideFromPublic(checked as boolean)
+                    }
+                  />
+                  <label
+                    htmlFor="hideFromPublic"
+                    className="text-sm cursor-pointer text-purple-300"
+                  >
+                    Hide from public (leaderboard, matchmaking, match cards)
                   </label>
                 </div>
               </div>

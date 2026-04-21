@@ -243,6 +243,7 @@ export default function FraudMonitoringSection() {
   const [blockCompetitions, setBlockCompetitions] = useState<boolean>(true);
   const [blockDeposit, setBlockDeposit] = useState<boolean>(true);
   const [blockWithdraw, setBlockWithdraw] = useState<boolean>(true);
+  const [hideFromPublic, setHideFromPublic] = useState<boolean>(false);
   const [fraudScores, setFraudScores] = useState<Record<string, FraudScore>>({});
   const [selectedScoreUserId, setSelectedScoreUserId] = useState<string | null>(
     null,
@@ -659,6 +660,7 @@ export default function FraudMonitoringSection() {
           canDeposit: !blockDeposit,
           canWithdraw: !blockWithdraw,
         },
+        hideFromPublic,
       };
 
       if (investigationActionType === "suspend") {
@@ -2123,6 +2125,24 @@ export default function FraudMonitoringSection() {
                         </span>
                       </label>
                     </div>
+                  </div>
+
+                  {/* Visibility */}
+                  <div className="p-4 bg-purple-900/20 border border-purple-700/30 rounded mt-3">
+                    <Label className="text-gray-300 text-sm font-semibold mb-2 block">
+                      Visibility
+                    </Label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={hideFromPublic}
+                        onChange={(e) => setHideFromPublic(e.target.checked)}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm text-gray-300">
+                        Hide from public (leaderboard, matchmaking, match cards)
+                      </span>
+                    </label>
                   </div>
                 </>
               )}

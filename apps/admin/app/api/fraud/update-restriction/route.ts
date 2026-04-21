@@ -21,6 +21,7 @@ export async function PUT(request: NextRequest) {
       canEnterCompetitions,
       canDeposit,
       canWithdraw,
+      hideFromPublic,
       expiresAt,
       adminPassword,
     } = await request.json();
@@ -87,6 +88,9 @@ export async function PUT(request: NextRequest) {
     restriction.canEnterCompetitions = canEnterCompetitions;
     restriction.canDeposit = canDeposit;
     restriction.canWithdraw = canWithdraw;
+    if (hideFromPublic !== undefined) {
+      restriction.hideFromPublic = hideFromPublic;
+    }
 
     if (expiresAt) {
       restriction.expiresAt = new Date(expiresAt);

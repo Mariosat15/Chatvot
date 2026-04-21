@@ -63,6 +63,8 @@ import { auditLogService } from "@/lib/services/audit-log.service";
  * - User presence data
  * - Audit logs related to this user
  */
+export const maxDuration = 60;
+
 export async function DELETE(request: Request) {
   try {
     const { userId } = await request.json();
@@ -633,6 +635,17 @@ export async function DELETE(request: Request) {
       }
     } catch (auditError) {
       console.error("Failed to log audit action:", auditError);
+    }
+
+    if (deletionResults.user === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "User not found or already deleted",
+          deletionResults,
+        },
+        { status: 404 },
+      );
     }
 
     return NextResponse.json({

@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
       reason = "multi_accounting",
       customReason = "",
       restrictions = {},
+      hideFromPublic = false,
     } = await request.json();
 
     if (!alertId || !userIds || !Array.isArray(userIds) || !suspendUntil) {
@@ -62,6 +63,7 @@ export async function POST(request: NextRequest) {
           restrictions.canWithdraw !== undefined
             ? restrictions.canWithdraw
             : false,
+        hideFromPublic: !!hideFromPublic,
         expiresAt: new Date(suspendUntil),
         restrictedBy: adminUser.adminId || "unknown",
         relatedFraudAlertId: alertId,

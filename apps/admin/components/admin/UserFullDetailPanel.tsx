@@ -919,6 +919,10 @@ export default function UserFullDetailPanel({
 
   // Delete user
   const handleDeleteUser = () => {
+    // Reason: Close delete dialog first to prevent z-index stacking conflict
+    // with the password dialog — both use z-[60], and the delete dialog is
+    // rendered after the password dialog in JSX, blocking access to the password input.
+    setShowDeleteConfirm(false);
     setPendingAction("delete");
     setPasswordDialogOpen(true);
   };

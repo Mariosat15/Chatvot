@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
+import { getHiddenUserIds } from "@/lib/services/user-restriction.service";
 
 interface LeaderboardEntry {
   rank: number;
@@ -102,8 +103,14 @@ export async function GET() {
 
     const userMap = new Map(users.map((u) => [u.id, u]));
 
+    // Exclude restricted users hidden from public
+    const hiddenIds = await getHiddenUserIds();
+    const visibleWinners = topCompetitionWinners.filter(
+      (w) => !hiddenIds.has(w._id),
+    );
+
     // Build leaderboard entries
-    const leaderboard: LeaderboardEntry[] = topCompetitionWinners.map(
+    const leaderboard: LeaderboardEntry[] = visibleWinners.map(
       (winner, index) => {
         const user = userMap.get(winner._id);
         const challengeData = challengeWinsMap.get(winner._id) || {

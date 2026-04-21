@@ -136,6 +136,22 @@ export async function getAllRestrictions(filters?: {
 }
 
 /**
+ * Get user IDs that should be hidden from public-facing lists
+ * (leaderboard, matchmaking, match cards, landing preview).
+ * Returns IDs with an active restriction where hideFromPublic is true.
+ */
+export async function getHiddenUserIds(): Promise<Set<string>> {
+  await connectToDatabase();
+
+  const hidden = await UserRestriction.find(
+    { isActive: true, hideFromPublic: true },
+    { userId: 1 },
+  ).lean();
+
+  return new Set(hidden.map((r) => r.userId));
+}
+
+/**
  * Unrestrict a user (unban/unsuspend)
  */
 export async function unrestrictUser(
