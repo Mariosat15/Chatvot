@@ -35,8 +35,6 @@ import PositionEvent from "@/database/models/position-event.model";
 import UserNotificationPreferences from "@/database/models/user-notification-preferences.model";
 import UserPresence from "@/database/models/user-presence.model";
 import AuditLog from "@/database/models/audit-log.model";
-import Conversation from "@/database/models/messaging/conversation.model";
-import Message from "@/database/models/messaging/message.model";
 import { ObjectId } from "mongodb";
 import { getAdminSession } from "@/lib/admin/auth";
 import { auditLogService } from "@/lib/services/audit-log.service";
@@ -620,24 +618,24 @@ export async function DELETE(request: Request) {
     // ============================================
 
     try {
-      // Find all conversations this user participates in
-      const userConversations = await Conversation.find({
-        "participants.id": userId,
-      }).select("_id");
+      // Reason: messaging models live in the main app, so use raw MongoDB ops
+      const userConversations = await db
+        .collection("conversations")
+        .find({ "participants.id": userId })
+        .project({ _id: 1 })
+        .toArray();
       const conversationIds = userConversations.map((c) => c._id);
 
       if (conversationIds.length > 0) {
-        // Delete all messages in those conversations
-        const messagesResult = await Message.deleteMany({
-          conversationId: { $in: conversationIds },
-        });
+        const messagesResult = await db
+          .collection("messages")
+          .deleteMany({ conversationId: { $in: conversationIds } });
         deletionResults.messages = messagesResult.deletedCount;
         console.log(`✅ Deleted ${deletionResults.messages} messages`);
 
-        // Delete the conversations themselves
-        const convoResult = await Conversation.deleteMany({
-          _id: { $in: conversationIds },
-        });
+        const convoResult = await db
+          .collection("conversations")
+          .deleteMany({ _id: { $in: conversationIds } });
         deletionResults.conversations = convoResult.deletedCount;
         console.log(`✅ Deleted ${deletionResults.conversations} conversations`);
       } else {
