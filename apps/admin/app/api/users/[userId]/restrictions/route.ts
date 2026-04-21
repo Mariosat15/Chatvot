@@ -75,6 +75,7 @@ export async function POST(
       reason: body.reason,
       customReason: body.customReason,
       ...blockSettings,
+      hideFromPublic: !!body.hideFromPublic,
       restrictedAt: new Date(),
       expiresAt: body.expiresAt ? new Date(body.expiresAt) : undefined,
       restrictedBy: session.id,
@@ -112,6 +113,20 @@ export async function POST(
       },
       status: "success",
     });
+
+    // Invalidate leaderboard cache if user is hidden from public
+    if (body.hideFromPublic) {
+      try {
+        const mainAppUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        await fetch(`${mainAppUrl}/api/leaderboard/invalidate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ secret: process.env.INTERNAL_API_SECRET || "simulator-cleanup" }),
+        });
+      } catch {
+        // Cache will expire naturally in 5 min
+      }
+    }
 
     return NextResponse.json({ restriction });
   } catch (error) {

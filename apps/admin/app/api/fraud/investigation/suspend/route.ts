@@ -174,6 +174,20 @@ export async function POST(request: NextRequest) {
       console.error("Failed to log audit action:", auditError);
     }
 
+    // Invalidate leaderboard cache if user is hidden from public
+    if (hideFromPublic) {
+      try {
+        const mainAppUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        await fetch(`${mainAppUrl}/api/leaderboard/invalidate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ secret: process.env.INTERNAL_API_SECRET || "simulator-cleanup" }),
+        });
+      } catch {
+        // Cache will expire naturally in 5 min
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: `Successfully suspended ${userIds.length} account(s) until ${new Date(suspendUntil).toLocaleString()}`,

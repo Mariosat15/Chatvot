@@ -157,6 +157,7 @@ interface UserRestriction {
   canEnterCompetitions: boolean;
   canDeposit: boolean;
   canWithdraw: boolean;
+  hideFromPublic?: boolean;
   restrictedAt: string;
   expiresAt?: string;
   isActive: boolean;
@@ -299,11 +300,13 @@ const RESTRICTION_REASONS = [
   { value: "kyc_failed", label: "KYC Failed" },
   { value: "kyc_fraud", label: "KYC Fraud" },
   { value: "fraud", label: "Fraud" },
+  { value: "fraud_detected", label: "Fraud Detected" },
   { value: "multi_accounting", label: "Multi-accounting" },
   { value: "terms_violation", label: "Terms Violation" },
   { value: "payment_fraud", label: "Payment Fraud" },
   { value: "suspicious_activity", label: "Suspicious Activity" },
   { value: "admin_decision", label: "Admin Decision" },
+  { value: "automated_fraud_detection", label: "Automated Fraud Detection" },
   { value: "other", label: "Other" },
 ];
 
@@ -380,6 +383,7 @@ export default function UserFullDetailPanel({
   const [restrictionReason, setRestrictionReason] = useState("admin_decision");
   const [customReason, setCustomReason] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
+  const [restrictionHideFromPublic, setRestrictionHideFromPublic] = useState(false);
   const [savingRestriction, setSavingRestriction] = useState(false);
 
   // Account Deactivation State
@@ -1235,6 +1239,7 @@ export default function UserFullDetailPanel({
           reason: restrictionReason,
           customReason: customReason.trim() || undefined,
           expiresAt: expiresAt || undefined,
+          hideFromPublic: restrictionHideFromPublic,
         }),
       });
 
@@ -1244,6 +1249,7 @@ export default function UserFullDetailPanel({
         setShowRestrictionForm(false);
         setCustomReason("");
         setExpiresAt("");
+        setRestrictionHideFromPublic(false);
         toast.success(
           `User ${restrictionType === "banned" ? "banned" : "suspended"}`,
         );
@@ -2804,6 +2810,21 @@ export default function UserFullDetailPanel({
                               />
                             </div>
                           )}
+                          {/* Visibility */}
+                          <div className="p-3 bg-purple-900/20 border border-purple-700/30 rounded">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={restrictionHideFromPublic}
+                                onChange={(e) => setRestrictionHideFromPublic(e.target.checked)}
+                                className="w-4 h-4"
+                              />
+                              <span className="text-sm text-purple-300">
+                                Hide from public (leaderboard, matchmaking, match cards)
+                              </span>
+                            </label>
+                          </div>
+
                           <div className="flex gap-2">
                             <Button
                               variant="destructive"
@@ -2912,6 +2933,14 @@ export default function UserFullDetailPanel({
                                     className="text-xs"
                                   >
                                     No Deposits
+                                  </Badge>
+                                )}
+                                {r.hideFromPublic && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-xs bg-purple-500/20 text-purple-300"
+                                  >
+                                    Hidden from Public
                                   </Badge>
                                 )}
                               </div>

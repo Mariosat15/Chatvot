@@ -100,6 +100,20 @@ export async function PUT(request: NextRequest) {
 
     await restriction.save();
 
+    // Invalidate leaderboard cache when hideFromPublic changed
+    if (hideFromPublic !== undefined) {
+      try {
+        const mainAppUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        await fetch(`${mainAppUrl}/api/leaderboard/invalidate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ secret: process.env.INTERNAL_API_SECRET || "simulator-cleanup" }),
+        });
+      } catch {
+        // Cache will expire naturally in 5 min
+      }
+    }
+
     console.log(
       `✅ Updated restriction ${restrictionId} for user ${restriction.userId}`,
     );

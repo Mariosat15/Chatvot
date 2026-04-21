@@ -4,6 +4,7 @@ export type RestrictionType = "banned" | "suspended";
 export type RestrictionReason =
   | "multi_accounting"
   | "fraud"
+  | "fraud_detected"
   | "terms_violation"
   | "payment_fraud"
   | "suspicious_activity"
@@ -63,6 +64,7 @@ const UserRestrictionSchema = new Schema<IUserRestriction>(
       enum: [
         "multi_accounting",
         "fraud",
+        "fraud_detected",
         "terms_violation",
         "payment_fraud",
         "suspicious_activity",

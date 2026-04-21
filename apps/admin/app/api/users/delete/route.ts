@@ -35,6 +35,8 @@ import PositionEvent from "@/database/models/position-event.model";
 import UserNotificationPreferences from "@/database/models/user-notification-preferences.model";
 import UserPresence from "@/database/models/user-presence.model";
 import AuditLog from "@/database/models/audit-log.model";
+import Conversation from "@/database/models/messaging/conversation.model";
+import Message from "@/database/models/messaging/message.model";
 import { ObjectId } from "mongodb";
 import { getAdminSession } from "@/lib/admin/auth";
 import { auditLogService } from "@/lib/services/audit-log.service";
@@ -363,7 +365,7 @@ export async function DELETE(request: Request) {
       }
       deletionResults.invoices = invoiceResult.deletedCount;
       console.log(`✅ Deleted ${deletionResults.invoices} invoices`);
-    } catch (e) {
+    } catch {
       console.log(`⚠️ No invoices to delete or Invoice model not found`);
       deletionResults.invoices = 0;
     }
@@ -378,7 +380,7 @@ export async function DELETE(request: Request) {
       console.log(
         `✅ Deleted ${deletionResults.platformTransactions} platform transactions`,
       );
-    } catch (e) {
+    } catch {
       console.log(`⚠️ No platform transactions to delete`);
       deletionResults.platformTransactions = 0;
     }
@@ -394,7 +396,7 @@ export async function DELETE(request: Request) {
       console.log(
         `✅ Deleted ${deletionResults.withdrawalRequests} withdrawal requests`,
       );
-    } catch (e) {
+    } catch {
       console.log(`⚠️ No withdrawal requests to delete`);
       deletionResults.withdrawalRequests = 0;
     }
@@ -406,7 +408,7 @@ export async function DELETE(request: Request) {
       console.log(
         `✅ Deleted ${deletionResults.userBankAccounts} user bank accounts`,
       );
-    } catch (e) {
+    } catch {
       console.log(`⚠️ No user bank accounts to delete`);
       deletionResults.userBankAccounts = 0;
     }
@@ -420,7 +422,7 @@ export async function DELETE(request: Request) {
       const notificationResult = await Notification.deleteMany({ userId });
       deletionResults.notifications = notificationResult.deletedCount;
       console.log(`✅ Deleted ${deletionResults.notifications} notifications`);
-    } catch (e) {
+    } catch {
       console.log(`⚠️ No notifications to delete`);
       deletionResults.notifications = 0;
     }
@@ -434,7 +436,7 @@ export async function DELETE(request: Request) {
       console.log(
         `✅ Deleted ${deletionResults.notificationPreferences} notification preferences`,
       );
-    } catch (e) {
+    } catch {
       console.log(`⚠️ No notification preferences to delete`);
       deletionResults.notificationPreferences = 0;
     }
@@ -449,7 +451,7 @@ export async function DELETE(request: Request) {
       console.log(
         `✅ Deleted ${deletionResults.marketplacePurchases} marketplace purchases`,
       );
-    } catch (e) {
+    } catch {
       console.log(`⚠️ No marketplace purchases to delete`);
       deletionResults.marketplacePurchases = 0;
     }
@@ -559,7 +561,7 @@ export async function DELETE(request: Request) {
       const notesResult = await UserNote.deleteMany({ userId });
       deletionResults.userNotes = notesResult.deletedCount;
       console.log(`✅ Deleted ${deletionResults.userNotes} user notes`);
-    } catch (e) {
+    } catch {
       console.log(`⚠️ No user notes to delete`);
       deletionResults.userNotes = 0;
     }
@@ -574,7 +576,7 @@ export async function DELETE(request: Request) {
       console.log(
         `✅ Deleted ${deletionResults.positionEvents} position events`,
       );
-    } catch (e) {
+    } catch {
       console.log(`⚠️ No position events to delete`);
       deletionResults.positionEvents = 0;
     }
@@ -589,7 +591,7 @@ export async function DELETE(request: Request) {
       console.log(
         `✅ Deleted ${deletionResults.userPresence} user presence records`,
       );
-    } catch (e) {
+    } catch {
       console.log(`⚠️ No user presence to delete`);
       deletionResults.userPresence = 0;
     }
@@ -608,9 +610,44 @@ export async function DELETE(request: Request) {
       });
       deletionResults.auditLogs = auditResult.deletedCount;
       console.log(`✅ Deleted ${deletionResults.auditLogs} audit logs`);
-    } catch (e) {
+    } catch {
       console.log(`⚠️ No audit logs to delete`);
       deletionResults.auditLogs = 0;
+    }
+
+    // ============================================
+    // 15. DELETE MESSAGING DATA
+    // ============================================
+
+    try {
+      // Find all conversations this user participates in
+      const userConversations = await Conversation.find({
+        "participants.id": userId,
+      }).select("_id");
+      const conversationIds = userConversations.map((c) => c._id);
+
+      if (conversationIds.length > 0) {
+        // Delete all messages in those conversations
+        const messagesResult = await Message.deleteMany({
+          conversationId: { $in: conversationIds },
+        });
+        deletionResults.messages = messagesResult.deletedCount;
+        console.log(`✅ Deleted ${deletionResults.messages} messages`);
+
+        // Delete the conversations themselves
+        const convoResult = await Conversation.deleteMany({
+          _id: { $in: conversationIds },
+        });
+        deletionResults.conversations = convoResult.deletedCount;
+        console.log(`✅ Deleted ${deletionResults.conversations} conversations`);
+      } else {
+        deletionResults.messages = 0;
+        deletionResults.conversations = 0;
+      }
+    } catch (e) {
+      console.log(`⚠️ Error cleaning up messaging data:`, e);
+      deletionResults.messages = 0;
+      deletionResults.conversations = 0;
     }
 
     console.log("");
@@ -635,6 +672,19 @@ export async function DELETE(request: Request) {
       }
     } catch (auditError) {
       console.error("Failed to log audit action:", auditError);
+    }
+
+    // Invalidate leaderboard cache so deleted user disappears immediately
+    try {
+      const mainAppUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      await fetch(`${mainAppUrl}/api/leaderboard/invalidate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ secret: process.env.INTERNAL_API_SECRET || "simulator-cleanup" }),
+      });
+      console.log("✅ Leaderboard cache invalidated");
+    } catch {
+      // Cache will expire naturally in 5 min
     }
 
     if (deletionResults.user === 0) {
