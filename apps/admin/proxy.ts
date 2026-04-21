@@ -17,7 +17,7 @@ function getJwtSecret(): string {
   return secret || "dev-only-insecure-secret-do-not-use-in-production-32chars";
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Allow public routes (login page and auth endpoints)
@@ -86,7 +86,7 @@ export async function middleware(request: NextRequest) {
   }
 }
 
-// Configure which paths the middleware runs on
+// Configure which paths the proxy runs on
 export const config = {
   matcher: [
     /*
