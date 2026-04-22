@@ -94,18 +94,26 @@ export async function POST(request: NextRequest) {
     else if (ext === "gif") mimeType = "image/gif";
     else if (ext === "webp") mimeType = "image/webp";
 
-    // Try to read the file from disk
+    // Try to read the file from disk.
+    //
+    // Reason: these paths are resolved at runtime against user-uploaded
+    // assets (outside the app bundle). We mark them with
+    // `turbopackIgnore` so Next.js's Node File Tracer doesn't try to
+    // follow the `process.cwd()` + ".."/".." traversal and accidentally
+    // include the whole monorepo in the admin build output.
     const possiblePaths = [
       // Production
       path.join(
+        /* turbopackIgnore: true */
         "/var/www/chartvolt",
         "public",
         "uploads",
         "marketplace",
         filename,
       ),
-      // Monorepo local dev
+      // Monorepo local dev (admin lives under apps/admin)
       path.join(
+        /* turbopackIgnore: true */
         process.cwd(),
         "..",
         "..",
@@ -115,14 +123,21 @@ export async function POST(request: NextRequest) {
         filename,
       ),
       // Admin app local
-      path.join(process.cwd(), "public", "uploads", "marketplace", filename),
+      path.join(
+        /* turbopackIgnore: true */
+        process.cwd(),
+        "public",
+        "uploads",
+        "marketplace",
+        filename,
+      ),
     ];
 
     let fileBuffer: Buffer | null = null;
     for (const filePath of possiblePaths) {
       try {
-        await access(filePath, constants.R_OK);
-        fileBuffer = await readFile(filePath);
+        await access(/* turbopackIgnore: true */ filePath, constants.R_OK);
+        fileBuffer = await readFile(/* turbopackIgnore: true */ filePath);
         console.log(`✅ [AI Generate] Found image at: ${filePath}`);
         break;
       } catch {
