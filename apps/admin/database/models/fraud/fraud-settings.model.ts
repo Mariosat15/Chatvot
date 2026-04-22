@@ -100,6 +100,9 @@ export interface IFraudSettings extends Document {
 
   // Two-Factor Step-Up Policy
   requireTwoFactorForPasswordChange: boolean;
+  // Require 2FA on sign-in for users who have enrolled 2FA. See main
+  // `database/models/fraud/fraud-settings.model.ts` for full commentary.
+  requireTwoFactorForLogin: boolean;
 
   // Metadata
   updatedAt: Date;
@@ -290,6 +293,7 @@ const FraudSettingsSchema = new Schema<IFraudSettings>(
 
     // Two-Factor Step-Up Policy
     requireTwoFactorForPasswordChange: { type: Boolean, default: false },
+    requireTwoFactorForLogin: { type: Boolean, default: true },
 
     // Metadata
     updatedAt: { type: Date, default: Date.now },
@@ -418,4 +422,5 @@ export const DEFAULT_FRAUD_SETTINGS: Partial<IFraudSettings> = {
 
   // Two-Factor step-up defaults
   requireTwoFactorForPasswordChange: false,
+  requireTwoFactorForLogin: true,
 };

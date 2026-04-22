@@ -112,6 +112,7 @@ interface FraudSettings {
 
   // Two-Factor Step-Up Policy
   requireTwoFactorForPasswordChange: boolean;
+  requireTwoFactorForLogin: boolean;
 }
 
 export default function FraudSettingsSection() {
@@ -868,6 +869,26 @@ export default function FraudSettingsSection() {
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-0 space-y-4">
+              <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
+                <div>
+                  <Label className="text-gray-300 text-sm">
+                    Require 2FA on Login
+                  </Label>
+                  <p className="text-xs text-gray-500">
+                    When ON, users with 2FA enrolled must enter a TOTP after
+                    email + password to complete sign-in. When OFF, enrolled
+                    users can sign in with password only — but 2FA still
+                    applies to withdrawals and password changes if those
+                    toggles are enabled.
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.requireTwoFactorForLogin ?? true}
+                  onCheckedChange={(checked) =>
+                    updateSetting("requireTwoFactorForLogin", checked)
+                  }
+                />
+              </div>
               <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
                 <div>
                   <Label className="text-gray-300 text-sm">

@@ -1,4 +1,7 @@
+import mongoose from "mongoose";
+
 import { auth, twoFactorApi } from "@/lib/better-auth/auth";
+import { connectToDatabase } from "@/database/mongoose";
 
 /**
  * Two-Factor Step-Up Gate
@@ -49,28 +52,39 @@ export type TwoFactorGateResult =
     };
 
 /**
- * Returns whether the current user has 2FA enabled on their account.
+ * Returns whether the current user has an active 2FA enrolment.
  *
- * Reads the `twoFactorEnabled` flag via better-auth's session resolver
- * rather than querying the `user` collection directly.
+ * Source of truth: the better-auth `twoFactor` collection, which stores
+ * a document per user (id: `userId`, encrypted TOTP secret, backup
+ * codes). The plugin inserts that document on `enableTwoFactor` and
+ * deletes it on `disableTwoFactor`, so its presence is the canonical
+ * "enrolled" signal — independent of `user.twoFactorEnabled`, which
+ * the login-2FA gate may flip transiently when admins disable the
+ * sign-in challenge globally.
  *
- * Reason: better-auth's mongodb adapter stores `user._id` as an
- * `ObjectId`, while session tokens expose the id as a hex *string*.
- * Querying `db.collection("user").findOne({ _id: stringId })` therefore
- * never matches and always returned `false` — which surfaced as a false
- * "Please enable two-factor authentication" error on withdrawals even
- * for users who had 2FA correctly enabled. Delegating to `auth.api.getSession`
- * lets the adapter perform the proper id conversion for us.
+ * Reason: reading `user.twoFactorEnabled` would incorrectly report
+ * "not enabled" during the sub-second window in which the sign-in
+ * flow temporarily clears the flag to bypass the login challenge. The
+ * `twoFactor` row is never touched by that workflow, so it remains
+ * stable for withdrawal / password-change step-up gates.
  */
 export async function isTwoFactorEnabled(
   reqHeaders: Headers,
 ): Promise<boolean> {
   try {
     const session = await auth.api.getSession({ headers: reqHeaders });
-    const user = session?.user as unknown as
-      | { twoFactorEnabled?: boolean }
-      | undefined;
-    return Boolean(user?.twoFactorEnabled);
+    const userId = (session?.user as { id?: string } | undefined)?.id;
+    if (!userId) return false;
+
+    await connectToDatabase();
+    const col = mongoose.connection.collection("twoFactor");
+    const record = await col.findOne(
+      // Reason: better-auth stores `userId` as a string in the twoFactor
+      // collection; the driver types require a BSON filter, hence the cast.
+      { userId } as unknown as Parameters<typeof col.findOne>[0],
+      { projection: { _id: 1 } },
+    );
+    return Boolean(record);
   } catch (err) {
     console.warn("⚠️ [2FA gate] isTwoFactorEnabled read error:", err);
     // Reason: Fail-closed would lock users out on a transient read error.

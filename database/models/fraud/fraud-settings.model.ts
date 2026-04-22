@@ -103,6 +103,13 @@ export interface IFraudSettings extends Document {
   // ============================================
   // Require a valid TOTP on password changes for users who have 2FA enabled.
   requireTwoFactorForPasswordChange: boolean;
+  // Require 2FA on sign-in for users who have enrolled 2FA.
+  // Reason: admins can disable the login challenge globally while still
+  // enforcing 2FA for high-risk actions like withdrawals / password change.
+  // When disabled, users with an existing 2FA enrolment can sign in with
+  // email + password only; the withdrawal and password-change gates still
+  // check enrolment via the better-auth `twoFactor` collection.
+  requireTwoFactorForLogin: boolean;
 
   // Metadata
   updatedAt: Date;
@@ -297,6 +304,9 @@ const FraudSettingsSchema = new Schema<IFraudSettings>(
     // Reason: disabled by default for backward-compat. Admin can flip this
     // on once 2FA enrolment is rolled out to the user base.
     requireTwoFactorForPasswordChange: { type: Boolean, default: false },
+    // Reason: true by default so existing installs preserve the current
+    // behaviour where enrolled users are challenged on every sign-in.
+    requireTwoFactorForLogin: { type: Boolean, default: true },
 
     // Metadata
     updatedAt: { type: Date, default: Date.now },
@@ -425,4 +435,5 @@ export const DEFAULT_FRAUD_SETTINGS: Partial<IFraudSettings> = {
 
   // Two-Factor step-up defaults
   requireTwoFactorForPasswordChange: false,
+  requireTwoFactorForLogin: true,
 };

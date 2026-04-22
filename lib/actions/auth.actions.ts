@@ -14,6 +14,7 @@ import {
   clearFailedLogins,
   getClientIP,
 } from "@/lib/services/registration-security.service";
+import { getFraudSettings } from "@/lib/services/fraud-settings.service";
 
 export const signUpWithEmail = async ({
   email,
@@ -467,6 +468,44 @@ export const signInWithEmail = async ({ email, password }: SignInFormData) => {
       }
     }
 
+    // Reason: when the admin has disabled 2FA on login we still want
+    // the withdrawal / password-change step-up gates to work. The
+    // better-auth twoFactor plugin's sign-in hook gates off the single
+    // `user.twoFactorEnabled` boolean, so we temporarily clear it for
+    // the duration of the signInEmail call and restore it afterwards.
+    // Enrolment state (the TOTP secret + backup codes in the `twoFactor`
+    // collection) is never touched, which is what the withdrawal gate
+    // and the /api/user/2fa/status endpoint read.
+    let bypassUserId: ObjectId | null = null;
+    try {
+      if (db) {
+        const fraud = await getFraudSettings().catch(() => null);
+        if (fraud && fraud.requireTwoFactorForLogin === false) {
+          const u = await db
+            .collection("user")
+            .findOne(
+              { email },
+              { projection: { _id: 1, twoFactorEnabled: 1 } },
+            );
+          if (u && u.twoFactorEnabled === true) {
+            bypassUserId = u._id as ObjectId;
+            await db
+              .collection("user")
+              .updateOne(
+                { _id: bypassUserId },
+                { $set: { twoFactorEnabled: false } },
+              );
+          }
+        }
+      }
+    } catch (bypassErr) {
+      console.warn(
+        "⚠️ [signIn] login-2FA bypass preflight failed, continuing with default flow:",
+        bypassErr instanceof Error ? bypassErr.message : bypassErr,
+      );
+      bypassUserId = null;
+    }
+
     try {
       const response = await auth.api.signInEmail({
         body: { email, password },
@@ -538,6 +577,29 @@ export const signInWithEmail = async ({ email, password }: SignInFormData) => {
         success: false,
         error: `Invalid email or password${remainingMsg}`,
       };
+    } finally {
+      // Reason: always restore the twoFactorEnabled flag we cleared for
+      // the login-2FA bypass. If this update fails (e.g. DB hiccup) the
+      // user is left with `twoFactorEnabled=false`, which only matters
+      // the next time the admin flips `requireTwoFactorForLogin` back
+      // on — at which point better-auth would skip the challenge for
+      // this user. Enrolment (the TOTP secret in the `twoFactor` coll.)
+      // remains intact, so the withdrawal gate still enforces 2FA.
+      if (bypassUserId && db) {
+        try {
+          await db
+            .collection("user")
+            .updateOne(
+              { _id: bypassUserId },
+              { $set: { twoFactorEnabled: true } },
+            );
+        } catch (restoreErr) {
+          console.error(
+            "❌ [signIn] failed to restore twoFactorEnabled after login-2FA bypass:",
+            restoreErr,
+          );
+        }
+      }
     }
   } catch (e) {
     console.log("Sign in failed", e);
