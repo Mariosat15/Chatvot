@@ -142,7 +142,6 @@ export type WithdrawalFailureCode =
   | "ACTIVE_COMPETITIONS"
   | "ACTIVE_CHALLENGES"
   | "METHOD_DISABLED"
-  | "METHOD_NOT_ALLOWED"
   | "TWO_FACTOR_REQUIRED"
   | "TWO_FACTOR_NOT_ENABLED"
   | "TWO_FACTOR_INVALID";
@@ -716,39 +715,23 @@ export async function validateWithdrawal(
     );
   }
 
-  // Admin-configured allow-list overlay.
+  // NOTE: `settings.allowedPayoutMethods` is intentionally NOT enforced
+  // server-side.
   //
-  // Reason: the admin UI historically offered a mix of logical categories
-  // (`original_method`, `stripe_payout`, `stripe_refund`, `bank_transfer`)
-  // while the route handlers send a slightly different set at runtime
-  // (`bank_transfer`, `card_payout`, `original_method`). Legacy databases
-  // therefore have allowlists that don't cover any runtime category, which
-  // would wrongly reject every withdrawal.
+  // Reason: the admin UI's allow-list mixed logical categories
+  // (`original_method`, `stripe_payout`, `stripe_refund`) with runtime
+  // categories (`bank_transfer`, `card_payout`) and legacy databases have
+  // lists that partially overlap with what the routes now send. Any
+  // strict enforcement — even a "lenient" intersection check — risked
+  // rejecting legitimate withdrawals when an admin had never touched the
+  // defaults.
   //
-  // We only enforce the allowlist when the admin has explicitly opted in
-  // for THIS runtime category space — i.e. their list contains at least
-  // one of the categories routes actually send. Otherwise the list is
-  // treated as a UI hint and the real gates remain the coarser
-  // `bankWithdrawalsEnabled` / `cardWithdrawalsEnabled` flags above.
-  const RUNTIME_CATEGORIES: PayoutCategory[] = [
-    "bank_transfer",
-    "card_payout",
-    "original_method",
-  ];
-  const list = Array.isArray(settings.allowedPayoutMethods)
-    ? settings.allowedPayoutMethods
-    : [];
-  const adminConfiguredForRuntime = RUNTIME_CATEGORIES.some((c) =>
-    list.includes(c),
-  );
-  if (adminConfiguredForRuntime && !list.includes(payoutCategory)) {
-    return fail(
-      403,
-      "METHOD_NOT_ALLOWED",
-      "This payout method is not enabled by the administrator.",
-      rateLimitHeaders,
-    );
-  }
+  // The `bankWithdrawalsEnabled` / `cardWithdrawalsEnabled` toggles above
+  // are the authoritative server-side gates. The allow-list is kept in
+  // the DB purely as a UI hint that controls which methods appear in the
+  // withdrawal modal; the client is trusted to respect it because the
+  // backend already re-validates the chosen category through the
+  // bank/card toggles.
 
   return {
     ok: true,
