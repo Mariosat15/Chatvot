@@ -15,6 +15,7 @@ import UserBankAccount from "@/database/models/user-bank-account.model";
 import KYCSettings from "@/database/models/kyc-settings.model";
 import { sanitizeUserNote, sanitizeAmount } from "@/lib/utils/sanitize";
 import { createSecurityLogger } from "@/lib/utils/security-logger";
+import { evaluateTwoFactorGate } from "@/lib/services/two-factor-gate.service";
 
 /**
  * GET /api/wallet/withdraw
@@ -341,7 +342,11 @@ export async function POST(request: NextRequest) {
     // withdrawalSettings is reused below - no need to fetch again
 
     const body = await request.json();
-    const { withdrawalMethodId, userNote: rawUserNote } = body;
+    const {
+      withdrawalMethodId,
+      userNote: rawUserNote,
+      twoFactorCode,
+    } = body;
 
     // SECURITY: Sanitize inputs
     const amountEUR = sanitizeAmount(body.amountEUR);
@@ -358,6 +363,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: "Please select a withdrawal method" },
         { status: 400 },
+      );
+    }
+
+    // SECURITY: Two-factor step-up gate. Runs before any state-changing
+    // work so failed / missing TOTP returns cheaply.
+    // Reason: withdrawal is the highest-value user action — we block
+    // session-hijack attacks by requiring a fresh TOTP when the admin
+    // has enabled 2FA enforcement (globally or above a threshold).
+    const twoFactorGate = await evaluateTwoFactorGate({
+      userId: session.user.id,
+      reqHeaders: await headers(),
+      code:
+        typeof twoFactorCode === "string" ? twoFactorCode.trim() : undefined,
+      policy: {
+        required: withdrawalSettings.requireTwoFactorForWithdrawal === true,
+        requireAboveAmount:
+          typeof withdrawalSettings.requireTwoFactorAboveAmount === "number"
+            ? withdrawalSettings.requireTwoFactorAboveAmount
+            : 0,
+        blockIfNotEnabled:
+          withdrawalSettings.blockWithdrawalsWithoutTwoFactor === true,
+        amount: amountEUR,
+      },
+    });
+    if (!twoFactorGate.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: twoFactorGate.error,
+          code: twoFactorGate.code,
+        },
+        { status: twoFactorGate.status },
       );
     }
 

@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { isEUCountry } from "@/lib/utils/country-vat";
+import TwoFactorSection from "@/components/profile/TwoFactorSection";
 
 interface UserProfile {
   id: string;
@@ -88,6 +89,10 @@ export default function ProfileSettingsSection() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  // 2FA step-up for password change (only shown when the server demands it)
+  const [passwordTwoFactorRequired, setPasswordTwoFactorRequired] =
+    useState(false);
+  const [passwordTwoFactorCode, setPasswordTwoFactorCode] = useState("");
 
   // Privacy settings
   const [allowFriendRequests, setAllowFriendRequests] = useState(true);
@@ -353,6 +358,12 @@ export default function ProfileSettingsSection() {
         body: JSON.stringify({
           currentPassword,
           newPassword,
+          // Reason: Only send the code when the server has already asked for
+          // it. Sending an empty string is fine — the gate treats it as "no
+          // code provided" and will respond with TWO_FACTOR_REQUIRED.
+          twoFactorCode: passwordTwoFactorRequired
+            ? passwordTwoFactorCode.trim()
+            : undefined,
         }),
       });
 
@@ -361,9 +372,26 @@ export default function ProfileSettingsSection() {
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
+        setPasswordTwoFactorRequired(false);
+        setPasswordTwoFactorCode("");
       } else {
         const error = await response.json();
-        toast.error(error.error || "Failed to change password");
+        const code = error?.code as string | undefined;
+
+        if (code === "TWO_FACTOR_REQUIRED" || code === "TWO_FACTOR_INVALID") {
+          setPasswordTwoFactorRequired(true);
+          toast.error(
+            error.error ||
+              "Enter your authenticator code to confirm the password change.",
+          );
+        } else if (code === "TWO_FACTOR_NOT_ENABLED") {
+          toast.error(
+            error.error ||
+              "Enable two-factor authentication first, then try again.",
+          );
+        } else {
+          toast.error(error.error || "Failed to change password");
+        }
       }
     } catch (error) {
       console.error("Error changing password:", error);
@@ -794,6 +822,33 @@ export default function ProfileSettingsSection() {
               )}
           </div>
 
+          {/* 2FA Step-Up Prompt (shown only after the server asks for it) */}
+          {passwordTwoFactorRequired && (
+            <div className="space-y-2 p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
+              <Label
+                htmlFor="passwordTwoFactorCode"
+                className="text-amber-200 flex items-center gap-2"
+              >
+                <Shield className="h-4 w-4" />
+                Two-Factor Code Required
+              </Label>
+              <p className="text-xs text-amber-300/80">
+                Enter the 6-digit code from your authenticator app (or a backup
+                code) to confirm this password change.
+              </p>
+              <Input
+                id="passwordTwoFactorCode"
+                value={passwordTwoFactorCode}
+                onChange={(e) => setPasswordTwoFactorCode(e.target.value)}
+                placeholder="123456"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                className="bg-dark-800 border-dark-600 text-white tracking-widest"
+                maxLength={10}
+              />
+            </div>
+          )}
+
           {/* Change Password Button */}
           <div className="pt-2">
             <Button
@@ -820,6 +875,9 @@ export default function ProfileSettingsSection() {
           </div>
         </form>
       </div>
+
+      {/* Two-Factor Authentication */}
+      <TwoFactorSection />
 
       {/* Privacy Settings */}
       <div className="bg-dark-700/50 rounded-2xl p-6 shadow-xl border border-dark-600">

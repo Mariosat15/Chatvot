@@ -39,7 +39,6 @@ import {
   Building,
   Users,
   Lock,
-  Unlock,
   RotateCcw,
   Info,
 } from "lucide-react";
@@ -82,6 +81,11 @@ interface WithdrawalSettings {
   maxWithdrawalsPerDay: number;
   maxWithdrawalsPerMonth: number;
   holdPeriodAfterDeposit: number;
+
+  // Two-Factor Authentication
+  requireTwoFactorForWithdrawal: boolean;
+  requireTwoFactorAboveAmount: number;
+  blockWithdrawalsWithoutTwoFactor: boolean;
 
   // API Rate Limiting (spam protection)
   apiRateLimitEnabled: boolean;
@@ -227,7 +231,10 @@ export default function WithdrawalSettingsSection() {
     }
   };
 
-  const updateSetting = (key: keyof WithdrawalSettings, value: any) => {
+  const updateSetting = <K extends keyof WithdrawalSettings>(
+    key: K,
+    value: WithdrawalSettings[K],
+  ) => {
     if (settings) {
       setSettings({ ...settings, [key]: value });
     }
@@ -915,6 +922,133 @@ export default function WithdrawalSettingsSection() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Two-Factor Authentication Policy */}
+      <Card className="bg-gradient-to-br from-amber-900/20 to-yellow-900/10 border-amber-500/30">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Lock className="h-5 w-5 text-amber-400" />
+            Two-Factor Authentication (Step-Up)
+            {(settings.requireTwoFactorForWithdrawal ||
+              (settings.requireTwoFactorAboveAmount ?? 0) > 0) && (
+              <Badge className="bg-amber-500/20 text-amber-300">Active</Badge>
+            )}
+          </CardTitle>
+          <CardDescription>
+            Require users to provide a one-time authenticator code (TOTP) or
+            backup code on withdrawal requests. Protects against session
+            hijacking and stolen credentials.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Always require 2FA */}
+          <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+            <div className="flex items-center gap-3">
+              <div
+                className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+                  settings.requireTwoFactorForWithdrawal
+                    ? "bg-amber-500/20"
+                    : "bg-gray-600/20"
+                }`}
+              >
+                <Lock
+                  className={`h-5 w-5 ${settings.requireTwoFactorForWithdrawal ? "text-amber-400" : "text-gray-500"}`}
+                />
+              </div>
+              <div>
+                <Label className="text-gray-300">
+                  Require 2FA on Every Withdrawal
+                </Label>
+                <p className="text-xs text-gray-500">
+                  Prompt for authenticator code on every withdrawal request
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={settings.requireTwoFactorForWithdrawal ?? false}
+              onCheckedChange={(checked) =>
+                updateSetting("requireTwoFactorForWithdrawal", checked)
+              }
+            />
+          </div>
+
+          {/* Threshold-based 2FA */}
+          <div className="p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <Label className="text-gray-300">
+                  Require 2FA Above Amount (EUR)
+                </Label>
+                <p className="text-xs text-gray-500">
+                  Only prompt for 2FA when the withdrawal exceeds this value.
+                  Set to 0 to disable threshold-based gating.
+                </p>
+              </div>
+            </div>
+            <Input
+              type="number"
+              min={0}
+              step={50}
+              value={settings.requireTwoFactorAboveAmount ?? 0}
+              onChange={(e) =>
+                updateSetting(
+                  "requireTwoFactorAboveAmount",
+                  parseInt(e.target.value) || 0,
+                )
+              }
+              className="bg-gray-700 border-gray-600 w-40"
+              disabled={settings.requireTwoFactorForWithdrawal}
+            />
+            {settings.requireTwoFactorForWithdrawal && (
+              <p className="text-xs text-amber-300/80 mt-2">
+                Ignored — 2FA is already required on every withdrawal above.
+              </p>
+            )}
+          </div>
+
+          {/* Block users without 2FA */}
+          <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+            <div className="flex items-center gap-3">
+              <div
+                className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+                  settings.blockWithdrawalsWithoutTwoFactor
+                    ? "bg-red-500/20"
+                    : "bg-gray-600/20"
+                }`}
+              >
+                <Ban
+                  className={`h-5 w-5 ${settings.blockWithdrawalsWithoutTwoFactor ? "text-red-400" : "text-gray-500"}`}
+                />
+              </div>
+              <div>
+                <Label className="text-gray-300">
+                  Block Withdrawals if 2FA Not Enabled
+                </Label>
+                <p className="text-xs text-gray-500">
+                  Users without 2FA enrolled cannot withdraw at all. Forces
+                  enrollment on users who want to move money off-platform.
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={settings.blockWithdrawalsWithoutTwoFactor ?? false}
+              onCheckedChange={(checked) =>
+                updateSetting("blockWithdrawalsWithoutTwoFactor", checked)
+              }
+            />
+          </div>
+
+          {!settings.requireTwoFactorForWithdrawal &&
+            (settings.requireTwoFactorAboveAmount ?? 0) === 0 &&
+            !settings.blockWithdrawalsWithoutTwoFactor && (
+              <div className="bg-gray-700/30 border border-gray-600 rounded-lg p-3 text-sm text-gray-400">
+                <Info className="h-4 w-4 inline mr-2" />
+                2FA step-up is currently disabled for withdrawals. Users may
+                still enable 2FA on their profile for sign-in protection.
+              </div>
+            )}
+        </CardContent>
+      </Card>
 
       {/* Nuvei Automatic Withdrawal */}
       <Card className="bg-gradient-to-br from-purple-900/30 to-blue-900/30 border-purple-500/30">

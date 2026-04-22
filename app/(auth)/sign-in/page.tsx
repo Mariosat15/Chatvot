@@ -101,6 +101,21 @@ const SignIn = () => {
     try {
       const result = await signInWithEmail(data);
       if (result.success) {
+        // Reason: When the user has 2FA enabled, the credentials were
+        // correct but the session is not active yet. Redirect to the
+        // verify page; the temporary 2FA cookie is already set by the
+        // server action via better-auth's nextCookies plugin.
+        if ((result as { twoFactorRequired?: boolean }).twoFactorRequired) {
+          const methods = (
+            result as { twoFactorMethods?: string[] }
+          ).twoFactorMethods;
+          const params = methods?.length
+            ? `?methods=${encodeURIComponent(methods.join(","))}`
+            : "";
+          router.push(`/verify-2fa${params}`);
+          return;
+        }
+
         // Track device fingerprint after successful sign-in
         try {
           await trackDeviceFingerprint();

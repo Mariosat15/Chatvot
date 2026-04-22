@@ -112,6 +112,9 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
     null,
   );
   const [showTerms, setShowTerms] = useState(false);
+  // Two-factor step-up state for when the admin has required TOTP on withdrawals.
+  const [twoFactorRequired, setTwoFactorRequired] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState("");
   const router = useRouter();
 
   // Fetch withdrawal info when modal opens
@@ -214,7 +217,7 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
             selectedMethod.userPaymentOptionId);
 
         if (canTryAutomatic) {
-          const requestBody: any = {
+          const requestBody: Record<string, unknown> = {
             amountEUR,
             withdrawalMethod,
           };
@@ -301,12 +304,37 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
           amountEUR,
           withdrawalMethodId: selectedMethodId,
           userNote: userNote.trim() || undefined,
+          // Include 2FA code when the user has entered one (ignored by
+          // the server when 2FA is not required for this withdrawal).
+          twoFactorCode: twoFactorCode.trim() || undefined,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
+        // Step-up handling — surface the TOTP input without wiping the form.
+        if (
+          data?.code === "TWO_FACTOR_REQUIRED" ||
+          data?.code === "TWO_FACTOR_INVALID"
+        ) {
+          setTwoFactorRequired(true);
+          setError(
+            data.code === "TWO_FACTOR_INVALID"
+              ? "Invalid or expired code. Please try again."
+              : "Enter your authenticator code to continue.",
+          );
+          setLoading(false);
+          return;
+        }
+        if (data?.code === "TWO_FACTOR_NOT_ENABLED") {
+          setError(
+            data.error ||
+              "Two-factor authentication is required for this withdrawal. Please enable it in your profile.",
+          );
+          setLoading(false);
+          return;
+        }
         setError(data.error || "Withdrawal request failed");
         setLoading(false);
         return;
@@ -357,6 +385,8 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
     setSelectedMethodId("");
     setUserNote("");
     setError("");
+    setTwoFactorRequired(false);
+    setTwoFactorCode("");
     setSuccess(null);
     setLoading(false);
   };
@@ -761,6 +791,28 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
               <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3 flex items-start gap-2">
                 <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
                 <p className="text-xs text-red-400">{error}</p>
+              </div>
+            )}
+
+            {twoFactorRequired && (
+              <div className="rounded-lg bg-yellow-500/5 border border-yellow-500/30 p-3 space-y-2">
+                <div className="flex items-center gap-2 text-yellow-300 text-xs font-medium">
+                  <Shield className="h-4 w-4" />
+                  Two-factor verification required
+                </div>
+                <p className="text-xs text-gray-400">
+                  Enter the 6-digit code from your authenticator app to
+                  confirm this withdrawal.
+                </p>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={twoFactorCode}
+                  onChange={(e) => setTwoFactorCode(e.target.value)}
+                  placeholder="123456"
+                  className="bg-gray-900/60 border-gray-700 text-white text-center tracking-widest"
+                />
               </div>
             )}
 

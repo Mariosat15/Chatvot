@@ -1,0 +1,195 @@
+import { auth } from "@/lib/better-auth/auth";
+import { connectToDatabase } from "@/database/mongoose";
+import mongoose from "mongoose";
+
+/**
+ * Two-Factor Step-Up Gate
+ * -----------------------
+ * Helpers that enforce 2FA on individual actions (withdrawals, password
+ * changes, etc.) for users who already have an active session.
+ *
+ * Why a dedicated module:
+ *   - Centralises the 2FA policy so the same rules apply across features.
+ *   - Keeps route handlers thin and declarative:
+ *       `const gate = await evaluateTwoFactorGate(...); if (!gate.ok) return 403`
+ *   - Gives admin settings a single point of effect.
+ */
+
+export interface TwoFactorGateContext {
+  userId: string;
+  /** The request headers, used by better-auth to resolve the session. */
+  reqHeaders: Headers;
+  /** TOTP / backup code provided in the request body (if any). */
+  code?: string;
+  /** Admin policy — see WithdrawalSettings / ProfileSecuritySettings. */
+  policy: {
+    /** Always require 2FA. */
+    required?: boolean;
+    /**
+     * Require 2FA only when the action amount exceeds this EUR value.
+     * 0 or undefined disables threshold-based gating.
+     */
+    requireAboveAmount?: number;
+    /** Block the action entirely if the user has no 2FA enabled. */
+    blockIfNotEnabled?: boolean;
+    /** Current amount being acted on, used for threshold comparison. */
+    amount?: number;
+  };
+}
+
+export type TwoFactorGateResult =
+  | { ok: true }
+  | {
+      ok: false;
+      status: number;
+      code:
+        | "TWO_FACTOR_REQUIRED"
+        | "TWO_FACTOR_NOT_ENABLED"
+        | "TWO_FACTOR_INVALID"
+        | "UNAUTHORIZED";
+      error: string;
+    };
+
+/**
+ * Returns whether the current user has 2FA enabled on their account.
+ * Reads the `twoFactorEnabled` flag that better-auth maintains on the
+ * user document. Safe to call on every request — the collection read
+ * is a projected point-lookup by id.
+ */
+export async function isTwoFactorEnabled(userId: string): Promise<boolean> {
+  try {
+    await connectToDatabase();
+    const db = mongoose.connection.db;
+    if (!db) return false;
+
+    const candidates: Array<Record<string, unknown>> = [
+      { _id: userId as unknown as object },
+      { id: userId },
+    ];
+    for (const filter of candidates) {
+      const doc = await db
+        .collection("user")
+        .findOne(filter, { projection: { twoFactorEnabled: 1 } });
+      if (doc) return Boolean(doc.twoFactorEnabled);
+    }
+    return false;
+  } catch (err) {
+    console.warn("⚠️ [2FA gate] isTwoFactorEnabled read error:", err);
+    // Reason: Fail-closed would lock users out on a transient DB error.
+    // We fail-open here; the caller must still rely on policy flags to
+    // decide whether the action is allowed.
+    return false;
+  }
+}
+
+/**
+ * Verifies a supplied TOTP (or backup) code for the active session.
+ * Delegates to better-auth's `verifyTOTP` / `verifyBackupCode` methods
+ * which read the session from the supplied headers. Returns true only
+ * on exact match; any error is treated as invalid.
+ */
+export async function verifyActionTwoFactor(
+  code: string,
+  reqHeaders: Headers,
+): Promise<{ valid: boolean; usedBackup: boolean }> {
+  const trimmed = code.trim();
+  if (!trimmed) return { valid: false, usedBackup: false };
+
+  // Numeric 6-8 digit → TOTP. Anything else (e.g. alphanumeric backup codes) → backup code.
+  const isTotp = /^\d{6,8}$/.test(trimmed);
+
+  try {
+    if (isTotp) {
+      await auth.api.verifyTOTP({
+        body: { code: trimmed, trustDevice: false },
+        headers: reqHeaders,
+      });
+      return { valid: true, usedBackup: false };
+    }
+    await auth.api.verifyBackupCode({
+      body: { code: trimmed, trustDevice: false },
+      headers: reqHeaders,
+    });
+    return { valid: true, usedBackup: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn("⚠️ [2FA gate] verifyActionTwoFactor failed:", msg);
+    return { valid: false, usedBackup: false };
+  }
+}
+
+/**
+ * Evaluates a step-up gate in one call. Typical usage in a route handler:
+ *
+ *   const gate = await evaluateTwoFactorGate({ userId, reqHeaders, code, policy });
+ *   if (!gate.ok) return NextResponse.json({ error: gate.error, code: gate.code }, { status: gate.status });
+ */
+export async function evaluateTwoFactorGate(
+  ctx: TwoFactorGateContext,
+): Promise<TwoFactorGateResult> {
+  const { userId, reqHeaders, code, policy } = ctx;
+
+  if (!userId) {
+    return {
+      ok: false,
+      status: 401,
+      code: "UNAUTHORIZED",
+      error: "Unauthorized.",
+    };
+  }
+
+  // Decide whether this specific action needs 2FA.
+  const amountGate =
+    typeof policy.requireAboveAmount === "number" &&
+    policy.requireAboveAmount > 0 &&
+    typeof policy.amount === "number" &&
+    policy.amount > policy.requireAboveAmount;
+
+  const needsTwoFactor = Boolean(policy.required) || amountGate;
+
+  if (!needsTwoFactor) return { ok: true };
+
+  const enabled = await isTwoFactorEnabled(userId);
+
+  if (!enabled) {
+    if (policy.blockIfNotEnabled) {
+      return {
+        ok: false,
+        status: 403,
+        code: "TWO_FACTOR_NOT_ENABLED",
+        error:
+          "Please enable two-factor authentication in your profile before continuing.",
+      };
+    }
+    // Reason: Policy requires 2FA but user hasn't enrolled. Prompt them
+    // to enrol rather than silently bypassing the gate.
+    return {
+      ok: false,
+      status: 403,
+      code: "TWO_FACTOR_NOT_ENABLED",
+      error:
+        "Two-factor authentication is required for this action. Please enable it in your profile first.",
+    };
+  }
+
+  if (!code) {
+    return {
+      ok: false,
+      status: 403,
+      code: "TWO_FACTOR_REQUIRED",
+      error: "Enter your authenticator code to continue.",
+    };
+  }
+
+  const { valid } = await verifyActionTwoFactor(code, reqHeaders);
+  if (!valid) {
+    return {
+      ok: false,
+      status: 403,
+      code: "TWO_FACTOR_INVALID",
+      error: "Invalid or expired verification code.",
+    };
+  }
+
+  return { ok: true };
+}

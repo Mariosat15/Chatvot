@@ -472,6 +472,28 @@ export const signInWithEmail = async ({ email, password }: SignInFormData) => {
         body: { email, password },
       });
 
+      // Reason: When the user has 2FA enabled, better-auth returns a
+      // `twoFactorRedirect: true` payload and sets a short-lived 2FA
+      // cookie (handled automatically by the nextCookies() plugin) that
+      // the verify-2fa endpoints will consume. We must NOT clear failed
+      // logins yet — the login is only complete once TOTP is verified.
+      if (
+        response &&
+        typeof response === "object" &&
+        "twoFactorRedirect" in (response as Record<string, unknown>) &&
+        (response as { twoFactorRedirect?: boolean }).twoFactorRedirect === true
+      ) {
+        const methods =
+          (response as { twoFactorMethods?: string[] }).twoFactorMethods || [
+            "totp",
+          ];
+        return {
+          success: true,
+          twoFactorRequired: true,
+          twoFactorMethods: methods,
+        };
+      }
+
       // SECURITY: Clear failed login attempts on success
       await clearFailedLogins({ email, ip });
 

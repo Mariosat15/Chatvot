@@ -98,6 +98,9 @@ export interface IFraudSettings extends Document {
   failedLoginAlertThreshold: number; // Alert admin after X failed attempts
   trackFailedLogins: boolean; // Store failed login attempts
 
+  // Two-Factor Step-Up Policy
+  requireTwoFactorForPasswordChange: boolean;
+
   // Metadata
   updatedAt: Date;
   updatedBy?: string; // Admin user ID
@@ -285,6 +288,9 @@ const FraudSettingsSchema = new Schema<IFraudSettings>(
     failedLoginAlertThreshold: { type: Number, default: 10, min: 1, max: 100 },
     trackFailedLogins: { type: Boolean, default: true },
 
+    // Two-Factor Step-Up Policy
+    requireTwoFactorForPasswordChange: { type: Boolean, default: false },
+
     // Metadata
     updatedAt: { type: Date, default: Date.now },
     updatedBy: String,
@@ -409,4 +415,7 @@ export const DEFAULT_FRAUD_SETTINGS: Partial<IFraudSettings> = {
   loginCooldownAfterFailedAttempts: 3,
   failedLoginAlertThreshold: 5, // Same as lockout threshold - alert when account is locked
   trackFailedLogins: true,
+
+  // Two-Factor step-up defaults
+  requireTwoFactorForPasswordChange: false,
 };

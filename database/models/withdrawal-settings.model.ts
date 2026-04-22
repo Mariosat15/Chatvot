@@ -44,6 +44,11 @@ export interface IWithdrawalSettings extends Document {
   apiRateLimitEnabled: boolean; // Enable/disable API rate limiting
   apiRateLimitRequestsPerMinute: number; // Max API requests per minute per user (0 = unlimited)
 
+  // Two-Factor Authentication (step-up security)
+  requireTwoFactorForWithdrawal: boolean; // Require a valid 2FA code on every withdrawal when the user has 2FA enabled
+  requireTwoFactorAboveAmount: number; // If > 0, require 2FA only when withdrawal exceeds this EUR amount (0 disables amount-based gating)
+  blockWithdrawalsWithoutTwoFactor: boolean; // If true, users without 2FA enabled cannot withdraw at all
+
   // Payout Methods
   allowedPayoutMethods: string[]; // ['stripe_refund', 'stripe_payout', 'bank_transfer', 'original_method']
   preferredPayoutMethod: string; // Default payout method
@@ -211,6 +216,28 @@ const WithdrawalSettingsSchema = new Schema<IWithdrawalSettings>(
       default: 5, // 5 requests per minute per user
       min: 1,
       max: 100,
+    },
+
+    // Two-Factor Authentication (step-up security)
+    // Reason: When enabled, we require a valid TOTP on every withdrawal for
+    // users who have 2FA active. This blocks session-hijack withdrawals.
+    // Disabled by default to avoid locking out existing users on release day.
+    requireTwoFactorForWithdrawal: {
+      type: Boolean,
+      default: false,
+    },
+    // Reason: Threshold-based enforcement lets admins require 2FA only for
+    // high-value withdrawals (e.g. > €500). Value 0 disables this gate.
+    requireTwoFactorAboveAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    // Reason: Strictest policy — users without 2FA enabled cannot withdraw
+    // at all. Used together with forced enrollment in the profile UI.
+    blockWithdrawalsWithoutTwoFactor: {
+      type: Boolean,
+      default: false,
     },
 
     // Payout Methods

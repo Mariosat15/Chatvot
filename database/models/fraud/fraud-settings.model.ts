@@ -98,6 +98,12 @@ export interface IFraudSettings extends Document {
   failedLoginAlertThreshold: number; // Alert admin after X failed attempts
   trackFailedLogins: boolean; // Store failed login attempts
 
+  // ============================================
+  // TWO-FACTOR STEP-UP POLICY
+  // ============================================
+  // Require a valid TOTP on password changes for users who have 2FA enabled.
+  requireTwoFactorForPasswordChange: boolean;
+
   // Metadata
   updatedAt: Date;
   updatedBy?: string; // Admin user ID
@@ -287,6 +293,11 @@ const FraudSettingsSchema = new Schema<IFraudSettings>(
     failedLoginAlertThreshold: { type: Number, default: 10, min: 1, max: 100 },
     trackFailedLogins: { type: Boolean, default: true },
 
+    // Two-factor step-up policy
+    // Reason: disabled by default for backward-compat. Admin can flip this
+    // on once 2FA enrolment is rolled out to the user base.
+    requireTwoFactorForPasswordChange: { type: Boolean, default: false },
+
     // Metadata
     updatedAt: { type: Date, default: Date.now },
     updatedBy: String,
@@ -411,4 +422,7 @@ export const DEFAULT_FRAUD_SETTINGS: Partial<IFraudSettings> = {
   loginCooldownAfterFailedAttempts: 3,
   failedLoginAlertThreshold: 5, // Same as lockout threshold - alert when account is locked
   trackFailedLogins: true,
+
+  // Two-Factor step-up defaults
+  requireTwoFactorForPasswordChange: false,
 };

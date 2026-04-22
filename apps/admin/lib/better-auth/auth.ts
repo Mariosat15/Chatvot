@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
+import { twoFactor } from "better-auth/plugins";
 import { connectToDatabase } from "@/database/mongoose";
 import { nextCookies } from "better-auth/next-js";
 
@@ -20,9 +21,16 @@ export const getAuth = async (): Promise<ReturnType<typeof betterAuth>> => {
       if (!db) throw new Error("MongoDB connection not found");
 
       authInstance = betterAuth({
+        // Reason: mongodbAdapter accepts Db but the mongoose native driver's
+        // type shape differs slightly from the one shipped with better-auth.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         database: mongodbAdapter(db as any),
         secret: process.env.BETTER_AUTH_SECRET,
         baseURL: process.env.BETTER_AUTH_URL,
+        // Reason: appName is used by twoFactor plugin as the TOTP issuer.
+        // Kept identical to the main app so the same authenticator entry
+        // works across both sign-ins (shared user collection).
+        appName: "ChartVolt",
         emailAndPassword: {
           enabled: true,
           disableSignUp: false,
@@ -31,7 +39,12 @@ export const getAuth = async (): Promise<ReturnType<typeof betterAuth>> => {
           maxPasswordLength: 128,
           autoSignIn: true,
         },
-        plugins: [nextCookies()],
+        plugins: [
+          twoFactor({
+            issuer: "ChartVolt",
+          }),
+          nextCookies(),
+        ],
       });
 
       return authInstance;

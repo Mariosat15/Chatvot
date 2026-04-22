@@ -16,6 +16,7 @@ import {
   Save,
   RefreshCw,
   Shield,
+  ShieldCheck,
   Eye,
   AlertTriangle,
   UserX,
@@ -108,6 +109,9 @@ interface FraudSettings {
   loginCooldownAfterFailedAttempts: number;
   failedLoginAlertThreshold: number;
   trackFailedLogins: boolean;
+
+  // Two-Factor Step-Up Policy
+  requireTwoFactorForPasswordChange: boolean;
 }
 
 export default function FraudSettingsSection() {
@@ -848,6 +852,47 @@ export default function FraudSettingsSection() {
                 </div>
               </CardContent>
             )}
+          </Card>
+
+          {/* Two-Factor Step-Up Policy */}
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-gray-100 flex items-center gap-2 text-base">
+                <ShieldCheck className="h-4 w-4 text-amber-400" />
+                Two-Factor Authentication (Step-Up)
+              </CardTitle>
+              <CardDescription className="text-gray-500 text-xs">
+                Require a TOTP code on sensitive self-service actions for users
+                who already have 2FA enabled. This acts as a second barrier in
+                case a session is stolen.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0 space-y-4">
+              <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
+                <div>
+                  <Label className="text-gray-300 text-sm">
+                    Require 2FA on Password Change
+                  </Label>
+                  <p className="text-xs text-gray-500">
+                    Forces users with 2FA enabled to enter a fresh TOTP before
+                    changing their password. No effect on users who have not
+                    enrolled 2FA.
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.requireTwoFactorForPasswordChange ?? false}
+                  onCheckedChange={(checked) =>
+                    updateSetting("requireTwoFactorForPasswordChange", checked)
+                  }
+                />
+              </div>
+              <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg text-xs text-amber-200/80">
+                Withdrawal-specific 2FA rules (always-on, threshold,
+                block-without-2FA) live in{" "}
+                <strong>Withdrawal Settings → Two-Factor Authentication</strong>
+                .
+              </div>
+            </CardContent>
           </Card>
         </TabsContent>
 

@@ -1,8 +1,10 @@
 import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
+import { twoFactor } from "better-auth/plugins";
 import { connectToDatabase } from "@/database/mongoose";
 import { nextCookies } from "better-auth/next-js";
 import { validateEnvironment } from "@/lib/utils/validate-env";
+import { sendTwoFactorOTP } from "@/lib/nodemailer/send-two-factor-otp";
 import bcrypt from "bcryptjs";
 
 let authInstance: ReturnType<typeof betterAuth> | null = null;
@@ -29,9 +31,15 @@ export const getAuth = async (): Promise<ReturnType<typeof betterAuth>> => {
       if (!db) throw new Error("MongoDB connection not found");
 
       authInstance = betterAuth({
+        // Reason: mongodbAdapter accepts Db but the mongoose native driver's
+        // type shape differs slightly from the one shipped with better-auth.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         database: mongodbAdapter(db as any),
         secret: process.env.BETTER_AUTH_SECRET,
         baseURL: process.env.BETTER_AUTH_URL,
+        // Reason: appName is used by the twoFactor plugin as the TOTP issuer
+        // shown inside authenticator apps (Google Authenticator, 1Password, etc.).
+        appName: "ChartVolt",
         emailAndPassword: {
           enabled: true,
           disableSignUp: false,
@@ -50,7 +58,26 @@ export const getAuth = async (): Promise<ReturnType<typeof betterAuth>> => {
             },
           },
         },
-        plugins: [nextCookies()],
+        plugins: [
+          // Reason: Enables TOTP-based 2FA with authenticator apps, backup
+          // codes, and an email-OTP fallback channel. The plugin creates its
+          // own collection to store encrypted TOTP secrets and backup codes
+          // — no custom schema work required. Ordered before nextCookies()
+          // so verification cookies are handled by the Next.js integration.
+          twoFactor({
+            issuer: "ChartVolt",
+            otpOptions: {
+              async sendOTP({ user, otp }) {
+                await sendTwoFactorOTP({
+                  email: user.email,
+                  name: user.name,
+                  otp,
+                });
+              },
+            },
+          }),
+          nextCookies(),
+        ],
       });
 
       return authInstance;
