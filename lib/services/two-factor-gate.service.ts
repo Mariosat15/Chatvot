@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { ObjectId } from "mongodb";
 
 import { auth, twoFactorApi } from "@/lib/better-auth/auth";
 import { connectToDatabase } from "@/database/mongoose";
@@ -78,10 +79,26 @@ export async function isTwoFactorEnabled(
 
     await connectToDatabase();
     const col = mongoose.connection.collection("twoFactor");
+
+    // Reason: better-auth's mongodb adapter serializes any field that
+    // references `user.id` (including `twoFactor.userId`) into an
+    // `ObjectId` at write time. Session tokens, however, expose the id
+    // as a hex string, so a plain `{ userId: stringId }` query never
+    // matches. We try both shapes — ObjectId first, then the raw string
+    // — so the check works whether the row was created by the better-auth
+    // adapter or by a custom import that stored the id verbatim.
+    let oid: ObjectId | null = null;
+    try {
+      oid = new ObjectId(userId);
+    } catch {
+      oid = null;
+    }
+
+    const filter: Record<string, unknown> = oid
+      ? { userId: { $in: [oid, userId] } }
+      : { userId };
     const record = await col.findOne(
-      // Reason: better-auth stores `userId` as a string in the twoFactor
-      // collection; the driver types require a BSON filter, hence the cast.
-      { userId } as unknown as Parameters<typeof col.findOne>[0],
+      filter as unknown as Parameters<typeof col.findOne>[0],
       { projection: { _id: 1 } },
     );
     return Boolean(record);

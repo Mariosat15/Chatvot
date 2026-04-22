@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import mongoose from "mongoose";
+import { ObjectId } from "mongodb";
 
 import { auth } from "@/lib/better-auth/auth";
 import { connectToDatabase } from "@/database/mongoose";
@@ -16,6 +17,12 @@ import { connectToDatabase } from "@/database/mongoose";
  * "enrolled" signal. This stays consistent even when the login-2FA
  * admin toggle transiently clears `user.twoFactorEnabled` during the
  * sign-in bypass (which never touches the TOTP secret / backup codes).
+ *
+ * Reason: the better-auth mongodb adapter serializes `twoFactor.userId`
+ * into an `ObjectId` at write time (any field that references `user.id`
+ * is converted). Session tokens expose the id as a hex string, so we
+ * query against both shapes to cover rows written by either the adapter
+ * or a direct import path.
  */
 export async function GET() {
   try {
@@ -27,8 +34,20 @@ export async function GET() {
 
     await connectToDatabase();
     const col = mongoose.connection.collection("twoFactor");
+
+    let oid: ObjectId | null = null;
+    try {
+      oid = new ObjectId(userId);
+    } catch {
+      oid = null;
+    }
+
+    const filter: Record<string, unknown> = oid
+      ? { userId: { $in: [oid, userId] } }
+      : { userId };
+
     const record = await col.findOne(
-      { userId } as unknown as Parameters<typeof col.findOne>[0],
+      filter as unknown as Parameters<typeof col.findOne>[0],
       { projection: { _id: 1 } },
     );
 
