@@ -244,6 +244,14 @@ export default function FraudMonitoringSection() {
   const [blockDeposit, setBlockDeposit] = useState<boolean>(true);
   const [blockWithdraw, setBlockWithdraw] = useState<boolean>(true);
   const [hideFromPublic, setHideFromPublic] = useState<boolean>(false);
+  // Review packet — mirrors the per-user restriction form so both admin
+  // entry points write the same fields to UserRestriction and the user
+  // sees identical content on /account/review regardless of how the
+  // restriction was created.
+  const [investigationReviewEtaDays, setInvestigationReviewEtaDays] =
+    useState<string>("3");
+  const [investigationDocumentsRequested, setInvestigationDocumentsRequested] =
+    useState<string>("");
   const [fraudScores, setFraudScores] = useState<Record<string, FraudScore>>({});
   const [selectedScoreUserId, setSelectedScoreUserId] = useState<string | null>(
     null,
@@ -629,6 +637,8 @@ export default function FraudMonitoringSection() {
     setBlockCompetitions(true);
     setBlockDeposit(true);
     setBlockWithdraw(true);
+    setInvestigationReviewEtaDays("3");
+    setInvestigationDocumentsRequested("");
     setShowInvestigationDialog(true);
   };
 
@@ -648,6 +658,23 @@ export default function FraudMonitoringSection() {
     try {
       const token = localStorage.getItem("adminToken");
       let endpoint = "";
+
+      // Normalize the review-packet inputs on the client so the admin
+      // dialog and the per-user panel produce identical payloads. The
+      // server clamps again defensively; this avoids sending garbage.
+      const parsedEta =
+        investigationReviewEtaDays.trim() === ""
+          ? undefined
+          : Number(investigationReviewEtaDays);
+      const reviewEtaDays =
+        parsedEta === undefined || Number.isNaN(parsedEta)
+          ? undefined
+          : Math.max(0, Math.min(90, parsedEta));
+      const documentsList = investigationDocumentsRequested
+        .split(/[\n,]/)
+        .map((d) => d.trim())
+        .filter((d) => d.length > 0);
+
       const body: Record<string, unknown> = {
         alertId: selectedInvestigationAlert._id,
         action: investigationActionType,
@@ -661,6 +688,9 @@ export default function FraudMonitoringSection() {
           canWithdraw: !blockWithdraw,
         },
         hideFromPublic,
+        reviewEtaDays,
+        documentsRequested:
+          documentsList.length > 0 ? documentsList : undefined,
       };
 
       if (investigationActionType === "suspend") {
@@ -2143,6 +2173,51 @@ export default function FraudMonitoringSection() {
                         Hide from public (leaderboard, matchmaking, match cards)
                       </span>
                     </label>
+                  </div>
+
+                  {/* Review packet — surfaces on /account/review.
+                      // Reason: mirrors the Restrictions form in the user
+                      detail panel so both admin entry points write the same
+                      fields and the user sees identical content. */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 bg-amber-900/10 border border-amber-700/30 rounded mt-3">
+                    <div className="space-y-2">
+                      <Label className="text-amber-200 text-sm font-semibold">
+                        Review ETA (business days)
+                      </Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={90}
+                        value={investigationReviewEtaDays}
+                        onChange={(e) =>
+                          setInvestigationReviewEtaDays(e.target.value)
+                        }
+                        placeholder="3"
+                        className="bg-gray-800 border-gray-700 text-gray-100"
+                      />
+                      <p className="text-xs text-amber-200/70">
+                        Shown on the user&apos;s &quot;Account Under Review&quot; page. Default 3.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-amber-200 text-sm font-semibold">
+                        Documents requested
+                      </Label>
+                      <Textarea
+                        value={investigationDocumentsRequested}
+                        onChange={(e) =>
+                          setInvestigationDocumentsRequested(e.target.value)
+                        }
+                        placeholder={
+                          "One per line or comma-separated\nID document\nProof of address"
+                        }
+                        className="bg-gray-800 border-gray-700 text-gray-100 min-h-[80px]"
+                        rows={3}
+                      />
+                      <p className="text-xs text-amber-200/70">
+                        Listed on the user&apos;s review page. Leave blank if none are needed.
+                      </p>
+                    </div>
                   </div>
                 </>
               )}

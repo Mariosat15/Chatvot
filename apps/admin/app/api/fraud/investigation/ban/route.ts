@@ -25,6 +25,8 @@ export async function POST(request: NextRequest) {
       customReason = "",
       restrictions = {},
       hideFromPublic = false,
+      reviewEtaDays: rawReviewEtaDays,
+      documentsRequested: rawDocumentsRequested,
     } = await request.json();
 
     if (!alertId || !userIds || !Array.isArray(userIds)) {
@@ -33,6 +35,25 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+
+    // Normalize review-packet inputs defensively — these surface on the
+    // user-facing /account/review page. Mirrors the per-user restriction API.
+    const parsedEta =
+      typeof rawReviewEtaDays === "number"
+        ? rawReviewEtaDays
+        : typeof rawReviewEtaDays === "string" && rawReviewEtaDays.trim() !== ""
+          ? Number(rawReviewEtaDays)
+          : undefined;
+    const reviewEtaDays =
+      typeof parsedEta === "number" && Number.isFinite(parsedEta)
+        ? Math.max(0, Math.min(90, Math.floor(parsedEta)))
+        : undefined;
+    const documentsRequested = Array.isArray(rawDocumentsRequested)
+      ? rawDocumentsRequested
+          .map((d: unknown) => (typeof d === "string" ? d.trim() : ""))
+          .filter((d: string) => d.length > 0)
+          .slice(0, 20)
+      : undefined;
 
     await connectToDatabase();
 
@@ -65,6 +86,11 @@ export async function POST(request: NextRequest) {
         relatedFraudAlertId: alertId,
         relatedUserIds: userIds,
         isActive: true,
+        reviewEtaDays,
+        documentsRequested:
+          documentsRequested && documentsRequested.length > 0
+            ? documentsRequested
+            : undefined,
       }),
     );
 
