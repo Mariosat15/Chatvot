@@ -138,7 +138,7 @@ export async function evaluateTwoFactorGate(
     };
   }
 
-  // Decide whether this specific action needs 2FA.
+  // Decide whether this specific action needs a TOTP challenge.
   const amountGate =
     typeof policy.requireAboveAmount === "number" &&
     policy.requireAboveAmount > 0 &&
@@ -147,30 +147,32 @@ export async function evaluateTwoFactorGate(
 
   const needsTwoFactor = Boolean(policy.required) || amountGate;
 
-  if (!needsTwoFactor) return { ok: true };
+  // Reason: `blockIfNotEnabled` is an *independent* enrolment gate. Even
+  // when the action itself doesn't demand a fresh code (e.g. withdrawal
+  // under threshold), the admin may still want to force all withdrawers
+  // to have 2FA set up — this prevents session-theft "silent" drains from
+  // unprotected accounts. If neither gate is active, skip the check.
+  if (!needsTwoFactor && !policy.blockIfNotEnabled) {
+    return { ok: true };
+  }
 
   const enabled = await isTwoFactorEnabled(userId);
 
   if (!enabled) {
-    if (policy.blockIfNotEnabled) {
-      return {
-        ok: false,
-        status: 403,
-        code: "TWO_FACTOR_NOT_ENABLED",
-        error:
-          "Please enable two-factor authentication in your profile before continuing.",
-      };
-    }
-    // Reason: Policy requires 2FA but user hasn't enrolled. Prompt them
-    // to enrol rather than silently bypassing the gate.
+    const message = policy.blockIfNotEnabled
+      ? "Please enable two-factor authentication in your profile before continuing."
+      : "Two-factor authentication is required for this action. Please enable it in your profile first.";
     return {
       ok: false,
       status: 403,
       code: "TWO_FACTOR_NOT_ENABLED",
-      error:
-        "Two-factor authentication is required for this action. Please enable it in your profile first.",
+      error: message,
     };
   }
+
+  // 2FA is enrolled. If the action itself doesn't demand a code (enrolment
+  // gate only), we're done — having 2FA set up is sufficient.
+  if (!needsTwoFactor) return { ok: true };
 
   if (!code) {
     return {

@@ -34,6 +34,15 @@ async function build() {
         // Keep optional peer deps external
         'bufferutil',
         'utf-8-validate',
+        // Reason: jsdom (pulled in via isomorphic-dompurify) uses
+        // require.resolve('./xhr-sync-worker.js') at runtime. Bundling it
+        // breaks that lookup and triggers the esbuild "require-resolve-not-external"
+        // warning. Keep it external so Node resolves the worker file from
+        // node_modules at runtime.
+        'jsdom',
+        'isomorphic-dompurify',
+        // canvas is an optional peer dep of jsdom — keep external to match.
+        'canvas',
       ],
       logLevel: 'info',
     });
