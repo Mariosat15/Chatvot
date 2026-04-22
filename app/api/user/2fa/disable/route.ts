@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { auth } from "@/lib/better-auth/auth";
+import { auth, twoFactorApi } from "@/lib/better-auth/auth";
 
 /**
  * POST /api/user/2fa/disable
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await auth.api.disableTwoFactor({
+    await twoFactorApi().disableTwoFactor({
       body: { password },
       headers: await headers(),
     });

@@ -1,4 +1,4 @@
-import { auth } from "@/lib/better-auth/auth";
+import { auth, twoFactorApi } from "@/lib/better-auth/auth";
 
 /**
  * Two-Factor Step-Up Gate
@@ -97,14 +97,15 @@ export async function verifyActionTwoFactor(
   const isTotp = /^\d{6,8}$/.test(trimmed);
 
   try {
+    const api = twoFactorApi();
     if (isTotp) {
-      await auth.api.verifyTOTP({
+      await api.verifyTOTP({
         body: { code: trimmed, trustDevice: false },
         headers: reqHeaders,
       });
       return { valid: true, usedBackup: false };
     }
-    await auth.api.verifyBackupCode({
+    await api.verifyBackupCode({
       body: { code: trimmed, trustDevice: false },
       headers: reqHeaders,
     });

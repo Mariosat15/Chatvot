@@ -142,3 +142,72 @@ function createLazyAuthProxy(): ReturnType<typeof betterAuth> {
 // Export a lazy proxy that initializes the auth instance on first method call
 // This prevents connection issues from blocking module initialization
 export const auth = createLazyAuthProxy();
+
+// -----------------------------------------------------------------------
+// Type augmentation for the `twoFactor` plugin endpoints.
+//
+// Reason: better-auth infers `auth.api` from the `betterAuth(...)` config,
+// but the plugin types surface through a generic `InferAPI<...>` shape
+// that doesn't include the extra endpoints added by `twoFactor()`
+// (`verifyTOTP`, `verifyBackupCode`, `enableTwoFactor`, `disableTwoFactor`,
+// `sendTwoFactorOTP`, `generateBackupCodes`). The methods exist at runtime
+// — this is purely a TypeScript visibility issue.
+//
+// We expose a minimal `TwoFactorApi` surface describing only the inputs
+// our routes actually use, cast the lazy proxy through it, and re-export
+// under the same `auth` import path via `authWith2fa`. Call sites can
+// continue to use `auth.api.<method>()` by casting through this helper.
+// -----------------------------------------------------------------------
+
+interface TwoFactorVerifyArgs {
+  body: { code: string; trustDevice?: boolean };
+  headers: Headers;
+}
+
+interface TwoFactorEnableArgs {
+  body: { password: string; issuer?: string };
+  headers: Headers;
+}
+
+interface TwoFactorDisableArgs {
+  body: { password: string };
+  headers: Headers;
+}
+
+interface TwoFactorSendOtpArgs {
+  body?: { trustDevice?: boolean };
+  headers: Headers;
+}
+
+interface TwoFactorGenerateBackupCodesArgs {
+  body: { password: string };
+  headers: Headers;
+}
+
+export interface TwoFactorApi {
+  verifyTOTP: (args: TwoFactorVerifyArgs) => Promise<unknown>;
+  verifyBackupCode: (args: TwoFactorVerifyArgs) => Promise<unknown>;
+  verifyTwoFactorOTP: (args: TwoFactorVerifyArgs) => Promise<unknown>;
+  enableTwoFactor: (
+    args: TwoFactorEnableArgs,
+  ) => Promise<{ totpURI?: string; backupCodes?: string[] }>;
+  disableTwoFactor: (args: TwoFactorDisableArgs) => Promise<unknown>;
+  sendTwoFactorOTP: (args: TwoFactorSendOtpArgs) => Promise<unknown>;
+  generateBackupCodes: (
+    args: TwoFactorGenerateBackupCodesArgs,
+  ) => Promise<{ backupCodes: string[] }>;
+}
+
+/**
+ * Typed accessor for the better-auth `twoFactor` plugin endpoints.
+ *
+ * Usage (replaces `auth.api.verifyTOTP(...)`):
+ *
+ *   await twoFactorApi().verifyTOTP({ body: { code }, headers });
+ *
+ * Reason: keeps the cast centralised in one place so route handlers stay
+ * strictly typed without sprinkling `as unknown as` everywhere.
+ */
+export function twoFactorApi(): TwoFactorApi {
+  return (auth.api as unknown) as TwoFactorApi;
+}

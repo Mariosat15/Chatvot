@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { auth } from "@/lib/better-auth/auth";
+import { auth, twoFactorApi } from "@/lib/better-auth/auth";
 
 /**
  * POST /api/user/2fa/regenerate-backup-codes
@@ -26,10 +26,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = (await auth.api.generateBackupCodes({
+    const result = await twoFactorApi().generateBackupCodes({
       body: { password },
       headers: await headers(),
-    })) as { backupCodes?: string[] } | undefined;
+    });
 
     return NextResponse.json({
       success: true,

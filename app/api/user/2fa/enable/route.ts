@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { auth } from "@/lib/better-auth/auth";
+import { auth, twoFactorApi } from "@/lib/better-auth/auth";
 
 /**
  * POST /api/user/2fa/enable
@@ -30,10 +30,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = (await auth.api.enableTwoFactor({
+    const result = await twoFactorApi().enableTwoFactor({
       body: { password },
       headers: await headers(),
-    })) as { totpURI?: string; backupCodes?: string[] } | undefined;
+    });
 
     if (!result?.totpURI) {
       return NextResponse.json(

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { auth } from "@/lib/better-auth/auth";
+import { twoFactorApi } from "@/lib/better-auth/auth";
 
 /**
  * POST /api/user/2fa/send-otp
@@ -13,7 +13,7 @@ import { auth } from "@/lib/better-auth/auth";
  */
 export async function POST() {
   try {
-    await auth.api.sendTwoFactorOTP({
+    await twoFactorApi().sendTwoFactorOTP({
       body: {},
       headers: await headers(),
     });

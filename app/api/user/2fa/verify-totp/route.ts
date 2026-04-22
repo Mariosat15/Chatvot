@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { auth } from "@/lib/better-auth/auth";
+import { twoFactorApi } from "@/lib/better-auth/auth";
 
 /**
  * POST /api/user/2fa/verify-totp
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await auth.api.verifyTOTP({
+    await twoFactorApi().verifyTOTP({
       body: {
         code: code.trim(),
         trustDevice: Boolean(trustDevice),
