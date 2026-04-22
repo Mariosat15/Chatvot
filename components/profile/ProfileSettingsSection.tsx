@@ -130,6 +130,13 @@ export default function ProfileSettingsSection() {
   // the user confirms a navigation (so a second reload attempt re-prompts).
   const [loadedOnce, setLoadedOnce] = useState(false);
 
+  // Reason: `originalValues` is a ref (it can't be a useMemo dep), so after
+  // a successful save we bump this counter to force `hasUnsavedChanges` to
+  // recompute against the new baseline. Without this, the memo keeps
+  // returning its cached pre-save `true` value and the "Unsaved changes"
+  // banner + leave-guard never turn off.
+  const [baselineVersion, setBaselineVersion] = useState(0);
+
   // Pending navigation captured when the user clicks an in-app link with
   // unsaved changes — resolved by the AlertDialog below.
   const [pendingNav, setPendingNav] = useState<null | {
@@ -138,8 +145,8 @@ export default function ProfileSettingsSection() {
   }>(null);
 
   // Reason: useMemo so `hasUnsavedChanges` updates reactively as the user
-  // edits fields. Using a function call would still recompute on every
-  // render but wouldn't trigger effects that depend on it.
+  // edits fields. `baselineVersion` is included so the memo also recomputes
+  // after a save/fetch refreshes `originalValues.current`.
   const hasUnsavedChanges = useMemo(() => {
     if (!loadedOnce || !originalValues.current) return false;
     return (
@@ -151,7 +158,22 @@ export default function ProfileSettingsSection() {
       postalCode !== originalValues.current.postalCode ||
       phone !== originalValues.current.phone
     );
-  }, [loadedOnce, name, bio, country, address, city, postalCode, phone]);
+    // Reason: `baselineVersion` is included intentionally so the memo
+    // re-evaluates after `originalValues.current` (a ref) is refreshed
+    // post-save. ESLint can't see through the ref so it thinks the dep
+    // is unnecessary — it is not.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    loadedOnce,
+    baselineVersion,
+    name,
+    bio,
+    country,
+    address,
+    city,
+    postalCode,
+    phone,
+  ]);
 
   // Check if password form is valid
   const isPasswordFormValid = () => {
@@ -367,8 +389,11 @@ export default function ProfileSettingsSection() {
         const updatedProfile = data.user || data;
         setProfile(updatedProfile);
 
-        // Update original values
-        originalValues.current = {
+        // Reason: the server trims strings (name, bio, address, city,
+        // postalCode, phone). Re-sync local state to the normalized values
+        // it returned so a trailing-space edit doesn't leave the form
+        // flagged as "dirty" forever.
+        const normalized = {
           name: updatedProfile.name || "",
           bio: updatedProfile.bio || "",
           country: updatedProfile.country || "",
@@ -377,6 +402,20 @@ export default function ProfileSettingsSection() {
           postalCode: updatedProfile.postalCode || "",
           phone: updatedProfile.phone || "",
         };
+
+        setName(normalized.name);
+        setBio(normalized.bio);
+        setCountry(normalized.country);
+        setAddress(normalized.address);
+        setCity(normalized.city);
+        setPostalCode(normalized.postalCode);
+        setPhone(normalized.phone);
+
+        originalValues.current = normalized;
+        // Reason: force `hasUnsavedChanges` memo to re-evaluate against
+        // the new baseline. Without this, it returns its cached `true`
+        // value and the banner/leave-guard stay armed after save.
+        setBaselineVersion((v) => v + 1);
 
         toast.success("Profile updated successfully!");
       } else {
