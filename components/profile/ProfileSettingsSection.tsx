@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   User,
   MapPin,
@@ -20,6 +20,7 @@ import {
   UserPlus,
   AlertTriangle,
   Power,
+  Undo2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { isEUCountry } from "@/lib/utils/country-vat";
 import TwoFactorSection from "@/components/profile/TwoFactorSection";
 
@@ -115,9 +126,22 @@ export default function ProfileSettingsSection() {
     return String.fromCodePoint(...codePoints);
   };
 
-  // Check if profile has changes
-  const _hasProfileChanges = () => {
-    if (!originalValues.current) return false;
+  // Track whether the beforeunload/link-guard should stay "armed" even after
+  // the user confirms a navigation (so a second reload attempt re-prompts).
+  const [loadedOnce, setLoadedOnce] = useState(false);
+
+  // Pending navigation captured when the user clicks an in-app link with
+  // unsaved changes — resolved by the AlertDialog below.
+  const [pendingNav, setPendingNav] = useState<null | {
+    kind: "url";
+    href: string;
+  }>(null);
+
+  // Reason: useMemo so `hasUnsavedChanges` updates reactively as the user
+  // edits fields. Using a function call would still recompute on every
+  // render but wouldn't trigger effects that depend on it.
+  const hasUnsavedChanges = useMemo(() => {
+    if (!loadedOnce || !originalValues.current) return false;
     return (
       name !== originalValues.current.name ||
       bio !== originalValues.current.bio ||
@@ -127,7 +151,7 @@ export default function ProfileSettingsSection() {
       postalCode !== originalValues.current.postalCode ||
       phone !== originalValues.current.phone
     );
-  };
+  }, [loadedOnce, name, bio, country, address, city, postalCode, phone]);
 
   // Check if password form is valid
   const isPasswordFormValid = () => {
@@ -141,6 +165,70 @@ export default function ProfileSettingsSection() {
   useEffect(() => {
     fetchProfile();
   }, []);
+
+  // Warn the user when reloading / closing the tab with unsaved edits.
+  // Browsers show their own native "Changes you made may not be saved" UI.
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // Reason: Some browsers (older Chrome/Safari) still need returnValue
+      // to be set explicitly to trigger the native confirmation prompt.
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsavedChanges]);
+
+  // Intercept in-app anchor clicks so the user is prompted before the
+  // Next.js App Router transitions away from the profile page. Reason:
+  // App Router does not expose router.events; the standard pattern is
+  // to catch the click on the anchor in capture phase and cancel it
+  // until the user confirms discarding changes.
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const clickHandler = (e: MouseEvent) => {
+      if (e.defaultPrevented) return;
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)
+        return;
+      const target = e.target as HTMLElement | null;
+      const anchor = target?.closest("a") as HTMLAnchorElement | null;
+      if (!anchor) return;
+      const href = anchor.getAttribute("href");
+      if (!href) return;
+      // Ignore same-page anchors, new tabs, downloads, mail/tel, and
+      // links that open outside the SPA.
+      if (
+        anchor.target === "_blank" ||
+        anchor.hasAttribute("download") ||
+        href.startsWith("#") ||
+        href.startsWith("mailto:") ||
+        href.startsWith("tel:") ||
+        href.startsWith("javascript:")
+      )
+        return;
+      const currentPath = window.location.pathname + window.location.search;
+      // Resolve href to a pathname+search to compare against the current
+      // location. External links are allowed through beforeunload.
+      let resolved: URL;
+      try {
+        resolved = new URL(href, window.location.href);
+      } catch {
+        return;
+      }
+      if (resolved.origin !== window.location.origin) return;
+      if (resolved.pathname + resolved.search === currentPath) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setPendingNav({
+        kind: "url",
+        href: resolved.pathname + resolved.search + resolved.hash,
+      });
+    };
+    // Capture so we run before any inner onClick (e.g. Link) navigates.
+    document.addEventListener("click", clickHandler, true);
+    return () => document.removeEventListener("click", clickHandler, true);
+  }, [hasUnsavedChanges]);
 
   const fetchProfile = async () => {
     try {
@@ -173,6 +261,7 @@ export default function ProfileSettingsSection() {
           postalCode: userData.postalCode || "",
           phone: userData.phone || "",
         };
+        setLoadedOnce(true);
       } else {
         toast.error("Failed to load profile");
       }
@@ -183,6 +272,18 @@ export default function ProfileSettingsSection() {
       setLoading(false);
     }
   };
+
+  const discardChanges = useCallback(() => {
+    if (!originalValues.current) return;
+    setName(originalValues.current.name);
+    setBio(originalValues.current.bio);
+    setCountry(originalValues.current.country);
+    setAddress(originalValues.current.address);
+    setCity(originalValues.current.city);
+    setPostalCode(originalValues.current.postalCode);
+    setPhone(originalValues.current.phone);
+    toast.info("Changes discarded.");
+  }, []);
 
   const handleDeactivateAccount = async () => {
     if (deactivateConfirmText !== "DEACTIVATE") return;
@@ -564,10 +665,23 @@ export default function ProfileSettingsSection() {
       </div>
 
       {/* Address Information */}
-      <div className="bg-dark-700/50 rounded-2xl p-6 shadow-xl border border-dark-600">
-        <div className="flex items-center gap-3 mb-6">
+      <div
+        className={`bg-dark-700/50 rounded-2xl p-6 shadow-xl border transition-colors ${
+          hasUnsavedChanges ? "border-amber-500/50" : "border-dark-600"
+        }`}
+      >
+        <div className="flex items-center gap-3 mb-6 flex-wrap">
           <MapPin className="h-6 w-6 text-green-500" />
           <h2 className="text-2xl font-bold text-white">Address Information</h2>
+          {hasUnsavedChanges && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/40">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75 animate-ping" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400" />
+              </span>
+              Unsaved changes
+            </span>
+          )}
         </div>
 
         <div className="space-y-6">
@@ -686,25 +800,50 @@ export default function ProfileSettingsSection() {
           </div>
         </div>
 
-        {/* Save Profile Button */}
-        <div className="flex justify-end mt-6">
-          <Button
-            onClick={handleSaveProfile}
-            disabled={saving}
-            className="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white font-semibold"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="mr-2 h-4 w-4" />
-                Save Profile
-              </>
-            )}
-          </Button>
+        {/* Save / Discard row */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-8 pt-6 border-t border-dark-600/60">
+          <p className="text-sm text-gray-400">
+            {hasUnsavedChanges
+              ? "You have unsaved changes to your profile."
+              : "Your profile is up to date."}
+          </p>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={discardChanges}
+              disabled={!hasUnsavedChanges || saving}
+              className="border-gray-600 text-gray-300 hover:bg-dark-600/60 disabled:opacity-40"
+            >
+              <Undo2 className="mr-2 h-4 w-4" />
+              Discard
+            </Button>
+            <Button
+              onClick={handleSaveProfile}
+              disabled={saving || !hasUnsavedChanges}
+              size="lg"
+              className={`relative px-8 py-6 text-base font-bold text-white shadow-lg transition-all ${
+                hasUnsavedChanges
+                  ? "bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:via-teal-400 hover:to-cyan-400 shadow-emerald-500/30 hover:shadow-emerald-500/50 ring-2 ring-emerald-400/40 hover:scale-[1.02]"
+                  : "bg-dark-600 text-gray-400 cursor-not-allowed"
+              }`}
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-5 w-5" />
+                  Save changes
+                </>
+              )}
+              {hasUnsavedChanges && !saving && (
+                <span className="absolute -inset-1 rounded-md bg-emerald-400/20 animate-pulse pointer-events-none" />
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -1026,6 +1165,108 @@ export default function ProfileSettingsSection() {
           )}
         </div>
       </div>
+
+      {/* Sticky unsaved-changes action bar — always visible until saved or
+          discarded. Reason: the profile page is long; a floating bar ensures
+          the user cannot accidentally leave the page unaware of pending edits
+          to their address, phone or personal information. */}
+      {hasUnsavedChanges && (
+        <div
+          role="region"
+          aria-label="Unsaved changes"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-amber-500/40 bg-dark-800/95 backdrop-blur shadow-2xl animate-in slide-in-from-bottom-4 duration-200"
+        >
+          <div className="max-w-5xl mx-auto flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between p-4">
+            <div className="flex items-center gap-3 text-sm text-amber-200">
+              <AlertTriangle className="h-5 w-5 text-amber-400 flex-shrink-0" />
+              <span>
+                You have unsaved changes to your profile. Save them before
+                leaving this page.
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={discardChanges}
+                disabled={saving}
+                className="border-gray-600 text-gray-200 hover:bg-dark-600"
+              >
+                <Undo2 className="mr-2 h-4 w-4" />
+                Discard
+              </Button>
+              <Button
+                onClick={handleSaveProfile}
+                disabled={saving}
+                className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:via-teal-400 hover:to-cyan-400 text-white font-bold shadow-lg shadow-emerald-500/30"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save changes
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm-leave prompt shown when the user clicks an in-app link
+          while their profile edits are still unsaved. */}
+      <AlertDialog
+        open={pendingNav !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingNav(null);
+        }}
+      >
+        <AlertDialogContent className="bg-dark-800 border-dark-600 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-400" />
+              Leave without saving?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-300">
+              You have unsaved changes on your profile. If you leave now, your
+              edits to personal information, address, or phone number will be
+              lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => setPendingNav(null)}
+              className="bg-dark-700 text-white border-dark-600 hover:bg-dark-600"
+            >
+              Stay on page
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                const target = pendingNav;
+                setPendingNav(null);
+                if (!target) return;
+                // Reason: We discard the in-memory edits and then perform
+                // the navigation the user originally requested. Using
+                // window.location preserves the exact href (pathname,
+                // search, hash) with minimal dependencies on next/navigation.
+                discardChanges();
+                // Wait a tick so the beforeunload listener (which reads
+                // hasUnsavedChanges) re-evaluates after state updates.
+                requestAnimationFrame(() => {
+                  window.location.href = target.href;
+                });
+              }}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Discard &amp; leave
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

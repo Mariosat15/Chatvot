@@ -1,6 +1,4 @@
 import { auth } from "@/lib/better-auth/auth";
-import { connectToDatabase } from "@/database/mongoose";
-import mongoose from "mongoose";
 
 /**
  * Two-Factor Step-Up Gate
@@ -52,30 +50,30 @@ export type TwoFactorGateResult =
 
 /**
  * Returns whether the current user has 2FA enabled on their account.
- * Reads the `twoFactorEnabled` flag that better-auth maintains on the
- * user document. Safe to call on every request — the collection read
- * is a projected point-lookup by id.
+ *
+ * Reads the `twoFactorEnabled` flag via better-auth's session resolver
+ * rather than querying the `user` collection directly.
+ *
+ * Reason: better-auth's mongodb adapter stores `user._id` as an
+ * `ObjectId`, while session tokens expose the id as a hex *string*.
+ * Querying `db.collection("user").findOne({ _id: stringId })` therefore
+ * never matches and always returned `false` — which surfaced as a false
+ * "Please enable two-factor authentication" error on withdrawals even
+ * for users who had 2FA correctly enabled. Delegating to `auth.api.getSession`
+ * lets the adapter perform the proper id conversion for us.
  */
-export async function isTwoFactorEnabled(userId: string): Promise<boolean> {
+export async function isTwoFactorEnabled(
+  reqHeaders: Headers,
+): Promise<boolean> {
   try {
-    await connectToDatabase();
-    const db = mongoose.connection.db;
-    if (!db) return false;
-
-    const candidates: Array<Record<string, unknown>> = [
-      { _id: userId as unknown as object },
-      { id: userId },
-    ];
-    for (const filter of candidates) {
-      const doc = await db
-        .collection("user")
-        .findOne(filter, { projection: { twoFactorEnabled: 1 } });
-      if (doc) return Boolean(doc.twoFactorEnabled);
-    }
-    return false;
+    const session = await auth.api.getSession({ headers: reqHeaders });
+    const user = session?.user as unknown as
+      | { twoFactorEnabled?: boolean }
+      | undefined;
+    return Boolean(user?.twoFactorEnabled);
   } catch (err) {
     console.warn("⚠️ [2FA gate] isTwoFactorEnabled read error:", err);
-    // Reason: Fail-closed would lock users out on a transient DB error.
+    // Reason: Fail-closed would lock users out on a transient read error.
     // We fail-open here; the caller must still rely on policy flags to
     // decide whether the action is allowed.
     return false;
@@ -156,7 +154,7 @@ export async function evaluateTwoFactorGate(
     return { ok: true };
   }
 
-  const enabled = await isTwoFactorEnabled(userId);
+  const enabled = await isTwoFactorEnabled(reqHeaders);
 
   if (!enabled) {
     const message = policy.blockIfNotEnabled
