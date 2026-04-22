@@ -716,12 +716,32 @@ export async function validateWithdrawal(
     );
   }
 
-  // Admin-configured allow-list. Empty list = no restriction.
-  if (
-    Array.isArray(settings.allowedPayoutMethods) &&
-    settings.allowedPayoutMethods.length > 0 &&
-    !settings.allowedPayoutMethods.includes(payoutCategory)
-  ) {
+  // Admin-configured allow-list overlay.
+  //
+  // Reason: the admin UI historically offered a mix of logical categories
+  // (`original_method`, `stripe_payout`, `stripe_refund`, `bank_transfer`)
+  // while the route handlers send a slightly different set at runtime
+  // (`bank_transfer`, `card_payout`, `original_method`). Legacy databases
+  // therefore have allowlists that don't cover any runtime category, which
+  // would wrongly reject every withdrawal.
+  //
+  // We only enforce the allowlist when the admin has explicitly opted in
+  // for THIS runtime category space — i.e. their list contains at least
+  // one of the categories routes actually send. Otherwise the list is
+  // treated as a UI hint and the real gates remain the coarser
+  // `bankWithdrawalsEnabled` / `cardWithdrawalsEnabled` flags above.
+  const RUNTIME_CATEGORIES: PayoutCategory[] = [
+    "bank_transfer",
+    "card_payout",
+    "original_method",
+  ];
+  const list = Array.isArray(settings.allowedPayoutMethods)
+    ? settings.allowedPayoutMethods
+    : [];
+  const adminConfiguredForRuntime = RUNTIME_CATEGORIES.some((c) =>
+    list.includes(c),
+  );
+  if (adminConfiguredForRuntime && !list.includes(payoutCategory)) {
     return fail(
       403,
       "METHOD_NOT_ALLOWED",

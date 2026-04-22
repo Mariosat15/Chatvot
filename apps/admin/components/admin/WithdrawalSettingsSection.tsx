@@ -122,26 +122,37 @@ interface WithdrawalSettings {
   updatedBy: string;
 }
 
+// Reason: these values must match the payout categories sent by the
+// withdrawal routes at runtime (`bank_transfer`, `card_payout`,
+// `original_method`). The validator's allow-list check compares by value.
+// Legacy provider-specific entries (`stripe_*`) are kept for backwards
+// compatibility with older databases but are no longer exposed as the
+// primary options.
 const PAYOUT_METHODS = [
   {
     value: "original_method",
     label: "Original Payment Method",
-    description: "Refund to original card/bank",
+    description: "Refund to original card/bank used for deposit",
+  },
+  {
+    value: "card_payout",
+    label: "Card Payout",
+    description: "Send funds to a stored card via Nuvei",
+  },
+  {
+    value: "bank_transfer",
+    label: "Bank Transfer",
+    description: "Transfer to user's verified bank account",
   },
   {
     value: "stripe_payout",
-    label: "Stripe Payout",
+    label: "Stripe Payout (legacy)",
     description: "Bank transfer via Stripe",
   },
   {
     value: "stripe_refund",
-    label: "Stripe Refund",
+    label: "Stripe Refund (legacy)",
     description: "Refund original Stripe charge",
-  },
-  {
-    value: "bank_transfer",
-    label: "Manual Bank Transfer",
-    description: "Manual wire transfer",
   },
 ];
 

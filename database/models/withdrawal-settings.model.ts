@@ -245,9 +245,12 @@ const WithdrawalSettingsSchema = new Schema<IWithdrawalSettings>(
     },
 
     // Payout Methods
+    // Reason: must include the runtime categories the withdrawal routes
+    // actually send (`bank_transfer`, `card_payout`, `original_method`) —
+    // otherwise the validator's allow-list overlay rejects every request.
     allowedPayoutMethods: {
       type: [String],
-      default: ["original_method", "stripe_payout"],
+      default: ["original_method", "card_payout", "bank_transfer"],
     },
     preferredPayoutMethod: {
       type: String,
