@@ -13,9 +13,12 @@ import Challenge from "@/database/models/trading/challenge.model";
 import AppSettings from "@/database/models/app-settings.model";
 import UserBankAccount from "@/database/models/user-bank-account.model";
 import KYCSettings from "@/database/models/kyc-settings.model";
-import { sanitizeUserNote, sanitizeAmount } from "@/lib/utils/sanitize";
+import { sanitizeUserNote } from "@/lib/utils/sanitize";
 import { createSecurityLogger } from "@/lib/utils/security-logger";
-import { evaluateTwoFactorGate } from "@/lib/services/two-factor-gate.service";
+import {
+  validateWithdrawal,
+  type PayoutCategory,
+} from "@/lib/services/withdrawal-validator.service";
 
 /**
  * GET /api/wallet/withdraw
@@ -292,8 +295,9 @@ export async function POST(request: NextRequest) {
   // SECURITY: Create logger for this request
   const securityLogger = createSecurityLogger(request);
 
-  const mongoSession = await mongoose.startSession();
-  mongoSession.startTransaction();
+  // Declared outside the try so the catch/finally can clean up even when we
+  // bail before starting the transaction (e.g. validator rejection).
+  let mongoSession: mongoose.ClientSession | null = null;
 
   try {
     const session = await auth.api.getSession({
@@ -309,38 +313,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await connectToDatabase();
-
-    // SECURITY: Get settings from database (also used for rate limiting)
-    const withdrawalSettings = await WithdrawalSettings.getSingleton();
-
-    // SECURITY: Rate limiting - uses admin-configured limits (default 5/min if not set)
-    if (withdrawalSettings.apiRateLimitEnabled !== false) {
-      const { checkRateLimit, getRateLimitHeaders } =
-        await import("@/lib/utils/rate-limiter");
-      const rateLimitResult = checkRateLimit(session.user.id, {
-        maxRequests: withdrawalSettings.apiRateLimitRequestsPerMinute || 5,
-        windowMs: 60 * 1000, // 1 minute window
-        keyPrefix: "withdrawal",
-      });
-
-      if (!rateLimitResult.success) {
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              "Too many requests. Please wait a moment before trying again.",
-          },
-          {
-            status: 429,
-            headers: getRateLimitHeaders(rateLimitResult),
-          },
-        );
-      }
-    }
-
-    // withdrawalSettings is reused below - no need to fetch again
-
     const body = await request.json();
     const {
       withdrawalMethodId,
@@ -348,16 +320,7 @@ export async function POST(request: NextRequest) {
       twoFactorCode,
     } = body;
 
-    // SECURITY: Sanitize inputs
-    const amountEUR = sanitizeAmount(body.amountEUR);
     const userNote = sanitizeUserNote(rawUserNote);
-
-    if (!amountEUR || amountEUR <= 0) {
-      return NextResponse.json(
-        { success: false, error: "Invalid withdrawal amount" },
-        { status: 400 },
-      );
-    }
 
     if (!withdrawalMethodId) {
       return NextResponse.json(
@@ -366,62 +329,80 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // SECURITY: Two-factor step-up gate. Runs before any state-changing
-    // work so failed / missing TOTP returns cheaply.
-    // Reason: withdrawal is the highest-value user action — we block
-    // session-hijack attacks by requiring a fresh TOTP when the admin
-    // has enabled 2FA enforcement (globally or above a threshold).
-    const twoFactorGate = await evaluateTwoFactorGate({
+    // Derive the logical payout category from the UI-selected id so the
+    // shared validator can enforce bankWithdrawalsEnabled /
+    // cardWithdrawalsEnabled / allowedPayoutMethods exactly once.
+    const payoutCategory: PayoutCategory =
+      withdrawalMethodId === "original_method"
+        ? "original_method"
+        : typeof withdrawalMethodId === "string" &&
+            withdrawalMethodId.startsWith("upo_")
+          ? "card_payout"
+          : "bank_transfer";
+
+    // SECURITY: Shared withdrawal validator — runs rate-limit, 2FA gate,
+    // user restrictions, KYC, deposit/age rules, daily/monthly caps,
+    // cooldown, hold-period, active competitions/challenges, method
+    // toggles and the allowed-methods list. Identical to the Nuvei route.
+    // Reason: keeping a single validator makes it impossible for a new
+    // admin setting to go live on only one of the two withdrawal paths.
+    const validation = await validateWithdrawal({
       userId: session.user.id,
+      userEmail: session.user.email,
       reqHeaders: await headers(),
-      code:
-        typeof twoFactorCode === "string" ? twoFactorCode.trim() : undefined,
-      policy: {
-        required: withdrawalSettings.requireTwoFactorForWithdrawal === true,
-        requireAboveAmount:
-          typeof withdrawalSettings.requireTwoFactorAboveAmount === "number"
-            ? withdrawalSettings.requireTwoFactorAboveAmount
-            : 0,
-        blockIfNotEnabled:
-          withdrawalSettings.blockWithdrawalsWithoutTwoFactor === true,
-        amount: amountEUR,
-      },
+      amountEUR: body.amountEUR,
+      payoutCategory,
+      twoFactorCode:
+        typeof twoFactorCode === "string" ? twoFactorCode : undefined,
     });
-    if (!twoFactorGate.ok) {
+    if (!validation.ok) {
       return NextResponse.json(
         {
           success: false,
-          error: twoFactorGate.error,
-          code: twoFactorGate.code,
+          error: validation.error,
+          code: validation.code,
         },
-        { status: twoFactorGate.status },
+        {
+          status: validation.status,
+          headers: validation.rateLimitHeaders,
+        },
       );
     }
 
-    // Note: connectToDatabase() already called above for rate limiting
-    // Fetch remaining settings (withdrawalSettings already fetched for rate limit check)
-    const [creditSettings, wallet, appSettings, kycSettings] =
-      await Promise.all([
-        CreditConversionSettings.getSingleton(),
-        CreditWallet.findOne({ userId: session.user.id }).session(mongoSession),
-        AppSettings.findById("global-app-settings"),
-        KYCSettings.findOne(),
-      ]);
+    const amountEUR = validation.amountEUR;
+    const withdrawalSettings = validation.settings;
+    const appSettings = validation.appSettings;
+    const {
+      isSandbox,
+      currencySymbol: cs,
+      exchangeRate,
+      creditsNeeded: amountCredits,
+      feePercentage,
+      feeFixed,
+      platformFee,
+      platformFeeCredits,
+      netAmountEUR,
+    } = validation.computed;
+
+    // Transaction starts AFTER validation to keep the hot-path short when
+    // we reject — avoids an unnecessary `startSession` on every spam req.
+    mongoSession = await mongoose.startSession();
+    mongoSession.startTransaction();
+
+    // Re-load the wallet inside the transaction for transactional write
+    // safety; the validator already loaded a snapshot for policy checks.
+    const wallet = await CreditWallet.findOne({
+      userId: session.user.id,
+    }).session(mongoSession);
 
     if (!wallet) {
       await mongoSession.abortTransaction();
+      mongoSession.endSession();
       return NextResponse.json(
         { success: false, error: "Wallet not found" },
         { status: 404 },
       );
     }
-
-    const isSandbox = appSettings?.simulatorModeEnabled ?? true;
-    const kycEnabledForWithdrawal =
-      (kycSettings?.enabled && kycSettings?.requiredForWithdrawal) ||
-      withdrawalSettings.requireKYC;
-    const cs = appSettings?.currency?.symbol || "€";
-    const kycAmountThreshold = kycSettings?.requiredAmount || 0;
 
     // Determine withdrawal method (original method, UPO card, or bank account)
     let bankAccount = null;
@@ -524,108 +505,17 @@ export async function POST(request: NextRequest) {
       payoutMethodType = "bank_transfer";
     }
 
-    // Check eligibility (pass actual withdrawal amount for KYC threshold check)
-    const eligibility = await checkWithdrawalEligibility(
-      session.user.id,
-      wallet,
-      withdrawalSettings,
-      creditSettings,
-      isSandbox,
-      kycEnabledForWithdrawal,
-      cs,
-      kycAmountThreshold,
-      kycSettings,
-      amountEUR, // Reason: pass actual amount so we can check against KYC threshold
-    );
-
-    if (!eligibility.eligible) {
-      await mongoSession.abortTransaction();
-      return NextResponse.json(
-        { success: false, error: eligibility.reason },
-        { status: 400 },
-      );
-    }
-
-    // Validate amount
-    if (amountEUR < withdrawalSettings.minimumWithdrawal) {
-      await mongoSession.abortTransaction();
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Minimum withdrawal is ${cs}${withdrawalSettings.minimumWithdrawal}`,
-        },
-        { status: 400 },
-      );
-    }
-
-    if (amountEUR > withdrawalSettings.maximumWithdrawal) {
-      await mongoSession.abortTransaction();
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Maximum withdrawal is ${cs}${withdrawalSettings.maximumWithdrawal}`,
-        },
-        { status: 400 },
-      );
-    }
-
-    // Convert EUR to credits
-    const exchangeRate = creditSettings.eurToCreditsRate;
-    const amountCredits = amountEUR * exchangeRate;
-
+    // Transactional balance re-check. The validator already compared the
+    // snapshot balance but between that read and the transactional write a
+    // parallel request could have changed it. Cheap safety net.
     if (amountCredits > wallet.creditBalance) {
       await mongoSession.abortTransaction();
+      mongoSession.endSession();
       return NextResponse.json(
         { success: false, error: "Insufficient balance" },
         { status: 400 },
       );
     }
-
-    // Check daily limit
-    const dailyTotal = await WithdrawalRequest.getDailyTotal(session.user.id);
-    if (
-      withdrawalSettings.dailyWithdrawalLimit > 0 &&
-      dailyTotal + amountEUR > withdrawalSettings.dailyWithdrawalLimit
-    ) {
-      await mongoSession.abortTransaction();
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Would exceed daily limit of ${cs}${withdrawalSettings.dailyWithdrawalLimit}`,
-        },
-        { status: 400 },
-      );
-    }
-
-    // Check monthly limit
-    const monthlyTotal = await WithdrawalRequest.getMonthlyTotal(
-      session.user.id,
-    );
-    if (
-      withdrawalSettings.monthlyWithdrawalLimit > 0 &&
-      monthlyTotal + amountEUR > withdrawalSettings.monthlyWithdrawalLimit
-    ) {
-      await mongoSession.abortTransaction();
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Would exceed monthly limit of ${cs}${withdrawalSettings.monthlyWithdrawalLimit}`,
-        },
-        { status: 400 },
-      );
-    }
-
-    // Calculate fees
-    const feePercentage = withdrawalSettings.useCustomFees
-      ? withdrawalSettings.platformFeePercentage
-      : creditSettings.platformWithdrawalFeePercentage;
-    const feeFixed = withdrawalSettings.useCustomFees
-      ? withdrawalSettings.platformFeeFixed
-      : 0;
-
-    const platformFee = (amountEUR * feePercentage) / 100 + feeFixed;
-    const platformFeeCredits = platformFee * exchangeRate;
-    const netAmountEUR = amountEUR - platformFee;
 
     // Deduct credits from wallet
     const balanceBefore = wallet.creditBalance;
@@ -886,7 +776,13 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    await mongoSession.abortTransaction();
+    if (mongoSession && mongoSession.inTransaction()) {
+      try {
+        await mongoSession.abortTransaction();
+      } catch (abortError) {
+        console.error("Error aborting transaction:", abortError);
+      }
+    }
     console.error("Error creating withdrawal:", error);
     // SECURITY: Log failed withdrawal request
     await securityLogger.log({
@@ -900,12 +796,19 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   } finally {
-    mongoSession.endSession();
+    if (mongoSession) {
+      mongoSession.endSession();
+    }
   }
 }
 
 /**
- * Check if user is eligible for withdrawal
+ * Check if user is eligible for withdrawal (read-only, used by GET).
+ *
+ * The POST handler now delegates to `validateWithdrawal` in the shared
+ * `withdrawal-validator.service`. This helper remains here because the
+ * GET endpoint needs a preview-style eligibility check that runs without
+ * an amount and without starting a transaction.
  */
 async function checkWithdrawalEligibility(
   userId: string,
@@ -924,18 +827,12 @@ async function checkWithdrawalEligibility(
   withdrawalAmountEUR?: number,
 ): Promise<{ eligible: boolean; reason: string; warnings: string[] }> {
   const warnings: string[] = [];
-
-  // Get the actual conversion rate from credit settings
   const conversionRate = creditSettings?.eurToCreditsRate || 100;
 
-  // ============================================
-  // FIRST: Check user restrictions (banned/suspended)
-  // This must be checked before anything else!
-  // ============================================
-  const { canUserPerformAction } =
-    await import("@/lib/services/user-restriction.service");
+  const { canUserPerformAction } = await import(
+    "@/lib/services/user-restriction.service"
+  );
   const restrictionCheck = await canUserPerformAction(userId, "withdraw");
-
   if (!restrictionCheck.allowed) {
     return {
       eligible: false,
@@ -946,7 +843,6 @@ async function checkWithdrawalEligibility(
     };
   }
 
-  // Check if sandbox withdrawals are enabled
   if (isSandbox && !settings.sandboxEnabled) {
     return {
       eligible: false,
@@ -955,7 +851,6 @@ async function checkWithdrawalEligibility(
     };
   }
 
-  // Check if wallet is active
   if (!wallet.isActive) {
     return {
       eligible: false,
@@ -964,10 +859,6 @@ async function checkWithdrawalEligibility(
     };
   }
 
-  // Note: wallet.withdrawalEnabled is no longer checked here
-  // Admin withdrawal settings now control eligibility globally
-
-  // Check minimum balance using actual conversion rate
   const minCreditsRequired = settings.minimumWithdrawal * conversionRate;
   if (wallet.creditBalance < minCreditsRequired) {
     const userBalanceEUR = (wallet.creditBalance / conversionRate).toFixed(2);
@@ -978,17 +869,13 @@ async function checkWithdrawalEligibility(
     };
   }
 
-  // Check KYC requirement (uses combined KYC settings from both models)
-  // Reason: If kycAmountThreshold > 0, KYC is only required for withdrawals >= threshold
   if (kycRequired && !wallet.kycVerified) {
     const amountToCheck = withdrawalAmountEUR ?? 0;
     const thresholdApplies =
       kycAmountThreshold > 0 && amountToCheck > 0
         ? amountToCheck >= kycAmountThreshold
-        : true; // threshold = 0 means always required
-
+        : true;
     if (thresholdApplies) {
-      // Use custom KYC message from settings if available
       const kycMessage =
         kycSettings?.kycRequiredMessage ||
         "KYC verification required before withdrawal. Please complete identity verification.";
@@ -997,15 +884,12 @@ async function checkWithdrawalEligibility(
         reason: kycMessage,
         warnings,
       };
-    } else {
-      // Amount is below the KYC threshold — allow but warn
-      warnings.push(
-        `KYC verification will be required for withdrawals of ${currencySymbol}${kycAmountThreshold} or more.`,
-      );
     }
+    warnings.push(
+      `KYC verification will be required for withdrawals of ${currencySymbol}${kycAmountThreshold} or more.`,
+    );
   }
 
-  // Check deposit requirement
   if (settings.minimumDepositRequired && wallet.totalDeposited === 0) {
     return {
       eligible: false,
@@ -1014,13 +898,17 @@ async function checkWithdrawalEligibility(
     };
   }
 
-  // Check withdrawal frequency limits
+  const ACTIVE_STATUSES = [
+    "pending",
+    "approved",
+    "processing",
+    "completed",
+  ] as const;
   const todayCount = await WithdrawalRequest.countDocuments({
     userId,
-    status: { $in: ["pending", "approved", "processing", "completed"] },
+    status: { $in: ACTIVE_STATUSES },
     requestedAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) },
   });
-
   if (todayCount >= settings.maxWithdrawalsPerDay) {
     return {
       eligible: false,
@@ -1029,17 +917,14 @@ async function checkWithdrawalEligibility(
     };
   }
 
-  // Check monthly limit
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
-
   const monthCount = await WithdrawalRequest.countDocuments({
     userId,
-    status: { $in: ["pending", "approved", "processing", "completed"] },
+    status: { $in: ACTIVE_STATUSES },
     requestedAt: { $gte: startOfMonth },
   });
-
   if (monthCount >= settings.maxWithdrawalsPerMonth) {
     return {
       eligible: false,
@@ -1048,17 +933,14 @@ async function checkWithdrawalEligibility(
     };
   }
 
-  // Check cooldown
   if (settings.cooldownHours > 0) {
     const lastWithdrawal = await WithdrawalRequest.findOne({
       userId,
-      status: { $in: ["pending", "approved", "processing", "completed"] },
+      status: { $in: ACTIVE_STATUSES },
     }).sort({ requestedAt: -1 });
-
     if (lastWithdrawal) {
       const cooldownEnd = new Date(lastWithdrawal.requestedAt);
       cooldownEnd.setHours(cooldownEnd.getHours() + settings.cooldownHours);
-
       if (cooldownEnd > new Date()) {
         const hoursLeft = Math.ceil(
           (cooldownEnd.getTime() - Date.now()) / (1000 * 60 * 60),
@@ -1072,18 +954,15 @@ async function checkWithdrawalEligibility(
     }
   }
 
-  // Check hold period after deposit
   if (settings.holdPeriodAfterDeposit > 0) {
     const lastDeposit = await WalletTransaction.findOne({
       userId,
       transactionType: "deposit",
       status: "completed",
     }).sort({ createdAt: -1 });
-
     if (lastDeposit) {
       const holdEnd = new Date(lastDeposit.createdAt);
       holdEnd.setHours(holdEnd.getHours() + settings.holdPeriodAfterDeposit);
-
       if (holdEnd > new Date()) {
         const hoursLeft = Math.ceil(
           (holdEnd.getTime() - Date.now()) / (1000 * 60 * 60),
@@ -1097,32 +976,24 @@ async function checkWithdrawalEligibility(
     }
   }
 
-  // Check active competitions/challenges
   if (!settings.allowWithdrawalDuringActiveCompetitions) {
-    // IMPROVED: Check for participants where BOTH the participant AND competition are still active
-    // This handles cases where competition ended but participant status wasn't updated
     const Competition = (
       await import("@/database/models/trading/competition.model")
     ).default;
-
-    // Get all participant records for this user
     const participantRecords = await CompetitionParticipant.find({
-      userId: userId,
+      userId,
       status: "active",
     })
       .select("competitionId")
       .lean();
-
     if (participantRecords.length > 0) {
-      // Check if any of these competitions are actually still active
       const competitionIds = participantRecords.map(
         (p: Record<string, unknown>) => p.competitionId,
       );
       const activeCompetitionCount = await Competition.countDocuments({
         _id: { $in: competitionIds },
-        status: "active", // Only count if competition itself is still active
+        status: "active",
       });
-
       if (activeCompetitionCount > 0) {
         return {
           eligible: false,
@@ -1130,22 +1001,25 @@ async function checkWithdrawalEligibility(
           warnings,
         };
       }
-
-      // If participant is 'active' but competition is NOT active, auto-fix the participant status
+      // Auto-fix orphan "active" participant rows whose competition ended.
       if (participantRecords.length > activeCompetitionCount) {
-        // Get competitions that are NOT active (auto-fix orphaned participant status)
         const nonActiveCompetitions = await Competition.find({
           _id: { $in: competitionIds },
           status: { $ne: "active" },
         })
           .select("_id status")
           .lean();
-
         for (const comp of nonActiveCompetitions) {
           const newStatus =
-            (comp as Record<string, unknown>).status === "cancelled" ? "refunded" : "completed";
+            (comp as Record<string, unknown>).status === "cancelled"
+              ? "refunded"
+              : "completed";
           await CompetitionParticipant.updateMany(
-            { userId, competitionId: (comp as Record<string, unknown>)._id, status: "active" },
+            {
+              userId,
+              competitionId: (comp as Record<string, unknown>)._id,
+              status: "active",
+            },
             { $set: { status: newStatus } },
           );
         }
@@ -1154,107 +1028,44 @@ async function checkWithdrawalEligibility(
   }
 
   if (settings.blockWithdrawalOnActiveChallenges) {
-    // Find active challenges where user is either challenger or challenged
-    // Status values: 'pending' = waiting for accept, 'accepted' = accepted but not started, 'active' = in progress
+    const now = new Date();
     const activeChallenges = await Challenge.find({
       $or: [{ challengerId: userId }, { challengedId: userId }],
       status: { $in: ["pending", "accepted", "active"] },
     })
       .select("_id status challengerId challengedId acceptDeadline createdAt")
       .lean();
-
-    if (activeChallenges.length > 0) {
-      // Check if any pending challenges have expired accept deadlines
-      const now = new Date();
-      const expiredPending = activeChallenges.filter(
-        (c: Record<string, unknown>) =>
+    const stillBlocking = activeChallenges.filter(
+      (c: Record<string, unknown>) =>
+        !(
           c.status === "pending" &&
           c.acceptDeadline &&
-          new Date(c.acceptDeadline as string) < now,
-      );
-
-      if (expiredPending.length > 0) {
-        // Auto-expire these stale challenges
-        for (const expiredChallenge of expiredPending) {
-          try {
-            await Challenge.updateOne(
-              { _id: expiredChallenge._id, status: "pending" },
-              { $set: { status: "expired", expiredAt: now } },
-            );
-          } catch (err) {
-            console.error(
-              `Failed to expire challenge ${expiredChallenge._id}:`,
-              err,
-            );
-          }
-        }
-
-        // Re-check after cleanup
-        const remainingChallenges = activeChallenges.filter(
-          (c: Record<string, unknown>) =>
-            !(
-              c.status === "pending" &&
-              c.acceptDeadline &&
-              new Date(c.acceptDeadline as string) < now
-            ),
-        );
-
-        if (remainingChallenges.length === 0) {
-          // Continue to next check instead of blocking
-        } else {
-          const pendingCount = remainingChallenges.filter(
-            (c: Record<string, unknown>) => c.status === "pending",
-          ).length;
-          const activeCount = remainingChallenges.filter(
-            (c: Record<string, unknown>) => c.status === "accepted" || c.status === "active",
-          ).length;
-
-          let message = "You have ";
-          const parts = [];
-          if (pendingCount > 0)
-            parts.push(`${pendingCount} pending challenge(s)`);
-          if (activeCount > 0) parts.push(`${activeCount} active challenge(s)`);
-          message +=
-            parts.join(" and ") +
-            ". Complete or cancel them before withdrawing.";
-
-          return {
-            eligible: false,
-            reason: message,
-            warnings,
-          };
-        }
-      } else {
-        const pendingCount = activeChallenges.filter(
-          (c: Record<string, unknown>) => c.status === "pending",
-        ).length;
-        const activeCount = activeChallenges.filter(
-          (c: Record<string, unknown>) => c.status === "accepted" || c.status === "active",
-        ).length;
-
-        let message = "You have ";
-        const parts = [];
-        if (pendingCount > 0)
-          parts.push(`${pendingCount} pending challenge(s)`);
-        if (activeCount > 0) parts.push(`${activeCount} active challenge(s)`);
-        message +=
-          parts.join(" and ") + ". Complete or cancel them before withdrawing.";
-
-        return {
-          eligible: false,
-          reason: message,
-          warnings,
-        };
-      }
+          new Date(c.acceptDeadline as string) < now
+        ),
+    );
+    if (stillBlocking.length > 0) {
+      const pendingCount = stillBlocking.filter(
+        (c: Record<string, unknown>) => c.status === "pending",
+      ).length;
+      const activeCount = stillBlocking.filter(
+        (c: Record<string, unknown>) =>
+          c.status === "accepted" || c.status === "active",
+      ).length;
+      const parts: string[] = [];
+      if (pendingCount > 0) parts.push(`${pendingCount} pending challenge(s)`);
+      if (activeCount > 0) parts.push(`${activeCount} active challenge(s)`);
+      return {
+        eligible: false,
+        reason: `You have ${parts.join(" and ")}. Complete or cancel them before withdrawing.`,
+        warnings,
+      };
     }
   }
 
-  // Check pending withdrawals
   const pendingWithdrawals = await WithdrawalRequest.countDocuments({
     userId,
     status: { $in: ["pending", "approved", "processing"] },
   });
-
   if (pendingWithdrawals > 0) {
     warnings.push(
       `You have ${pendingWithdrawals} pending withdrawal request(s)`,

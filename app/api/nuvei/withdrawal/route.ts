@@ -12,15 +12,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { nuveiService } from "@/lib/services/nuvei.service";
-import { connectToDatabase } from "@/database/mongoose";
-import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import WithdrawalRequest from "@/database/models/withdrawal-request.model";
 import WithdrawalSettings from "@/database/models/withdrawal-settings.model";
-import CreditConversionSettings from "@/database/models/credit-conversion-settings.model";
 import UserBankAccount from "@/database/models/user-bank-account.model";
-import AppSettings from "@/database/models/app-settings.model";
-import { evaluateTwoFactorGate } from "@/lib/services/two-factor-gate.service";
+import { connectToDatabase } from "@/database/mongoose";
+import {
+  validateWithdrawal,
+  type PayoutCategory,
+} from "@/lib/services/withdrawal-validator.service";
 
 /**
  * POST - Submit a withdrawal request via Nuvei
@@ -42,33 +42,85 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       amountEUR,
-      withdrawalMethod, // 'card_payout' | 'bank_transfer'
+      withdrawalMethod, // 'card_payout' | 'bank_transfer' | 'card_refund'
       cardDetails, // For card refund: { paymentIntentId, cardBrand, cardLast4, userPaymentOptionId }
       bankAccountId, // For bank transfer: existing bank account ID
       userPaymentOptionId, // Direct UPO ID if provided
       twoFactorCode, // Optional TOTP / backup code for 2FA step-up
     } = body;
 
-    // Validate amount
-    const amount = parseFloat(amountEUR);
-    if (!amount || isNaN(amount) || amount <= 0) {
+    // Reject unknown methods up-front so the shared validator receives a
+    // known PayoutCategory and user-facing errors stay crisp.
+    const knownMethods = new Set([
+      "bank_transfer",
+      "card_payout",
+      "card_refund",
+    ]);
+    if (!knownMethods.has(withdrawalMethod)) {
       return NextResponse.json(
-        { error: "Invalid withdrawal amount" },
+        {
+          error:
+            "Invalid withdrawal method. Choose card_payout or bank_transfer.",
+        },
         { status: 400 },
       );
     }
 
-    await connectToDatabase();
+    const payoutCategory: PayoutCategory =
+      withdrawalMethod === "bank_transfer" ? "bank_transfer" : "card_payout";
 
-    // Check if Nuvei withdrawals are enabled
-    const [withdrawalSettings, creditSettings, wallet, appSettings] =
-      await Promise.all([
-        WithdrawalSettings.getSingleton(),
-        CreditConversionSettings.getSingleton(),
-        CreditWallet.findOne({ userId }),
-        AppSettings.findById("global-app-settings"),
-      ]);
+    // SECURITY: Shared withdrawal validator — enforces every admin-controlled
+    // policy exactly once. Covers rate limiting, 2FA step-up, user
+    // restrictions, wallet/KYC/deposit gates, min/max, daily/monthly caps,
+    // cooldown, hold-after-deposit, active competitions / challenges,
+    // method toggles and the allowed-payout-methods list.
+    //
+    // Reason: before this refactor the Nuvei route re-implemented only a
+    // subset of these rules, letting attackers bypass ~16 policies
+    // (restrictions, caps, KYC, …) simply by POSTing here instead of the
+    // manual route. Centralising the logic makes bypass impossible.
+    const validation = await validateWithdrawal({
+      userId,
+      userEmail,
+      reqHeaders: await headers(),
+      amountEUR,
+      payoutCategory,
+      twoFactorCode:
+        typeof twoFactorCode === "string" ? twoFactorCode : undefined,
+    });
+    if (!validation.ok) {
+      return NextResponse.json(
+        { error: validation.error, code: validation.code },
+        {
+          status: validation.status,
+          headers: validation.rateLimitHeaders,
+        },
+      );
+    }
 
+    const {
+      settings: withdrawalSettings,
+      wallet,
+      computed,
+    } = validation;
+    const amount = validation.amountEUR;
+    const {
+      isSandbox,
+      currencyCode,
+      currencySymbol: cs,
+      exchangeRate,
+      creditsNeeded,
+      feePercentage,
+      feeFixed,
+      platformFee,
+      platformFeeCredits,
+      netAmountEUR,
+    } = computed;
+
+    // The shared validator doesn't know this is the automatic route, so we
+    // still have to guard on the "Nuvei automatic processing" toggle here.
+    // Reason: users must fall back to the manual route when the admin turns
+    // Nuvei off.
     if (!withdrawalSettings.nuveiWithdrawalEnabled) {
       return NextResponse.json(
         {
@@ -79,98 +131,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Wallet is guaranteed non-null by the validator, but TS needs the guard.
     if (!wallet) {
       return NextResponse.json({ error: "Wallet not found" }, { status: 404 });
     }
 
-    // SECURITY: Two-factor step-up gate. Same policy as the manual withdraw
-    // route — automatic Nuvei withdrawals are still real money leaving the
-    // platform, so they get the same enrolment + TOTP rules.
-    // Reason: previously this route bypassed 2FA entirely, allowing
-    // attackers with a stolen session to drain accounts via the automatic
-    // path even when the admin had mandated 2FA.
-    const twoFactorGate = await evaluateTwoFactorGate({
-      userId,
-      reqHeaders: await headers(),
-      code:
-        typeof twoFactorCode === "string" ? twoFactorCode.trim() : undefined,
-      policy: {
-        required: withdrawalSettings.requireTwoFactorForWithdrawal === true,
-        requireAboveAmount:
-          typeof withdrawalSettings.requireTwoFactorAboveAmount === "number"
-            ? withdrawalSettings.requireTwoFactorAboveAmount
-            : 0,
-        blockIfNotEnabled:
-          withdrawalSettings.blockWithdrawalsWithoutTwoFactor === true,
-        amount,
-      },
-    });
-    if (!twoFactorGate.ok) {
-      return NextResponse.json(
-        {
-          error: twoFactorGate.error,
-          code: twoFactorGate.code,
-        },
-        { status: twoFactorGate.status },
-      );
-    }
-
-    const isSandbox = appSettings?.simulatorModeEnabled ?? true;
-    const currencyCode = appSettings?.currency?.code || "EUR";
-    const cs = appSettings?.currency?.symbol || "€";
-
-    // Get fee settings
-    const feePercentage = withdrawalSettings.useCustomFees
-      ? withdrawalSettings.platformFeePercentage
-      : creditSettings.platformWithdrawalFeePercentage;
-    const feeFixed = withdrawalSettings.useCustomFees
-      ? withdrawalSettings.platformFeeFixed
-      : 0;
-
-    // Calculate fees
-    const platformFee = (amount * feePercentage) / 100 + feeFixed;
-    const platformFeeCredits =
-      platformFee * (creditSettings.eurToCreditsRate || 1);
-    const netAmountEUR = amount - platformFee;
-
-    if (netAmountEUR <= 0) {
-      return NextResponse.json(
-        { error: "Withdrawal amount too small after fees" },
-        { status: 400 },
-      );
-    }
-
-    // Check balance
-    const exchangeRate = creditSettings.eurToCreditsRate || 1;
-    const creditsNeeded = amount * exchangeRate;
-
-    if (wallet.creditBalance < creditsNeeded) {
-      return NextResponse.json(
-        { error: "Insufficient balance" },
-        { status: 400 },
-      );
-    }
-
-    // Validate withdrawal limits
-    if (amount < withdrawalSettings.minimumWithdrawal) {
-      return NextResponse.json(
-        {
-          error: `Minimum withdrawal is €${withdrawalSettings.minimumWithdrawal}`,
-        },
-        { status: 400 },
-      );
-    }
-
-    if (amount > withdrawalSettings.maximumWithdrawal) {
-      return NextResponse.json(
-        {
-          error: `Maximum withdrawal is €${withdrawalSettings.maximumWithdrawal}`,
-        },
-        { status: 400 },
-      );
-    }
-
-    // Get bank details for bank transfer or UPO for card refund
+    // Method-specific detail lookup (bank_transfer needs a verified bank
+    // account, card methods need a UPO id). Kept in this route because the
+    // objects returned here are Nuvei-specific.
     let bankAccount = null;
     let bankDetailsForRequest: Record<string, unknown> | null = null;
     let actualUpoId: string | null = null;
