@@ -161,6 +161,10 @@ interface UserRestriction {
   restrictedAt: string;
   expiresAt?: string;
   isActive: boolean;
+  reviewEtaDays?: number;
+  documentsRequested?: string[];
+  appealSubmittedAt?: string;
+  appealConversationId?: string;
 }
 
 interface Invoice {
@@ -1413,7 +1417,14 @@ export default function UserFullDetailPanel({
       : []),
     { id: "kyc", label: "KYC", icon: Shield },
     { id: "history", label: `History (${history.length})`, icon: History },
-    { id: "conversations", label: "Conversations", icon: MessageSquare },
+    {
+      id: "conversations",
+      label: "Conversations",
+      icon: MessageSquare,
+      // Reason: visual indicator when the user has an unread / unanswered
+      // support message waiting for admin response.
+      hasBadge: Boolean(user.hasUnreadSupport),
+    },
     { id: "audit", label: "Audit Trail", icon: ClipboardList },
     { id: "notes", label: `Notes (${notes.length})`, icon: Send },
     { id: "restrictions", label: "Restrictions", icon: Ban },
@@ -1476,12 +1487,30 @@ export default function UserFullDetailPanel({
               </Badge>
             )}
             {activeRestrictions.length > 0 && (
-              <Badge variant="destructive">
-                <Ban className="h-3 w-3 mr-1" />
-                {activeRestrictions[0].restrictionType === "banned"
-                  ? "Banned"
-                  : "Suspended"}
-              </Badge>
+              <>
+                <Badge variant="destructive">
+                  <Ban className="h-3 w-3 mr-1" />
+                  {activeRestrictions[0].restrictionType === "banned"
+                    ? "Banned"
+                    : activeRestrictions[0].restrictionType === "suspended"
+                      ? "Suspended"
+                      : activeRestrictions[0].restrictionType ===
+                          "review_required"
+                        ? "Under Review"
+                        : "Restricted"}
+                </Badge>
+                {activeRestrictions[0].appealSubmittedAt && (
+                  <Badge
+                    className="bg-amber-500/90 text-white border-amber-400/60"
+                    title={`Appeal submitted ${new Date(
+                      activeRestrictions[0].appealSubmittedAt,
+                    ).toLocaleString()}`}
+                  >
+                    <MessageSquare className="h-3 w-3 mr-1" />
+                    Appeal
+                  </Badge>
+                )}
+              </>
             )}
             <Badge
               className={`${kycStatusConfig.bgColor} ${kycStatusConfig.color} border-0`}
@@ -1520,11 +1549,12 @@ export default function UserFullDetailPanel({
           <nav className="space-y-1">
             {tabs.map((tab) => {
               const Icon = tab.icon;
+              const hasBadge = "hasBadge" in tab && tab.hasBadge === true;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as TabType)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all ${
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all relative ${
                     activeTab === tab.id
                       ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30"
                       : "text-gray-400 hover:bg-gray-700/50 hover:text-white"
@@ -1532,6 +1562,15 @@ export default function UserFullDetailPanel({
                 >
                   <Icon className="h-4 w-4" />
                   <span className="text-sm font-medium">{tab.label}</span>
+                  {hasBadge && (
+                    <span
+                      className="ml-auto relative flex h-2 w-2"
+                      title="New support message"
+                    >
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+                    </span>
+                  )}
                 </button>
               );
             })}

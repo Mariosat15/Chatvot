@@ -27,6 +27,8 @@ import {
   UserCheck,
   AlertTriangle,
   Crown,
+  Ban,
+  MessageCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import UserFullDetailPanel from "./UserFullDetailPanel";
@@ -142,6 +144,19 @@ export interface UserData {
   // Deactivation status
   isDeactivated?: boolean;
   deactivatedAt?: string;
+  // Active restriction summary — shown as a badge next to the user name.
+  restriction?: {
+    id: string;
+    type: "suspended" | "banned" | "restricted" | "review_required" | string;
+    reason: string;
+    restrictedAt?: string;
+    expiresAt?: string | null;
+    hasAppeal?: boolean;
+    appealSubmittedAt?: string | null;
+    appealConversationId?: string | null;
+  } | null;
+  // True when the user has an unread/unresponded support message.
+  hasUnreadSupport?: boolean;
   // Optional fields that may be present
   country?: string;
   city?: string;
@@ -837,7 +852,16 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-medium text-gray-100 truncate">
+                              <p className="font-medium text-gray-100 truncate flex items-center gap-1.5">
+                                {user.hasUnreadSupport && (
+                                  <span
+                                    className="relative flex h-2 w-2"
+                                    title="New support message"
+                                  >
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+                                  </span>
+                                )}
                                 {user.name}
                               </p>
                               <Badge
@@ -845,6 +869,46 @@ export default function UsersSection({ initialUserId }: UsersSectionProps) {
                               >
                                 {roleConfig.label}
                               </Badge>
+                              {user.restriction &&
+                                (() => {
+                                  const t = user.restriction.type;
+                                  const isBan = t === "banned";
+                                  const isSuspend = t === "suspended";
+                                  const isReview = t === "review_required";
+                                  const label = isBan
+                                    ? "BANNED"
+                                    : isSuspend
+                                      ? "SUSPENDED"
+                                      : isReview
+                                        ? "UNDER REVIEW"
+                                        : "RESTRICTED";
+                                  const cls = isBan
+                                    ? "bg-red-600/90 text-white border-red-500/60"
+                                    : isSuspend
+                                      ? "bg-orange-500/90 text-white border-orange-400/60"
+                                      : isReview
+                                        ? "bg-amber-500/90 text-white border-amber-400/60"
+                                        : "bg-yellow-600/90 text-white border-yellow-500/60";
+                                  return (
+                                    <Badge
+                                      title={`Reason: ${user.restriction.reason}${
+                                        user.restriction.hasAppeal
+                                          ? " • Appeal submitted"
+                                          : ""
+                                      }`}
+                                      className={`${cls} text-[10px] border flex items-center gap-1`}
+                                    >
+                                      <Ban className="h-3 w-3" />
+                                      {label}
+                                      {user.restriction.hasAppeal && (
+                                        <span className="ml-1 inline-flex items-center gap-0.5">
+                                          <MessageCircle className="h-3 w-3" />
+                                          APPEAL
+                                        </span>
+                                      )}
+                                    </Badge>
+                                  );
+                                })()}
                               {user.gameMaster?.isGameMaster && (
                                 <Badge
                                   className={`text-xs border flex items-center gap-1 ${

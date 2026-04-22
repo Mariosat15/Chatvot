@@ -7,6 +7,7 @@ import CompetitionParticipant from "@/database/models/trading/competition-partic
 import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
 import { UserPurchase } from "@/database/models/marketplace/user-purchase.model";
 import TradeHistory from "@/database/models/trading/trade-history.model";
+import UserRestriction from "@/database/models/user-restriction.model";
 // Force model registration before populate is called
 import "@/database/models/marketplace/marketplace-item.model";
 
@@ -267,6 +268,55 @@ export async function GET(request: NextRequest) {
       tradeStatsMap.set(row._id, { totalTrades: row.totalTrades, winningTrades: row.winningTrades });
     }
 
+    // Get active restrictions for displayed users (one per user, most recent).
+    // Reason: Admin list shows a Suspended/Banned badge; UserFullDetailPanel
+    // still fetches full restriction history when opened.
+    const restrictionDocs = await UserRestriction.find({
+      userId: { $in: userIds },
+      isActive: true,
+    })
+      .sort({ restrictedAt: -1 })
+      .lean();
+    const restrictionMap = new Map<string, any>();
+    for (const r of restrictionDocs as any[]) {
+      // First occurrence wins (already sorted DESC by restrictedAt).
+      if (!restrictionMap.has(r.userId)) restrictionMap.set(r.userId, r);
+    }
+
+    // Unread support messages per user.
+    // Reason: Admins asked for an indicator on the user name when a user has a
+    // new/unanswered support message (including appeals). We treat a support
+    // conversation as "unread for admins" when the most recent message was
+    // sent by the user (senderType === "user") and the conversation is not
+    // resolved. This avoids needing a per-admin unread map.
+    const supportUnreadSet = new Set<string>();
+    try {
+      const supportConvos = await db
+        .collection("conversations")
+        .find(
+          {
+            type: "user-to-support",
+            "lastMessage.senderType": "user",
+            // Exclude closed/archived conversations from the indicator.
+            status: { $nin: ["closed", "archived"] },
+            participants: {
+              $elemMatch: { type: "user", id: { $in: userIds } },
+            },
+          },
+          { projection: { participants: 1 } },
+        )
+        .toArray();
+      for (const c of supportConvos as any[]) {
+        const userParticipant = (c.participants || []).find(
+          (p: any) => p?.type === "user",
+        );
+        if (userParticipant?.id) supportUnreadSet.add(userParticipant.id);
+      }
+    } catch (err) {
+      // Non-fatal: indicator just won't appear.
+      console.warn("⚠️ Failed to load support unread indicator:", err);
+    }
+
     // Combine all data
     const usersWithData = users.map((user: any) => {
       const userId = user.id || user._id?.toString();
@@ -322,6 +372,22 @@ export async function GET(request: NextRequest) {
         .map((p: any) => p.itemId?.name || "Unknown")
         .filter(Boolean);
 
+      // Active restriction summary (if any) — powers the Suspended/Banned
+      // badge in the admin users list.
+      const restrictionDoc = restrictionMap.get(userId) || null;
+      const restriction = restrictionDoc
+        ? {
+            id: String(restrictionDoc._id),
+            type: restrictionDoc.restrictionType as string, // "suspended" | "banned" | "restricted" | "review_required"
+            reason: restrictionDoc.reason as string,
+            restrictedAt: restrictionDoc.restrictedAt,
+            expiresAt: restrictionDoc.expiresAt || null,
+            hasAppeal: Boolean(restrictionDoc.appealSubmittedAt),
+            appealSubmittedAt: restrictionDoc.appealSubmittedAt || null,
+            appealConversationId: restrictionDoc.appealConversationId || null,
+          }
+        : null;
+
       // Determine role - check GM subscription first, then stored role, fallback to email-based detection
       const storedRole =
         user.role ||
@@ -340,6 +406,10 @@ export async function GET(request: NextRequest) {
         emailVerified: user.emailVerified || false,
         isDeactivated: user.isDeactivated || false,
         deactivatedAt: user.deactivatedAt || null,
+
+        // Active restriction summary + support-unread indicator
+        restriction,
+        hasUnreadSupport: supportUnreadSet.has(userId),
 
         // Address fields
         country: user.country || "",
