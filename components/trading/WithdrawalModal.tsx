@@ -112,6 +112,12 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
     null,
   );
   const [showTerms, setShowTerms] = useState(false);
+  // Reason: Track whether the user has already accepted the withdrawal T&C
+  // during this modal session. When 2FA is required, the server responds
+  // with TWO_FACTOR_REQUIRED after the first submit and the user must
+  // re-submit with the TOTP code. Without this flag, the T&C dialog would
+  // reopen on every retry, forcing the user to accept the same terms twice.
+  const [termsAcceptedForFlow, setTermsAcceptedForFlow] = useState(false);
   // Two-factor step-up state for when the admin has required TOTP on withdrawals.
   const [twoFactorRequired, setTwoFactorRequired] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState("");
@@ -177,13 +183,23 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
       return;
     }
 
-    // Show terms dialog before proceeding
+    // Reason: Only show the T&C dialog the first time the user submits in
+    // this modal session. If they've already accepted (e.g. they're now
+    // retrying with a 2FA code after a TWO_FACTOR_REQUIRED response), skip
+    // straight to the API call — re-accepting the same terms adds friction
+    // without any compliance benefit.
+    if (termsAcceptedForFlow) {
+      void proceedAfterTerms();
+      return;
+    }
+
     setShowTerms(true);
   };
 
   /** Called after user accepts terms — proceeds with withdrawal */
   const proceedAfterTerms = async () => {
     setShowTerms(false);
+    setTermsAcceptedForFlow(true);
     setLoading(true);
 
     try {
@@ -418,6 +434,10 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
     setError("");
     setTwoFactorRequired(false);
     setTwoFactorCode("");
+    // Reason: Clear the "terms accepted" flag so a brand-new withdrawal
+    // attempt (after a success, or after closing and reopening the modal)
+    // re-prompts the user as expected.
+    setTermsAcceptedForFlow(false);
     setSuccess(null);
     setLoading(false);
   };
