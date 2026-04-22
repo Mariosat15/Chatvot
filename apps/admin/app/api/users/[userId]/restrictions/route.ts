@@ -59,14 +59,34 @@ export async function POST(
       );
     }
 
-    // Determine blocked actions based on restriction type
+    // Determine blocked actions. If the caller supplied an explicit
+    // `restrictions` object (new UI), honor it. Otherwise fall back to the
+    // legacy preset (banned = block everything, suspended = allow deposits
+    // only) so older callers keep working.
+    // Reason: gives admins the same granular control we already expose in
+    // the Fraud Monitoring dialog while preserving backward compatibility.
     const isBanned = body.restrictionType === "banned";
-    const blockSettings = {
-      canTrade: false,
-      canEnterCompetitions: false,
-      canDeposit: !isBanned, // Suspended users can still deposit
-      canWithdraw: false,
-    };
+    const explicit = body.restrictions as
+      | {
+          canTrade?: boolean;
+          canEnterCompetitions?: boolean;
+          canDeposit?: boolean;
+          canWithdraw?: boolean;
+        }
+      | undefined;
+    const blockSettings = explicit
+      ? {
+          canTrade: !!explicit.canTrade,
+          canEnterCompetitions: !!explicit.canEnterCompetitions,
+          canDeposit: !!explicit.canDeposit,
+          canWithdraw: !!explicit.canWithdraw,
+        }
+      : {
+          canTrade: false,
+          canEnterCompetitions: false,
+          canDeposit: !isBanned, // Suspended users can still deposit
+          canWithdraw: false,
+        };
 
     // Normalize the optional review-packet inputs so malformed admin input
     // (string in a number field, blank textarea, etc.) never reaches the

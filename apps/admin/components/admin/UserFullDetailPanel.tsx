@@ -384,6 +384,14 @@ export default function UserFullDetailPanel({
   const [customReason, setCustomReason] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [restrictionHideFromPublic, setRestrictionHideFromPublic] = useState(false);
+  // Granular "what to block" flags — parity with the Fraud Monitoring
+  // bulk dialog. Default to all-blocked so the admin can simply uncheck
+  // the actions they want to leave open. The backend still falls back to
+  // the legacy preset if these aren't supplied (backward-compatible).
+  const [blockTrading, setBlockTrading] = useState<boolean>(true);
+  const [blockCompetitions, setBlockCompetitions] = useState<boolean>(true);
+  const [blockDeposit, setBlockDeposit] = useState<boolean>(true);
+  const [blockWithdraw, setBlockWithdraw] = useState<boolean>(true);
   // Review packet — shown on the user-facing /account/review page.
   // Reason: Lets compliance set expectations (ETA + required documents) so
   // the user has a clear next step instead of a generic "contact support".
@@ -1259,6 +1267,15 @@ export default function UserFullDetailPanel({
           customReason: customReason.trim() || undefined,
           expiresAt: expiresAt || undefined,
           hideFromPublic: restrictionHideFromPublic,
+          // Granular block flags (convention mirrors /api/fraud/investigation/*:
+          // `canX = !blockX`). The backend falls back to the legacy preset
+          // if `restrictions` is omitted, so older callers keep working.
+          restrictions: {
+            canTrade: !blockTrading,
+            canEnterCompetitions: !blockCompetitions,
+            canDeposit: !blockDeposit,
+            canWithdraw: !blockWithdraw,
+          },
           reviewEtaDays: etaToSend,
           documentsRequested: documentsList.length > 0 ? documentsList : undefined,
         }),
@@ -1271,6 +1288,10 @@ export default function UserFullDetailPanel({
         setCustomReason("");
         setExpiresAt("");
         setRestrictionHideFromPublic(false);
+        setBlockTrading(true);
+        setBlockCompetitions(true);
+        setBlockDeposit(true);
+        setBlockWithdraw(true);
         setReviewEtaDays("3");
         setDocumentsRequested("");
         toast.success(
@@ -2833,6 +2854,66 @@ export default function UserFullDetailPanel({
                               />
                             </div>
                           )}
+
+                          {/* Block These Actions — parity with the Fraud
+                              Monitoring Suspend/Ban dialog so both admin
+                              entry points offer the same granular control. */}
+                          <div className="space-y-3 p-3 bg-gray-900/70 rounded border border-gray-700">
+                            <Label className="text-gray-300 text-sm font-semibold">
+                              Block These Actions:
+                            </Label>
+                            <div className="space-y-2">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={blockTrading}
+                                  onChange={(e) =>
+                                    setBlockTrading(e.target.checked)
+                                  }
+                                  className="w-4 h-4"
+                                />
+                                <span className="text-sm text-gray-300">Trading</span>
+                              </label>
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={blockCompetitions}
+                                  onChange={(e) =>
+                                    setBlockCompetitions(e.target.checked)
+                                  }
+                                  className="w-4 h-4"
+                                />
+                                <span className="text-sm text-gray-300">
+                                  Enter Competitions
+                                </span>
+                              </label>
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={blockDeposit}
+                                  onChange={(e) =>
+                                    setBlockDeposit(e.target.checked)
+                                  }
+                                  className="w-4 h-4"
+                                />
+                                <span className="text-sm text-gray-300">Deposits</span>
+                              </label>
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={blockWithdraw}
+                                  onChange={(e) =>
+                                    setBlockWithdraw(e.target.checked)
+                                  }
+                                  className="w-4 h-4"
+                                />
+                                <span className="text-sm text-gray-300">
+                                  Withdrawals
+                                </span>
+                              </label>
+                            </div>
+                          </div>
+
                           {/* Visibility */}
                           <div className="p-3 bg-purple-900/20 border border-purple-700/30 rounded">
                             <label className="flex items-center gap-2 cursor-pointer">
