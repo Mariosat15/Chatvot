@@ -63,7 +63,11 @@ export interface IWithdrawalSettings extends Document {
 
   // Nuvei Automatic Processing
   nuveiWithdrawalEnabled: boolean; // Enable automatic processing via Nuvei
-  nuveiPreferCardRefund: boolean; // Prefer refunding to original card over bank transfer
+  // UI-only hint: when true, the user-facing withdrawal modal should default
+  // the method selector to "original card" (card refund) instead of bank
+  // transfer. Not enforced server-side — users retain the right to pick any
+  // allowed method.
+  nuveiPreferCardRefund: boolean;
   usePaymentProcessorForManual: boolean; // Use Nuvei to process even in manual mode (creates request in Nuvei when admin approves)
 
   // Notifications

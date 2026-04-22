@@ -19,6 +19,7 @@ import UserBankAccount from "@/database/models/user-bank-account.model";
 import { connectToDatabase } from "@/database/mongoose";
 import {
   validateWithdrawal,
+  notifyAdminsOfWithdrawal,
   type PayoutCategory,
 } from "@/lib/services/withdrawal-validator.service";
 
@@ -345,6 +346,21 @@ export async function POST(req: NextRequest) {
         provider: "nuvei",
         initiatedAt: new Date().toISOString(),
       },
+    });
+
+    // Fire-and-forget admin fan-out notification.
+    // Reason: honours the admin-configured "notifyAdminOnRequest" and
+    // "notifyAdminOnHighValue" toggles. Runs off the hot path.
+    void notifyAdminsOfWithdrawal({
+      withdrawalRequestId: withdrawalRequest._id.toString(),
+      userId,
+      userEmail,
+      userName,
+      amountEUR: amount,
+      netAmountEUR,
+      currencySymbol: cs,
+      method: withdrawalMethod,
+      settings: withdrawalSettings,
     });
 
     // Create pending wallet transaction

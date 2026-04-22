@@ -20,6 +20,11 @@ export async function GET() {
       maximumWithdrawal: settings.maximumWithdrawal,
       processingTimeHours: settings.processingTimeHours,
       nuveiWithdrawalEnabled: settings.nuveiWithdrawalEnabled,
+      // UI defaults for the withdrawal modal — these mirror the admin policy
+      // but are never enforced server-side (the validator is the authority).
+      allowedPayoutMethods: settings.allowedPayoutMethods || [],
+      preferredPayoutMethod: settings.preferredPayoutMethod || "",
+      nuveiPreferCardRefund: settings.nuveiPreferCardRefund === true,
     });
   } catch (error) {
     console.error("Error fetching withdrawal settings:", error);

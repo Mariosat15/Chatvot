@@ -17,6 +17,7 @@ import { sanitizeUserNote } from "@/lib/utils/sanitize";
 import { createSecurityLogger } from "@/lib/utils/security-logger";
 import {
   validateWithdrawal,
+  notifyAdminsOfWithdrawal,
   type PayoutCategory,
 } from "@/lib/services/withdrawal-validator.service";
 
@@ -759,6 +760,21 @@ export async function POST(request: NextRequest) {
       body: { amountEUR, netAmountEUR, withdrawalMethodId, autoApproved },
       statusCode: 200,
       success: true,
+    });
+
+    // Fire-and-forget admin fan-out notification.
+    // Reason: honours the admin-configured "notifyAdminOnRequest" and
+    // "notifyAdminOnHighValue" toggles without blocking the response path.
+    void notifyAdminsOfWithdrawal({
+      withdrawalRequestId: String(withdrawalRequest[0]._id),
+      userId: session.user.id,
+      userEmail: session.user.email,
+      userName: session.user.name,
+      amountEUR,
+      netAmountEUR,
+      currencySymbol: cs,
+      method: payoutMethodType,
+      settings: withdrawalSettings,
     });
 
     return NextResponse.json({

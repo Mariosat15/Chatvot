@@ -14,6 +14,7 @@
  * by using the automatic endpoint. This service closes that gap.
  */
 
+import mongoose from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
 import WithdrawalSettings, {
   type IWithdrawalSettings,
@@ -123,10 +124,13 @@ export type WithdrawalFailureCode =
   | "WALLET_NOT_FOUND"
   | "WALLET_INACTIVE"
   | "SANDBOX_DISABLED"
+  | "EMAIL_NOT_VERIFIED"
+  | "ACCOUNT_TOO_NEW"
   | "KYC_REQUIRED"
   | "MIN_DEPOSIT_REQUIRED"
   | "BELOW_MIN"
   | "ABOVE_MAX"
+  | "PARTIAL_WITHDRAWAL_DISABLED"
   | "INSUFFICIENT_BALANCE"
   | "AMOUNT_TOO_SMALL_AFTER_FEES"
   | "DAILY_LIMIT_EXCEEDED"
@@ -149,6 +153,37 @@ export type WithdrawalValidationResult =
 
 const CURRENCY_FALLBACK_SYMBOL = "€";
 const CURRENCY_FALLBACK_CODE = "EUR";
+
+/**
+ * Fetch the better-auth `user` document directly from the Mongo collection.
+ *
+ * Reason: better-auth doesn't expose a mongoose model for the `user`
+ * collection, so we have to read it via the raw driver. We only need a
+ * couple of fields (emailVerified, createdAt) for the account-age / email
+ * verification gates, so a tiny projection keeps the round trip cheap.
+ */
+async function fetchAuthUser(userId: string): Promise<{
+  emailVerified: boolean;
+  createdAt: Date | null;
+} | null> {
+  try {
+    const col = mongoose.connection.collection("user");
+    // Reason: better-auth stores user IDs as strings (not ObjectIds), so
+    // we bypass the driver's BSON-typed filter via a local cast.
+    const doc = await col.findOne(
+      { _id: userId } as unknown as Parameters<typeof col.findOne>[0],
+      { projection: { emailVerified: 1, createdAt: 1 } },
+    );
+    if (!doc) return null;
+    return {
+      emailVerified: (doc as { emailVerified?: boolean }).emailVerified === true,
+      createdAt: (doc as { createdAt?: Date }).createdAt ?? null,
+    };
+  } catch (err) {
+    console.error("⚠️ withdrawal-validator: failed to load auth user", err);
+    return null;
+  }
+}
 
 /**
  * Run every admin-controlled gate for a withdrawal attempt.
@@ -306,6 +341,65 @@ export async function validateWithdrawal(
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // 6a) Email verification + account age gates.
+  // Reason: admin-configurable signals that block brand-new / unverified
+  // accounts from withdrawing. Previously only configurable in the admin UI
+  // but never enforced on the server.
+  // ---------------------------------------------------------------------------
+  if (
+    settings.requireEmailVerification === true ||
+    (typeof settings.minimumAccountAge === "number" &&
+      settings.minimumAccountAge > 0)
+  ) {
+    const authUser = await fetchAuthUser(userId);
+    if (!authUser) {
+      return fail(
+        404,
+        "UNAUTHORIZED",
+        "User account not found",
+        rateLimitHeaders,
+      );
+    }
+    if (
+      settings.requireEmailVerification === true &&
+      !authUser.emailVerified
+    ) {
+      return fail(
+        403,
+        "EMAIL_NOT_VERIFIED",
+        "Please verify your email address before withdrawing.",
+        rateLimitHeaders,
+      );
+    }
+    if (
+      typeof settings.minimumAccountAge === "number" &&
+      settings.minimumAccountAge > 0
+    ) {
+      const createdAt = authUser.createdAt;
+      if (!createdAt) {
+        return fail(
+          403,
+          "ACCOUNT_TOO_NEW",
+          "Account creation date is unavailable. Please contact support.",
+          rateLimitHeaders,
+        );
+      }
+      const ageDays = Math.floor(
+        (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24),
+      );
+      if (ageDays < settings.minimumAccountAge) {
+        const daysLeft = settings.minimumAccountAge - ageDays;
+        return fail(
+          403,
+          "ACCOUNT_TOO_NEW",
+          `Your account must be at least ${settings.minimumAccountAge} day(s) old to withdraw. Please try again in ${daysLeft} day(s).`,
+          rateLimitHeaders,
+        );
+      }
+    }
+  }
+
   const kycRequired =
     (kycSettings?.enabled && kycSettings?.requiredForWithdrawal) ||
     settings.requireKYC;
@@ -385,6 +479,25 @@ export async function validateWithdrawal(
       "Insufficient balance",
       rateLimitHeaders,
     );
+  }
+
+  // Partial-withdrawal gate. When the admin disables partial withdrawals,
+  // users must empty their entire credit balance in a single request.
+  // Reason: some operators use this to simplify their accounting or force
+  // full balance reconciliation before closing an account.
+  if (settings.allowPartialWithdrawal === false) {
+    // Allow a tiny float tolerance (half a cent) to avoid rounding locks.
+    const balanceRemaining = wallet.creditBalance - creditsNeeded;
+    if (balanceRemaining > 0.005) {
+      const fullEur =
+        Math.round((wallet.creditBalance / exchangeRate) * 100) / 100;
+      return fail(
+        400,
+        "PARTIAL_WITHDRAWAL_DISABLED",
+        `Partial withdrawals are disabled. Please withdraw your full balance of ${currencySymbol}${fullEur.toFixed(2)}.`,
+        rateLimitHeaders,
+      );
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -649,4 +762,116 @@ function fail(
   rateLimitHeaders?: Record<string, string>,
 ): WithdrawalValidationFailure {
   return { ok: false, status, code, error, rateLimitHeaders };
+}
+
+// ---------------------------------------------------------------------------
+// Admin-notification fan-out.
+// ---------------------------------------------------------------------------
+/**
+ * Arguments for {@link notifyAdminsOfWithdrawal}. A minimal shape so the
+ * helper does not have to re-query anything the caller already has.
+ */
+export interface NotifyAdminsOfWithdrawalArgs {
+  withdrawalRequestId: string;
+  userId: string;
+  userEmail?: string;
+  userName?: string;
+  amountEUR: number;
+  netAmountEUR: number;
+  currencySymbol: string;
+  method: string;
+  settings: IWithdrawalSettings;
+}
+
+/**
+ * Fan out an in-app notification to every admin when a new withdrawal
+ * request is created. Honours both the global "notifyAdminOnRequest"
+ * toggle and the high-value escalation (amount ≥ highValueThreshold).
+ *
+ * Reason: these settings exist in the admin panel but were previously not
+ * wired anywhere. Skipping silently when both toggles are off keeps the
+ * call-site in the routes one-liner simple.
+ */
+export async function notifyAdminsOfWithdrawal(
+  args: NotifyAdminsOfWithdrawalArgs,
+): Promise<void> {
+  const { settings, amountEUR } = args;
+  const notifyBasic = settings.notifyAdminOnRequest === true;
+  const notifyHigh =
+    settings.notifyAdminOnHighValue === true &&
+    typeof settings.highValueThreshold === "number" &&
+    settings.highValueThreshold > 0 &&
+    amountEUR >= settings.highValueThreshold;
+
+  if (!notifyBasic && !notifyHigh) return;
+
+  try {
+    await connectToDatabase();
+    const usersCollection = mongoose.connection.collection("user");
+    const admins = await usersCollection
+      .find({ role: "admin" })
+      .project({ _id: 1 })
+      .toArray();
+    if (!admins.length) return;
+
+    // Lazy-loaded to avoid pulling the email/notification tree into cold
+    // paths that never fire a notification.
+    const { notificationService } = await import(
+      "@/lib/services/notification.service"
+    );
+
+    const displayName = args.userName?.trim() || args.userEmail || args.userId;
+    const { currencySymbol, amountEUR: amt, netAmountEUR } = args;
+    const amountStr = `${currencySymbol}${amt.toFixed(2)}`;
+    const netStr = `${currencySymbol}${netAmountEUR.toFixed(2)}`;
+
+    const title = notifyHigh
+      ? `🚨 High-value withdrawal: ${amountStr}`
+      : `💸 New withdrawal request: ${amountStr}`;
+    const message = notifyHigh
+      ? `${displayName} requested ${amountStr} (${netStr} net) via ${args.method}. This exceeds the ${currencySymbol}${settings.highValueThreshold} high-value threshold.`
+      : `${displayName} requested ${amountStr} (${netStr} net) via ${args.method}.`;
+
+    await Promise.all(
+      admins.map((admin) =>
+        notificationService
+          .createCustom({
+            userId: admin._id.toString(),
+            type: notifyHigh
+              ? "withdrawal_high_value"
+              : "withdrawal_request_created",
+            title,
+            message,
+            icon: notifyHigh ? "alert-triangle" : "wallet",
+            category: "system",
+            priority: notifyHigh ? "urgent" : "high",
+            color: notifyHigh ? "red" : "amber",
+            actionUrl: `/withdrawals/${args.withdrawalRequestId}`,
+            actionText: "Review",
+            metadata: {
+              withdrawalRequestId: args.withdrawalRequestId,
+              userId: args.userId,
+              amountEUR: amt,
+              netAmountEUR,
+              method: args.method,
+              threshold: settings.highValueThreshold,
+              isHighValue: notifyHigh,
+            },
+          })
+          .catch((err: unknown) => {
+            console.error(
+              "⚠️ withdrawal admin notification failed for admin:",
+              err,
+            );
+          }),
+      ),
+    );
+  } catch (err) {
+    // Reason: notifications are a side-channel — never block the withdrawal
+    // flow if they fail. Log loudly instead.
+    console.error(
+      "❌ notifyAdminsOfWithdrawal: unexpected failure (ignored)",
+      err,
+    );
+  }
 }
