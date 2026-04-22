@@ -45,6 +45,17 @@ export interface IUserRestriction extends Document {
   unrestrictedAt?: Date;
   unrestrictedBy?: string; // Admin who unrestricted
 
+  // Review packet (shown to the user on /account/review)
+  // Reason: Gives the restricted user a clear, branded explanation of when
+  // the review should complete and what they need to provide, instead of a
+  // generic "contact support" toast. All fields are admin-configurable.
+  reviewEtaDays?: number; // Default 3 business days when not set.
+  documentsRequested?: string[]; // e.g. ["ID document", "Proof of address"]
+
+  // Appeal tracking (populated when the user clicks "Submit an appeal")
+  appealSubmittedAt?: Date;
+  appealConversationId?: string;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -99,6 +110,14 @@ const UserRestrictionSchema = new Schema<IUserRestriction>(
     isActive: { type: Boolean, default: true },
     unrestrictedAt: Date,
     unrestrictedBy: String,
+
+    // Review packet — shown on /account/review.
+    reviewEtaDays: { type: Number, min: 0, max: 90 },
+    documentsRequested: { type: [String], default: undefined },
+
+    // Appeal tracking
+    appealSubmittedAt: Date,
+    appealConversationId: String,
   },
   {
     timestamps: true,

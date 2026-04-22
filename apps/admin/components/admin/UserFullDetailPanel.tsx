@@ -384,6 +384,11 @@ export default function UserFullDetailPanel({
   const [customReason, setCustomReason] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [restrictionHideFromPublic, setRestrictionHideFromPublic] = useState(false);
+  // Review packet — shown on the user-facing /account/review page.
+  // Reason: Lets compliance set expectations (ETA + required documents) so
+  // the user has a clear next step instead of a generic "contact support".
+  const [reviewEtaDays, setReviewEtaDays] = useState<string>("3");
+  const [documentsRequested, setDocumentsRequested] = useState<string>("");
   const [savingRestriction, setSavingRestriction] = useState(false);
 
   // Account Deactivation State
@@ -1231,6 +1236,20 @@ export default function UserFullDetailPanel({
   const handleAddRestriction = async () => {
     setSavingRestriction(true);
     try {
+      // Parse the ETA (blank = use server default). Admin UI shows "3" by
+      // default which matches DEFAULT_REVIEW_ETA_DAYS on the backend.
+      const parsedEta = reviewEtaDays.trim() === "" ? undefined : Number(reviewEtaDays);
+      const etaToSend =
+        parsedEta === undefined || Number.isNaN(parsedEta)
+          ? undefined
+          : Math.max(0, Math.min(90, parsedEta));
+
+      // Split the documents textarea on newlines/commas → trimmed list.
+      const documentsList = documentsRequested
+        .split(/[\n,]/)
+        .map((d) => d.trim())
+        .filter((d) => d.length > 0);
+
       const response = await fetch(`/api/users/${user.id}/restrictions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1240,6 +1259,8 @@ export default function UserFullDetailPanel({
           customReason: customReason.trim() || undefined,
           expiresAt: expiresAt || undefined,
           hideFromPublic: restrictionHideFromPublic,
+          reviewEtaDays: etaToSend,
+          documentsRequested: documentsList.length > 0 ? documentsList : undefined,
         }),
       });
 
@@ -1250,6 +1271,8 @@ export default function UserFullDetailPanel({
         setCustomReason("");
         setExpiresAt("");
         setRestrictionHideFromPublic(false);
+        setReviewEtaDays("3");
+        setDocumentsRequested("");
         toast.success(
           `User ${restrictionType === "banned" ? "banned" : "suspended"}`,
         );
@@ -2823,6 +2846,43 @@ export default function UserFullDetailPanel({
                                 Hide from public (leaderboard, matchmaking, match cards)
                               </span>
                             </label>
+                          </div>
+
+                          {/* Review packet — surfaces on /account/review */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-amber-900/10 border border-amber-700/30 rounded">
+                            <div className="space-y-2">
+                              <Label className="text-amber-200">
+                                Review ETA (business days)
+                              </Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                max={90}
+                                value={reviewEtaDays}
+                                onChange={(e) => setReviewEtaDays(e.target.value)}
+                                placeholder="3"
+                                className="bg-gray-900 border-gray-700"
+                              />
+                              <p className="text-xs text-amber-200/70">
+                                Shown to the user on the &quot;Account Under Review&quot; page. Default 3.
+                              </p>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-amber-200">
+                                Documents requested
+                              </Label>
+                              <Textarea
+                                value={documentsRequested}
+                                onChange={(e) =>
+                                  setDocumentsRequested(e.target.value)
+                                }
+                                placeholder={"One per line or comma-separated\nID document\nProof of address"}
+                                className="bg-gray-900 border-gray-700 min-h-[80px]"
+                              />
+                              <p className="text-xs text-amber-200/70">
+                                Listed on the user&apos;s review page. Leave blank if none are needed.
+                              </p>
+                            </div>
                           </div>
 
                           <div className="flex gap-2">

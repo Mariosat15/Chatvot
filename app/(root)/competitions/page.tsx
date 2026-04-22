@@ -6,11 +6,16 @@ import {
 } from "@/lib/actions/trading/competition.actions";
 import { getWalletBalance } from "@/lib/actions/trading/wallet.actions";
 import CompetitionsPageContent from "./page-content";
+import { redirectIfRestricted } from "@/lib/services/restriction-guard.service";
 
 // Force dynamic rendering - this page uses authentication
 export const dynamic = "force-dynamic";
 
 const CompetitionsPage = async () => {
+  // Reason: bounce restricted users to /account/review instead of showing
+  // a list of competitions they cannot enter.
+  await redirectIfRestricted("enterCompetition");
+
   // Fetch competitions with limits so list doesn't grow unbounded (50 upcoming, 50 active, etc.)
   const [
     upcomingCompetitions,

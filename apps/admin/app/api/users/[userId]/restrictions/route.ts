@@ -68,6 +68,28 @@ export async function POST(
       canWithdraw: false,
     };
 
+    // Normalize the optional review-packet inputs so malformed admin input
+    // (string in a number field, blank textarea, etc.) never reaches the
+    // database. These fields surface on the user-facing /account/review
+    // page, so we clamp + trim defensively.
+    const rawEta =
+      typeof body.reviewEtaDays === "number"
+        ? body.reviewEtaDays
+        : typeof body.reviewEtaDays === "string" && body.reviewEtaDays.trim() !== ""
+          ? Number(body.reviewEtaDays)
+          : undefined;
+    const reviewEtaDays =
+      typeof rawEta === "number" && Number.isFinite(rawEta)
+        ? Math.max(0, Math.min(90, Math.floor(rawEta)))
+        : undefined;
+
+    const documentsRequested = Array.isArray(body.documentsRequested)
+      ? body.documentsRequested
+          .map((d: unknown) => (typeof d === "string" ? d.trim() : ""))
+          .filter((d: string) => d.length > 0)
+          .slice(0, 20)
+      : undefined;
+
     // Create restriction
     const restriction = await UserRestriction.create({
       userId,
@@ -80,6 +102,11 @@ export async function POST(
       expiresAt: body.expiresAt ? new Date(body.expiresAt) : undefined,
       restrictedBy: session.id,
       isActive: true,
+      reviewEtaDays,
+      documentsRequested:
+        documentsRequested && documentsRequested.length > 0
+          ? documentsRequested
+          : undefined,
     });
 
     // Auto-add a note about the restriction
