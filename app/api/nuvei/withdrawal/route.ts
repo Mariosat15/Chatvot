@@ -20,6 +20,7 @@ import WithdrawalSettings from "@/database/models/withdrawal-settings.model";
 import CreditConversionSettings from "@/database/models/credit-conversion-settings.model";
 import UserBankAccount from "@/database/models/user-bank-account.model";
 import AppSettings from "@/database/models/app-settings.model";
+import { evaluateTwoFactorGate } from "@/lib/services/two-factor-gate.service";
 
 /**
  * POST - Submit a withdrawal request via Nuvei
@@ -45,6 +46,7 @@ export async function POST(req: NextRequest) {
       cardDetails, // For card refund: { paymentIntentId, cardBrand, cardLast4, userPaymentOptionId }
       bankAccountId, // For bank transfer: existing bank account ID
       userPaymentOptionId, // Direct UPO ID if provided
+      twoFactorCode, // Optional TOTP / backup code for 2FA step-up
     } = body;
 
     // Validate amount
@@ -79,6 +81,38 @@ export async function POST(req: NextRequest) {
 
     if (!wallet) {
       return NextResponse.json({ error: "Wallet not found" }, { status: 404 });
+    }
+
+    // SECURITY: Two-factor step-up gate. Same policy as the manual withdraw
+    // route — automatic Nuvei withdrawals are still real money leaving the
+    // platform, so they get the same enrolment + TOTP rules.
+    // Reason: previously this route bypassed 2FA entirely, allowing
+    // attackers with a stolen session to drain accounts via the automatic
+    // path even when the admin had mandated 2FA.
+    const twoFactorGate = await evaluateTwoFactorGate({
+      userId,
+      reqHeaders: await headers(),
+      code:
+        typeof twoFactorCode === "string" ? twoFactorCode.trim() : undefined,
+      policy: {
+        required: withdrawalSettings.requireTwoFactorForWithdrawal === true,
+        requireAboveAmount:
+          typeof withdrawalSettings.requireTwoFactorAboveAmount === "number"
+            ? withdrawalSettings.requireTwoFactorAboveAmount
+            : 0,
+        blockIfNotEnabled:
+          withdrawalSettings.blockWithdrawalsWithoutTwoFactor === true,
+        amount,
+      },
+    });
+    if (!twoFactorGate.ok) {
+      return NextResponse.json(
+        {
+          error: twoFactorGate.error,
+          code: twoFactorGate.code,
+        },
+        { status: twoFactorGate.status },
+      );
     }
 
     const isSandbox = appSettings?.simulatorModeEnabled ?? true;
@@ -138,7 +172,7 @@ export async function POST(req: NextRequest) {
 
     // Get bank details for bank transfer or UPO for card refund
     let bankAccount = null;
-    let bankDetailsForRequest: any = null;
+    let bankDetailsForRequest: Record<string, unknown> | null = null;
     let actualUpoId: string | null = null;
 
     if (withdrawalMethod === "bank_transfer") {

@@ -220,6 +220,10 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
           const requestBody: Record<string, unknown> = {
             amountEUR,
             withdrawalMethod,
+            // Reason: include 2FA code on every automatic attempt so a
+            // retry after a TWO_FACTOR_REQUIRED response succeeds. The
+            // server treats it as optional when 2FA is not required.
+            twoFactorCode: twoFactorCode.trim() || undefined,
           };
 
           if (withdrawalMethod === "card_payout") {
@@ -242,6 +246,33 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
             });
 
             const data = await response.json();
+
+            // Step-up handling for the automatic path — mirror the manual
+            // route's behaviour so the user gets the inline TOTP prompt
+            // instead of a confusing "withdrawal failed" message.
+            if (!response.ok) {
+              if (
+                data?.code === "TWO_FACTOR_REQUIRED" ||
+                data?.code === "TWO_FACTOR_INVALID"
+              ) {
+                setTwoFactorRequired(true);
+                setError(
+                  data.code === "TWO_FACTOR_INVALID"
+                    ? "Invalid or expired code. Please try again."
+                    : "Enter your authenticator code to continue.",
+                );
+                setLoading(false);
+                return;
+              }
+              if (data?.code === "TWO_FACTOR_NOT_ENABLED") {
+                setError(
+                  data.error ||
+                    "Two-factor authentication is required. Please enable it in your profile.",
+                );
+                setLoading(false);
+                return;
+              }
+            }
 
             if (response.ok) {
               // Automatic withdrawal succeeded
