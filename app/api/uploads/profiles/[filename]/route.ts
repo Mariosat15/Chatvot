@@ -21,16 +21,18 @@ export async function GET(
       `📸 Serving profile image: ${sanitizedFilename}, cwd: ${process.cwd()}`,
     );
 
-    // Try multiple possible locations for the file
+    // Try multiple possible locations for the file.
+    // Reason: `/*turbopackIgnore: true*/` prevents NFT from widening the
+    // trace to the whole project due to the runtime-only `process.cwd()` read.
     const possiblePaths = [
       path.join(
-        process.cwd(),
+        /*turbopackIgnore: true*/ process.cwd(),
         "public",
         "uploads",
         "profiles",
         sanitizedFilename,
       ),
-      path.join(process.cwd(), "uploads", "profiles", sanitizedFilename),
+      path.join(/*turbopackIgnore: true*/ process.cwd(), "uploads", "profiles", sanitizedFilename),
       path.join(
         "/var/www/chartvolt",
         "public",
@@ -41,7 +43,7 @@ export async function GET(
       path.join("/var/www/chartvolt", "uploads", "profiles", sanitizedFilename),
       // Also try the .next directory in case running from there
       path.join(
-        process.cwd(),
+        /*turbopackIgnore: true*/ process.cwd(),
         "..",
         "public",
         "uploads",

@@ -70,10 +70,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create uploads directory if it doesn't exist
-    // Try multiple possible locations for production compatibility
+    // Create uploads directory if it doesn't exist.
+    // Try multiple possible locations for production compatibility.
+    // Reason: `/*turbopackIgnore: true*/` prevents NFT from widening the
+    // trace to the whole project due to the runtime-only `process.cwd()` read.
     const possibleDirs = [
-      path.join(process.cwd(), "public", "uploads", "profiles"),
+      path.join(/*turbopackIgnore: true*/ process.cwd(), "public", "uploads", "profiles"),
       path.join("/var/www/chartvolt", "public", "uploads", "profiles"),
     ];
 

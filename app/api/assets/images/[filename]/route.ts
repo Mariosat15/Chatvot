@@ -44,11 +44,13 @@ export async function GET(
         "images",
         sanitizedFilename,
       ),
-      // Local dev: current app's public folder
-      path.join(process.cwd(), "public", "assets", "images", sanitizedFilename),
+      // Local dev: current app's public folder.
+      // Reason: `/*turbopackIgnore: true*/` prevents NFT from widening
+      // the trace to the whole project due to the runtime-only `process.cwd()` read.
+      path.join(/*turbopackIgnore: true*/ process.cwd(), "public", "assets", "images", sanitizedFilename),
       // Local dev: admin app's public folder (monorepo)
       path.join(
-        process.cwd(),
+        /*turbopackIgnore: true*/ process.cwd(),
         "apps",
         "admin",
         "public",

@@ -16,9 +16,11 @@ export async function GET(
     const { filename } = await params;
     const sanitizedFilename = path.basename(filename.split("?")[0]);
 
+    // Reason: `/*turbopackIgnore: true*/` prevents NFT from widening the
+    // trace to the whole project due to the runtime-only `process.cwd()` read.
     const possiblePaths = [
       path.join("/var/www/chartvolt", "public", "uploads", "hero", sanitizedFilename),
-      path.join(process.cwd(), "public", "uploads", "hero", sanitizedFilename),
+      path.join(/*turbopackIgnore: true*/ process.cwd(), "public", "uploads", "hero", sanitizedFilename),
     ];
 
     let filePath: string | null = null;

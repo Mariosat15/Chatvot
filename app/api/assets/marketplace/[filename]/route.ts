@@ -34,16 +34,18 @@ export async function GET(
       filenamesToTry.push(webpFilename);
     }
 
-    // Base directories to search (no hardcoded paths - works on any server)
-    const cwd = process.cwd();
+    // Base directories to search (no hardcoded paths - works on any server).
+    // Reason: `/*turbopackIgnore: true*/` prevents Turbopack's NFT from
+    // widening the trace to the whole project. These directories are
+    // read at runtime only and should never be bundled.
     const baseDirs = [
       // Committed assets (defaults saved via "Save as Defaults") - check first
-      path.join(cwd, "public", "assets", "marketplace"),
+      path.join(/*turbopackIgnore: true*/ process.cwd(), "public", "assets", "marketplace"),
       // Runtime uploads
-      path.join(cwd, "public", "uploads", "marketplace"),
+      path.join(/*turbopackIgnore: true*/ process.cwd(), "public", "uploads", "marketplace"),
       // Admin app's directories (monorepo: web app is at root, admin at apps/admin)
-      path.join(cwd, "apps", "admin", "public", "uploads", "marketplace"),
-      path.join(cwd, "apps", "admin", "public", "assets", "marketplace"),
+      path.join(/*turbopackIgnore: true*/ process.cwd(), "apps", "admin", "public", "uploads", "marketplace"),
+      path.join(/*turbopackIgnore: true*/ process.cwd(), "apps", "admin", "public", "assets", "marketplace"),
     ];
 
     let filePath: string | null = null;
