@@ -98,15 +98,22 @@ export async function GET() {
         avatar: 1,
         profileImage: 1,
         privacySettings: 1,
+        emailVerified: 1,
       })
       .toArray();
 
     const userMap = new Map(users.map((u) => [u.id, u]));
 
-    // Exclude restricted users hidden from public
+    // Reason: Build a set of user IDs that are email-verified so unverified
+    // spam accounts never appear on the public landing preview.
+    const verifiedIds = new Set(
+      users.filter((u) => u.emailVerified === true).map((u) => u.id),
+    );
+
+    // Exclude restricted users hidden from public + unverified users
     const hiddenIds = await getHiddenUserIds();
     const visibleWinners = topCompetitionWinners.filter(
-      (w) => !hiddenIds.has(w._id),
+      (w) => !hiddenIds.has(w._id) && verifiedIds.has(w._id),
     );
 
     // Build leaderboard entries

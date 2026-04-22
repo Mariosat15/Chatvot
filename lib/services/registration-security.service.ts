@@ -357,12 +357,17 @@ export function isSuspiciousName(
   name: string,
   patterns: string[],
 ): { suspicious: boolean; pattern?: string } {
+  // Reason: Match against the ORIGINAL (non-lowercased) string too so regex
+  // patterns that include character-class ranges (e.g. Cyrillic) still fire.
   const lowerName = name.toLowerCase().trim();
+  const rawName = name.trim();
 
   for (const pattern of patterns) {
     try {
+      // Patterns are admin-controlled via FraudSettings, not user input.
+      // eslint-disable-next-line security/detect-non-literal-regexp
       const regex = new RegExp(pattern, "i");
-      if (regex.test(lowerName)) {
+      if (regex.test(lowerName) || regex.test(rawName)) {
         return { suspicious: true, pattern };
       }
     } catch {
@@ -371,6 +376,98 @@ export function isSuspiciousName(
   }
 
   return { suspicious: false };
+}
+
+/**
+ * Detect URL-like tokens in a display name (spam campaigns often embed links).
+ *
+ * Matches:
+ *  - http:// or https:// protocols
+ *  - shortener domains (bit.ly, tinyurl, t.me)
+ *  - raw www. prefix
+ *  - common TLDs (.com/.ru/.xyz/.io/.net) with slash, end, or word boundary
+ */
+export function nameContainsUrl(name: string): boolean {
+  const normalized = name.trim().toLowerCase();
+  if (!normalized) return false;
+
+  const urlPatterns: RegExp[] = [
+    /https?:\/\//i,
+    /\bwww\./i,
+    /\bbit\.ly\b/i,
+    /\btinyurl\b/i,
+    /\bt\.me\//i,
+    /\b[a-z0-9-]+\.(com|net|org|ru|xyz|io|co|info|biz|me|site|online|shop|live|gg|tv|top|click)(\/|$|\s)/i,
+  ];
+
+  return urlPatterns.some((p) => p.test(normalized));
+}
+
+/**
+ * Count emoji / pictographic characters in a string.
+ * Uses Unicode property escapes — supported in Node 10+ / ES2018.
+ */
+export function countEmojis(input: string): number {
+  const matches = input.match(/\p{Extended_Pictographic}/gu);
+  return matches ? matches.length : 0;
+}
+
+/**
+ * Check whether the first non-whitespace character is an ASCII or Unicode letter.
+ * Rejects names that start with digits, punctuation, symbols, or emojis
+ * (e.g. "🌶 85.000 Lira ...").
+ */
+export function startsWithLetter(name: string): boolean {
+  const trimmed = name.trim();
+  if (!trimmed) return false;
+  return /^\p{L}/u.test(trimmed);
+}
+
+/**
+ * Check if an IP matches any entry in the known-bad list.
+ * Supports exact match and simple CIDR prefix match ("1.2.3.0/24").
+ */
+export function isKnownBadIP(ip: string, knownBadIPs: string[]): boolean {
+  if (!ip || ip === "unknown" || !knownBadIPs?.length) return false;
+
+  for (const entry of knownBadIPs) {
+    const trimmed = entry.trim();
+    if (!trimmed) continue;
+
+    // Exact match
+    if (trimmed === ip) return true;
+
+    // Simple IPv4 CIDR (e.g. "203.0.113.0/24") — prefix-based
+    if (trimmed.includes("/")) {
+      const [network, prefixStr] = trimmed.split("/");
+      const prefix = parseInt(prefixStr, 10);
+      if (Number.isNaN(prefix) || prefix < 0 || prefix > 32) continue;
+
+      const ipParts = ip.split(".").map((p) => parseInt(p, 10));
+      const netParts = network.split(".").map((p) => parseInt(p, 10));
+      if (ipParts.length !== 4 || netParts.length !== 4) continue;
+      if (ipParts.some((n) => Number.isNaN(n))) continue;
+
+      // Compare the first `prefix` bits
+      const mask = prefix === 0 ? 0 : (~0 << (32 - prefix)) >>> 0;
+      const ipInt =
+        ((ipParts[0] << 24) |
+          (ipParts[1] << 16) |
+          (ipParts[2] << 8) |
+          ipParts[3]) >>>
+        0;
+      const netInt =
+        ((netParts[0] << 24) |
+          (netParts[1] << 16) |
+          (netParts[2] << 8) |
+          netParts[3]) >>>
+        0;
+
+      if ((ipInt & mask) === (netInt & mask)) return true;
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -470,6 +567,24 @@ export async function validateRegistration(data: {
     return { allowed: true, riskScore: 0 };
   }
 
+  // 2b. Check known-bad IP list (reputation)
+  // Reason: settings flag `blockKnownBadIPs` existed but was not wired to any
+  // list — now it consults the admin-curated `knownBadIPs` array.
+  if (
+    settings.blockKnownBadIPs &&
+    isKnownBadIP(ip, settings.knownBadIPs || [])
+  ) {
+    console.log(`🛡️ Registration blocked: known-bad IP ${ip}`);
+    return {
+      allowed: false,
+      reason: settings.genericErrorMessages
+        ? "Registration failed. Please try again."
+        : "Your IP address has been flagged. Registration not allowed.",
+      code: "BAD_IP",
+      riskScore: 100,
+    };
+  }
+
   // 3. Check rate limiting
   if (settings.registrationRateLimitEnabled) {
     const rateCheck = checkRegistrationRateLimit(
@@ -524,14 +639,30 @@ export async function validateRegistration(data: {
     }
   }
 
-  // 6. Check name length
-  const nameLength = data.name.trim().length;
+  // 6. Check name length (min)
+  const trimmedName = data.name.trim();
+  const nameLength = trimmedName.length;
   if (nameLength < (settings.minNameLength || 2)) {
     return {
       allowed: false,
       reason: `Name must be at least ${settings.minNameLength || 2} characters.`,
       code: "NAME_TOO_SHORT",
       riskScore: 50,
+    };
+  }
+
+  // 6b. Check name length (max)
+  // Reason: Spam bots often submit long promotional strings as display names.
+  const maxNameLen = settings.maxNameLength || 40;
+  if (nameLength > maxNameLen) {
+    console.log(
+      `🛡️ Registration blocked: name too long (${nameLength} chars) - ${trimmedName.slice(0, 40)}...`,
+    );
+    return {
+      allowed: false,
+      reason: `Name must be at most ${maxNameLen} characters.`,
+      code: "NAME_TOO_LONG",
+      riskScore: 90,
     };
   }
 
@@ -545,8 +676,49 @@ export async function validateRegistration(data: {
     };
   }
 
+  // 7b. Require letter start (rejects emoji / digit / symbol-leading names)
+  if (settings.requireLetterStart && !startsWithLetter(trimmedName)) {
+    console.log(
+      `🛡️ Registration blocked: name does not start with a letter - "${trimmedName}"`,
+    );
+    return {
+      allowed: false,
+      reason: "Name must start with a letter.",
+      code: "INVALID_NAME_START",
+      riskScore: 90,
+    };
+  }
+
+  // 7c. Reject URLs embedded in name
+  if (settings.blockUrlsInName && nameContainsUrl(trimmedName)) {
+    console.log(
+      `🛡️ Registration blocked: URL in name - "${trimmedName}"`,
+    );
+    return {
+      allowed: false,
+      reason: "Name cannot contain URLs or links.",
+      code: "URL_IN_NAME",
+      riskScore: 95,
+    };
+  }
+
+  // 7d. Reject names with excessive emojis
+  const emojiCount = countEmojis(trimmedName);
+  const maxEmojis = settings.maxEmojisInName ?? 2;
+  if (emojiCount > maxEmojis) {
+    console.log(
+      `🛡️ Registration blocked: too many emojis (${emojiCount}) in name - "${trimmedName}"`,
+    );
+    return {
+      allowed: false,
+      reason: "Name contains too many emoji characters.",
+      code: "TOO_MANY_EMOJIS",
+      riskScore: 85,
+    };
+  }
+
   // 8. Check numeric-only names
-  if (settings.blockNumericOnlyNames && /^[0-9]+$/.test(data.name.trim())) {
+  if (settings.blockNumericOnlyNames && /^[0-9]+$/.test(trimmedName)) {
     return {
       allowed: false,
       reason: "Please enter a valid name.",
@@ -555,23 +727,29 @@ export async function validateRegistration(data: {
     };
   }
 
-  // 9. Check suspicious name patterns
+  // 9. Check suspicious name patterns — HARD BLOCK (not just risk-score)
+  // Reason: Admin-curated patterns represent known spam campaigns; matching them
+  // should be a hard reject, not a soft score bump.
   if (
     settings.blockSuspiciousPatterns &&
     settings.suspiciousNamePatterns?.length > 0
   ) {
     const nameCheck = isSuspiciousName(
-      data.name,
+      trimmedName,
       settings.suspiciousNamePatterns,
     );
     if (nameCheck.suspicious) {
       console.log(
-        `⚠️ Suspicious name pattern detected: ${data.name} (pattern: ${nameCheck.pattern})`,
+        `🛡️ Registration blocked: suspicious name pattern "${nameCheck.pattern}" matched "${trimmedName}"`,
       );
-      riskScore += 30;
-
-      // Don't block, but increase risk score
-      // Actual blocking should only happen for clear violations
+      return {
+        allowed: false,
+        reason: settings.genericErrorMessages
+          ? "Please enter a valid name."
+          : `Name matches a blocked pattern.`,
+        code: "SUSPICIOUS_NAME",
+        riskScore: 90,
+      };
     }
   }
 
@@ -597,6 +775,24 @@ export async function validateRegistration(data: {
     console.log(
       `⚠️ High-risk registration: email=${data.email}, name=${data.name}, ip=${ip}, score=${riskScore}`,
     );
+  }
+
+  // 11. Score-based blocking — reject if accumulated risk exceeds threshold
+  // Reason: Previously suspicious signals only raised the score without ever
+  // blocking. This converts soft signals into a hard block above the threshold.
+  const blockThreshold = settings.riskScoreBlockThreshold ?? 70;
+  if (riskScore >= blockThreshold) {
+    console.log(
+      `🛡️ Registration blocked by risk threshold: score=${riskScore} >= ${blockThreshold} (email=${data.email}, ip=${ip})`,
+    );
+    return {
+      allowed: false,
+      reason: settings.genericErrorMessages
+        ? "Registration failed. Please try again."
+        : "Registration flagged by risk scoring.",
+      code: "RISK_THRESHOLD_EXCEEDED",
+      riskScore,
+    };
   }
 
   return { allowed: true, riskScore };
@@ -647,6 +843,8 @@ export async function validateLogin(data: {
     // Escape special regex characters to prevent regex injection
     const escapedEmail = data.email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const dbLockout = await AccountLockout.findOne({
+      // Input is pre-escaped above.
+      // eslint-disable-next-line security/detect-non-literal-regexp
       email: { $regex: new RegExp(`^${escapedEmail}$`, "i") },
       isActive: true,
       $or: [
@@ -782,6 +980,8 @@ export async function recordFailedLogin(data: {
         // Escape special regex characters to prevent regex injection
         const escapedEmailForLockout = data.email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const activeLockout = await AccountLockout.findOne({
+          // Input is pre-escaped above.
+          // eslint-disable-next-line security/detect-non-literal-regexp
           email: { $regex: new RegExp(`^${escapedEmailForLockout}$`, "i") },
           isActive: true,
         });
@@ -789,6 +989,8 @@ export async function recordFailedLogin(data: {
         if (!activeLockout) {
           // No active lockout - check if there was a recent unlock
           const recentUnlock = await AccountLockout.findOne({
+            // Input is pre-escaped above.
+            // eslint-disable-next-line security/detect-non-literal-regexp
             email: { $regex: new RegExp(`^${escapedEmailForLockout}$`, "i") },
             isActive: false,
             unlockedAt: { $exists: true },
@@ -1119,6 +1321,8 @@ export async function adminUnlockAccount(data: {
     // Escape special regex characters to prevent regex injection
     const escapedEmailForUnlock = data.email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const allLockouts = await AccountLockout.find({
+      // Input is pre-escaped above.
+      // eslint-disable-next-line security/detect-non-literal-regexp
       email: { $regex: new RegExp(`^${escapedEmailForUnlock}$`, "i") },
     }).lean();
 
@@ -1126,13 +1330,16 @@ export async function adminUnlockAccount(data: {
       "🔓 [Database] Found", allLockouts.length, "total lockouts for", data.email
     );
     for (const l of allLockouts) {
+      const doc = l as { _id: unknown; isActive?: boolean; ipAddress?: string };
       console.log(
-        "   - ID:", (l as any)._id, ", isActive:", (l as any).isActive, ", IP:", (l as any).ipAddress
+        "   - ID:", doc._id, ", isActive:", doc.isActive, ", IP:", doc.ipAddress
       );
     }
 
     // Clear ALL lockouts for this email (regardless of isActive status to be safe)
     const result = await AccountLockout.updateMany(
+      // Input is pre-escaped above.
+      // eslint-disable-next-line security/detect-non-literal-regexp
       { email: { $regex: new RegExp(`^${escapedEmailForUnlock}$`, "i") } },
       {
         $set: {

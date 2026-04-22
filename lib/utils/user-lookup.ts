@@ -139,7 +139,16 @@ export async function getAllUsers(): Promise<UserInfo[]> {
       .find(
         {},
         {
-          projection: { id: 1, _id: 1, email: 1, name: 1, profileImage: 1, image: 1, role: 1 },
+          projection: {
+            id: 1,
+            _id: 1,
+            email: 1,
+            name: 1,
+            profileImage: 1,
+            image: 1,
+            role: 1,
+            emailVerified: 1,
+          },
           readPreference: ReadPreference.SECONDARY_PREFERRED,
         }
       )
@@ -162,6 +171,11 @@ export async function getAllUsers(): Promise<UserInfo[]> {
 
       // Skip admin
       if (adminEmail && email === adminEmail) continue;
+
+      // Reason: Exclude users whose email is not verified. Unverified accounts
+      // are spam signups or bots that never completed email confirmation and
+      // must not appear on public leaderboards / matchmaking.
+      if (user.emailVerified !== true) continue;
 
       uniqueUsersMap.set(email, {
         id,

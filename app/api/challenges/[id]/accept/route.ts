@@ -23,6 +23,19 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Reason: Require verified email before accepting challenges.
+    // Keeps unverified/spam accounts from engaging with real traders.
+    if ((session.user as { emailVerified?: boolean }).emailVerified !== true) {
+      await dbSession.abortTransaction();
+      return NextResponse.json(
+        {
+          error:
+            "Please verify your email address before accepting challenges.",
+        },
+        { status: 403 },
+      );
+    }
+
     const { id } = await params;
     await connectToDatabase();
 

@@ -13,7 +13,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import {
-  Settings,
   Save,
   RefreshCw,
   Shield,
@@ -91,8 +90,14 @@ interface FraudSettings {
   blockNumericOnlyNames: boolean;
   blockSingleCharacterNames: boolean;
   minNameLength: number;
+  maxNameLength: number;
+  blockUrlsInName: boolean;
+  requireLetterStart: boolean;
+  maxEmojisInName: number;
+  riskScoreBlockThreshold: number;
   blockDatacenterIPs: boolean;
   blockKnownBadIPs: boolean;
+  knownBadIPs: string[];
   genericErrorMessages: boolean;
 
   // Login Security
@@ -571,6 +576,34 @@ export default function FraudSettingsSection() {
                     }
                   />
                 </div>
+                <div
+                  className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg"
+                  title="First character of a display name must be an alphabetic letter (blocks emojis, digits, symbols)"
+                >
+                  <Label className="text-gray-300 text-xs">
+                    Require Letter Start
+                  </Label>
+                  <Switch
+                    checked={settings.requireLetterStart ?? true}
+                    onCheckedChange={(checked) =>
+                      updateSetting("requireLetterStart", checked)
+                    }
+                  />
+                </div>
+                <div
+                  className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg"
+                  title="Reject display names containing URLs / shortener domains"
+                >
+                  <Label className="text-gray-300 text-xs">
+                    Block URLs in Name
+                  </Label>
+                  <Switch
+                    checked={settings.blockUrlsInName ?? true}
+                    onCheckedChange={(checked) =>
+                      updateSetting("blockUrlsInName", checked)
+                    }
+                  />
+                </div>
                 <div className="p-3 bg-gray-900/50 rounded-lg">
                   <Label className="text-gray-300 text-xs">Min Length</Label>
                   <Input
@@ -584,10 +617,39 @@ export default function FraudSettingsSection() {
                     className="bg-gray-900 border-gray-700 text-gray-100 mt-1 h-8"
                   />
                 </div>
+                <div className="p-3 bg-gray-900/50 rounded-lg">
+                  <Label className="text-gray-300 text-xs">Max Length</Label>
+                  <Input
+                    type="number"
+                    min="10"
+                    max="120"
+                    value={settings.maxNameLength ?? 40}
+                    onChange={(e) =>
+                      updateSetting("maxNameLength", parseInt(e.target.value))
+                    }
+                    className="bg-gray-900 border-gray-700 text-gray-100 mt-1 h-8"
+                  />
+                </div>
+                <div className="p-3 bg-gray-900/50 rounded-lg">
+                  <Label className="text-gray-300 text-xs">Max Emojis</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="20"
+                    value={settings.maxEmojisInName ?? 2}
+                    onChange={(e) =>
+                      updateSetting(
+                        "maxEmojisInName",
+                        parseInt(e.target.value),
+                      )
+                    }
+                    className="bg-gray-900 border-gray-700 text-gray-100 mt-1 h-8"
+                  />
+                </div>
               </div>
               <div>
                 <Label className="text-gray-300 text-sm">
-                  Suspicious Patterns (regex)
+                  Suspicious Patterns (regex, comma-separated)
                 </Label>
                 <Input
                   value={(settings.suspiciousNamePatterns || []).join(", ")}
@@ -600,9 +662,13 @@ export default function FraudSettingsSection() {
                         .filter(Boolean),
                     )
                   }
-                  placeholder="^test[0-9]*$, ^user[0-9]*$, ^asdf"
+                  placeholder="^test[0-9]*$, ^user[0-9]*$, ^asdf, https?://, bit\\.ly, \\.ru(/|$)"
                   className="bg-gray-900 border-gray-700 text-gray-100 mt-1 text-xs"
                 />
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Matches block registration. Case-insensitive. Tested against
+                  both raw and lowercased names.
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -993,7 +1059,7 @@ export default function FraudSettingsSection() {
                       Block Known Bad IPs
                     </Label>
                     <p className="text-xs text-gray-500">
-                      Threat intelligence lists
+                      Uses the custom list below
                     </p>
                   </div>
                   <Switch
@@ -1004,6 +1070,35 @@ export default function FraudSettingsSection() {
                   />
                 </div>
               </div>
+
+              {settings.blockKnownBadIPs && (
+                <div className="mt-4">
+                  <Label className="text-gray-300 text-sm">
+                    Known Bad IPs / CIDRs
+                  </Label>
+                  <textarea
+                    value={(settings.knownBadIPs || []).join("\n")}
+                    onChange={(e) =>
+                      updateSetting(
+                        "knownBadIPs",
+                        e.target.value
+                          .split(/[\n,]/)
+                          .map((d) => d.trim())
+                          .filter(Boolean),
+                      )
+                    }
+                    placeholder={
+                      "One per line, e.g.\n203.0.113.42\n45.9.148.0/24"
+                    }
+                    rows={4}
+                    className="w-full mt-1 p-2 text-xs font-mono bg-gray-900 border border-gray-700 rounded-md text-gray-100 resize-y"
+                  />
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    Supports exact IPv4 matches and `/prefix` CIDR ranges
+                    (0–32). Requests from these IPs are blocked at signup.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1081,6 +1176,35 @@ export default function FraudSettingsSection() {
                   }}
                   className="w-full accent-red-500"
                 />
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <Label className="text-gray-300">
+                    Registration Risk Block Threshold
+                  </Label>
+                  <span className="text-2xl font-bold text-red-500">
+                    {settings.riskScoreBlockThreshold ?? 70}
+                  </span>
+                </div>
+                <Input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={settings.riskScoreBlockThreshold ?? 70}
+                  onChange={(e) =>
+                    updateSetting(
+                      "riskScoreBlockThreshold",
+                      parseInt(e.target.value),
+                    )
+                  }
+                  className="w-full accent-red-500"
+                />
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Signups whose accumulated risk score (honeypot, rate limit,
+                  suspicious email/name, bot patterns, etc.) meets or exceeds
+                  this value are rejected.
+                </p>
               </div>
 
               {/* Rate Limiting for Activities */}

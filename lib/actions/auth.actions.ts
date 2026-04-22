@@ -30,6 +30,59 @@ export const signUpWithEmail = async ({
     // Get client IP for security checks
     const ip = await getClientIP();
 
+    // SECURITY: Verify request Origin / Referer matches our own domain.
+    // Reason: Server Actions can be invoked via direct POST from external
+    // scripts/bots. Rejecting cross-origin callers blocks automated spam
+    // tools that never hit our signup page in the browser.
+    try {
+      const hdrs = await headers();
+      const origin = hdrs.get("origin") || "";
+      const referer = hdrs.get("referer") || "";
+      const host = hdrs.get("host") || "";
+
+      const appUrl = (
+        process.env.NEXT_PUBLIC_APP_URL ||
+        process.env.BETTER_AUTH_URL ||
+        ""
+      ).toLowerCase();
+
+      const allowedHosts = new Set<string>();
+      if (host) allowedHosts.add(host.toLowerCase());
+      try {
+        if (appUrl) allowedHosts.add(new URL(appUrl).host.toLowerCase());
+      } catch {
+        /* ignore invalid URL */
+      }
+
+      // Only enforce when we have at least one allowed host AND the caller
+      // provided an Origin or Referer. Server-to-server calls without these
+      // headers are rare in browser flows; signed-in admin tooling would not
+      // invoke this action.
+      const candidateUrl = origin || referer;
+      if (candidateUrl && allowedHosts.size > 0) {
+        let callerHost = "";
+        try {
+          callerHost = new URL(candidateUrl).host.toLowerCase();
+        } catch {
+          callerHost = "";
+        }
+
+        if (!callerHost || !allowedHosts.has(callerHost)) {
+          console.log(
+            `🛡️ Signup blocked: cross-origin request origin="${origin}" referer="${referer}" host="${host}"`,
+          );
+          return {
+            success: false,
+            error: "Registration failed. Please try again.",
+            code: "INVALID_ORIGIN",
+          };
+        }
+      }
+    } catch (originErr) {
+      console.warn("⚠️ Origin check skipped due to error:", originErr);
+      // Fail-open: don't block sign-ups if header access fails
+    }
+
     // SECURITY: Validate registration with comprehensive checks
     const securityResult = await validateRegistration({
       email,
@@ -274,10 +327,9 @@ export const signUpWithEmail = async ({
 
       // Send welcome email (separate from verification)
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const template = await EmailTemplate.findOne({
+        const template = (await EmailTemplate.findOne({
           templateType: "welcome",
-        }).lean() as any;
+        }).lean()) as { isActive?: boolean; introText?: string } | null;
         if (template?.isActive !== false) {
           const introText =
             template?.introText ||

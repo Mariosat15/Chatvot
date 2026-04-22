@@ -361,6 +361,14 @@ export const enterCompetition = async (competitionId: string) => {
 
     await connectToDatabase();
 
+    // Reason: Email verification is required to enter public competitions.
+    // Prevents spam signups from occupying seats and skewing matchmaking.
+    if ((session.user as { emailVerified?: boolean }).emailVerified !== true) {
+      throw new Error(
+        "Please verify your email address before entering competitions.",
+      );
+    }
+
     // ✅ CHECK USER RESTRICTIONS
     console.log(
       `🔐 Checking competition entry restrictions for user ${session.user.id}`,

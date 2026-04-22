@@ -13,7 +13,7 @@ import { trackTiming, errorResponse } from "@/lib/utils/api-utils";
 import { canJoinChallenge } from "@/lib/services/market-hours.service";
 
 // Request timeout for this route (5 seconds)
-const REQUEST_TIMEOUT_MS = 5000;
+const _REQUEST_TIMEOUT_MS = 5000;
 // Individual DB operation timeout (3 seconds)
 const DB_TIMEOUT_MS = 3000;
 
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
       tieBreaker2,
       minimumTrades,
       // disqualifyOnLiquidation is always true for challenges (locked)
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+       
       disqualifyOnLiquidation: _disqualifyOnLiquidationIgnored = true,
     } = body;
 
@@ -128,6 +128,17 @@ export async function POST(request: NextRequest) {
       const session = await auth.api.getSession({ headers: await headers() });
       if (!session?.user?.id) {
         return errorResponse("Unauthorized", 401);
+      }
+      // Reason: Require verified email before a user can create challenges.
+      // Blocks spam accounts that never completed email confirmation from
+      // interacting with real users.
+      if (
+        (session.user as { emailVerified?: boolean }).emailVerified !== true
+      ) {
+        return errorResponse(
+          "Please verify your email address before creating challenges.",
+          403,
+        );
       }
       challengerId = session.user.id;
       challengerName = session.user.name || "Unknown";
@@ -274,11 +285,13 @@ export async function POST(request: NextRequest) {
         Promise.all([
           CreditWallet.findOne({ userId: challengerId })
             .lean()
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .exec() as Promise<any>,
           getUserById(challengerId),
           getUserById(challengedId),
           UserPresence.findOne({ userId: challengedId })
             .lean()
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .exec() as Promise<any>,
           Challenge.countDocuments({ challengerId, status: "pending" }),
           Challenge.countDocuments({

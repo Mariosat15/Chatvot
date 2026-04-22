@@ -72,10 +72,16 @@ export interface IFraudSettings extends Document {
   blockNumericOnlyNames: boolean; // Block names that are numbers only
   blockSingleCharacterNames: boolean; // Block single character names
   minNameLength: number; // Minimum name length
+  maxNameLength: number; // Maximum name length (e.g., 40)
+  blockUrlsInName: boolean; // Reject names containing URL-like tokens
+  requireLetterStart: boolean; // First character must be a letter
+  maxEmojisInName: number; // Maximum emoji characters allowed in name
+  riskScoreBlockThreshold: number; // Block if computed risk score >= this value
 
   // IP Intelligence
   blockDatacenterIPs: boolean; // Block known datacenter/hosting IPs
   blockKnownBadIPs: boolean; // Block IPs from threat intelligence lists
+  knownBadIPs: string[]; // Manually curated list of bad IPs / CIDRs
 
   // Account Enumeration Protection
   genericErrorMessages: boolean; // Don't reveal if email exists
@@ -227,15 +233,34 @@ const FraudSettingsSchema = new Schema<IFraudSettings>(
         "^qwerty",
         "^admin",
         "^root",
+        // Reason: Block spam campaigns that push promo/casino/affiliate text as
+        // display names (e.g. "🌶85.000 Lira Seni Bekliyor ... bit.ly/...")
+        "https?://",
+        "bit\\.ly",
+        "tinyurl",
+        "t\\.me/",
+        "\\.com(/|$)",
+        "\\.ru(/|$)",
+        "\\.xyz(/|$)",
+        "www\\.",
+        "\\b(casino|bet|bonus|promo|viagra|crypto|airdrop|giveaway)\\b",
+        "\\b(lira|usdt|btc|eth|\\$\\$\\$)\\b",
+        "[\\u0500-\\u052F\\u0400-\\u04FF]{6,}", // Cyrillic runs 6+ (often spam names)
       ],
     },
     blockNumericOnlyNames: { type: Boolean, default: true },
     blockSingleCharacterNames: { type: Boolean, default: true },
     minNameLength: { type: Number, default: 2, min: 1, max: 10 },
+    maxNameLength: { type: Number, default: 40, min: 10, max: 120 },
+    blockUrlsInName: { type: Boolean, default: true },
+    requireLetterStart: { type: Boolean, default: true },
+    maxEmojisInName: { type: Number, default: 2, min: 0, max: 20 },
+    riskScoreBlockThreshold: { type: Number, default: 70, min: 0, max: 100 },
 
     // IP Intelligence
     blockDatacenterIPs: { type: Boolean, default: false },
     blockKnownBadIPs: { type: Boolean, default: true },
+    knownBadIPs: { type: [String], default: [] },
 
     // Account Enumeration Protection
     genericErrorMessages: { type: Boolean, default: true },
@@ -354,12 +379,28 @@ export const DEFAULT_FRAUD_SETTINGS: Partial<IFraudSettings> = {
     "^qwerty",
     "^admin",
     "^root",
+    "https?://",
+    "bit\\.ly",
+    "tinyurl",
+    "t\\.me/",
+    "\\.com(/|$)",
+    "\\.ru(/|$)",
+    "\\.xyz(/|$)",
+    "www\\.",
+    "\\b(casino|bet|bonus|promo|viagra|crypto|airdrop|giveaway)\\b",
+    "\\b(lira|usdt|btc|eth|\\$\\$\\$)\\b",
   ],
   blockNumericOnlyNames: true,
   blockSingleCharacterNames: true,
   minNameLength: 2,
+  maxNameLength: 40,
+  blockUrlsInName: true,
+  requireLetterStart: true,
+  maxEmojisInName: 2,
+  riskScoreBlockThreshold: 70,
   blockDatacenterIPs: false,
   blockKnownBadIPs: true,
+  knownBadIPs: [],
   genericErrorMessages: true,
 
   // Login Security defaults
