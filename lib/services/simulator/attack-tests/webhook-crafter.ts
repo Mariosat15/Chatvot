@@ -18,7 +18,8 @@
  */
 
 import crypto from "crypto";
-import PaymentProvider from "@/database/models/payment-provider.model";
+// Reason: relative import for dual-app (main + admin) resolution.
+import PaymentProvider from "../../../../database/models/payment-provider.model";
 
 export type SignatureMode = "valid" | "invalid" | "missing";
 

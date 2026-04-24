@@ -13,7 +13,8 @@ import {
   postCraftedDmn,
   resolveNuveiSecret,
 } from "./webhook-crafter";
-import type { IAttackScenarioResult } from "@/database/models/simulator/attack-run.model";
+// Reason: relative import for dual-app (main + admin) resolution.
+import type { IAttackScenarioResult } from "../../../../database/models/simulator/attack-run.model";
 
 export interface AttackScenarioContext {
   baseUrl: string;

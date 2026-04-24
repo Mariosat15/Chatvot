@@ -8,11 +8,13 @@
  */
 
 import crypto from "crypto";
-import { connectToDatabase } from "@/database/mongoose";
+// Reason: relative imports so the module resolves under both the main app's
+// @/ alias (repo root) and the admin app's @/ alias (apps/admin/).
+import { connectToDatabase } from "../../../database/mongoose";
 import {
   AttackSuiteConfig,
   type IAttackSuiteConfig,
-} from "@/database/models/simulator/attack-suite-config.model";
+} from "../../../database/models/simulator/attack-suite-config.model";
 
 export interface AttackSuiteAdmin {
   adminId: string;

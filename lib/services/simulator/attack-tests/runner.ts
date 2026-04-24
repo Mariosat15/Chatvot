@@ -10,13 +10,16 @@
  * exercised end-to-end.
  */
 
-import AttackRun from "@/database/models/simulator/attack-run.model";
+// Reason: use relative imports instead of the @/ alias so this module resolves
+// correctly when bundled by both the main app (root-level @/) and the admin
+// app (apps/admin/-level @/).
+import AttackRun from "../../../../database/models/simulator/attack-run.model";
 import type {
   IAttackRun,
   IAttackRunLog,
   IAttackScenarioResult,
-} from "@/database/models/simulator/attack-run.model";
-import { connectToDatabase } from "@/database/mongoose";
+} from "../../../../database/models/simulator/attack-run.model";
+import { connectToDatabase } from "../../../../database/mongoose";
 import {
   ALL_SCENARIOS,
   type AttackScenarioContext,

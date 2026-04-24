@@ -22,11 +22,14 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { getClientIP, checkRateLimit } from "@/lib/utils/rate-limiter";
+// Reason: relative imports so this guard resolves identically under both
+// the main app's @/ alias (repo root) and the admin app's @/ alias
+// (apps/admin/), where "@/lib/..." would otherwise map outside the tree.
+import { getClientIP, checkRateLimit } from "../../../utils/rate-limiter";
 import {
   isAttackSuiteEnabled,
   getAttackSuiteSecret,
-} from "@/lib/services/simulator/attack-suite-config.service";
+} from "../attack-suite-config.service";
 
 export const ATTACK_USER_PREFIX = "sim-attack-";
 export const ATTACK_SECRET_HEADER = "x-simulator-attack-secret";
