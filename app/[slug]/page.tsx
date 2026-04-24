@@ -45,14 +45,37 @@ const SCANNER_PROBE_PREFIXES = new Set([
   ".well-known", ".env", ".git", ".htaccess", ".svn",
   "admin.php", "xmlrpc", "vendor", "node_modules",
   "server-status", "server-info", "telescope",
+  // Common CMS/info probes that leaked into page-error logs
+  "info", "_environment", "environment", "debug",
+  "actuator", "metrics", "health", "status",
+  "config", "configuration", ".aws", ".ssh",
 ]);
 
+// Reason: slugs beginning with "_" are almost always Next internals or
+// scanner probes (/_next/* is handled by Next itself, but raw /_something
+// lands here). Treat all underscore-prefixed slugs as probes.
 function isScannerProbe(slug: string): boolean {
   const lower = slug.toLowerCase();
+  if (lower.startsWith("_")) return true;
   for (const prefix of SCANNER_PROBE_PREFIXES) {
     if (lower === prefix || lower.startsWith(prefix)) return true;
   }
   return false;
+}
+
+// Reason: Next.js uses special `Error.digest` values for control flow like
+// `notFound()` and `redirect()`. A try/catch around page code MUST re-throw
+// these so Next renders the correct response — catching them results in the
+// observed `❌ Error rendering page /x: NEXT_HTTP_ERROR_FALLBACK;404` noise.
+function isNextControlFlowError(error: unknown): boolean {
+  if (!error || typeof error !== "object" || !("digest" in error)) return false;
+  const digest = (error as { digest?: unknown }).digest;
+  if (typeof digest !== "string") return false;
+  return (
+    digest.startsWith("NEXT_NOT_FOUND") ||
+    digest.startsWith("NEXT_REDIRECT") ||
+    digest.startsWith("NEXT_HTTP_ERROR_FALLBACK")
+  );
 }
 
 // ─── Branding loader ────────────────────────────────────────────────────────
@@ -491,6 +514,11 @@ export default async function DynamicSitePage({ params }: PageProps) {
       </div>
     );
   } catch (error) {
+    // Propagate Next.js internal control-flow errors so the framework can
+    // render the correct 404/redirect response instead of logging noise.
+    if (isNextControlFlowError(error)) {
+      throw error;
+    }
     console.error(`❌ Error rendering page /${slug}:`, error);
     notFound();
   }
