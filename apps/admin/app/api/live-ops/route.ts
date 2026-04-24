@@ -5,6 +5,7 @@ import { connectToDatabase } from "@/database/mongoose";
 import { requireAdminAuth } from "@/lib/admin/auth";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import UserPresence from "@/database/models/user-presence.model";
+import WithdrawalRequest from "@/database/models/withdrawal-request.model";
 // Reason: shared service lives at repo root and is loaded via relative path
 // so it resolves the same under the admin app's @/ alias.
 import { listSecurityAlerts } from "../../../../../lib/services/security/security-alert.service";
@@ -102,13 +103,17 @@ export async function GET() {
     const presenceThreshold = new Date(now - PRESENCE_WINDOW_MS);
 
     // Run all four feeds in parallel — they're independent, small, indexed.
+    // Reason: withdrawals are sourced from `WithdrawalRequest` (the admin
+    // approval workflow collection) because that's where `ipAddress`,
+    // `status` (approval state), `bankDetails`, and `originalCardDetails`
+    // actually live. `WalletTransaction` only has the accounting entry.
     const [depositsRaw, withdrawalsRaw, onlineRaw, alertsRaw] =
       await Promise.all([
         WalletTransaction.find({ transactionType: "deposit" })
           .sort({ createdAt: -1 })
           .limit(DEPOSIT_LIMIT)
           .lean(),
-        WalletTransaction.find({ transactionType: "withdrawal" })
+        WithdrawalRequest.find({})
           .sort({ createdAt: -1 })
           .limit(WITHDRAWAL_LIMIT)
           .lean(),
@@ -159,21 +164,53 @@ export async function GET() {
 
     const withdrawals = withdrawalsRaw.map((w) => {
       const u = pickUser(w.userId);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- free-form PSP metadata blob
-      const md = (w.metadata ?? {}) as Record<string, any>;
+      const userName = w.userName || u.name;
+      const userEmail = w.userEmail || u.email;
+
+      // Build a human-readable destination. Prefer bank IBAN (already masked
+      // in the DB), then original card brand + last4, then payout card
+      // last4, finally fall back to payout method / provider.
+      let destination: string | undefined;
+      if (w.bankDetails?.iban) {
+        destination = `IBAN ${w.bankDetails.iban}${w.bankDetails.bankName ? ` · ${w.bankDetails.bankName}` : ""}`;
+      } else if (w.originalCardDetails?.last4) {
+        const brand = w.originalCardDetails.brand || "card";
+        destination = `${brand} •••• ${w.originalCardDetails.last4}`;
+      } else if (w.payoutCardLast4) {
+        destination = `card •••• ${w.payoutCardLast4}`;
+      } else if (w.withdrawalMethod) {
+        destination = w.withdrawalMethod;
+      } else if (w.payoutMethod) {
+        destination = w.payoutMethod;
+      }
+
+      // Approval label: if auto-approved we surface that explicitly so the
+      // admin can see compliance actions at a glance; otherwise the status
+      // itself is the approval state in this system.
+      let approvalStatus: string | undefined;
+      if (w.isAutoApproved) {
+        approvalStatus = "auto";
+      } else if (w.status === "pending") {
+        approvalStatus = "awaiting admin";
+      } else if (w.status === "approved") {
+        approvalStatus = "approved";
+      } else if (w.status === "rejected") {
+        approvalStatus = "rejected";
+      }
+
       return {
         id: String(w._id),
         userId: w.userId,
-        userName: u.name,
-        userEmail: u.email,
-        amount: w.amount,
-        currency: w.currency,
+        userName,
+        userEmail,
+        amount: w.amountEUR,
+        currency: "EUR",
         status: w.status,
-        provider: w.provider,
-        paymentMethod: w.paymentMethod,
-        destination: md.destination || md.target || md.iban || undefined,
-        approvalStatus: md.approvalStatus || md.adminStatus || undefined,
-        ip: md.ip || md.clientIp || undefined,
+        provider: w.payoutProvider || w.payoutMethod,
+        paymentMethod: w.withdrawalMethod || w.payoutMethod,
+        destination,
+        approvalStatus,
+        ip: w.ipAddress,
         failureReason: w.failureReason,
         createdAt: w.createdAt,
       };
