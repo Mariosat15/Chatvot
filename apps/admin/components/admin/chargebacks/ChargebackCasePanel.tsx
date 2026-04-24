@@ -9,12 +9,14 @@ import {
   ArrowLeft,
   Copy,
   Download,
+  FileText,
   FileUp,
   Flag,
   Hammer,
   RefreshCw,
   Send,
   ShieldAlert,
+  Sparkles,
   Trash2,
   XCircle,
 } from "lucide-react";
@@ -102,6 +104,7 @@ export default function ChargebackCasePanel({
   const [savingNarrative, setSavingNarrative] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [completeOpen, setCompleteOpen] = useState(false);
+  const [generatingAI, setGeneratingAI] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = useCallback(async () => {
@@ -183,9 +186,40 @@ export default function ChargebackCasePanel({
     }
   }, [caseId]);
 
-  const downloadReport = useCallback(() => {
+  const downloadDocx = useCallback(() => {
+    window.location.href = `/api/chargebacks/${caseId}/report?format=docx`;
+  }, [caseId]);
+
+  const downloadMd = useCallback(() => {
     window.location.href = `/api/chargebacks/${caseId}/report?format=md`;
   }, [caseId]);
+
+  const generateAINarrative = useCallback(async () => {
+    setGeneratingAI(true);
+    try {
+      const res = await fetch(`/api/chargebacks/${caseId}/ai-narrative`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.error || "Failed");
+      }
+      const json = await res.json();
+      if (json?.narrative) setNarrativeDraft(json.narrative);
+      toast.success(
+        json?.source === "ai"
+          ? `AI narrative generated (${json.model || "openai"})`
+          : "Narrative regenerated from template (AI disabled)",
+      );
+      load();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setGeneratingAI(false);
+    }
+  }, [caseId, load]);
 
   const onFilesPicked = useCallback(
     async (files: FileList | null) => {
@@ -335,20 +369,43 @@ export default function ChargebackCasePanel({
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <div className="rounded-lg border border-gray-700 bg-gray-900/50 p-4 space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <h3 className="font-semibold text-gray-200">Defense packet</h3>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              {!terminal && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-purple-700 text-purple-300"
+                  onClick={generateAINarrative}
+                  disabled={generatingAI}
+                  title="Regenerate the defense narrative with AI using the latest evidence."
+                >
+                  <Sparkles className="h-3 w-3 mr-1" />
+                  {generatingAI ? "Generating…" : "Generate with AI"}
+                </Button>
+              )}
+              <Button
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={downloadDocx}
+                title="Download as Microsoft Word (.docx)"
+              >
+                <FileText className="h-3 w-3 mr-1" /> Download Word
+              </Button>
+              <Button size="sm" variant="outline" onClick={downloadMd}>
+                <Download className="h-3 w-3 mr-1" /> .md
+              </Button>
               <Button size="sm" variant="outline" onClick={copyReport}>
                 <Copy className="h-3 w-3 mr-1" /> Copy
-              </Button>
-              <Button size="sm" variant="outline" onClick={downloadReport}>
-                <Download className="h-3 w-3 mr-1" /> Download .md
               </Button>
             </div>
           </div>
           <div className="text-xs text-gray-500">
             Snapshot generated {data.initiatedAt ? "on initiate" : "live"}.
             Frozen snapshots preserve the exact packet sent to the acquirer.
+            The Word download includes an AI-written narrative plus the full
+            raw evidence in human-readable tables.
           </div>
           <div>
             <label className="block text-xs text-gray-400 mb-1">
