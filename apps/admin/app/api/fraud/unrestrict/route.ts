@@ -3,6 +3,7 @@ import { requireAdminAuth } from "@/lib/admin/auth";
 import { connectToDatabase } from "@/database/mongoose";
 import UserRestriction from "@/database/models/user-restriction.model";
 import { Admin } from "@/database/models/admin.model";
+import { invalidateLeaderboardCache } from "../../../../../../lib/services/leaderboard-cache.invalidator";
 import bcrypt from "bcryptjs";
 
 /**
@@ -54,6 +55,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Reason: checked BEFORE the update so we only bust the leaderboard
+    // cache when we actually un-hid somebody. Keeps the happy-path HTTP
+    // call off the hot path when admins are just clearing trade-blocks.
+    const hadHiddenRestriction = await UserRestriction.exists({
+      userId: { $in: userIds },
+      isActive: true,
+      hideFromPublic: true,
+    });
+
     // Unrestrict all specified users by marking restrictions as inactive
     const result = await UserRestriction.updateMany(
       {
@@ -67,6 +77,11 @@ export async function POST(request: NextRequest) {
     );
 
     console.log(`✅ Unrestricted ${result.modifiedCount} user(s): ${JSON.stringify(userIds)}`);
+
+    if (result.modifiedCount > 0 && hadHiddenRestriction) {
+      // Fire-and-forget; never block the response on cache invalidation.
+      void invalidateLeaderboardCache();
+    }
 
     if (result.modifiedCount === 0) {
       return NextResponse.json(

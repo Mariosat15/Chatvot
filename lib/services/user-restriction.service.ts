@@ -1,5 +1,6 @@
 import { connectToDatabase } from "@/database/mongoose";
 import UserRestriction from "@/database/models/user-restriction.model";
+import { invalidateLeaderboardCache } from "./leaderboard-cache.invalidator";
 
 /**
  * Check if a user has any active restrictions
@@ -160,6 +161,15 @@ export async function unrestrictUser(
 ): Promise<boolean> {
   await connectToDatabase();
 
+  // Reason: checked BEFORE the update so we only bust the leaderboard cache
+  // when the user was actually hidden. Skips an HTTP call for suspensions /
+  // trade-blocks that never affected leaderboard visibility.
+  const wasHidden = await UserRestriction.exists({
+    userId,
+    isActive: true,
+    hideFromPublic: true,
+  });
+
   const result = await UserRestriction.updateMany(
     { userId, isActive: true },
     {
@@ -170,6 +180,11 @@ export async function unrestrictUser(
       },
     },
   );
+
+  if (result.modifiedCount > 0 && wasHidden) {
+    // Fire-and-forget; never block the response on cache invalidation.
+    void invalidateLeaderboardCache();
+  }
 
   return result.modifiedCount > 0;
 }

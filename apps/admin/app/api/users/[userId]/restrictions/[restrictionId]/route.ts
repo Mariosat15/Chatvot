@@ -5,6 +5,7 @@ import FraudAlert from "@/database/models/fraud/fraud-alert.model";
 import AuditLog from "@/database/models/audit-log.model";
 import UserNote from "@/database/models/user-notes.model";
 import { getAdminSession } from "@/lib/admin/auth";
+import { invalidateLeaderboardCache } from "../../../../../../../../lib/services/leaderboard-cache.invalidator";
 
 export async function DELETE(
   req: NextRequest,
@@ -79,6 +80,13 @@ export async function DELETE(
       console.log(
         `📝 Marked fraud alert ${restriction.relatedFraudAlertId} as cleared`,
       );
+    }
+
+    // Reason: if the lifted restriction had hideFromPublic=true, bust the
+    // leaderboard cache so the user reappears immediately instead of
+    // waiting up to 5 minutes for the cache TTL to expire.
+    if (restriction.hideFromPublic) {
+      void invalidateLeaderboardCache();
     }
 
     return NextResponse.json({ success: true });

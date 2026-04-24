@@ -19,6 +19,7 @@ import WalletTransaction from "../../../database/models/trading/wallet-transacti
 import CreditWallet from "../../../database/models/trading/credit-wallet.model";
 import { PlatformTransaction } from "../../../database/models/platform-financials.model";
 import AuditLog from "../../../database/models/audit-log.model";
+import { invalidateLeaderboardCache } from "../leaderboard-cache.invalidator";
 
 export interface CompleteChargebackInput {
   userWallet?: { amount: number };
@@ -304,9 +305,10 @@ export async function resolveWithoutClawback(
   // Reason: only auto-lift the restriction that we set (tracked via
   // c.restrictionId). Admin-created restrictions unrelated to this case
   // are left untouched.
+  let liftedHiddenRestriction = false;
   if (c.restrictionId) {
     try {
-      await UserRestriction.updateOne(
+      const lifted = await UserRestriction.findOneAndUpdate(
         { _id: c.restrictionId, isActive: true },
         {
           $set: {
@@ -315,7 +317,14 @@ export async function resolveWithoutClawback(
             unrestrictedBy: admin.id || "admin:chargeback-resolve",
           },
         },
+        { new: false },
       );
+      // Reason: if the lifted restriction had hideFromPublic=true, we need
+      // to bust the leaderboard cache so the user reappears immediately;
+      // otherwise they linger hidden for up to 5 minutes.
+      if (lifted && lifted.hideFromPublic) {
+        liftedHiddenRestriction = true;
+      }
     } catch (err) {
       console.error("⚠️ [chargeback] failed to lift UserRestriction:", err);
     }
@@ -347,6 +356,10 @@ export async function resolveWithoutClawback(
     metadata: { chargebackId: String(c._id), notes: input.notes },
     status: "success",
   });
+
+  if (liftedHiddenRestriction) {
+    void invalidateLeaderboardCache();
+  }
 
   return c;
 }
