@@ -73,6 +73,9 @@ import { CustomerAssignmentCard } from "./CustomerAssignmentBadge";
 import ChargebacksTab from "./chargebacks/ChargebacksTab";
 import { CustomerAuditTrail } from "./CustomerAuditTrail";
 import { TransferCustomerDialog } from "./TransferCustomerDialog";
+import TransactionDetailDialog, {
+  type TxDetail,
+} from "./transactions/TransactionDetailDialog";
 
 interface UserFullDetailPanelProps {
   open: boolean;
@@ -340,6 +343,7 @@ export default function UserFullDetailPanel({
 }: UserFullDetailPanelProps) {
   const { settings } = useAppSettings();
   const cs = settings?.currency?.symbol || "€";
+  const creditsSymbol = settings?.credits?.symbol || "⚡";
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [loading, setLoading] = useState(true);
 
@@ -477,17 +481,25 @@ export default function UserFullDetailPanel({
   const [deleting, setDeleting] = useState(false);
 
   // Transactions Tab State
+  // Reason: Mirrors the shape returned by /api/transactions so rows can be
+  // passed straight to the shared TransactionDetailDialog.
   interface UserTransaction {
     _id: string;
+    userId: string;
+    userName?: string;
+    userInfo?: { id: string; name: string; email: string };
     transactionType: string;
     amount: number;
     amountEUR?: number;
     status: string;
     description?: string;
     createdAt: string;
+    competitionId?: string;
+    paymentMethod?: string;
     metadata?: Record<string, unknown>;
   }
   const [userTxs, setUserTxs] = useState<UserTransaction[]>([]);
+  const [selectedUserTx, setSelectedUserTx] = useState<TxDetail | null>(null);
   const [userTxsTotal, setUserTxsTotal] = useState(0);
   const [userTxsPage, setUserTxsPage] = useState(1);
   const [userTxsLoading, setUserTxsLoading] = useState(false);
@@ -3890,7 +3902,32 @@ export default function UserFullDetailPanel({
                                     return (
                                       <tr
                                         key={tx._id}
-                                        className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors"
+                                        className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors cursor-pointer"
+                                        onClick={() =>
+                                          setSelectedUserTx({
+                                            _id: tx._id,
+                                            userId: tx.userId || user.id,
+                                            userName:
+                                              tx.userName || user.name,
+                                            userInfo:
+                                              tx.userInfo || {
+                                                id: user.id,
+                                                name: user.name || "Unknown",
+                                                email: user.email || "",
+                                              },
+                                            transactionType:
+                                              tx.transactionType,
+                                            amount: tx.amount,
+                                            amountEUR: tx.amountEUR,
+                                            status: tx.status,
+                                            createdAt: tx.createdAt,
+                                            description: tx.description,
+                                            competitionId: tx.competitionId,
+                                            paymentMethod: tx.paymentMethod,
+                                            metadata: tx.metadata,
+                                          })
+                                        }
+                                        title="Click to view full transaction details"
                                       >
                                         <td className="px-4 py-3 text-gray-300 whitespace-nowrap">
                                           {new Date(tx.createdAt).toLocaleString()}
@@ -3972,6 +4009,14 @@ export default function UserFullDetailPanel({
                         )}
                       </CardContent>
                     </Card>
+
+                    {/* Transaction detail modal (matches Financials view) */}
+                    <TransactionDetailDialog
+                      tx={selectedUserTx}
+                      onClose={() => setSelectedUserTx(null)}
+                      creditSymbol={creditsSymbol}
+                      currencySymbol={cs}
+                    />
                   </div>
                 )}
 
