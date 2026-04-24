@@ -28,6 +28,10 @@ export interface IUserPresence extends Document {
   socketId?: string;
   userAgent?: string;
   ipAddress?: string;
+  // Geo enrichment (Cloudflare headers — zero-cost, set when behind Cloudflare)
+  country?: string;
+  city?: string;
+  region?: string;
 
   createdAt: Date;
   updatedAt: Date;
@@ -102,6 +106,15 @@ const UserPresenceSchema = new Schema<IUserPresence>(
       type: String,
     },
     ipAddress: {
+      type: String,
+    },
+    country: {
+      type: String,
+    },
+    city: {
+      type: String,
+    },
+    region: {
       type: String,
     },
   },

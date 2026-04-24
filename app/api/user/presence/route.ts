@@ -123,6 +123,26 @@ export async function POST(request: NextRequest) {
       updateData.acceptingChallenges = acceptingChallenges;
     }
 
+    // Capture connection info for the admin live-ops dashboard.
+    // Reason: IP/UA/geo fields already exist on the schema but were never
+    // populated. Cloudflare headers cost nothing to read and give us the
+    // admin-visible geo enrichment without an extra GeoIP lookup.
+    const hdr = request.headers;
+    const ip =
+      hdr.get("cf-connecting-ip") ||
+      hdr.get("x-real-ip") ||
+      hdr.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      undefined;
+    const userAgent = hdr.get("user-agent") || undefined;
+    const country = hdr.get("cf-ipcountry") || undefined;
+    const city = hdr.get("cf-ipcity") || undefined;
+    const region = hdr.get("cf-region") || undefined;
+    if (ip) updateData.ipAddress = ip;
+    if (userAgent) updateData.userAgent = userAgent;
+    if (country) updateData.country = country;
+    if (city) updateData.city = city;
+    if (region) updateData.region = region;
+
     const presence = await UserPresence.findOneAndUpdate(
       { userId: session.user.id },
       {

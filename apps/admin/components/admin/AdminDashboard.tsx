@@ -116,6 +116,7 @@ import DependencyUpdatesSection from "@/components/admin/DependencyUpdatesSectio
 import DataCleanupSection from "@/components/admin/DataCleanupSection";
 import DataMaintenanceSection from "@/components/admin/DataMaintenanceSection";
 import AdminOverviewDashboard from "@/components/admin/AdminOverviewDashboard";
+import LiveOpsPanel from "@/components/admin/LiveOpsPanel";
 import AIAgentSection from "@/components/admin/AIAgentSection";
 import AIKnowledgeSection from "@/components/admin/AIKnowledgeSection";
 import EmployeesSection from "@/components/admin/EmployeesSection";
@@ -983,12 +984,15 @@ export default function AdminDashboard({
     switch (activeSection) {
       case "overview":
         return (
-          <AdminOverviewDashboard
-            key={currentRefreshKey}
-            onNavigate={(section) =>
-              hasAccess(section) && setActiveSection(section)
-            }
-          />
+          <div className="space-y-8">
+            <AdminOverviewDashboard
+              key={currentRefreshKey}
+              onNavigate={(section) =>
+                hasAccess(section) && setActiveSection(section)
+              }
+            />
+            <LiveOpsPanel key={`live-ops-${currentRefreshKey}`} />
+          </div>
         );
       case "hero-page":
         return <LandingPageBuilder key={currentRefreshKey} />;
