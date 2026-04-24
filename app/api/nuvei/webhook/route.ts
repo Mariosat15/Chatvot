@@ -89,6 +89,63 @@ function buildParams(entries: Array<[string, string]>): NuveiDmnParams {
 }
 
 /**
+ * Normalize Nuvei DMN authentication fields so chargeback defense packets
+ * and the admin live-ops dashboard always have the data they need.
+ *
+ * Reason: Nuvei's DMN includes AVS, CVV2, 3DS, and auth-code outcomes, but the
+ * webhook previously only persisted status + UPO. Without these we cannot
+ * defend "fraudulent transaction" / "card-not-present" chargebacks. This
+ * extractor runs ONLY after HMAC signature verification, so the inputs are
+ * trusted PSP data.
+ *
+ * Maps Nuvei field names to the normalized keys read by
+ * {@link lib/services/security/chargeback-evidence.service.ts}.
+ */
+function extractAuthenticationFacts(
+  params: NuveiDmnParams,
+): Record<string, string> {
+  const clean = (raw: string | undefined): string | undefined => {
+    if (raw === undefined || raw === null) return undefined;
+    const value = String(raw).trim();
+    if (!value || value.toLowerCase() === "none") return undefined;
+    return value;
+  };
+
+  const candidates: Array<[string, string | undefined]> = [
+    ["authCode", clean(params.AuthCode)],
+    ["avsResult", clean(params.AVSCode || params.AVS)],
+    ["cvvResult", clean(params.CVV2Reply)],
+    ["threeDSEci", clean(params.eci)],
+    ["threeDSFlow", clean(params.threeDFlow)],
+    ["threeDSAuthenticationType", clean(params.authenticationType)],
+    ["threeDSProtocolVersion", clean(params.threeDSProtocolVersion)],
+    ["threeDSCavv", clean(params.cavv)],
+    ["threeDSXid", clean(params.xid)],
+    ["threeDSDsTransId", clean(params.dsTransID)],
+    ["cardBin", clean(params.bin)],
+    ["cardType", clean(params.cardType)],
+    ["cardIssuerCountry", clean(params.cardIssuerCountry || params.issuerCountry)],
+    ["issuerBank", clean(params.issuerBank)],
+  ];
+
+  const out = Object.fromEntries(
+    candidates.filter((pair): pair is [string, string] => pair[1] !== undefined),
+  );
+
+  // Derive a human-readable 3DS status for the evidence packet.
+  // Rules: full auth if we have both CAVV and ECI; attempted if the 3DS flow
+  // flag is set but no cryptogram; otherwise leave unset.
+  const flowFlag = out.threeDSFlow?.toLowerCase();
+  if (out.threeDSCavv && out.threeDSEci) {
+    return { ...out, threeDSStatus: "authenticated" };
+  }
+  if (flowFlag && ["1", "y", "yes", "true"].includes(flowFlag)) {
+    return { ...out, threeDSStatus: "attempted" };
+  }
+  return out;
+}
+
+/**
  * Verify DMN signature using Nuvei's advanceResponseChecksum
  *
  * SECURITY: This is CRITICAL for preventing forged webhooks.
@@ -533,6 +590,9 @@ export async function POST(req: NextRequest) {
         nuveiPPPTransactionId: params.PPP_TransactionID,
         // IMPORTANT: Store UPO for future card refunds
         userPaymentOptionId: params.userPaymentOptionId,
+        // Reason: AVS / CVV2 / 3DS / authCode evidence used to defend
+        // "fraudulent transaction" chargebacks (reason codes 10.4, 4837, etc).
+        ...extractAuthenticationFacts(params),
       };
       await transaction.save();
 
@@ -711,6 +771,9 @@ export async function POST(req: NextRequest) {
         errorCode: errCode,
         errorReason:
           params.Reason || params.errApmDescription || "Payment declined",
+        // Reason: Even on declines we want AVS / CVV mismatches and 3DS flags
+        // recorded so the fraud dashboard can surface card-testing patterns.
+        ...extractAuthenticationFacts(params),
       };
       await transaction.save();
       console.log(
@@ -751,6 +814,7 @@ export async function POST(req: NextRequest) {
         ...transaction.metadata,
         dmnStatus: status,
         dmnTransactionId: nuveiTransactionId,
+        ...extractAuthenticationFacts(params),
       };
       await transaction.save();
       console.log("Transaction still pending:", transaction._id);

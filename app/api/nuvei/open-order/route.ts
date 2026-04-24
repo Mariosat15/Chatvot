@@ -64,6 +64,10 @@ export async function POST(req: NextRequest) {
     }
 
     const clientIp = getClientIP(req);
+    // Reason: Captured at checkout so chargeback defense packets can prove the
+    // browser/device used by the cardholder. Nuvei's DMN does not echo this
+    // back, so it must be persisted from the originating request.
+    const clientUserAgent = (req.headers.get("user-agent") || "").slice(0, 500);
     if (clientIp !== "unknown") {
       const ipLimitResult = RateLimiters.depositByIp(clientIp);
       if (!ipLimitResult.success) {
@@ -391,6 +395,7 @@ export async function POST(req: NextRequest) {
         // Reason: Stored so the webhook can record decline-velocity against
         // the originating IP (not just the userId).
         clientIp: clientIp !== "unknown" ? clientIp : undefined,
+        userAgent: clientUserAgent || undefined,
         // Cloudflare-derived geo at deposit creation (surfaced in the admin
         // live-ops dashboard; zero external lookup).
         ...(() => {
