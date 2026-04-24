@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { AlertTriangle, Plus, RefreshCw } from "lucide-react";
 import ChargebackCasePanel from "./ChargebackCasePanel";
+import ChargebackCreateDialog from "./ChargebackCreateDialog";
 
 /** Thin list of a user's chargeback cases. Clicking opens the detail view. */
 
@@ -38,10 +39,11 @@ const STATUS_BADGE: Record<string, string> = {
   withdrawn: "bg-gray-800 border-gray-600 text-gray-300",
 };
 
-export default function ChargebacksTab({ userId, userEmail, userName }: Props) {
+export default function ChargebacksTab({ userId }: Props) {
   const [cases, setCases] = useState<ChargebackSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -63,46 +65,6 @@ export default function ChargebacksTab({ userId, userEmail, userName }: Props) {
   useEffect(() => {
     load();
   }, [load]);
-
-  const onManualCreate = useCallback(async () => {
-    const amountStr = window.prompt(
-      "Chargeback amount (in EUR credits):",
-      "0",
-    );
-    if (!amountStr) return;
-    const amount = Number(amountStr);
-    if (!(amount > 0)) {
-      toast.error("Amount must be a positive number");
-      return;
-    }
-    const provider = window.prompt("Provider (e.g. nuvei):", "nuvei") || "";
-    if (!provider.trim()) return;
-    const reasonCode = window.prompt("Reason code (optional):", "") || undefined;
-    const providerTx = window.prompt("Provider transaction id (optional):", "") || undefined;
-
-    try {
-      const res = await fetch(`/api/users/${userId}/chargebacks`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          amount,
-          provider: provider.trim(),
-          reasonCode,
-          providerTransactionId: providerTx,
-          userEmail,
-          userName,
-        }),
-      });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j?.error || "Failed");
-      }
-      toast.success("Chargeback case created");
-      load();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create case");
-    }
-  }, [userId, userEmail, userName, load]);
 
   const sorted = useMemo(
     () =>
@@ -139,7 +101,11 @@ export default function ChargebacksTab({ userId, userEmail, userName }: Props) {
             <RefreshCw className="h-3 w-3 mr-1" />
             Refresh
           </Button>
-          <Button size="sm" variant="outline" onClick={onManualCreate}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setCreateOpen(true)}
+          >
             <Plus className="h-3 w-3 mr-1" />
             Add case
           </Button>
@@ -206,6 +172,13 @@ export default function ChargebacksTab({ userId, userEmail, userName }: Props) {
           </table>
         </div>
       )}
+
+      <ChargebackCreateDialog
+        userId={userId}
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={load}
+      />
     </div>
   );
 }

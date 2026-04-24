@@ -84,6 +84,34 @@ export async function buildDefensePacket(
   }
 
   const txMeta = depositTx?.metadata || {};
+  // Reason: card details are not stored on the WalletTransaction — they live
+  // in NuveiUserPaymentOption (UPO), linked back by createdFromTransactionId.
+  // Pull those here so the defense packet shows the card brand/last4 for
+  // AVS/CVV/3DS cross-referencing, instead of rendering "—" everywhere.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let upoFacts: any = null;
+  try {
+    if (depositTx?._id) {
+      const { default: NuveiUserPaymentOption } = await import(
+        "../../../database/models/nuvei-user-payment-option.model"
+      );
+      const upoByTx = await NuveiUserPaymentOption.findOne({
+        createdFromTransactionId: String(depositTx._id),
+      }).lean();
+      if (upoByTx) {
+        upoFacts = upoByTx;
+      } else if (txMeta.userPaymentOptionId && depositTx.userId) {
+        // Fallback: match by user + UPO id stored on the tx.
+        upoFacts = await NuveiUserPaymentOption.findOne({
+          userId: depositTx.userId,
+          userPaymentOptionId: String(txMeta.userPaymentOptionId),
+        }).lean();
+      }
+    }
+  } catch (err) {
+    console.warn("⚠️ [evidence] UPO lookup skipped:", err);
+  }
+
   const txFacts = {
     transactionId: depositTx?._id ? String(depositTx._id) : undefined,
     amount: depositTx?.amount,
@@ -109,7 +137,21 @@ export async function buildDefensePacket(
       "authCode",
       "userAgent",
       "deviceFingerprint",
+      "userPaymentOptionId",
     ]),
+    // UPO-sourced card facts take precedence over whatever may be in
+    // metadata (UPO is the canonical card store for Nuvei).
+    ...(upoFacts && {
+      cardBrand:
+        (upoFacts as { cardBrand?: string }).cardBrand ||
+        (txMeta as { cardBrand?: string }).cardBrand,
+      cardLast4:
+        (upoFacts as { cardLast4?: string }).cardLast4 ||
+        (txMeta as { cardLast4?: string }).cardLast4,
+      expMonth: (upoFacts as { expMonth?: string }).expMonth,
+      expYear: (upoFacts as { expYear?: string }).expYear,
+      uniqueCC: (upoFacts as { uniqueCC?: string }).uniqueCC,
+    }),
   };
 
   // 2) Wallet.
