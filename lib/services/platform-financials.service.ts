@@ -320,7 +320,8 @@ export const PlatformFinancialsService = {
     // Bank Reconciliation
     totalUserDeposits: number;
     totalUserWithdrawals: number;
-    theoreticalBankBalance: number; // What should be in bank
+    totalChargebackLoss: number; // EUR — platform funds lost to lost chargebacks
+    theoreticalBankBalance: number; // What should be in bank (already minus chargeback losses)
 
     // Risk Metrics
     coverageRatio: number;
@@ -452,6 +453,27 @@ export const PlatformFinancialsService = {
       }
     }
 
+    // Chargeback losses: sum of PlatformTransaction.transactionType === "chargeback_loss"
+    // These rows are written with negative amount/amountEUR when an admin
+    // completes a chargeback against the platform bank leg. We take the
+    // absolute value so the dashboard can surface a positive "loss" figure
+    // and subtract it from the theoretical bank balance below.
+    let totalChargebackLoss = 0; // EUR
+    try {
+      const chargebackAgg = await PlatformTransaction.aggregate([
+        { $match: { transactionType: "chargeback_loss" } },
+        {
+          $group: {
+            _id: null,
+            totalEUR: { $sum: "$amountEUR" },
+          },
+        },
+      ]);
+      totalChargebackLoss = Math.abs(chargebackAgg[0]?.totalEUR || 0);
+    } catch (e) {
+      console.error("⚠️ [financials] chargeback_loss aggregation failed:", e);
+    }
+
     // Reason: All values below are now consistently in EUR
     const totalBankFees = totalBankDepositFees + totalBankWithdrawalFees;
     const totalGrossEarnings =
@@ -517,8 +539,14 @@ export const PlatformFinancialsService = {
       walletStats.totalDeposited + totalDepositFeesGross + totalVATCollected;
     const totalMoneyPaidOut =
       totalUserWithdrawalsEUR + totalAdminWithdrawalsEUR + totalVATPaid;
+    // Reason: chargeback losses are real funds already pulled from the
+    // acquirer — subtract them so the theoretical bank balance doesn't get
+    // flagged as drift by reconciliation when clawbacks are applied.
     const theoreticalBankBalance =
-      totalMoneyReceivedGross - totalBankFees - totalMoneyPaidOut;
+      totalMoneyReceivedGross -
+      totalBankFees -
+      totalMoneyPaidOut -
+      totalChargebackLoss;
 
     // Coverage ratio: How much of total liabilities can be covered
     // Liabilities = User credit balances + Outstanding VAT
@@ -563,6 +591,7 @@ export const PlatformFinancialsService = {
 
       totalUserDeposits: walletStats.totalDeposited, // EUR
       totalUserWithdrawals: totalUserWithdrawalsEUR, // EUR (converted from credits)
+      totalChargebackLoss,
       theoreticalBankBalance,
 
       coverageRatio,

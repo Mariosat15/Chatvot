@@ -97,6 +97,8 @@ export async function POST(req: NextRequest) {
     securityAlertsDeleted: 0,
     lockoutsDeleted: 0,
     fraudAlertsDeleted: 0,
+    chargebacksDeleted: 0,
+    platformTxDeleted: 0,
   };
 
   // Clear decline state FIRST (user + ip namespaces) so even if DB deletes fail
@@ -208,6 +210,49 @@ export async function POST(req: NextRequest) {
       console.error("lockout cleanup failed:", err);
     }
 
+    // Chargeback cases created by the chargeback simulator scenario.
+    // Reason: Chargeback cases are keyed by userId, so sim-attack-* users
+    // scope them naturally. Also clean up any matching platform/wallet
+    // chargeback ledger rows for those users.
+    try {
+      const cbRes = await db
+        .collection("chargebacks")
+        .deleteMany({ userId: { $in: targetUserIds } });
+      summary.chargebacksDeleted += cbRes.deletedCount ?? 0;
+    } catch (err) {
+      console.error("chargeback cleanup failed:", err);
+    }
+
+    // chargeback_clawback WalletTransactions tied to these users (rare, since
+    // simulator scenarios don't normally complete the chargeback, but belt
+    // and suspenders).
+    try {
+      const clawbackRes = await WalletTransaction.deleteMany({
+        userId: { $in: targetUserIds },
+        transactionType: "chargeback_clawback",
+      });
+      summary.transactionsDeleted += clawbackRes.deletedCount ?? 0;
+    } catch (err) {
+      console.error("chargeback_clawback cleanup failed:", err);
+    }
+
+    // chargeback_loss PlatformTransactions whose metadata references one of
+    // the sim-attack-* users. Reason: PlatformTransaction rows are not
+    // user-scoped by default, so we match on metadata.userId written when
+    // completeChargeback applies the bank-leg clawback.
+    try {
+      const platformRes = await db.collection("platformtransactions").deleteMany({
+        transactionType: "chargeback_loss",
+        $or: [
+          { userId: { $in: targetUserIds } },
+          { "metadata.userId": { $in: targetUserIds } },
+        ],
+      });
+      summary.platformTxDeleted += platformRes.deletedCount ?? 0;
+    } catch (err) {
+      console.error("chargeback_loss cleanup failed:", err);
+    }
+
     // FraudAlerts created by recordFailedLogin
     try {
       const fraudRes = await db.collection("fraudalerts").deleteMany({
@@ -257,6 +302,40 @@ export async function POST(req: NextRequest) {
       summary.securityAlertsDeleted += alertSweep.deletedCount ?? 0;
     } catch (err) {
       console.error("metadata-tag alert sweep failed:", err);
+    }
+
+    // Chargeback + chargeback ledger rows for any sim-attack-* userId that
+    // survived a crashed run.
+    try {
+      const cbSweep = await db
+        .collection("chargebacks")
+        .deleteMany({ userId: { $regex: ATTACK_PREFIX_RE } });
+      summary.chargebacksDeleted += cbSweep.deletedCount ?? 0;
+    } catch (err) {
+      console.error("metadata-tag chargeback sweep failed:", err);
+    }
+    try {
+      const clawSweep = await WalletTransaction.deleteMany({
+        transactionType: "chargeback_clawback",
+        userId: { $regex: ATTACK_PREFIX_RE },
+      });
+      summary.transactionsDeleted += clawSweep.deletedCount ?? 0;
+    } catch (err) {
+      console.error("metadata-tag chargeback_clawback sweep failed:", err);
+    }
+    try {
+      const platformSweep = await db
+        .collection("platformtransactions")
+        .deleteMany({
+          transactionType: "chargeback_loss",
+          $or: [
+            { userId: { $regex: ATTACK_PREFIX_RE } },
+            { "metadata.userId": { $regex: ATTACK_PREFIX_RE } },
+          ],
+        });
+      summary.platformTxDeleted += platformSweep.deletedCount ?? 0;
+    } catch (err) {
+      console.error("metadata-tag chargeback_loss sweep failed:", err);
     }
 
     // And stray AccountLockouts with sim-attack-* emails (survivors from

@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ChargebacksFinancialTab from "./chargebacks/ChargebacksFinancialTab";
 import {
   Select,
   SelectContent,
@@ -1298,6 +1299,7 @@ export default function FinancialDashboard() {
           <TabsTrigger value="invoices">Invoices</TabsTrigger>
           <TabsTrigger value="analytics">📊 Analytics</TabsTrigger>
           <TabsTrigger value="reconciliation">Reconciliation</TabsTrigger>
+          <TabsTrigger value="chargebacks">Chargebacks</TabsTrigger>
         </TabsList>
 
         {/* OVERVIEW TAB */}
@@ -5376,6 +5378,11 @@ export default function FinancialDashboard() {
         {/* RECONCILIATION TAB */}
         <TabsContent value="reconciliation" className="space-y-6">
           <ReconciliationSection />
+        </TabsContent>
+
+        {/* CHARGEBACKS TAB */}
+        <TabsContent value="chargebacks" className="space-y-6">
+          <ChargebacksFinancialTab />
         </TabsContent>
       </Tabs>
 

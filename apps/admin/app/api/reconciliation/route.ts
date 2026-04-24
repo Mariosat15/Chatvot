@@ -919,8 +919,9 @@ async function checkDuplicateTransactions() {
  * - admin_adjustment: +/- credits (manual adjustment)
  * - marketplace_purchase: -credits (item purchased)
  * - platform_fee: -credits (fee deducted from winnings)
- *
- * Future: chargeback: -credits (bank reversed the payment)
+ * - chargeback_clawback: -credits (bank reversed the payment; reflected as a
+ *   negative WalletTransaction tied to a Chargeback case, matched against the
+ *   original deposit once the case is resolved as "lost")
  */
 async function getDetailedUserReconciliation(
   userId: string,
@@ -1007,6 +1008,7 @@ async function getDetailedUserReconciliation(
     gmCompetitionEarnings: 0,
     gmChallengeEarnings: 0,
     incidentCompensations: 0,
+    chargebackClawbacks: 0,
     other: 0,
   };
 
@@ -1120,6 +1122,14 @@ async function getDetailedUserReconciliation(
         breakdown.incidentCompensations++;
         break;
 
+      case "chargeback_clawback":
+        // Credits reversed from user wallet after a lost chargeback.
+        // Reason: the signed negative amount is already summed into
+        // `balanceFromAllTransactions`; we only track the count here so that
+        // the reconciliation breakdown surfaces it for admins.
+        breakdown.chargebackClawbacks++;
+        break;
+
       default:
         breakdown.other++;
     }
@@ -1184,6 +1194,49 @@ async function getDetailedUserReconciliation(
         description: explanation,
       },
     });
+  }
+
+  // Informational note: any disputed deposits without a matched chargeback
+  // clawback yet. This is NOT a discrepancy — the chargeback case is still
+  // open and will be reconciled when the admin resolves it.
+  try {
+    const disputedDeposits = await WalletTransaction.find({
+      userId,
+      transactionType: "deposit",
+      status: "disputed",
+    }).lean();
+    if (disputedDeposits.length > 0) {
+      const clawbackTxIds = new Set(
+        transactions
+          .filter((t) => t.transactionType === "chargeback_clawback")
+          .map((t) =>
+            String(
+              (t.metadata as any)?.originalDepositTxId ||
+                (t.metadata as any)?.walletTransactionId ||
+                "",
+            ),
+          )
+          .filter(Boolean),
+      );
+      const unmatched = disputedDeposits.filter(
+        (d) => !clawbackTxIds.has(String(d._id)),
+      );
+      if (unmatched.length > 0) {
+        issues.push({
+          type: "chargeback_pending_clawback",
+          severity: "info",
+          userId,
+          userEmail,
+          details: {
+            description:
+              `${unmatched.length} disputed deposit(s) are awaiting chargeback resolution — ` +
+              `this is informational, not a discrepancy.`,
+          },
+        });
+      }
+    }
+  } catch (e) {
+    console.error("⚠️ [reconciliation] disputed-deposit check failed:", e);
   }
 
   // Check deposit total (should include manual_deposit_credit)

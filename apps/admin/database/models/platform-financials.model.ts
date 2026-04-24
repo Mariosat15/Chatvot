@@ -18,6 +18,7 @@ export interface IPlatformTransaction extends Document {
     | "refund_clawback" // Refund that returns funds to platform
     | "retained_gm_fee" // GM referral fee retained by platform due to inactive GM subscription
     | "incident_compensation" // Platform expense for compensating users due to incidents
+    | "chargeback_loss" // Platform funds lost when a chargeback is marked lost / completed
     | "admin_balance_add" // Admin adding funds to operating balance
     | "custom_expense"; // Custom expense (e.g., marketing, software, etc.)
 
@@ -149,6 +150,7 @@ const PlatformTransactionSchema = new Schema<IPlatformTransaction>(
         "incident_compensation",
         "admin_balance_add",
         "custom_expense",
+        "chargeback_loss",
       ],
       index: true,
     },

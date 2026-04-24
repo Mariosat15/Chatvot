@@ -70,6 +70,7 @@ import {
 import { toast } from "sonner";
 import { UserData, Assignment } from "./UsersSection";
 import { CustomerAssignmentCard } from "./CustomerAssignmentBadge";
+import ChargebacksTab from "./chargebacks/ChargebacksTab";
 import { CustomerAuditTrail } from "./CustomerAuditTrail";
 import { TransferCustomerDialog } from "./TransferCustomerDialog";
 
@@ -321,6 +322,7 @@ type TabType =
   | "kyc"
   | "notes"
   | "restrictions"
+  | "chargebacks"
   | "invoices"
   | "activity"
   | "assignment"
@@ -1428,6 +1430,7 @@ export default function UserFullDetailPanel({
     { id: "audit", label: "Audit Trail", icon: ClipboardList },
     { id: "notes", label: `Notes (${notes.length})`, icon: Send },
     { id: "restrictions", label: "Restrictions", icon: Ban },
+    { id: "chargebacks", label: "Chargebacks", icon: AlertTriangle },
     { id: "transactions", label: "Transactions", icon: CreditCard },
     { id: "invoices", label: `Invoices (${invoices.length})`, icon: FileText },
   ];
@@ -3177,6 +3180,17 @@ export default function UserFullDetailPanel({
                         </CardContent>
                       </Card>
                     )}
+                  </div>
+                )}
+
+                {/* Chargebacks Tab */}
+                {activeTab === "chargebacks" && (
+                  <div className="space-y-6">
+                    <ChargebacksTab
+                      userId={user.id}
+                      userEmail={user.email}
+                      userName={user.name || undefined}
+                    />
                   </div>
                 )}
 

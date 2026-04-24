@@ -240,7 +240,18 @@ export default function AccountStatusCard({
     hasActiveRestriction,
     hasOpenAlert,
     isLocked,
+    openChargebackCaseId,
   } = accountStatus;
+
+  // Reason: When an open chargeback case exists and the user has a
+  // payment_fraud restriction, show chargeback-specific copy instead of the
+  // generic "Payment Security" label. The underlying restriction entry still
+  // renders below with its canTrade/canDeposit flags intact.
+  const hasChargebackCase = Boolean(openChargebackCaseId);
+  const hasPaymentFraudRestriction = restrictions.some(
+    (r) => r.reason === "payment_fraud",
+  );
+  const showChargebackNotice = hasChargebackCase && hasPaymentFraudRestriction;
 
   // Reason: Only show this card when there is an actual issue the user needs
   // to know about — an active restriction, investigation, lockout, or KYC problem.
@@ -352,6 +363,15 @@ export default function AccountStatusCard({
             </span>
           </div>
         )}
+
+        {showChargebackNotice && (
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-red-500/10 border border-red-500/20">
+            <CreditCard className="w-3.5 h-3.5 text-red-400" />
+            <span className="text-[11px] text-red-300 font-medium">
+              Chargeback Under Review
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Expanded Details */}
@@ -364,6 +384,33 @@ export default function AccountStatusCard({
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.25 }}
           >
+            {/* ── Chargeback Under Review ── */}
+            {showChargebackNotice && (
+              <div className="space-y-2">
+                <h4 className="text-xs text-gray-400 uppercase tracking-wider font-medium flex items-center gap-1.5">
+                  <CreditCard className="w-3 h-3" /> Chargeback Under Review
+                </h4>
+                <div className="p-3 rounded-lg bg-red-500/5 border border-red-500/15 space-y-1.5">
+                  <p className="text-xs font-semibold text-red-300">
+                    A payment dispute has been opened on your account.
+                  </p>
+                  <p className="text-[11px] text-gray-400 leading-relaxed">
+                    Your account is restricted while we review. You may still
+                    sign in. If you have additional information that can help
+                    resolve this dispute (receipts, communications, or proof
+                    of service), please{" "}
+                    <Link
+                      href="/messaging"
+                      className="text-blue-400 hover:text-blue-300 underline"
+                    >
+                      contact our support team
+                    </Link>
+                    .
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* ── Active Investigations ── */}
             {fraudAlerts.length > 0 && (
               <div className="space-y-3">

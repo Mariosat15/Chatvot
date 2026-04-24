@@ -20,6 +20,7 @@ import { connectToDatabase } from "../../../database/mongoose";
 import UserRestriction from "../../../database/models/user-restriction.model";
 import WalletTransaction from "../../../database/models/trading/wallet-transaction.model";
 import { recordSecurityAlert } from "./security-alert.service";
+import { ensureChargebackCase } from "./chargeback-case.service";
 
 export interface HandleChargebackInput {
   /** Provider slug (e.g., "nuvei"). */
@@ -44,6 +45,9 @@ export interface HandleChargebackResult {
   restrictionId?: string;
   securityAlertId?: string;
   transactionUpdated: boolean;
+  /** Chargeback case id (admin queue). Optional because case creation is
+   *  best-effort — failure must not break the webhook response. */
+  chargebackId?: string;
 }
 
 export async function handleChargeback(
@@ -143,6 +147,26 @@ export async function handleChargeback(
     } catch (err) {
       console.error("⚠️ [chargeback] failed to mark transaction disputed:", err);
     }
+  }
+
+  // 4) Ensure a Chargeback case exists for the admin queue. Fully best-effort
+  //    and idempotent — if this fails, the existing alert + restriction + tx
+  //    update are already in place and the webhook keeps responding 200.
+  try {
+    const cb = await ensureChargebackCase({
+      provider: input.provider,
+      userId: input.userId,
+      walletTransactionId: input.transactionId,
+      providerTransactionId: input.providerTransactionId,
+      chargebackCaseId: input.chargebackCaseId,
+      reasonCode: input.reasonCode,
+      amount: input.amount ?? 0,
+      restrictionId: result.restrictionId,
+      securityAlertId: result.securityAlertId,
+    });
+    if (cb && cb._id) result.chargebackId = String(cb._id);
+  } catch (err) {
+    console.error("⚠️ [chargeback] failed to ensure Chargeback case:", err);
   }
 
   return result;

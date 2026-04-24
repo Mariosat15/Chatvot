@@ -252,6 +252,9 @@ export interface ComprehensiveDashboardData {
     hasActiveRestriction: boolean;
     hasOpenAlert: boolean;
     isLocked: boolean;
+    // Open (non-terminal) chargeback case id, if any. Surfaces a dedicated
+    // "Chargeback under review" copy on the user dashboard when present.
+    openChargebackCaseId?: string | null;
   };
 }
 
@@ -1204,10 +1207,32 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       hasActiveRestriction: (restrictions as any[]).length > 0,
       hasOpenAlert: (alerts as any[]).length > 0,
       isLocked: (lockouts as any[]).length > 0,
+      openChargebackCaseId: null,
     };
   } catch (err) {
     // Non-critical — dashboard still works without account status data
     console.warn("⚠️ Failed to fetch account status for dashboard:", err);
+  }
+
+  // Chargeback case lookup: a separate lean find keeps the main account-status
+  // block backward-compatible. If this fails, the dashboard still renders the
+  // generic payment_fraud restriction copy.
+  try {
+    const { default: Chargeback } = await import(
+      "@/database/models/chargeback.model"
+    );
+    const openCase = await Chargeback.findOne({
+      userId,
+      status: { $in: ["pending_review", "initiated", "represented"] },
+    })
+      .select("_id status")
+      .sort({ createdAt: -1 })
+      .lean();
+    if (openCase && (openCase as any)._id) {
+      accountStatusData.openChargebackCaseId = String((openCase as any)._id);
+    }
+  } catch (err) {
+    console.warn("⚠️ Failed to check open chargeback case:", err);
   }
 
   return {
