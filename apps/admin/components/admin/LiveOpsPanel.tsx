@@ -32,7 +32,9 @@ import {
   AlertTriangle,
   ArrowDownToLine,
   ArrowUpFromLine,
+  CheckCircle2,
   Globe2,
+  Loader2,
   Pause,
   Play,
   RefreshCw,
@@ -40,8 +42,10 @@ import {
   Users,
   Wifi,
   WifiOff,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -181,6 +185,13 @@ export default function LiveOpsPanel() {
   const abortRef = useRef<AbortController | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Optimistic-dismiss state so the row disappears immediately on click
+  // even before the next poll completes. `undoing` marks a row that's
+  // currently being acknowledged so we can show a spinner + lock the button.
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
+  const [dismissingIds, setDismissingIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+
   const fetchLive = useCallback(async () => {
     abortRef.current?.abort();
     const ctrl = new AbortController();
@@ -248,7 +259,111 @@ export default function LiveOpsPanel() {
   const deposits = useMemo(() => data?.deposits ?? [], [data]);
   const withdrawals = useMemo(() => data?.withdrawals ?? [], [data]);
   const onlineUsers = useMemo(() => data?.onlineUsers ?? [], [data]);
-  const securityAlerts = useMemo(() => data?.securityAlerts ?? [], [data]);
+  // Hide optimistically-dismissed alerts until the server confirms.
+  // On the next successful poll, the backend will no longer return them
+  // (they're acknowledged=true and GET filters those out by default).
+  const securityAlerts = useMemo(
+    () =>
+      (data?.securityAlerts ?? []).filter((a) => !dismissedIds.has(a.id)),
+    [data, dismissedIds],
+  );
+
+  // Prune the dismissedIds set once the server confirms an alert is gone
+  // from the feed — keeps the set small across long-lived sessions.
+  useEffect(() => {
+    if (dismissedIds.size === 0) return;
+    const stillPresent = new Set(
+      (data?.securityAlerts ?? []).map((a) => a.id),
+    );
+    let changed = false;
+    const next = new Set<string>();
+    for (const id of dismissedIds) {
+      if (stillPresent.has(id)) {
+        next.add(id);
+      } else {
+        changed = true;
+      }
+    }
+    if (changed) setDismissedIds(next);
+  }, [data, dismissedIds]);
+
+  const ackAlert = useCallback(async (id: string) => {
+    setDismissingIds((prev) => new Set(prev).add(id));
+    try {
+      const res = await fetch("/api/security/alerts", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ alertId: id }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error || `HTTP ${res.status}`);
+      }
+      setDismissedIds((prev) => new Set(prev).add(id));
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? `Failed to dismiss alert: ${err.message}`
+          : "Failed to dismiss alert. Please contact support.",
+      );
+    } finally {
+      setDismissingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  }, []);
+
+  const ackAllVisible = useCallback(async () => {
+    const ids = securityAlerts.map((a) => a.id);
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    try {
+      // Fire concurrently but bounded — 30 rows max. The API is a tiny
+      // findByIdAndUpdate, so load is trivial.
+      const results = await Promise.allSettled(
+        ids.map(async (id) => {
+          const res = await fetch("/api/security/alerts", {
+            method: "POST",
+            credentials: "include",
+            cache: "no-store",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ alertId: id }),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return id;
+        }),
+      );
+      const okIds = new Set<string>();
+      let failed = 0;
+      for (const r of results) {
+        if (r.status === "fulfilled") {
+          okIds.add(r.value);
+        } else {
+          failed += 1;
+        }
+      }
+      if (okIds.size > 0) {
+        setDismissedIds((prev) => {
+          const next = new Set(prev);
+          okIds.forEach((id) => next.add(id));
+          return next;
+        });
+      }
+      if (failed > 0) {
+        toast.error(
+          `${okIds.size} dismissed, ${failed} failed. Please contact support.`,
+        );
+      } else {
+        toast.success(`${okIds.size} alerts dismissed.`);
+      }
+    } finally {
+      setBulkBusy(false);
+    }
+  }, [securityAlerts]);
 
   const onlineCount = useMemo(
     () => onlineUsers.filter((u) => u.status === "online").length,
@@ -362,7 +477,13 @@ export default function LiveOpsPanel() {
         <DepositsCard entries={deposits} />
         <WithdrawalsCard entries={withdrawals} />
         <OnlineUsersCard entries={onlineUsers} />
-        <SecurityAlertsCard entries={securityAlerts} />
+        <SecurityAlertsCard
+          entries={securityAlerts}
+          onAck={ackAlert}
+          onAckAll={ackAllVisible}
+          dismissingIds={dismissingIds}
+          bulkBusy={bulkBusy}
+        />
       </div>
     </div>
   );
@@ -681,17 +802,48 @@ function OnlineUsersCard({ entries }: { entries: OnlineUserEntry[] }) {
   );
 }
 
-function SecurityAlertsCard({ entries }: { entries: SecurityAlertEntry[] }) {
+function SecurityAlertsCard({
+  entries,
+  onAck,
+  onAckAll,
+  dismissingIds,
+  bulkBusy,
+}: {
+  entries: SecurityAlertEntry[];
+  onAck: (id: string) => void;
+  onAckAll: () => void;
+  dismissingIds: Set<string>;
+  bulkBusy: boolean;
+}) {
   return (
     <Card className="bg-slate-900/50 border-slate-800">
       <CardHeader className="pb-3">
-        <CardTitle className="text-white flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-red-400" /> Live Security Alerts
-        </CardTitle>
-        <CardDescription>
-          Unacknowledged runtime security events from webhooks, auth,
-          anti-fraud, etc.
-        </CardDescription>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <CardTitle className="text-white flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-400" /> Live Security
+              Alerts
+            </CardTitle>
+            <CardDescription>
+              Unacknowledged runtime security events from webhooks, auth,
+              anti-fraud, etc.
+            </CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onAckAll}
+            disabled={bulkBusy || entries.length === 0}
+            className="shrink-0"
+          >
+            {bulkBusy ? (
+              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+            ) : (
+              <CheckCircle2 className="w-3 h-3 mr-1" />
+            )}
+            Dismiss all
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="p-0">
         <div className="max-h-[420px] overflow-y-auto">
@@ -707,38 +859,58 @@ function SecurityAlertsCard({ entries }: { entries: SecurityAlertEntry[] }) {
                   <th className="text-left px-3 py-2">Source</th>
                   <th className="text-left px-3 py-2">IP</th>
                   <th className="text-left px-3 py-2">Reason</th>
+                  <th className="text-right px-3 py-2 w-[40px]" />
                 </tr>
               </thead>
               <tbody>
-                {entries.map((a) => (
-                  <tr
-                    key={a.id}
-                    className="border-t border-slate-800 text-slate-300"
-                  >
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {formatRelative(a.createdAt)}
-                    </td>
-                    <td className="px-3 py-2 font-mono">{a.alertType}</td>
-                    <td className="px-3 py-2">
-                      <Badge
-                        variant="outline"
-                        className={cn(severityBadgeClasses(a.severity))}
-                      >
-                        {a.severity}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-2 truncate max-w-[160px]">
-                      {a.source}
-                      {a.provider && (
-                        <span className="text-slate-500"> / {a.provider}</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 font-mono">{a.ip || "—"}</td>
-                    <td className="px-3 py-2 truncate max-w-[280px] text-slate-400">
-                      {a.reason}
-                    </td>
-                  </tr>
-                ))}
+                {entries.map((a) => {
+                  const busy = dismissingIds.has(a.id);
+                  return (
+                    <tr
+                      key={a.id}
+                      className="border-t border-slate-800 text-slate-300"
+                    >
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        {formatRelative(a.createdAt)}
+                      </td>
+                      <td className="px-3 py-2 font-mono">{a.alertType}</td>
+                      <td className="px-3 py-2">
+                        <Badge
+                          variant="outline"
+                          className={cn(severityBadgeClasses(a.severity))}
+                        >
+                          {a.severity}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-2 truncate max-w-[160px]">
+                        {a.source}
+                        {a.provider && (
+                          <span className="text-slate-500"> / {a.provider}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 font-mono">{a.ip || "—"}</td>
+                      <td className="px-3 py-2 truncate max-w-[280px] text-slate-400">
+                        {a.reason}
+                      </td>
+                      <td className="px-2 py-2 text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-slate-400 hover:text-white hover:bg-red-500/10"
+                          onClick={() => onAck(a.id)}
+                          disabled={busy}
+                          title="Dismiss / acknowledge"
+                        >
+                          {busy ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <X className="w-3 h-3" />
+                          )}
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
