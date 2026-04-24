@@ -8,6 +8,7 @@ import {
 import { connectToDatabase } from "@/database/mongoose";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import { isValidObjectId, isSafeMongoString } from "@/lib/utils/url-validator";
+import { recordDecline, clearDeclines } from "@/lib/utils/rate-limiter";
 
 /**
  * Paddle Webhook Handler
@@ -124,6 +125,7 @@ function verifyPaddleWebhook(
  * Handle completed transaction - ADD CREDITS TO USER
  * Includes idempotency check to prevent duplicate processing
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Paddle webhook payload type not modelled; pre-existing.
 async function handleTransactionCompleted(data: any) {
   try {
     const customData = data.custom_data;
@@ -193,6 +195,17 @@ async function handleTransactionCompleted(data: any) {
 
     console.log("✅ Credits added for transaction", transactionId);
 
+    // Reason: Clear decline-velocity counters after a successful charge so a
+    // single past decline (e.g., wrong CVV) doesn't keep legitimate users
+    // locked out. Mirrors Stripe/Nuvei behaviour.
+    try {
+      await clearDeclines(userId);
+      const clientIp = customData.client_ip as string | undefined;
+      if (clientIp) await clearDeclines(`ip:${clientIp}`);
+    } catch {
+      // Non-blocking
+    }
+
     // Send notification to user
     try {
       const { notificationService } =
@@ -210,6 +223,7 @@ async function handleTransactionCompleted(data: any) {
 /**
  * Handle failed payment
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Paddle webhook payload type not modelled; pre-existing.
 async function handleTransactionFailed(data: any) {
   try {
     const customData = data.custom_data;
@@ -234,6 +248,37 @@ async function handleTransactionFailed(data: any) {
 
     // Cancel the deposit
     await cancelDeposit(transactionId, "failed", reason);
+
+    // Reason: Record decline-velocity so repeated failures card-test through
+    // this account / IP trigger a cooldown (parity with Stripe / Nuvei).
+    const userId = customData?.user_id as string | undefined;
+    const clientIp = customData?.client_ip as string | undefined;
+    if (userId) {
+      try {
+        const userBlock = await recordDecline(userId);
+        if (userBlock.blocked) {
+          console.warn(
+            `🚨 Decline-velocity threshold tripped for user ${userId} ` +
+              `— deposits blocked until ${new Date(userBlock.blockedUntil!).toISOString()}`,
+          );
+        }
+      } catch (err) {
+        console.error("⚠️ Decline-velocity (user) failed:", err);
+      }
+    }
+    if (clientIp) {
+      try {
+        const ipBlock = await recordDecline(`ip:${clientIp}`);
+        if (ipBlock.blocked) {
+          console.warn(
+            `🚨 Decline-velocity threshold tripped for IP ${clientIp} ` +
+              `— deposits blocked until ${new Date(ipBlock.blockedUntil!).toISOString()}`,
+          );
+        }
+      } catch (err) {
+        console.error("⚠️ Decline-velocity (ip) failed:", err);
+      }
+    }
 
     // Notify user
     if (customData?.user_id) {
@@ -261,6 +306,7 @@ async function handleTransactionFailed(data: any) {
 /**
  * Handle refunded transaction
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Paddle webhook payload type not modelled; pre-existing.
 async function handleTransactionRefunded(data: any) {
   try {
     const customData = data.custom_data;

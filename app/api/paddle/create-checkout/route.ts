@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
-import {
-  getPaddleConfig,
-  paddleRequest,
-  getPaddleApiUrl,
-} from "@/lib/paddle/config";
+import { getPaddleConfig, paddleRequest } from "@/lib/paddle/config";
 import { initiateDeposit } from "@/lib/actions/trading/wallet.actions";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import { connectToDatabase } from "@/database/mongoose";
+import {
+  RateLimiters,
+  getRateLimitHeaders,
+  getClientIP,
+  isDeclineBlocked,
+} from "@/lib/utils/rate-limiter";
 
 /**
  * Create Paddle Checkout Session
@@ -26,6 +28,66 @@ export async function POST(req: NextRequest) {
 
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // SECURITY: Rate limiting + decline-velocity block (parity with Nuvei and
+    // Stripe open-order routes). Defends against card-testing campaigns
+    // where an attacker rotates stolen cards through a single account/IP.
+    const userId = session.user.id;
+    const rateLimitResult = RateLimiters.deposit(userId);
+    if (!rateLimitResult.success) {
+      console.log("🛡️ Rate limit exceeded for user - paddle deposit:", userId);
+      return NextResponse.json(
+        {
+          error: "Too many requests. Please wait a moment before trying again.",
+        },
+        {
+          status: 429,
+          headers: getRateLimitHeaders(rateLimitResult),
+        },
+      );
+    }
+
+    const clientIp = getClientIP(req);
+    if (clientIp !== "unknown") {
+      const ipLimitResult = RateLimiters.depositByIp(clientIp);
+      if (!ipLimitResult.success) {
+        console.log("🛡️ IP rate limit exceeded - paddle deposit:", clientIp);
+        return NextResponse.json(
+          {
+            error:
+              "Too many payment attempts from your network. Please wait a moment and try again.",
+          },
+          {
+            status: 429,
+            headers: getRateLimitHeaders(ipLimitResult),
+          },
+        );
+      }
+    }
+
+    if ((await isDeclineBlocked(userId)).blocked) {
+      console.log(`🛡️ Decline-velocity block active for user ${userId}`);
+      return NextResponse.json(
+        {
+          error:
+            "We've paused deposits from your account due to repeated declined payments. Please try again later or contact support.",
+        },
+        { status: 429 },
+      );
+    }
+    if (
+      clientIp !== "unknown" &&
+      (await isDeclineBlocked(`ip:${clientIp}`)).blocked
+    ) {
+      console.log(`🛡️ Decline-velocity block active for IP ${clientIp}`);
+      return NextResponse.json(
+        {
+          error:
+            "We've paused deposits from your network due to repeated declined payments. Please try again later.",
+        },
+        { status: 429 },
+      );
     }
 
     const { amount, currency = "EUR" } = await req.json();
@@ -59,6 +121,7 @@ export async function POST(req: NextRequest) {
 
     // Create Paddle transaction
     // Using Paddle Billing API (v2)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Paddle transaction response type not modelled; pre-existing.
     const paddleTransaction = await paddleRequest<any>("/transactions", {
       method: "POST",
       body: {
@@ -84,6 +147,9 @@ export async function POST(req: NextRequest) {
           transaction_id: transaction._id.toString(),
           type: "deposit",
           amount: amount.toString(),
+          // Reason: Stored so the webhook can record decline-velocity against
+          // the originating IP (not just the userId).
+          ...(clientIp !== "unknown" ? { client_ip: clientIp } : {}),
         },
         currency_code: currency.toUpperCase(),
       },
@@ -95,6 +161,7 @@ export async function POST(req: NextRequest) {
       paymentIntentId: paddleTransaction.data.id,
       "metadata.paddleTransactionId": paddleTransaction.data.id,
       "metadata.provider": "paddle",
+      ...(clientIp !== "unknown" ? { "metadata.clientIp": clientIp } : {}),
     });
 
     console.log("✅ Paddle transaction created:", paddleTransaction.data.id);

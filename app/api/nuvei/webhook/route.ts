@@ -19,6 +19,7 @@ import WithdrawalRequest from "@/database/models/withdrawal-request.model";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import PaymentProvider from "@/database/models/payment-provider.model";
 import { PaymentFraudService } from "@/lib/services/fraud/payment-fraud.service";
+import { recordDecline, clearDeclines } from "@/lib/utils/rate-limiter";
 import crypto from "crypto";
 
 interface NuveiDmnParams {
@@ -143,6 +144,7 @@ function verifyDmnSignature(
 
       let altData = "";
       for (const key of sortedKeys) {
+        // eslint-disable-next-line security/detect-object-injection -- `key` is sourced from Object.keys(params); safe read.
         const value = params[key];
         if (value !== undefined && value !== "") {
           altData += value;
@@ -178,6 +180,7 @@ export async function POST(req: NextRequest) {
       const formData = await req.formData();
       params = {} as NuveiDmnParams;
       formData.forEach((value, key) => {
+        // eslint-disable-next-line security/detect-object-injection -- `key` sourced from FormData iterator.
         params[key] = value.toString();
       });
     } else if (contentType.includes("application/json")) {
@@ -188,6 +191,7 @@ export async function POST(req: NextRequest) {
       params = {} as NuveiDmnParams;
       const urlParams = new URLSearchParams(text);
       urlParams.forEach((value, key) => {
+        // eslint-disable-next-line security/detect-object-injection -- `key` sourced from URLSearchParams iterator.
         params[key] = value;
       });
     }
@@ -500,6 +504,17 @@ export async function POST(req: NextRequest) {
           `✅ Nuvei deposit completed via completeDeposit: ${transaction._id}`,
         );
 
+        // Reason: Successful charge clears the decline-velocity counter so
+        // a single past decline (e.g., wrong CVV) doesn't keep legitimate
+        // users locked out.
+        try {
+          await clearDeclines(transaction.userId);
+          const txIp = transaction.metadata?.clientIp as string | undefined;
+          if (txIp) await clearDeclines(`ip:${txIp}`);
+        } catch {
+          // Non-blocking
+        }
+
         // Trigger journey milestone check after successful deposit
         try {
           const { checkAndCompleteMilestones } = await import(
@@ -607,6 +622,35 @@ export async function POST(req: NextRequest) {
       console.log(
         `Transaction ${transaction._id} marked as failed: ${params.Reason}`,
       );
+
+      // SECURITY: Track decline velocity against both the user and the
+      // originating IP. Defends against card-testing campaigns that would
+      // otherwise not trip our per-user-per-minute rate limit because each
+      // declined request only counts as a single attempt.
+      try {
+        const userBlock = await recordDecline(transaction.userId);
+        if (userBlock.blocked) {
+          console.warn(
+            `🚨 Decline-velocity threshold tripped for user ${transaction.userId} ` +
+              `— deposits blocked until ${new Date(userBlock.blockedUntil!).toISOString()}`,
+          );
+        }
+        const txIp = transaction.metadata?.clientIp as string | undefined;
+        if (txIp) {
+          const ipBlock = await recordDecline(`ip:${txIp}`);
+          if (ipBlock.blocked) {
+            console.warn(
+              `🚨 Decline-velocity threshold tripped for IP ${txIp} ` +
+                `— deposits blocked until ${new Date(ipBlock.blockedUntil!).toISOString()}`,
+            );
+          }
+        }
+      } catch (declineErr) {
+        console.error(
+          "⚠️ Failed to record decline velocity (non-blocking):",
+          declineErr,
+        );
+      }
     } else if (status === "PENDING") {
       // Payment pending - update metadata
       transaction.metadata = {
@@ -876,6 +920,7 @@ async function handlePayoutDmn(params: NuveiDmnParams): Promise<NextResponse> {
     );
 
     // Update withdrawal request
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Partial Mongoose update shape; pre-existing.
     const updateData: any = {
       status: newStatus,
       "metadata.payoutDmnReceived": true,
@@ -897,6 +942,7 @@ async function handlePayoutDmn(params: NuveiDmnParams): Promise<NextResponse> {
 
     // Update wallet transaction if found
     if (walletTx) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Partial Mongoose update shape; pre-existing.
       const txUpdateData: any = {
         status:
           newStatus === "completed"
@@ -926,6 +972,7 @@ async function handlePayoutDmn(params: NuveiDmnParams): Promise<NextResponse> {
 
       if (wallet) {
         // Only update totalWithdrawn if not already counted (prevent double-counting from sync + DMN)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Loose metadata access; pre-existing.
         const wdMetadata = (withdrawalRequest as any).metadata || {};
         const alreadyCounted = wdMetadata.totalWithdrawnUpdated === true;
         if (!alreadyCounted) {
@@ -1245,6 +1292,7 @@ async function handleWithdrawalDmn(
 
       if (wallet) {
         // Only update totalWithdrawn if not already counted (prevent double-counting from sync + DMN)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Loose metadata access; pre-existing.
         const wdMeta = (withdrawalRequest as any).metadata || {};
         const alreadyCounted = wdMeta.totalWithdrawnUpdated === true;
         if (!alreadyCounted) {

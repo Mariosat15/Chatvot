@@ -12,6 +12,12 @@ import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import KYCSettings from "@/database/models/kyc-settings.model";
 import AppSettings from "@/database/models/app-settings.model";
 import { connectToDatabase } from "@/database/mongoose";
+import {
+  RateLimiters,
+  getRateLimitHeaders,
+  getClientIP,
+  isDeclineBlocked,
+} from "@/lib/utils/rate-limiter";
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,6 +26,68 @@ export async function POST(req: NextRequest) {
 
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // SECURITY: Rate limiting — per-user (5/min) and per-IP (10/min).
+    // Mirrors the Nuvei open-order route so both PSPs enforce the same
+    // anti-card-testing policy.
+    const userId = session.user.id;
+    const rateLimitResult = RateLimiters.deposit(userId);
+    if (!rateLimitResult.success) {
+      console.log("🛡️ Rate limit exceeded for user - stripe deposit:", userId);
+      return NextResponse.json(
+        {
+          error: "Too many requests. Please wait a moment before trying again.",
+        },
+        {
+          status: 429,
+          headers: getRateLimitHeaders(rateLimitResult),
+        },
+      );
+    }
+
+    const clientIp = getClientIP(req);
+    if (clientIp !== "unknown") {
+      const ipLimitResult = RateLimiters.depositByIp(clientIp);
+      if (!ipLimitResult.success) {
+        console.log("🛡️ IP rate limit exceeded - stripe deposit:", clientIp);
+        return NextResponse.json(
+          {
+            error:
+              "Too many payment attempts from your network. Please wait a moment and try again.",
+          },
+          {
+            status: 429,
+            headers: getRateLimitHeaders(ipLimitResult),
+          },
+        );
+      }
+    }
+
+    // SECURITY: Decline-velocity block (see lib/utils/rate-limiter.ts).
+    // Blocks users/IPs that recently accumulated multiple declined payments.
+    if ((await isDeclineBlocked(userId)).blocked) {
+      console.log(`🛡️ Decline-velocity block active for user ${userId}`);
+      return NextResponse.json(
+        {
+          error:
+            "We've paused deposits from your account due to repeated declined payments. Please try again later or contact support.",
+        },
+        { status: 429 },
+      );
+    }
+    if (
+      clientIp !== "unknown" &&
+      (await isDeclineBlocked(`ip:${clientIp}`)).blocked
+    ) {
+      console.log(`🛡️ Decline-velocity block active for IP ${clientIp}`);
+      return NextResponse.json(
+        {
+          error:
+            "We've paused deposits from your network due to repeated declined payments. Please try again later.",
+        },
+        { status: 429 },
+      );
     }
 
     await connectToDatabase();
@@ -170,6 +238,9 @@ export async function POST(req: NextRequest) {
         platformFeeAmount: (platformFeeAmount || 0).toString(),
         platformFeePercentage: (platformFeePercentage || 0).toString(),
         totalAmount: chargeAmount.toString(),
+        // Reason: Stored so the webhook can record decline-velocity against
+        // the originating IP (not just the userId).
+        ...(clientIp !== "unknown" ? { clientIp } : {}),
       },
       description,
     });

@@ -6,6 +6,7 @@ import {
 } from "@/lib/actions/trading/wallet.actions";
 import { getPaymentProviderCredentials } from "@/lib/services/settings.service";
 import { PaymentFraudService } from "@/lib/services/fraud/payment-fraud.service";
+import { recordDecline, clearDeclines } from "@/lib/utils/rate-limiter";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import { connectToDatabase } from "@/database/mongoose";
 import Stripe from "stripe";
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest) {
     const stripe = await getStripeClient();
 
     // Try database config first, then .env
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Credentials shape varies per provider; pre-existing cast.
     const stripeConfig = (await getPaymentProviderCredentials("stripe")) as any;
     const webhookSecret =
       stripeConfig?.webhook_secret || process.env.STRIPE_WEBHOOK_SECRET;
@@ -238,6 +240,17 @@ async function handlePaymentIntentSucceeded(
 
     // Track for fraud detection
     await trackPaymentFingerprint(paymentIntent, userId);
+
+    // Reason: Clear decline-velocity counters after a successful charge so
+    // a single past decline (e.g., wrong CVV) doesn't keep legitimate users
+    // locked out.
+    try {
+      await clearDeclines(userId);
+      const clientIp = paymentIntent.metadata?.clientIp;
+      if (clientIp) await clearDeclines(`ip:${clientIp}`);
+    } catch {
+      // Non-blocking
+    }
   } catch (error) {
     console.error("❌ Error handling successful payment:", error);
   }
@@ -303,7 +316,7 @@ async function trackPaymentFingerprint(
  */
 async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
   try {
-    const { transactionId, userId } = paymentIntent.metadata;
+    const { transactionId, userId, clientIp } = paymentIntent.metadata;
 
     console.error("❌ Payment failed:", paymentIntent.id);
     console.error("   Reason:", paymentIntent.last_payment_error?.message);
@@ -314,6 +327,37 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
         "failed",
         paymentIntent.last_payment_error?.message || "Payment failed",
       );
+    }
+
+    // SECURITY: Track decline velocity (see lib/utils/rate-limiter.ts).
+    // Classic card-testing burns many cards through a single account/IP; the
+    // per-minute rate limit only counts *requests*, not *failures*, so without
+    // this the same user could attempt hundreds of stolen cards per hour.
+    if (userId) {
+      try {
+        const userBlock = await recordDecline(userId);
+        if (userBlock.blocked) {
+          console.warn(
+            `🚨 Decline-velocity threshold tripped for user ${userId} ` +
+              `— deposits blocked until ${new Date(userBlock.blockedUntil!).toISOString()}`,
+          );
+        }
+      } catch (err) {
+        console.error("⚠️ Decline-velocity (user) failed:", err);
+      }
+    }
+    if (clientIp) {
+      try {
+        const ipBlock = await recordDecline(`ip:${clientIp}`);
+        if (ipBlock.blocked) {
+          console.warn(
+            `🚨 Decline-velocity threshold tripped for IP ${clientIp} ` +
+              `— deposits blocked until ${new Date(ipBlock.blockedUntil!).toISOString()}`,
+          );
+        }
+      } catch (err) {
+        console.error("⚠️ Decline-velocity (ip) failed:", err);
+      }
     }
 
     // Notify user

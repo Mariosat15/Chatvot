@@ -15,7 +15,12 @@ import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import KYCSettings from "@/database/models/kyc-settings.model";
 import AppSettings from "@/database/models/app-settings.model";
-import { RateLimiters, getRateLimitHeaders } from "@/lib/utils/rate-limiter";
+import {
+  RateLimiters,
+  getRateLimitHeaders,
+  isDeclineBlocked,
+  getClientIP,
+} from "@/lib/utils/rate-limiter";
 import { createSecurityLogger } from "@/lib/utils/security-logger";
 
 export async function POST(req: NextRequest) {
@@ -39,7 +44,10 @@ export async function POST(req: NextRequest) {
 
     const userId = session.user.id;
 
-    // SECURITY: Rate limiting - 5 deposit attempts per minute per user
+    // SECURITY: Rate limiting — per-user (5/min) and per-IP (10/min).
+    // Reason: Per-user alone is bypassable by an attacker rotating accounts
+    // from the same IP. Per-IP catches the aggregate flood used in card
+    // testing campaigns.
     const rateLimitResult = RateLimiters.deposit(userId);
     if (!rateLimitResult.success) {
       console.log("🛡️ Rate limit exceeded for user - deposit:", userId);
@@ -52,6 +60,76 @@ export async function POST(req: NextRequest) {
           headers: getRateLimitHeaders(rateLimitResult),
         },
       );
+    }
+
+    const clientIp = getClientIP(req);
+    if (clientIp !== "unknown") {
+      const ipLimitResult = RateLimiters.depositByIp(clientIp);
+      if (!ipLimitResult.success) {
+        console.log("🛡️ IP rate limit exceeded - deposit:", clientIp);
+        await securityLogger.log({
+          statusCode: 429,
+          success: false,
+          errorMessage: "Deposit IP rate limit exceeded",
+        });
+        return NextResponse.json(
+          {
+            error:
+              "Too many payment attempts from your network. Please wait a moment and try again.",
+          },
+          {
+            status: 429,
+            headers: getRateLimitHeaders(ipLimitResult),
+          },
+        );
+      }
+    }
+
+    // SECURITY: Decline-velocity block — rejects deposits from users who
+    // recently accumulated multiple declined payments (card-testing pattern).
+    // The block is set by the webhook on DECLINED/ERROR DMNs. Applied to both
+    // the userId and the IP so that an attacker cannot sidestep by simply
+    // switching accounts.
+    const userDeclineBlock = await isDeclineBlocked(userId);
+    if (userDeclineBlock.blocked) {
+      const minutesLeft = Math.ceil(
+        (userDeclineBlock.retryAfterMs ?? 0) / 60000,
+      );
+      console.log(
+        `🛡️ Decline-velocity block active for user ${userId} (${minutesLeft}m left)`,
+      );
+      await securityLogger.log({
+        statusCode: 429,
+        success: false,
+        errorMessage: "Decline-velocity block (user)",
+      });
+      return NextResponse.json(
+        {
+          error:
+            "We've paused deposits from your account due to repeated declined payments. Please try again later or contact support.",
+        },
+        { status: 429 },
+      );
+    }
+    if (clientIp !== "unknown") {
+      const ipDeclineBlock = await isDeclineBlocked(`ip:${clientIp}`);
+      if (ipDeclineBlock.blocked) {
+        console.log(
+          `🛡️ Decline-velocity block active for IP ${clientIp}`,
+        );
+        await securityLogger.log({
+          statusCode: 429,
+          success: false,
+          errorMessage: "Decline-velocity block (IP)",
+        });
+        return NextResponse.json(
+          {
+            error:
+              "We've paused deposits from your network due to repeated declined payments. Please try again later.",
+          },
+          { status: 429 },
+        );
+      }
     }
 
     await connectToDatabase();
@@ -309,6 +387,9 @@ export async function POST(req: NextRequest) {
         bankDepositFeeFixed: bankDepositFeeFixed,
         bankFeeTotal: parseFloat(bankFeeTotal.toFixed(2)),
         netPlatformEarning: parseFloat(netPlatformEarning.toFixed(2)),
+        // Reason: Stored so the webhook can record decline-velocity against
+        // the originating IP (not just the userId).
+        clientIp: clientIp !== "unknown" ? clientIp : undefined,
       },
     });
 
