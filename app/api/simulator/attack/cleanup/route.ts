@@ -28,6 +28,13 @@ import { clearDeclines } from "@/lib/utils/rate-limiter";
 
 export const dynamic = "force-dynamic";
 
+// Precomputed cleanup regexes. ATTACK_USER_PREFIX is a compile-time constant
+// exported from the guards module (`"sim-attack-"`), so the resulting
+// RegExp is static — not user-controlled — and not a ReDoS surface.
+// eslint-disable-next-line security/detect-non-literal-regexp -- fixed compile-time prefix
+const ATTACK_PREFIX_RE = new RegExp(`^${ATTACK_USER_PREFIX}`);
+const ATO_EMAIL_SUFFIX_RE = /@test\.simulator$/;
+
 interface CleanupBody {
   userIds?: string[];
   ips?: string[];
@@ -159,23 +166,41 @@ export async function POST(req: NextRequest) {
       console.error("restriction cleanup failed:", err);
     }
 
-    // SecurityAlerts scoped to sim-attack users
+    // SecurityAlerts: broaden so we also catch alerts that don't carry a
+    // user-scoped `userId` field (they're stored only in metadata). The three
+    // current simulator-originated alert types are:
+    //   - chargeback_received      (top-level userId → caught by $in)
+    //   - webhook_signature_failure (no userId; sim-attack userid in metadata.userid)
+    //   - nosql_injection_attempt  (no userId; tagged by probe-nosql with metadata.simulator=true)
+    // Reason: matching on these explicit markers avoids accidentally deleting
+    // real production alerts that happen to be contemporaneous.
     try {
-      const alertRes = await db
-        .collection("securityalerts")
-        .deleteMany({ userId: { $in: targetUserIds } });
+      const alertRes = await db.collection("securityalerts").deleteMany({
+        $or: [
+          { userId: { $in: targetUserIds } },
+          { "metadata.userId": { $in: targetUserIds } },
+          { "metadata.userid": { $regex: ATTACK_PREFIX_RE } },
+          { "metadata.simulator": true },
+        ],
+      });
       summary.securityAlertsDeleted += alertRes.deletedCount ?? 0;
     } catch (err) {
       console.error("security-alert cleanup failed:", err);
     }
 
-    // AccountLockouts created by the ATO scenario
+    // AccountLockouts created by the ATO scenario. Use the Mongoose model so
+    // the collection name resolution is guaranteed to match production, and
+    // widen the regex to also catch the fixed @test.simulator suffix the
+    // scenario uses.
     try {
-      const lockoutRes = await db.collection("accountlockouts").deleteMany({
+      const AccountLockout = (
+        await import("@/database/models/account-lockout.model")
+      ).default;
+      const lockoutRes = await AccountLockout.deleteMany({
         $or: [
           { userId: { $in: targetUserIds } },
-          // The ATO scenario uses sim-attack-*@test.simulator emails
-          { email: { $regex: `^${ATTACK_USER_PREFIX}` } },
+          { email: ATTACK_PREFIX_RE },
+          { email: ATO_EMAIL_SUFFIX_RE },
         ],
       });
       summary.lockoutsDeleted += lockoutRes.deletedCount ?? 0;
@@ -189,7 +214,10 @@ export async function POST(req: NextRequest) {
         $or: [
           { primaryUserId: { $in: targetUserIds } },
           { suspiciousUserIds: { $in: targetUserIds } },
-          { primaryUserId: { $regex: `^${ATTACK_USER_PREFIX}` } },
+          { primaryUserId: { $regex: ATTACK_PREFIX_RE } },
+          // ATO scenario records primary identifier as email when userId is unknown.
+          { primaryUserId: ATO_EMAIL_SUFFIX_RE },
+          { primaryUserId: ATTACK_PREFIX_RE },
         ],
       });
       summary.fraudAlertsDeleted += fraudRes.deletedCount ?? 0;
@@ -217,6 +245,35 @@ export async function POST(req: NextRequest) {
       summary.transactionsDeleted += res.deletedCount ?? 0;
     } catch (err) {
       console.error("metadata-tag tx sweep failed:", err);
+    }
+
+    // Same safety net for SecurityAlerts: anything explicitly flagged as
+    // simulator-originated (by probe-nosql or future probes) gets wiped,
+    // even from dead/broken runs whose targetUserIds we can no longer derive.
+    try {
+      const alertSweep = await db
+        .collection("securityalerts")
+        .deleteMany({ "metadata.simulator": true });
+      summary.securityAlertsDeleted += alertSweep.deletedCount ?? 0;
+    } catch (err) {
+      console.error("metadata-tag alert sweep failed:", err);
+    }
+
+    // And stray AccountLockouts with sim-attack-* emails (survivors from
+    // earlier runs before the email regex was broadened).
+    try {
+      const AccountLockout = (
+        await import("@/database/models/account-lockout.model")
+      ).default;
+      const lockoutSweep = await AccountLockout.deleteMany({
+        $or: [
+          { email: ATTACK_PREFIX_RE },
+          { email: ATO_EMAIL_SUFFIX_RE },
+        ],
+      });
+      summary.lockoutsDeleted += lockoutSweep.deletedCount ?? 0;
+    } catch (err) {
+      console.error("metadata-tag lockout sweep failed:", err);
     }
   }
 

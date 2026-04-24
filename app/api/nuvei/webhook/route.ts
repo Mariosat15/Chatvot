@@ -307,6 +307,10 @@ export async function POST(req: NextRequest) {
             transactionType: params.transactionType,
             status: params.Status,
             merchantUniqueId: params.merchant_unique_id,
+            // Reason: attack-suite cleanup matches simulator-generated alerts
+            // by `metadata.userid` starting with the sim-attack- prefix.
+            // Real attackers have no reason to set this to our test prefix.
+            userid: params.userid,
           },
         });
       }

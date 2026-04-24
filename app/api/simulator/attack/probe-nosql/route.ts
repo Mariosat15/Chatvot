@@ -61,6 +61,12 @@ export async function POST(req: NextRequest) {
       break;
   }
 
+  // Capture a pre-call timestamp. After signInWithEmail runs, any
+  // `nosql_injection_attempt` alert recorded after this instant is one we
+  // just caused — we tag it so cleanup can reliably remove it without
+  // deleting real production alerts that happen to be contemporaneous.
+  const probeStartedAt = new Date();
+
   try {
     // Bypass TS to simulate what a crafted Server Action payload could send.
     const result = await signInWithEmail({
@@ -73,6 +79,28 @@ export async function POST(req: NextRequest) {
       typeof result === "object" &&
       "success" in result &&
       (result as { success?: boolean }).success === false;
+
+    // Best-effort: tag the alert(s) we just produced so cleanup is idempotent
+    // and reliable. We do not await failures — the test result stands
+    // regardless. Reason: a simulator probe must never fail the scenario just
+    // because a cleanup-marker write hiccuped.
+    try {
+      const { connectToDatabase } = await import("@/database/mongoose");
+      const mongoose = await connectToDatabase();
+      const coll = mongoose.connection.db?.collection("securityalerts");
+      if (coll) {
+        await coll.updateMany(
+          {
+            alertType: "nosql_injection_attempt",
+            source: "signInWithEmail",
+            createdAt: { $gte: probeStartedAt },
+          },
+          { $set: { "metadata.simulator": true } },
+        );
+      }
+    } catch (tagErr) {
+      console.warn("probe-nosql: failed to tag simulator alerts:", tagErr);
+    }
 
     return NextResponse.json({
       success: true,
