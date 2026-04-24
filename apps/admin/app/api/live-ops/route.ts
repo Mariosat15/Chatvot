@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
+import { ObjectId } from "mongodb";
 import { connectToDatabase } from "@/database/mongoose";
 import { requireAdminAuth } from "@/lib/admin/auth";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
@@ -32,7 +33,8 @@ const PRESENCE_WINDOW_MS = 2 * 60 * 1000; // 2 minutes
 
 interface UserLookupDoc {
   id?: string;
-  _id?: unknown;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- _id is ObjectId | string
+  _id?: any;
   name?: string;
   email?: string;
   image?: string;
@@ -40,6 +42,16 @@ interface UserLookupDoc {
 
 type UserLookupMap = Map<string, { name?: string; email?: string; image?: string }>;
 
+/**
+ * Look up the `user` collection for display names/emails.
+ *
+ * Reason: Better Auth stores the primary key as `_id` (ObjectId) but also
+ * surfaces it as a string `id` field; different code paths have written
+ * user references using one or the other. To match every transaction we
+ * search under BOTH `id: <string>` and `_id: <ObjectId>` (and string `_id`
+ * as a safety net), mirroring the `buildUserQuery` pattern used elsewhere
+ * in the admin codebase.
+ */
 async function loadUserLookup(userIds: string[]): Promise<UserLookupMap> {
   const map: UserLookupMap = new Map();
   if (userIds.length === 0) return map;
@@ -48,17 +60,34 @@ async function loadUserLookup(userIds: string[]): Promise<UserLookupMap> {
   if (!db) return map;
 
   const uniq = Array.from(new Set(userIds.filter(Boolean)));
+  const asObjectIds: ObjectId[] = [];
+  for (const id of uniq) {
+    if (ObjectId.isValid(id)) {
+      asObjectIds.push(new ObjectId(id));
+    }
+  }
+
+  const orClauses: Record<string, unknown>[] = [
+    { id: { $in: uniq } },
+    { _id: { $in: uniq } },
+  ];
+  if (asObjectIds.length > 0) {
+    orClauses.push({ _id: { $in: asObjectIds } });
+  }
+
   const users = await db
     .collection<UserLookupDoc>("user")
     .find(
-      { id: { $in: uniq } },
-      { projection: { id: 1, name: 1, email: 1, image: 1 } },
+      { $or: orClauses },
+      { projection: { id: 1, _id: 1, name: 1, email: 1, image: 1 } },
     )
     .toArray();
 
   for (const u of users) {
-    if (u.id) {
-      map.set(u.id, { name: u.name, email: u.email, image: u.image });
+    const info = { name: u.name, email: u.email, image: u.image };
+    if (u.id) map.set(u.id, info);
+    if (u._id !== undefined && u._id !== null) {
+      map.set(String(u._id), info);
     }
   }
   return map;
