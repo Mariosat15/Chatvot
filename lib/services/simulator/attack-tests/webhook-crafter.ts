@@ -39,6 +39,9 @@ export interface CraftDmnOptions {
   status: "APPROVED" | "DECLINED" | "ERROR";
   errCode?: number;
   signatureMode: SignatureMode;
+  // "Sale" (default), "Chargeback", "Reversal", etc. Enables the chargeback
+  // scenario to exercise the chargeback branch of the Nuvei webhook.
+  transactionType?: string;
   // Optional override; normally resolved from DB/env at runtime.
   secretKeyOverride?: string;
 }
@@ -113,7 +116,7 @@ export async function craftNuveiDmn(
     currency: opts.currency ?? "EUR",
     totalAmount: opts.amount.toFixed(2),
     amount: opts.amount.toFixed(2),
-    transactionType: "Sale",
+    transactionType: opts.transactionType ?? "Sale",
     responseTimeStamp,
     productId: "",
     // Synthetic card fields so the fraud-fingerprint branch is exercised.

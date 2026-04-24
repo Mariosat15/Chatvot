@@ -30,12 +30,13 @@ export interface IWalletTransaction extends Document {
   balanceAfter: number; // Balance after transaction
   currency: string; // EUR, USD, etc.
   exchangeRate: number; // Exchange rate (1 credit = X EUR)
-  status: "pending" | "completed" | "failed" | "cancelled";
+  status: "pending" | "completed" | "failed" | "cancelled" | "disputed";
   paymentMethod?: string; // stripe, paypal, bank_transfer
   paymentId?: string; // Stripe payment ID, etc.
   paymentIntentId?: string; // Stripe Payment Intent ID (for fraud detection)
   competitionId?: string; // If related to competition
   description: string; // Transaction description
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- free-form PSP metadata blob
   metadata?: Record<string, any>; // Additional data
   failureReason?: string; // If failed
   processedAt?: Date; // When transaction was processed
@@ -103,7 +104,7 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
     status: {
       type: String,
       required: true,
-      enum: ["pending", "completed", "failed", "cancelled"],
+      enum: ["pending", "completed", "failed", "cancelled", "disputed"],
       default: "pending",
     },
     paymentMethod: {

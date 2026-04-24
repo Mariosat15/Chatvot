@@ -86,6 +86,10 @@ export async function POST(req: NextRequest) {
     walletsDeleted: 0,
     transactionsDeleted: 0,
     declineKeysCleared: 0,
+    restrictionsDeleted: 0,
+    securityAlertsDeleted: 0,
+    lockoutsDeleted: 0,
+    fraudAlertsDeleted: 0,
   };
 
   // Clear decline state FIRST (user + ip namespaces) so even if DB deletes fail
@@ -143,6 +147,54 @@ export async function POST(req: NextRequest) {
       summary.walletsDeleted += walletRes.deletedCount ?? 0;
     } catch (err) {
       console.error("wallet cleanup failed:", err);
+    }
+
+    // UserRestrictions created by the chargeback scenario
+    try {
+      const restrRes = await db
+        .collection("userrestrictions")
+        .deleteMany({ userId: { $in: targetUserIds } });
+      summary.restrictionsDeleted += restrRes.deletedCount ?? 0;
+    } catch (err) {
+      console.error("restriction cleanup failed:", err);
+    }
+
+    // SecurityAlerts scoped to sim-attack users
+    try {
+      const alertRes = await db
+        .collection("securityalerts")
+        .deleteMany({ userId: { $in: targetUserIds } });
+      summary.securityAlertsDeleted += alertRes.deletedCount ?? 0;
+    } catch (err) {
+      console.error("security-alert cleanup failed:", err);
+    }
+
+    // AccountLockouts created by the ATO scenario
+    try {
+      const lockoutRes = await db.collection("accountlockouts").deleteMany({
+        $or: [
+          { userId: { $in: targetUserIds } },
+          // The ATO scenario uses sim-attack-*@test.simulator emails
+          { email: { $regex: `^${ATTACK_USER_PREFIX}` } },
+        ],
+      });
+      summary.lockoutsDeleted += lockoutRes.deletedCount ?? 0;
+    } catch (err) {
+      console.error("lockout cleanup failed:", err);
+    }
+
+    // FraudAlerts created by recordFailedLogin
+    try {
+      const fraudRes = await db.collection("fraudalerts").deleteMany({
+        $or: [
+          { primaryUserId: { $in: targetUserIds } },
+          { suspiciousUserIds: { $in: targetUserIds } },
+          { primaryUserId: { $regex: `^${ATTACK_USER_PREFIX}` } },
+        ],
+      });
+      summary.fraudAlertsDeleted += fraudRes.deletedCount ?? 0;
+    } catch (err) {
+      console.error("fraud-alert cleanup failed:", err);
     }
 
     try {

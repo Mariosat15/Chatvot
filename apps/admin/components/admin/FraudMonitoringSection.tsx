@@ -57,7 +57,8 @@ import SuspicionScoreCard from "@/components/admin/fraud/SuspicionScoreCard";
 import FraudAlertDetailTabs from "@/components/admin/fraud/FraudAlertDetailTabs";
 import FraudHistorySection from "@/components/admin/FraudHistorySection";
 import ManualCheckResultPanel from "@/components/admin/fraud/ManualCheckResultPanel";
-import { History } from "lucide-react";
+import SecurityAlertsCard from "@/components/admin/SecurityAlertsCard";
+import { History, ShieldAlert } from "lucide-react";
 import {
   computeAlertTitle,
   computeAlertDescription,
@@ -1007,6 +1008,13 @@ export default function FraudMonitoringSection() {
             <History className="h-4 w-4 mr-2" />
             History
           </TabsTrigger>
+          <TabsTrigger
+            value="security-alerts"
+            className="data-[state=active]:bg-gray-700"
+          >
+            <ShieldAlert className="h-4 w-4 mr-2" />
+            Security Alerts
+          </TabsTrigger>
         </TabsList>
 
         {/* Alerts Tab */}
@@ -1730,6 +1738,11 @@ export default function FraudMonitoringSection() {
         {/* History Tab */}
         <TabsContent value="history" className="space-y-4">
           <FraudHistorySection />
+        </TabsContent>
+
+        {/* Security Alerts Tab */}
+        <TabsContent value="security-alerts" className="space-y-4">
+          <SecurityAlertsCard />
         </TabsContent>
       </Tabs>
 

@@ -20,6 +20,8 @@ import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import PaymentProvider from "@/database/models/payment-provider.model";
 import { PaymentFraudService } from "@/lib/services/fraud/payment-fraud.service";
 import { recordDecline, clearDeclines } from "@/lib/utils/rate-limiter";
+import { reportWebhookSignatureFailure } from "@/lib/services/security/webhook-signature-failure";
+import { recordSecurityAlert } from "@/lib/services/security/security-alert.service";
 import crypto from "crypto";
 
 interface NuveiDmnParams {
@@ -286,21 +288,26 @@ export async function POST(req: NextRequest) {
       console.warn("⚠️ Proceeding without signature verification");
     }
 
-    // SECURITY: Verify DMN signature to prevent forged webhooks
-    // This is CRITICAL for production - never disable this!
+    // SECURITY: Verify DMN signature to prevent forged webhooks.
+    // This is CRITICAL for production - never disable this.
+    // Reason: return HTTP 401 (not 200) on failure so forged requests are
+    // distinguishable in logs/alerting and PSPs treat them as terminal.
+    // Failed requests persist a SecurityAlert for admin review.
     if (secretKey) {
       const isValidSignature = verifyDmnSignature(params, secretKey);
       if (!isValidSignature) {
-        console.error(
-          "🚨 SECURITY: DMN signature verification FAILED - possible forged webhook",
-        );
-        // In production, reject invalid signatures immediately
-        // The signature check logs details for debugging
-        // Don't process the DMN but return OK to prevent Nuvei retries
-        return NextResponse.json({
-          status: "OK",
-          message: "Signature verification failed",
-          warning: "This request will not be processed",
+        return await reportWebhookSignatureFailure({
+          provider: "nuvei",
+          source: "/api/nuvei/webhook",
+          request: req,
+          reason: "Nuvei DMN advanceResponseChecksum mismatch",
+          metadata: {
+            pppTransactionId: params.PPP_TransactionID,
+            providedChecksum: params.advanceResponseChecksum,
+            transactionType: params.transactionType,
+            status: params.Status,
+            merchantUniqueId: params.merchant_unique_id,
+          },
         });
       }
     } else {
@@ -308,6 +315,85 @@ export async function POST(req: NextRequest) {
       console.warn(
         "⚠️ SECURITY WARNING: Processing DMN without signature verification (no secret key)",
       );
+    }
+
+    // SECURITY: Detect chargeback DMNs BEFORE regular deposit/withdrawal
+    // processing. Nuvei sends chargebacks with transactionType indicating
+    // "Chargeback" or "Reversal". When detected, we restrict the user
+    // immediately and mark the original transaction as disputed.
+    // Reason: chargebacks indicate the cardholder successfully disputed the
+    // payment with their bank — proven fraud or unauthorized use. Trading on
+    // clawed-back funds would compound losses, so we block all actions.
+    const rawTxType = (params.transactionType || "").toLowerCase();
+    if (
+      rawTxType === "chargeback" ||
+      rawTxType === "reversal" ||
+      rawTxType.includes("chargeback")
+    ) {
+      const { handleChargeback } = await import(
+        "@/lib/services/security/chargeback-handler"
+      );
+
+      // Resolve the original transaction (same lookup logic as below)
+      const cbClientUniqueId =
+        params.clientUniqueId || params.merchant_unique_id;
+      let cbTx = null;
+      if (cbClientUniqueId?.startsWith("txn_")) {
+        cbTx = await WalletTransaction.findById(
+          cbClientUniqueId.replace("txn_", ""),
+        );
+      }
+      if (!cbTx) {
+        cbTx = await WalletTransaction.findOne({
+          "metadata.clientUniqueId": cbClientUniqueId,
+          provider: "nuvei",
+        });
+      }
+
+      const chargebackUserId = cbTx?.userId ?? params.userid;
+      if (!chargebackUserId) {
+        console.error(
+          "🚨 Chargeback DMN received but user could not be resolved",
+          { clientUniqueId: cbClientUniqueId },
+        );
+        // Still 200 OK to Nuvei — alert persisted so ops can reconcile.
+        await recordSecurityAlert({
+          alertType: "chargeback_received",
+          severity: "critical",
+          source: "/api/nuvei/webhook",
+          provider: "nuvei",
+          reason: "Chargeback received but user could not be resolved",
+          metadata: {
+            clientUniqueId: cbClientUniqueId,
+            pppTransactionId: params.PPP_TransactionID,
+            transactionType: params.transactionType,
+          },
+        });
+        return NextResponse.json({
+          status: "OK",
+          message: "Chargeback acknowledged — user not resolved",
+        });
+      }
+
+      const cbResult = await handleChargeback({
+        provider: "nuvei",
+        userId: chargebackUserId,
+        transactionId: cbTx?._id?.toString(),
+        amount: parseFloat(params.totalAmount || params.amount || "0") || 0,
+        providerTransactionId: params.PPP_TransactionID,
+        chargebackCaseId: params.PPP_TransactionID,
+        reasonCode: params.Reason || params.ReasonCode,
+      });
+
+      console.log(
+        `🚨 Chargeback handled for user ${chargebackUserId}: restrictionId=${cbResult.restrictionId} alertId=${cbResult.securityAlertId}`,
+      );
+
+      return NextResponse.json({
+        status: "OK",
+        message: "Chargeback acknowledged",
+        restricted: !!cbResult.restrictionId,
+      });
     }
 
     // Extract transaction details

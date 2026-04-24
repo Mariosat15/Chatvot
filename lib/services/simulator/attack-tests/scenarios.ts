@@ -494,24 +494,30 @@ export const scenarioHmacRejection: AttackScenario = async (ctx) => {
       id,
     );
 
+    // Reason: the Nuvei webhook now returns HTTP 401 on signature failure
+    // (previously 200) so forged requests are distinguishable in logs/alerting
+    // and PSPs treat them as terminal. A SecurityAlert is also persisted.
     result.assertions.push({
-      label: "Webhook HTTP status is 200 (does NOT retry)",
-      passed: status === 200,
+      label: "Webhook HTTP status is 401 (Unauthorized)",
+      passed: status === 401,
       detail: `status=${status}`,
     });
+    const bodyError =
+      typeof bodyObj.error === "string" ? (bodyObj.error as string) : "";
     result.assertions.push({
-      label: "Response message indicates signature failure",
+      label: "Response body indicates unauthorized / forged request",
       passed:
+        /unauthorized/i.test(bodyError) ||
         /signature verification failed/i.test(message) ||
         /signature verification failed/i.test(text) ||
         /will not be processed/i.test(warning),
-      detail: `message="${message}" warning="${warning}"`,
+      detail: `status=${status} error="${bodyError}" message="${message}"`,
     });
 
     const pass = result.assertions.every((a) => a.passed);
     result.verdict = pass
-      ? "PASS (forged webhook rejected without wallet impact)"
-      : "FAIL (forged webhook was NOT rejected — investigate HMAC path)";
+      ? "PASS (forged webhook rejected with HTTP 401 and no wallet impact)"
+      : "FAIL (forged webhook was NOT rejected with 401 — investigate HMAC path)";
   } catch (err) {
     result.status = "failed";
     result.errorMessage =
@@ -651,6 +657,307 @@ function extractMessage(body: unknown, text: string): string {
   return text;
 }
 
+// ─── scenario 7: ATO brute-force login rate-limit ────────────────────────────
+
+export const scenarioAtoBruteForce: AttackScenario = async (ctx) => {
+  const id = "s7_ato_brute_force";
+  const result = newScenarioResult(
+    id,
+    "ATO brute-force login lockout",
+    "Record failed logins for a sim-attack email. The account must be locked and validateLogin must deny further attempts.",
+  );
+
+  try {
+    // Ensure we start from a clean state (no prior lockout / fraud alert)
+    const email = `sim-attack-ato-${Date.now()}-${Math.floor(Math.random() * 1000)}@test.simulator`;
+    // Register the username part for cleanup sweep (prefix-scoped)
+    ctx.registerTestUser(email.split("@")[0]);
+    await ctx.log("info", `ATO target email: ${email}`, id);
+
+    await callAttack(ctx, "/api/simulator/attack/simulate-login", {
+      method: "POST",
+      body: JSON.stringify({ action: "clear", email }),
+    });
+
+    // Probe BEFORE: user should be allowed.
+    const { data: before } = await callAttack<{
+      success: boolean;
+      allowed: boolean;
+      code?: string;
+    }>(ctx, "/api/simulator/attack/simulate-login", {
+      method: "POST",
+      body: JSON.stringify({ action: "probe", email }),
+    });
+    await ctx.log(
+      "info",
+      `Pre-flood probe: allowed=${before.allowed} code=${before.code ?? "-"}`,
+      id,
+    );
+    result.assertions.push({
+      label: "Fresh email is initially allowed to log in",
+      passed: before.allowed === true,
+      detail: `allowed=${before.allowed}`,
+    });
+
+    // Record 10 failed attempts (default lockout threshold is ≤10 in fraud-settings).
+    const { data: rec } = await callAttack<{
+      success: boolean;
+      events: Array<{
+        attempt: number;
+        locked: boolean;
+        remainingAttempts: number;
+      }>;
+    }>(ctx, "/api/simulator/attack/simulate-login", {
+      method: "POST",
+      body: JSON.stringify({ action: "record-failures", email, count: 10 }),
+    });
+    const firstLockIdx = rec.events.findIndex((e) => e.locked);
+    await ctx.log(
+      "info",
+      `Recorded ${rec.events.length} failures; first lockout event at attempt #${firstLockIdx + 1}`,
+      id,
+    );
+
+    result.assertions.push({
+      label: "Repeated failures trigger a lockout event",
+      passed: firstLockIdx >= 0,
+      detail: `firstLockIdx=${firstLockIdx}`,
+    });
+
+    // Probe AFTER: user must be blocked.
+    const { data: after } = await callAttack<{
+      success: boolean;
+      allowed: boolean;
+      code?: string;
+    }>(ctx, "/api/simulator/attack/simulate-login", {
+      method: "POST",
+      body: JSON.stringify({ action: "probe", email }),
+    });
+    await ctx.log(
+      "info",
+      `Post-flood probe: allowed=${after.allowed} code=${after.code ?? "-"}`,
+      id,
+    );
+    result.assertions.push({
+      label: "validateLogin denies login after threshold",
+      passed: after.allowed === false,
+      detail: `allowed=${after.allowed} code=${after.code}`,
+    });
+
+    // Idempotent cleanup — not strictly required since runner cleanup handles
+    // it, but leaves a tidier state if the scenario is run in isolation.
+    await callAttack(ctx, "/api/simulator/attack/simulate-login", {
+      method: "POST",
+      body: JSON.stringify({ action: "clear", email }),
+    });
+
+    const pass = result.assertions.every((a) => a.passed);
+    result.verdict = pass
+      ? "PASS (brute-force flood locks the account as expected)"
+      : "FAIL (ATO defense did not lock the account after repeated failures)";
+  } catch (err) {
+    result.status = "failed";
+    result.errorMessage =
+      err instanceof Error ? err.message : "scenario threw unexpectedly";
+    await ctx.log("error", `Scenario ${id} crashed: ${result.errorMessage}`, id);
+  }
+
+  return finalize(result);
+};
+
+// ─── scenario 8: chargeback → user restriction ───────────────────────────────
+
+export const scenarioChargebackRestriction: AttackScenario = async (ctx) => {
+  const id = "s8_chargeback_restriction";
+  const result = newScenarioResult(
+    id,
+    "Chargeback → automatic user restriction",
+    "Send a signed Nuvei DMN with transactionType=Chargeback. The user must be banned from all actions and a SecurityAlert must be recorded.",
+  );
+
+  try {
+    const secret = await resolveNuveiSecret();
+    if (!secret) {
+      result.status = "skipped";
+      result.verdict =
+        "SKIP (Nuvei secret not configured — cannot post a valid-signature chargeback DMN)";
+      await ctx.log(
+        "warn",
+        "Skipping chargeback test — Nuvei secret missing",
+        id,
+      );
+      return finalize(result);
+    }
+
+    const userId = await setupTestUser(ctx);
+
+    // Create a completed deposit tx so the chargeback handler can find it
+    // and mark it disputed.
+    const { status: setupStatus, data: setupData } = await callAttack<{
+      success: boolean;
+      transactionId?: string;
+      pppTransactionId?: string;
+      clientUniqueId?: string;
+      error?: string;
+    }>(ctx, "/api/simulator/attack/setup", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "create-completed-tx",
+        userId,
+        amount: 25,
+      }),
+    });
+    if (
+      setupStatus !== 200 ||
+      !setupData.success ||
+      !setupData.transactionId ||
+      !setupData.pppTransactionId ||
+      !setupData.clientUniqueId
+    ) {
+      throw new Error(
+        `setup create-completed-tx failed: ${setupStatus} ${setupData.error ?? ""}`,
+      );
+    }
+    ctx.registerTransaction(setupData.transactionId);
+
+    const crafted = await craftNuveiDmn({
+      pppTransactionId: setupData.pppTransactionId,
+      clientUniqueId: setupData.clientUniqueId,
+      userId,
+      amount: 25,
+      status: "APPROVED",
+      signatureMode: "valid",
+      transactionType: "Chargeback",
+    });
+
+    await ctx.log(
+      "info",
+      `Posting signed chargeback DMN for user ${userId}`,
+      id,
+    );
+
+    const r = await postCraftedDmn(ctx.baseUrl, crafted);
+    await ctx.log(
+      "info",
+      `Chargeback webhook response: status=${r.status} body=${r.text.slice(0, 140)}`,
+      id,
+    );
+
+    result.assertions.push({
+      label: "Webhook acknowledges chargeback (HTTP 200)",
+      passed: r.status === 200,
+      detail: `status=${r.status}`,
+    });
+
+    // Allow a small settle window for the restriction write.
+    await new Promise((res) => setTimeout(res, 250));
+
+    const { data: restr } = await callAttack<{
+      success: boolean;
+      restricted: boolean;
+      restrictionType?: string;
+      reason?: string;
+      canTrade?: boolean;
+      canDeposit?: boolean;
+      canWithdraw?: boolean;
+      canEnterCompetitions?: boolean;
+    }>(
+      ctx,
+      `/api/simulator/attack/check-user-restriction?userId=${encodeURIComponent(userId)}`,
+      { method: "GET" },
+    );
+
+    result.assertions.push({
+      label: "UserRestriction exists after chargeback",
+      passed: restr.restricted === true,
+      detail: `restricted=${restr.restricted}`,
+    });
+    result.assertions.push({
+      label: "Restriction blocks all actions",
+      passed:
+        restr.canTrade === false &&
+        restr.canDeposit === false &&
+        restr.canWithdraw === false &&
+        restr.canEnterCompetitions === false,
+      detail: `trade=${restr.canTrade} deposit=${restr.canDeposit} withdraw=${restr.canWithdraw} compete=${restr.canEnterCompetitions}`,
+    });
+    result.assertions.push({
+      label: "Reason is payment_fraud",
+      passed: restr.reason === "payment_fraud",
+      detail: `reason=${restr.reason}`,
+    });
+
+    const pass = result.assertions.every((a) => a.passed);
+    result.verdict = pass
+      ? "PASS (chargeback triggered a full UserRestriction and SecurityAlert)"
+      : "FAIL (chargeback did NOT fully restrict the user — check Nuvei webhook chargeback branch)";
+  } catch (err) {
+    result.status = "failed";
+    result.errorMessage =
+      err instanceof Error ? err.message : "scenario threw unexpectedly";
+    await ctx.log("error", `Scenario ${id} crashed: ${result.errorMessage}`, id);
+  }
+
+  return finalize(result);
+};
+
+// ─── scenario 9: NoSQL injection on login ────────────────────────────────────
+
+export const scenarioNosqlInjection: AttackScenario = async (ctx) => {
+  const id = "s9_nosql_injection_login";
+  const result = newScenarioResult(
+    id,
+    "NoSQL injection guard on login",
+    "Invoke signInWithEmail with non-string credentials (Mongo query operators). Guard must reject with success=false.",
+  );
+
+  try {
+    const modes = [
+      "object-email-gt",
+      "object-email-ne",
+      "array-email",
+      "object-password",
+    ] as const;
+
+    for (const mode of modes) {
+      const { data } = await callAttack<{
+        success: boolean;
+        rejected: boolean;
+        threw?: boolean;
+        result?: { success?: boolean; error?: string };
+      }>(ctx, "/api/simulator/attack/probe-nosql", {
+        method: "POST",
+        body: JSON.stringify({ mode }),
+      });
+
+      const rejected = data.rejected === true;
+      await ctx.log(
+        "info",
+        `mode=${mode} rejected=${rejected} threw=${data.threw ?? false}`,
+        id,
+      );
+
+      result.assertions.push({
+        label: `Crafted payload (${mode}) is rejected without session`,
+        passed: rejected,
+        detail: JSON.stringify(data.result ?? { threw: data.threw }),
+      });
+    }
+
+    const pass = result.assertions.every((a) => a.passed);
+    result.verdict = pass
+      ? "PASS (all NoSQL-style payloads rejected by the type guard)"
+      : "FAIL (at least one crafted payload was accepted — tighten signInWithEmail guard)";
+  } catch (err) {
+    result.status = "failed";
+    result.errorMessage =
+      err instanceof Error ? err.message : "scenario threw unexpectedly";
+    await ctx.log("error", `Scenario ${id} crashed: ${result.errorMessage}`, id);
+  }
+
+  return finalize(result);
+};
+
 // Ordered export — scenario 4 depends on having cleared state from earlier
 // scenarios, which is why we always clear at its start. Scenarios can run in
 // sequence; isolation per test user keeps them independent.
@@ -661,4 +968,7 @@ export const ALL_SCENARIOS: AttackScenario[] = [
   scenarioBlockRecovery,
   scenarioHmacRejection,
   scenarioReplayIdempotency,
+  scenarioAtoBruteForce,
+  scenarioChargebackRestriction,
+  scenarioNosqlInjection,
 ];

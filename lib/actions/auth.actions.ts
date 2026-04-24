@@ -405,6 +405,35 @@ export const signUpWithEmail = async ({
 
 export const signInWithEmail = async ({ email, password }: SignInFormData) => {
   try {
+    // SECURITY: Reject non-string credentials. Server Actions serialize only
+    // JSON-compatible values, so a crafted client can send `{email: {$gt: ""}}`
+    // which Mongo would interpret as a query operator — classic NoSQL
+    // injection. Reject anything that isn't a plain string before we touch
+    // the database.
+    // Reason: a generic "Invalid credentials" message avoids leaking that
+    // the check rejected a type rather than a wrong password.
+    if (typeof email !== "string" || typeof password !== "string") {
+      // Best-effort security alert — imported lazily to avoid circular deps.
+      try {
+        const { recordSecurityAlert } = await import(
+          "@/lib/services/security/security-alert.service"
+        );
+        await recordSecurityAlert({
+          alertType: "nosql_injection_attempt",
+          severity: "high",
+          source: "signInWithEmail",
+          reason: "Non-string credential rejected at login",
+          metadata: {
+            emailType: typeof email,
+            passwordType: typeof password,
+          },
+        });
+      } catch {
+        // Non-blocking — the rejection itself is the primary defense.
+      }
+      return { success: false, error: "Invalid credentials." };
+    }
+
     const ip = await getClientIP();
 
     // SECURITY: Check login rate limiting and account lockout
