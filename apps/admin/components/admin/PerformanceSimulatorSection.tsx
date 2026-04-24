@@ -14,13 +14,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
@@ -39,27 +32,24 @@ import {
   Trash2,
   Brain,
   Cpu,
-  HardDrive,
   Users,
   Trophy,
-  Swords,
   TrendingUp,
   Zap,
   Activity,
   Database,
   AlertTriangle,
   Info,
-  Download,
   Sparkles,
   Target,
   Wallet,
-  ArrowDownToLine,
   MemoryStick,
   Timer,
   Loader2,
   Award,
   Flag,
   FlaskConical,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import EndLogicTestsTab from "./EndLogicTestsTab";
@@ -68,9 +58,8 @@ import DatabaseIndexesTab from "./DatabaseIndexesTab";
 import BadgeSimulatorTab from "./BadgeSimulatorTab";
 import MilestoneSimulatorTab from "./MilestoneSimulatorTab";
 import UnitTestsTab from "./UnitTestsTab";
+import AttackSuitePanel from "./AttackSuitePanel";
 import {
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -253,8 +242,6 @@ interface SimulatorRun {
   createdAt: string;
 }
 
-const COLORS = ["#10b981", "#f59e0b", "#ef4444", "#6366f1", "#8b5cf6"];
-
 export default function PerformanceSimulatorSection() {
   const [activeTab, setActiveTab] = useState("config");
   const [config, setConfig] = useState<SimulatorConfig | null>(null);
@@ -272,12 +259,14 @@ export default function PerformanceSimulatorSection() {
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Fetch config on mount
+  /* eslint-disable react-hooks/exhaustive-deps -- run-once on mount; dependencies are stable in-component functions */
   useEffect(() => {
     fetchConfig();
     fetchRuns();
     checkRunningStatus();
     fetchCleanupData();
   }, []);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Fetch cleanup data counts
   const fetchCleanupData = async () => {
@@ -616,6 +605,7 @@ export default function PerformanceSimulatorSection() {
 
   const applyPreset = (preset: "small" | "medium" | "large") => {
     if (!config) return;
+    // eslint-disable-next-line security/detect-object-injection -- preset is typed as a fixed union of literals
     const presetConfig = config.presets[preset];
     setConfig({
       ...config,
@@ -886,6 +876,13 @@ export default function PerformanceSimulatorSection() {
             <FlaskConical className="h-4 w-4 mr-2" />
             Unit Tests
           </TabsTrigger>
+          <TabsTrigger
+            value="attack-suite"
+            className="data-[state=active]:bg-gray-700"
+          >
+            <ShieldCheck className="h-4 w-4 mr-2" />
+            Attack Suite
+          </TabsTrigger>
         </TabsList>
 
         {/* Configuration Tab */}
@@ -902,39 +899,44 @@ export default function PerformanceSimulatorSection() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-3 gap-4">
-                    {(["small", "medium", "large"] as const).map((preset) => (
-                      <button
-                        key={preset}
-                        onClick={() => applyPreset(preset)}
-                        className={cn(
-                          "p-4 rounded-xl border-2 transition-all text-left",
-                          config.scale === preset
-                            ? "border-cyan-500 bg-cyan-500/10"
-                            : "border-gray-700 bg-gray-800/30 hover:border-gray-600",
-                        )}
-                      >
-                        <p className="font-semibold text-white capitalize mb-2">
-                          {preset}
-                        </p>
-                        <div className="text-xs text-gray-400 space-y-1">
-                          <p>
-                            👥 {config.presets[preset].users.toLocaleString()}{" "}
-                            users
+                    {(["small", "medium", "large"] as const).map((preset) => {
+                      // eslint-disable-next-line security/detect-object-injection -- preset is typed as a fixed union of literals
+                      const p = config.presets[preset];
+                      return (
+                        <button
+                          key={preset}
+                          onClick={() => applyPreset(preset)}
+                          className={cn(
+                            "p-4 rounded-xl border-2 transition-all text-left",
+                            config.scale === preset
+                              ? "border-cyan-500 bg-cyan-500/10"
+                              : "border-gray-700 bg-gray-800/30 hover:border-gray-600",
+                          )}
+                        >
+                          <p className="font-semibold text-white capitalize mb-2">
+                            {preset}
                           </p>
-                          <p>
-                            🏆 {config.presets[preset].competitions}{" "}
-                            competitions
-                          </p>
-                          <p>
-                            ⚔️ {config.presets[preset].challenges} challenges
-                          </p>
-                          <p>
-                            📊 {config.presets[preset].trades.toLocaleString()}{" "}
-                            trades
-                          </p>
-                        </div>
-                      </button>
-                    ))}
+                          <div className="text-xs text-gray-400 space-y-1">
+                            <p>
+                              {"\u{1F465} "}
+                              {p.users.toLocaleString()} users
+                            </p>
+                            <p>
+                              {"\u{1F3C6} "}
+                              {p.competitions} competitions
+                            </p>
+                            <p>
+                              {"\u2694\uFE0F "}
+                              {p.challenges} challenges
+                            </p>
+                            <p>
+                              {"\u{1F4CA} "}
+                              {p.trades.toLocaleString()} trades
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -2353,7 +2355,7 @@ export default function PerformanceSimulatorSection() {
                         AI Analysis not generated yet
                       </p>
                       <p className="text-sm text-gray-500 mt-1">
-                        Click "Generate Report" to get AI-powered insights
+                        Click &quot;Generate Report&quot; to get AI-powered insights
                       </p>
                       <Button
                         onClick={() => runAIAnalysis(currentRun._id)}
@@ -3069,6 +3071,11 @@ export default function PerformanceSimulatorSection() {
         {/* Unit Tests Tab */}
         <TabsContent value="unit-tests">
           <UnitTestsTab />
+        </TabsContent>
+
+        {/* Card-Testing Attack Suite Tab */}
+        <TabsContent value="attack-suite">
+          <AttackSuitePanel />
         </TabsContent>
       </Tabs>
     </div>

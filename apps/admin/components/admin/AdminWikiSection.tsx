@@ -1629,6 +1629,76 @@ export default function AdminWikiSection() {
             </CardContent>
           </Card>
 
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-gray-300">
+                How to verify these defenses
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-300 space-y-2">
+              <p>
+                Open the <strong>Performance Simulator</strong> section and
+                switch to the <strong>Attack Suite</strong> tab. The{" "}
+                <em>Run Attack Suite</em> button fires six scenarios that probe
+                the defenses described above — all without entering a single
+                card number (PCI SAQ A preserved):
+              </p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>
+                  <strong>Per-user flood</strong> — 20 deposit attempts as one
+                  test user; must be blocked after #5.
+                </li>
+                <li>
+                  <strong>Per-IP flood</strong> — 25 attempts from one IP across
+                  12 users; must be blocked after #10.
+                </li>
+                <li>
+                  <strong>Decline velocity</strong> — 3 synthetic declines must
+                  trip a 1-hour block.
+                </li>
+                <li>
+                  <strong>Block recovery</strong> — a successful payment must
+                  reset the counter so legitimate users aren&apos;t stuck.
+                </li>
+                <li>
+                  <strong>HMAC rejection</strong> — a forged Nuvei webhook with
+                  an invalid checksum must be rejected and credit nothing.
+                </li>
+                <li>
+                  <strong>Replay idempotency</strong> — the same webhook sent
+                  twice must land on the &quot;already processed&quot; branch.
+                </li>
+              </ol>
+              <p className="pt-1">
+                Each scenario returns a <strong>PASS / FAIL / SKIP</strong>{" "}
+                verdict with explicit assertions and a live timeline of events.
+                Runs self-clean via a <code>try/finally</code> block: every
+                test user, wallet, transaction, and Redis key created during
+                the run is removed. The orange &quot;Wipe Test Data&quot;
+                button is available for emergency cleanup after a crashed run.
+              </p>
+              <p>
+                <strong>Access control:</strong> the attack endpoints live
+                behind seven independent layers (env flag, shared secret,
+                loopback-only, <code>sim-attack-*</code> user prefix, self
+                rate-limit, admin auth on kickoff, audit log). To enable, set{" "}
+                <code>SIMULATOR_ATTACK_TESTS_ENABLED=true</code> and{" "}
+                <code>SIMULATOR_ATTACK_SECRET</code> (generate with{" "}
+                <code>openssl rand -hex 32</code>) in the environment. Every
+                admin-initiated run is recorded with{" "}
+                <code>auditLogService</code> under the{" "}
+                <strong>security</strong> category.
+              </p>
+              <p className="text-gray-400">
+                Re-run this suite whenever you change anything in{" "}
+                <code>lib/utils/rate-limiter.ts</code>,{" "}
+                <code>app/api/nuvei/webhook/route.ts</code>, or any new
+                payment provider you wire up — it doubles as a regression
+                test for the entire card-testing defense layer.
+              </p>
+            </CardContent>
+          </Card>
+
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
             <p className="text-sm text-yellow-200">
               <strong>Adding a new payment provider?</strong> Make sure the
