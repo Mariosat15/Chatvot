@@ -31,10 +31,7 @@ import {
   Code,
   FileText,
   TrendingUp,
-  Lock,
-  Unlock,
   Eye,
-  EyeOff,
   Globe,
   Cpu,
   Server,
@@ -52,8 +49,6 @@ import {
   Wallet,
   PieChart,
   Download,
-  Filter,
-  Calendar,
   Radio,
   Wifi,
   HardDrive,
@@ -63,15 +58,11 @@ import {
   Timer,
   Trash2,
   Play,
-  Pause,
-  RefreshCcw,
   LineChart,
   CandlestickChart,
   HeartPulse,
   FileWarning,
   ShieldAlert,
-  Gift,
-  Scale,
   Camera,
 } from "lucide-react";
 
@@ -253,15 +244,15 @@ export default function AdminWikiSection() {
                 <div className="space-y-1 text-sm">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>"Weekend Warriors Trading Challenge"</span>
+                    <span>&quot;Weekend Warriors Trading Challenge&quot;</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span>"€10K Prize Pool - Forex Masters"</span>
+                    <span>&quot;€10K Prize Pool - Forex Masters&quot;</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <XCircle className="h-4 w-4 text-red-500" />
-                    <span>"comp1" (too generic)</span>
+                    <span>&quot;comp1&quot; (too generic)</span>
                   </div>
                 </div>
               </div>
@@ -383,7 +374,7 @@ export default function AdminWikiSection() {
                   Minimum Trades Requirement
                 </h4>
                 <p className="text-sm">
-                  Set minimum trades required to qualify. Users who don't meet
+                  Set minimum trades required to qualify. Users who don&apos;t meet
                   this at competition end are <strong>disqualified</strong> and
                   their portion of the prize pool is redistributed.
                 </p>
@@ -464,7 +455,7 @@ export default function AdminWikiSection() {
                   Important: Minimum Participants
                 </h4>
                 <p className="text-sm text-gray-300">
-                  If a competition doesn't meet minimum participants by start
+                  If a competition doesn&apos;t meet minimum participants by start
                   time, it will be <strong>automatically cancelled</strong> and
                   all participants will receive a <strong>full refund</strong>{" "}
                   including any platform fees.
@@ -542,7 +533,7 @@ export default function AdminWikiSection() {
             </CardHeader>
             <CardContent className="space-y-3 text-gray-300">
               <p className="text-sm">
-                When a competition's start time arrives:
+                When a competition&apos;s start time arrives:
               </p>
               <div className="space-y-2">
                 <div className="bg-green-500/10 border border-green-500/30 rounded p-3">
@@ -550,7 +541,7 @@ export default function AdminWikiSection() {
                     ✅ If Minimum Participants Met
                   </div>
                   <div className="text-sm">
-                    Competition starts normally → Status becomes "Active"
+                    Competition starts normally → Status becomes &quot;Active&quot;
                   </div>
                 </div>
                 <div className="bg-red-500/10 border border-red-500/30 rounded p-3">
@@ -559,7 +550,7 @@ export default function AdminWikiSection() {
                   </div>
                   <div className="text-sm">
                     Competition is cancelled → All participants receive full
-                    refund → Status becomes "Cancelled"
+                    refund → Status becomes &quot;Cancelled&quot;
                   </div>
                 </div>
               </div>
@@ -1183,6 +1174,476 @@ export default function AdminWikiSection() {
       ),
     },
 
+    // ==================== PAYMENT / CARD-TESTING FRAUD ====================
+    {
+      id: "fraud-card-testing",
+      title: "Card Testing & Payment Fraud Protection",
+      icon: CreditCard,
+      category: "Fraud Detection",
+      tags: [
+        "card testing",
+        "card-testing",
+        "transaction spamming",
+        "stolen cards",
+        "decline velocity",
+        "stripe",
+        "nuvei",
+        "paddle",
+        "rate limit",
+        "redis",
+        "replay",
+        "idempotency",
+      ],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-red-400 mb-3">
+              Card Testing & Payment Fraud Protection
+            </h2>
+            <p className="text-gray-300 mb-4">
+              &quot;Card testing&quot; (also called transaction spamming) is one
+              of the most common attacks against any platform that accepts card
+              payments. Criminals take a list of stolen card numbers and fire
+              many small deposit attempts in rapid succession to find which
+              cards are still live, then cash out on the ones that approve.
+              Unchecked, it drives chargebacks, burns processor trust, and
+              eventually gets the merchant account suspended.
+            </p>
+            <p className="text-gray-300">
+              The platform defends against this in{" "}
+              <strong>four independent layers</strong> that all three payment
+              providers (<strong>Stripe</strong>, <strong>Nuvei</strong>, and{" "}
+              <strong>Paddle</strong>) share.
+            </p>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-blue-400 flex items-center gap-2">
+                <Timer className="h-5 w-5" />
+                Layer 1 — Per-User Deposit Rate Limit
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-300 space-y-2">
+              <p>
+                Every deposit-creation endpoint is rate-limited{" "}
+                <strong>per user ID</strong> so a single account cannot fire
+                dozens of attempts per minute.
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-gray-400">
+                <li>
+                  <strong>Limit:</strong> 5 deposit requests per minute per
+                  user.
+                </li>
+                <li>
+                  <strong>Response:</strong> HTTP 429 with a{" "}
+                  <code className="text-yellow-400">Retry-After</code> header.
+                </li>
+                <li>
+                  <strong>Scope:</strong> <code>/api/stripe/create-payment-intent</code>,{" "}
+                  <code>/api/nuvei/open-order</code>,{" "}
+                  <code>/api/paddle/create-checkout</code>.
+                </li>
+              </ul>
+              <p className="text-xs text-gray-500 mt-2">
+                Source:{" "}
+                <code>lib/utils/rate-limiter.ts</code> →{" "}
+                <code>RateLimiters.deposit</code>
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-cyan-400 flex items-center gap-2">
+                <Globe className="h-5 w-5" />
+                Layer 2 — Per-IP Deposit Rate Limit
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-300 space-y-2">
+              <p>
+                The per-user limit is easy to bypass if an attacker rotates
+                fresh accounts. A second limit is applied to the originating
+                IP address so the same script running from one host cannot
+                sustain high-volume attempts even across many accounts.
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-gray-400">
+                <li>
+                  <strong>Limit:</strong> 10 deposit requests per minute per
+                  IP.
+                </li>
+                <li>
+                  <strong>Works alongside Nginx:</strong> the application-level
+                  limit is a back-stop for Nginx&apos;s global IP limits,
+                  enforced at Node layer so it survives nginx mis-config.
+                </li>
+                <li>
+                  <strong>IPv4 &amp; IPv6:</strong> client IP is resolved from{" "}
+                  <code>x-forwarded-for</code> with the{" "}
+                  <code>getClientIP()</code> helper.
+                </li>
+              </ul>
+              <p className="text-xs text-gray-500 mt-2">
+                Source: <code>RateLimiters.depositByIp</code>
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-red-400 flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5" />
+                Layer 3 — Decline-Velocity Block (key defense)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-300 space-y-3">
+              <p>
+                This is the layer specifically designed to defeat card
+                testing. Rate limits alone are not enough — the attacker
+                <em> wants </em> to be throttled quickly, because each declined
+                card only takes one attempt to classify. What actually hurts
+                them is being locked out after too many declines regardless of
+                volume.
+              </p>
+
+              <div className="bg-gray-900 rounded p-3">
+                <p className="font-semibold text-white mb-1">How it works</p>
+                <ol className="list-decimal list-inside space-y-1 text-gray-400 text-xs">
+                  <li>
+                    Every time a payment provider webhook reports{" "}
+                    <strong>decline / error / payment_failed</strong>, the
+                    counter for the paying <code>userId</code> <em>and</em>{" "}
+                    the originating <code>clientIp</code> both increment.
+                  </li>
+                  <li>
+                    If a user or IP accumulates <strong>3 declines within
+                    a 10-minute rolling window</strong>, further deposits are
+                    blocked for <strong>1 hour</strong>.
+                  </li>
+                  <li>
+                    A <strong>successful</strong> deposit clears both counters,
+                    so a single past CVV typo never haunts a legitimate user.
+                  </li>
+                </ol>
+              </div>
+
+              <div className="bg-gray-900 rounded p-3">
+                <p className="font-semibold text-white mb-1">
+                  Why track both user and IP
+                </p>
+                <p className="text-xs text-gray-400">
+                  A user-only block is bypassed by burner accounts. An
+                  IP-only block is bypassed by VPN rotation. Tracking both
+                  independently makes the attacker pay a cost on whichever
+                  dimension they try to scale.
+                </p>
+              </div>
+
+              <div className="bg-red-500/10 border border-red-500/30 rounded p-3">
+                <p className="font-semibold text-red-300 mb-1">
+                  User-facing response when blocked
+                </p>
+                <p className="text-xs text-gray-300 italic">
+                  &quot;We&apos;ve paused deposits from your account due to
+                  repeated declined payments. Please try again later or
+                  contact support.&quot;
+                </p>
+                <p className="text-xs text-gray-500 mt-1">HTTP 429.</p>
+              </div>
+
+              <p className="text-xs text-gray-500">
+                Source: <code>lib/utils/rate-limiter.ts</code> →{" "}
+                <code>isDeclineBlocked()</code>,{" "}
+                <code>recordDecline()</code>,{" "}
+                <code>clearDeclines()</code>.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-green-400 flex items-center gap-2">
+                <HardDrive className="h-5 w-5" />
+                Layer 4 — Redis-Backed Counters (multi-process)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-300 space-y-2">
+              <p>
+                The decline counters are persisted in <strong>Redis</strong> so
+                they are shared across every process that handles a deposit
+                webhook — the main Next.js app, the worker, and the api-server.
+                Without this, an attacker could amplify the threshold by
+                targeting whichever process had the lowest counter.
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-gray-400">
+                <li>
+                  <strong>Storage:</strong> Redis sorted set (rolling window) +
+                  a TTL key for the block itself.
+                </li>
+                <li>
+                  <strong>Fallback:</strong> if Redis is disabled in{" "}
+                  <em>Admin → Settings → Redis</em>, the counters fall back to
+                  an in-memory Map automatically. No errors, just slightly
+                  reduced effectiveness on multi-instance deployments.
+                </li>
+                <li>
+                  <strong>Cleanup:</strong> Redis TTLs handle expiry
+                  automatically. The in-memory fallback has its own timer-based
+                  cleanup.
+                </li>
+              </ul>
+              <p className="text-xs text-gray-500 mt-2">
+                Tip: enable Redis in production — cross-process sharing is
+                what closes the &quot;multiply threshold by N processes&quot;
+                bypass.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-purple-400">
+                Other Anti-Card-Testing Safeguards Already In Place
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-300 space-y-2">
+              <p>
+                In addition to the four layers above, several existing systems
+                make card testing structurally harder on this platform:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-gray-400">
+                <li>
+                  <strong>Webhook signature verification (HMAC):</strong>{" "}
+                  Stripe, Nuvei, and Paddle webhooks are rejected unless the
+                  signature matches the configured secret — forged deposit
+                  notifications are impossible.
+                </li>
+                <li>
+                  <strong>Idempotency keys:</strong> webhooks check the
+                  provider&apos;s payment ID before crediting, so replaying
+                  the same webhook never double-credits a user.
+                </li>
+                <li>
+                  <strong>3D Secure (3DS2) / SCA:</strong> enabled on the Nuvei
+                  integration so stolen cards with no CVV / no SCA are
+                  rejected by the issuer upfront.
+                </li>
+                <li>
+                  <strong>Shared-payment-method detection:</strong>{" "}
+                  <code>PaymentFraudService</code> fingerprints card /
+                  e-wallet identifiers and raises a fraud alert the moment the
+                  same instrument is used by two different accounts.
+                </li>
+                <li>
+                  <strong>KYC gate on deposits:</strong> deposits above the
+                  KYC-required threshold are blocked until verification, so
+                  unverified attackers can only attempt low-value charges.
+                </li>
+                <li>
+                  <strong>Prototype-pollution guard on Nuvei DMN:</strong>{" "}
+                  form / URL parameters are funnelled through an allow-list
+                  before being parsed, preventing a poisoned payload from
+                  hijacking the signature check.
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-yellow-400 flex items-center gap-2">
+                <Eye className="h-5 w-5" />
+                What You See As An Admin
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-300 space-y-3">
+              <p>Watch the server logs for these markers:</p>
+              <div className="bg-gray-900 rounded overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-700">
+                    <tr>
+                      <th className="text-left p-2 text-gray-300">
+                        Log Pattern
+                      </th>
+                      <th className="text-left p-2 text-gray-300">Meaning</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-gray-400">
+                    <tr className="border-t border-gray-700">
+                      <td className="p-2">
+                        <code>🛡️ Rate limit exceeded</code>
+                      </td>
+                      <td className="p-2">
+                        Normal — user or IP hit the 5/min or 10/min cap.
+                      </td>
+                    </tr>
+                    <tr className="border-t border-gray-700">
+                      <td className="p-2">
+                        <code>🛡️ Decline-velocity block active</code>
+                      </td>
+                      <td className="p-2">
+                        Deposit rejected pre-flight because the user/IP is
+                        already in cooldown.
+                      </td>
+                    </tr>
+                    <tr className="border-t border-gray-700">
+                      <td className="p-2">
+                        <code>🚨 Decline-velocity threshold tripped</code>
+                      </td>
+                      <td className="p-2">
+                        Threshold just crossed — 1-hour block now active.
+                        Worth investigating.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <p className="text-xs text-gray-400 mt-2">
+                When the <strong>🚨 tripped</strong> log appears, open the
+                user&apos;s profile in <em>Admin → Users</em> and review:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-gray-400 text-xs">
+                <li>
+                  <strong>Wallet transactions</strong> — are all attempts the
+                  same small amount?
+                </li>
+                <li>
+                  <strong>Device fingerprint match</strong> — are these all
+                  coming from one device?
+                </li>
+                <li>
+                  <strong>Suspicion score</strong> — may have also increased
+                  from payment-method sharing.
+                </li>
+                <li>
+                  <strong>Registration age</strong> — brand-new accounts with
+                  many declines are the classic pattern.
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-blue-400">
+                Recovering A Legitimate User
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-300 space-y-2">
+              <p>
+                If a real customer is caught in the decline block (e.g. 3
+                mistyped CVV attempts):
+              </p>
+              <ol className="list-decimal list-inside space-y-1 text-gray-400">
+                <li>
+                  The block auto-clears after <strong>1 hour</strong>.
+                </li>
+                <li>
+                  A single successful deposit (e.g. via a different card) also
+                  clears both counters immediately.
+                </li>
+                <li>
+                  If you need to override manually, the block lives in Redis
+                  keys <code>decline:block:&lt;userId&gt;</code> and{" "}
+                  <code>decline:block:ip:&lt;ip&gt;</code>; an engineer can{" "}
+                  <code>DEL</code> them directly. Prefer waiting for auto-clear
+                  unless urgency justifies it.
+                </li>
+              </ol>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-gray-300">
+                Configuration &amp; Tuning
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-gray-300 space-y-2">
+              <p>
+                Defaults are conservative and battle-tested. To change them,
+                edit the <code>DEFAULT_DECLINE_CONFIG</code> constant in{" "}
+                <code>lib/utils/rate-limiter.ts</code>:
+              </p>
+              <div className="bg-gray-900 rounded p-3">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-700">
+                    <tr>
+                      <th className="text-left p-2 text-gray-300">Setting</th>
+                      <th className="text-left p-2 text-gray-300">Default</th>
+                      <th className="text-left p-2 text-gray-300">Guidance</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-gray-400">
+                    <tr className="border-t border-gray-700">
+                      <td className="p-2">
+                        <code>maxDeclinesPerWindow</code>
+                      </td>
+                      <td className="p-2">3</td>
+                      <td className="p-2">
+                        Lower = stricter. Going below 2 risks blocking
+                        customers with a single CVV typo plus a retry.
+                      </td>
+                    </tr>
+                    <tr className="border-t border-gray-700">
+                      <td className="p-2">
+                        <code>windowMs</code>
+                      </td>
+                      <td className="p-2">10 minutes</td>
+                      <td className="p-2">
+                        Rolling window the N declines must fall within.
+                      </td>
+                    </tr>
+                    <tr className="border-t border-gray-700">
+                      <td className="p-2">
+                        <code>blockDurationMs</code>
+                      </td>
+                      <td className="p-2">1 hour</td>
+                      <td className="p-2">
+                        How long deposits are paused after tripping. Longer =
+                        safer but more support load.
+                      </td>
+                    </tr>
+                    <tr className="border-t border-gray-700">
+                      <td className="p-2">
+                        <code>RateLimiters.deposit</code>
+                      </td>
+                      <td className="p-2">5 / min / user</td>
+                      <td className="p-2">
+                        Burst allowance for normal humans.
+                      </td>
+                    </tr>
+                    <tr className="border-t border-gray-700">
+                      <td className="p-2">
+                        <code>RateLimiters.depositByIp</code>
+                      </td>
+                      <td className="p-2">10 / min / IP</td>
+                      <td className="p-2">
+                        Slightly higher because households often share an IP.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
+            <p className="text-sm text-yellow-200">
+              <strong>Adding a new payment provider?</strong> Make sure the
+              new deposit-initiation route calls <code>RateLimiters.deposit</code>{" "}
+              +<code> RateLimiters.depositByIp</code> +{" "}
+              <code>isDeclineBlocked</code>, and that the corresponding webhook
+              calls <code>recordDecline()</code> on failed events and{" "}
+              <code>clearDeclines()</code> on successful ones. Nuvei, Stripe,
+              and Paddle already follow this pattern — copy from any of them.
+            </p>
+          </div>
+        </div>
+      ),
+    },
+
     // ==================== SECURITY & PROTECTION ====================
     {
       id: "security-protection",
@@ -1720,13 +2181,13 @@ export default function AdminWikiSection() {
                     <tr className="border-b border-gray-700/50">
                       <td className="py-2 px-3 font-medium">To Date</td>
                       <td className="py-2 px-3">
-                        Click <strong>"Set to today →"</strong>
+                        Click <strong>&quot;Set to today →&quot;</strong>
                       </td>
                     </tr>
                     <tr>
                       <td className="py-2 px-3 font-medium">Select Symbols</td>
                       <td className="py-2 px-3">
-                        Click <strong>"Select All"</strong> (or choose specific
+                        Click <strong>&quot;Select All&quot;</strong> (or choose specific
                         ones)
                       </td>
                     </tr>
@@ -1735,7 +2196,7 @@ export default function AdminWikiSection() {
               </div>
               <div className="mt-4 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
                 <p className="text-sm text-purple-300">
-                  Click <strong>"Start Import"</strong> and wait for completion.
+                  Click <strong>&quot;Start Import&quot;</strong> and wait for completion.
                   This downloads 1m candles into{" "}
                   <code className="bg-gray-700 px-1 rounded">
                     candles_historical_1m
@@ -1799,7 +2260,7 @@ export default function AdminWikiSection() {
                     <tr>
                       <td className="py-2 px-3 font-medium">Select Symbols</td>
                       <td className="py-2 px-3">
-                        Click <strong>"Select All"</strong>
+                        Click <strong>&quot;Select All&quot;</strong>
                       </td>
                     </tr>
                   </tbody>
@@ -1807,7 +2268,7 @@ export default function AdminWikiSection() {
               </div>
               <div className="mt-4 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg">
                 <p className="text-sm text-orange-300 mb-2">
-                  Click <strong>"Download History"</strong> and wait for
+                  Click <strong>&quot;Download History&quot;</strong> and wait for
                   completion. This downloads pre-built candles into:
                 </p>
                 <div className="flex flex-wrap gap-2 text-xs">
@@ -2427,7 +2888,7 @@ export default function AdminWikiSection() {
               Real-Time Price Streaming
             </h2>
             <p className="text-gray-300 mb-4">
-              How prices flow from Massive.com to your users' charts in
+              How prices flow from Massive.com to your users&apos; charts in
               real-time.
             </p>
           </div>
@@ -2441,7 +2902,7 @@ export default function AdminWikiSection() {
             </CardHeader>
             <CardContent className="space-y-3 text-gray-300">
               <p className="text-sm">
-                The system connects to Massive.com's WebSocket server to receive
+                The system connects to Massive.com&apos;s WebSocket server to receive
                 live price quotes.
               </p>
               <div className="bg-gray-900 p-3 rounded space-y-2 text-sm">
@@ -2645,7 +3106,7 @@ export default function AdminWikiSection() {
                   </div>
                   <ArrowRight className="h-4 w-4 text-gray-500" />
                   <div className="text-sm">
-                    Update forming candle's high/low/close
+                    Update forming candle&apos;s high/low/close
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -2959,7 +3420,7 @@ export default function AdminWikiSection() {
             <CardContent className="space-y-4 text-gray-300">
               <p className="text-sm">
                 In Admin Panel → Dev Zone → Market Data Settings, use the
-                "Download Higher Timeframe History" section.
+                &quot;Download Higher Timeframe History&quot; section.
               </p>
               <div className="space-y-3">
                 <div className="bg-gray-900 p-3 rounded">
@@ -3299,8 +3760,8 @@ export default function AdminWikiSection() {
             </CardHeader>
             <CardContent className="space-y-4 text-gray-300">
               <p className="text-sm">
-                In Admin → Dev Zone → Market Data Settings, use the "Cleanup Old
-                Data" section.
+                In Admin → Dev Zone → Market Data Settings, use the &quot;Cleanup Old
+                Data&quot; section.
               </p>
 
               <div className="space-y-3">
@@ -3609,7 +4070,7 @@ export default function AdminWikiSection() {
                       <li>
                         2. Download historical data for desired timeframes
                       </li>
-                      <li>3. Enable "Use Local History" toggle</li>
+                      <li>3. Enable &quot;Use Local History&quot; toggle</li>
                     </ol>
                   </div>
                 </div>
@@ -3675,10 +4136,10 @@ export default function AdminWikiSection() {
                   <div className="text-gray-400 mt-2">
                     <strong>Fix:</strong>
                     <ol className="mt-1 space-y-1">
-                      <li>1. Use "Cleanup Old Data" with "Keep Recent" mode</li>
+                      <li>1. Use &quot;Cleanup Old Data&quot; with &quot;Keep Recent&quot; mode</li>
                       <li>2. Set reasonable retention (e.g., 365 days)</li>
                       <li>
-                        3. Enable "Include Historical" to clean all collections
+                        3. Enable &quot;Include Historical&quot; to clean all collections
                       </li>
                       <li>4. Schedule monthly cleanup</li>
                     </ol>
@@ -3874,7 +4335,7 @@ export default function AdminWikiSection() {
                     ✅ NET POSITION
                   </div>
                   <p className="text-xs">
-                    HAVE - OWE = Platform's actual money
+                    HAVE - OWE = Platform&apos;s actual money
                   </p>
                 </div>
               </div>
@@ -4019,7 +4480,7 @@ export default function AdminWikiSection() {
                   <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded">
                     3
                   </span>
-                  <span>Click "Complete Payment" to credit user's wallet</span>
+                  <span>Click &quot;Complete Payment&quot; to credit user&apos;s wallet</span>
                 </li>
               </ol>
             </CardContent>
@@ -4036,8 +4497,8 @@ export default function AdminWikiSection() {
                 Admin can withdraw platform earnings:
               </p>
               <ul className="text-sm space-y-1">
-                <li>• View "Available to Withdraw" in Financial Dashboard</li>
-                <li>• Click "Withdraw" button</li>
+                <li>• View &quot;Available to Withdraw&quot; in Financial Dashboard</li>
+                <li>• Click &quot;Withdraw&quot; button</li>
                 <li>• Enter amount and confirm with admin password</li>
                 <li>• Transaction is recorded in audit log</li>
               </ul>
@@ -4251,7 +4712,7 @@ export default function AdminWikiSection() {
                 based on:
               </p>
               <ul className="text-sm space-y-1">
-                <li>• User's name and registration context</li>
+                <li>• User&apos;s name and registration context</li>
                 <li>• Platform features and current competitions</li>
                 <li>• Custom prompt you provide</li>
               </ul>
@@ -4322,8 +4783,8 @@ export default function AdminWikiSection() {
                 <li>• Invoice emails (below invoice details)</li>
               </ul>
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-3 text-sm">
-                <strong>Example:</strong> "All transactions are final. This is a
-                digital product..."
+                <strong>Example:</strong> &quot;All transactions are final. This is a
+                digital product...&quot;
               </div>
             </CardContent>
           </Card>
@@ -5062,7 +5523,7 @@ export default function AdminWikiSection() {
               <ul className="text-sm space-y-1">
                 <li>• Use a strong, unique password (12+ characters)</li>
                 <li>• Change password regularly (every 90 days)</li>
-                <li>• Don't share admin credentials</li>
+                <li>• Don&apos;t share admin credentials</li>
                 <li>• Always logout when finished</li>
                 <li>• Check audit logs for unauthorized access</li>
               </ul>
@@ -5086,7 +5547,7 @@ export default function AdminWikiSection() {
               Platform Settings
             </h2>
             <p className="text-gray-300 mb-4">
-              Customize your platform's appearance and behavior.
+              Customize your platform&apos;s appearance and behavior.
             </p>
           </div>
 
@@ -5130,7 +5591,7 @@ export default function AdminWikiSection() {
                 </div>
                 <div className="bg-gray-900 p-3 rounded">
                   <strong>Credit Name:</strong> Custom name for credits (e.g.,
-                  "Volts")
+                  &quot;Volts&quot;)
                   <p className="text-xs text-gray-400 mt-1">
                     With custom symbol and decimal places
                   </p>
