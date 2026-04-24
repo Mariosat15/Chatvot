@@ -1681,14 +1681,52 @@ export default function AdminWikiSection() {
                 <strong>Access control:</strong> the attack endpoints live
                 behind seven independent layers (env flag, shared secret,
                 loopback-only, <code>sim-attack-*</code> user prefix, self
-                rate-limit, admin auth on kickoff, audit log). To enable, set{" "}
-                <code>SIMULATOR_ATTACK_TESTS_ENABLED=true</code> and{" "}
-                <code>SIMULATOR_ATTACK_SECRET</code> (generate with{" "}
-                <code>openssl rand -hex 32</code>) in the environment. Every
+                rate-limit, admin auth on kickoff, audit log). Every
                 admin-initiated run is recorded with{" "}
                 <code>auditLogService</code> under the{" "}
                 <strong>security</strong> category.
               </p>
+              <div className="pt-1">
+                <p className="font-semibold text-gray-200">
+                  Enabling the suite (dev / staging only)
+                </p>
+                <p>
+                  Add these lines to your local <code>.env</code> file (which
+                  is gitignored — never commit real values) and restart both
+                  the main app and the admin app:
+                </p>
+                <pre className="bg-gray-900 border border-gray-700 rounded-md p-3 text-xs text-gray-200 overflow-x-auto">
+                  {[
+                    "# Master on/off switch (default: disabled)",
+                    "SIMULATOR_ATTACK_TESTS_ENABLED=true",
+                    "",
+                    "# 32-byte hex shared secret",
+                    "SIMULATOR_ATTACK_SECRET=<paste generated value here>",
+                    "",
+                    "# Optional: override the main-app URL the admin calls",
+                    "# MAIN_APP_URL=http://127.0.0.1:3000",
+                  ].join("\n")}
+                </pre>
+                <p className="pt-2">
+                  Generate the secret with either command:
+                </p>
+                <pre className="bg-gray-900 border border-gray-700 rounded-md p-3 text-xs text-gray-200 overflow-x-auto">
+                  {[
+                    "# macOS / Linux / Git Bash",
+                    "openssl rand -hex 32",
+                    "",
+                    "# Windows PowerShell",
+                    "-join ((1..32) | ForEach-Object { '{0:x2}' -f (Get-Random -Max 256) })",
+                  ].join("\n")}
+                </pre>
+                <p className="pt-2 text-gray-400">
+                  In production, leave both variables <em>unset</em>. Even if
+                  they accidentally ship enabled, layers 3–7 (loopback,
+                  test-user prefix, self rate-limit, admin auth, audit log)
+                  still prevent any real user or real wallet from being
+                  touched.
+                </p>
+              </div>
               <p className="text-gray-400">
                 Re-run this suite whenever you change anything in{" "}
                 <code>lib/utils/rate-limiter.ts</code>,{" "}
