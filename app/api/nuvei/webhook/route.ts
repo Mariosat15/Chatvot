@@ -71,6 +71,21 @@ interface NuveiDmnParams {
   [key: string]: string | undefined;
 }
 
+// Keys that would mutate Object.prototype if assigned blindly. The webhook
+// payload is attacker-controlled until the HMAC signature check succeeds, so
+// skip these three defensively as a defense-in-depth measure.
+const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+/**
+ * Build a NuveiDmnParams dict from raw key/value pairs, discarding any key
+ * that could pollute Object.prototype. Using Object.fromEntries ensures we
+ * never write a variable key via bracket notation into a shared object.
+ */
+function buildParams(entries: Array<[string, string]>): NuveiDmnParams {
+  const safe = entries.filter(([k]) => !UNSAFE_KEYS.has(k));
+  return Object.fromEntries(safe) as NuveiDmnParams;
+}
+
 /**
  * Verify DMN signature using Nuvei's advanceResponseChecksum
  *
@@ -136,21 +151,16 @@ function verifyDmnSignature(
     // Try alternative calculation method (some DMNs use different field order)
     // responsechecksum = SHA256(all param values sorted alphabetically + secret_key)
     if (params.responsechecksum) {
-      const sortedKeys = Object.keys(params)
-        .filter(
-          (k) => k !== "advanceResponseChecksum" && k !== "responsechecksum",
-        )
-        .sort();
-
-      let altData = "";
-      for (const key of sortedKeys) {
-        // eslint-disable-next-line security/detect-object-injection -- `key` is sourced from Object.keys(params); safe read.
-        const value = params[key];
-        if (value !== undefined && value !== "") {
-          altData += value;
-        }
-      }
-      altData += secretKey;
+      const altData =
+        Object.entries(params)
+          .filter(
+            ([k]) =>
+              k !== "advanceResponseChecksum" && k !== "responsechecksum",
+          )
+          // Preserve the original Array.prototype.sort() codepoint ordering.
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+          .map(([, v]) => (v !== undefined && v !== "" ? v : ""))
+          .join("") + secretKey;
 
       const altChecksum = crypto
         .createHash("sha256")
@@ -178,22 +188,16 @@ export async function POST(req: NextRequest) {
 
     if (contentType.includes("application/x-www-form-urlencoded")) {
       const formData = await req.formData();
-      params = {} as NuveiDmnParams;
-      formData.forEach((value, key) => {
-        // eslint-disable-next-line security/detect-object-injection -- `key` sourced from FormData iterator.
-        params[key] = value.toString();
-      });
+      params = buildParams(
+        Array.from(formData.entries()).map(([k, v]) => [k, v.toString()]),
+      );
     } else if (contentType.includes("application/json")) {
       params = await req.json();
     } else {
       // Try to parse as URL encoded
       const text = await req.text();
-      params = {} as NuveiDmnParams;
       const urlParams = new URLSearchParams(text);
-      urlParams.forEach((value, key) => {
-        // eslint-disable-next-line security/detect-object-injection -- `key` sourced from URLSearchParams iterator.
-        params[key] = value;
-      });
+      params = buildParams(Array.from(urlParams.entries()));
     }
 
     console.log("Nuvei DMN received:", JSON.stringify(params, null, 2));
@@ -920,8 +924,7 @@ async function handlePayoutDmn(params: NuveiDmnParams): Promise<NextResponse> {
     );
 
     // Update withdrawal request
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Partial Mongoose update shape; pre-existing.
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       status: newStatus,
       "metadata.payoutDmnReceived": true,
       "metadata.payoutDmnStatus": status,
@@ -942,8 +945,7 @@ async function handlePayoutDmn(params: NuveiDmnParams): Promise<NextResponse> {
 
     // Update wallet transaction if found
     if (walletTx) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Partial Mongoose update shape; pre-existing.
-      const txUpdateData: any = {
+      const txUpdateData: Record<string, unknown> = {
         status:
           newStatus === "completed"
             ? "completed"
@@ -972,8 +974,7 @@ async function handlePayoutDmn(params: NuveiDmnParams): Promise<NextResponse> {
 
       if (wallet) {
         // Only update totalWithdrawn if not already counted (prevent double-counting from sync + DMN)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Loose metadata access; pre-existing.
-        const wdMetadata = (withdrawalRequest as any).metadata || {};
+        const wdMetadata = withdrawalRequest.metadata ?? {};
         const alreadyCounted = wdMetadata.totalWithdrawnUpdated === true;
         if (!alreadyCounted) {
           const creditsWithdrawn = withdrawalRequest.amountCredits || 0;
@@ -1292,8 +1293,7 @@ async function handleWithdrawalDmn(
 
       if (wallet) {
         // Only update totalWithdrawn if not already counted (prevent double-counting from sync + DMN)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Loose metadata access; pre-existing.
-        const wdMeta = (withdrawalRequest as any).metadata || {};
+        const wdMeta = withdrawalRequest.metadata ?? {};
         const alreadyCounted = wdMeta.totalWithdrawnUpdated === true;
         if (!alreadyCounted) {
           const creditsWithdrawn = Math.abs(

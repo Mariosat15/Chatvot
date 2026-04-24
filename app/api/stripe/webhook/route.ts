@@ -40,8 +40,9 @@ export async function POST(req: NextRequest) {
     const stripe = await getStripeClient();
 
     // Try database config first, then .env
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Credentials shape varies per provider; pre-existing cast.
-    const stripeConfig = (await getPaymentProviderCredentials("stripe")) as any;
+    const stripeConfig = (await getPaymentProviderCredentials("stripe")) as
+      | { webhook_secret?: string }
+      | null;
     const webhookSecret =
       stripeConfig?.webhook_secret || process.env.STRIPE_WEBHOOK_SECRET;
 

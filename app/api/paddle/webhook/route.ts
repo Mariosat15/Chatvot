@@ -10,6 +10,27 @@ import WalletTransaction from "@/database/models/trading/wallet-transaction.mode
 import { isValidObjectId, isSafeMongoString } from "@/lib/utils/url-validator";
 import { recordDecline, clearDeclines } from "@/lib/utils/rate-limiter";
 
+// Minimal subset of the Paddle Billing API webhook event data we consume.
+// Full schema: https://developer.paddle.com/webhooks/transactions/transaction-completed
+interface PaddleTransactionEventData {
+  id: string;
+  custom_data?: {
+    transaction_id?: string;
+    user_id?: string;
+    type?: string;
+    amount?: string;
+    client_ip?: string;
+  } | null;
+  details?: {
+    reason?: string;
+  } | null;
+}
+
+interface PaddleWebhookEvent {
+  event_type?: string;
+  data: PaddleTransactionEventData;
+}
+
 /**
  * Paddle Webhook Handler
  *
@@ -55,7 +76,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Parse the event
-    const event = JSON.parse(body);
+    const event = JSON.parse(body) as PaddleWebhookEvent;
 
     console.log("📨 Paddle Webhook:", event.event_type);
 
@@ -125,8 +146,7 @@ function verifyPaddleWebhook(
  * Handle completed transaction - ADD CREDITS TO USER
  * Includes idempotency check to prevent duplicate processing
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Paddle webhook payload type not modelled; pre-existing.
-async function handleTransactionCompleted(data: any) {
+async function handleTransactionCompleted(data: PaddleTransactionEventData) {
   try {
     const customData = data.custom_data;
 
@@ -210,7 +230,7 @@ async function handleTransactionCompleted(data: any) {
     try {
       const { notificationService } =
         await import("@/lib/services/notification.service");
-      const amount = parseFloat(customData.amount) || 0;
+      const amount = parseFloat(customData.amount ?? "0") || 0;
       await notificationService.notifyDepositCompleted(userId, amount, 0);
     } catch (notifyError) {
       console.error("❌ Error sending notification:", notifyError);
@@ -223,8 +243,7 @@ async function handleTransactionCompleted(data: any) {
 /**
  * Handle failed payment
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Paddle webhook payload type not modelled; pre-existing.
-async function handleTransactionFailed(data: any) {
+async function handleTransactionFailed(data: PaddleTransactionEventData) {
   try {
     const customData = data.custom_data;
 
@@ -285,7 +304,7 @@ async function handleTransactionFailed(data: any) {
       try {
         const { notificationService } =
           await import("@/lib/services/notification.service");
-        const amount = parseFloat(customData.amount) || 0;
+        const amount = parseFloat(customData.amount ?? "0") || 0;
         await notificationService.notifyDepositFailed(
           customData.user_id,
           amount,
@@ -306,8 +325,7 @@ async function handleTransactionFailed(data: any) {
 /**
  * Handle refunded transaction
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Paddle webhook payload type not modelled; pre-existing.
-async function handleTransactionRefunded(data: any) {
+async function handleTransactionRefunded(data: PaddleTransactionEventData) {
   try {
     const customData = data.custom_data;
 

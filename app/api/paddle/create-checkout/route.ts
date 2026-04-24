@@ -12,6 +12,17 @@ import {
   isDeclineBlocked,
 } from "@/lib/utils/rate-limiter";
 
+// Minimal subset of the Paddle Billing API /transactions response we consume.
+// Full schema: https://developer.paddle.com/api-reference/transactions/create-transaction
+interface PaddleTransactionResponse {
+  data: {
+    id: string;
+    checkout?: {
+      url?: string | null;
+    } | null;
+  };
+}
+
 /**
  * Create Paddle Checkout Session
  *
@@ -121,8 +132,9 @@ export async function POST(req: NextRequest) {
 
     // Create Paddle transaction
     // Using Paddle Billing API (v2)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Paddle transaction response type not modelled; pre-existing.
-    const paddleTransaction = await paddleRequest<any>("/transactions", {
+    const paddleTransaction = await paddleRequest<PaddleTransactionResponse>(
+      "/transactions",
+      {
       method: "POST",
       body: {
         items: [
