@@ -22,6 +22,7 @@ import {
   getClientIP,
 } from "@/lib/utils/rate-limiter";
 import { createSecurityLogger } from "@/lib/utils/security-logger";
+import { getRequestGeo } from "@/lib/utils/request-geo";
 
 export async function POST(req: NextRequest) {
   // SECURITY: Create logger for this request
@@ -390,6 +391,16 @@ export async function POST(req: NextRequest) {
         // Reason: Stored so the webhook can record decline-velocity against
         // the originating IP (not just the userId).
         clientIp: clientIp !== "unknown" ? clientIp : undefined,
+        // Cloudflare-derived geo at deposit creation (surfaced in the admin
+        // live-ops dashboard; zero external lookup).
+        ...(() => {
+          const geo = getRequestGeo(req);
+          return {
+            clientCountry: geo.country,
+            clientCity: geo.city,
+            clientRegion: geo.region,
+          };
+        })(),
       },
     });
 

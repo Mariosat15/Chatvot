@@ -108,6 +108,10 @@ export interface IWithdrawalRequest extends Document {
   riskFlags?: string[]; // Any risk flags raised
   ipAddress?: string; // IP at time of request
   userAgent?: string; // Browser/device info
+  // Cloudflare-derived geo at request time (zero external lookup).
+  country?: string;
+  city?: string;
+  region?: string;
 
   // Sandbox/Production
   isSandbox: boolean; // Is this a sandbox withdrawal?
@@ -310,6 +314,9 @@ const WithdrawalRequestSchema = new Schema<IWithdrawalRequest>(
     riskFlags: [String],
     ipAddress: String,
     userAgent: String,
+    country: String,
+    city: String,
+    region: String,
 
     // Sandbox/Production
     isSandbox: {

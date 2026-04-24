@@ -15,6 +15,7 @@ import { nuveiService } from "@/lib/services/nuvei.service";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import WithdrawalRequest from "@/database/models/withdrawal-request.model";
 import WithdrawalSettings from "@/database/models/withdrawal-settings.model";
+import { getRequestGeo } from "@/lib/utils/request-geo";
 import UserBankAccount from "@/database/models/user-bank-account.model";
 import { connectToDatabase } from "@/database/mongoose";
 import {
@@ -275,6 +276,9 @@ export async function POST(req: NextRequest) {
     wallet.creditBalance -= creditsNeeded;
     await wallet.save();
 
+    // Compute once so the DB insert stays clean.
+    const reqGeo = getRequestGeo(req);
+
     // Create pending withdrawal request with ALL required fields
     const withdrawalRequest = await WithdrawalRequest.create({
       // Required user info
@@ -333,11 +337,13 @@ export async function POST(req: NextRequest) {
       isAutoApproved: true, // Automatic withdrawals are always "auto-approved"
       autoApprovalReason: "Automatic withdrawal via Nuvei",
 
-      // Request info
+      // Request info (IP + Cloudflare-derived geo)
       requestedAt: new Date(),
-      ipAddress:
-        req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip"),
+      ipAddress: reqGeo.ip,
       userAgent: req.headers.get("user-agent"),
+      country: reqGeo.country,
+      city: reqGeo.city,
+      region: reqGeo.region,
 
       // Metadata
       metadata: {

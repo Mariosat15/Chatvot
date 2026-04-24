@@ -62,6 +62,9 @@ interface DepositEntry {
   providerTransactionId?: string;
   failureReason?: string;
   ip?: string;
+  country?: string;
+  city?: string;
+  region?: string;
   cardLast4?: string;
   classification?: string;
   createdAt: string;
@@ -80,6 +83,9 @@ interface WithdrawalEntry {
   destination?: string;
   approvalStatus?: string;
   ip?: string;
+  country?: string;
+  city?: string;
+  region?: string;
   failureReason?: string;
   createdAt: string;
 }
@@ -164,6 +170,17 @@ function statusBadgeClasses(status: string): string {
   if (s === "disputed")
     return "bg-fuchsia-500/20 text-fuchsia-400 border-fuchsia-500/30";
   return "bg-slate-500/20 text-slate-300 border-slate-500/30";
+}
+
+function formatGeoInline(
+  city?: string,
+  region?: string,
+  country?: string,
+): string | undefined {
+  const parts = [city, region, country].filter(
+    (p): p is string => typeof p === "string" && p.length > 0,
+  );
+  return parts.length > 0 ? parts.join(", ") : undefined;
 }
 
 function severityBadgeClasses(severity: string): string {
@@ -593,7 +610,18 @@ function DepositsCard({ entries }: { entries: DepositEntry[] }) {
                     <td className="px-3 py-2 font-mono">
                       {d.cardLast4 ? `•••• ${d.cardLast4}` : "—"}
                     </td>
-                    <td className="px-3 py-2 font-mono">{d.ip || "—"}</td>
+                    <td className="px-3 py-2">
+                      <div className="font-mono">{d.ip || "—"}</div>
+                      {(() => {
+                        const g = formatGeoInline(d.city, d.region, d.country);
+                        return g ? (
+                          <div className="mt-0.5 inline-flex items-center gap-1 text-slate-500">
+                            <Globe2 className="w-3 h-3" />
+                            {g}
+                          </div>
+                        ) : null;
+                      })()}
+                    </td>
                     <td className="px-3 py-2">
                       <Badge
                         variant="outline"
@@ -674,7 +702,18 @@ function WithdrawalsCard({ entries }: { entries: WithdrawalEntry[] }) {
                     <td className="px-3 py-2 truncate max-w-[160px]">
                       {w.destination || w.paymentMethod || w.provider || "—"}
                     </td>
-                    <td className="px-3 py-2 font-mono">{w.ip || "—"}</td>
+                    <td className="px-3 py-2">
+                      <div className="font-mono">{w.ip || "—"}</div>
+                      {(() => {
+                        const g = formatGeoInline(w.city, w.region, w.country);
+                        return g ? (
+                          <div className="mt-0.5 inline-flex items-center gap-1 text-slate-500">
+                            <Globe2 className="w-3 h-3" />
+                            {g}
+                          </div>
+                        ) : null;
+                      })()}
+                    </td>
                     <td className="px-3 py-2">
                       {w.approvalStatus ? (
                         <Badge

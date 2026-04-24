@@ -106,6 +106,10 @@ export interface IWithdrawalRequest extends Document {
   riskFlags?: string[]; // Any risk flags raised
   ipAddress?: string; // IP at time of request
   userAgent?: string; // Browser/device info
+  // Cloudflare-derived geo at request time (zero external lookup).
+  country?: string;
+  city?: string;
+  region?: string;
 
   // Sandbox/Production
   isSandbox: boolean; // Is this a sandbox withdrawal?
@@ -115,6 +119,7 @@ export interface IWithdrawalRequest extends Document {
   adminNote?: string; // Admin's internal note
 
   // Metadata (for storing provider-specific data like Nuvei request IDs)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- free-form PSP metadata blob
   metadata?: Record<string, any>;
 
   // KYC Status at Time of Request
@@ -299,6 +304,9 @@ const WithdrawalRequestSchema = new Schema<IWithdrawalRequest>(
     riskFlags: [String],
     ipAddress: String,
     userAgent: String,
+    country: String,
+    city: String,
+    region: String,
 
     // Sandbox/Production
     isSandbox: {
@@ -346,6 +354,7 @@ WithdrawalRequestSchema.index({ payoutId: 1 });
 WithdrawalRequestSchema.statics.getPendingCount = async function (
   userId?: string,
 ): Promise<number> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Mongoose query builder accepts arbitrary filter shapes
   const query: any = { status: { $in: ["pending", "approved", "processing"] } };
   if (userId) query.userId = userId;
   return this.countDocuments(query);

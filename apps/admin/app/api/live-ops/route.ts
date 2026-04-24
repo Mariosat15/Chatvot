@@ -155,6 +155,11 @@ export async function GET() {
         providerTransactionId: d.providerTransactionId,
         failureReason: d.failureReason,
         ip: md.ip || md.clientIp || undefined,
+        // Cloudflare-derived geo captured at deposit creation. `md.clientCountry`
+        // etc. are the canonical keys; older rows without them surface as —.
+        country: md.clientCountry || md.country || undefined,
+        city: md.clientCity || md.city || undefined,
+        region: md.clientRegion || md.region || undefined,
         cardLast4: md.cardLast4 || md.last4 || undefined,
         classification:
           md.fraudClassification || md.riskClassification || undefined,
@@ -211,6 +216,9 @@ export async function GET() {
         destination,
         approvalStatus,
         ip: w.ipAddress,
+        country: w.country,
+        city: w.city,
+        region: w.region,
         failureReason: w.failureReason,
         createdAt: w.createdAt,
       };
