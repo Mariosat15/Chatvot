@@ -5,7 +5,11 @@ export interface IAuditLog extends Document {
   userId: string;
   userName: string;
   userEmail: string;
-  userRole: "admin" | "superadmin" | "moderator" | "user";
+  // Flexible string to support custom employee roles AND system-initiated
+  // audit entries (PSP webhooks, scheduled jobs, background workers).
+  // Reason: keeping this as a free string mirrors the admin-side model and
+  // avoids rejecting legitimate non-human actors like "system".
+  userRole: string;
 
   // What action was performed
   action: string;
@@ -56,7 +60,7 @@ export interface IAuditLogModel extends Model<IAuditLog> {
     userId: string;
     userName: string;
     userEmail: string;
-    userRole?: "admin" | "superadmin" | "moderator" | "user";
+    userRole?: string; // admin / superadmin / moderator / user / system / custom
     action: string;
     actionCategory: IAuditLog["actionCategory"];
     description: string;
@@ -92,7 +96,9 @@ const AuditLogSchema = new Schema<IAuditLog>(
     },
     userRole: {
       type: String,
-      enum: ["admin", "superadmin", "moderator", "user"],
+      // Reason: intentionally not using `enum` — system-initiated audits
+      // ("system") and custom employee roles must be allowed. Matches the
+      // admin-mirror model.
       default: "admin",
     },
     action: {
