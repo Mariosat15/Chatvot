@@ -7,8 +7,9 @@
  * attack route passes through `requireAttackTestAccess` as its first step.
  *
  * SEVEN LAYERS (any single failure = 403):
- *   1. Env flag          SIMULATOR_ATTACK_TESTS_ENABLED === "true"
- *   2. Shared secret     X-Simulator-Attack-Secret header (constant-time compare)
+ *   1. DB toggle         AttackSuiteConfig.enabled === true (admin-controlled)
+ *   2. Shared secret     X-Simulator-Attack-Secret header (constant-time compare
+ *                        against AttackSuiteConfig.secret)
  *   3. Loopback only     client IP must be 127.0.0.1 or ::1 (or equivalents)
  *   4. Test-user prefix  any userId param must start with "sim-attack-"
  *   5. Self rate-limit   60 attack calls / minute / IP
@@ -22,6 +23,10 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { getClientIP, checkRateLimit } from "@/lib/utils/rate-limiter";
+import {
+  isAttackSuiteEnabled,
+  getAttackSuiteSecret,
+} from "@/lib/services/simulator/attack-suite-config.service";
 
 export const ATTACK_USER_PREFIX = "sim-attack-";
 export const ATTACK_SECRET_HEADER = "x-simulator-attack-secret";
@@ -82,16 +87,17 @@ function isLoopback(ip: string): boolean {
  * the status/reason that the route should return. No information about which
  * specific layer failed leaks to the client beyond 403 + "Forbidden".
  */
-export function requireAttackTestAccess(
+export async function requireAttackTestAccess(
   req: NextRequest | Request,
-): AttackGuardResult {
-  // LAYER 1: Env flag
-  if (process.env.SIMULATOR_ATTACK_TESTS_ENABLED !== "true") {
+): Promise<AttackGuardResult> {
+  // LAYER 1: DB toggle (admin-controlled via Attack Suite config)
+  const enabled = await isAttackSuiteEnabled();
+  if (!enabled) {
     return { ok: false, status: 403, reason: "disabled" };
   }
 
-  // LAYER 2: Shared secret
-  const expectedSecret = process.env.SIMULATOR_ATTACK_SECRET;
+  // LAYER 2: Shared secret (stored in AttackSuiteConfig, rotated from admin UI)
+  const expectedSecret = await getAttackSuiteSecret();
   if (!expectedSecret || expectedSecret.length < 16) {
     // Missing/too-short secret is treated as "disabled" to avoid weak defaults.
     return { ok: false, status: 403, reason: "disabled" };
@@ -126,10 +132,10 @@ export function requireAttackTestAccess(
  * Convenience helper: run the guard and return a NextResponse on failure, or
  * null on success. Keeps route handlers short.
  */
-export function guardAttackRoute(
+export async function guardAttackRoute(
   req: NextRequest,
-): { response: NextResponse } | { clientIp: string } {
-  const result = requireAttackTestAccess(req);
+): Promise<{ response: NextResponse } | { clientIp: string }> {
+  const result = await requireAttackTestAccess(req);
   if (!result.ok) {
     return {
       response: NextResponse.json(

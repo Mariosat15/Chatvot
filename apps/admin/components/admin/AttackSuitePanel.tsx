@@ -16,13 +16,13 @@ import { toast } from "sonner";
 import {
   Play,
   ShieldCheck,
-  AlertTriangle,
   Loader2,
   CheckCircle2,
   XCircle,
   SkipForward,
   Trash2,
 } from "lucide-react";
+import AttackSuiteConfigCard from "./AttackSuiteConfigCard";
 
 /**
  * Admin UI for the Card-Testing Attack Suite.
@@ -218,6 +218,14 @@ export default function AttackSuitePanel() {
 
   return (
     <div className="space-y-4">
+      <AttackSuiteConfigCard
+        mutationsLocked={isRunning}
+        onChange={(cfg) => {
+          setEnabled(cfg.enabled);
+          setSecretConfigured(cfg.secretSet);
+        }}
+      />
+
       <Card className="bg-gray-900/60 border-gray-700">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-white">
@@ -232,31 +240,11 @@ export default function AttackSuitePanel() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {enabled === false && (
-            <div className="rounded border border-amber-600 bg-amber-900/30 p-3 text-amber-200 text-sm flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 mt-0.5" />
-              <div>
-                Attack suite is disabled. Set{" "}
-                <code className="bg-black/30 px-1 rounded">
-                  SIMULATOR_ATTACK_TESTS_ENABLED=true
-                </code>{" "}
-                in the environment and restart.
-              </div>
-            </div>
-          )}
-          {secretConfigured === false && (
-            <div className="rounded border border-red-600 bg-red-900/30 p-3 text-red-200 text-sm flex items-start gap-2">
-              <AlertTriangle className="h-4 w-4 mt-0.5" />
-              <div>
-                <code className="bg-black/30 px-1 rounded">
-                  SIMULATOR_ATTACK_SECRET
-                </code>{" "}
-                is missing or too short. Generate one with{" "}
-                <code className="bg-black/30 px-1 rounded">
-                  openssl rand -hex 32
-                </code>{" "}
-                and set it in the environment.
-              </div>
+          {enabled === false && secretConfigured !== null && (
+            <div className="rounded border border-amber-700 bg-amber-900/20 p-3 text-amber-200 text-sm">
+              The Attack Suite is currently disabled. Use the{" "}
+              <strong>Configuration</strong> card above to enable it and
+              generate a secret.
             </div>
           )}
 

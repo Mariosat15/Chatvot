@@ -15,7 +15,7 @@ import { isDeclineBlocked } from "@/lib/utils/rate-limiter";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const guard = guardAttackRoute(req);
+  const guard = await guardAttackRoute(req);
   if ("response" in guard) return guard.response;
 
   const { searchParams } = new URL(req.url);

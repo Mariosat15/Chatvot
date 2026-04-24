@@ -1688,43 +1688,51 @@ export default function AdminWikiSection() {
               </p>
               <div className="pt-1">
                 <p className="font-semibold text-gray-200">
-                  Enabling the suite (dev / staging only)
+                  Enabling the suite (admin UI, no env vars)
                 </p>
                 <p>
-                  Add these lines to your local <code>.env</code> file (which
-                  is gitignored — never commit real values) and restart both
-                  the main app and the admin app:
+                  Everything is controlled from the{" "}
+                  <strong>Configuration</strong> card at the top of the{" "}
+                  <strong>Attack Suite</strong> tab. Walk-through for a brand
+                  new deployment:
                 </p>
-                <pre className="bg-gray-900 border border-gray-700 rounded-md p-3 text-xs text-gray-200 overflow-x-auto">
-                  {[
-                    "# Master on/off switch (default: disabled)",
-                    "SIMULATOR_ATTACK_TESTS_ENABLED=true",
-                    "",
-                    "# 32-byte hex shared secret",
-                    "SIMULATOR_ATTACK_SECRET=<paste generated value here>",
-                    "",
-                    "# Optional: override the main-app URL the admin calls",
-                    "# MAIN_APP_URL=http://127.0.0.1:3000",
-                  ].join("\n")}
-                </pre>
+                <ol className="list-decimal list-inside space-y-1 pt-1">
+                  <li>
+                    Click <strong>Generate Secret</strong>. The server creates
+                    a fresh 32-byte hex secret and stores it in MongoDB. A
+                    one-time dialog reveals the plaintext so you can copy it
+                    to a password manager if you need it for out-of-band
+                    debugging (normal operation never requires pasting it
+                    anywhere).
+                  </li>
+                  <li>
+                    Click <strong>Enable Suite</strong>. Both the toggle and
+                    the secret are now in place — <em>Run Attack Suite</em>{" "}
+                    activates.
+                  </li>
+                  <li>
+                    To turn the suite off: click <strong>Disable Suite</strong>
+                    . To invalidate the stored secret: click{" "}
+                    <strong>Revoke Secret</strong> (this also force-disables
+                    the suite).
+                  </li>
+                </ol>
                 <p className="pt-2">
-                  Generate the secret with either command:
+                  <strong>Audit trail:</strong> every enable, disable, rotate,
+                  and revoke writes an entry under{" "}
+                  <code>audit-logs</code> with category{" "}
+                  <strong>security</strong> and action prefix{" "}
+                  <code>attack_test.*</code>. The acting admin&apos;s email
+                  and name are captured on each mutation.
                 </p>
-                <pre className="bg-gray-900 border border-gray-700 rounded-md p-3 text-xs text-gray-200 overflow-x-auto">
-                  {[
-                    "# macOS / Linux / Git Bash",
-                    "openssl rand -hex 32",
-                    "",
-                    "# Windows PowerShell",
-                    "-join ((1..32) | ForEach-Object { '{0:x2}' -f (Get-Random -Max 256) })",
-                  ].join("\n")}
-                </pre>
                 <p className="pt-2 text-gray-400">
-                  In production, leave both variables <em>unset</em>. Even if
-                  they accidentally ship enabled, layers 3–7 (loopback,
-                  test-user prefix, self rate-limit, admin auth, audit log)
-                  still prevent any real user or real wallet from being
-                  touched.
+                  <strong>Production posture:</strong> fresh deployments ship
+                  with <code>enabled: false</code> and no secret. The suite is
+                  completely inert until an admin explicitly opts in. Even if
+                  an attacker somehow flipped the DB flag, layers 3–7
+                  (loopback, <code>sim-attack-*</code> prefix, self
+                  rate-limit, admin auth on kickoff, audit log) still block
+                  any path to real users or real wallets.
                 </p>
               </div>
               <p className="text-gray-400">

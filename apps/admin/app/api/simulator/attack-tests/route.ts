@@ -23,6 +23,11 @@ import {
 } from "../../../../../../lib/services/simulator/attack-tests/runner";
 import AttackRun from "../../../../../../database/models/simulator/attack-run.model";
 import { connectToDatabase } from "../../../../../../database/mongoose";
+import {
+  getAttackSuiteSecret,
+  getPublicAttackSuiteConfig,
+  isAttackSuiteEnabled,
+} from "../../../../../../lib/services/simulator/attack-suite-config.service";
 
 export const dynamic = "force-dynamic";
 
@@ -38,12 +43,6 @@ function resolveMainAppUrl(): string {
   return baseUrl;
 }
 
-function getAttackSecret(): string | null {
-  const secret = process.env.SIMULATOR_ATTACK_SECRET;
-  if (!secret || secret.length < 16) return null;
-  return secret;
-}
-
 export async function POST(req: NextRequest) {
   try {
     await requireAdminAuth();
@@ -54,23 +53,25 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (process.env.SIMULATOR_ATTACK_TESTS_ENABLED !== "true") {
+  const enabled = await isAttackSuiteEnabled();
+  if (!enabled) {
     return NextResponse.json(
       {
         success: false,
-        error: "Attack suite disabled. Set SIMULATOR_ATTACK_TESTS_ENABLED=true.",
+        error:
+          "Attack Suite is disabled. Enable it and rotate a secret from the Configuration card before running.",
       },
       { status: 403 },
     );
   }
 
-  const secret = getAttackSecret();
+  const secret = await getAttackSuiteSecret();
   if (!secret) {
     return NextResponse.json(
       {
         success: false,
         error:
-          "SIMULATOR_ATTACK_SECRET not configured (min 16 chars, use `openssl rand -hex 32`).",
+          "Attack Suite secret is not configured. Click 'Rotate Secret' in the Configuration card first.",
       },
       { status: 500 },
     );
@@ -233,10 +234,13 @@ export async function GET(req: NextRequest) {
     .select("-logs")
     .lean();
 
+  const publicConfig = await getPublicAttackSuiteConfig();
+
   return NextResponse.json({
     success: true,
     runs,
-    enabled: process.env.SIMULATOR_ATTACK_TESTS_ENABLED === "true",
-    secretConfigured: !!getAttackSecret(),
+    enabled: publicConfig.enabled,
+    secretConfigured: publicConfig.secretSet,
+    config: publicConfig,
   });
 }

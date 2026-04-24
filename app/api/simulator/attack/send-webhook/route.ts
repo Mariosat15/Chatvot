@@ -37,7 +37,7 @@ interface WebhookBody {
 }
 
 export async function POST(req: NextRequest) {
-  const guard = guardAttackRoute(req);
+  const guard = await guardAttackRoute(req);
   if ("response" in guard) return guard.response;
 
   let body: WebhookBody;
