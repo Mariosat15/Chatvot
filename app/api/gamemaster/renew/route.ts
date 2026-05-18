@@ -69,7 +69,26 @@ export async function POST() {
     // Get current package to determine renewal price and duration
     let renewalPrice = subscription.renewalPrice || 0;
     let durationDays = 30;
-    let packageConfig = subscription.limits;
+    // Reason: `subscription.limits` is a Mongoose subdocument; cloning to a
+    // plain object below means we must include every required field
+    // (canEarnFromChallenges is required: true on the schema).
+    const existingLimits = subscription.limits ?? {};
+    let packageConfig: {
+      maxCompetitionsPerDay: number;
+      maxUsersPerCompetition: number;
+      referralFeePercentage: number;
+      canCreateCompetitions: boolean;
+      canEarnFromChallenges: boolean;
+      challengeReferralFeePercentage?: number;
+    } = {
+      maxCompetitionsPerDay: existingLimits.maxCompetitionsPerDay ?? 1,
+      maxUsersPerCompetition: existingLimits.maxUsersPerCompetition ?? 50,
+      referralFeePercentage: existingLimits.referralFeePercentage ?? 5,
+      canCreateCompetitions: existingLimits.canCreateCompetitions !== false,
+      canEarnFromChallenges: existingLimits.canEarnFromChallenges === true,
+      challengeReferralFeePercentage:
+        existingLimits.challengeReferralFeePercentage,
+    };
 
     if (subscription.packageId) {
       const currentPackage = await MarketplaceItem.findById(
@@ -88,6 +107,12 @@ export async function POST() {
             currentPackage.gameMasterConfig.referralFeePercentage || 5,
           canCreateCompetitions:
             currentPackage.gameMasterConfig.canCreateCompetitions !== false,
+          canEarnFromChallenges:
+            currentPackage.gameMasterConfig.canEarnFromChallenges === true,
+          challengeReferralFeePercentage:
+            currentPackage.gameMasterConfig.challengeReferralFeePercentage ??
+            currentPackage.gameMasterConfig.referralFeePercentage ??
+            0,
         };
       }
     }

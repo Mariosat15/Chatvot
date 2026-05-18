@@ -246,7 +246,12 @@ const GameMasterSubscriptionSchema = new Schema<IGameMasterSubscription>(
       {
         date: { type: Date, required: true },
         amount: { type: Number, required: true },
-        transactionId: { type: String, required: true },
+        // Reason: failed renewals (e.g. insufficient balance) legitimately
+        // have no wallet transaction — see worker/jobs/gamemaster-renewal.job.ts
+        // which $pushes transactionId: "" for those rows. Marking this
+        // required: true caused subscription.save() to fail on any document
+        // that already had a historical failed-renewal entry.
+        transactionId: { type: String, default: "" },
         status: { type: String, enum: ["success", "failed"], required: true },
         failureReason: { type: String },
       },
