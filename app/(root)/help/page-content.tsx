@@ -40,6 +40,8 @@ import {
   BadgeCheck,
   CheckCircle2,
   AlertTriangle,
+  Map,
+  Flag,
 } from "lucide-react";
 import { GameIcon } from "@/components/ui/GameIcon";
 import type { GameIconName } from "@/lib/constants/game-icons";
@@ -132,6 +134,7 @@ const menuSections = [
   { id: "arsenal", title: "🎯 Trading Arsenal", icon: Briefcase },
   { id: "gamemaster", title: "👑 Game Master", icon: Award },
   { id: "notifications", title: "🔔 Notifications", icon: Bell },
+  { id: "journey", title: "🗺️ Trader's Journey", icon: Map },
   { id: "trader-levels", title: "👑 Trader Levels", icon: Award },
   { id: "badge-system", title: "🏅 Badge System", icon: Award },
   { id: "risk-management", title: "🛡️ Risk Management", icon: Shield },
@@ -6750,6 +6753,425 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   </li>
                 </ul>
               </div>
+            </div>
+          </section>
+
+          {/* Trader's Journey */}
+          <section
+            id="journey"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
+          >
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+              <Map className="h-6 w-6 text-amber-400" />
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
+                🗺️ Trader&apos;s Journey
+              </h2>
+            </div>
+
+            <div className="space-y-4 text-gray-300">
+              <p className="leading-relaxed">
+                The Trader&apos;s Journey is your{" "}
+                <strong className="text-white">in-game progression map</strong>{" "}
+                — a curated path of milestones that turns your real actions
+                on the platform (depositing, trading, entering
+                competitions, accepting 1v1s, earning badges, climbing
+                levels) into a visible adventure. Each milestone you
+                complete drops <strong className="text-white">XP</strong>{" "}
+                into your account, can hand you a{" "}
+                <strong className="text-white">badge</strong>, and pushes
+                you closer to the next{" "}
+                <strong className="text-white">Trader Level</strong>.
+              </p>
+
+              <p className="text-sm text-gray-400">
+                You can open it in two places: the{" "}
+                <Link
+                  href="/profile?tab=journey"
+                  className="text-amber-400 hover:underline"
+                >
+                  Journey tab
+                </Link>{" "}
+                in your profile, or the dedicated{" "}
+                <Link
+                  href="/journey"
+                  className="text-amber-400 hover:underline"
+                >
+                  /journey
+                </Link>{" "}
+                page from the sidebar.
+              </p>
+
+              {/* How it works */}
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-5">
+                <h3 className="text-lg font-bold text-amber-400 mb-3 flex items-center gap-2">
+                  <Flag className="h-5 w-5" />
+                  How the journey is built
+                </h3>
+                <ul className="space-y-2 text-sm text-gray-300">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      The journey is split into up to{" "}
+                      <strong className="text-white">10 maps</strong>,
+                      each themed around a stage of your trading career
+                      (onboarding, first competitions, multi-asset
+                      mastery, etc.).
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Each map contains a chain of{" "}
+                      <strong className="text-white">milestones</strong>{" "}
+                      (nodes). They unlock in order — you can&apos;t
+                      jump ahead, but you can always look at the next
+                      node to see what unlocks it.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Milestone conditions are checked against your{" "}
+                      <strong className="text-white">real account
+                      stats</strong> (deposits, closed trades, lifetime
+                      PnL, competitions entered/won, 1v1s won, badges
+                      earned, account level, days active, etc.). Nothing
+                      is awarded for clicking — only for actually doing
+                      the thing.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Progress is evaluated automatically every time you
+                      open the Journey tab, plus after every trade
+                      closes, every deposit completes, and every
+                      competition / 1v1 settles — so the map updates as
+                      you play.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* What you see on the Journey page */}
+              <div>
+                <h3 className="text-lg font-bold text-white mb-3">
+                  What you see on the Journey page
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="p-4 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-amber-300 text-sm mb-1">
+                      🧭 Stat cards
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Total Journey XP earned, total milestones
+                      completed across all maps, days since you joined
+                      the journey, and maps completed (e.g.{" "}
+                      <code className="text-[10px] bg-gray-900 px-1 py-0.5 rounded">
+                        3 / 10
+                      </code>
+                      ).
+                    </p>
+                  </div>
+                  <div className="p-4 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-amber-300 text-sm mb-1">
+                      🗺️ Map picker
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Horizontal strip of all available maps. Completed
+                      maps are checked off, the current map is
+                      highlighted, and later maps appear locked until
+                      you unlock them.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-amber-300 text-sm mb-1">
+                      📍 Map canvas
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      The active map itself: a draggable board with
+                      nodes for each milestone. Nodes are colour-coded{" "}
+                      <span className="text-gray-400">locked</span> →{" "}
+                      <span className="text-cyan-400">unlocked</span> →{" "}
+                      <span className="text-amber-300">current</span> →{" "}
+                      <span className="text-green-400">completed</span>.
+                      A small 🏆 marker appears on nodes that also award
+                      a badge.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-amber-300 text-sm mb-1">
+                      🏅 Recent Achievements
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      The last <strong className="text-white">five</strong>{" "}
+                      milestones you completed on the current map, in
+                      reverse chronological order — handy for jumping
+                      back to a node you just cleared.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* How a milestone completes */}
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-5">
+                <h3 className="text-lg font-bold text-blue-400 mb-3">
+                  How a milestone completes
+                </h3>
+                <ol className="space-y-2 text-sm text-gray-300 list-decimal pl-5">
+                  <li>
+                    The milestone declares a set of{" "}
+                    <strong className="text-white">conditions</strong>{" "}
+                    (e.g. <em>3 closed trades</em>,{" "}
+                    <em>first deposit</em>,{" "}
+                    <em>5 competitions entered</em>,{" "}
+                    <em>reach Level 5</em>, <em>earn the &quot;First
+                    Blood&quot; badge</em>).
+                  </li>
+                  <li>
+                    Whenever a relevant event happens, the platform
+                    re-checks the conditions for the current and
+                    next-up milestones — using the same stats engine
+                    that drives badges.
+                  </li>
+                  <li>
+                    When every condition is satisfied, the milestone is
+                    marked <strong className="text-green-400">completed</strong>{" "}
+                    and its rewards are paid out at once: XP credited to
+                    your{" "}
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection("trader-levels")}
+                      className="text-cyan-400 hover:underline"
+                    >
+                      Trader Level
+                    </button>
+                    , an optional{" "}
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection("badge-system")}
+                      className="text-yellow-400 hover:underline"
+                    >
+                      badge
+                    </button>
+                    , an optional title, and any platform features the
+                    map chooses to unlock at that node.
+                  </li>
+                  <li>
+                    A toast / notification fires for the completion. If
+                    the XP push also crossed a level threshold,{" "}
+                    <strong className="text-white">you level up at
+                    the same time</strong>.
+                  </li>
+                </ol>
+              </div>
+
+              {/* Connection to badges */}
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-5">
+                <h3 className="text-lg font-bold text-yellow-400 mb-3 flex items-center gap-2">
+                  <Award className="h-5 w-5" />
+                  How the Journey ties into Badges
+                </h3>
+                <div className="space-y-3 text-sm text-gray-300">
+                  <p>
+                    The Journey and the{" "}
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection("badge-system")}
+                      className="text-yellow-400 hover:underline"
+                    >
+                      🏅 Badge System
+                    </button>{" "}
+                    feed into each other in three ways:
+                  </p>
+                  <ul className="space-y-2 list-disc pl-5 text-gray-400">
+                    <li>
+                      <strong className="text-white">
+                        Milestones award badges.
+                      </strong>{" "}
+                      Every &quot;first&quot;-style achievement on
+                      ChartVolt — first deposit, first trade, first
+                      competition entered, first 1v1 won, etc. — is
+                      handled by Journey milestones, and the badge for
+                      that achievement is granted the moment the
+                      milestone completes. (This is why the standalone
+                      Badge System doesn&apos;t duplicate &quot;first
+                      X&quot; badges.)
+                    </li>
+                    <li>
+                      <strong className="text-white">
+                        Badges can gate milestones.
+                      </strong>{" "}
+                      Later milestones can require specific badges as a
+                      pre-condition — e.g. a competition-mastery
+                      milestone that only unlocks after you&apos;ve
+                      earned the &quot;Podium Finisher&quot; badge.
+                    </li>
+                    <li>
+                      <strong className="text-white">
+                        Earning a badge re-checks the Journey.
+                      </strong>{" "}
+                      When the badge engine awards you anything, it
+                      immediately re-runs the milestone evaluator —
+                      so if that new badge was the last missing piece
+                      of a milestone, the milestone completes in the
+                      same step.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Connection to levels */}
+              <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-5">
+                <h3 className="text-lg font-bold text-cyan-400 mb-3 flex items-center gap-2">
+                  <Award className="h-5 w-5" />
+                  How the Journey ties into Trader Levels
+                </h3>
+                <div className="space-y-3 text-sm text-gray-300">
+                  <p>
+                    Journey XP is{" "}
+                    <strong className="text-white">
+                      the same XP
+                    </strong>{" "}
+                    used by your account-wide{" "}
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection("trader-levels")}
+                      className="text-cyan-400 hover:underline"
+                    >
+                      Trader Level
+                    </button>{" "}
+                    — there is only one XP pool. Milestones simply
+                    push into it from one more source (alongside
+                    badges, trades, competitions, and challenges).
+                  </p>
+                  <ul className="space-y-2 list-disc pl-5 text-gray-400">
+                    <li>
+                      Completing a milestone calls the same{" "}
+                      <code className="text-[11px] bg-gray-900 px-1.5 py-0.5 rounded">
+                        awardXP
+                      </code>{" "}
+                      service that the Badge System uses, so the XP
+                      bar on your Overview tab and the Journey&apos;s
+                      &quot;Total XP&quot; figure are always in sync.
+                    </li>
+                    <li>
+                      Some maps and milestones have a{" "}
+                      <strong className="text-white">
+                        level requirement
+                      </strong>{" "}
+                      (e.g. &quot;reach Level 5 to unlock Map 2&quot;).
+                      Those nodes stay locked even if you meet the
+                      action conditions until you cross the level
+                      threshold.
+                    </li>
+                    <li>
+                      Big milestones can hand out enough XP to{" "}
+                      <strong className="text-white">trigger a
+                      level-up in the same moment</strong>. You&apos;ll
+                      get the milestone toast followed immediately by
+                      the level-up notification.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Summary table */}
+              <div>
+                <h3 className="text-lg font-bold text-white mb-3">
+                  Quick recap: Journey vs Badges vs Levels
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm border border-gray-700 rounded-lg overflow-hidden">
+                    <thead>
+                      <tr className="bg-gray-700/50 text-gray-300">
+                        <th className="px-3 py-2 text-left">System</th>
+                        <th className="px-3 py-2 text-left">
+                          What it&apos;s for
+                        </th>
+                        <th className="px-3 py-2 text-left">
+                          Awards XP?
+                        </th>
+                        <th className="px-3 py-2 text-left">
+                          Granted automatically?
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-gray-300">
+                      <tr className="border-t border-gray-700">
+                        <td className="px-3 py-2 font-semibold text-amber-300">
+                          Journey
+                        </td>
+                        <td className="px-3 py-2 text-gray-400">
+                          Ordered path of milestones turning your
+                          actions into a visible progression map.
+                        </td>
+                        <td className="px-3 py-2 text-green-400">
+                          Yes
+                        </td>
+                        <td className="px-3 py-2 text-green-400">
+                          Yes — re-evaluated on relevant events
+                        </td>
+                      </tr>
+                      <tr className="border-t border-gray-700">
+                        <td className="px-3 py-2 font-semibold text-yellow-300">
+                          Badges
+                        </td>
+                        <td className="px-3 py-2 text-gray-400">
+                          Collectible achievements you can show off on
+                          your profile and the leaderboard.
+                        </td>
+                        <td className="px-3 py-2 text-green-400">
+                          Yes
+                        </td>
+                        <td className="px-3 py-2 text-green-400">
+                          Yes — event-driven + hourly
+                        </td>
+                      </tr>
+                      <tr className="border-t border-gray-700">
+                        <td className="px-3 py-2 font-semibold text-cyan-300">
+                          Trader Levels
+                        </td>
+                        <td className="px-3 py-2 text-gray-400">
+                          Single account-wide level driven by the total
+                          XP earned from all sources.
+                        </td>
+                        <td className="px-3 py-2 text-gray-400">
+                          (Levels consume XP)
+                        </td>
+                        <td className="px-3 py-2 text-green-400">
+                          Yes — every XP grant recalculates
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* CTA */}
+              {isLoggedIn && (
+                <div className="bg-gray-700/50 border border-gray-600 rounded-xl p-5 text-center">
+                  <p className="text-sm text-gray-400 mb-3">
+                    Pick up where you left off — every closed trade,
+                    every deposit, every podium finish nudges you a
+                    little further down the map.
+                  </p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    <Link
+                      href="/journey"
+                      className="inline-block px-6 py-2 bg-amber-500 hover:bg-amber-600 text-gray-900 rounded-lg transition-colors font-medium text-sm"
+                    >
+                      Open the Journey
+                    </Link>
+                    <Link
+                      href="/profile?tab=journey"
+                      className="inline-block px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors font-medium text-sm border border-gray-600"
+                    >
+                      Profile → Journey tab
+                    </Link>
+                  </div>
+                </div>
+              )}
             </div>
           </section>
 
