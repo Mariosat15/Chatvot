@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createReadStream, createWriteStream } from "fs";
 import { stat } from "fs/promises";
 import path from "path";
+import { Readable } from "stream";
 import { pipeline } from "stream/promises";
 import { requireAdminAuth } from "@/lib/admin/auth";
 import { connectToDatabase } from "@/database/mongoose";
@@ -86,20 +87,34 @@ export async function POST(
 
     const sessionDir = await getSessionTmpDir(sessionId);
     const finalPath = path.join(videoDir, path.basename(session.filename));
+    const totalChunks = session.totalChunks;
 
-    // Stream-concatenate chunks 0..N-1 into the final file.
-    const writeStream = createWriteStream(finalPath);
-    try {
-      for (let i = 0; i < session.totalChunks; i++) {
+    /**
+     * Stream-concatenate chunks 0..N-1 into the final file via a
+     * single `pipeline()` call.
+     *
+     * Reason: Calling `pipeline()` per-chunk on the same writeStream
+     * attaches a fresh set of `error`/`close`/`finish`/`end` listeners
+     * every iteration. For a 200 MB upload split into 40 chunks that
+     * is ~160 listeners on one emitter, which trips Node's
+     * MaxListenersExceededWarning (default cap: 10). Wrapping the
+     * read sequence in an async generator means pipeline only runs
+     * once and only one set of listeners is ever attached.
+     */
+    async function* concatChunks(): AsyncGenerator<Buffer> {
+      for (let i = 0; i < totalChunks; i++) {
         const chunkPath = path.join(sessionDir, `${i}.part`);
-        // Verify the chunk exists & is readable before piping.
-        await stat(chunkPath);
-        await pipeline(createReadStream(chunkPath), writeStream, {
-          end: i === session.totalChunks - 1,
-        });
+        await stat(chunkPath); // verify before reading
+        const reader = createReadStream(chunkPath);
+        for await (const buf of reader) {
+          yield buf as Buffer;
+        }
       }
+    }
+
+    try {
+      await pipeline(Readable.from(concatChunks()), createWriteStream(finalPath));
     } catch (concatErr) {
-      writeStream.destroy();
       console.error("❌ [tutorials finalize] concat failed:", concatErr);
       return NextResponse.json(
         { success: false, error: "Failed to assemble video file" },
