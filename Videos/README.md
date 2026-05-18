@@ -36,7 +36,18 @@ the `<video>` player can scrub without re-downloading).
 - Accepted video MIME types: `video/mp4`, `video/webm`, `video/ogg`,
   `video/quicktime`.
 - Max upload size: **200 MB** (set in
-  `apps/admin/app/api/tutorials/route.ts`).
+  `apps/admin/app/api/tutorials/upload/init/route.ts`).
+- Uploads are split client-side into ~5 MB chunks and reassembled on
+  the server, so no nginx / reverse-proxy body-size tuning is needed
+  on any white-label deployment (the default 10 MB limit is more than
+  enough for a single chunk). Endpoints involved:
+  - `POST /api/tutorials/upload/init`
+  - `PUT /api/tutorials/upload/[sessionId]/chunk?index=N`
+  - `POST /api/tutorials/upload/[sessionId]/finalize`
+  - `DELETE /api/tutorials/upload/[sessionId]` (abort)
+- In-flight uploads live under `Videos/.tmp-uploads/<sessionId>/`.
+  Abandoned sessions are garbage-collected after 24 h via MongoDB TTL
+  and an opportunistic sweep on every new upload.
 - Optional thumbnail: PNG / JPEG / WebP, max **2 MB** — resized to
   640×360 WebP by `sharp` on upload, stored under `thumbnails/`.
 - File names use a slug + timestamp pattern, e.g.

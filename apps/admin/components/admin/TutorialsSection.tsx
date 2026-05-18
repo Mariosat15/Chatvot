@@ -83,6 +83,10 @@ export default function TutorialsSection() {
   const [previewing, setPreviewing] = useState<Tutorial | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const thumbInputRef = useRef<HTMLInputElement>(null);
+  // Refs to track the active upload session so we can abort cleanly
+  // on unmount, browser close, or the explicit Cancel button.
+  const sessionIdRef = useRef<string | null>(null);
+  const cancelRequestedRef = useRef(false);
 
   // Upload form
   const [form, setForm] = useState({
@@ -129,6 +133,69 @@ export default function TutorialsSection() {
     fetchTutorials();
   }, [fetchTutorials]);
 
+  // Reason: Reads a File/Blob as base64 for sending the small (< 2 MB)
+  // thumbnail inline with the init request. Avoids a second multipart
+  // round-trip just for a couple hundred KB of image.
+  const readAsBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result !== "string") {
+          reject(new Error("Failed to read thumbnail"));
+          return;
+        }
+        // strip the "data:<mime>;base64," prefix
+        const comma = result.indexOf(",");
+        resolve(comma >= 0 ? result.slice(comma + 1) : result);
+      };
+      reader.onerror = () => reject(new Error("Failed to read thumbnail"));
+      reader.readAsDataURL(file);
+    });
+
+  /**
+   * Aborts the current upload session (if any). Best-effort — safe to
+   * call multiple times.
+   */
+  const abortUpload = async () => {
+    cancelRequestedRef.current = true;
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    sessionIdRef.current = null;
+    try {
+      await fetch(`/api/tutorials/upload/${sid}`, {
+        method: "DELETE",
+        credentials: "include",
+        // sendBeacon-style: don't block UI on the response
+        keepalive: true,
+      });
+    } catch {
+      // best-effort
+    }
+  };
+
+  // Cancel any in-flight upload if the section unmounts or the
+  // browser tab closes.
+  useEffect(() => {
+    const onUnload = () => {
+      const sid = sessionIdRef.current;
+      if (sid && navigator.sendBeacon) {
+        // sendBeacon doesn't support DELETE, so fire-and-forget POST to abort.
+        // The DELETE endpoint is idempotent and will accept either method
+        // semantics for cleanup, but we keep DELETE for the live UI path.
+        // For unload, the keepalive fetch in abortUpload() also covers it.
+        navigator.sendBeacon(`/api/tutorials/upload/${sid}`);
+      }
+    };
+    window.addEventListener("beforeunload", onUnload);
+    return () => {
+      window.removeEventListener("beforeunload", onUnload);
+      if (sessionIdRef.current) {
+        void abortUpload();
+      }
+    };
+  }, []);
+
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.file) {
@@ -140,53 +207,129 @@ export default function TutorialsSection() {
       return;
     }
 
+    // Reason: capture File reference once so closures below don't need
+    // the non-null assertion that depends on outer-scope narrowing.
+    const file: File = form.file;
+
     setUploading(true);
     setUploadProgress(0);
+    cancelRequestedRef.current = false;
+    sessionIdRef.current = null;
 
     try {
-      const fd = new FormData();
-      fd.append("file", form.file);
-      if (form.thumb) fd.append("thumbnail", form.thumb);
-      fd.append("title", form.title.trim());
-      fd.append("description", form.description.trim());
-      fd.append("category", form.category);
-      fd.append("order", String(form.order));
-      fd.append("isActive", String(form.isActive));
+      // ---- 1. Init -------------------------------------------------
+      const initBody: Record<string, unknown> = {
+        title: form.title.trim(),
+        description: form.description.trim(),
+        category: form.category,
+        order: form.order,
+        isActive: form.isActive,
+        mimeType: file.type,
+        totalSize: file.size,
+      };
 
-      // Reason: Using XHR (not fetch) so we get upload progress events.
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", "/api/tutorials");
-        xhr.withCredentials = true;
-        xhr.upload.onprogress = (ev) => {
-          if (ev.lengthComputable) {
-            setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
-          }
+      if (form.thumb) {
+        const thumbB64 = await readAsBase64(form.thumb);
+        initBody.thumbnail = {
+          mimeType: form.thumb.type,
+          base64: thumbB64,
         };
-        xhr.onload = () => {
-          try {
-            const json = JSON.parse(xhr.responseText || "{}");
-            if (xhr.status >= 200 && xhr.status < 300 && json.success) {
+      }
+
+      const initRes = await fetch("/api/tutorials/upload/init", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(initBody),
+      });
+      const initJson = await initRes.json();
+      if (!initRes.ok || !initJson.success) {
+        throw new Error(initJson.error || `Init failed (${initRes.status})`);
+      }
+
+      const sessionId: string = initJson.sessionId;
+      const chunkSize: number = initJson.chunkSize;
+      const totalChunks: number = initJson.totalChunks;
+      sessionIdRef.current = sessionId;
+
+      // ---- 2. Upload chunks ---------------------------------------
+      for (let i = 0; i < totalChunks; i++) {
+        if (cancelRequestedRef.current) {
+          throw new Error("Upload cancelled");
+        }
+
+        const start = i * chunkSize;
+        const end = Math.min(start + chunkSize, file.size);
+        const blob = file.slice(start, end);
+
+        // XHR for per-chunk progress so we can roll an overall %.
+        // Reason: A single fetch() does not expose upload progress in
+        // any browser today; XHR is still the only portable option.
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("PUT", `/api/tutorials/upload/${sessionId}/chunk?index=${i}`);
+          xhr.withCredentials = true;
+          xhr.setRequestHeader("Content-Type", "application/octet-stream");
+          xhr.upload.onprogress = (ev) => {
+            if (ev.lengthComputable) {
+              const completedBytes = start + ev.loaded;
+              setUploadProgress(
+                Math.min(
+                  99,
+                  Math.round((completedBytes / file.size) * 100),
+                ),
+              );
+            }
+          };
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
               resolve();
             } else {
-              reject(new Error(json.error || `Upload failed (${xhr.status})`));
+              try {
+                const j = JSON.parse(xhr.responseText || "{}");
+                reject(
+                  new Error(j.error || `Chunk ${i} failed (${xhr.status})`),
+                );
+              } catch {
+                reject(new Error(`Chunk ${i} failed (${xhr.status})`));
+              }
             }
-          } catch {
-            reject(new Error(`Upload failed (${xhr.status})`));
-          }
-        };
-        xhr.onerror = () => reject(new Error("Network error during upload"));
-        xhr.send(fd);
-      });
+          };
+          xhr.onerror = () =>
+            reject(new Error(`Network error on chunk ${i}`));
+          xhr.send(blob);
+        });
+      }
 
+      // ---- 3. Finalize --------------------------------------------
+      const finRes = await fetch(
+        `/api/tutorials/upload/${sessionId}/finalize`,
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+      const finJson = await finRes.json();
+      if (!finRes.ok || !finJson.success) {
+        throw new Error(finJson.error || `Finalize failed (${finRes.status})`);
+      }
+
+      setUploadProgress(100);
+      sessionIdRef.current = null;
       toast.success("Tutorial uploaded successfully");
       resetForm();
       await fetchTutorials();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Upload failed");
+      const message = err instanceof Error ? err.message : "Upload failed";
+      toast.error(message);
+      // Try to clean up the partial upload on the server.
+      if (sessionIdRef.current) {
+        await abortUpload();
+      }
     } finally {
       setUploading(false);
       setUploadProgress(0);
+      cancelRequestedRef.current = false;
     }
   };
 
@@ -283,8 +426,10 @@ export default function TutorialsSection() {
           </h2>
           <p className="text-sm text-gray-400 mt-1">
             Upload tutorial videos to <code className="text-rose-300">Videos/</code>.
-            Committed videos ship as platform defaults for every white-label
-            deployment; admin-uploaded videos override them at runtime.
+            Files up to 200 MB are uploaded in small chunks so no reverse-proxy
+            tuning is required. Committed videos ship as platform defaults for
+            every white-label deployment; admin-uploaded videos override them
+            at runtime.
           </p>
         </div>
         <Button
@@ -435,14 +580,28 @@ export default function TutorialsSection() {
               >
                 {uploading ? "Uploading…" : "Upload Tutorial"}
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={resetForm}
-                disabled={uploading}
-              >
-                Reset
-              </Button>
+              {uploading ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="text-red-300 border-red-500/40 hover:bg-red-500/10"
+                  onClick={() => {
+                    cancelRequestedRef.current = true;
+                    void abortUpload();
+                  }}
+                >
+                  Cancel
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={resetForm}
+                  disabled={uploading}
+                >
+                  Reset
+                </Button>
+              )}
             </div>
           </form>
         </CardContent>

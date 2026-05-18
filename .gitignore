@@ -73,6 +73,9 @@ public/uploads/gamemaster/
 public/uploads/marketplace/*
 !public/uploads/marketplace/*.webp
 
+# Tutorial chunked-upload temp folder (never commit in-flight chunks)
+Videos/.tmp-uploads/
+
 # Logs
 logs/
 *.log
