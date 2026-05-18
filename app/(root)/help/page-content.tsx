@@ -928,56 +928,301 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           >
             <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <LayoutDashboard className="h-6 w-6 text-blue-500" />
-              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">📊 Dashboard</h2>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
+                📊 Dashboard
+              </h2>
             </div>
 
-            <div className="space-y-4 text-gray-300">
+            <div className="space-y-6 text-gray-300">
               <p className="leading-relaxed">
-                Your Dashboard is the command center where you see all trading
-                activity at a glance.
+                Your{" "}
+                <Link
+                  href="/dashboard"
+                  className="text-blue-400 hover:text-blue-300 underline"
+                >
+                  Dashboard
+                </Link>{" "}
+                is the home screen you land on after signing in. It&apos;s
+                organised into <strong className="text-white">four tabs</strong>{" "}
+                — Overview, Wallet, Performance and Contests — plus a
+                first-time onboarding checklist that hides itself once
+                you&apos;ve completed it. Your last-used tab is remembered
+                per browser, so you return to where you were.
               </p>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                  <h5 className="font-semibold text-white mb-2 flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4 text-blue-400" /> Portfolio
-                    Overview
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Total balance, today&apos;s P&L, win rate, and total trades.
-                  </p>
-                </div>
+              {/* ── Onboarding checklist (above the tabs) ─────────────── */}
+              <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                <h5 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-blue-400" /> Getting
+                  Started checklist (above the tabs)
+                </h5>
+                <p className="text-sm text-gray-300 mb-2">
+                  When you&apos;re new, a checklist appears at the top of the
+                  dashboard tracking five milestones:
+                </p>
+                <ul className="text-sm text-gray-300 space-y-1 ml-2 list-disc list-inside marker:text-blue-400/60">
+                  <li>Fund your wallet (first deposit)</li>
+                  <li>Join your first competition</li>
+                  <li>Place your first trade</li>
+                  <li>Complete a journey milestone</li>
+                  <li>Challenge another user to a 1v1</li>
+                </ul>
+                <p className="text-xs text-gray-400 mt-2">
+                  The checklist disappears automatically once every step is
+                  done, or you can dismiss it manually — that preference is
+                  remembered per browser.
+                </p>
+              </div>
 
-                <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                  <h5 className="font-semibold text-white mb-2 flex items-center gap-2">
-                    <Trophy className="h-4 w-4 text-yellow-400" /> Active
-                    Competitions
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Quick access to your current competitions with live
-                    rankings.
-                  </p>
-                </div>
+              {/* ── Tab 1: Overview ──────────────────────────────────── */}
+              <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                <h5 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <LayoutDashboard className="h-5 w-5 text-blue-400" /> Tab 1
+                  — Overview
+                </h5>
+                <p className="text-sm text-gray-400 mb-3">
+                  Snapshot of your account at a glance. Stacked top-to-bottom:
+                </p>
+                <ul className="text-sm text-gray-300 space-y-2 ml-2">
+                  <li className="flex items-start gap-2">
+                    <Shield className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Account Status</strong> —
+                      surfaces any active restrictions on your account (e.g.
+                      review, suspension, chargeback in progress). Only shown
+                      when there&apos;s something to report.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <BarChart3 className="h-4 w-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Hero Stats</strong> (4
+                      cards): Credit Balance ({settings.credits.symbol}), Win
+                      Rate, ROI %, and Total Prizes Won.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <User className="h-4 w-4 text-purple-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Player Profile Card</strong>{" "}
+                      — your current Trader Level &amp; title, XP progress bar
+                      to the next level, global rank out of all users, your
+                      most recent badges and a quick view of your active
+                      journey milestone.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Clock className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Recent Trades Feed</strong>{" "}
+                      — your latest closed trades and currently open positions
+                      with running P&amp;L.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Zap className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Streaks Showcase</strong>{" "}
+                      — current win/loss streaks, your longest-ever streaks,
+                      trading days this month, and consecutive profitable
+                      days.
+                    </span>
+                  </li>
+                </ul>
+              </div>
 
-                <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                  <h5 className="font-semibold text-white mb-2 flex items-center gap-2">
-                    <LineChart className="h-4 w-4 text-green-400" /> Performance
-                    Charts
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Daily P&L, statistics, and performance over time.
-                  </p>
-                </div>
+              {/* ── Tab 2: Wallet ────────────────────────────────────── */}
+              <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                <h5 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Wallet className="h-5 w-5 text-emerald-400" /> Tab 2 —
+                  Wallet &amp; Credits
+                </h5>
+                <p className="text-sm text-gray-400 mb-3">
+                  Everything money-related, in one place.
+                </p>
+                <ul className="text-sm text-gray-300 space-y-2 ml-2">
+                  <li className="flex items-start gap-2">
+                    <BarChart3 className="h-4 w-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Hero Stats</strong> (4
+                      cards): Credit Balance, Total Spent (entry fees +
+                      marketplace + GM), GM Earnings, Prizes Won.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <LineChart className="h-4 w-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Equity Chart</strong> —
+                      your wallet balance plotted over time.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <BarChart3 className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Daily Credit Flow</strong>{" "}
+                      — day-by-day in/out movements (deposits, withdrawals,
+                      entry fees, prizes, refunds).
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Coins className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Credit Breakdown</strong>{" "}
+                      — how your spending and earnings split by category
+                      (entry fees, marketplace purchases, Game Master,
+                      prizes, etc.), plus all-time totals.
+                    </span>
+                  </li>
+                </ul>
+                <p className="text-xs text-gray-500 mt-3">
+                  To actually deposit, withdraw, or see individual
+                  transactions, go to{" "}
+                  <Link
+                    href="/wallet"
+                    className="text-emerald-400 hover:text-emerald-300 underline"
+                  >
+                    /wallet
+                  </Link>{" "}
+                  — the Wallet tab here is read-only analytics.
+                </p>
+              </div>
 
-                <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                  <h5 className="font-semibold text-white mb-2 flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-purple-400" /> Recent
-                    Activity
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Latest trades, entries, and badge achievements.
-                  </p>
-                </div>
+              {/* ── Tab 3: Performance ───────────────────────────────── */}
+              <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                <h5 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-purple-400" /> Tab 3 —
+                  Trading Performance
+                </h5>
+                <p className="text-sm text-gray-400 mb-3">
+                  Deep statistical view of how you trade.
+                </p>
+                <ul className="text-sm text-gray-300 space-y-2 ml-2">
+                  <li className="flex items-start gap-2">
+                    <Target className="h-4 w-4 text-purple-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Performance Rings</strong>{" "}
+                      — Win Rate, ROI, Profit Factor, plus Average Win,
+                      Average Loss, Largest Win and Largest Loss.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <LineChart className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Trading Analytics</strong>{" "}
+                      — Win/Loss distribution, trades grouped by symbol
+                      (which Forex pairs you trade most), and trades by hour
+                      of day (when you&apos;re active).
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Trophy className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Contest Stats Cards</strong>{" "}
+                      — your aggregate stats from competitions and 1v1
+                      challenges (entries, wins, podiums, etc.).
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Clock className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Market Holidays</strong>{" "}
+                      — upcoming sessions where Forex trading will be closed
+                      or restricted (so you can plan around them).
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* ── Tab 4: Contests ──────────────────────────────────── */}
+              <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                <h5 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-yellow-400" /> Tab 4 —
+                  Contests
+                </h5>
+                <p className="text-sm text-gray-400 mb-3">
+                  Your participation in competitions and 1v1 challenges, all
+                  on one screen.
+                </p>
+                <ul className="text-sm text-gray-300 space-y-2 ml-2">
+                  <li className="flex items-start gap-2">
+                    <Trophy className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Competitions</strong> —
+                      your <em>active</em> competitions (with live rank) and{" "}
+                      <em>upcoming</em> competitions you&apos;ve joined.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Swords className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Challenges</strong> — your{" "}
+                      <em>active</em> 1v1 challenges and any{" "}
+                      <em>pending</em> challenges waiting for the opponent to
+                      accept or for you to respond to.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <BarChart3 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Quick stats</strong> —
+                      total contests entered, wins, and podium finishes.
+                    </span>
+                  </li>
+                </ul>
+                <p className="text-xs text-gray-500 mt-3">
+                  Click any card to jump into that contest&apos;s page,
+                  leaderboard or trading view.
+                </p>
+              </div>
+
+              {/* ── Pro tips ──────────────────────────────────────────── */}
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Info className="h-4 w-4 text-blue-400" /> Tips
+                </h4>
+                <ul className="space-y-2 text-sm text-gray-300">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Live numbers.</strong>{" "}
+                      Every stat is recomputed each time you load the
+                      dashboard — there&apos;s no manual refresh button to
+                      hunt for.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Currency.</strong> All
+                      money values on the dashboard are shown in{" "}
+                      {settings.credits.name.toLowerCase()} (
+                      {settings.credits.symbol}). To convert to{" "}
+                      {settings.currency.name}, divide by{" "}
+                      {settings.credits.eurToCreditsRate} — i.e.{" "}
+                      {settings.credits.symbol}
+                      {settings.credits.eurToCreditsRate} ={" "}
+                      {settings.currency.symbol}1.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">No data yet?</strong> If
+                      you haven&apos;t traded yet, most cards will show
+                      zeros and empty states. That&apos;s expected — the
+                      cards fill up as you play.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Restrictions show first.</strong>{" "}
+                      If your account is suspended, in review or in chargeback,
+                      the <em>Account Status</em> banner explains the situation
+                      and which actions are blocked.
+                    </span>
+                  </li>
+                </ul>
               </div>
             </div>
           </section>
