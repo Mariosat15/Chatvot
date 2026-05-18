@@ -9,6 +9,7 @@ import {
   Wallet,
   BarChart3,
   Trophy,
+  GraduationCap,
 } from "lucide-react";
 import HeroStatsBar from "./HeroStatsBar";
 import PlayerProfileCard from "./PlayerProfileCard";
@@ -27,6 +28,9 @@ const EquityChart = dynamic(() => import("./EquityChart"), { ssr: false });
 const DailyCreditFlow = dynamic(() => import("./DailyCreditFlow"), {
   ssr: false,
 });
+// Reason: Tutorials tab is lazy-loaded — it only fetches videos when the user
+// actually opens this tab, so it adds zero cost to the default Overview view.
+const TutorialsTab = dynamic(() => import("./TutorialsTab"), { ssr: false });
 
 const TAB_STORAGE_KEY = "chartvolt_dashboard_tab";
 
@@ -43,7 +47,12 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
 
   useEffect(() => {
     const saved = localStorage.getItem(TAB_STORAGE_KEY);
-    if (saved && ["overview", "wallet", "performance", "contests"].includes(saved)) {
+    if (
+      saved &&
+      ["overview", "wallet", "performance", "contests", "tutorials"].includes(
+        saved,
+      )
+    ) {
       setActiveTab(saved);
     }
   }, []);
@@ -65,7 +74,7 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
       />
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-4">
-        <TabsList className="w-full grid grid-cols-4 h-11 bg-gray-800/60 border border-gray-700/50">
+        <TabsList className="w-full grid grid-cols-5 h-11 bg-gray-800/60 border border-gray-700/50">
           <TabsTrigger value="overview" className="gap-1.5 text-xs sm:text-sm">
             <LayoutDashboard className="w-4 h-4 hidden sm:block" />
             Overview
@@ -81,6 +90,10 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
           <TabsTrigger value="contests" className="gap-1.5 text-xs sm:text-sm">
             <Trophy className="w-4 h-4 hidden sm:block" />
             Contests
+          </TabsTrigger>
+          <TabsTrigger value="tutorials" className="gap-1.5 text-xs sm:text-sm">
+            <GraduationCap className="w-4 h-4 hidden sm:block" />
+            Tutorials
           </TabsTrigger>
         </TabsList>
 
@@ -198,6 +211,11 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
             }}
             fullWidth
           />
+        </TabsContent>
+
+        {/* ── Tab 5: Tutorials ── */}
+        <TabsContent value="tutorials" className="space-y-4 mt-4">
+          <TutorialsTab />
         </TabsContent>
       </Tabs>
     </div>

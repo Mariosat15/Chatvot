@@ -69,6 +69,7 @@ import {
   Eye,
   Cookie,
   Megaphone,
+  Video,
 } from "lucide-react";
 import { toast } from "sonner";
 import CredentialsSection from "@/components/admin/CredentialsSection";
@@ -88,6 +89,7 @@ import PendingPaymentsSection from "@/components/admin/PendingPaymentsSection";
 import FailedDepositsSection from "@/components/admin/FailedDepositsSection";
 import FraudMonitoringSection from "@/components/admin/FraudMonitoringSection";
 import AdminWikiSection from "@/components/admin/AdminWikiSection";
+import TutorialsSection from "@/components/admin/TutorialsSection";
 import BadgeXPManagementSection from "@/components/admin/BadgeXPManagementSection";
 import FeeSettingsSection from "@/components/admin/FeeSettingsSection";
 import CompanyDetailsSection from "@/components/admin/CompanyDetailsSection";
@@ -444,6 +446,13 @@ const menuGroups: MenuGroup[] = [
         icon: <BookOpen className="h-5 w-5" />,
         color: "text-indigo-400",
         bgColor: "bg-indigo-500/10 hover:bg-indigo-500/20",
+      },
+      {
+        id: "tutorials",
+        label: "Tutorial Videos",
+        icon: <Video className="h-5 w-5" />,
+        color: "text-rose-400",
+        bgColor: "bg-rose-500/10 hover:bg-rose-500/20",
       },
     ],
   },
@@ -1051,6 +1060,8 @@ export default function AdminDashboard({
         return <GamificationWizardSection key={currentRefreshKey} />;
       case "wiki":
         return <AdminWikiSection key={currentRefreshKey} />;
+      case "tutorials":
+        return <TutorialsSection key={currentRefreshKey} />;
       case "credentials":
         return (
           <CredentialsSection

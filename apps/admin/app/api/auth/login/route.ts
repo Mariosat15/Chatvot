@@ -53,6 +53,7 @@ const ALL_ADMIN_SECTIONS = [
   "kyc-history",
   "fraud",
   "wiki",
+  "tutorials",
   "credentials",
   "email-templates",
   "notifications",
