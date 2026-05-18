@@ -5122,27 +5122,448 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
 
             <div className="space-y-4 text-gray-300">
               <p className="leading-relaxed">
-                Your Profile shows trading history, statistics, badges, and
-                account settings.
+                Your profile is your home in ChartVolt — the place where
+                you fine-tune your identity, see your career-level stats,
+                manage notifications, KYC, security, and your purchased
+                tools. Open it at{" "}
+                <Link
+                  href="/profile"
+                  className="text-cyan-400 hover:underline"
+                >
+                  /profile
+                </Link>{" "}
+                or via the avatar dropdown in the top-right.
               </p>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                  <h5 className="font-semibold text-cyan-400 mb-2">
-                    📊 Competition Stats
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Entries, wins, podiums, best P&L.
-                  </p>
+              <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-3 text-xs text-gray-300">
+                <strong className="text-cyan-300">Good to know:</strong>{" "}
+                There is no public &quot;/profile/username&quot; URL —{" "}
+                <code className="bg-gray-900 px-1 py-0.5 rounded">
+                  /profile
+                </code>{" "}
+                always shows <em>your own</em> profile. Other traders see
+                a limited card view of you (avatar, bio, public stats) via
+                the Profile Card on the leaderboard and on Match Cards.
+              </div>
+
+              {/* Tabs map */}
+              <div>
+                <h3 className="font-semibold text-white text-base mb-2">
+                  The seven tabs on /profile
+                </h3>
+                <p className="text-sm text-gray-400 mb-3">
+                  The active tab is reflected in the URL as{" "}
+                  <code className="bg-gray-900 px-1 py-0.5 rounded">
+                    ?tab=…
+                  </code>{" "}
+                  so you can bookmark or deep-link directly to any tab.
+                </p>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {/* Overview */}
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-cyan-400 text-sm mb-1 flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4" />
+                      Overview
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Your Trader Level & Title with an XP progress bar
+                      (earn XP by collecting badges — see{" "}
+                      <button
+                        type="button"
+                        onClick={() => scrollToSection("trader-levels")}
+                        className="text-cyan-400 hover:underline"
+                      >
+                        Trader Levels
+                      </button>
+                      ), plus competition and 1v1 summary cards (entered,
+                      won, podiums, credits won, victories).
+                    </p>
+                  </div>
+
+                  {/* Journey */}
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-purple-400 text-sm mb-1 flex items-center gap-2">
+                      <Sparkles className="h-4 w-4" />
+                      Journey
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      A visual roadmap of your milestones on the platform
+                      — competitions joined, wins, badge unlocks, and
+                      account events plotted across your account
+                      timeline.
+                    </p>
+                  </div>
+
+                  {/* Badges */}
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-yellow-400 text-sm mb-1 flex items-center gap-2">
+                      <Medal className="h-4 w-4" />
+                      Badges
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Every badge you have earned (and every one you
+                      haven&apos;t) with filters by{" "}
+                      <strong className="text-white">category</strong>{" "}
+                      and{" "}
+                      <strong className="text-white">rarity</strong>{" "}
+                      (Common / Rare / Epic / Legendary). Click a badge
+                      to open the detail card. Each rarity grants XP —
+                      see{" "}
+                      <button
+                        type="button"
+                        onClick={() => scrollToSection("badge-system")}
+                        className="text-yellow-400 hover:underline"
+                      >
+                        Badge System
+                      </button>
+                      .
+                    </p>
+                  </div>
+
+                  {/* Arsenal */}
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-orange-400 text-sm mb-1 flex items-center gap-2">
+                      <Briefcase className="h-4 w-4" />
+                      Arsenal
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Your purchased indicators, strategies, Game Master
+                      packages, profile frames, and other items from the
+                      Marketplace. Toggle items on/off, see expiry dates,
+                      and renew. Full details in{" "}
+                      <button
+                        type="button"
+                        onClick={() => scrollToSection("arsenal")}
+                        className="text-orange-400 hover:underline"
+                      >
+                        Trading Arsenal
+                      </button>
+                      .
+                    </p>
+                  </div>
+
+                  {/* Verification */}
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-green-400 text-sm mb-1 flex items-center gap-2">
+                      <BadgeCheck className="h-4 w-4" />
+                      Verification
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Your identity-verification (KYC) status and the
+                      &quot;Start verification&quot; flow. KYC is
+                      required before withdrawing
+                      {settings.kyc?.enabled &&
+                        settings.kyc?.requiredAmount > 0 && (
+                          <>
+                            {" "}
+                            (for amounts at or above{" "}
+                            {settings.currency.symbol}
+                            {settings.kyc.requiredAmount})
+                          </>
+                        )}
+                      .
+                    </p>
+                  </div>
+
+                  {/* Notifications */}
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-pink-400 text-sm mb-1 flex items-center gap-2">
+                      <Bell className="h-4 w-4" />
+                      Notifications
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Your in-app notification center: competition
+                      invites, challenge requests, prize payouts, KYC
+                      updates, marketplace receipts, and system
+                      announcements. See{" "}
+                      <button
+                        type="button"
+                        onClick={() => scrollToSection("notifications")}
+                        className="text-pink-400 hover:underline"
+                      >
+                        Notifications
+                      </button>
+                      .
+                    </p>
+                  </div>
+
+                  {/* Settings */}
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600 sm:col-span-2">
+                    <p className="font-semibold text-gray-200 text-sm mb-1 flex items-center gap-2">
+                      <Settings className="h-4 w-4" />
+                      Settings
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Everything you can change about yourself
+                      (picture, bio, name, address), plus password
+                      change, two-factor authentication, friend-request
+                      privacy, and account deactivation. Full breakdown
+                      below.
+                    </p>
+                  </div>
                 </div>
-                <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                  <h5 className="font-semibold text-yellow-400 mb-2">
-                    🏅 Badge Collection
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    All earned badges organized by category.
-                  </p>
+              </div>
+
+              {/* Settings deep-dive */}
+              <div>
+                <h3 className="font-semibold text-white text-base mb-2 flex items-center gap-2">
+                  <Settings className="h-4 w-4 text-gray-300" />
+                  What you can change in Settings
+                </h3>
+
+                <div className="space-y-3">
+                  {/* Picture & bio */}
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1">
+                      Profile Picture &amp; Bio
+                    </p>
+                    <ul className="space-y-1 text-xs text-gray-400 list-disc pl-5">
+                      <li>
+                        Upload a new picture —{" "}
+                        <strong className="text-white">
+                          JPEG, PNG, WebP, or GIF
+                        </strong>
+                        , up to{" "}
+                        <strong className="text-white">5&nbsp;MB</strong>.
+                      </li>
+                      <li>
+                        Write a short bio (max{" "}
+                        <strong className="text-white">500</strong>{" "}
+                        characters). This is what other traders see on
+                        your public Profile Card.
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Personal info */}
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1">
+                      Personal Information
+                    </p>
+                    <ul className="space-y-1 text-xs text-gray-400 list-disc pl-5">
+                      <li>
+                        <strong className="text-white">Full name</strong>{" "}
+                        — editable.
+                      </li>
+                      <li>
+                        <strong className="text-white">Email</strong> —{" "}
+                        <span className="text-red-300">
+                          read-only.
+                        </span>{" "}
+                        Email cannot be changed from this screen for
+                        security reasons. Contact support if you need
+                        to update it.
+                      </li>
+                      <li>
+                        <strong className="text-white">
+                          Address fields
+                        </strong>{" "}
+                        — country, street, city, postal code, phone.
+                        These appear on your tax invoices for deposits
+                        and are required for KYC.
+                      </li>
+                    </ul>
+                    <p className="text-xs text-gray-500 mt-2">
+                      A sticky bar appears whenever you have unsaved
+                      changes; click{" "}
+                      <strong className="text-white">
+                        &quot;Save changes&quot;
+                      </strong>{" "}
+                      or{" "}
+                      <strong className="text-white">
+                        &quot;Discard&quot;
+                      </strong>{" "}
+                      to commit or revert.
+                    </p>
+                  </div>
+
+                  {/* Security */}
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1 flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-cyan-400" />
+                      Security
+                    </p>
+                    <ul className="space-y-1 text-xs text-gray-400 list-disc pl-5">
+                      <li>
+                        <strong className="text-white">
+                          Change password
+                        </strong>{" "}
+                        — enter your current password, new password, and
+                        confirm. If 2FA is enabled you&apos;ll be
+                        prompted for your authenticator code.
+                      </li>
+                      <li>
+                        <strong className="text-white">
+                          Two-Factor Authentication (2FA)
+                        </strong>{" "}
+                        — turn on TOTP-based 2FA with any standard
+                        authenticator app (Google Authenticator, Authy,
+                        1Password, etc.). Strongly recommended; required
+                        for many sensitive actions once enabled.
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Privacy */}
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1">
+                      Privacy
+                    </p>
+                    <ul className="space-y-1 text-xs text-gray-400 list-disc pl-5">
+                      <li>
+                        <strong className="text-white">
+                          Allow friend requests
+                        </strong>{" "}
+                        — when off, other traders can&apos;t send you
+                        friend requests. Your stats stay visible on the
+                        leaderboard.
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Deactivate */}
+                  <div className="p-3 bg-red-500/10 rounded-lg border border-red-500/30">
+                    <p className="font-semibold text-red-400 text-sm mb-1 flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      Deactivate account
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Closes your account. You will be signed out and
+                      your profile will no longer appear on public
+                      surfaces. Any pending withdrawals are processed
+                      according to platform policy. Open competitions
+                      and challenges must be settled first.
+                    </p>
+                  </div>
                 </div>
+              </div>
+
+              {/* Stats — single source of truth */}
+              <div>
+                <h3 className="font-semibold text-white text-base mb-2 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-blue-400" />
+                  Where your stats come from
+                </h3>
+                <p className="text-sm text-gray-400 mb-3">
+                  ChartVolt has a single source of truth so the same
+                  number shows up everywhere it appears:
+                </p>
+                <div className="grid gap-2 text-xs text-gray-300">
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Trading stats
+                    </strong>{" "}
+                    (Trades, Win Rate, P&amp;L, Profit Factor, best/worst
+                    trade, avg win/loss) are computed from the unified{" "}
+                    <code className="bg-gray-900 px-1 py-0.5 rounded">
+                      TradeHistory
+                    </code>{" "}
+                    collection — the same one feeding your Dashboard,
+                    your competition/challenge result screens, and the
+                    Leaderboard.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Competition stats
+                    </strong>{" "}
+                    (entered, won, podiums, prize money) come from your{" "}
+                    <code className="bg-gray-900 px-1 py-0.5 rounded">
+                      CompetitionParticipant
+                    </code>{" "}
+                    rows.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      1v1 stats
+                    </strong>{" "}
+                    (challenges entered, won, credits won) come from your{" "}
+                    <code className="bg-gray-900 px-1 py-0.5 rounded">
+                      ChallengeParticipant
+                    </code>{" "}
+                    rows.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">Score</strong>{" "}
+                    (ChartVolt Score) is computed on the leaderboard
+                    cache and shown on your Profile Card — the formula
+                    and what counts is documented in the{" "}
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection("score-system")}
+                      className="text-yellow-400 hover:underline"
+                    >
+                      ⚡ Score System
+                    </button>{" "}
+                    section.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      XP &amp; Level / Title
+                    </strong>{" "}
+                    come from the badges you have earned — see{" "}
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection("trader-levels")}
+                      className="text-cyan-400 hover:underline"
+                    >
+                      Trader Levels
+                    </button>
+                    .
+                  </div>
+                </div>
+              </div>
+
+              {/* What others see */}
+              <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Eye className="h-4 w-4 text-cyan-300" />
+                  What other traders see of you
+                </h4>
+                <ul className="space-y-1.5 text-sm text-gray-300 list-disc pl-5">
+                  <li>
+                    On the{" "}
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection("leaderboard")}
+                      className="text-cyan-400 hover:underline"
+                    >
+                      Leaderboard
+                    </button>{" "}
+                    and in-competition leaderboard, clicking your name
+                    opens a{" "}
+                    <strong className="text-white">
+                      Profile Card modal
+                    </strong>{" "}
+                    with your{" "}
+                    <strong className="text-white">profile picture</strong>
+                    ,{" "}
+                    <strong className="text-white">bio</strong>, tier
+                    label (Champion / Elite / Veteran / Trader), trading
+                    stats (Win Rate, Trades, P&amp;L), competition &amp;
+                    1v1 battle record, badges, and Score.
+                  </li>
+                  <li>
+                    On{" "}
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection("matchmaking")}
+                      className="text-pink-400 hover:underline"
+                    >
+                      Match Cards
+                    </button>
+                    , other traders see your avatar, username, public
+                    stats and the matchmaking reasons — no private
+                    fields are exposed.
+                  </li>
+                  <li>
+                    <strong className="text-white">
+                      Never exposed publicly:
+                    </strong>{" "}
+                    email, address, phone, country, payment details,
+                    transaction history, balance.
+                  </li>
+                </ul>
               </div>
             </div>
           </section>
