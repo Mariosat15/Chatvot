@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import { MarketplaceItem } from "@/database/models/marketplace/marketplace-item.model";
 import { UserPurchase } from "@/database/models/marketplace/user-purchase.model";
+import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { seedMarketplaceItems } from "@/lib/services/marketplace-seed.service";
@@ -102,20 +103,69 @@ export async function GET(request: NextRequest) {
       .lean();
 
     let userPurchases: string[] = [];
+    // Reason: needed by the marketplace UI to render "Renew" instead of
+    // "Owned" on the user's own expired GameMaster package, and to short-
+    // circuit the "owned -> arsenal" router push so the user can renew
+    // without hunting through the profile section.
+    let gmSubscription: {
+      packageId?: string;
+      status?: string;
+      endDate?: Date | string;
+      renewalPrice?: number;
+      packageName?: string;
+    } | null = null;
     if (userId) {
-      const purchases = await UserPurchase.find({
-        userId,
-      })
-          .select("itemId")
-          .limit(500)
-          .lean();
+      const [purchases, gmSub] = await Promise.all([
+        UserPurchase.find({ userId }).select("itemId").limit(500).lean(),
+        GameMasterSubscription.findOne({ userId })
+          .select("packageId status endDate renewalPrice packageName")
+          .lean<{
+            packageId?: string | { toString(): string };
+            status?: string;
+            endDate?: Date | string;
+            renewalPrice?: number;
+            packageName?: string;
+          } | null>(),
+      ]);
       userPurchases = purchases.map((p) => p.itemId.toString());
+      gmSubscription = gmSub
+        ? {
+            packageId: gmSub.packageId
+              ? typeof gmSub.packageId === "string"
+                ? gmSub.packageId
+                : gmSub.packageId.toString()
+              : undefined,
+            status: gmSub.status,
+            endDate: gmSub.endDate,
+            renewalPrice: gmSub.renewalPrice,
+            packageName: gmSub.packageName,
+          }
+        : null;
     }
 
-    const itemsWithOwnership = items.map((item) => ({
-      ...item,
-      owned: userPurchases.includes(item._id.toString()),
-    }));
+    // Pre-compute expiry once; identical for every GM item in this list.
+    const gmExpired = gmSubscription
+      ? gmSubscription.status === "expired" ||
+        (gmSubscription.endDate
+          ? new Date(gmSubscription.endDate).getTime() <= Date.now()
+          : false)
+      : false;
+
+    const itemsWithOwnership = items.map((item) => {
+      const itemId = item._id.toString();
+      const owned = userPurchases.includes(itemId);
+      const enriched: Record<string, unknown> = { ...item, owned };
+      if (
+        item.category === "gamemaster" &&
+        gmSubscription?.packageId === itemId
+      ) {
+        enriched.gameMasterSubscriptionStatus = gmExpired
+          ? "expired"
+          : "active";
+        enriched.gameMasterRenewalPrice = gmSubscription.renewalPrice;
+      }
+      return enriched;
+    });
 
     const payload = { success: true as const, items: itemsWithOwnership };
     if (!search) {

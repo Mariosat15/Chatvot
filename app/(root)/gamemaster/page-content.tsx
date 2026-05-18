@@ -51,7 +51,9 @@ export default function GameMasterDashboardContent() {
     togglingRenewal, togglingPause, schedulingCancel,
     showCancelConfirm, setShowCancelConfirm,
     toggleAutoRenew, togglePause, toggleScheduledCancellation,
-  } = useGmSubscription(getSub, updateSub);
+    renewNow, renewingNow,
+    // Reason: closure captures fetchGameMasterData lexically; resolved at click time.
+  } = useGmSubscription(getSub, updateSub, () => fetchGameMasterData());
 
   useEffect(() => { fetchGameMasterData(); }, []);
 
@@ -242,7 +244,7 @@ export default function GameMasterDashboardContent() {
         {activeTab === "Referrals" && <ReferralsTab referrals={filteredReferrals} search={referralSearch} onSearchChange={setReferralSearch} total={stats?.totalReferredUsers ?? 0} />}
         {activeTab === "Earnings" && stats && <EarningsTab earnings={filteredEarnings} filter={earningsFilter} onFilterChange={setEarningsFilter} stats={stats} />}
 
-        <SubscriptionPanel sub={sub} isExpired={isExpired} isPaused={isPaused} isScheduledForDeletion={isScheduledForDeletion} togglingRenewal={togglingRenewal} togglingPause={togglingPause} schedulingCancel={schedulingCancel} toggleAutoRenew={toggleAutoRenew} togglePause={togglePause} onShowCancelConfirm={() => setShowCancelConfirm(true)} toggleScheduledCancellation={toggleScheduledCancellation} />
+        <SubscriptionPanel sub={sub} isExpired={isExpired} isPaused={isPaused} isScheduledForDeletion={isScheduledForDeletion} togglingRenewal={togglingRenewal} togglingPause={togglingPause} schedulingCancel={schedulingCancel} renewingNow={renewingNow} toggleAutoRenew={toggleAutoRenew} togglePause={togglePause} onShowCancelConfirm={() => setShowCancelConfirm(true)} toggleScheduledCancellation={toggleScheduledCancellation} onRenewNow={renewNow} />
       </div>
 
       {showCancelConfirm && <CancelModal endDate={sub.endDate} schedulingCancel={schedulingCancel} onClose={() => setShowCancelConfirm(false)} onConfirm={toggleScheduledCancellation} />}

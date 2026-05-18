@@ -10,6 +10,7 @@ import {
   ExternalLink,
   Loader2,
   AlertTriangle,
+  RefreshCw,
   Shield,
   Trash2,
 } from "lucide-react";
@@ -166,10 +167,12 @@ export function SubscriptionPanel({
   togglingRenewal,
   togglingPause,
   schedulingCancel,
+  renewingNow,
   toggleAutoRenew,
   togglePause,
   onShowCancelConfirm,
   toggleScheduledCancellation,
+  onRenewNow,
 }: {
   sub: SubscriptionData;
   isExpired: boolean;
@@ -178,10 +181,12 @@ export function SubscriptionPanel({
   togglingRenewal: boolean;
   togglingPause: boolean;
   schedulingCancel: boolean;
+  renewingNow: boolean;
   toggleAutoRenew: () => void;
   togglePause: () => void;
   onShowCancelConfirm: () => void;
   toggleScheduledCancellation: () => void;
+  onRenewNow: () => void;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -308,6 +313,33 @@ export function SubscriptionPanel({
                   </button>
                 </div>
               )}
+            </div>
+          )}
+          {isExpired && (
+            <div className="pt-3 border-t border-gray-700/50 space-y-2">
+              <button
+                onClick={onRenewNow}
+                disabled={renewingNow}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-black transition-colors disabled:opacity-50"
+              >
+                {renewingNow ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    Renew now
+                    {sub.renewalPrice && sub.renewalPrice > 0 ? (
+                      <span className="ml-1 font-bold">
+                        (⚡ {sub.renewalPrice.toLocaleString()})
+                      </span>
+                    ) : null}
+                  </>
+                )}
+              </button>
+              <p className="text-xs text-red-400/80 flex items-center gap-1.5">
+                <AlertTriangle className="h-3 w-3" />
+                Subscription expired — renew to resume earnings and competitions.
+              </p>
             </div>
           )}
         </div>

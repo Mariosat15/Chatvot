@@ -72,6 +72,11 @@ interface MarketplaceItem {
   riskLevel: string;
   riskWarning?: string;
   owned: boolean;
+  // Reason: API enriches the user's own GameMaster package row so the UI can
+  // render "Renew" instead of "Owned" and short-circuit to the renew modal
+  // when the subscription is past its endDate.
+  gameMasterSubscriptionStatus?: "active" | "expired";
+  gameMasterRenewalPrice?: number;
   gameMasterConfig?: {
     subscriptionDurationDays: number;
     referralFeePercentage: number;
@@ -290,6 +295,25 @@ export default function MarketplaceContent() {
 
   const handlePurchase = async (item: MarketplaceItem) => {
     if (item.owned) {
+      // Reason: when the user's own GameMaster package is expired we must
+      // open the renew/delete modal instead of bouncing them to the arsenal
+      // (the arsenal also offers a renew button now, but keeping the action
+      // in-place avoids an unnecessary navigation).
+      if (
+        item.category === "gamemaster" &&
+        item.gameMasterSubscriptionStatus === "expired"
+      ) {
+        setGmActionModal({
+          show: true,
+          type: "renew_or_delete",
+          details: {
+            expiredDate: undefined,
+            renewalPrice: item.gameMasterRenewalPrice ?? item.price,
+            message: `Your "${item.name}" subscription has expired. Renew to keep your benefits, or delete it from your arsenal to free up the slot for a different package.`,
+          },
+        });
+        return;
+      }
       router.push("/profile?tab=arsenal");
       return;
     }
@@ -1620,6 +1644,14 @@ function GameMasterCard({
 }) {
   const config = item.gameMasterConfig;
   const hasImage = !!item.imageUrl;
+  // Reason: the user's own GM package can be "owned" but expired — in that
+  // case the action button must be enabled and labelled "Renew" so the
+  // expired-renew flow can open the existing gmActionModal.
+  const isExpiredOwn =
+    item.owned && item.gameMasterSubscriptionStatus === "expired";
+  const renewPriceLabel = (
+    item.gameMasterRenewalPrice ?? item.price
+  ).toLocaleString();
 
   if (listView) {
     return (
@@ -1649,9 +1681,14 @@ function GameMasterCard({
             <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 flex-shrink-0">
               Game Master
             </span>
-            {item.owned && (
+            {item.owned && !isExpiredOwn && (
               <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 flex-shrink-0">
                 Active
+              </span>
+            )}
+            {isExpiredOwn && (
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-500/20 text-red-400 border border-red-500/30 flex-shrink-0">
+                Expired
               </span>
             )}
           </div>
@@ -1677,16 +1714,18 @@ function GameMasterCard({
         {/* Action */}
         <button
           onClick={(e) => { e.stopPropagation(); onPurchase(); }}
-          disabled={purchasing || item.owned}
+          disabled={purchasing || (item.owned && !isExpiredOwn)}
           className={cn(
             "flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all flex-shrink-0",
-            item.owned
+            item.owned && !isExpiredOwn
               ? "bg-yellow-500/10 text-yellow-400 cursor-default"
               : "bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-black shadow-lg shadow-yellow-500/20",
           )}
         >
           {purchasing ? (
             <div className="animate-spin rounded-full h-3 w-3 border-2 border-black border-t-transparent" />
+          ) : isExpiredOwn ? (
+            <><RefreshCw className="h-3 w-3" />Renew</>
           ) : item.owned ? (
             <><Check className="h-3 w-3" />Active</>
           ) : (
@@ -1727,11 +1766,19 @@ function GameMasterCard({
             <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-500/20 backdrop-blur-sm border border-yellow-500/30 text-yellow-400">
               Game Master
             </span>
-            {item.owned && (
+            {item.owned && !isExpiredOwn && (
               <div className="flex items-center gap-1.5 px-2.5 py-1 bg-yellow-500/20 backdrop-blur-sm border border-yellow-500/30 rounded-full">
                 <BadgeCheck className="h-3.5 w-3.5 text-yellow-400" />
                 <span className="text-xs font-semibold text-yellow-400">
                   Active
+                </span>
+              </div>
+            )}
+            {isExpiredOwn && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-red-500/20 backdrop-blur-sm border border-red-500/30 rounded-full">
+                <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
+                <span className="text-xs font-semibold text-red-400">
+                  Expired
                 </span>
               </div>
             )}
@@ -1757,11 +1804,19 @@ function GameMasterCard({
                 </h3>
               </div>
             </div>
-            {item.owned && (
+            {item.owned && !isExpiredOwn && (
               <div className="flex items-center gap-1.5 px-2.5 py-1 bg-yellow-500/20 backdrop-blur-sm border border-yellow-500/30 rounded-full">
                 <BadgeCheck className="h-3.5 w-3.5 text-yellow-400" />
                 <span className="text-xs font-semibold text-yellow-400">
                   Active
+                </span>
+              </div>
+            )}
+            {isExpiredOwn && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-red-500/20 backdrop-blur-sm border border-red-500/30 rounded-full">
+                <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
+                <span className="text-xs font-semibold text-red-400">
+                  Expired
                 </span>
               </div>
             )}
@@ -1894,16 +1949,21 @@ function GameMasterCard({
               e.stopPropagation();
               onPurchase();
             }}
-            disabled={purchasing || item.owned}
+            disabled={purchasing || (item.owned && !isExpiredOwn)}
             className={cn(
               "flex items-center gap-2 px-5 py-3 rounded-xl font-semibold transition-all",
-              item.owned
+              item.owned && !isExpiredOwn
                 ? "bg-yellow-500/10 text-yellow-400 cursor-default"
                 : "bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-black shadow-lg shadow-yellow-500/20",
             )}
           >
             {purchasing ? (
               <div className="animate-spin rounded-full h-4 w-4 border-2 border-black border-t-transparent" />
+            ) : isExpiredOwn ? (
+              <>
+                <RefreshCw className="h-4 w-4" />
+                Renew (⚡ {renewPriceLabel})
+              </>
             ) : item.owned ? (
               <>
                 <Check className="h-4 w-4" />
@@ -2242,36 +2302,65 @@ function ItemDetailModal({
 
         {/* === ACTION BUTTON === */}
         <div className="mx-3 mb-3">
-          <button
-            onClick={onPurchase}
-            disabled={purchasing || item.owned}
-            className={cn(
-              "w-full py-2.5 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2",
-              item.owned
-                ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/30 hover:brightness-110"
-                : isGameMaster
-                  ? "bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-black shadow-lg shadow-yellow-500/30"
-                  : `bg-gradient-to-r ${headerBg} text-white shadow-lg hover:brightness-110`,
-            )}
-          >
-            {purchasing ? (
-              <div className={cn(
-                "animate-spin rounded-full h-5 w-5 border-2 border-t-transparent",
-                isGameMaster && !item.owned ? "border-black" : "border-white"
-              )} />
-            ) : item.owned ? (
-              <>
-                <Check className="h-4 w-4" />
-                {isGameMaster ? "Already Active" : "Owned — Go to Arsenal"}
-                {!isGameMaster && <ArrowUpRight className="h-3.5 w-3.5" />}
-              </>
-            ) : (
-              <>
-                {isGameMaster ? <Crown className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
-                {isGameMaster ? "Become a Game Master" : "Purchase Now"}
-              </>
-            )}
-          </button>
+          {(() => {
+            // Reason: an owned GM package can be expired; in that case the
+            // action button must be enabled and offer renewal instead of
+            // showing the "Already Active" dead-end label.
+            const isExpiredGmOwn =
+              isGameMaster &&
+              item.owned &&
+              item.gameMasterSubscriptionStatus === "expired";
+            const renewPrice = (
+              item.gameMasterRenewalPrice ?? item.price
+            ).toLocaleString();
+            return (
+              <button
+                onClick={onPurchase}
+                disabled={purchasing || (item.owned && !isExpiredGmOwn)}
+                className={cn(
+                  "w-full py-2.5 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2",
+                  isExpiredGmOwn
+                    ? "bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-black shadow-lg shadow-yellow-500/30"
+                    : item.owned
+                      ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/30 hover:brightness-110"
+                      : isGameMaster
+                        ? "bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-black shadow-lg shadow-yellow-500/30"
+                        : `bg-gradient-to-r ${headerBg} text-white shadow-lg hover:brightness-110`,
+                )}
+              >
+                {purchasing ? (
+                  <div
+                    className={cn(
+                      "animate-spin rounded-full h-5 w-5 border-2 border-t-transparent",
+                      (isGameMaster && !item.owned) || isExpiredGmOwn
+                        ? "border-black"
+                        : "border-white",
+                    )}
+                  />
+                ) : isExpiredGmOwn ? (
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    Renew now (⚡ {renewPrice})
+                  </>
+                ) : item.owned ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    {isGameMaster ? "Already Active" : "Owned — Go to Arsenal"}
+                    {!isGameMaster && <ArrowUpRight className="h-3.5 w-3.5" />}
+                  </>
+                ) : (
+                  <>
+                    {isGameMaster ? (
+                      <Crown className="h-4 w-4" />
+                    ) : (
+                      <ShoppingCart className="h-4 w-4" />
+                    )}
+                    {isGameMaster ? "Become a Game Master" : "Purchase Now"}
+                  </>
+                )}
+              </button>
+            );
+          })()}
         </div>
 
         {/* Card ID */}

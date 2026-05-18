@@ -25,6 +25,7 @@ import {
   Trash2,
   AlertTriangle,
   ExternalLink,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -104,6 +105,9 @@ interface GameMasterSubscription {
   autoRenew: boolean;
   isPaused: boolean;
   scheduledForDeletion: boolean;
+  // Reason: needed so the expired-state Renew button can display the price
+  // and the API knows how much to charge on POST /api/gamemaster/renew.
+  renewalPrice?: number;
   limits: {
     referralFeePercentage: number;
     canCreateCompetitions: boolean;
@@ -134,6 +138,7 @@ export default function TradingArsenalSection() {
   const [togglingGmPause, setTogglingGmPause] = useState(false);
   const [schedulingGmCancel, setSchedulingGmCancel] = useState(false);
   const [showGmCancelConfirm, setShowGmCancelConfirm] = useState(false);
+  const [renewingGm, setRenewingGm] = useState(false);
 
   useEffect(() => {
     fetchPurchases();
@@ -258,6 +263,40 @@ export default function TradingArsenalSection() {
       toast.error(`Failed to ${action} cancellation`);
     } finally {
       setSchedulingGmCancel(false);
+    }
+  };
+
+  // Reason: surfaces the existing /api/gamemaster/renew endpoint on the
+  // expired card so users can renew without hunting through the marketplace.
+  const handleGmRenew = async () => {
+    if (!gmSubscription) return;
+    try {
+      setRenewingGm(true);
+      const response = await fetch("/api/gamemaster/renew", { method: "POST" });
+      const data = await response.json();
+      if (data.success) {
+        toast.success(
+          data.message || "Subscription renewed",
+          {
+            description: data.subscription?.endDate
+              ? `Active until ${new Date(data.subscription.endDate).toLocaleDateString()}`
+              : undefined,
+            duration: 6000,
+          },
+        );
+        await fetchGmSubscription();
+      } else if (data.details?.required && data.details?.available !== undefined) {
+        toast.error("Insufficient credits", {
+          description: `Need ⚡ ${data.details.required}, you have ⚡ ${data.details.available}.`,
+        });
+      } else {
+        toast.error(data.error || "Failed to renew subscription");
+      }
+    } catch (error) {
+      console.error("Failed to renew GM subscription", error);
+      toast.error("Failed to renew subscription");
+    } finally {
+      setRenewingGm(false);
     }
   };
 
@@ -525,8 +564,10 @@ export default function TradingArsenalSection() {
                   onTogglePause={toggleGmPause}
                   onScheduleCancel={() => setShowGmCancelConfirm(true)}
                   onUnscheduleCancel={toggleGmScheduledCancellation}
+                  onRenew={handleGmRenew}
                   togglingPause={togglingGmPause}
                   schedulingCancel={schedulingGmCancel}
+                  renewing={renewingGm}
                 />
               </div>
             )}
@@ -998,15 +1039,19 @@ function GameMasterSubscriptionCard({
   onTogglePause,
   onScheduleCancel,
   onUnscheduleCancel,
+  onRenew,
   togglingPause,
   schedulingCancel,
+  renewing,
 }: {
   subscription: GameMasterSubscription;
   onTogglePause: () => void;
   onScheduleCancel: () => void;
   onUnscheduleCancel: () => void;
+  onRenew: () => void;
   togglingPause: boolean;
   schedulingCancel: boolean;
+  renewing: boolean;
 }) {
   const daysRemaining = Math.max(
     0,
@@ -1168,6 +1213,35 @@ function GameMasterSubscriptionCard({
                 <Trash2 className="h-4 w-4" /> Cancel
               </button>
             )}
+          </div>
+        )}
+
+        {/* Renew block — only when expired */}
+        {isExpired && (
+          <div className="pt-3 border-t border-gray-800 space-y-2">
+            <button
+              onClick={onRenew}
+              disabled={renewing}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-black transition-colors disabled:opacity-50"
+            >
+              {renewing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  Renew now
+                  {subscription.renewalPrice && subscription.renewalPrice > 0 ? (
+                    <span className="ml-1 font-bold">
+                      (⚡ {subscription.renewalPrice})
+                    </span>
+                  ) : null}
+                </>
+              )}
+            </button>
+            <p className="text-xs text-red-400/80 flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3" />
+              Subscription expired — renew to keep earning referrals.
+            </p>
           </div>
         )}
 

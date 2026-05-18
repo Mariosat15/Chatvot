@@ -17,11 +17,17 @@ interface SubscriptionState {
 export function useGmSubscription(
   getSubscription: () => SubscriptionState | null,
   updateSubscription: (partial: Partial<SubscriptionState>) => void,
+  // Reason: a successful renewal extends the endDate, resets the period
+  // counters and may swap the package limits. Partial updates aren't enough;
+  // the page must refetch the dashboard. Optional so non-renewal callers
+  // don't have to wire it up.
+  onRefresh?: () => Promise<void> | void,
 ) {
   const [togglingRenewal, setTogglingRenewal] = useState(false);
   const [togglingPause, setTogglingPause] = useState(false);
   const [schedulingCancel, setSchedulingCancel] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [renewingNow, setRenewingNow] = useState(false);
 
   const toggleAutoRenew = async () => {
     const sub = getSubscription();
@@ -124,6 +130,38 @@ export function useGmSubscription(
     }
   };
 
+  const renewNow = async () => {
+    try {
+      setRenewingNow(true);
+      const res = await fetch("/api/gamemaster/renew", { method: "POST" });
+      const result = await res.json();
+      if (result.success) {
+        toast.success(result.message || "Subscription renewed", {
+          description: result.subscription?.endDate
+            ? `Active until ${new Date(result.subscription.endDate).toLocaleDateString()}`
+            : undefined,
+          duration: 6000,
+        });
+        if (onRefresh) {
+          await onRefresh();
+        }
+      } else if (
+        result.details?.required !== undefined &&
+        result.details?.available !== undefined
+      ) {
+        toast.error("Insufficient credits", {
+          description: `Need ⚡ ${result.details.required}, you have ⚡ ${result.details.available}.`,
+        });
+      } else {
+        toast.error(result.error || "Failed to renew subscription");
+      }
+    } catch {
+      toast.error("Failed to renew subscription");
+    } finally {
+      setRenewingNow(false);
+    }
+  };
+
   return {
     togglingRenewal,
     togglingPause,
@@ -133,5 +171,7 @@ export function useGmSubscription(
     toggleAutoRenew,
     togglePause,
     toggleScheduledCancellation,
+    renewNow,
+    renewingNow,
   };
 }
