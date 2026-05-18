@@ -3211,11 +3211,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                     </span>
                   </div>
                   <div className="p-3 bg-gray-800/50 rounded-lg flex items-center gap-2">
-                    <Trophy className="h-4 w-4 text-orange-400 flex-shrink-0" />
+                    <Swords className="h-4 w-4 text-red-400 flex-shrink-0" />
                     <span>
-                      <strong className="text-white">Hall of Fame.</strong>{" "}
-                      Records of past champions and milestone Score levels
-                      are highlighted there.
+                      <strong className="text-white">Profile Card stats.</strong>{" "}
+                      The same Score number flows through the stats object
+                      attached to any Profile Card you open.
                     </span>
                   </div>
                 </div>
@@ -4294,29 +4294,308 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
               <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">🥇 Leaderboard</h2>
             </div>
 
-            <div className="space-y-4 text-gray-300">
+            <div className="space-y-6 text-gray-300">
               <p className="leading-relaxed">
-                The Global Leaderboard ranks all traders based on XP, badges,
-                and overall performance.
+                The{" "}
+                <Link
+                  href="/leaderboard"
+                  className="text-yellow-400 hover:text-yellow-300 underline underline-offset-2"
+                >
+                  Global Leaderboard
+                </Link>{" "}
+                ranks every active trader on ChartVolt by their{" "}
+                <strong className="text-yellow-400">Score</strong> — the
+                composite metric covered in detail in the{" "}
+                <a
+                  href="#score-system"
+                  className="text-yellow-400 hover:text-yellow-300 underline underline-offset-2"
+                >
+                  ⚡ Score System
+                </a>{" "}
+                section. Higher Score = higher rank. The same data feeds
+                the Match Cards deck and the Profile Card stats you see
+                when you click a trader&apos;s name.
               </p>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                  <h5 className="font-semibold text-yellow-400 mb-2">
-                    🏆 XP & Level
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Total experience points from badges.
-                  </p>
+              {/* Two views */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <LayoutDashboard className="h-4 w-4 text-cyan-400" />
+                  Two views: Table &amp; Match Cards
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
+                    <h5 className="font-semibold text-yellow-300 mb-2 flex items-center gap-2">
+                      <Medal className="h-4 w-4" /> Table view
+                    </h5>
+                    <p className="text-sm text-gray-400">
+                      Classic ranking grid with sortable columns and
+                      filters. Best for finding a specific trader or
+                      sorting by a stat that matters to you.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-pink-500/10 rounded-lg border border-pink-500/30">
+                    <h5 className="font-semibold text-pink-300 mb-2 flex items-center gap-2">
+                      <Heart className="h-4 w-4" /> Match Cards view
+                    </h5>
+                    <p className="text-sm text-gray-400">
+                      Tinder-style swipe deck of fellow traders ranked
+                      by compatibility with you. See the{" "}
+                      <a
+                        href="#matchmaking"
+                        className="text-yellow-400 hover:text-yellow-300 underline underline-offset-2"
+                      >
+                        💖 Match Cards
+                      </a>{" "}
+                      section for details.
+                    </p>
+                  </div>
                 </div>
-                <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                  <h5 className="font-semibold text-green-400 mb-2">
-                    💰 Total Winnings
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Total {settings.credits.name.toLowerCase()} won.
-                  </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  Toggle between the two from the buttons at the top of
+                  the leaderboard page.
+                </p>
+              </div>
+
+              {/* What the table shows */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-yellow-400" />
+                  Columns in the table view
+                </h3>
+                <p className="text-sm mb-3">
+                  Each row shows a trader and their key stats. From left
+                  to right:
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2 text-sm">
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <strong className="text-white">Rank</strong>{" "}
+                    <span className="text-gray-400">
+                      — current position based on Score.
+                    </span>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <strong className="text-white">Trader</strong>{" "}
+                    <span className="text-gray-400">
+                      — avatar, username, level title pill and total
+                      trades.
+                    </span>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <strong className="text-white">P&amp;L</strong>{" "}
+                    <span className="text-gray-400">
+                      — total profit/loss across all competitions and
+                      challenges.
+                    </span>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <strong className="text-white">ROI</strong>{" "}
+                    <span className="text-gray-400">
+                      — return % on total starting capital.
+                    </span>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <strong className="text-white">Win Rate</strong>{" "}
+                    <span className="text-gray-400">
+                      — % of winning closed trades.
+                    </span>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <strong className="text-white">P. Factor</strong>{" "}
+                    <span className="text-gray-400">
+                      — profit factor (gross profit ÷ gross loss).
+                    </span>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <strong className="text-white">Comps</strong>{" "}
+                    <span className="text-gray-400">
+                      — competition wins (count of finalised contests
+                      finished at #1).
+                    </span>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <strong className="text-white">Badges</strong>{" "}
+                    <span className="text-gray-400">
+                      — total badges unlocked.
+                    </span>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg sm:col-span-2">
+                    <strong className="text-white">Score</strong>{" "}
+                    <span className="text-gray-400">
+                      — the composite ranking number. This is the
+                      default sort column.
+                    </span>
+                  </div>
                 </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Mobile devices show the same data in a vertically
+                  stacked card format for readability.
+                </p>
+              </div>
+
+              {/* Sorting & filtering */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Settings className="h-4 w-4 text-cyan-400" />
+                  Sorting &amp; filtering
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Sort by any column.</strong>{" "}
+                      Click a column header (Rank, P&amp;L, ROI, Win
+                      Rate, P. Factor, Comps, Badges or Score) to sort
+                      by that stat. Click again to flip ascending /
+                      descending. Default: <em>Score, descending</em>.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Search</strong> by
+                      username or email substring (case-insensitive).
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Rank range filter</strong>{" "}
+                      — All / Top 10 / Top 25 / Top 50 / Top 100.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Win rate filter</strong>{" "}
+                      and{" "}
+                      <strong className="text-white">trade count filter</strong>{" "}
+                      to focus on, say, &gt;60% win rate or experienced
+                      traders only.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Reset filters</strong>{" "}
+                      button clears everything if the empty state shows{" "}
+                      <em>&quot;No traders match your filters&quot;</em>.
+                    </span>
+                  </li>
+                </ul>
+                <p className="text-xs text-gray-500 mt-2">
+                  Note: filters and sort apply to the{" "}
+                  <strong>current page</strong> of 50 traders. If
+                  you&apos;re looking for a specific person far down the
+                  list, use the search box or navigate to the right
+                  page with the pagination controls.
+                </p>
+              </div>
+
+              {/* Your Rank */}
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+                <h3 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <User className="h-4 w-4 text-purple-400" />
+                  Your Rank card
+                </h3>
+                <ul className="space-y-2 text-sm text-gray-300">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-purple-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Above the table, a personalised card shows your
+                      current global rank (e.g. <em>#42 of 1,250 traders</em>)
+                      so you don&apos;t have to scroll to find yourself.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-purple-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Your row in the table is highlighted with a
+                      coloured stripe and a small{" "}
+                      <strong className="text-white">YOU</strong> badge
+                      on the avatar so you can spot yourself instantly.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-purple-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      If you haven&apos;t finished a competition yet
+                      you&apos;ll see <em>&quot;Unranked&quot;</em> with
+                      a prompt to enter your first contest.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Profile click */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Eye className="h-4 w-4 text-blue-400" />
+                  Open a trader&apos;s profile
+                </h3>
+                <p className="text-sm">
+                  Click any trader&apos;s username to open their{" "}
+                  <strong className="text-white">Profile Card</strong>{" "}
+                  in a modal — full stats, recent activity and a{" "}
+                  <em>Challenge</em> button to send them a 1v1 invite if
+                  they&apos;re online and accepting challenges. The
+                  Challenge button respects the same restrictions as
+                  the rest of the platform (verified email, cooldowns,
+                  per-user limits).
+                </p>
+              </div>
+
+              {/* Who appears */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-green-400" />
+                  Who appears on the leaderboard
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Real <strong className="text-white">trader accounts</strong>{" "}
+                      with a verified email address. Admin and support
+                      accounts are excluded automatically.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Accounts that admins have flagged as{" "}
+                      <em>hidden from public</em> (e.g. internal
+                      testers, suspended accounts) don&apos;t show up.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                    <span>
+                      The leaderboard processes up to{" "}
+                      <strong className="text-white">5,000 traders</strong>{" "}
+                      per refresh to stay fast — once you&apos;re in,
+                      you&apos;re in.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* How fresh */}
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                <h3 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-blue-400" />
+                  How often does it update?
+                </h3>
+                <p className="text-sm text-gray-300">
+                  The full leaderboard is rebuilt and cached for{" "}
+                  <strong className="text-white">about 5 minutes</strong>{" "}
+                  for performance. Major events — competition
+                  settlement, challenge winners, badge awards — bust
+                  the cache immediately so winners climb the board on
+                  the next page load. There&apos;s no manual refresh
+                  button; just navigate away and back or change page
+                  to grab the latest snapshot.
+                </p>
               </div>
             </div>
           </section>
