@@ -1237,70 +1237,554 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
               <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">🏆 Competitions</h2>
             </div>
 
-            <div className="space-y-4 text-gray-300">
+            <div className="space-y-6 text-gray-300">
               <p className="leading-relaxed">
-                Competitions are time-limited trading events where multiple
-                traders compete for prizes.
+                Competitions are time-limited trading tournaments. You pay a
+                one-off <strong>entry fee in {settings.credits.name.toLowerCase()}</strong>{" "}
+                (<span className="text-yellow-400">{settings.credits.symbol}</span>),
+                receive a fresh <strong>virtual starting capital</strong>{" "}
+                that&apos;s separate from your wallet, trade the markets for the
+                duration of the contest, and the top finishers split the prize
+                pool. Your real {settings.credits.name.toLowerCase()} wallet is
+                only touched twice: when you pay the entry fee and when you
+                receive a prize.
               </p>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
-                  <h5 className="font-semibold text-yellow-400 mb-2">
-                    🎯 P&L Competitions
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Ranked by total profit/loss.
-                  </p>
+              {/* What a competition is */}
+              <div className="bg-gray-900/40 border border-gray-700 rounded-lg p-4">
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Info className="h-4 w-4 text-blue-400" />
+                  How a competition works
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Sandbox capital.</strong>{" "}
+                      Each contest defines its own <em>starting capital</em>{" "}
+                      (e.g. $10,000 virtual). All trades inside the contest use
+                      this sandbox balance — wins and losses do <strong>not</strong>{" "}
+                      move your real {settings.credits.name.toLowerCase()}{" "}
+                      balance during the contest.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Entry fee.</strong>{" "}
+                      Deducted from your wallet the moment you confirm entry.
+                      The fee is added to the contest&apos;s prize pool.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Prize pool.</strong>{" "}
+                      Funded entirely from participants&apos; entry fees
+                      (<code className="bg-gray-800 px-1 rounded text-xs">
+                        prize pool = participants × entry fee
+                      </code>). The platform takes a configurable cut from each
+                      winner&apos;s share; the rest is paid out automatically.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Auto-settlement.</strong>{" "}
+                      When the end time hits, the system closes any remaining
+                      open positions, ranks all eligible participants, and
+                      credits the prize {settings.credits.name.toLowerCase()}{" "}
+                      directly to the winners&apos; wallets. You don&apos;t
+                      need to claim them.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Status lifecycle */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-cyan-400" />
+                  Competition statuses
+                </h3>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/30 text-sm">
+                    <span className="font-semibold text-yellow-300">
+                      🟡 Upcoming
+                    </span>
+                    <p className="text-gray-400 mt-1">
+                      Open for registration. You can join until the
+                      registration deadline (or until it fills up).
+                    </p>
+                  </div>
+                  <div className="p-3 bg-red-500/10 rounded-lg border border-red-500/30 text-sm">
+                    <span className="font-semibold text-red-300">
+                      🔴 Live
+                    </span>
+                    <p className="text-gray-400 mt-1">
+                      Trading is open. Late entries are still possible if the
+                      contest allows them and there are seats free.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/30 text-sm">
+                    <span className="font-semibold text-purple-300">
+                      🟣 Finalizing
+                    </span>
+                    <p className="text-gray-400 mt-1">
+                      End time reached. The system is closing positions and
+                      computing the final leaderboard.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/30 text-sm">
+                    <span className="font-semibold text-green-300">
+                      🟢 Completed
+                    </span>
+                    <p className="text-gray-400 mt-1">
+                      Prizes paid out. Visit the <em>Results</em> page to
+                      review the final standings and your trade history.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600 text-sm sm:col-span-2">
+                    <span className="font-semibold text-gray-300">
+                      ⚪ Cancelled
+                    </span>
+                    <p className="text-gray-400 mt-1">
+                      If the minimum number of participants isn&apos;t reached,
+                      or the admin cancels the contest, every entry fee is{" "}
+                      <strong className="text-white">fully refunded</strong> to
+                      your wallet automatically.
+                    </p>
+                  </div>
                 </div>
-                <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/30">
-                  <h5 className="font-semibold text-green-400 mb-2">
-                    📊 ROI Competitions
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Ranked by return on investment %.
+              </div>
+
+              {/* Joining */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <LogIn className="h-4 w-4 text-green-400" />
+                  Joining a competition
+                </h3>
+                <ol className="space-y-2 text-sm list-decimal list-inside marker:text-yellow-400">
+                  <li>
+                    Open{" "}
+                    <Link
+                      href="/competitions"
+                      className="text-yellow-400 hover:text-yellow-300 underline underline-offset-2"
+                    >
+                      /competitions
+                    </Link>{" "}
+                    and browse the active and upcoming list. Filter by status
+                    (Live / Soon / Completed), ranking method, asset class,
+                    difficulty, your required level, or sort by prize pool,
+                    start time or entry fee.
+                  </li>
+                  <li>
+                    Open a competition&apos;s card to see its rules: entry fee,
+                    starting capital, prize distribution, ranking method,
+                    leverage limit, max open positions and any minimum-trades
+                    requirement.
+                  </li>
+                  <li>
+                    Click <strong className="text-white">Enter Competition</strong>,
+                    confirm the entry terms, and the fee is debited from your
+                    wallet. You become a participant immediately.
+                  </li>
+                  <li>
+                    Once the contest goes Live, the{" "}
+                    <strong className="text-white">Trade</strong> button takes
+                    you into the contest&apos;s dedicated trading screen.
+                  </li>
+                </ol>
+
+                <div className="mt-3 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-sm">
+                  <p className="text-amber-200 font-semibold mb-2 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Entry requirements
                   </p>
+                  <ul className="space-y-1 text-gray-300">
+                    <li className="flex items-start gap-2">
+                      <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <span>
+                        Your email must be{" "}
+                        <strong className="text-white">verified</strong>.
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <span>
+                        Your account must <strong className="text-white">not</strong>{" "}
+                        be suspended, in chargeback, or otherwise restricted
+                        from entering competitions.
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <span>
+                        Your wallet balance must cover the entry fee.
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <span>
+                        Some contests require a{" "}
+                        <strong className="text-white">minimum player level</strong>{" "}
+                        (XP rank). The card shows the gate; if you don&apos;t
+                        meet it, the button is locked.
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <span>
+                        You can&apos;t enter the same contest twice.
+                      </span>
+                    </li>
+                  </ul>
                 </div>
-                <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                  <h5 className="font-semibold text-blue-400 mb-2">
-                    🎯 Win Rate Competitions
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Ranked by % of winning trades.
+
+                <div className="mt-3 bg-rose-500/10 border border-rose-500/30 rounded-lg p-3 text-sm">
+                  <p className="text-rose-200 font-semibold mb-1">
+                    Refunds
                   </p>
-                </div>
-                <div className="p-4 bg-purple-500/10 rounded-lg border border-purple-500/30">
-                  <h5 className="font-semibold text-purple-400 mb-2">
-                    ⚡ Volume Competitions
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Ranked by number of trades.
+                  <p className="text-gray-300">
+                    Entry fees are <strong>non-refundable</strong> once paid.
+                    The <em>only</em> automatic refund is when a competition is{" "}
+                    <strong className="text-white">cancelled</strong> (e.g.
+                    minimum participants not reached) — in that case every
+                    entry fee is returned to your wallet in full and the
+                    competition is marked Cancelled.
                   </p>
                 </div>
               </div>
 
-              <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4">
-                <h4 className="font-semibold text-white mb-2">
-                  ⚠️ Important Rules:
-                </h4>
+              {/* Ranking methods */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-yellow-400" />
+                  Ranking methods
+                </h3>
+                <p className="text-sm mb-3">
+                  Each competition picks one scoring method. Highest value
+                  wins, with tie-breakers applied if two players are level.
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/30 text-sm">
+                    <span className="font-semibold text-yellow-300">
+                      💰 P&amp;L
+                    </span>
+                    <p className="text-gray-400 mt-1">
+                      Absolute profit/loss in the sandbox currency. Bigger net
+                      gain = higher rank.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/30 text-sm">
+                    <span className="font-semibold text-green-300">
+                      📊 ROI
+                    </span>
+                    <p className="text-gray-400 mt-1">
+                      Return on starting capital, in %. Levels the field for
+                      contests with different starting balances.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/30 text-sm">
+                    <span className="font-semibold text-blue-300">
+                      🏦 Total Capital
+                    </span>
+                    <p className="text-gray-400 mt-1">
+                      Largest final equity wins. Behaves like P&amp;L but
+                      compares ending balances directly.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-cyan-500/10 rounded-lg border border-cyan-500/30 text-sm">
+                    <span className="font-semibold text-cyan-300">
+                      🎯 Win Rate
+                    </span>
+                    <p className="text-gray-400 mt-1">
+                      % of winning closed trades. Rewards consistency rather
+                      than swinging for the fences.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/30 text-sm">
+                    <span className="font-semibold text-purple-300">
+                      🥇 Total Wins
+                    </span>
+                    <p className="text-gray-400 mt-1">
+                      Raw count of winning trades. Encourages high activity
+                      with positive edge.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-pink-500/10 rounded-lg border border-pink-500/30 text-sm">
+                    <span className="font-semibold text-pink-300">
+                      ⚖️ Profit Factor
+                    </span>
+                    <p className="text-gray-400 mt-1">
+                      Wins ÷ losses ratio. Pure quality metric — one big win
+                      can dominate many small losses.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 p-3 bg-gray-900/40 border border-gray-700 rounded-lg text-sm">
+                  <p className="text-gray-300">
+                    <strong className="text-white">Tie-breakers.</strong> If
+                    two players are exactly tied on the primary score, the
+                    contest&apos;s configured tie-breaker decides (e.g.
+                    fewer-trades, higher win rate, earlier join time, or split
+                    the prize). If still tied, the player who joined the
+                    contest first is ranked higher. Some contests use{" "}
+                    <em>split equally</em> or <em>split weighted</em> rules so
+                    tied winners actually share the prize for that rank.
+                  </p>
+                </div>
+              </div>
+
+              {/* Prize distribution */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Coins className="h-4 w-4 text-yellow-400" />
+                  Prizes &amp; payout
+                </h3>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start gap-2">
-                    <ChevronRight className="h-4 w-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                    <CheckCircle2 className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
                     <span>
-                      Getting liquidated (below {settings.margin.liquidation}%
-                      margin) disqualifies you from prizes
+                      Each contest lists a{" "}
+                      <strong className="text-white">prize distribution</strong>{" "}
+                      table — e.g. <em>1st: 70%, 2nd: 20%, 3rd: 10%</em>. You
+                      can see it on the competition card and detail page.
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <ChevronRight className="h-4 w-4 text-orange-500 mt-0.5 flex-shrink-0" />
-                    <span>Entry fees are non-refundable once paid</span>
+                    <CheckCircle2 className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      A <strong className="text-white">platform fee</strong>{" "}
+                      (also displayed on the contest page) is deducted from
+                      each winner&apos;s share before payout.
+                    </span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <ChevronRight className="h-4 w-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                    <CheckCircle2 className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
                     <span>
-                      Max {settings.positions.maxOpen} open positions at a time
+                      If a paying rank has no eligible player (e.g. only two
+                      participants in a top-3 payout), the unfilled
+                      percentage is redistributed across the winners who{" "}
+                      <em>did</em> qualify.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Prizes are credited to your wallet{" "}
+                      <strong className="text-white">automatically</strong> the
+                      moment the contest settles. The transaction appears in
+                      your wallet history as{" "}
+                      <code className="bg-gray-800 px-1 rounded text-xs">
+                        competition_win
+                      </code>
+                      .
                     </span>
                   </li>
                 </ul>
+              </div>
+
+              {/* Trading rules inside a contest */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-orange-400" />
+                  Trading rules inside a contest
+                </h3>
+                <p className="text-sm mb-3">
+                  Every contest can override the platform-wide trading
+                  defaults. Always check the contest&apos;s rules card before
+                  you enter — these are the levers you&apos;ll encounter:
+                </p>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Leverage cap.</strong> The
+                      contest defines a maximum leverage (1× to whatever the
+                      admin allows). The default global cap is{" "}
+                      {settings.leverage.max}×, but each contest can be lower.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Max open positions.</strong>{" "}
+                      Most contests allow up to{" "}
+                      {settings.positions.maxOpen} positions open at once.
+                      Game-Master-created contests can be lower.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Asset class &amp; symbol scope.</strong>{" "}
+                      A contest can restrict which markets you can trade (e.g.
+                      Forex only, or a specific whitelist / blacklist of
+                      symbols).
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Short selling.</strong>{" "}
+                      Some contests disable shorts. The order ticket will
+                      surface this when you try to sell.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Risk caps.</strong> Some
+                      contests enable additional guard rails — max drawdown,
+                      daily loss limit, or equity-based checks — that block
+                      new orders once you cross the threshold.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Live leaderboard.</strong>{" "}
+                      The in-contest leaderboard refreshes roughly every 15
+                      seconds and uses live unrealized P&amp;L, so your rank
+                      moves as the market does.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Liquidation & disqualification */}
+              <div className="bg-rose-500/10 border border-rose-500/30 rounded-lg p-4">
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-rose-400" />
+                  Liquidation &amp; disqualification
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-rose-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      If your sandbox margin level falls to{" "}
+                      <strong className="text-white">
+                        {settings.margin.liquidation}%
+                      </strong>{" "}
+                      or below, all your open positions in that contest are
+                      force-closed and your participant status flips to{" "}
+                      <em>liquidated</em>.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-rose-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Most contests have{" "}
+                      <strong className="text-white">
+                        disqualify-on-liquidation
+                      </strong>{" "}
+                      enabled — you keep your seat but you&apos;re removed
+                      from the prize ranking and can no longer place trades
+                      in this contest.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-rose-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      You can still open the contest&apos;s trade view in{" "}
+                      <strong className="text-white">view-only mode</strong> to
+                      review your history.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-rose-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      For contests with a{" "}
+                      <em>minimum trades</em> or <em>minimum win rate</em>{" "}
+                      qualifier, players who finish below that bar are also
+                      ranked as disqualified at settlement.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Last man standing */}
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Trophy className="h-4 w-4 text-amber-400" />
+                  Last-player-standing early end
+                </h3>
+                <p className="text-sm">
+                  If every other participant gets liquidated or disqualified
+                  before the end time, the single remaining active player
+                  sees a <strong className="text-white">Claim Victory</strong>{" "}
+                  button. Pressing it ends the competition early and triggers
+                  the same automatic settlement path — prizes pay out
+                  immediately to the survivor and any unclaimed shares
+                  redistribute according to the contest&apos;s prize rules.
+                </p>
+              </div>
+
+              {/* Pages */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <LayoutDashboard className="h-4 w-4 text-purple-400" />
+                  Where to find what
+                </h3>
+                <div className="grid gap-2 sm:grid-cols-2 text-sm">
+                  <Link
+                    href="/competitions"
+                    className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg hover:bg-gray-800/40 transition-colors block"
+                  >
+                    <div className="font-semibold text-yellow-300">
+                      /competitions
+                    </div>
+                    <p className="text-gray-400 mt-1">
+                      Browse and filter every competition. Status badges,
+                      countdowns and prize pools update live.
+                    </p>
+                  </Link>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <div className="font-semibold text-yellow-300">
+                      /competitions/[id]
+                    </div>
+                    <p className="text-gray-400 mt-1">
+                      Detail page — rules, prize distribution, participants
+                      list and current leaderboard.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <div className="font-semibold text-yellow-300">
+                      /competitions/[id]/trade
+                    </div>
+                    <p className="text-gray-400 mt-1">
+                      The contest trading screen — chart, order ticket, open
+                      positions, live ranking. Participants only.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <div className="font-semibold text-yellow-300">
+                      /competitions/[id]/results
+                    </div>
+                    <p className="text-gray-400 mt-1">
+                      Post-settlement summary — your final stats, your prize
+                      and a link to view-only trade history.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Fair play */}
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                <h3 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-blue-400" />
+                  Fair play
+                </h3>
+                <p className="text-sm text-gray-300">
+                  ChartVolt monitors coordinated entries, mirror-trading
+                  patterns and equity-based anti-collusion signals across
+                  related accounts. If we detect manipulation we can
+                  disqualify involved entrants and reverse their prizes.
+                  Trade your own book — competing fairly is the only way to
+                  keep climbing the leaderboard and the Hall of Fame.
+                </p>
               </div>
             </div>
           </section>
