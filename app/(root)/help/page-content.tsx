@@ -4614,70 +4614,496 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
 
             <div className="space-y-4 text-gray-300">
               <p className="leading-relaxed">
-                {settings.credits.name} ({settings.credits.symbol}) are the
-                platform currency. Buy with {settings.currency.code} and
-                withdraw your winnings.
+                <strong className="text-white">{settings.credits.name}</strong>{" "}
+                ({settings.credits.symbol}) are the in-platform currency you
+                use to enter competitions, accept 1v1 challenges, buy items
+                in the Marketplace, and receive prizes. You buy them with
+                real {settings.currency.code}, and you can withdraw your
+                winnings back to {settings.currency.code} at any time
+                (subject to fees and KYC rules below).
               </p>
 
+              <p className="leading-relaxed text-sm text-gray-400">
+                Your wallet lives on{" "}
+                <Link
+                  href="/wallet"
+                  className="text-cyan-400 hover:underline"
+                >
+                  /wallet
+                </Link>
+                . You can also reach it from the sidebar (
+                <strong className="text-white">Wallet</strong>) and from
+                the user dropdown in the top-right.
+              </p>
+
+              {/* Conversion + key numbers */}
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
-                <h4 className="font-semibold text-white mb-3">
-                  💱 Conversion Rate:
+                <h4 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Coins className="h-4 w-4 text-yellow-400" />
+                  Conversion & limits
                 </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                   <div>
-                    <p className="text-gray-400">Rate:</p>
+                    <p className="text-gray-400">Rate</p>
                     <p className="text-white font-bold">
                       {settings.currency.symbol}1 ={" "}
                       {settings.credits.eurToCreditsRate}{" "}
-                      {settings.credits.name}
+                      {settings.credits.symbol}
                     </p>
                   </div>
                   <div>
-                    <p className="text-gray-400">Min. Deposit:</p>
+                    <p className="text-gray-400">Min. deposit</p>
                     <p className="text-white font-bold">
                       {settings.currency.symbol}
                       {settings.credits.minimumDeposit}
                     </p>
                   </div>
                   <div>
-                    <p className="text-gray-400">Min. Withdrawal:</p>
+                    <p className="text-gray-400">Min. withdrawal</p>
                     <p className="text-white font-bold">
                       {settings.currency.symbol}
                       {settings.credits.minimumWithdrawal}
                     </p>
                   </div>
                   <div>
-                    <p className="text-gray-400">Withdrawal Fee:</p>
+                    <p className="text-gray-400">Withdrawal fee</p>
                     <p className="text-white font-bold">
                       {settings.credits.withdrawalFee}%
+                    </p>
+                  </div>
+                  {settings.payments &&
+                    settings.payments.depositFeePercentage > 0 && (
+                      <div>
+                        <p className="text-gray-400">Deposit fee</p>
+                        <p className="text-white font-bold">
+                          {settings.payments.depositFeePercentage}%
+                        </p>
+                      </div>
+                    )}
+                  {settings.vat?.enabled && (
+                    <div>
+                      <p className="text-gray-400">VAT (where applicable)</p>
+                      <p className="text-white font-bold">
+                        {settings.vat.percentage}%
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mt-3">
+                  Example with the current rate:{" "}
+                  {settings.currency.symbol}
+                  {settings.credits.minimumDeposit} →{" "}
+                  <span className="text-white font-semibold">
+                    {(
+                      settings.credits.minimumDeposit *
+                      settings.credits.eurToCreditsRate
+                    ).toLocaleString()}{" "}
+                    {settings.credits.symbol} {settings.credits.name}
+                  </span>
+                  .
+                </p>
+              </div>
+
+              {/* What lives in your wallet */}
+              <div>
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Wallet className="h-4 w-4 text-cyan-400" />
+                  What you see on the Wallet page
+                </h4>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1">
+                      Available Balance
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Your spendable {settings.credits.name} balance. This
+                      is what gets debited when you enter a competition,
+                      accept a 1v1, or buy from the Marketplace, and it
+                      drops the moment a withdrawal request is submitted.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1">
+                      Lifetime totals
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Total Deposited, Total Withdrawn, Total Spent
+                      (Competitions / Challenges / Marketplace), Total Won
+                      (Competitions / Challenges), Refunded, and Admin
+                      adjustments.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1">
+                      Referral / Game Master earnings
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      If you&apos;re a Game Master, your referral payouts
+                      appear as a separate card and are credited to your
+                      balance as wallet transactions (see{" "}
+                      <button
+                        type="button"
+                        onClick={() => scrollToSection("gamemaster")}
+                        className="text-purple-400 hover:underline"
+                      >
+                        👑 Game Master
+                      </button>
+                      ).
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1">
+                      Transaction History
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Full ledger of every movement on your wallet, with
+                      filters by category, status and date range, and a
+                      &quot;load more&quot; pager (25 per page). Excel
+                      export and per-deposit invoice download are
+                      available.
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/30">
-                  <h5 className="font-semibold text-green-400 mb-2">
-                    💳 Buy {settings.credits.name}
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Pay {settings.currency.symbol}
-                    {settings.credits.minimumDeposit} → Get{" "}
-                    {settings.credits.minimumDeposit *
-                      settings.credits.eurToCreditsRate}{" "}
-                    {settings.credits.name}
+              {/* Buying credits */}
+              <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/30">
+                <h5 className="font-semibold text-green-400 mb-2 flex items-center gap-2">
+                  <CreditCard className="h-4 w-4" />
+                  Buying {settings.credits.name}
+                </h5>
+                <ol className="space-y-2 text-sm text-gray-300 list-decimal pl-5">
+                  <li>
+                    Open{" "}
+                    <Link
+                      href="/wallet"
+                      className="text-cyan-400 hover:underline"
+                    >
+                      /wallet
+                    </Link>{" "}
+                    and click{" "}
+                    <strong className="text-white">
+                      &quot;Buy {settings.credits.name}&quot;
+                    </strong>
+                    .
+                  </li>
+                  <li>
+                    Enter the amount in {settings.currency.code} (minimum{" "}
+                    {settings.currency.symbol}
+                    {settings.credits.minimumDeposit}). The dialog shows
+                    you exactly how many {settings.credits.name} you&apos;ll
+                    receive at the current rate.
+                  </li>
+                  {settings.payments?.anyEnabled && (
+                    <li>
+                      Choose a payment method.{" "}
+                      <span className="text-gray-400">
+                        Available right now:&nbsp;
+                        {[
+                          settings.payments.stripe && "Stripe (cards)",
+                          settings.payments.nuvei &&
+                            "Nuvei (cards + 3D Secure)",
+                          settings.payments.paddle && "Paddle",
+                        ]
+                          .filter(Boolean)
+                          .join(", ")}
+                        .
+                      </span>
+                    </li>
+                  )}
+                  <li>
+                    Complete the secure payment.{" "}
+                    {settings.payments?.nuvei && (
+                      <span className="text-gray-400">
+                        Nuvei card payments may trigger a 3D Secure
+                        (3DS2) challenge from your bank.
+                      </span>
+                    )}
+                  </li>
+                  <li>
+                    {settings.credits.name} land in your wallet
+                    automatically once the provider confirms the payment.
+                    A receipt is recorded as a{" "}
+                    <code className="text-xs bg-gray-900 px-1.5 py-0.5 rounded">
+                      deposit
+                    </code>{" "}
+                    transaction.
+                  </li>
+                </ol>
+                {(settings.kyc?.requiredForDeposit ||
+                  settings.payments?.depositFeePercentage ||
+                  settings.vat?.enabled) && (
+                  <div className="mt-3 pt-3 border-t border-green-500/20 space-y-1 text-xs text-gray-400">
+                    {settings.payments &&
+                      settings.payments.depositFeePercentage > 0 && (
+                        <p>
+                          • A platform processing fee of{" "}
+                          <strong className="text-white">
+                            {settings.payments.depositFeePercentage}%
+                          </strong>{" "}
+                          is added at checkout.
+                        </p>
+                      )}
+                    {settings.vat?.enabled && (
+                      <p>
+                        • VAT ({settings.vat.percentage}%) applies for EU
+                        consumers when the company is EU-registered. The
+                        applicable amount is shown at checkout.
+                      </p>
+                    )}
+                    {settings.kyc?.enabled &&
+                      settings.kyc?.requiredForDeposit && (
+                        <p>
+                          • Identity verification (KYC) is required before
+                          you can fund the wallet
+                          {settings.kyc.requiredAmount > 0 && (
+                            <>
+                              {" "}
+                              for deposits at or above{" "}
+                              {settings.currency.symbol}
+                              {settings.kyc.requiredAmount}
+                            </>
+                          )}
+                          .
+                        </p>
+                      )}
+                  </div>
+                )}
+              </div>
+
+              {/* Withdrawing */}
+              <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                <h5 className="font-semibold text-blue-400 mb-2 flex items-center gap-2">
+                  <Wallet className="h-4 w-4" />
+                  Withdrawing to {settings.currency.code}
+                </h5>
+                <ol className="space-y-2 text-sm text-gray-300 list-decimal pl-5">
+                  <li>
+                    Open{" "}
+                    <Link
+                      href="/wallet"
+                      className="text-cyan-400 hover:underline"
+                    >
+                      /wallet
+                    </Link>{" "}
+                    and click{" "}
+                    <strong className="text-white">
+                      &quot;Withdraw&quot;
+                    </strong>
+                    .
+                  </li>
+                  <li>
+                    Enter the amount (minimum{" "}
+                    {settings.currency.symbol}
+                    {settings.credits.minimumWithdrawal}). The dialog
+                    shows the fee, the net payout, and the available
+                    payout method (typically the same card you used to
+                    deposit, a Stripe payout, or a manual bank transfer).
+                  </li>
+                  <li>
+                    Submit. Your {settings.credits.name} are deducted{" "}
+                    <strong className="text-white">immediately</strong>{" "}
+                    and the request appears in your Transaction History
+                    as{" "}
+                    <code className="text-xs bg-gray-900 px-1.5 py-0.5 rounded">
+                      withdrawal
+                    </code>{" "}
+                    with status{" "}
+                    <strong className="text-yellow-400">
+                      pending
+                    </strong>
+                    .
+                  </li>
+                  <li>
+                    The request moves through{" "}
+                    <strong className="text-cyan-400">approved</strong> →{" "}
+                    <strong className="text-cyan-400">processing</strong>{" "}
+                    →{" "}
+                    <strong className="text-green-400">completed</strong>.
+                    If anything fails (provider error, payout method
+                    invalid, etc.) it becomes{" "}
+                    <strong className="text-red-400">rejected</strong>,{" "}
+                    <strong className="text-red-400">failed</strong>, or{" "}
+                    <strong className="text-gray-400">cancelled</strong>{" "}
+                    and the credits are refunded to your balance as a{" "}
+                    <code className="text-xs bg-gray-900 px-1.5 py-0.5 rounded">
+                      withdrawal_refund
+                    </code>
+                    .
+                  </li>
+                </ol>
+                <div className="mt-3 pt-3 border-t border-blue-500/20 space-y-1 text-xs text-gray-400">
+                  {settings.kyc?.enabled &&
+                    settings.kyc?.requiredForWithdrawal && (
+                      <p>
+                        • Identity verification (KYC) is required before
+                        your first withdrawal can be approved
+                        {settings.kyc.requiredAmount > 0 && (
+                          <>
+                            {" "}
+                            for amounts at or above{" "}
+                            {settings.currency.symbol}
+                            {settings.kyc.requiredAmount}
+                          </>
+                        )}
+                        .
+                      </p>
+                    )}
+                  <p>
+                    • The fee shown in the dialog is the authoritative
+                    one — it is computed from the current platform
+                    settings (default{" "}
+                    {settings.credits.withdrawalFee}%) and may include a
+                    fixed component depending on payout method.
+                  </p>
+                  <p>
+                    • Processing time, daily / monthly withdrawal limits,
+                    a cooldown between requests, and a hold period after
+                    new deposits may apply. The withdrawal dialog will
+                    tell you exactly what blocks a request if any of
+                    these rules are hit.
+                  </p>
+                  <p>
+                    • Withdrawals are blocked while you are in an{" "}
+                    <strong className="text-white">
+                      active competition or 1v1 challenge
+                    </strong>{" "}
+                    that has locked stakes.
                   </p>
                 </div>
-                <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                  <h5 className="font-semibold text-blue-400 mb-2">
-                    💸 Withdraw
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Convert {settings.credits.name} back to{" "}
-                    {settings.currency.code} (minus{" "}
-                    {settings.credits.withdrawalFee}% fee)
-                  </p>
+              </div>
+
+              {/* Transaction types */}
+              <div>
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-purple-400" />
+                  Transaction types you may see in your history
+                </h4>
+                <div className="grid gap-2 sm:grid-cols-2 text-xs text-gray-300">
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <p className="font-semibold text-green-400 mb-1">
+                      Money in
+                    </p>
+                    <p className="text-gray-400">
+                      <code>deposit</code>,{" "}
+                      <code>manual_deposit_credit</code>,{" "}
+                      <code>competition_win</code>,{" "}
+                      <code>challenge_win</code>,{" "}
+                      <code>competition_refund</code>,{" "}
+                      <code>challenge_refund</code>,{" "}
+                      <code>challenge_declined</code>,{" "}
+                      <code>challenge_expired</code>,{" "}
+                      <code>withdrawal_refund</code>,{" "}
+                      <code>incident_compensation</code>,{" "}
+                      <code>admin_adjustment</code> (positive)
+                    </p>
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <p className="font-semibold text-red-400 mb-1">
+                      Money out
+                    </p>
+                    <p className="text-gray-400">
+                      <code>withdrawal</code>,{" "}
+                      <code>withdrawal_fee</code>,{" "}
+                      <code>competition_entry</code>,{" "}
+                      <code>challenge_entry</code>,{" "}
+                      <code>marketplace_purchase</code>,{" "}
+                      <code>gamemaster_subscription</code>,{" "}
+                      <code>platform_fee</code>,{" "}
+                      <code>chargeback_clawback</code>,{" "}
+                      <code>admin_adjustment</code> (negative)
+                    </p>
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600 sm:col-span-2">
+                    <p className="font-semibold text-purple-400 mb-1">
+                      Game Master payouts
+                    </p>
+                    <p className="text-gray-400">
+                      <code>gamemaster_earning</code> (competition
+                      referral commission),{" "}
+                      <code>gamemaster_challenge_referral</code> (1v1
+                      referral commission),{" "}
+                      <code>gamemaster_subscription_refund</code> (if a
+                      GM package purchase is reversed).
+                    </p>
+                  </div>
                 </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Every row in your history shows the type, amount,{" "}
+                  status (
+                  <span className="text-yellow-400">pending</span> /{" "}
+                  <span className="text-green-400">completed</span> /{" "}
+                  <span className="text-red-400">failed</span> /{" "}
+                  <span className="text-gray-400">cancelled</span> /{" "}
+                  <span className="text-orange-400">disputed</span>),
+                  balance before/after, and a description. Click any row
+                  for the full detail panel.
+                </p>
+              </div>
+
+              {/* Invoices */}
+              <div className="bg-gray-800/60 border border-gray-700 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-cyan-400" />
+                  Invoices for deposits
+                </h4>
+                <p className="text-sm text-gray-300 leading-relaxed">
+                  When invoicing is enabled, every successful deposit
+                  generates a tax-compliant invoice that is e-mailed to
+                  you and made available from the Transaction History row
+                  (look for the download icon). The invoice itemises the
+                  credit purchase, the platform fee (if any), and VAT
+                  (when applicable). You can find every invoice you have
+                  ever received in{" "}
+                  <button
+                    type="button"
+                    onClick={() => scrollToSection("invoices")}
+                    className="text-cyan-400 hover:underline"
+                  >
+                    📄 Invoices &amp; Billing
+                  </button>
+                  .
+                </p>
+              </div>
+
+              {/* Safety / chargebacks */}
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-red-400 mb-2 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Important: chargebacks &amp; clawbacks
+                </h4>
+                <ul className="space-y-1.5 text-sm text-gray-300 list-disc pl-5">
+                  <li>
+                    If you dispute a deposit with your bank, the platform
+                    will record a{" "}
+                    <code className="text-xs bg-gray-900 px-1.5 py-0.5 rounded">
+                      chargeback_clawback
+                    </code>{" "}
+                    on your wallet for the disputed amount, your account
+                    may be restricted while the case is reviewed, and the
+                    original deposit invoice is marked as{" "}
+                    <strong className="text-orange-400">disputed</strong>.
+                  </li>
+                  <li>
+                    Wallet balances do{" "}
+                    <strong className="text-white">not</strong> expire.
+                    They stay yours until you spend them, withdraw them,
+                    or close your account.
+                  </li>
+                  <li>
+                    The platform never asks for your full card number,
+                    CVV, or banking password — payments are handled
+                    end-to-end by the PSP (
+                    {[
+                      settings.payments?.stripe && "Stripe",
+                      settings.payments?.nuvei && "Nuvei",
+                      settings.payments?.paddle && "Paddle",
+                    ]
+                      .filter(Boolean)
+                      .join(" / ") || "your payment provider"}
+                    ).
+                  </li>
+                </ul>
               </div>
             </div>
           </section>
