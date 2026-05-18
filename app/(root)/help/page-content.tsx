@@ -9719,70 +9719,345 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           >
             <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <HelpCircle className="h-6 w-6 text-purple-500" />
-              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">❓ FAQ</h2>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
+                ❓ FAQ
+              </h2>
             </div>
 
-            <div className="space-y-4">
+            <p className="text-sm text-gray-400 mb-5">
+              Short answers to the questions support gets most often.
+              Each topic links back to the deep-dive section above for
+              the full picture.
+            </p>
+
+            <div className="space-y-6">
               {[
                 {
-                  q: "Is this real money trading?",
-                  a: `No, trading is simulated. Entry fees and prizes are in ${settings.credits.name} (${settings.currency.code}).`,
+                  title: "🚀 Getting started",
+                  sectionId: "getting-started",
+                  items: [
+                    {
+                      q: "Is this real-money trading?",
+                      a: `No. All trading on ChartVolt is simulated against live market quotes — you cannot lose real money on a trade. The only real-money flow is buying ${settings.credits.name} with ${settings.currency.code} to pay competition / 1v1 entry fees, Marketplace purchases, and to receive prize payouts, all of which you can withdraw back to ${settings.currency.code}.`,
+                    },
+                    {
+                      q: "Do I need to verify my email to use the platform?",
+                      a: "You can browse and complete the Getting Started checklist without verifying, but verified email is required before you can enter competitions, accept 1v1 challenges, deposit, or withdraw. You'll see a banner with a one-click resend if your address is unverified.",
+                    },
+                    {
+                      q: "Is the platform free to use?",
+                      a: `Creating an account, demo trading and browsing competitions are free. Competitions and 1v1 challenges have entry fees in ${settings.credits.name}. Wallet deposits may include a configurable platform fee${
+                        settings.payments &&
+                        settings.payments.depositFeePercentage > 0
+                          ? ` (currently ${settings.payments.depositFeePercentage}%)`
+                          : ""
+                      } and EU VAT where applicable.`,
+                    },
+                    {
+                      q: "What devices do you support?",
+                      a: "Any modern desktop or mobile browser. Charts and the order ticket are fully responsive. There is no mobile app yet — the web app is the supported surface.",
+                    },
+                  ],
                 },
                 {
-                  q: `How do I buy ${settings.credits.name}?`,
-                  a: `Go to Wallet, click "Buy ${settings.credits.name}", minimum ${settings.currency.symbol}${settings.credits.minimumDeposit}.`,
+                  title: `💰 Wallet, ${settings.credits.name} & payments`,
+                  sectionId: "credits",
+                  items: [
+                    {
+                      q: `How do I buy ${settings.credits.name}?`,
+                      a: `Open the wallet (/wallet), click "Buy ${settings.credits.name}", enter an amount in ${settings.currency.code} (minimum ${settings.currency.symbol}${settings.credits.minimumDeposit}), then complete the secure card payment. At the current rate of ${settings.currency.symbol}1 = ${settings.credits.eurToCreditsRate} ${settings.credits.symbol}, ${settings.currency.symbol}${settings.credits.minimumDeposit} gives you ${(settings.credits.minimumDeposit * settings.credits.eurToCreditsRate).toLocaleString()} ${settings.credits.name}. ${settings.credits.name} are credited automatically the instant the processor confirms the charge.`,
+                    },
+                    {
+                      q: "Why was my deposit declined?",
+                      a: "Most declines come from your bank (insufficient funds, 3D-Secure failure, regional card restriction, suspected fraud). After 3 declined attempts within 10 minutes, ChartVolt temporarily pauses new deposit attempts on your account for an hour to protect you from card-testing fraud. Try a different card, contact your bank, or wait and retry.",
+                    },
+                    {
+                      q: "Can I withdraw my winnings?",
+                      a: `Yes. Open the wallet, click "Withdraw", enter at least ${settings.currency.symbol}${settings.credits.minimumWithdrawal}. The dialog shows the fee (default ${settings.credits.withdrawalFee}%), the net payout, and the available payout method — usually a refund to the card you deposited from, or a manual bank transfer if a card refund isn't possible. Withdrawals move through pending → approved → processing → completed.`,
+                    },
+                    {
+                      q: "Why can't I withdraw right now?",
+                      a: "A withdrawal request can be blocked by: pending KYC, an active competition or 1v1 with locked stakes, a recent deposit still inside the hold period, an active account restriction, the daily/monthly withdrawal cap, or a cooldown between requests. The withdrawal dialog tells you exactly which rule is blocking the request.",
+                    },
+                    {
+                      q: `Do ${settings.credits.name} expire?`,
+                      a: `No. Wallet balances stay yours until you spend them, withdraw them, or close your account. There is no inactivity fee.`,
+                    },
+                    {
+                      q: "Will I be charged VAT?",
+                      a: settings.vat?.enabled
+                        ? `VAT is charged only when your country is in the EU AND the operating company is in the EU AND VAT is enabled (currently ${settings.vat.percentage}%). It applies only to the credit purchase line — not to the platform processing fee. The deposit dialog always shows the VAT amount before you confirm.`
+                        : "VAT is not currently being collected. If applicable rules change, the deposit dialog will always show any VAT amount before you confirm.",
+                    },
+                    {
+                      q: "Where can I get my invoices?",
+                      a: "Every successful deposit generates a tax-compliant invoice, e-mailed to you with a PDF attachment. You can also re-open the HTML version from the Transaction History row on the wallet page (look for the View Invoice icon). Withdrawals, in-app spending, and prizes don't generate separate invoices — they're tracked in Transaction History.",
+                    },
+                  ],
                 },
                 {
-                  q: "Can I withdraw my winnings?",
-                  a: `Yes! Minimum withdrawal is ${settings.currency.symbol}${settings.credits.minimumWithdrawal} with ${settings.credits.withdrawalFee}% fee.`,
+                  title: "🏆 Competitions",
+                  sectionId: "competitions",
+                  items: [
+                    {
+                      q: "How do I enter a competition?",
+                      a: "Open /competitions, pick one, accept the terms, and pay the entry fee. The platform checks your email verification, restrictions, registration deadline, and balance — if anything blocks you, the dialog says so. After entering, you trade with the contest's starting virtual capital, separate from your real wallet.",
+                    },
+                    {
+                      q: "What ranks me in a competition?",
+                      a: "It depends on the competition's ranking method (P&L, ROI %, etc.) shown on the terms screen. Live ranking updates while the contest runs; the final ranking applies tie-breakers (e.g. higher win-rate, lower drawdown) and platform fees before the prize pool is paid out.",
+                    },
+                    {
+                      q: "Do I keep the virtual capital after the competition?",
+                      a: "No. Virtual capital is contest-scoped — it resets every time you enter. Your real wallet only changes through entry fees in, and prize payouts out, in your wallet currency.",
+                    },
+                    {
+                      q: "Can I leave a competition I've joined?",
+                      a: "No, entry is final once paid. You can stop trading, but your entry fee is not refunded except in narrow admin-handled cases (e.g. a competition is cancelled before it starts).",
+                    },
+                    {
+                      q: "What happens if I'm the last one trading?",
+                      a: "Some competitions allow the last remaining active participant to trigger an early finalization. When eligible, a Claim Early End button appears on the competition page.",
+                    },
+                  ],
                 },
                 {
-                  q: "What happens if I get liquidated?",
-                  a: `All positions close at ${settings.margin.liquidation}% margin. You may be disqualified from prizes.`,
+                  title: "⚔️ 1v1 Challenges",
+                  sectionId: "challenges",
+                  items: [
+                    {
+                      q: "How does a 1v1 challenge work?",
+                      a: "You create or accept a 1v1 against a specific trader. Both sides put up an equal stake. You each trade the same virtual capital for the agreed duration. Whoever has the higher P&L at the deadline wins the combined pot (minus the platform fee). If a challenge is never accepted, it expires and your stake is refunded.",
+                    },
+                    {
+                      q: "Can I challenge anyone?",
+                      a: "Only traders who are online and have accepting challenges turned on. You'll see their availability badge on Match Cards and on their Profile Card. Send the challenge from the VS screen; they have a limited window to accept before it expires.",
+                    },
+                    {
+                      q: "What if my opponent declines or never responds?",
+                      a: "Declined or expired challenges return your stake to your wallet automatically as a challenge_declined or challenge_expired transaction.",
+                    },
+                    {
+                      q: "Are draws possible?",
+                      a: "Yes, when both sides finish with identical scoring metrics. The platform follows the configured tie policy (typically refund-both or split-pot minus the fee).",
+                    },
+                  ],
                 },
                 {
-                  q: "Can I change my leverage?",
-                  a: `Leverage is set between ${settings.leverage.min}x - ${settings.leverage.max}x (default ${settings.leverage.default}x).`,
+                  title: "📈 Trading & Risk",
+                  sectionId: "trading",
+                  items: [
+                    {
+                      q: "When is the market open?",
+                      a: "Forex pairs are open 24/5 (Sunday 22:00 UTC → Friday 22:00 UTC, broker-defined). Outside those hours, the order ticket is disabled and the chart shows a market-closed banner. Some symbols may have additional maintenance windows.",
+                    },
+                    {
+                      q: "Can I change my leverage?",
+                      a: `Leverage is configurable per competition. The platform default is ${settings.leverage.default}× with a maximum of ${settings.leverage.max}× and a minimum of ${settings.leverage.min}×. Some competitions tighten this. You can request a lower leverage on the order ticket — the contest cap is the ceiling, not a forced value.`,
+                    },
+                    {
+                      q: "How many positions can I open?",
+                      a: `By default up to ${settings.positions.maxOpen} simultaneous open positions per contest. Some competitions tighten this further. Pending orders count against the cap once they trigger.`,
+                    },
+                    {
+                      q: "What happens if I get liquidated?",
+                      a: `When your margin level drops below ${settings.margin.liquidation}%, the platform automatically closes every open position in that contest at market and flags your participant record as liquidated. You cannot open new trades in the same competition / 1v1 after that. Whether liquidation also disqualifies you from prizes depends on each competition's rules.`,
+                    },
+                    {
+                      q: "Will my Stop Loss / Take Profit actually fire?",
+                      a: "Yes — SL and TP triggers off the live price feed in real time as quotes update. There is no worker-delay or polling gap. When a level is hit, the position is closed at the next available tick. Trading with SL set is the single best protection against liquidation.",
+                    },
+                    {
+                      q: "Does it cost anything to keep a position open overnight?",
+                      a: "No. ChartVolt does not charge swap / overnight financing on simulated positions. Spread is the only cost baked into each trade, applied at open and close from the live feed.",
+                    },
+                  ],
                 },
                 {
-                  q: "How many positions can I open?",
-                  a: `Maximum ${settings.positions.maxOpen} open positions at a time.`,
+                  title: "🛒 Marketplace & Game Master",
+                  sectionId: "marketplace",
+                  items: [
+                    {
+                      q: "Are Marketplace purchases refundable?",
+                      a: `${settings.credits.name} purchases are generally final once delivered. Refunds are handled by support on a case-by-case basis (e.g. an item is broken or the purchase was an obvious mistake captured within a short window).`,
+                    },
+                    {
+                      q: "What happens to my indicators if my Game Master pack expires?",
+                      a: "Indicators and strategies you bought as separate Marketplace items stay yours forever. GM packages, on the other hand, expire and need to be renewed from the Arsenal tab, the Game Master page, or the Marketplace card.",
+                    },
+                    {
+                      q: "How do I renew an expired Game Master pack?",
+                      a: "Either click Renew on the GM card in /profile?tab=arsenal, click Renew now on /gamemaster, or open the same GM package in the Marketplace and use the Renew button. Your GM Dashboard reappears in the sidebar the moment the renewal completes — no page refresh needed.",
+                    },
+                    {
+                      q: "Do I get commission as a Game Master?",
+                      a: "Yes — every competition and 1v1 you create earns a configurable referral commission on entries from your referred traders, credited to your wallet as gamemaster_earning / gamemaster_challenge_referral transactions.",
+                    },
+                  ],
                 },
                 {
-                  q: "Do badges expire?",
-                  a: `No, badges are permanent. XP can only go up!`,
+                  title: "🗺️ Journey, Badges & Trader Levels",
+                  sectionId: "journey",
+                  items: [
+                    {
+                      q: "Do badges expire?",
+                      a: "No, badges are permanent. Once earned, they stay on your profile forever and XP only goes up.",
+                    },
+                    {
+                      q: "What gives me XP?",
+                      a: "Five sources, all feeding the same XP pool: earning badges (XP per rarity), completing Journey milestones, closing trades, finishing competitions, and finishing 1v1 challenges. The XP bar on your Overview tab is the single source of truth.",
+                    },
+                    {
+                      q: "Why don't I see a badge for my first deposit / first trade?",
+                      a: `Because "first X" achievements are handled by Journey milestones, not the standalone Badge System — to avoid duplication. Open /profile?tab=journey to see them.`,
+                    },
+                    {
+                      q: "How does my level affect my account?",
+                      a: "Level is mostly a display of your progression — the title that shows up on your profile, Profile Card, leaderboard, and chat. Some Journey milestones and Marketplace items can have a minimum-level requirement, but most platform features (trading, competitions, 1v1s, withdrawals) don't gate on level.",
+                    },
+                    {
+                      q: "Can I lose XP?",
+                      a: "No. XP is non-decreasing — badges can't be revoked through normal play, so XP only accumulates. The level under your avatar can only go up.",
+                    },
+                  ],
                 },
                 {
-                  q: "When is the market open?",
-                  a: "Forex markets are open 24/5 (Monday-Friday), closed weekends.",
+                  title: "💖 Match Cards & Social",
+                  sectionId: "matchmaking",
+                  items: [
+                    {
+                      q: "How does Match Cards pick opponents for me?",
+                      a: "The matchmaking engine builds a score from a few factors: similar trader level, similar trading style (pairs, hold time, risk), recent activity, and online availability. You see the top reasons your match was selected on each card.",
+                    },
+                    {
+                      q: "Why does someone appear as offline / unavailable?",
+                      a: 'Either they\'re currently signed out, or they have "accepting challenges" turned off in their settings. Cards still let you view their profile but the Challenge button is disabled.',
+                    },
+                    {
+                      q: "Can I turn off Match Cards entirely?",
+                      a: "You can stop appearing in matchmaking by toggling off your acceptance setting on the profile, or by privacy options that suppress friend requests. Your stats remain visible on the leaderboard either way.",
+                    },
+                  ],
                 },
                 {
-                  q: "Why was my account flagged for a security review?",
-                  a: "Our automated security system detected something that requires a routine check — such as a shared device, payment method, or network. This is a standard procedure and not an accusation. Most reviews are resolved quickly. You can continue using the platform while the review is in progress.",
+                  title: "👤 Profile, KYC & Security",
+                  sectionId: "profile",
+                  items: [
+                    {
+                      q: "Can I change my email?",
+                      a: "Not from the Settings UI — sign-in email is intentionally read-only to prevent account take-over. Contact support if you genuinely need to update it; we'll verify ownership of both addresses first.",
+                    },
+                    {
+                      q: "Do I have to do KYC?",
+                      a: settings.kyc?.enabled
+                        ? `Yes, when you reach a gated action. KYC is required ${
+                            settings.kyc.requiredForDeposit
+                              ? "before deposits"
+                              : ""
+                          }${
+                            settings.kyc.requiredForDeposit &&
+                            settings.kyc.requiredForWithdrawal
+                              ? " and "
+                              : ""
+                          }${
+                            settings.kyc.requiredForWithdrawal
+                              ? "before your first withdrawal"
+                              : ""
+                          }${
+                            settings.kyc.requiredAmount > 0
+                              ? ` for amounts at or above ${settings.currency.symbol}${settings.kyc.requiredAmount}`
+                              : ""
+                          }. The flow uses Veriff, takes about 5 minutes, and your raw documents stay with Veriff — never on our servers.`
+                        : "KYC is not currently required on this platform. If that changes, you'll be prompted to verify when you next try a gated action.",
+                    },
+                    {
+                      q: "How long does KYC take?",
+                      a: "Usually a few minutes after you submit. During peak times it can take up to a few hours. The Verification tab polls automatically and the status flips from Pending → Approved (or Resubmission / Declined) the moment Veriff returns a decision.",
+                    },
+                    {
+                      q: "What if my KYC is declined?",
+                      a: "Most declines are resolvable (blurry document, glare, expired ID, unsupported country). The page tells you whether you can retry directly or whether you need to contact support. You have a limited number of attempts before support has to intervene.",
+                    },
+                    {
+                      q: "Do I have to enable 2FA?",
+                      a: "Not required, but strongly recommended. TOTP-based 2FA stops 99% of password-leak takeovers. Setup is in Profile → Settings → Two-Factor Authentication, with backup codes you can regenerate and an email-OTP fallback if you lose your authenticator.",
+                    },
+                    {
+                      q: "Why was my account flagged for a security review?",
+                      a: "Our automated systems spotted a signal that needs a routine check — shared device or payment method with another account, an IP/VPN pattern, or an unusual coordination of competition entries. Most flags clear quickly. You can use the platform normally during the review unless a specific action is paused.",
+                    },
+                    {
+                      q: "Can I use a VPN?",
+                      a: "Casual VPN use is fine but may trigger an extra review, especially if it's combined with other signals (different device, different country, etc.). Using a VPN to disguise multi-accounting or bypass a restriction is not allowed.",
+                    },
+                    {
+                      q: "My household member also trades here — will we both get flagged?",
+                      a: "Possibly, because you share IP / device cookies. Tell support proactively that you share a household — flags resolve dramatically faster when context is on file.",
+                    },
+                    {
+                      q: "What happens if I'm caught multi-accounting?",
+                      a: "Confirmed multi-accounting leads to temporary or permanent restrictions on a per-action basis (trading, deposits, withdrawals, competition entries can each be paused independently). Severe / repeated violations result in a permanent ban; legitimate remaining funds can still be released by support on request.",
+                    },
+                  ],
                 },
                 {
-                  q: "Can I use a VPN while trading?",
-                  a: "Using VPNs may trigger a security flag. We recommend trading without a VPN to avoid unnecessary reviews. If you must use one, be aware that it may result in additional verification steps.",
+                  title: "💸 Chargebacks & disputes",
+                  sectionId: "credits",
+                  items: [
+                    {
+                      q: "What happens if I file a chargeback on a deposit?",
+                      a: "ChartVolt records a chargeback_clawback against your wallet for the disputed amount, opens an internal case, and cross-links your deposit's invoice as evidence. Your account may be restricted while the case is reviewed by both your bank and our team. If the chargeback is found legitimate the funds are released to your bank; if it's reversed in our favour, the clawback stays in place.",
+                    },
+                    {
+                      q: "Will a chargeback affect my account?",
+                      a: "Yes — fraudulent chargebacks are treated as payment fraud. Confirmed cases lead to a permanent ban. If you have a legitimate dispute, contact support before filing with your bank — most issues resolve faster that way.",
+                    },
+                  ],
                 },
                 {
-                  q: "My household member also uses this platform — will we be flagged?",
-                  a: "Possibly, since your devices share the same network. We recommend contacting support proactively to let us know about shared households. This helps our team distinguish legitimate use from multi-accounting.",
+                  title: "🔔 Notifications",
+                  sectionId: "notifications",
+                  items: [
+                    {
+                      q: "Why didn't I get an email for that notification?",
+                      a: "Email delivery follows your preferences in Profile → Notifications. Email is opt-in per category; the bell-icon in-app feed is always real-time for challenges and polled every ~30s for everything else.",
+                    },
+                    {
+                      q: "Can I turn off competition or 1v1 popups?",
+                      a: "Yes — open Profile → Notifications → Preferences. You can mute by category (Competitions, Challenges, Marketplace, etc.), turn off the master switch, set quiet hours, or disable the on-screen challenge popup specifically.",
+                    },
+                  ],
                 },
-                {
-                  q: "What happens if I'm found to be multi-accounting?",
-                  a: "Multi-accounting violates our terms. Consequences range from warnings to temporary suspension or permanent ban depending on severity. Remaining funds can always be withdrawn.",
-                },
-                {
-                  q: "How do I clear a security flag on my account?",
-                  a: "Most flags are reviewed and resolved by our team automatically. If you believe the flag is incorrect, contact support with an explanation. Once cleared, you won't be flagged for the same reason again.",
-                },
-              ].map((faq, index) => (
-                <div
-                  key={index}
-                  className="p-4 bg-gray-700/50 rounded-lg border border-gray-600"
-                >
-                  <h4 className="font-semibold text-white mb-2">{faq.q}</h4>
-                  <p className="text-sm text-gray-400">{faq.a}</p>
+              ].map((group) => (
+                <div key={group.sectionId} className="space-y-3">
+                  <div className="flex items-center justify-between gap-2 border-b border-gray-700 pb-1">
+                    <h3 className="text-base font-bold text-white">
+                      {group.title}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection(group.sectionId)}
+                      className="text-xs text-purple-300 hover:text-purple-200 hover:underline whitespace-nowrap"
+                    >
+                      Open full section →
+                    </button>
+                  </div>
+                  {group.items.map((faq, index) => (
+                    <details
+                      key={`${group.sectionId}-${index}`}
+                      className="group p-4 bg-gray-700/40 rounded-lg border border-gray-600 open:bg-gray-700/60 open:border-purple-500/30 transition-colors"
+                    >
+                      <summary className="flex items-start justify-between gap-3 cursor-pointer list-none">
+                        <span className="font-semibold text-white text-sm">
+                          {faq.q}
+                        </span>
+                        <ChevronRight className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0 transition-transform group-open:rotate-90" />
+                      </summary>
+                      <p className="text-sm text-gray-300 leading-relaxed mt-3">
+                        {faq.a}
+                      </p>
+                    </details>
+                  ))}
                 </div>
               ))}
             </div>
