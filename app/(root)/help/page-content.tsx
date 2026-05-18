@@ -42,6 +42,9 @@ import {
   AlertTriangle,
   Map,
   Flag,
+  MessageSquare,
+  UserPlus,
+  Headphones,
 } from "lucide-react";
 import { GameIcon } from "@/components/ui/GameIcon";
 import type { GameIconName } from "@/lib/constants/game-icons";
@@ -139,6 +142,7 @@ const menuSections = [
   { id: "badge-system", title: "🏅 Badge System", icon: Award },
   { id: "risk-management", title: "🛡️ Risk Management", icon: Shield },
   { id: "account-security", title: "🔒 Account Security", icon: Eye },
+  { id: "support", title: "💬 Support & Messaging", icon: MessageSquare },
   { id: "invoices", title: "📄 Invoices & Billing", icon: FileText },
   { id: "faq", title: "❓ FAQ", icon: HelpCircle },
 ];
@@ -9295,6 +9299,572 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   </div>
                 )}
               </div>
+            </div>
+          </section>
+
+          {/* Support & Messaging */}
+          <section
+            id="support"
+            className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
+          >
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+              <MessageSquare className="h-6 w-6 text-pink-400" />
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
+                💬 Support &amp; Messaging
+              </h2>
+            </div>
+
+            <div className="space-y-4 text-gray-300">
+              <p className="leading-relaxed">
+                ChartVolt&apos;s entire messaging experience lives at
+                one address:{" "}
+                <Link
+                  href="/messaging"
+                  className="text-pink-400 hover:underline"
+                >
+                  /messaging
+                </Link>
+                . The same page is used to{" "}
+                <strong className="text-white">talk to our support team</strong>{" "}
+                (with an AI first responder and a real human behind it
+                when needed) and to{" "}
+                <strong className="text-white">
+                  chat directly with other traders
+                </strong>{" "}
+                you&apos;ve connected with. You can open it from the{" "}
+                <strong className="text-white">Messages</strong>{" "}
+                sidebar entry, which shows a numeric badge whenever you
+                have unread messages waiting.
+              </p>
+
+              <div className="bg-pink-500/10 border border-pink-500/30 rounded-lg p-3 text-xs text-gray-300">
+                <strong className="text-pink-300">Quick map:</strong>{" "}
+                The left pane lists{" "}
+                <strong className="text-white">
+                  Support tickets &amp; chats
+                </strong>{" "}
+                (your conversations with us) and{" "}
+                <strong className="text-white">Direct messages</strong>{" "}
+                (your conversations with other traders). The right
+                pane is the active thread. On mobile, the two panes
+                stack and you tap a row to enter the thread.
+              </div>
+
+              {/* ───── Customer support ───── */}
+              <div>
+                <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                  <Headphones className="h-5 w-5 text-pink-400" />
+                  How customer support works
+                </h3>
+
+                {/* Two-stage model */}
+                <div className="bg-gray-800/60 border border-gray-700 rounded-xl p-4 mb-3">
+                  <p className="text-sm text-gray-300 mb-3">
+                    Support is a{" "}
+                    <strong className="text-white">two-stage system</strong>
+                    : an AI assistant handles routine questions
+                    instantly, and a human{" "}
+                    <strong className="text-white">support agent</strong>{" "}
+                    takes over the moment the conversation needs a real
+                    person.
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                      <p className="font-semibold text-cyan-300 text-sm mb-1 flex items-center gap-2">
+                        <Sparkles className="h-4 w-4" />
+                        Stage 1 — AI assistant
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        The first responder is an AI built on a curated
+                        knowledge base of platform documentation, fees,
+                        rules, and frequent procedures. It typically
+                        answers in seconds, 24/7. You&apos;ll see an
+                        AI tag on its replies — it never pretends to be
+                        a person.
+                      </p>
+                    </div>
+                    <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                      <p className="font-semibold text-pink-300 text-sm mb-1 flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Stage 2 — Human agent
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        When a question is beyond &quot;how do I…&quot;
+                        territory — payments, KYC edge cases, account
+                        restrictions, refunds, disputes — a human agent
+                        picks up the same thread. Their replies are
+                        tagged with the agent&apos;s name.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Start a chat */}
+                <div className="mb-3">
+                  <h4 className="font-semibold text-white text-sm mb-2">
+                    Starting a support chat
+                  </h4>
+                  <ol className="space-y-2 text-sm text-gray-300 list-decimal pl-5">
+                    <li>
+                      Open{" "}
+                      <Link
+                        href="/messaging"
+                        className="text-pink-400 hover:underline"
+                      >
+                        /messaging
+                      </Link>{" "}
+                      and use the{" "}
+                      <strong className="text-white">Contact Support</strong>{" "}
+                      action above the conversation list. A new
+                      conversation is created and routed to the AI by
+                      default.
+                    </li>
+                    <li>
+                      Type your question in plain language. Be
+                      specific (the action you took, the page, any
+                      transaction ID or error message). Concrete
+                      details cut resolution time dramatically.
+                    </li>
+                    <li>
+                      The AI replies in the same thread. If its
+                      answer resolves your question, you&apos;re done.
+                      You can re-open the ticket later by sending a
+                      new message in the same thread.
+                    </li>
+                  </ol>
+                </div>
+
+                {/* Escalation */}
+                <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-4 mb-3">
+                  <h4 className="font-semibold text-white text-sm mb-2 flex items-center gap-2">
+                    <UserPlus className="h-4 w-4 text-cyan-300" />
+                    How a conversation reaches a human agent
+                  </h4>
+                  <p className="text-xs text-gray-300 mb-2">
+                    Escalation is automatic — you don&apos;t need to
+                    fill in a separate ticket form. It happens when
+                    any one of these is true:
+                  </p>
+                  <ul className="space-y-1.5 text-xs text-gray-300 list-disc pl-5">
+                    <li>
+                      You explicitly ask for one. Phrases like{" "}
+                      <code className="bg-gray-900 px-1.5 py-0.5 rounded">
+                        human
+                      </code>
+                      ,{" "}
+                      <code className="bg-gray-900 px-1.5 py-0.5 rounded">
+                        agent
+                      </code>
+                      ,{" "}
+                      <code className="bg-gray-900 px-1.5 py-0.5 rounded">
+                        talk to someone
+                      </code>
+                      ,{" "}
+                      <code className="bg-gray-900 px-1.5 py-0.5 rounded">
+                        representative
+                      </code>{" "}
+                      flip the conversation to the human queue
+                      immediately. (Just typing &quot;please&quot; is
+                      not enough — be explicit.)
+                    </li>
+                    <li>
+                      The conversation has reached the configured
+                      maximum number of AI replies — usually around
+                      ten. After that the AI hands off to a person
+                      automatically, even if you didn&apos;t ask.
+                    </li>
+                    <li>
+                      The AI is uncertain about its own answer (low
+                      confidence). When the platform can tell the
+                      reply might be wrong, it escalates instead of
+                      guessing.
+                    </li>
+                  </ul>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Once escalated, an internal notice is pushed to
+                    the available agents in real-time so the next one
+                    available can pick up. The AI stops replying on
+                    that thread the moment a person takes over.
+                  </p>
+                </div>
+
+                {/* Agent assignment */}
+                <div className="mb-3">
+                  <h4 className="font-semibold text-white text-sm mb-2">
+                    How an agent gets assigned to you
+                  </h4>
+                  <p className="text-xs text-gray-300 mb-2">
+                    Routing follows a clear priority order:
+                  </p>
+                  <ol className="space-y-1.5 text-xs text-gray-300 list-decimal pl-5">
+                    <li>
+                      <strong className="text-white">
+                        Dedicated account manager.
+                      </strong>{" "}
+                      If you already have a relationship with a
+                      specific agent (high-balance accounts, ongoing
+                      cases, VIP traders), every new support thread
+                      routes to that same agent so you don&apos;t have
+                      to re-explain context.
+                    </li>
+                    <li>
+                      <strong className="text-white">
+                        Department queue.
+                      </strong>{" "}
+                      If no personal assignment exists, the
+                      conversation enters the queue of any available
+                      Back-office, Support Agent, or Full Admin who is
+                      currently online and accepting chats.
+                    </li>
+                    <li>
+                      <strong className="text-white">Sticky thread.</strong>{" "}
+                      Once an agent replies in a thread, they
+                      &quot;own&quot; it. Follow-up messages reach the
+                      same agent until they hand the case off, the
+                      ticket is resolved, or you reopen it later.
+                    </li>
+                  </ol>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Agents can also{" "}
+                    <strong className="text-white">transfer</strong>{" "}
+                    your thread to a colleague better suited to the
+                    case (e.g. payments → finance team). You&apos;ll
+                    see a system note in the thread when that happens.
+                  </p>
+                </div>
+
+                {/* What you see in the thread */}
+                <div className="mb-3">
+                  <h4 className="font-semibold text-white text-sm mb-2">
+                    What you see inside a support thread
+                  </h4>
+                  <div className="grid gap-2 text-xs text-gray-300">
+                    <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                      <strong className="text-white">Sender tag.</strong>{" "}
+                      Each message is labelled — your name on your
+                      messages, the AI tag on AI replies, the
+                      agent&apos;s name on human replies, and{" "}
+                      <em>system</em> for routing notes (escalation,
+                      transfer, resolution).
+                    </div>
+                    <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                      <strong className="text-white">
+                        Read receipts.
+                      </strong>{" "}
+                      Each message shows when it was delivered and
+                      when the recipient read it.
+                    </div>
+                    <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                      <strong className="text-white">Attachments.</strong>{" "}
+                      You can include images / screenshots and short
+                      files when explaining a bug, a payment screen, a
+                      KYC document issue, etc.
+                    </div>
+                    <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                      <strong className="text-white">
+                        Ticket number.
+                      </strong>{" "}
+                      Every support thread carries a unique ticket
+                      number so support can reference it across
+                      e-mail, internal notes, and follow-ups.
+                    </div>
+                  </div>
+                </div>
+
+                {/* States */}
+                <div className="mb-3">
+                  <h4 className="font-semibold text-white text-sm mb-2">
+                    Conversation states
+                  </h4>
+                  <div className="grid gap-2 text-xs text-gray-300">
+                    <div className="p-2.5 bg-gray-700/40 rounded border border-green-500/30">
+                      <strong className="text-green-300">Active.</strong>{" "}
+                      The thread is open. Either the AI is currently
+                      handling it, or it&apos;s in the human queue, or
+                      an agent is actively responding.
+                    </div>
+                    <div className="p-2.5 bg-gray-700/40 rounded border border-gray-500/30">
+                      <strong className="text-gray-300">Resolved / Archived.</strong>{" "}
+                      An agent marked your case resolved. The full
+                      transcript stays in your inbox; send a new
+                      message in the same thread to re-open it.
+                    </div>
+                    <div className="p-2.5 bg-gray-700/40 rounded border border-gray-500/30">
+                      <strong className="text-gray-300">Closed.</strong>{" "}
+                      Long-inactive or administratively closed.
+                      Open a fresh ticket via Contact Support if you
+                      still need help.
+                    </div>
+                  </div>
+                </div>
+
+                {/* AI limitations */}
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                  <h4 className="font-semibold text-white text-sm mb-2 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                    What the AI is good at — and what it isn&apos;t
+                  </h4>
+                  <div className="grid gap-3 sm:grid-cols-2 text-xs text-gray-300">
+                    <div>
+                      <p className="font-semibold text-green-300 mb-1">
+                        Good at
+                      </p>
+                      <ul className="space-y-1 list-disc pl-5 text-gray-400">
+                        <li>
+                          Explaining platform rules (fees, limits,
+                          leverage, market hours).
+                        </li>
+                        <li>
+                          Walking you through where a feature lives.
+                        </li>
+                        <li>
+                          Re-stating policy in plain language.
+                        </li>
+                        <li>Suggesting the right help section.</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-red-300 mb-1">
+                        Not allowed to do
+                      </p>
+                      <ul className="space-y-1 list-disc pl-5 text-gray-400">
+                        <li>
+                          Touch your account (no balance adjustments,
+                          no refunds, no KYC overrides).
+                        </li>
+                        <li>
+                          Reveal someone else&apos;s data or your
+                          full card / banking details.
+                        </li>
+                        <li>
+                          Make commercial promises (fee waivers,
+                          custom prizes).
+                        </li>
+                        <li>
+                          Handle disputes — those always go to a human.
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ───── User to user messaging ───── */}
+              <div>
+                <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                  <Users className="h-5 w-5 text-cyan-400" />
+                  Chatting with other traders
+                </h3>
+
+                <p className="text-sm text-gray-300 mb-3">
+                  Direct messages live in the same Messages inbox.
+                  Each DM is a one-on-one thread between you and
+                  another trader — there are no public chat rooms.
+                </p>
+
+                {/* Finding another trader */}
+                <div className="mb-3">
+                  <h4 className="font-semibold text-white text-sm mb-2">
+                    Finding someone to chat with
+                  </h4>
+                  <ul className="space-y-1.5 text-sm text-gray-300 list-disc pl-5">
+                    <li>
+                      <strong className="text-white">
+                        From the leaderboard
+                      </strong>{" "}
+                      — click any trader to open their Profile Card,
+                      then use the Message / Add Friend buttons.
+                    </li>
+                    <li>
+                      <strong className="text-white">From Match Cards</strong>{" "}
+                      — every card has a quick action to start a
+                      conversation or jump to the VS screen.
+                    </li>
+                    <li>
+                      <strong className="text-white">
+                        From an in-competition leaderboard
+                      </strong>{" "}
+                      — competitors you&apos;re racing against in a
+                      live event.
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Friend system */}
+                <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-4 mb-3">
+                  <h4 className="font-semibold text-white text-sm mb-2 flex items-center gap-2">
+                    <UserPlus className="h-4 w-4 text-cyan-300" />
+                    Friend requests &amp; the friends-only rule
+                  </h4>
+                  <ul className="space-y-1.5 text-xs text-gray-300 list-disc pl-5">
+                    <li>
+                      Some platforms require you to be{" "}
+                      <strong className="text-white">friends</strong>{" "}
+                      before DMs are allowed. When that rule is
+                      enabled, trying to message a stranger first
+                      sends them a{" "}
+                      <strong className="text-white">friend request</strong>
+                      ; once they accept, the thread opens.
+                    </li>
+                    <li>
+                      You can{" "}
+                      <strong className="text-white">
+                        turn friend requests off
+                      </strong>{" "}
+                      altogether from{" "}
+                      <Link
+                        href="/profile?tab=settings"
+                        className="text-cyan-400 hover:underline"
+                      >
+                        Profile → Settings → Privacy
+                      </Link>{" "}
+                      using the &quot;Allow friend requests&quot;
+                      toggle. Your stats stay visible on the
+                      leaderboard either way.
+                    </li>
+                    <li>
+                      Pending and accepted requests appear in your
+                      messaging sidebar, with notifications routed
+                      through the bell icon.
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Online presence */}
+                <div className="mb-3">
+                  <h4 className="font-semibold text-white text-sm mb-2">
+                    Online presence &amp; availability
+                  </h4>
+                  <ul className="space-y-1.5 text-sm text-gray-300 list-disc pl-5">
+                    <li>
+                      A small dot beside someone&apos;s avatar shows
+                      whether they are{" "}
+                      <strong className="text-green-300">online</strong>{" "}
+                      right now. Offline messages are queued and
+                      delivered when they next sign in.
+                    </li>
+                    <li>
+                      For 1v1 challenges, traders also expose an{" "}
+                      <strong className="text-white">
+                        accepting challenges
+                      </strong>{" "}
+                      flag — the same flag controls whether the
+                      Challenge button in their thread is active.
+                    </li>
+                    <li>
+                      Read receipts work both ways: you can see
+                      when your message has been read, and they can
+                      see when you have read theirs.
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Safety */}
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+                  <h4 className="font-semibold text-white text-sm mb-2 flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-red-400" />
+                    Block, report &amp; safety
+                  </h4>
+                  <ul className="space-y-1.5 text-xs text-gray-300 list-disc pl-5">
+                    <li>
+                      <strong className="text-white">Block.</strong>{" "}
+                      From any DM thread you can block the other
+                      trader — they stop appearing in your inbox,
+                      they can&apos;t message you, and they can&apos;t
+                      send you friend / challenge requests. You can
+                      unblock at any time.
+                    </li>
+                    <li>
+                      <strong className="text-white">
+                        Report suspicious behaviour.
+                      </strong>{" "}
+                      If another trader is harassing you, trying to
+                      coordinate trades, asking for credentials, or
+                      offering to share an account, contact support
+                      via the{" "}
+                      <strong className="text-white">Contact Support</strong>{" "}
+                      flow. Include the trader&apos;s username and
+                      the relevant conversation — agents have
+                      full-context tools to investigate.
+                    </li>
+                    <li>
+                      <strong className="text-white">
+                        Never share credentials, 2FA codes, or
+                        document scans
+                      </strong>{" "}
+                      with another trader. Real support staff will
+                      <em> never </em>ask for them either.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* ───── Real-time + notifications ───── */}
+              <div>
+                <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                  <Bell className="h-5 w-5 text-yellow-400" />
+                  How fast messages arrive &amp; how you&apos;re alerted
+                </h3>
+                <ul className="space-y-1.5 text-sm text-gray-300 list-disc pl-5">
+                  <li>
+                    Both support replies and DMs are pushed in{" "}
+                    <strong className="text-white">real-time</strong>{" "}
+                    over a persistent WebSocket connection — messages
+                    arrive instantly while the app is open.
+                  </li>
+                  <li>
+                    If the WebSocket drops (flaky network, sleeping
+                    laptop), the app{" "}
+                    <strong className="text-white">polls every few
+                    seconds</strong>{" "}
+                    as a fallback so nothing is missed.
+                  </li>
+                  <li>
+                    The <strong className="text-white">Messages</strong>{" "}
+                    sidebar entry shows an unread count badge. The
+                    badge updates roughly every 10 seconds and
+                    instantly when a message arrives.
+                  </li>
+                  <li>
+                    New replies also surface in the{" "}
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection("notifications")}
+                      className="text-pink-400 hover:underline"
+                    >
+                      🔔 Notification center
+                    </button>
+                    . You can mute the category, enable e-mail copies,
+                    or set quiet hours from Profile → Notifications.
+                  </li>
+                </ul>
+              </div>
+
+              {/* CTA */}
+              {isLoggedIn && (
+                <div className="bg-gray-700/50 border border-gray-600 rounded-xl p-5 text-center">
+                  <p className="text-sm text-gray-400 mb-3">
+                    Need a hand or want to ping another trader? Open
+                    the Messages inbox — the AI is usually a few
+                    seconds away, and a human agent is one keyword away
+                    if you need it.
+                  </p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    <Link
+                      href="/messaging"
+                      className="inline-block px-6 py-2 bg-pink-500 hover:bg-pink-600 text-white rounded-lg transition-colors font-medium text-sm"
+                    >
+                      Open Messages
+                    </Link>
+                    <Link
+                      href="/profile?tab=settings"
+                      className="inline-block px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors font-medium text-sm border border-gray-600"
+                    >
+                      Privacy &amp; preferences
+                    </Link>
+                  </div>
+                </div>
+              )}
             </div>
           </section>
 
