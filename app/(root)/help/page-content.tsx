@@ -5017,10 +5017,12 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                     <code className="text-xs bg-gray-900 px-1.5 py-0.5 rounded">
                       chargeback_clawback
                     </code>{" "}
-                    on your wallet for the disputed amount, your account
-                    may be restricted while the case is reviewed, and the
-                    original deposit invoice is marked as{" "}
-                    <strong className="text-orange-400">disputed</strong>.
+                    on your wallet for the disputed amount and your
+                    account may be restricted while the case is
+                    reviewed by both your bank and our team. The case
+                    is filed in our internal chargeback register and
+                    cross-linked to the original deposit transaction
+                    and its invoice for evidence packaging.
                   </li>
                   <li>
                     Wallet balances do{" "}
@@ -9296,7 +9298,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
             </div>
           </section>
 
-          {/* Invoices */}
+          {/* Invoices & Billing */}
           <section
             id="invoices"
             className="bg-gray-800/50 rounded-xl p-4 sm:p-6 border border-gray-700 scroll-mt-6"
@@ -9304,36 +9306,408 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
             <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <FileText className="h-6 w-6 text-teal-500" />
               <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
-                📄 Invoices & Billing
+                📄 Invoices &amp; Billing
               </h2>
             </div>
 
             <div className="space-y-4 text-gray-300">
               <p className="leading-relaxed">
-                All transactions generate invoices for your records.
+                Every time you successfully fund your wallet with{" "}
+                {settings.currency.code}, the platform issues a
+                tax-compliant invoice for that deposit, e-mails it to
+                you with a PDF attached, and stores it on your account
+                for download from the wallet. Internal{" "}
+                <strong className="text-white">
+                  {settings.credits.name}
+                </strong>{" "}
+                movements — competition entries, prize payouts,
+                Marketplace buys, GM commissions, withdrawal refunds —
+                do <em>not</em> generate a separate invoice; they live
+                in your Transaction History instead.
               </p>
 
+              {/* When invoices are issued */}
+              <div className="bg-teal-500/10 border border-teal-500/30 rounded-xl p-5">
+                <h3 className="text-lg font-bold text-teal-300 mb-3 flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  When you get an invoice
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-green-300 text-sm mb-1 flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" />
+                      Deposit invoices
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Generated automatically the moment the payment
+                      processor confirms a successful card payment.
+                      The invoice is issued in your name with the
+                      {" "}line-itemised breakdown of{" "}
+                      {settings.credits.name} purchased, the optional
+                      platform fee, and VAT where applicable.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-gray-300 text-sm mb-1 flex items-center gap-2">
+                      <Wallet className="h-4 w-4" />
+                      Withdrawals &amp; in-app spending
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Withdrawals, competition entries, 1v1 stakes,
+                      Marketplace purchases, GM commissions, and prize
+                      payouts are recorded as wallet transactions with
+                      a full audit trail in your{" "}
+                      <button
+                        type="button"
+                        onClick={() => scrollToSection("credits")}
+                        className="text-cyan-400 hover:underline"
+                      >
+                        Transaction History
+                      </button>
+                      , but they don&apos;t produce a separate
+                      PDF invoice.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* What's on the invoice */}
+              <div>
+                <h3 className="font-semibold text-white text-base mb-3 flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-teal-300" />
+                  What appears on a deposit invoice
+                </h3>
+                <div className="grid gap-2 text-xs text-gray-300">
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">Invoice header.</strong>{" "}
+                    Title (e.g.{" "}
+                    <code className="bg-gray-900 px-1 py-0.5 rounded">
+                      INVOICE
+                    </code>
+                    ), invoice number, invoice date, and a{" "}
+                    <span className="text-green-300 font-semibold">
+                      PAID
+                    </span>{" "}
+                    status badge — invoices are issued after the
+                    money settles, so they&apos;re always paid at
+                    creation.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Seller block (&quot;From&quot;).
+                    </strong>{" "}
+                    Company legal name, address, country, registration
+                    number, VAT number, support email, and optional
+                    company logo. This block is a snapshot — it
+                    reflects the company details on file at the moment
+                    the invoice was issued.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Buyer block (&quot;Bill To&quot;).
+                    </strong>{" "}
+                    Your full name and account email. If you have
+                    completed your{" "}
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection("profile")}
+                      className="text-cyan-400 hover:underline"
+                    >
+                      profile address fields
+                    </button>{" "}
+                    (street, city, postal code, country), they appear
+                    here too — so make sure they&apos;re correct
+                    before depositing.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">Line items.</strong>{" "}
+                    A primary line for the{" "}
+                    {settings.credits.name} purchase (e.g.{" "}
+                    <code className="bg-gray-900 px-1 py-0.5 rounded">
+                      Credit Purchase — 100.00 Credits
+                    </code>
+                    ) with unit price in {settings.currency.code}. If a{" "}
+                    <strong className="text-white">
+                      platform processing fee
+                    </strong>{" "}
+                    is configured, it appears as its own line.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Subtotal, VAT, Total.
+                    </strong>{" "}
+                    Subtotal is the sum of all lines. VAT is added on
+                    top (VAT-exclusive pricing). The grand total is
+                    what your card was actually charged.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">Payment terms.</strong>{" "}
+                    Spells out that the invoice was settled at
+                    issuance.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Bank details (optional).
+                    </strong>{" "}
+                    If the company has bank details configured, they
+                    appear at the foot of the invoice (useful for
+                    accounting reconciliation).
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Legal &amp; thank-you footer.
+                    </strong>{" "}
+                    Configurable disclaimer text (VAT/B2B note,
+                    contact details, etc.).
+                  </div>
+                </div>
+              </div>
+
+              {/* VAT */}
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-5">
+                <h3 className="text-lg font-bold text-blue-300 mb-3 flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  VAT (Value Added Tax)
+                </h3>
+                <p className="text-sm text-gray-300 mb-3">
+                  VAT is applied at checkout and reproduced on the
+                  invoice based on a strict three-way rule — no
+                  surprises and no manual toggles:
+                </p>
+                <ul className="space-y-1.5 text-sm text-gray-300 list-disc pl-5">
+                  <li>
+                    <strong className="text-white">
+                      Both must be true:
+                    </strong>{" "}
+                    your country (from your profile) is in the EU{" "}
+                    <strong className="text-white">and</strong> the
+                    operating company is registered in the EU{" "}
+                    <strong className="text-white">and</strong>{" "}
+                    invoicing has VAT enabled. Then VAT applies at
+                    the configured rate
+                    {settings.vat?.enabled && (
+                      <>
+                        {" "}
+                        (currently{" "}
+                        <strong className="text-white">
+                          {settings.vat.percentage}%
+                        </strong>
+                        )
+                      </>
+                    )}
+                    .
+                  </li>
+                  <li>
+                    If your country is{" "}
+                    <strong className="text-white">outside the EU</strong>
+                    , no VAT is charged and the invoice shows VAT 0%
+                    — even if the operating company is in the EU.
+                  </li>
+                  <li>
+                    If the operating company is{" "}
+                    <strong className="text-white">
+                      outside the EU
+                    </strong>
+                    , VAT is not collected at all.
+                  </li>
+                  <li>
+                    VAT applies only to the{" "}
+                    <strong className="text-white">credit purchase</strong>{" "}
+                    line — not the platform processing fee, which is
+                    handled separately.
+                  </li>
+                  <li>
+                    <strong className="text-white">
+                      B2B / reverse charge
+                    </strong>{" "}
+                    is not auto-applied at checkout. If you&apos;re
+                    a VAT-registered business and require a
+                    reverse-charge invoice, contact support{" "}
+                    <em>before</em> depositing — the platform can
+                    re-issue with the correct treatment.
+                  </li>
+                </ul>
+                <p className="text-xs text-gray-500 mt-3">
+                  The deposit dialog always shows the VAT line and
+                  the final amount before you confirm the payment, so
+                  you can verify the calculation up-front.
+                </p>
+              </div>
+
+              {/* Currency + numbering */}
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/30">
-                  <h5 className="font-semibold text-green-400">
-                    💳 Deposit Invoices
-                  </h5>
+                <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                  <p className="font-semibold text-white text-sm mb-1">
+                    Numbering &amp; series
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Invoices use a single sequential counter with a
+                    configurable prefix and zero-padding (e.g.{" "}
+                    <code className="bg-gray-900 px-1 py-0.5 rounded">
+                      INV-000123
+                    </code>
+                    ). The counter is incremented atomically, so two
+                    deposits made at the same moment still get
+                    distinct, in-order numbers.
+                  </p>
                 </div>
-                <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                  <h5 className="font-semibold text-blue-400">
-                    💸 Withdrawal Receipts
-                  </h5>
+                <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                  <p className="font-semibold text-white text-sm mb-1">
+                    Currency
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Invoices are issued in{" "}
+                    <strong className="text-white">
+                      {settings.currency.code}
+                    </strong>
+                    , the platform&apos;s native fiat currency. Card
+                    payments in other currencies are converted by
+                    your bank at their rate; the invoice always
+                    reflects the {settings.currency.code} amount
+                    settled to the platform.
+                  </p>
                 </div>
-                <div className="p-4 bg-purple-500/10 rounded-lg border border-purple-500/30">
-                  <h5 className="font-semibold text-purple-400">
-                    🛒 Purchase Receipts
-                  </h5>
+              </div>
+
+              {/* Where to find it */}
+              <div>
+                <h3 className="font-semibold text-white text-base mb-3 flex items-center gap-2">
+                  <Wallet className="h-4 w-4 text-teal-300" />
+                  Where to find your invoices
+                </h3>
+                <ol className="space-y-2 text-sm text-gray-300 list-decimal pl-5">
+                  <li>
+                    <strong className="text-white">By email.</strong>{" "}
+                    Each invoice is e-mailed to your account address
+                    as soon as it&apos;s issued, with a PDF
+                    attachment (generated with{" "}
+                    <code className="text-[11px] bg-gray-900 px-1.5 py-0.5 rounded">
+                      pdf-lib
+                    </code>{" "}
+                    — no third-party rendering, no tracking pixels).
+                    The body summarises the totals and links back to
+                    the wallet.
+                  </li>
+                  <li>
+                    <strong className="text-white">
+                      In Transaction History.
+                    </strong>{" "}
+                    On the{" "}
+                    <Link
+                      href="/wallet"
+                      className="text-cyan-400 hover:underline"
+                    >
+                      wallet page
+                    </Link>
+                    , every completed deposit row exposes a small{" "}
+                    <strong className="text-white">
+                      View Invoice
+                    </strong>{" "}
+                    button that opens the full HTML invoice in a new
+                    tab — ready to print or save to PDF from your
+                    browser. Use the browser&apos;s &quot;Save as
+                    PDF&quot; for a fresh PDF if you no longer have
+                    the e-mail attachment.
+                  </li>
+                  <li>
+                    <strong className="text-white">
+                      By accountant request.
+                    </strong>{" "}
+                    If you need a re-issue (e.g. corrected name or
+                    address, lost copy, B2B reverse charge), contact
+                    support — admins can resend any invoice to your
+                    e-mail.
+                  </li>
+                </ol>
+              </div>
+
+              {/* Status */}
+              <div>
+                <h3 className="font-semibold text-white text-base mb-3">
+                  Invoice statuses
+                </h3>
+                <div className="grid gap-2 text-xs text-gray-300">
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-green-500/30">
+                    <strong className="text-green-300">Paid.</strong>{" "}
+                    Default state for newly issued invoices. The
+                    deposit settled successfully.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-cyan-500/30">
+                    <strong className="text-cyan-300">Sent.</strong>{" "}
+                    The invoice e-mail with PDF attachment has been
+                    delivered to your inbox. Set automatically after
+                    the mailer reports success.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-500/30">
+                    <strong className="text-gray-300">Cancelled.</strong>{" "}
+                    Admin-only state used in rare correction
+                    scenarios (e.g. duplicate issuance or system
+                    test). Cancelled invoices are no longer
+                    accounting-valid.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-orange-500/30">
+                    <strong className="text-orange-300">Refunded.</strong>{" "}
+                    The underlying deposit was refunded back to the
+                    payment method. Reach out to support if you need
+                    a separate refund document.
+                  </div>
                 </div>
-                <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
-                  <h5 className="font-semibold text-yellow-400">
-                    🏆 Prize Receipts
-                  </h5>
-                </div>
+              </div>
+
+              {/* Snapshot + accuracy callout */}
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                  Get your details right{" "}
+                  <em>before</em> you deposit
+                </h4>
+                <p className="text-xs text-gray-300 leading-relaxed">
+                  Each invoice is a{" "}
+                  <strong className="text-white">snapshot</strong>{" "}
+                  of your name and address at the moment of issuance.
+                  Updating your profile <em>after</em> a deposit does
+                  not edit older invoices retroactively. If you need
+                  a previously issued invoice corrected (legal name
+                  change, address typo, missing line, etc.), support
+                  will issue a corrected copy on request — but the
+                  cleanest path is to complete the{" "}
+                  <button
+                    type="button"
+                    onClick={() => scrollToSection("profile")}
+                    className="text-cyan-400 hover:underline"
+                  >
+                    Profile → Settings
+                  </button>{" "}
+                  address fields before your next deposit.
+                </p>
+              </div>
+
+              {/* Privacy / retention */}
+              <div className="bg-gray-700/50 border border-gray-600 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-gray-300" />
+                  Storage &amp; retention
+                </h4>
+                <ul className="space-y-1 text-xs text-gray-300 list-disc pl-5">
+                  <li>
+                    Invoice records (numbers, totals, line items,
+                    customer + company snapshot) are stored on the
+                    platform indefinitely — required for tax and
+                    accounting compliance.
+                  </li>
+                  <li>
+                    The HTML version is rendered live from that data
+                    each time you click{" "}
+                    <strong className="text-white">View Invoice</strong>
+                    .
+                  </li>
+                  <li>
+                    PDFs are generated on-demand at e-mail time and
+                    are not retained as files on our servers; your
+                    inbox copy and the &quot;Save as PDF&quot; from
+                    the browser are the canonical local copies.
+                  </li>
+                </ul>
               </div>
             </div>
           </section>
