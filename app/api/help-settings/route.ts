@@ -4,6 +4,12 @@ import XPConfig from "@/database/models/xp-config.model";
 import TradingRiskSettings from "@/database/models/trading-risk-settings.model";
 import CreditConversionSettings from "@/database/models/credit-conversion-settings.model";
 import AppSettings from "@/database/models/app-settings.model";
+import KYCSettings from "@/database/models/kyc-settings.model";
+import InvoiceSettings from "@/database/models/invoice-settings.model";
+import PaymentProvider from "@/database/models/payment-provider.model";
+import { getPaymentProviderCredentials } from "@/lib/services/settings.service";
+import { isPaddleConfigured } from "@/lib/paddle/config";
+import { nuveiService } from "@/lib/services/nuvei.service";
 import {
   getBadgeXPValues,
   getTitleLevels,
@@ -109,9 +115,98 @@ export async function GET() {
       },
     };
 
+    // KYC settings (admin-configurable, public-safe — no Veriff keys)
+    // Reason: the Help Center copy needs to tell the user *when* identity
+    // verification is required so the Getting Started flow doesn't lie.
+    let kyc = {
+      enabled: false,
+      requiredForDeposit: false,
+      requiredForWithdrawal: true,
+      requiredAmount: 0,
+    };
+    try {
+      const kycSettings = await KYCSettings.findOne().lean<{
+        enabled?: boolean;
+        requiredForDeposit?: boolean;
+        requiredForWithdrawal?: boolean;
+        requiredAmount?: number;
+      } | null>();
+      if (kycSettings) {
+        kyc = {
+          enabled: kycSettings.enabled ?? false,
+          requiredForDeposit: kycSettings.requiredForDeposit ?? false,
+          requiredForWithdrawal: kycSettings.requiredForWithdrawal ?? true,
+          requiredAmount: kycSettings.requiredAmount ?? 0,
+        };
+      }
+    } catch {
+      // Fall back to defaults declared above
+    }
+
+    // Payment provider availability — booleans only, no API keys.
+    // Reason: the Getting Started step "Fund your wallet" should only list
+    // methods the admin has actually enabled.
+    let stripeEnabled = false;
+    let nuveiEnabled = false;
+    let paddleEnabled = false;
+    try {
+      const stripeProvider = await PaymentProvider.findOne({
+        slug: "stripe",
+        isActive: true,
+      }).lean();
+      if (stripeProvider) {
+        const stripeCfg = (await getPaymentProviderCredentials(
+          "stripe",
+        )) as { publishable_key?: string; public_key?: string } | null;
+        stripeEnabled = !!(
+          stripeCfg && (stripeCfg.publishable_key || stripeCfg.public_key)
+        );
+      }
+    } catch {
+      // Stripe not configured
+    }
+    try {
+      const nuveiCfg = await nuveiService.getClientConfig();
+      nuveiEnabled = !!nuveiCfg?.enabled;
+    } catch {
+      // Nuvei not configured
+    }
+    try {
+      paddleEnabled = await isPaddleConfigured();
+    } catch {
+      // Paddle not configured
+    }
+
+    // VAT settings (company-wide; user-specific applicability is decided
+    // at deposit time by /api/payment-config, but the Help Center just
+    // needs the policy the admin published).
+    let vat = { enabled: false, percentage: 0 };
+    try {
+      const invoiceSettings = await InvoiceSettings.getSingleton();
+      vat = {
+        enabled: !!invoiceSettings.vatEnabled,
+        percentage: invoiceSettings.vatPercentage ?? 0,
+      };
+    } catch {
+      // Fall back to defaults
+    }
+
+    const helpSettingsFull = {
+      ...helpSettings,
+      kyc,
+      payments: {
+        stripe: stripeEnabled,
+        nuvei: nuveiEnabled,
+        paddle: paddleEnabled,
+        anyEnabled: stripeEnabled || nuveiEnabled || paddleEnabled,
+        depositFeePercentage: creditSettings.platformDepositFeePercentage ?? 0,
+      },
+      vat,
+    };
+
     return NextResponse.json({
       success: true,
-      settings: helpSettings,
+      settings: helpSettingsFull,
     });
   } catch (error) {
     console.error("Error fetching help settings:", error);

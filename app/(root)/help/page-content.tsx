@@ -34,6 +34,12 @@ import {
   Loader2,
   Heart,
   Users,
+  Mail,
+  LogIn,
+  CreditCard,
+  BadgeCheck,
+  CheckCircle2,
+  AlertTriangle,
 } from "lucide-react";
 import { GameIcon } from "@/components/ui/GameIcon";
 import type { GameIconName } from "@/lib/constants/game-icons";
@@ -88,6 +94,26 @@ interface HelpSettings {
     code: string;
     symbol: string;
     name: string;
+  };
+  // Optional — populated by /api/help-settings when the admin has configured
+  // KYC / payment / VAT. Defaults are safe-empty so older API responses still
+  // render correctly.
+  kyc?: {
+    enabled: boolean;
+    requiredForDeposit: boolean;
+    requiredForWithdrawal: boolean;
+    requiredAmount: number;
+  };
+  payments?: {
+    stripe: boolean;
+    nuvei: boolean;
+    paddle: boolean;
+    anyEnabled: boolean;
+    depositFeePercentage: number;
+  };
+  vat?: {
+    enabled: boolean;
+    percentage: number;
   };
 }
 
@@ -203,6 +229,20 @@ const defaultSettings: HelpSettings = {
     withdrawalFee: 2,
   },
   currency: { code: "EUR", symbol: "€", name: "Euro" },
+  kyc: {
+    enabled: false,
+    requiredForDeposit: false,
+    requiredForWithdrawal: true,
+    requiredAmount: 0,
+  },
+  payments: {
+    stripe: false,
+    nuvei: false,
+    paddle: false,
+    anyEnabled: false,
+    depositFeePercentage: 0,
+  },
+  vat: { enabled: false, percentage: 0 },
 };
 
 export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
@@ -376,75 +416,454 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
               </h2>
             </div>
 
-            <div className="space-y-4 text-gray-300">
+            <div className="space-y-6 text-gray-300">
               <p className="leading-relaxed">
-                Welcome to the trading competition platform! Test your trading
-                skills, compete with others, and win real prizes.
+                Welcome! This platform lets you trade real Forex pairs inside
+                time-boxed{" "}
+                <Link
+                  href="/competitions"
+                  className="text-yellow-400 hover:text-yellow-300 underline"
+                >
+                  Competitions
+                </Link>{" "}
+                and{" "}
+                <Link
+                  href="/challenges"
+                  className="text-yellow-400 hover:text-yellow-300 underline"
+                >
+                  1v1 Challenges
+                </Link>{" "}
+                using {settings.credits.name.toLowerCase()} you fund yourself.
+                Below is the exact step-by-step path from sign-up to your
+                first trade.
               </p>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-400 font-bold">
-                      1
-                    </div>
-                    <h4 className="font-semibold text-white">Create Account</h4>
+              {/* ── STEP 1 — Create your account ───────────────────────── */}
+              <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-400 font-bold flex-shrink-0">
+                    1
                   </div>
-                  <p className="text-sm text-gray-400">
-                    Sign up and verify your email to get started.
-                  </p>
+                  <h4 className="font-semibold text-white flex items-center gap-2">
+                    <User className="h-4 w-4 text-yellow-400" /> Create your
+                    account
+                  </h4>
                 </div>
-
-                <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-400 font-bold">
-                      2
-                    </div>
-                    <h4 className="font-semibold text-white">
-                      Add {settings.credits.name}
-                    </h4>
-                  </div>
-                  <p className="text-sm text-gray-400">
-                    Deposit min. {settings.currency.symbol}
-                    {settings.credits.minimumDeposit} to get{" "}
-                    {settings.credits.name.toLowerCase()}.
-                  </p>
-                </div>
-
-                <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-400 font-bold">
-                      3
-                    </div>
-                    <h4 className="font-semibold text-white">
-                      Join Competition
-                    </h4>
-                  </div>
-                  <p className="text-sm text-gray-400">
-                    Browse and join competitions that match your style.
-                  </p>
-                </div>
-
-                <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-400 font-bold">
-                      4
-                    </div>
-                    <h4 className="font-semibold text-white">Start Trading</h4>
-                  </div>
-                  <p className="text-sm text-gray-400">
-                    Trade forex pairs and compete for the top spot!
-                  </p>
+                <p className="text-sm text-gray-400 mb-3">
+                  Go to{" "}
+                  <Link
+                    href="/sign-up"
+                    className="text-yellow-400 hover:text-yellow-300 underline"
+                  >
+                    /sign-up
+                  </Link>{" "}
+                  and fill in your details. The form asks for:
+                </p>
+                <ul className="text-sm text-gray-400 space-y-1 ml-2 list-disc list-inside marker:text-yellow-500/60">
+                  <li>Full name</li>
+                  <li>Email address (must be reachable — see Step 2)</li>
+                  <li>Password (minimum 8 characters)</li>
+                  <li>
+                    Country, address, city and postal code (used for invoicing
+                    and VAT/tax compliance)
+                  </li>
+                </ul>
+                <div className="mt-3 text-xs text-gray-500 bg-gray-800/60 rounded-md p-2 border border-gray-700/60">
+                  <strong className="text-yellow-400">Tip:</strong> If a Game
+                  Master invited you with a referral link (
+                  <code className="text-yellow-300">/sign-up?ref=GM...</code>),
+                  open that link to sign up — you&apos;ll be linked to them
+                  and they earn a small referral fee on your competition entries.
                 </div>
               </div>
 
+              {/* ── STEP 2 — Verify your email ─────────────────────────── */}
+              <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-400 font-bold flex-shrink-0">
+                    2
+                  </div>
+                  <h4 className="font-semibold text-white flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-yellow-400" /> Verify your
+                    email
+                  </h4>
+                </div>
+                <p className="text-sm text-gray-400">
+                  Right after sign-up we email you a verification link. Open
+                  the email and click it — the link activates your account
+                  instantly. Until your email is verified you can&apos;t sign
+                  in or enter any competition.
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  No email? Check your spam folder, then use the &quot;Resend
+                  verification email&quot; option on the{" "}
+                  <Link
+                    href="/verify-email-required"
+                    className="text-yellow-400 hover:text-yellow-300 underline"
+                  >
+                    verification page
+                  </Link>
+                  .
+                </p>
+              </div>
+
+              {/* ── STEP 3 — Sign in & meet the dashboard ──────────────── */}
+              <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-400 font-bold flex-shrink-0">
+                    3
+                  </div>
+                  <h4 className="font-semibold text-white flex items-center gap-2">
+                    <LogIn className="h-4 w-4 text-yellow-400" /> Sign in &amp;
+                    meet your dashboard
+                  </h4>
+                </div>
+                <p className="text-sm text-gray-400">
+                  Sign in at{" "}
+                  <Link
+                    href="/sign-in"
+                    className="text-yellow-400 hover:text-yellow-300 underline"
+                  >
+                    /sign-in
+                  </Link>{" "}
+                  and you land on{" "}
+                  <Link
+                    href="/dashboard"
+                    className="text-yellow-400 hover:text-yellow-300 underline"
+                  >
+                    /dashboard
+                  </Link>
+                  . The dashboard shows your wallet balance, today&apos;s
+                  P&amp;L, win rate, active competitions, performance charts,
+                  recent activity, and an interactive checklist that guides
+                  you through your first deposit, your first competition
+                  entry, and your first trade.
+                </p>
+              </div>
+
+              {/* ── STEP 4 — Fund your wallet ──────────────────────────── */}
+              <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-400 font-bold flex-shrink-0">
+                    4
+                  </div>
+                  <h4 className="font-semibold text-white flex items-center gap-2">
+                    <Wallet className="h-4 w-4 text-yellow-400" /> Fund your
+                    wallet
+                  </h4>
+                </div>
+                <p className="text-sm text-gray-400 mb-3">
+                  Your wallet starts at{" "}
+                  <span className="text-white font-semibold">
+                    {settings.credits.symbol} 0
+                  </span>{" "}
+                  — there is no signup bonus. To compete you need to buy{" "}
+                  {settings.credits.name.toLowerCase()}. Open{" "}
+                  <Link
+                    href="/wallet"
+                    className="text-yellow-400 hover:text-yellow-300 underline"
+                  >
+                    /wallet
+                  </Link>{" "}
+                  and click{" "}
+                  <strong className="text-white">
+                    Buy {settings.credits.name}
+                  </strong>
+                  .
+                </p>
+
+                <div className="grid gap-2 sm:grid-cols-2 text-xs">
+                  <div className="bg-gray-800/60 rounded-md p-2 border border-gray-700/60">
+                    <div className="text-gray-500 mb-0.5">Minimum deposit</div>
+                    <div className="text-white font-semibold">
+                      {settings.currency.symbol}
+                      {settings.credits.minimumDeposit}
+                    </div>
+                  </div>
+                  <div className="bg-gray-800/60 rounded-md p-2 border border-gray-700/60">
+                    <div className="text-gray-500 mb-0.5">Exchange rate</div>
+                    <div className="text-white font-semibold">
+                      {settings.currency.symbol}1 ={" "}
+                      {settings.credits.eurToCreditsRate}{" "}
+                      {settings.credits.name.toLowerCase()}
+                    </div>
+                  </div>
+                  {settings.payments &&
+                    settings.payments.depositFeePercentage > 0 && (
+                      <div className="bg-gray-800/60 rounded-md p-2 border border-gray-700/60">
+                        <div className="text-gray-500 mb-0.5">
+                          Processing fee
+                        </div>
+                        <div className="text-white font-semibold">
+                          {settings.payments.depositFeePercentage}%
+                        </div>
+                      </div>
+                    )}
+                  {settings.vat && settings.vat.enabled && (
+                    <div className="bg-gray-800/60 rounded-md p-2 border border-gray-700/60">
+                      <div className="text-gray-500 mb-0.5">
+                        VAT (EU residents)
+                      </div>
+                      <div className="text-white font-semibold">
+                        {settings.vat.percentage}%
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Payment methods (only show what the admin has actually enabled) */}
+                {settings.payments?.anyEnabled ? (
+                  <div className="mt-3">
+                    <div className="text-xs text-gray-500 mb-1.5">
+                      Accepted payment methods:
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {settings.payments.stripe && (
+                        <span className="px-2 py-1 rounded-md bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 flex items-center gap-1">
+                          <CreditCard className="h-3 w-3" /> Cards via Stripe
+                        </span>
+                      )}
+                      {settings.payments.nuvei && (
+                        <span className="px-2 py-1 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                          <CreditCard className="h-3 w-3" /> Cards via Nuvei
+                        </span>
+                      )}
+                      {settings.payments.paddle && (
+                        <span className="px-2 py-1 rounded-md bg-blue-500/15 text-blue-300 border border-blue-500/30 flex items-center gap-1">
+                          <CreditCard className="h-3 w-3" /> Cards via Paddle
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3 text-xs text-orange-300 bg-orange-500/10 border border-orange-500/30 rounded-md p-2 flex items-start gap-2">
+                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Payment methods are being configured. Please contact
+                      support if you need help depositing.
+                    </span>
+                  </div>
+                )}
+
+                <p className="text-xs text-gray-500 mt-3">
+                  You&apos;ll be asked to accept the credit-purchase terms
+                  before checkout. Once payment clears your wallet is credited
+                  immediately and you receive an invoice by email.
+                </p>
+              </div>
+
+              {/* ── STEP 5 — Identity verification (conditional) ───────── */}
+              {settings.kyc?.enabled && (
+                <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 font-bold flex-shrink-0">
+                      5
+                    </div>
+                    <h4 className="font-semibold text-white flex items-center gap-2">
+                      <BadgeCheck className="h-4 w-4 text-blue-400" /> Verify
+                      your identity (KYC)
+                    </h4>
+                  </div>
+                  <p className="text-sm text-gray-300 mb-2">
+                    To keep the platform compliant we verify your identity
+                    using a passport, ID card, driver&apos;s licence or
+                    residence permit. Verification takes a few minutes and is
+                    valid going forward.
+                  </p>
+                  <ul className="text-sm text-gray-300 space-y-1 ml-2 list-disc list-inside marker:text-blue-400/60">
+                    {settings.kyc.requiredForDeposit && (
+                      <li>
+                        <strong className="text-white">Required to deposit</strong>{" "}
+                        — you&apos;ll need to verify before buying{" "}
+                        {settings.credits.name.toLowerCase()}.
+                      </li>
+                    )}
+                    {settings.kyc.requiredForWithdrawal && (
+                      <li>
+                        <strong className="text-white">
+                          Required to withdraw
+                        </strong>
+                        {settings.kyc.requiredAmount > 0
+                          ? ` for amounts of ${settings.currency.symbol}${settings.kyc.requiredAmount} or more`
+                          : " for all withdrawal amounts"}
+                        .
+                      </li>
+                    )}
+                  </ul>
+                  <p className="text-xs text-gray-400 mt-2">
+                    If verification is needed for an action you&apos;re trying
+                    to perform, the app will prompt you with a link to start
+                    the verification flow.
+                  </p>
+                </div>
+              )}
+
+              {/* ── STEP — Join your first competition ─────────────────── */}
+              <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-400 font-bold flex-shrink-0">
+                    {settings.kyc?.enabled ? "6" : "5"}
+                  </div>
+                  <h4 className="font-semibold text-white flex items-center gap-2">
+                    <Trophy className="h-4 w-4 text-yellow-400" /> Join your
+                    first competition
+                  </h4>
+                </div>
+                <p className="text-sm text-gray-400 mb-2">
+                  Browse{" "}
+                  <Link
+                    href="/competitions"
+                    className="text-yellow-400 hover:text-yellow-300 underline"
+                  >
+                    /competitions
+                  </Link>{" "}
+                  to see what&apos;s running. Each competition has a
+                  publicised <em>entry fee</em> (in{" "}
+                  {settings.credits.name.toLowerCase()}), a{" "}
+                  <em>ranking type</em> (P&amp;L, ROI %, win rate or volume),
+                  a <em>prize pool</em> and a <em>start/end time</em>.
+                </p>
+                <p className="text-sm text-gray-400">
+                  Click <strong className="text-white">Join</strong>, accept
+                  the entry terms, and the entry fee is deducted from your
+                  wallet. You also see your live ranking on the competition
+                  page. Want a faster format? Try{" "}
+                  <Link
+                    href="/challenges"
+                    className="text-yellow-400 hover:text-yellow-300 underline"
+                  >
+                    1v1 Challenges
+                  </Link>{" "}
+                  — head-to-head, shorter, instant payout.
+                </p>
+              </div>
+
+              {/* ── STEP — Place your first trade ──────────────────────── */}
+              <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-400 font-bold flex-shrink-0">
+                    {settings.kyc?.enabled ? "7" : "6"}
+                  </div>
+                  <h4 className="font-semibold text-white flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-yellow-400" /> Place
+                    your first trade
+                  </h4>
+                </div>
+                <p className="text-sm text-gray-400 mb-2">
+                  Once you&apos;re a participant, open the competition&apos;s
+                  trading view (<code className="text-gray-300">
+                    /competitions/&lt;id&gt;/trade
+                  </code>
+                  ). Pick a Forex pair, choose Buy (long) or Sell (short), set
+                  your lot size, and optionally add Stop Loss / Take Profit.
+                </p>
+                <div className="grid gap-2 sm:grid-cols-3 text-xs">
+                  <div className="bg-gray-800/60 rounded-md p-2 border border-gray-700/60">
+                    <div className="text-gray-500 mb-0.5">Leverage range</div>
+                    <div className="text-white font-semibold">
+                      {settings.leverage.min}× – {settings.leverage.max}×
+                    </div>
+                  </div>
+                  <div className="bg-gray-800/60 rounded-md p-2 border border-gray-700/60">
+                    <div className="text-gray-500 mb-0.5">
+                      Default leverage
+                    </div>
+                    <div className="text-white font-semibold">
+                      {settings.leverage.default}×
+                    </div>
+                  </div>
+                  <div className="bg-gray-800/60 rounded-md p-2 border border-gray-700/60">
+                    <div className="text-gray-500 mb-0.5">
+                      Max open positions
+                    </div>
+                    <div className="text-white font-semibold">
+                      {settings.positions.maxOpen}
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  The order panel has two layouts —{" "}
+                  <strong className="text-gray-300">Pro</strong> (full trader
+                  view) and <strong className="text-gray-300">Easy</strong>{" "}
+                  (simplified). Switch between them with the mode toggle in
+                  the trading interface — your choice is remembered per
+                  device.
+                </p>
+              </div>
+
+              {/* ── Important to know ──────────────────────────────────── */}
+              <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-orange-400" /> Good to
+                  know before you start
+                </h4>
+                <ul className="space-y-2 text-sm text-gray-300">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">
+                        Trading happens inside competitions and challenges
+                      </strong>{" "}
+                      — there is no &quot;always-on&quot; free-trading mode.
+                      To place an order you must first be an active
+                      participant.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Forex only.</strong> The
+                      currently tradable instruments are Forex pairs (majors,
+                      crosses and selected exotics). Crypto, stocks and
+                      commodities are not enabled.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">No signup bonus.</strong>{" "}
+                      You start with{" "}
+                      {settings.credits.symbol} 0. Everything you can do
+                      (entry fees, marketplace, Game Master) is funded by
+                      your own deposit.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Withdrawals.</strong>{" "}
+                      Minimum withdrawal is {settings.currency.symbol}
+                      {settings.credits.minimumWithdrawal}; a platform fee of{" "}
+                      {settings.credits.withdrawalFee}% applies.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">
+                        Trading involves risk.
+                      </strong>{" "}
+                      Leverage magnifies both wins and losses. Read the{" "}
+                      <button
+                        onClick={() => setActiveSection("risk-management")}
+                        className="text-orange-300 hover:text-orange-200 underline"
+                      >
+                        Risk Management
+                      </button>{" "}
+                      section before sizing up.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* ── Quick navigation ───────────────────────────────────── */}
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
                 <h4 className="font-semibold text-white mb-2">
                   💡 Quick Navigation:
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
                   <Link
-                    href="/"
+                    href="/dashboard"
                     className="text-yellow-400 hover:text-yellow-300 flex items-center gap-1"
                   >
                     <LayoutDashboard className="h-3 w-3" /> Dashboard
@@ -478,6 +897,24 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                     className="text-yellow-400 hover:text-yellow-300 flex items-center gap-1"
                   >
                     <Wallet className="h-3 w-3" /> Wallet
+                  </Link>
+                  <Link
+                    href="/profile"
+                    className="text-yellow-400 hover:text-yellow-300 flex items-center gap-1"
+                  >
+                    <User className="h-3 w-3" /> Profile
+                  </Link>
+                  <Link
+                    href="/gamemaster"
+                    className="text-yellow-400 hover:text-yellow-300 flex items-center gap-1"
+                  >
+                    <Award className="h-3 w-3" /> Game Master
+                  </Link>
+                  <Link
+                    href="/notifications"
+                    className="text-yellow-400 hover:text-yellow-300 flex items-center gap-1"
+                  >
+                    <Bell className="h-3 w-3" /> Notifications
                   </Link>
                 </div>
               </div>
