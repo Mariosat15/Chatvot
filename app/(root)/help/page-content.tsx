@@ -5047,34 +5047,118 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
             <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <User className="h-6 w-6 text-cyan-500" />
               <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
-                👤 Profile & Stats
+                👤 Profile &amp; Stats
               </h2>
             </div>
 
             <div className="space-y-4 text-gray-300">
               <p className="leading-relaxed">
-                Your profile is your home in ChartVolt — the place where
-                you fine-tune your identity, see your career-level stats,
-                manage notifications, KYC, security, and your purchased
-                tools. Open it at{" "}
+                Your profile is your home base on ChartVolt — the place
+                where you fine-tune your identity, view your career
+                stats, manage your KYC and security, control
+                notifications, and operate every item you have bought
+                from the Marketplace. Open it from the avatar dropdown
+                in the top-right, the sidebar, or directly at{" "}
                 <Link
                   href="/profile"
                   className="text-cyan-400 hover:underline"
                 >
                   /profile
-                </Link>{" "}
-                or via the avatar dropdown in the top-right.
+                </Link>
+                .
               </p>
 
               <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-3 text-xs text-gray-300">
                 <strong className="text-cyan-300">Good to know:</strong>{" "}
-                There is no public &quot;/profile/username&quot; URL —{" "}
+                There is no public{" "}
+                <code className="bg-gray-900 px-1 py-0.5 rounded">
+                  /profile/username
+                </code>{" "}
+                URL —{" "}
                 <code className="bg-gray-900 px-1 py-0.5 rounded">
                   /profile
                 </code>{" "}
-                always shows <em>your own</em> profile. Other traders see
-                a limited card view of you (avatar, bio, public stats) via
-                the Profile Card on the leaderboard and on Match Cards.
+                always shows <em>your own</em> profile. Other traders
+                only see a curated <strong>Profile Card</strong> with
+                public stats (avatar, bio, tier, trading stats, battle
+                record, badges, Score) — never your email, address,
+                phone, payment details, balance or transaction history.
+              </div>
+
+              {/* The profile header */}
+              <div>
+                <h3 className="font-semibold text-white text-base mb-2 flex items-center gap-2">
+                  <User className="h-4 w-4 text-cyan-300" />
+                  The header at the top of the page
+                </h3>
+                <p className="text-sm text-gray-400 mb-3">
+                  Above the tabs, every profile page renders a hero
+                  header that summarises who you are at a glance:
+                </p>
+                <div className="grid gap-2 text-xs text-gray-300">
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Avatar &amp; level ring.
+                    </strong>{" "}
+                    Your current profile picture wrapped in the active
+                    frame you applied from the Marketplace (if any),
+                    with a level-ring badge showing your current Trader
+                    Level number.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Display name, email, member-since.
+                    </strong>{" "}
+                    Your name and the email you signed up with,
+                    alongside the date your account was created.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Total XP &amp; wins.
+                    </strong>{" "}
+                    A quick XP read-out for your current title plus
+                    your total wins across competitions and 1v1
+                    challenges.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Wallet balance card.
+                    </strong>{" "}
+                    Your current{" "}
+                    <strong className="text-white">
+                      {settings.credits.name}
+                    </strong>{" "}
+                    balance. Click it to jump straight to{" "}
+                    <Link
+                      href="/wallet"
+                      className="text-cyan-400 hover:underline"
+                    >
+                      /wallet
+                    </Link>
+                    .
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Game Master badge.
+                    </strong>{" "}
+                    If you currently own an active Game Master pack, a
+                    GM badge links to the GM Dashboard at{" "}
+                    <Link
+                      href="/gamemaster"
+                      className="text-purple-400 hover:underline"
+                    >
+                      /gamemaster
+                    </Link>
+                    .
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">Quick Stats panel.</strong>{" "}
+                    Collapsible row showing your total trades, win
+                    rate, competitions entered, and 1v1s entered — a
+                    bird&apos;s-eye summary before you dive into the
+                    Overview tab.
+                  </div>
+                </div>
               </div>
 
               {/* Tabs map */}
@@ -5098,8 +5182,13 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       Overview
                     </p>
                     <p className="text-xs text-gray-400">
-                      Your Trader Level & Title with an XP progress bar
-                      (earn XP by collecting badges — see{" "}
+                      Two main cards:{" "}
+                      <strong className="text-white">
+                        Trader Level &amp; Title
+                      </strong>{" "}
+                      (current title, total XP, progress to next title,
+                      full grid of all 20 titles, and a &quot;How to
+                      earn XP&quot; matrix per badge rarity — see{" "}
                       <button
                         type="button"
                         onClick={() => scrollToSection("trader-levels")}
@@ -5107,22 +5196,33 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       >
                         Trader Levels
                       </button>
-                      ), plus competition and 1v1 summary cards (entered,
-                      won, podiums, credits won, victories).
+                      ), and{" "}
+                      <strong className="text-white">Performance</strong>{" "}
+                      tiles for Competitions (entered, podiums, active,
+                      total prizes) and 1v1 Challenges (total, won,
+                      lost, credits won).
                     </p>
                   </div>
 
                   {/* Journey */}
                   <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
-                    <p className="font-semibold text-purple-400 text-sm mb-1 flex items-center gap-2">
-                      <Sparkles className="h-4 w-4" />
+                    <p className="font-semibold text-amber-400 text-sm mb-1 flex items-center gap-2">
+                      <Map className="h-4 w-4" />
                       Journey
                     </p>
                     <p className="text-xs text-gray-400">
-                      A visual roadmap of your milestones on the platform
-                      — competitions joined, wins, badge unlocks, and
-                      account events plotted across your account
-                      timeline.
+                      Your{" "}
+                      <button
+                        type="button"
+                        onClick={() => scrollToSection("journey")}
+                        className="text-amber-400 hover:underline"
+                      >
+                        Trader&apos;s Journey
+                      </button>{" "}
+                      — an interactive multi-map progression of
+                      milestones built from your real account events
+                      (trades, deposits, competitions, badges). Awards
+                      XP and badges as you go.
                     </p>
                   </div>
 
@@ -5138,9 +5238,10 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       <strong className="text-white">category</strong>{" "}
                       and{" "}
                       <strong className="text-white">rarity</strong>{" "}
-                      (Common / Rare / Epic / Legendary). Click a badge
-                      to open the detail card. Each rarity grants XP —
-                      see{" "}
+                      (Common / Rare / Epic / Legendary). Locked badges
+                      show their unlock condition and a level gate when
+                      the rarity is restricted. Click any badge for the
+                      detail card. Full mechanics in the{" "}
                       <button
                         type="button"
                         onClick={() => scrollToSection("badge-system")}
@@ -5159,10 +5260,13 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       Arsenal
                     </p>
                     <p className="text-xs text-gray-400">
-                      Your purchased indicators, strategies, Game Master
-                      packages, profile frames, and other items from the
-                      Marketplace. Toggle items on/off, see expiry dates,
-                      and renew. Full details in{" "}
+                      Everything you have bought from the Marketplace,
+                      filtered by category (Game Master, Trading Bots,
+                      Indicators, Strategies, Cosmetics). Enable /
+                      disable items, edit settings, apply avatars &amp;
+                      frames, and run the full GM subscription panel
+                      (pause, schedule cancel, renew). Full breakdown
+                      in{" "}
                       <button
                         type="button"
                         onClick={() => scrollToSection("arsenal")}
@@ -5178,22 +5282,24 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
                     <p className="font-semibold text-green-400 text-sm mb-1 flex items-center gap-2">
                       <BadgeCheck className="h-4 w-4" />
-                      Verification
+                      Verification (KYC)
                     </p>
                     <p className="text-xs text-gray-400">
-                      Your identity-verification (KYC) status and the
-                      &quot;Start verification&quot; flow. KYC is
-                      required before withdrawing
-                      {settings.kyc?.enabled &&
-                        settings.kyc?.requiredAmount > 0 && (
-                          <>
-                            {" "}
-                            (for amounts at or above{" "}
-                            {settings.currency.symbol}
-                            {settings.kyc.requiredAmount})
-                          </>
-                        )}
-                      .
+                      Your identity-verification status, the{" "}
+                      <strong className="text-white">
+                        Start verification
+                      </strong>{" "}
+                      flow, what to prepare, the document types you can
+                      use, the verification expiry date, and the data
+                      retention notice. Complete breakdown in the{" "}
+                      <button
+                        type="button"
+                        onClick={() => scrollToSection("kyc")}
+                        className="text-green-400 hover:underline"
+                      >
+                        🪪 KYC
+                      </button>{" "}
+                      block below.
                     </p>
                   </div>
 
@@ -5204,18 +5310,26 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       Notifications
                     </p>
                     <p className="text-xs text-gray-400">
-                      Your in-app notification center: competition
-                      invites, challenge requests, prize payouts, KYC
-                      updates, marketplace receipts, and system
-                      announcements. See{" "}
+                      Your full notification history with filters,
+                      search, and a sub-tab for notification preferences
+                      (master switch, email, per-category opt-outs,
+                      quiet hours, challenge popups). Identical to the
+                      page at{" "}
+                      <Link
+                        href="/notifications"
+                        className="text-pink-400 hover:underline"
+                      >
+                        /notifications
+                      </Link>{" "}
+                      — see the{" "}
                       <button
                         type="button"
                         onClick={() => scrollToSection("notifications")}
                         className="text-pink-400 hover:underline"
                       >
                         Notifications
-                      </button>
-                      .
+                      </button>{" "}
+                      section.
                     </p>
                   </div>
 
@@ -5229,8 +5343,8 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       Everything you can change about yourself
                       (picture, bio, name, address), plus password
                       change, two-factor authentication, friend-request
-                      privacy, and account deactivation. Full breakdown
-                      below.
+                      privacy, and account deactivation. Full
+                      field-by-field breakdown below.
                     </p>
                   </div>
                 </div>
@@ -5242,27 +5356,59 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   <Settings className="h-4 w-4 text-gray-300" />
                   What you can change in Settings
                 </h3>
+                <p className="text-xs text-gray-400 mb-3">
+                  Settings is divided into clear blocks. A sticky bar
+                  appears at the bottom whenever you have unsaved
+                  changes with{" "}
+                  <strong className="text-white">Save changes</strong>{" "}
+                  and{" "}
+                  <strong className="text-white">Discard</strong>{" "}
+                  buttons. The page also warns you if you try to leave
+                  with unsaved edits.
+                </p>
 
                 <div className="space-y-3">
-                  {/* Picture & bio */}
+                  {/* Picture */}
                   <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
                     <p className="font-semibold text-white text-sm mb-1">
-                      Profile Picture &amp; Bio
+                      Profile Picture
                     </p>
                     <ul className="space-y-1 text-xs text-gray-400 list-disc pl-5">
                       <li>
-                        Upload a new picture —{" "}
-                        <strong className="text-white">
-                          JPEG, PNG, WebP, or GIF
-                        </strong>
-                        , up to{" "}
-                        <strong className="text-white">5&nbsp;MB</strong>.
+                        Click your avatar (or the &quot;Change
+                        photo&quot; overlay) to upload a new picture.
                       </li>
                       <li>
-                        Write a short bio (max{" "}
+                        Accepted formats:{" "}
+                        <strong className="text-white">
+                          JPEG, JPG, PNG, WebP, GIF
+                        </strong>
+                        . Maximum size:{" "}
+                        <strong className="text-white">5&nbsp;MB</strong>
+                        .
+                      </li>
+                      <li>
+                        The picture is shown together with the{" "}
+                        <strong className="text-white">profile frame</strong>{" "}
+                        you have currently activated from the Marketplace
+                        (Arsenal tab), and on every public surface
+                        (Profile Card, Match Cards, leaderboards).
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Bio */}
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1">
+                      Bio
+                    </p>
+                    <ul className="space-y-1 text-xs text-gray-400 list-disc pl-5">
+                      <li>
+                        Short freeform text (max{" "}
                         <strong className="text-white">500</strong>{" "}
-                        characters). This is what other traders see on
-                        your public Profile Card.
+                        characters) shown on your public Profile Card.
+                        Use it to share your style, time-zone, or
+                        favourite pairs — nothing sensitive.
                       </li>
                     </ul>
                   </div>
@@ -5275,70 +5421,37 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                     <ul className="space-y-1 text-xs text-gray-400 list-disc pl-5">
                       <li>
                         <strong className="text-white">Full name</strong>{" "}
-                        — editable.
+                        — editable. Appears on your invoices and on the
+                        Profile Card other traders see.
                       </li>
                       <li>
                         <strong className="text-white">Email</strong> —{" "}
-                        <span className="text-red-300">
-                          read-only.
-                        </span>{" "}
-                        Email cannot be changed from this screen for
-                        security reasons. Contact support if you need
-                        to update it.
+                        <span className="text-red-300">read-only</span>
+                        . Sign-in email cannot be changed from this
+                        screen — a deliberate choice to prevent
+                        account take-over. Contact support if you
+                        genuinely need to update it.
+                      </li>
+                      <li>
+                        <strong className="text-white">Country</strong>{" "}
+                        — dropdown. For EU consumers, the platform
+                        automatically applies VAT on deposits when
+                        applicable.
                       </li>
                       <li>
                         <strong className="text-white">
-                          Address fields
+                          Street, City, Postal code, Phone
                         </strong>{" "}
-                        — country, street, city, postal code, phone.
-                        These appear on your tax invoices for deposits
-                        and are required for KYC.
-                      </li>
-                    </ul>
-                    <p className="text-xs text-gray-500 mt-2">
-                      A sticky bar appears whenever you have unsaved
-                      changes; click{" "}
-                      <strong className="text-white">
-                        &quot;Save changes&quot;
-                      </strong>{" "}
-                      or{" "}
-                      <strong className="text-white">
-                        &quot;Discard&quot;
-                      </strong>{" "}
-                      to commit or revert.
-                    </p>
-                  </div>
-
-                  {/* Security */}
-                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
-                    <p className="font-semibold text-white text-sm mb-1 flex items-center gap-2">
-                      <Shield className="h-4 w-4 text-cyan-400" />
-                      Security
-                    </p>
-                    <ul className="space-y-1 text-xs text-gray-400 list-disc pl-5">
-                      <li>
-                        <strong className="text-white">
-                          Change password
-                        </strong>{" "}
-                        — enter your current password, new password, and
-                        confirm. If 2FA is enabled you&apos;ll be
-                        prompted for your authenticator code.
-                      </li>
-                      <li>
-                        <strong className="text-white">
-                          Two-Factor Authentication (2FA)
-                        </strong>{" "}
-                        — turn on TOTP-based 2FA with any standard
-                        authenticator app (Google Authenticator, Authy,
-                        1Password, etc.). Strongly recommended; required
-                        for many sensitive actions once enabled.
+                        — required for KYC and printed on tax invoices
+                        for deposits.
                       </li>
                     </ul>
                   </div>
 
                   {/* Privacy */}
                   <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
-                    <p className="font-semibold text-white text-sm mb-1">
+                    <p className="font-semibold text-white text-sm mb-1 flex items-center gap-2">
+                      <Eye className="h-4 w-4 text-cyan-400" />
                       Privacy
                     </p>
                     <ul className="space-y-1 text-xs text-gray-400 list-disc pl-5">
@@ -5346,10 +5459,97 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                         <strong className="text-white">
                           Allow friend requests
                         </strong>{" "}
-                        — when off, other traders can&apos;t send you
-                        friend requests. Your stats stay visible on the
-                        leaderboard.
+                        — toggle. When off, other traders can&apos;t
+                        send you friend invites. Your stats stay
+                        visible on the leaderboard either way.
                       </li>
+                    </ul>
+                  </div>
+
+                  {/* Password */}
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1 flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-cyan-400" />
+                      Change password
+                    </p>
+                    <ul className="space-y-1 text-xs text-gray-400 list-disc pl-5">
+                      <li>
+                        Enter your{" "}
+                        <strong className="text-white">
+                          current password
+                        </strong>
+                        , a{" "}
+                        <strong className="text-white">
+                          new password
+                        </strong>{" "}
+                        (minimum 8 characters, maximum 128), and
+                        confirm. Each field has a show/hide toggle.
+                      </li>
+                      <li>
+                        If 2FA is enabled, the form will ask for your
+                        authenticator code before the change is
+                        applied.
+                      </li>
+                      <li>
+                        Passwords are hashed with bcrypt server-side
+                        — neither support nor admins can read them.
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* 2FA */}
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1 flex items-center gap-2">
+                      <BadgeCheck className="h-4 w-4 text-green-400" />
+                      Two-Factor Authentication (2FA)
+                    </p>
+                    <ul className="space-y-1 text-xs text-gray-400 list-disc pl-5">
+                      <li>
+                        <strong className="text-white">Method:</strong>{" "}
+                        TOTP, compatible with any standard authenticator
+                        app — Google Authenticator, Authy, 1Password,
+                        Microsoft Authenticator, etc.
+                      </li>
+                      <li>
+                        <strong className="text-white">Setup:</strong>{" "}
+                        scan the QR code (or enter the manual secret),
+                        then verify with a 6-digit code from the app.
+                      </li>
+                      <li>
+                        <strong className="text-white">Backup codes:</strong>{" "}
+                        you receive a set of one-time codes at setup —
+                        store them somewhere safe. They let you sign
+                        in if you lose access to your authenticator.
+                        You can regenerate them at any time (this
+                        invalidates the old set).
+                      </li>
+                      <li>
+                        <strong className="text-white">
+                          Email OTP fallback
+                        </strong>{" "}
+                        — if both your authenticator and your backup
+                        codes are unavailable, an email-based one-time
+                        code can still get you in.
+                      </li>
+                      <li>
+                        <strong className="text-white">
+                          Disabling 2FA
+                        </strong>{" "}
+                        requires confirming a current 2FA code. Once
+                        disabled, accept that your account is
+                        materially less secure.
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Account info */}
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1">
+                      Account information (read-only)
+                    </p>
+                    <ul className="space-y-1 text-xs text-gray-400 list-disc pl-5">
+                      <li>Account created date.</li>
+                      <li>Last updated date.</li>
                     </ul>
                   </div>
 
@@ -5359,14 +5559,459 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       <AlertTriangle className="h-4 w-4" />
                       Deactivate account
                     </p>
-                    <p className="text-xs text-gray-400">
-                      Closes your account. You will be signed out and
-                      your profile will no longer appear on public
-                      surfaces. Any pending withdrawals are processed
-                      according to platform policy. Open competitions
-                      and challenges must be settled first.
+                    <p className="text-xs text-gray-400 mb-2">
+                      A protected action that closes your account.
+                      You&apos;ll be asked to type{" "}
+                      <code className="bg-gray-900 px-1.5 py-0.5 rounded">
+                        DEACTIVATE
+                      </code>{" "}
+                      to confirm. After deactivation:
                     </p>
+                    <ul className="space-y-1 text-xs text-gray-400 list-disc pl-5">
+                      <li>
+                        You are signed out and your profile is hidden
+                        from public surfaces (Leaderboard, Match
+                        Cards).
+                      </li>
+                      <li>
+                        Any pending withdrawals continue through their
+                        normal processing flow.
+                      </li>
+                      <li>
+                        Open competitions or 1v1 challenges must be
+                        settled first.
+                      </li>
+                      <li>
+                        Support can reactivate the account if you
+                        change your mind. Some data is retained per our
+                        privacy policy and applicable law.
+                      </li>
+                    </ul>
                   </div>
+                </div>
+              </div>
+
+              {/* KYC deep-dive */}
+              <div
+                id="kyc"
+                className="scroll-mt-6 bg-green-500/10 border border-green-500/30 rounded-xl p-5 space-y-4"
+              >
+                <h3 className="text-lg font-bold text-green-400 flex items-center gap-2">
+                  <BadgeCheck className="h-5 w-5" />
+                  🪪 Identity Verification (KYC) — full guide
+                </h3>
+
+                <p className="text-sm text-gray-300 leading-relaxed">
+                  <strong className="text-white">KYC</strong>{" "}
+                  (&quot;Know Your Customer&quot;) is the regulated
+                  identity-verification step that confirms you are a
+                  real person and that the documents you provide match
+                  you. ChartVolt uses{" "}
+                  <strong className="text-white">Veriff</strong>, a
+                  PCI-DSS / GDPR-compliant identity provider, to run the
+                  whole flow — ChartVolt never touches your raw ID
+                  documents.
+                </p>
+
+                <p className="text-xs text-gray-400">
+                  Run it from{" "}
+                  <Link
+                    href="/profile?tab=verification"
+                    className="text-green-400 hover:underline"
+                  >
+                    /profile?tab=verification
+                  </Link>
+                  . The Verification card only appears when KYC is
+                  enabled by the platform.
+                </p>
+
+                {/* When required */}
+                <div>
+                  <p className="font-semibold text-white text-sm mb-2">
+                    When KYC is required
+                  </p>
+                  <ul className="space-y-1.5 text-xs text-gray-300 list-disc pl-5">
+                    {settings.kyc?.requiredForDeposit && (
+                      <li>
+                        <strong className="text-white">Deposits</strong>{" "}
+                        — required before you can fund the wallet
+                        {settings.kyc?.requiredAmount > 0 && (
+                          <>
+                            {" "}
+                            for amounts at or above{" "}
+                            {settings.currency.symbol}
+                            {settings.kyc.requiredAmount}
+                          </>
+                        )}
+                        .
+                      </li>
+                    )}
+                    {settings.kyc?.requiredForWithdrawal && (
+                      <li>
+                        <strong className="text-white">Withdrawals</strong>{" "}
+                        — required before your first withdrawal is
+                        approved
+                        {settings.kyc?.requiredAmount > 0 && (
+                          <>
+                            {" "}
+                            for amounts at or above{" "}
+                            {settings.currency.symbol}
+                            {settings.kyc.requiredAmount}
+                          </>
+                        )}
+                        . The withdrawal dialog will redirect you to
+                        verification if needed.
+                      </li>
+                    )}
+                    <li>
+                      <strong className="text-white">
+                        After expiry
+                      </strong>{" "}
+                      — verification is valid for a fixed period
+                      (typically one year). When it expires, the
+                      platform automatically resets your KYC status and
+                      asks you to re-verify before your next gated
+                      action.
+                    </li>
+                    <li>
+                      <strong className="text-white">
+                        Admin request
+                      </strong>{" "}
+                      — for high-risk activity (chargeback dispute,
+                      suspected multi-accounting, etc.) the team may
+                      require re-verification regardless of expiry.
+                    </li>
+                  </ul>
+                </div>
+
+                {/* What you'll need */}
+                <div>
+                  <p className="font-semibold text-white text-sm mb-2">
+                    What you&apos;ll need before you start
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-2 text-xs text-gray-300">
+                    <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                      <strong className="text-white">
+                        A valid government-issued ID
+                      </strong>{" "}
+                      — passport, national ID card, driver&apos;s
+                      license, or residence permit. It must be current
+                      (not expired) and the photo must be clear.
+                    </div>
+                    <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                      <strong className="text-white">
+                        A camera-capable device
+                      </strong>{" "}
+                      — phone or laptop webcam. Veriff captures the
+                      document image and a short live selfie video for
+                      face matching.
+                    </div>
+                    <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                      <strong className="text-white">Good lighting</strong>{" "}
+                      and a steady hand. Glare, blur, or covered
+                      corners are the most common reasons a session
+                      gets sent for resubmission.
+                    </div>
+                    <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                      <strong className="text-white">About 5 minutes</strong>{" "}
+                      end-to-end. The session itself rarely takes more
+                      than 2–3 minutes; the decision typically comes
+                      back within a few minutes after submission.
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step by step */}
+                <div>
+                  <p className="font-semibold text-white text-sm mb-2">
+                    Step-by-step
+                  </p>
+                  <ol className="space-y-2 text-xs text-gray-300 list-decimal pl-5">
+                    <li>
+                      Go to{" "}
+                      <Link
+                        href="/profile?tab=verification"
+                        className="text-green-400 hover:underline"
+                      >
+                        Profile → Verification
+                      </Link>
+                      . If your address fields are missing, the page
+                      will prompt you to complete them in{" "}
+                      <Link
+                        href="/profile?tab=settings"
+                        className="text-cyan-400 hover:underline"
+                      >
+                        Settings
+                      </Link>{" "}
+                      first.
+                    </li>
+                    <li>
+                      Click{" "}
+                      <strong className="text-white">
+                        Start verification
+                      </strong>
+                      . A Veriff session opens in a popup window
+                      (allow pop-ups for ChartVolt). Veriff handles
+                      everything from here.
+                    </li>
+                    <li>
+                      Pick the country your document was issued in and
+                      the document type (passport / ID card / driving
+                      licence / residence permit).
+                    </li>
+                    <li>
+                      Capture the document — front and back where
+                      applicable. Hold steady, fill the frame, no
+                      glare.
+                    </li>
+                    <li>
+                      Record the short selfie /{" "}
+                      <strong className="text-white">liveness check</strong>{" "}
+                      so Veriff can confirm you are the person in the
+                      document.
+                    </li>
+                    <li>
+                      Submit. The popup closes and you&apos;re
+                      returned to the Verification tab, which switches
+                      to{" "}
+                      <strong className="text-yellow-300">Pending</strong>
+                      . The page polls automatically and the status
+                      flips to{" "}
+                      <strong className="text-green-300">Approved</strong>{" "}
+                      (or to{" "}
+                      <strong className="text-orange-300">
+                        Resubmission requested
+                      </strong>{" "}
+                      /{" "}
+                      <strong className="text-red-300">Declined</strong>
+                      ) as soon as the result comes back.
+                    </li>
+                  </ol>
+                </div>
+
+                {/* Statuses */}
+                <div>
+                  <p className="font-semibold text-white text-sm mb-2">
+                    Statuses you may see
+                  </p>
+                  <div className="grid gap-2 text-xs text-gray-300">
+                    <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                      <strong className="text-gray-300">
+                        Not started.
+                      </strong>{" "}
+                      No verification on file. Gated actions (deposits,
+                      withdrawals) will ask you to verify when you
+                      attempt them.
+                    </div>
+                    <div className="p-2.5 bg-gray-700/40 rounded border border-yellow-500/30">
+                      <strong className="text-yellow-300">Pending.</strong>{" "}
+                      Documents submitted, awaiting Veriff&apos;s
+                      decision. Usually a few minutes; up to a few
+                      hours during peak times. You can use the rest of
+                      the platform normally while you wait. A{" "}
+                      <strong className="text-white">
+                        Check Verification Status
+                      </strong>{" "}
+                      button is available to refresh manually.
+                    </div>
+                    <div className="p-2.5 bg-gray-700/40 rounded border border-green-500/30">
+                      <strong className="text-green-300">Approved.</strong>{" "}
+                      You&apos;re verified. The page shows the date
+                      you were verified, the expiry date (re-verify
+                      after this), and a data-retention notice.
+                    </div>
+                    <div className="p-2.5 bg-gray-700/40 rounded border border-orange-500/30">
+                      <strong className="text-orange-300">
+                        Resubmission requested.
+                      </strong>{" "}
+                      Veriff couldn&apos;t read the document well
+                      enough — usually a glare, blur, or cropped
+                      corner issue. Just retry from the same page; the
+                      attempt counts against your remaining attempts.
+                    </div>
+                    <div className="p-2.5 bg-gray-700/40 rounded border border-red-500/30">
+                      <strong className="text-red-300">Declined.</strong>{" "}
+                      Verification failed (e.g. document type or
+                      country not currently supported, expired
+                      document, face/document mismatch). Reach out to
+                      support — most declines are resolvable.
+                    </div>
+                    <div className="p-2.5 bg-gray-700/40 rounded border border-gray-500/30">
+                      <strong className="text-gray-300">Expired.</strong>{" "}
+                      Your previous approval&apos;s validity period
+                      has run out. Click{" "}
+                      <strong className="text-white">
+                        Start verification
+                      </strong>{" "}
+                      again to renew.
+                    </div>
+                    <div className="p-2.5 bg-gray-700/40 rounded border border-gray-500/30">
+                      <strong className="text-gray-400">Abandoned.</strong>{" "}
+                      You closed the popup without completing. You can
+                      restart at any time; the previous session is
+                      discarded automatically.
+                    </div>
+                  </div>
+                </div>
+
+                {/* What we collect */}
+                <div>
+                  <p className="font-semibold text-white text-sm mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-green-300" />
+                    What ChartVolt receives after approval
+                  </p>
+                  <p className="text-xs text-gray-400 mb-2">
+                    Veriff sends only the{" "}
+                    <strong className="text-white">structured data</strong>{" "}
+                    from your check — never raw images to our servers.
+                    On approval we store, on the verification record
+                    only:
+                  </p>
+                  <ul className="space-y-1 text-xs text-gray-300 list-disc pl-5">
+                    <li>
+                      <strong className="text-white">Identity:</strong>{" "}
+                      first name, last name, date of birth, gender,
+                      nationality, and an ID number (where the document
+                      provides one).
+                    </li>
+                    <li>
+                      <strong className="text-white">Document:</strong>{" "}
+                      type, document number, issuing country, valid-from
+                      and valid-until dates.
+                    </li>
+                    <li>
+                      <strong className="text-white">Wallet flags:</strong>{" "}
+                      <code className="text-[10px] bg-gray-900 px-1 py-0.5 rounded">
+                        kycVerified
+                      </code>{" "}
+                      = true, plus verified-at and expires-at
+                      timestamps used to gate deposits / withdrawals
+                      and trigger re-verification.
+                    </li>
+                  </ul>
+                  <p className="text-xs text-gray-500 mt-2">
+                    The raw photographs and the selfie video remain
+                    with Veriff and are retained according to their own
+                    policy (typically 2 years), then deleted. ChartVolt
+                    never stores the document image itself.
+                  </p>
+                </div>
+
+                {/* Duplicate detection */}
+                <div>
+                  <p className="font-semibold text-white text-sm mb-2">
+                    Duplicate-document check
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Each approved KYC is compared against existing
+                    records to make sure the same identity document
+                    isn&apos;t already in use on another account. We
+                    check four signals: document number + issuing
+                    country, identity number, an anonymised document
+                    fingerprint, and name + date of birth. If a match
+                    is found, the case is sent for manual review and
+                    flagged in our fraud system — see{" "}
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection("account-security")}
+                      className="text-green-400 hover:underline"
+                    >
+                      Account Security &amp; Fair Play
+                    </button>{" "}
+                    for what happens next.
+                  </p>
+                </div>
+
+                {/* Retries and expiry */}
+                <div>
+                  <p className="font-semibold text-white text-sm mb-2">
+                    Retries &amp; expiry
+                  </p>
+                  <ul className="space-y-1.5 text-xs text-gray-300 list-disc pl-5">
+                    <li>
+                      You get a limited number of attempts per account
+                      (configured by the platform). The attempt counter
+                      is shown when a session fails so you know how
+                      many tries remain.
+                    </li>
+                    <li>
+                      A session that is started but not submitted
+                      expires after a configurable window (typically{" "}
+                      <strong className="text-white">
+                        30 minutes
+                      </strong>
+                      ); a new one can be started immediately after.
+                    </li>
+                    <li>
+                      A successful approval is valid for the platform&apos;s
+                      configured period (typically{" "}
+                      <strong className="text-white">365 days</strong>
+                      ). Once it expires, the next deposit or
+                      withdrawal will prompt you to verify again.
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Troubleshooting */}
+                <div>
+                  <p className="font-semibold text-white text-sm mb-2">
+                    Troubleshooting
+                  </p>
+                  <ul className="space-y-1.5 text-xs text-gray-300 list-disc pl-5">
+                    <li>
+                      <strong className="text-white">
+                        Popup blocked?
+                      </strong>{" "}
+                      Allow pop-ups for ChartVolt or click{" "}
+                      <strong className="text-white">
+                        Start verification
+                      </strong>{" "}
+                      again — Veriff opens in a 500×700 window.
+                    </li>
+                    <li>
+                      <strong className="text-white">
+                        Camera permission denied?
+                      </strong>{" "}
+                      You&apos;ll need to enable camera access in your
+                      browser/OS, then restart the session.
+                    </li>
+                    <li>
+                      <strong className="text-white">
+                        Stuck on Pending?
+                      </strong>{" "}
+                      Click{" "}
+                      <strong className="text-white">
+                        Check Verification Status
+                      </strong>
+                      . If nothing changes after a couple of hours,
+                      contact support — Veriff can request
+                      resubmission in a few edge cases.
+                    </li>
+                    <li>
+                      <strong className="text-white">
+                        Wrong country or document type listed?
+                      </strong>{" "}
+                      The platform restricts the document types it
+                      accepts. If yours isn&apos;t supported, contact
+                      support for a manual review option.
+                    </li>
+                    <li>
+                      <strong className="text-white">
+                        Lost access to the account
+                      </strong>{" "}
+                      that owns the KYC? Don&apos;t open a new one —
+                      that triggers the duplicate-document check and
+                      delays things further. Recover the original via
+                      support.
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="text-xs text-gray-500 italic">
+                  Verification is powered by Veriff. ChartVolt acts as
+                  the data controller for the structured outcome
+                  (verified / not), Veriff acts as the data processor
+                  for the underlying check.
                 </div>
               </div>
 
