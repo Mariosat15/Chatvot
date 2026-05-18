@@ -611,28 +611,17 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   )}
                 </div>
 
-                {/* Payment methods (only show what the admin has actually enabled) */}
+                {/* Payment methods (only show when the admin has at least one card processor enabled) */}
                 {settings.payments?.anyEnabled ? (
                   <div className="mt-3">
                     <div className="text-xs text-gray-500 mb-1.5">
                       Accepted payment methods:
                     </div>
                     <div className="flex flex-wrap gap-2 text-xs">
-                      {settings.payments.stripe && (
-                        <span className="px-2 py-1 rounded-md bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 flex items-center gap-1">
-                          <CreditCard className="h-3 w-3" /> Cards via Stripe
-                        </span>
-                      )}
-                      {settings.payments.nuvei && (
-                        <span className="px-2 py-1 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                          <CreditCard className="h-3 w-3" /> Cards via Nuvei
-                        </span>
-                      )}
-                      {settings.payments.paddle && (
-                        <span className="px-2 py-1 rounded-md bg-blue-500/15 text-blue-300 border border-blue-500/30 flex items-center gap-1">
-                          <CreditCard className="h-3 w-3" /> Cards via Paddle
-                        </span>
-                      )}
+                      <span className="px-2 py-1 rounded-md bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 flex items-center gap-1">
+                        <CreditCard className="h-3 w-3" /> Debit &amp; credit
+                        cards (Visa, Mastercard, Maestro, American Express)
+                      </span>
                     </div>
                   </div>
                 ) : (
@@ -4796,29 +4785,22 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   </li>
                   {settings.payments?.anyEnabled && (
                     <li>
-                      Choose a payment method.{" "}
-                      <span className="text-gray-400">
-                        Available right now:&nbsp;
-                        {[
-                          settings.payments.stripe && "Stripe (cards)",
-                          settings.payments.nuvei &&
-                            "Nuvei (cards + 3D Secure)",
-                          settings.payments.paddle && "Paddle",
-                        ]
-                          .filter(Boolean)
-                          .join(", ")}
-                        .
-                      </span>
+                      Pay with your{" "}
+                      <strong className="text-white">
+                        debit or credit card
+                      </strong>{" "}
+                      (Visa, Mastercard, Maestro, American Express).
+                      Payments are processed by our secure payment
+                      processor — ChartVolt never sees or stores your
+                      full card number.
                     </li>
                   )}
                   <li>
                     Complete the secure payment.{" "}
-                    {settings.payments?.nuvei && (
-                      <span className="text-gray-400">
-                        Nuvei card payments may trigger a 3D Secure
-                        (3DS2) challenge from your bank.
-                      </span>
-                    )}
+                    <span className="text-gray-400">
+                      Your bank may show a 3D Secure (3DS2) challenge to
+                      confirm it&apos;s really you.
+                    </span>
                   </li>
                   <li>
                     {settings.credits.name} land in your wallet
@@ -4897,8 +4879,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                     {settings.currency.symbol}
                     {settings.credits.minimumWithdrawal}). The dialog
                     shows the fee, the net payout, and the available
-                    payout method (typically the same card you used to
-                    deposit, a Stripe payout, or a manual bank transfer).
+                    payout method — typically a{" "}
+                    <strong className="text-white">refund to the card</strong>{" "}
+                    you used to deposit, or a manual{" "}
+                    <strong className="text-white">bank transfer</strong>{" "}
+                    when that&apos;s not possible.
                   </li>
                   <li>
                     Submit. Your {settings.credits.name} are deducted{" "}
@@ -5092,16 +5077,9 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   </li>
                   <li>
                     The platform never asks for your full card number,
-                    CVV, or banking password — payments are handled
-                    end-to-end by the PSP (
-                    {[
-                      settings.payments?.stripe && "Stripe",
-                      settings.payments?.nuvei && "Nuvei",
-                      settings.payments?.paddle && "Paddle",
-                    ]
-                      .filter(Boolean)
-                      .join(" / ") || "your payment provider"}
-                    ).
+                    CVV, or banking password — card payments are handled
+                    end-to-end by our PCI-DSS compliant payment
+                    processor.
                   </li>
                 </ul>
               </div>
