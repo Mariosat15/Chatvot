@@ -140,80 +140,30 @@ const menuSections = [
   { id: "faq", title: "❓ FAQ", icon: HelpCircle },
 ];
 
-// Default settings as fallback
+// Default settings as fallback (mirrors lib/constants/levels.ts — keep in sync)
 const defaultSettings: HelpSettings = {
   badgeXP: { common: 10, rare: 25, epic: 50, legendary: 100 },
   levels: [
-    {
-      level: 1,
-      title: "Novice Trader",
-      minXP: 0,
-      icon: "🌱",
-      color: "text-gray-400",
-    },
-    {
-      level: 2,
-      title: "Apprentice Trader",
-      minXP: 100,
-      icon: "📚",
-      color: "text-green-400",
-    },
-    {
-      level: 3,
-      title: "Skilled Trader",
-      minXP: 300,
-      icon: "⚔️",
-      color: "text-blue-400",
-    },
-    {
-      level: 4,
-      title: "Expert Trader",
-      minXP: 600,
-      icon: "🎯",
-      color: "text-cyan-400",
-    },
-    {
-      level: 5,
-      title: "Elite Trader",
-      minXP: 1000,
-      icon: "💎",
-      color: "text-purple-400",
-    },
-    {
-      level: 6,
-      title: "Master Trader",
-      minXP: 1600,
-      icon: "👑",
-      color: "text-pink-400",
-    },
-    {
-      level: 7,
-      title: "Grand Master",
-      minXP: 2400,
-      icon: "🔥",
-      color: "text-orange-400",
-    },
-    {
-      level: 8,
-      title: "Trading Champion",
-      minXP: 3400,
-      icon: "⚡",
-      color: "text-red-400",
-    },
-    {
-      level: 9,
-      title: "Market Legend",
-      minXP: 4600,
-      icon: "🌟",
-      color: "text-yellow-400",
-    },
-    {
-      level: 10,
-      title: "Trading God",
-      minXP: 6000,
-      icon: "👑",
-      color: "text-yellow-300",
-    },
+    { level: 1, title: "Novice Trader", minXP: 0, icon: "starBadge", color: "text-gray-400" },
+    { level: 2, title: "Apprentice", minXP: 50, icon: "guideBook", color: "text-gray-300" },
+    { level: 3, title: "Trainee", minXP: 125, icon: "sword", color: "text-green-500" },
+    { level: 4, title: "Junior Trader", minXP: 250, icon: "trade", color: "text-green-400" },
+    { level: 5, title: "Rising Trader", minXP: 375, icon: "profit", color: "text-teal-400" },
+    { level: 6, title: "Skilled Trader", minXP: 500, icon: "target", color: "text-blue-400" },
+    { level: 7, title: "Competent Trader", minXP: 750, icon: "archer", color: "text-blue-300" },
+    { level: 8, title: "Proficient Trader", minXP: 1100, icon: "shield1", color: "text-cyan-400" },
+    { level: 9, title: "Expert Trader", minXP: 1450, icon: "swordNumbered", color: "text-cyan-300" },
+    { level: 10, title: "Senior Trader", minXP: 1800, icon: "gems", color: "text-purple-400" },
+    { level: 11, title: "Elite Trader", minXP: 2000, icon: "star1", color: "text-purple-300" },
+    { level: 12, title: "Master Trader", minXP: 2500, icon: "crown", color: "text-pink-400" },
+    { level: 13, title: "Grand Master", minXP: 3000, icon: "fireSpell", color: "text-pink-300" },
+    { level: 14, title: "Trading Virtuoso", minXP: 3500, icon: "blueFireSpell", color: "text-orange-400" },
+    { level: 15, title: "Trading Champion", minXP: 4000, icon: "trophy", color: "text-orange-300" },
+    { level: 16, title: "Market Legend", minXP: 5000, icon: "starAward", color: "text-yellow-400" },
+    { level: 17, title: "Trading Titan", minXP: 6000, icon: "goldMedal", color: "text-yellow-300" },
+    { level: 18, title: "Market Overlord", minXP: 7500, icon: "lord", color: "text-red-400" },
+    { level: 19, title: "Trading Immortal", minXP: 10000, icon: "champion", color: "text-red-300" },
+    { level: 20, title: "Trading God", minXP: 15000, icon: "victory", color: "text-amber-400" },
   ],
   margin: { safe: 200, warning: 150, marginCall: 100, liquidation: 50 },
   leverage: { min: 1, max: 500, default: 10 },
@@ -6811,55 +6761,205 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
             <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Award className="h-6 w-6 text-yellow-500" />
               <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
-                👑 Trader Levels & Titles
+                👑 Trader Levels &amp; Titles
               </h2>
             </div>
 
             <div className="space-y-4 text-gray-300">
-              <p className="leading-relaxed mb-4">
-                Earn badges to gain Experience Points (XP) and progress through{" "}
-                {settings.levels.length} prestigious trader levels!
+              <p className="leading-relaxed">
+                Every trader on ChartVolt has a{" "}
+                <strong className="text-white">Level</strong> and a{" "}
+                <strong className="text-white">Title</strong> earned
+                through{" "}
+                <strong className="text-white">Experience Points (XP)</strong>
+                . XP is awarded for the things you actually do on the
+                platform — unlocking badges, finishing trades, competing
+                in events, winning 1v1 challenges, and ticking off
+                onboarding milestones. Climb the{" "}
+                <strong className="text-white">
+                  {settings.levels.length} ranks
+                </strong>{" "}
+                from <em>Novice Trader</em> all the way to{" "}
+                <em className="text-amber-400">Trading God</em>.
               </p>
 
+              <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-3 text-xs text-gray-300">
+                <strong className="text-cyan-300">Where you see it:</strong>{" "}
+                Your current title appears under your name on the{" "}
+                <button
+                  type="button"
+                  onClick={() => scrollToSection("profile")}
+                  className="text-cyan-400 hover:underline"
+                >
+                  Profile
+                </button>{" "}
+                header, on the{" "}
+                <button
+                  type="button"
+                  onClick={() => scrollToSection("dashboard")}
+                  className="text-cyan-400 hover:underline"
+                >
+                  Dashboard
+                </button>{" "}
+                player card, and on every row of the{" "}
+                <button
+                  type="button"
+                  onClick={() => scrollToSection("leaderboard")}
+                  className="text-cyan-400 hover:underline"
+                >
+                  Leaderboard
+                </button>
+                . The XP progress bar (current XP → next level&apos;s
+                threshold) lives on your Profile.
+              </div>
+
+              {/* XP sources */}
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
                 <h4 className="font-semibold text-white mb-3">
-                  How to Earn XP:
+                  How to earn XP
                 </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="text-center p-3 rounded-lg bg-gray-700/50">
-                    <p className="text-gray-400 text-xs mb-1">
-                      ⭐ Common Badge
+                <p className="text-sm text-gray-400 mb-3">
+                  Five real sources of XP — every one of them feeds the
+                  same pool on your profile.
+                </p>
+
+                {/* Badges */}
+                <div className="mb-4">
+                  <p className="font-semibold text-white text-sm mb-2 flex items-center gap-2">
+                    <Medal className="h-4 w-4 text-yellow-400" />
+                    Unlock badges
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="text-center p-3 rounded-lg bg-gray-700/50">
+                      <p className="text-gray-400 text-xs mb-1">
+                        ⭐ Common
+                      </p>
+                      <p className="text-green-400 font-bold text-lg">
+                        +{settings.badgeXP.common} XP
+                      </p>
+                    </div>
+                    <div className="text-center p-3 rounded-lg bg-gray-700/50">
+                      <p className="text-gray-400 text-xs mb-1">
+                        💎 Rare
+                      </p>
+                      <p className="text-blue-400 font-bold text-lg">
+                        +{settings.badgeXP.rare} XP
+                      </p>
+                    </div>
+                    <div className="text-center p-3 rounded-lg bg-gray-700/50">
+                      <p className="text-gray-400 text-xs mb-1">
+                        👑 Epic
+                      </p>
+                      <p className="text-purple-400 font-bold text-lg">
+                        +{settings.badgeXP.epic} XP
+                      </p>
+                    </div>
+                    <div className="text-center p-3 rounded-lg bg-gray-700/50">
+                      <p className="text-gray-400 text-xs mb-1">
+                        🌟 Legendary
+                      </p>
+                      <p className="text-yellow-400 font-bold text-lg">
+                        +{settings.badgeXP.legendary} XP
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Full list of badges and how to earn each one in the{" "}
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection("badge-system")}
+                      className="text-yellow-400 hover:underline"
+                    >
+                      🏅 Badge System
+                    </button>{" "}
+                    section.
+                  </p>
+                </div>
+
+                {/* Trading activity */}
+                <div className="grid gap-2 sm:grid-cols-2 text-sm">
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <p className="font-semibold text-blue-400 mb-1 flex items-center gap-2">
+                      <TrendingUp className="h-3.5 w-3.5" /> Trading
                     </p>
-                    <p className="text-green-400 font-bold text-lg">
-                      +{settings.badgeXP.common} XP
+                    <p className="text-xs text-gray-400">
+                      <strong className="text-white">+2 XP</strong> per
+                      trade you close, plus{" "}
+                      <strong className="text-white">+3 XP</strong> if
+                      it was a winner.{" "}
+                      <em>Daily cap: 100 XP combined</em>, so grinding
+                      one-tick scalps won&apos;t game the system.
                     </p>
                   </div>
-                  <div className="text-center p-3 rounded-lg bg-gray-700/50">
-                    <p className="text-gray-400 text-xs mb-1">💎 Rare Badge</p>
-                    <p className="text-blue-400 font-bold text-lg">
-                      +{settings.badgeXP.rare} XP
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <p className="font-semibold text-yellow-400 mb-1 flex items-center gap-2">
+                      <Trophy className="h-3.5 w-3.5" /> Competitions
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      <strong className="text-white">+25 XP</strong> for
+                      finishing,{" "}
+                      <strong className="text-white">+20 / +35 / +50 XP</strong>{" "}
+                      bonus for 3rd / 2nd / 1st place podiums.
                     </p>
                   </div>
-                  <div className="text-center p-3 rounded-lg bg-gray-700/50">
-                    <p className="text-gray-400 text-xs mb-1">👑 Epic Badge</p>
-                    <p className="text-purple-400 font-bold text-lg">
-                      +{settings.badgeXP.epic} XP
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <p className="font-semibold text-red-400 mb-1 flex items-center gap-2">
+                      <Swords className="h-3.5 w-3.5" /> 1v1 Challenges
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      <strong className="text-white">+15 XP</strong> for
+                      every completed 1v1, plus{" "}
+                      <strong className="text-white">+30 XP</strong>{" "}
+                      bonus if you took the win.
                     </p>
                   </div>
-                  <div className="text-center p-3 rounded-lg bg-gray-700/50">
-                    <p className="text-gray-400 text-xs mb-1">
-                      🌟 Legendary Badge
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <p className="font-semibold text-purple-400 mb-1 flex items-center gap-2">
+                      <Sparkles className="h-3.5 w-3.5" /> Milestones
                     </p>
-                    <p className="text-yellow-400 font-bold text-lg">
-                      +{settings.badgeXP.legendary} XP
+                    <p className="text-xs text-gray-400">
+                      Bonus XP from the onboarding Journey and key
+                      account milestones (first deposit, first trade,
+                      first podium, etc.).
                     </p>
                   </div>
                 </div>
               </div>
 
+              {/* Tiers overview */}
               <div>
+                <h4 className="font-semibold text-white mb-2">
+                  Four tiers, twenty titles
+                </h4>
+                <div className="grid gap-2 sm:grid-cols-2 text-sm mb-4">
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600 flex items-center gap-2">
+                    <span className="text-gray-300 font-bold">Tier 1</span>
+                    <span className="text-xs text-gray-400">
+                      Beginner — Levels 1-5 (0-499 XP)
+                    </span>
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600 flex items-center gap-2">
+                    <span className="text-blue-300 font-bold">Tier 2</span>
+                    <span className="text-xs text-gray-400">
+                      Intermediate — Levels 6-10 (500-1,999 XP)
+                    </span>
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600 flex items-center gap-2">
+                    <span className="text-purple-300 font-bold">Tier 3</span>
+                    <span className="text-xs text-gray-400">
+                      Advanced — Levels 11-15 (2,000-4,999 XP)
+                    </span>
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600 flex items-center gap-2">
+                    <span className="text-yellow-300 font-bold">Tier 4</span>
+                    <span className="text-xs text-gray-400">
+                      Elite — Levels 16-20 (5,000+ XP)
+                    </span>
+                  </div>
+                </div>
+
                 <h4 className="font-semibold text-white mb-3">
-                  All Trader Levels:
+                  All {settings.levels.length} trader levels
                 </h4>
                 <div className="space-y-2">
                   {settings.levels.map((level, index) => (
@@ -6884,6 +6984,31 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* FAQ-ish notes */}
+              <div className="bg-gray-800/60 border border-gray-700 rounded-lg p-4 space-y-2 text-sm text-gray-300">
+                <p>
+                  <strong className="text-white">Do levels affect trading?</strong>{" "}
+                  Levels are a progression badge. Some Game Master
+                  competitions can require a minimum level to join, but
+                  trading rules (leverage, lot size, risk caps) are set
+                  by the contest, not your level.
+                </p>
+                <p>
+                  <strong className="text-white">Can XP go down?</strong>{" "}
+                  No. XP is cumulative — once earned, it stays on your
+                  account.
+                </p>
+                <p>
+                  <strong className="text-white">
+                    What if admins re-balance the thresholds?
+                  </strong>{" "}
+                  Titles and XP requirements are configurable by the
+                  platform team. If a level chart change happens, your
+                  current XP is automatically remapped to the new title
+                  the next time you load your profile.
+                </p>
               </div>
             </div>
           </section>
