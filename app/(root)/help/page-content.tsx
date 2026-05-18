@@ -5560,19 +5560,278 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
 
             <div className="space-y-4 text-gray-300">
               <p className="leading-relaxed">
-                Your purchased indicators, strategies, and tools. Activate them
-                on your charts.
+                The <strong className="text-white">Trading Arsenal</strong>{" "}
+                is the home for every item you have bought from the
+                Marketplace — chart{" "}
+                <strong className="text-white">indicators</strong>,
+                signal{" "}
+                <strong className="text-white">strategies</strong>,{" "}
+                <strong className="text-white">cosmetics</strong> (avatars
+                and profile frames), and your{" "}
+                <strong className="text-white">Game Master</strong>{" "}
+                package. You manage it from your profile, and you put it
+                to work on the chart inside competitions and 1v1
+                challenges.
               </p>
 
-              <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4">
-                <h4 className="font-semibold text-white mb-2">
-                  💡 How to Use:
+              {/* Where to find it */}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                  <p className="font-semibold text-orange-400 text-sm mb-1 flex items-center gap-2">
+                    <Briefcase className="h-4 w-4" />
+                    Profile → Arsenal tab
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Visit{" "}
+                    <Link
+                      href="/profile?tab=arsenal"
+                      className="text-orange-400 hover:underline"
+                    >
+                      /profile?tab=arsenal
+                    </Link>{" "}
+                    to see your full inventory, browse by category, toggle
+                    items on/off, apply cosmetics, and manage your Game
+                    Master subscription.
+                  </p>
+                </div>
+                <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                  <p className="font-semibold text-purple-400 text-sm mb-1 flex items-center gap-2">
+                    <Sparkles className="h-4 w-4" />
+                    Trading view side panel
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Inside any competition or 1v1 trade page, look for
+                    the &quot;Trading Arsenal&quot; panel in the side
+                    column. This is where you switch indicators and
+                    strategies on for the chart you&apos;re currently
+                    looking at.
+                  </p>
+                </div>
+              </div>
+
+              {/* What's in it */}
+              <div>
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <ShoppingBag className="h-4 w-4 text-orange-400" />
+                  What can live in your Arsenal
                 </h4>
-                <ol className="space-y-2 text-sm">
-                  <li>1. Go to any competition trading view</li>
-                  <li>2. Click &quot;Trading Arsenal&quot; in the toolbar</li>
-                  <li>3. Toggle ON the tools you want to activate</li>
-                  <li>4. See signals directly on your chart</li>
+                <div className="grid gap-2 text-sm">
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600 flex items-start gap-2">
+                    <LineChart className="h-4 w-4 text-cyan-400 flex-shrink-0 mt-0.5" />
+                    <span>
+                      <strong className="text-white">Indicators.</strong>{" "}
+                      Technical overlays that draw directly on your chart
+                      (moving averages, RSI, MACD, Bollinger Bands,
+                      Supertrend, VWAP, and premium proprietary
+                      indicators). Each one is rendered as a real chart
+                      series — not a static image.
+                    </span>
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600 flex items-start gap-2">
+                    <Zap className="h-4 w-4 text-yellow-400 flex-shrink-0 mt-0.5" />
+                    <span>
+                      <strong className="text-white">Strategies.</strong>{" "}
+                      Signal generators that scan the live candle stream
+                      and plot{" "}
+                      <strong className="text-green-400">
+                        buy / sell markers
+                      </strong>{" "}
+                      on the chart when their rules trigger. You decide
+                      whether to act on the signal — strategies
+                      don&apos;t place orders for you.
+                    </span>
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600 flex items-start gap-2">
+                    <Sparkles className="h-4 w-4 text-pink-400 flex-shrink-0 mt-0.5" />
+                    <span>
+                      <strong className="text-white">Cosmetics.</strong>{" "}
+                      Visual upgrades for your profile —{" "}
+                      <em>avatars</em>, <em>profile frames</em>,{" "}
+                      <em>titles</em>, and{" "}
+                      <em>special badge skins</em>. These don&apos;t
+                      affect trading, only how you appear on the
+                      leaderboard, Match Cards, and your Profile Card.
+                    </span>
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600 flex items-start gap-2">
+                    <Award className="h-4 w-4 text-purple-400 flex-shrink-0 mt-0.5" />
+                    <span>
+                      <strong className="text-white">
+                        Game Master packages.
+                      </strong>{" "}
+                      If you have an active GM subscription it appears
+                      here too, with renewal, pause, and scheduled-
+                      cancellation controls. Full details in the{" "}
+                      <button
+                        type="button"
+                        onClick={() => scrollToSection("gamemaster")}
+                        className="text-purple-400 hover:underline"
+                      >
+                        👑 Game Master
+                      </button>{" "}
+                      section.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* How activation works */}
+              <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-orange-400" />
+                  How activation works
+                </h4>
+                <ul className="space-y-1.5 text-sm text-gray-300 list-disc pl-5">
+                  <li>
+                    Every item has a per-account{" "}
+                    <strong className="text-white">on / off</strong>{" "}
+                    toggle. Switching it on from{" "}
+                    <Link
+                      href="/profile?tab=arsenal"
+                      className="text-orange-400 hover:underline"
+                    >
+                      /profile?tab=arsenal
+                    </Link>{" "}
+                    activates it everywhere you trade — there&apos;s no
+                    need to re-enable it per competition or per
+                    challenge.
+                  </li>
+                  <li>
+                    You can run{" "}
+                    <strong className="text-white">
+                      multiple indicators and strategies at the same
+                      time
+                    </strong>
+                    . The chart layers them on top of each other so you
+                    can combine systems (e.g. a trend indicator + a
+                    momentum strategy).
+                  </li>
+                  <li>
+                    Cosmetics work differently — only{" "}
+                    <strong className="text-white">one</strong> avatar
+                    and <strong className="text-white">one</strong>{" "}
+                    profile frame can be active at a time. Tap the one
+                    you want to wear, and it&apos;s applied immediately
+                    to your public surfaces.
+                  </li>
+                  <li>
+                    The in-trade side panel mirrors the same toggles —
+                    flipping a strategy off there also turns it off in
+                    your profile. State stays consistent across the app.
+                  </li>
+                </ul>
+              </div>
+
+              {/* Strategies vs trading manually */}
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                  Important: strategies are signals, not auto-trading
+                </h4>
+                <p className="text-sm text-gray-300">
+                  Even when a strategy plots a clear{" "}
+                  <strong className="text-green-400">BUY</strong> or{" "}
+                  <strong className="text-red-400">SELL</strong> marker
+                  on the chart, <strong className="text-white">no
+                  order is ever placed automatically on your behalf</strong>
+                  . You still have to open the order ticket and decide
+                  the size, leverage, stop-loss and take-profit yourself.
+                  Strategies are a decision aid, not a robot — see the{" "}
+                  <button
+                    type="button"
+                    onClick={() => scrollToSection("trading")}
+                    className="text-cyan-400 hover:underline"
+                  >
+                    📈 Trading Guide
+                  </button>{" "}
+                  for how to translate a signal into an actual position.
+                </p>
+              </div>
+
+              {/* Ownership & expiry */}
+              <div>
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-blue-400" />
+                  Ownership &amp; expiry
+                </h4>
+                <div className="grid gap-2 text-sm">
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Indicators, strategies and cosmetics are lifetime.
+                    </strong>{" "}
+                    Once purchased they stay in your Arsenal forever —
+                    they don&apos;t expire, and they don&apos;t need to
+                    be re-purchased after a season ends.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Game Master packages are subscriptions.
+                    </strong>{" "}
+                    They run for a fixed period (typically 30 days), and
+                    move to <em>expired</em> if you don&apos;t renew. The
+                    GM card in your Arsenal shows the exact remaining
+                    days and the &quot;Renew now&quot; button.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Marketplace purchases are final.
+                    </strong>{" "}
+                    Because items are delivered to your account
+                    immediately, marketplace credit purchases are not
+                    refundable. You can however{" "}
+                    <strong className="text-white">disable</strong> any
+                    item at any time so it stops affecting your chart or
+                    profile.
+                  </div>
+                </div>
+              </div>
+
+              {/* How to use */}
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-purple-400" />
+                  How to use it (quick start)
+                </h4>
+                <ol className="space-y-2 text-sm text-gray-300 list-decimal pl-5">
+                  <li>
+                    Buy an item from the{" "}
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection("marketplace")}
+                      className="text-orange-400 hover:underline"
+                    >
+                      Marketplace
+                    </button>
+                    . It is delivered to your account instantly.
+                  </li>
+                  <li>
+                    Open{" "}
+                    <Link
+                      href="/profile?tab=arsenal"
+                      className="text-orange-400 hover:underline"
+                    >
+                      /profile?tab=arsenal
+                    </Link>{" "}
+                    and find it by category. Toggle{" "}
+                    <strong className="text-white">Enabled</strong> to
+                    activate it.
+                  </li>
+                  <li>
+                    For cosmetics, click{" "}
+                    <strong className="text-white">Apply</strong> on the
+                    item card. It&apos;s now live on your Profile Card
+                    and the leaderboard.
+                  </li>
+                  <li>
+                    For indicators and strategies, jump into any
+                    competition or 1v1 trade page. Open the{" "}
+                    <strong className="text-white">
+                      Trading Arsenal
+                    </strong>{" "}
+                    side panel and confirm the items you want active on
+                    that chart — they&apos;ll start drawing on the price
+                    chart immediately.
+                  </li>
                 </ol>
               </div>
             </div>
