@@ -6405,31 +6405,400 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
 
             <div className="space-y-4 text-gray-300">
               <p className="leading-relaxed">
-                Stay informed with real-time notifications about trading
-                activity and competitions.
+                ChartVolt sends you an in-app notification whenever
+                something happens to your account — a trade fills, a
+                competition ends, a challenge invite lands in your lap,
+                a deposit clears, a badge is unlocked. You get the same
+                stream everywhere you log in, with full control over
+                what you receive and how loud it is.
               </p>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/30">
-                  <h5 className="font-semibold text-green-400">
-                    📈 Trade Executed
-                  </h5>
+              {/* Where to find them */}
+              <div>
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Bell className="h-4 w-4 text-pink-400" />
+                  Where to find your notifications
+                </h4>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1">
+                      The bell icon (top right)
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      The bell in the header — and in the desktop
+                      sidebar — shows an unread badge with a small ping
+                      animation when something new arrives. Click it to
+                      drop down your{" "}
+                      <strong className="text-white">20 most recent</strong>{" "}
+                      notifications.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1">
+                      Full page —{" "}
+                      <Link
+                        href="/notifications"
+                        className="text-pink-400 hover:underline"
+                      >
+                        /notifications
+                      </Link>
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      The full history with search, category filters,
+                      and bulk actions. Loads up to 100 at a time.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600 sm:col-span-2">
+                    <p className="font-semibold text-white text-sm mb-1">
+                      Profile → Notifications tab
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Open{" "}
+                      <Link
+                        href="/profile?tab=notifications"
+                        className="text-pink-400 hover:underline"
+                      >
+                        /profile?tab=notifications
+                      </Link>{" "}
+                      for the same Notification Center, plus the{" "}
+                      <strong className="text-white">
+                        Notification Settings
+                      </strong>{" "}
+                      panel for managing what you receive.
+                    </p>
+                  </div>
                 </div>
-                <div className="p-4 bg-red-500/10 rounded-lg border border-red-500/30">
-                  <h5 className="font-semibold text-red-400">
-                    🛑 Trade Closed
-                  </h5>
+              </div>
+
+              {/* Categories */}
+              <div>
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-pink-400" />
+                  What ChartVolt notifies you about
+                </h4>
+                <p className="text-sm text-gray-400 mb-3">
+                  Notifications are grouped into{" "}
+                  <strong className="text-white">ten categories</strong>{" "}
+                  so you can fine-tune which ones reach you. Examples
+                  below are representative — the exact triggers depend
+                  on what you do on the platform.
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2 text-sm">
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <p className="font-semibold text-cyan-400 mb-0.5 flex items-center gap-2">
+                      <Trophy className="h-3.5 w-3.5" />
+                      Competitions
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Joined / starting soon / started / ending / final
+                      ranking &amp; prize, cancellation refund,
+                      disqualification.
+                    </p>
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <p className="font-semibold text-red-400 mb-0.5 flex items-center gap-2">
+                      <Swords className="h-3.5 w-3.5" />
+                      Challenges
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Incoming 1v1 invite, accepted, declined, expired,
+                      completed, you won.
+                    </p>
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <p className="font-semibold text-blue-400 mb-0.5 flex items-center gap-2">
+                      <TrendingUp className="h-3.5 w-3.5" />
+                      Trading
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Order filled, position closed, stop-loss /
+                      take-profit hit, margin warning, liquidation.
+                    </p>
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <p className="font-semibold text-green-400 mb-0.5 flex items-center gap-2">
+                      <CreditCard className="h-3.5 w-3.5" />
+                      Purchases &amp; wallet
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Deposit initiated / completed / failed,
+                      withdrawal status changes, marketplace receipts.
+                    </p>
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <p className="font-semibold text-yellow-400 mb-0.5 flex items-center gap-2">
+                      <Medal className="h-3.5 w-3.5" />
+                      Achievements
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Badge unlocked, milestone reached, level-up.
+                    </p>
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <p className="font-semibold text-purple-400 mb-0.5 flex items-center gap-2">
+                      <Heart className="h-3.5 w-3.5" />
+                      Social
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Friend requests, new messages, match-card
+                      activity.
+                    </p>
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <p className="font-semibold text-pink-400 mb-0.5 flex items-center gap-2">
+                      <Mail className="h-3.5 w-3.5" />
+                      Messaging
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Inbox replies and direct-message threads.
+                    </p>
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <p className="font-semibold text-emerald-400 mb-0.5 flex items-center gap-2">
+                      <Shield className="h-3.5 w-3.5" />
+                      Security (always on)
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      KYC status changes, password changes, suspicious
+                      activity. You cannot mute this category — it
+                      protects your account.
+                    </p>
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <p className="font-semibold text-gray-300 mb-0.5 flex items-center gap-2">
+                      <Info className="h-3.5 w-3.5" />
+                      System
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Platform announcements, scheduled maintenance,
+                      terms updates.
+                    </p>
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <p className="font-semibold text-orange-400 mb-0.5 flex items-center gap-2">
+                      <User className="h-3.5 w-3.5" />
+                      Admin
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Direct messages from the support / ops team to
+                      your account.
+                    </p>
+                  </div>
                 </div>
-                <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
-                  <h5 className="font-semibold text-yellow-400">
-                    🏆 Competition Started
-                  </h5>
+              </div>
+
+              {/* Priority */}
+              <div>
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                  Priority &amp; styling
+                </h4>
+                <p className="text-sm text-gray-400 mb-3">
+                  Every notification carries one of four priority
+                  levels, and the UI highlights higher-priority items
+                  with a coloured left border and a slightly more
+                  prominent treatment.
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  <div className="p-2 bg-gray-700/40 rounded border-l-2 border-gray-500 text-gray-300">
+                    <strong className="text-gray-300">Low</strong> —
+                    quiet info
+                  </div>
+                  <div className="p-2 bg-gray-700/40 rounded border-l-2 border-blue-500 text-gray-300">
+                    <strong className="text-blue-300">Normal</strong> —
+                    default
+                  </div>
+                  <div className="p-2 bg-gray-700/40 rounded border-l-2 border-orange-500 text-gray-300">
+                    <strong className="text-orange-300">High</strong> —
+                    needs your attention
+                  </div>
+                  <div className="p-2 bg-red-500/10 rounded border-l-2 border-red-500 text-gray-300">
+                    <strong className="text-red-300">Urgent</strong> —
+                    take action now
+                  </div>
                 </div>
-                <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                  <h5 className="font-semibold text-blue-400">
-                    🏅 Badge Earned
-                  </h5>
+              </div>
+
+              {/* Real-time delivery */}
+              <div className="bg-pink-500/10 border border-pink-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-pink-400" />
+                  How fast do they arrive?
+                </h4>
+                <ul className="space-y-1.5 text-sm text-gray-300 list-disc pl-5">
+                  <li>
+                    <strong className="text-white">
+                      Incoming 1v1 challenges are pushed in real-time
+                    </strong>{" "}
+                    over a live connection — a Challenge popup appears
+                    instantly with Accept / Decline buttons. You can
+                    silence the popup separately if you only want the
+                    bell badge.
+                  </li>
+                  <li>
+                    Everything else lands the next time the bell polls
+                    for updates —{" "}
+                    <strong className="text-white">every 15 seconds</strong>{" "}
+                    while the dropdown is open, and{" "}
+                    <strong className="text-white">every 60 seconds</strong>{" "}
+                    in the background. Refresh the page or open the
+                    bell for an immediate fetch.
+                  </li>
+                  <li>
+                    Each notification can carry an{" "}
+                    <strong className="text-white">action button</strong>{" "}
+                    that deep-links to the relevant page (the
+                    competition, the challenge, the wallet, the trade
+                    detail).
+                  </li>
+                </ul>
+              </div>
+
+              {/* Read / unread / delete */}
+              <div>
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-400" />
+                  Reading, clearing &amp; deleting
+                </h4>
+                <ul className="space-y-1.5 text-sm text-gray-300 list-disc pl-5">
+                  <li>
+                    Clicking a row{" "}
+                    <strong className="text-white">marks it as read</strong>{" "}
+                    and navigates you to the related page if it has
+                    one.
+                  </li>
+                  <li>
+                    The dropdown has a{" "}
+                    <strong className="text-white">
+                      &quot;Mark all read&quot;
+                    </strong>{" "}
+                    button. The full page also lets you{" "}
+                    <strong className="text-white">delete</strong>{" "}
+                    individual notifications or{" "}
+                    <strong className="text-white">clear all</strong>.
+                  </li>
+                  <li>
+                    Read notifications stay in your history so you can
+                    scroll back through them; the bell&apos;s unread
+                    badge only counts the ones you haven&apos;t seen
+                    yet.
+                  </li>
+                </ul>
+              </div>
+
+              {/* Settings */}
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Settings className="h-4 w-4 text-purple-400" />
+                  Notification Settings
+                </h4>
+                <p className="text-sm text-gray-300 mb-3">
+                  Open{" "}
+                  <Link
+                    href="/profile?tab=notifications"
+                    className="text-purple-400 hover:underline"
+                  >
+                    /profile?tab=notifications
+                  </Link>{" "}
+                  → the{" "}
+                  <strong className="text-white">
+                    Notification Settings
+                  </strong>{" "}
+                  sub-tab to control:
+                </p>
+                <div className="grid gap-2 text-sm">
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">Master switch.</strong>{" "}
+                    One toggle that pauses everything except Security
+                    notifications.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Delivery methods.
+                    </strong>{" "}
+                    In-app notifications are{" "}
+                    <strong className="text-pink-300">always on</strong>{" "}
+                    (they live on this site). Email delivery has its
+                    own toggle for the few categories that also send
+                    you a confirmation message by email.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Challenge popup alerts.
+                    </strong>{" "}
+                    Turn the real-time 1v1 challenge popup on or off
+                    while still receiving the bell notification.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Category toggles.
+                    </strong>{" "}
+                    Mute or un-mute entire categories
+                    (Competitions, Challenges, Trading, Achievements,
+                    Social, Messaging, Purchases, System, Admin).
+                    Security stays on.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Per-notification fine-tuning.
+                    </strong>{" "}
+                    Inside each category you can disable individual
+                    notification types — for example, keep
+                    &quot;Competition started&quot; but mute
+                    &quot;Competition starting soon&quot;.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">Quiet hours.</strong>{" "}
+                    Define a time window during which non-urgent
+                    notifications are held back. Urgent and Security
+                    notifications always come through.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Reset to defaults.
+                    </strong>{" "}
+                    One click puts every preference back to the
+                    out-of-the-box setting.
+                  </div>
                 </div>
+              </div>
+
+              {/* Pro tips */}
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-2">💡 Pro tips</h4>
+                <ul className="space-y-1 text-sm">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                    <span>
+                      If the bell stops badging unexpectedly, check the
+                      master switch first — it&apos;s the most common
+                      cause of &quot;quiet&quot; accounts.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Quiet hours pair well with disabling the
+                      challenge popup — you still see invites in your
+                      bell when you wake up, without the screen taking
+                      over your evening.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Use category filters on{" "}
+                      <Link
+                        href="/notifications"
+                        className="text-yellow-400 hover:underline"
+                      >
+                        /notifications
+                      </Link>{" "}
+                      to focus on Trading or Competition events when
+                      you&apos;re running a busy session.
+                    </span>
+                  </li>
+                </ul>
               </div>
             </div>
           </section>
