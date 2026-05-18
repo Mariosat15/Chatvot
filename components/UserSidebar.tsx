@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 import { usePathname, useRouter } from "next/navigation";
@@ -13,6 +13,7 @@ import { signOut } from "@/lib/actions/auth.actions";
 import NotificationDropdown from "@/components/notifications/NotificationDropdown";
 import { GameIcon } from "@/components/ui/GameIcon";
 import { useUnreadMessages } from "@/hooks/useUnreadMessages";
+import { GM_SUBSCRIPTION_CHANGED } from "@/lib/events/gm-subscription";
 import {
   LogOut,
   Menu,
@@ -130,17 +131,30 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
   const [arenaEnabled, setArenaEnabled] = useState(true);
   const [userLevel, setUserLevel] = useState<{ title: string; level: number; color: string; icon: string } | null>(null);
 
+  // Reason: Pulled out so we can re-invoke it from the GM_SUBSCRIPTION_CHANGED
+  // event listener below without re-doing all the other fetches.
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const checkGameMasterStatus = useCallback(async () => {
+    try {
+      const response = await fetch("/api/gamemaster/status");
+      const data = await response.json();
+      if (!isMountedRef.current) return;
+      setIsGameMaster(data.success && data.isGameMaster);
+    } catch {
+      if (!isMountedRef.current) return;
+      setIsGameMaster(false);
+    }
+  }, []);
+
   // Fetch feature flags and game master status on mount
   useEffect(() => {
-    const checkGameMasterStatus = async () => {
-      try {
-        const response = await fetch("/api/gamemaster/status");
-        const data = await response.json();
-        setIsGameMaster(data.success && data.isGameMaster);
-      } catch {
-        setIsGameMaster(false);
-      }
-    };
     const fetchFeatureFlags = async () => {
       try {
         const response = await fetch("/api/settings");
@@ -169,7 +183,22 @@ const UserSidebar = ({ user }: UserSidebarProps) => {
     checkGameMasterStatus();
     fetchFeatureFlags();
     fetchUserLevel();
-  }, []);
+  }, [checkGameMasterStatus]);
+
+  // Refresh GM status when something elsewhere mutates it (purchase,
+  // renewal, deletion) and when the tab regains focus (catches cross-tab
+  // / admin-side changes on the next visit).
+  useEffect(() => {
+    const handleGmChanged = () => {
+      void checkGameMasterStatus();
+    };
+    window.addEventListener(GM_SUBSCRIPTION_CHANGED, handleGmChanged);
+    window.addEventListener("focus", handleGmChanged);
+    return () => {
+      window.removeEventListener(GM_SUBSCRIPTION_CHANGED, handleGmChanged);
+      window.removeEventListener("focus", handleGmChanged);
+    };
+  }, [checkGameMasterStatus]);
 
   // Close mobile menu on route change
   useEffect(() => {

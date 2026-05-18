@@ -30,6 +30,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { sanitizeHtml } from "@/lib/utils/html-sanitizer";
+import { notifyGmSubscriptionChanged } from "@/lib/events/gm-subscription";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -275,6 +276,7 @@ export default function TradingArsenalSection() {
       const response = await fetch("/api/gamemaster/renew", { method: "POST" });
       const data = await response.json();
       if (data.success) {
+        notifyGmSubscriptionChanged();
         toast.success(
           data.message || "Subscription renewed",
           {

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { sanitizeHtml } from "@/lib/utils/html-sanitizer";
+import { notifyGmSubscriptionChanged } from "@/lib/events/gm-subscription";
 import {
   TrendingUp,
   Star,
@@ -343,6 +344,9 @@ export default function MarketplaceContent() {
       if (data.success) {
         // Different success messages for GM packages
         if (data.gameMasterActivated) {
+          // Reason: sidebar listens on this event to refresh the GM Dashboard
+          // link without requiring a full page reload.
+          notifyGmSubscriptionChanged();
           const endDate = data.gameMasterSubscription?.endDate
             ? new Date(data.gameMasterSubscription.endDate).toLocaleDateString()
             : null;
@@ -415,6 +419,7 @@ export default function MarketplaceContent() {
       const data = await response.json();
 
       if (data.success) {
+        notifyGmSubscriptionChanged();
         toast.success(data.message);
         setGmActionModal({ show: false, type: null, details: null });
         fetchItems(); // Refresh items
@@ -438,6 +443,7 @@ export default function MarketplaceContent() {
       const data = await response.json();
 
       if (data.success) {
+        notifyGmSubscriptionChanged();
         toast.success(data.message);
         setGmActionModal({ show: false, type: null, details: null });
         fetchItems(); // Refresh items

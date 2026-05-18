@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { notifyGmSubscriptionChanged } from "@/lib/events/gm-subscription";
 
 interface SubscriptionState {
   autoRenew?: boolean;
@@ -136,6 +137,7 @@ export function useGmSubscription(
       const res = await fetch("/api/gamemaster/renew", { method: "POST" });
       const result = await res.json();
       if (result.success) {
+        notifyGmSubscriptionChanged();
         toast.success(result.message || "Subscription renewed", {
           description: result.subscription?.endDate
             ? `Active until ${new Date(result.subscription.endDate).toLocaleDateString()}`
