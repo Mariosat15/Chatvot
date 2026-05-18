@@ -3290,96 +3290,577 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
               </h2>
             </div>
 
-            <div className="space-y-4 text-gray-300">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                  <h5 className="font-semibold text-white mb-2 flex items-center gap-2">
-                    <Settings className="h-4 w-4 text-blue-400" /> Professional
-                    Mode
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Advanced charts, 50+ indicators, drawing tools.
-                  </p>
-                </div>
-                <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                  <h5 className="font-semibold text-white mb-2 flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-purple-400" /> Game Mode
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Simplified interface, quick bets, great for beginners.
-                  </p>
-                </div>
+            <div className="space-y-6 text-gray-300">
+              <p className="leading-relaxed">
+                Every trade on ChartVolt is placed inside a{" "}
+                <strong className="text-white">competition</strong> or{" "}
+                <strong className="text-white">1v1 challenge</strong>. You
+                don&apos;t trade your wallet — you trade a{" "}
+                <em>virtual starting capital</em> assigned when you enter
+                the contest. Your real{" "}
+                {settings.credits.name.toLowerCase()} balance is only
+                touched when you pay an entry fee or receive a prize.
+              </p>
+
+              {/* What you can trade */}
+              <div className="bg-gray-900/40 border border-gray-700 rounded-lg p-4">
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-blue-400" />
+                  What you can trade
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Forex pairs.</strong> The
+                      live trading engine supports the major Forex catalog
+                      (USD, EUR, GBP, JPY, AUD, NZD, CAD, CHF — plus the
+                      crosses and a handful of exotics).
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Three categories:</strong>{" "}
+                      <em>Majors</em> (EUR/USD, GBP/USD, USD/JPY…),{" "}
+                      <em>Crosses</em> (EUR/GBP, AUD/JPY…) and{" "}
+                      <em>Exotics</em> (USD/MXN, USD/ZAR, USD/TRY,
+                      USD/SEK, USD/NOK). Spreads are tighter on Majors and
+                      wider on Exotics.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Individual contests
+                      can narrow the list.</strong> A competition or
+                      challenge can restrict you to a subset of symbols —
+                      the order ticket only shows what&apos;s tradable
+                      inside that contest.
+                    </span>
+                  </li>
+                </ul>
               </div>
 
+              {/* Two UI modes */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Settings className="h-4 w-4 text-cyan-400" />
+                  Two ways to place orders
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                    <h5 className="font-semibold text-blue-400 mb-2 flex items-center gap-2">
+                      <Settings className="h-4 w-4" /> Pro mode
+                    </h5>
+                    <p className="text-sm text-gray-400 mb-2">
+                      The classic broker-style ticket with full controls:
+                    </p>
+                    <ul className="space-y-1 text-xs text-gray-300">
+                      <li>• Market <em>or</em> Limit orders</li>
+                      <li>• Choose your lot size manually</li>
+                      <li>• Optional Stop Loss and Take Profit (price or pips)</li>
+                      <li>• Direction toggle: Buy (Long) / Sell (Short)</li>
+                      <li>• Full price/pips switch on the limit input</li>
+                    </ul>
+                  </div>
+                  <div className="p-4 bg-purple-500/10 rounded-lg border border-purple-500/30">
+                    <h5 className="font-semibold text-purple-400 mb-2 flex items-center gap-2">
+                      <Zap className="h-4 w-4" /> Easy mode
+                    </h5>
+                    <p className="text-sm text-gray-400 mb-2">
+                      A streamlined ticket designed for fast decisions:
+                    </p>
+                    <ul className="space-y-1 text-xs text-gray-300">
+                      <li>• Market orders only (executed at the live bid/ask)</li>
+                      <li>• Preset lot sizes you can tap</li>
+                      <li>• Preset Stop Loss / Take Profit pips</li>
+                      <li>• Same Buy/Sell directions, same forex universe</li>
+                      <li>• Leverage stays at the platform default</li>
+                    </ul>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Switch between Pro and Easy from the toggle inside the
+                  trading panel. Your choice is remembered for next time.
+                </p>
+              </div>
+
+              {/* Order types */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Target className="h-4 w-4 text-yellow-400" />
+                  Order types
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/30 text-sm">
+                    <p className="font-semibold text-green-300 mb-1">
+                      ⚡ Market order
+                    </p>
+                    <p className="text-gray-400">
+                      Executes immediately at the live bid (for sells) /
+                      ask (for buys) at the moment you confirm. The
+                      order ticket locks the displayed price right before
+                      sending so you don&apos;t get an unexpected fill
+                      from a tick during round-trip.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-cyan-500/10 rounded-lg border border-cyan-500/30 text-sm">
+                    <p className="font-semibold text-cyan-300 mb-1">
+                      🎯 Limit order
+                    </p>
+                    <p className="text-gray-400">
+                      Sits as <em>pending</em> until the market reaches
+                      your chosen price, then fills automatically.
+                      Useful for buying dips or selling rallies. Limit
+                      orders can be cancelled while pending.
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Pip-based entries: in Pro mode you can enter a limit
+                  price as a price <em>or</em> as a pip offset from the
+                  current price. Same toggle works for Stop Loss and
+                  Take Profit.
+                </p>
+              </div>
+
+              {/* Trade lifecycle */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Info className="h-4 w-4 text-blue-400" />
+                  What happens when you place an order
+                </h3>
+                <ol className="space-y-2 text-sm list-decimal list-inside marker:text-green-400">
+                  <li>
+                    The platform checks that the{" "}
+                    <strong className="text-white">forex market is open</strong>{" "}
+                    and that you have no blocking account restriction
+                    (suspended, KYC pending, etc.).
+                  </li>
+                  <li>
+                    Your contest&apos;s rules are checked — leverage cap,
+                    max open positions, allowed symbols, and (if
+                    enabled) drawdown / daily-loss guards.
+                  </li>
+                  <li>
+                    Required <strong className="text-white">margin</strong>{" "}
+                    is computed from your quantity, price and leverage,
+                    and locked from your contest&apos;s available
+                    capital.
+                  </li>
+                  <li>
+                    For market orders: a position is opened immediately
+                    at the locked price. For limit orders: the order
+                    sits pending until the price is hit.
+                  </li>
+                  <li>
+                    The position then trades live until you close it
+                    manually, your Stop Loss / Take Profit triggers, or
+                    a margin/liquidation event closes it for you.
+                  </li>
+                </ol>
+              </div>
+
+              {/* Live pricing */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-cyan-400" />
+                  Live pricing
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Real bid/ask quotes</strong>{" "}
+                      come from a professional Forex data feed (currently
+                      via Massive.com).
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Quotes update on screen{" "}
+                      <strong className="text-white">about once per second</strong>{" "}
+                      and your open-position PnL recalculates on every
+                      tick.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Spreads can be{" "}
+                      <strong className="text-white">live</strong> (raw
+                      market spread) or{" "}
+                      <strong className="text-white">fixed</strong> (a
+                      consistent spread per pair set by the admin) —
+                      whichever the platform is currently configured for.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      The platform charges{" "}
+                      <strong className="text-white">no commission</strong>{" "}
+                      and{" "}
+                      <strong className="text-white">no overnight swap</strong>{" "}
+                      on individual trades — the only execution cost is
+                      the spread, which is already baked into the
+                      bid/ask you see.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Stop Loss / Take Profit */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-red-400" />
+                  Stop Loss &amp; Take Profit
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/30 text-sm">
+                    <p className="font-semibold text-green-300 mb-1">
+                      🎯 Take Profit
+                    </p>
+                    <p className="text-gray-400">
+                      Auto-closes your position when the market reaches
+                      your profit target.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-red-500/10 rounded-lg border border-red-500/30 text-sm">
+                    <p className="font-semibold text-red-300 mb-1">
+                      🛡️ Stop Loss
+                    </p>
+                    <p className="text-gray-400">
+                      Auto-closes when the market moves against you,
+                      limiting the damage from a single trade.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/30 text-sm">
+                    <p className="font-semibold text-blue-300 mb-1">
+                      ✏️ Editable
+                    </p>
+                    <p className="text-gray-400">
+                      You can change SL/TP on any open position at any
+                      time from the Positions panel.
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  SL/TP triggers are evaluated{" "}
+                  <strong className="text-white">in real time</strong> as
+                  every price tick arrives (typically within a fraction of
+                  a second). A backup sweep also runs on the server every
+                  minute to catch anything the realtime path missed during
+                  a hiccup.
+                </p>
+              </div>
+
+              {/* Leverage */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-purple-400" />
+                  Leverage &amp; lot sizes
+                </h3>
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                  <p className="font-semibold text-white mb-2">
+                    Current platform defaults
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                    <div>
+                      <span className="text-gray-400">Leverage range:</span>
+                      <span className="text-white ml-2">
+                        1× – {settings.leverage.max}×
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Default leverage:</span>
+                      <span className="text-white ml-2">
+                        {settings.leverage.default}×
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Max open positions:</span>
+                      <span className="text-white ml-2">
+                        {settings.positions.maxOpen}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Max lots per trade:</span>
+                      <span className="text-white ml-2">
+                        {settings.positions.maxSize}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Daily loss limit:</span>
+                      <span className="text-white ml-2">
+                        {settings.risk.dailyLossLimit}%
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Max drawdown:</span>
+                      <span className="text-white ml-2">
+                        {settings.risk.maxDrawdown}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <ul className="space-y-2 text-sm mt-3">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-purple-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Each <strong className="text-white">competition or
+                      challenge</strong> can cap leverage <em>below</em>{" "}
+                      the platform max. The effective leverage on your
+                      order is the lower of the two — the contest cap
+                      always wins.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-purple-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Required margin ={" "}
+                      <code className="bg-gray-800 px-1 rounded text-xs">
+                        (lots × contract size × price) ÷ leverage
+                      </code>
+                      . Higher leverage = less margin locked per trade,
+                      but bigger swings in your PnL %.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-purple-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Lot sizes start at <strong>0.01</strong> and can be
+                      fractional. The maximum lots per trade and per-symbol
+                      limits are enforced server-side — invalid orders
+                      come back with a clear error.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Margin & Liquidation */}
+              <div className="bg-rose-500/10 border border-rose-500/30 rounded-lg p-4">
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-rose-400" />
+                  Margin levels &amp; liquidation
+                </h3>
+                <p className="text-sm mb-3">
+                  Margin level ={" "}
+                  <code className="bg-gray-800 px-1 rounded text-xs">
+                    (equity ÷ used margin) × 100
+                  </code>
+                  . The platform watches it continuously and reacts at
+                  configurable thresholds:
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/30 text-sm">
+                    <p className="font-semibold text-green-300">
+                      ✅ Safe ≥ {settings.margin.safe}%
+                    </p>
+                    <p className="text-gray-400">Healthy buffer.</p>
+                  </div>
+                  <div className="p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/30 text-sm">
+                    <p className="font-semibold text-yellow-300">
+                      ⚠️ Warning &lt; {settings.margin.warning}%
+                    </p>
+                    <p className="text-gray-400">
+                      Consider trimming positions or hedging.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-orange-500/10 rounded-lg border border-orange-500/30 text-sm">
+                    <p className="font-semibold text-orange-300">
+                      🚨 Margin Call &lt; {settings.margin.marginCall}%
+                    </p>
+                    <p className="text-gray-400">
+                      You can no longer open new positions — close
+                      losing trades to recover.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-red-500/10 rounded-lg border border-red-500/30 text-sm">
+                    <p className="font-semibold text-red-300">
+                      ⛔ Liquidation ≤ {settings.margin.liquidation}%
+                    </p>
+                    <p className="text-gray-400">
+                      <strong>All</strong> your positions in that contest
+                      are force-closed by the platform, and your
+                      participant status flips to <em>liquidated</em>.
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400 mt-3">
+                  After liquidation in a competition with{" "}
+                  <em>disqualify-on-liquidation</em> enabled (most of
+                  them), you keep view-only access to your trade history
+                  but cannot place new orders in that contest. The
+                  margin check sweeps every minute as a backup; the
+                  realtime engine usually fires first.
+                </p>
+              </div>
+
+              {/* Contest risk caps */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-amber-400" />
+                  Optional contest-level risk caps
+                </h3>
+                <p className="text-sm mb-3">
+                  When a competition turns on its risk limits, your
+                  orders are also checked against the contest&apos;s
+                  own drawdown rules:
+                </p>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Max drawdown.</strong>{" "}
+                      Once your total losses since the start of the
+                      contest exceed the configured % of starting
+                      capital, new orders are blocked.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Daily loss limit.</strong>{" "}
+                      Realised losses since 00:00 UTC are capped at a
+                      configurable % — exceeding it pauses new orders
+                      for the day.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Equity drawdown.</strong>{" "}
+                      When enabled, the contest also blocks orders if
+                      your live equity (including unrealised PnL) drops
+                      too far below your starting capital.
+                    </span>
+                  </li>
+                </ul>
+                <p className="text-xs text-gray-500 mt-2">
+                  The contest&apos;s detail page shows whether risk
+                  limits are enabled and what the thresholds are before
+                  you join.
+                </p>
+              </div>
+
+              {/* Managing open positions */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Eye className="h-4 w-4 text-cyan-400" />
+                  Managing open positions
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Close anytime.</strong>{" "}
+                      Hit Close on the Positions panel to flatten a
+                      trade at the current market price. Your PnL is
+                      realised immediately and the locked margin is
+                      released back into your contest capital.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Edit SL/TP.</strong>{" "}
+                      Update the Stop Loss / Take Profit on any open
+                      position from the same panel. Changes take effect
+                      on the next price tick.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Partial closes
+                      aren&apos;t supported.</strong> Closing always
+                      flattens the full position. If you want to scale
+                      out, open multiple smaller trades instead.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Leverage is fixed
+                      at order time.</strong> You can&apos;t change a
+                      position&apos;s leverage after it&apos;s opened —
+                      close it and re-open if you need a different
+                      ratio.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Trade history.</strong>{" "}
+                      Closed trades appear in the contest&apos;s Trade
+                      History tab with realised PnL, fees (0 by design
+                      — spread-only cost), open/close prices and
+                      duration.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Market hours */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-cyan-400" />
+                  Market hours
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      The Forex market is open{" "}
+                      <strong className="text-white">
+                        from Sunday 22:00 UTC to Friday 22:00 UTC
+                      </strong>{" "}
+                      (give or take, depending on daylight-saving
+                      shifts). Trading is paused over the weekend.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      The platform respects a{" "}
+                      <strong className="text-white">global holiday calendar</strong>{" "}
+                      maintained by the admin. On a configured holiday,
+                      new orders are blocked and you&apos;ll see a
+                      &quot;Market closed for {"{holiday}"}&quot; message
+                      in the order ticket.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      The <em>Market Holidays</em> card on your
+                      dashboard shows upcoming closures so you can plan
+                      around them.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Fair play */}
               <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-                <h4 className="font-semibold text-white mb-2">
-                  ⚙️ Trading Parameters:
-                </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
-                  <div>
-                    <span className="text-gray-400">Leverage:</span>
-                    <span className="text-white ml-2">
-                      {settings.leverage.min}x - {settings.leverage.max}x
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Default Leverage:</span>
-                    <span className="text-white ml-2">
-                      {settings.leverage.default}x
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Max Positions:</span>
-                    <span className="text-white ml-2">
-                      {settings.positions.maxOpen}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Max Lot Size:</span>
-                    <span className="text-white ml-2">
-                      {settings.positions.maxSize}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Daily Loss Limit:</span>
-                    <span className="text-white ml-2">
-                      {settings.risk.dailyLossLimit}%
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Max Drawdown:</span>
-                    <span className="text-white ml-2">
-                      {settings.risk.maxDrawdown}%
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/30">
-                  <h5 className="font-semibold text-green-400 mb-2">
-                    🎯 Take Profit
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Auto-close at profit target
-                  </p>
-                </div>
-                <div className="p-4 bg-red-500/10 rounded-lg border border-red-500/30">
-                  <h5 className="font-semibold text-red-400 mb-2">
-                    🛡️ Stop Loss
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Auto-close to limit losses
-                  </p>
-                </div>
-                <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                  <h5 className="font-semibold text-blue-400 mb-2">
-                    ⚖️ Position Size
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Control risk per trade
-                  </p>
-                </div>
+                <h3 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-blue-400" />
+                  Fair-play guard rails
+                </h3>
+                <p className="text-sm text-gray-300">
+                  Trades are monitored by automated systems that detect
+                  patterns like{" "}
+                  <strong className="text-white">mirror trading</strong>{" "}
+                  (synchronised trades across linked accounts) and other
+                  collusion attempts. Manipulating contests by
+                  coordinating with other accounts can result in
+                  disqualification, prize reversal and account
+                  restrictions. Trade your own book — your stats become
+                  part of your public reputation on the leaderboard.
+                </p>
               </div>
             </div>
           </section>
