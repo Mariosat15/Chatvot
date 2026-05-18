@@ -2832,19 +2832,26 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
               <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">⚡ Score System</h2>
             </div>
 
-            <div className="space-y-4 text-gray-300">
+            <div className="space-y-6 text-gray-300">
               <p className="leading-relaxed">
-                Your <strong className="text-yellow-400">Score</strong> is a
-                composite rating that represents your overall trading
-                performance. It&apos;s used in the Leaderboard and Match Cards.
+                Your <strong className="text-yellow-400">Score</strong> (also
+                called your <em>ChartVolt Score</em>) is a single composite
+                number that sums up everything you&apos;ve done on the
+                platform — trading PnL, win rate, profit factor, competition
+                placements, 1v1 wins and badges. It&apos;s what the global
+                leaderboard sorts by, what Match Cards display under each
+                trader&apos;s avatar, and what shows up on profile cards.
+                Higher Score = higher leaderboard rank.
               </p>
 
+              {/* The exact formula */}
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
-                <h4 className="font-semibold text-white mb-3">
-                  📊 How Score is Calculated:
-                </h4>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-yellow-400" />
+                  The exact formula
+                </h3>
                 <div className="bg-gray-900/50 rounded-lg p-4 font-mono text-sm overflow-x-auto">
-                  <p className="text-gray-400 mb-2">// Score Formula</p>
+                  <p className="text-gray-400 mb-2">// Score formula</p>
                   <p className="text-white">Score = </p>
                   <p className="text-green-400 ml-4">totalPnl × 0.3 +</p>
                   <p className="text-blue-400 ml-4">totalPnlPercentage × 5 +</p>
@@ -2856,28 +2863,35 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   <p className="text-pink-400 ml-4">totalBadges × 2 +</p>
                   <p className="text-indigo-400 ml-4">legendaryBadges × 10</p>
                 </div>
+                <p className="text-xs text-gray-400 mt-3">
+                  Weights are hard-coded for fairness — every player runs
+                  through the same formula. Score is floored at <strong>0</strong>{" "}
+                  (large losses cannot push you negative) and displayed as a
+                  whole number on every surface.
+                </p>
               </div>
 
+              {/* Term breakdown */}
               <div>
-                <h4 className="font-semibold text-white mb-3">
-                  📈 Score Breakdown:
-                </h4>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Coins className="h-4 w-4 text-yellow-400" />
+                  Each term in plain English
+                </h3>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-lg border border-green-500/30">
                     <div className="flex items-center gap-3">
                       <span className="text-xl">💰</span>
                       <div>
                         <p className="font-semibold text-green-400">
-                          Total P&L
+                          Total P&amp;L
                         </p>
                         <p className="text-xs text-gray-500">
-                          Your cumulative profit/loss
+                          Sum of your participant PnL across every competition
+                          and 1v1 challenge.
                         </p>
                       </div>
                     </div>
-                    <p className="text-sm text-green-400 font-mono">
-                      × 0.3 pts
-                    </p>
+                    <p className="text-sm text-green-400 font-mono">× 0.3 pts</p>
                   </div>
 
                   <div className="flex items-center justify-between p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
@@ -2885,10 +2899,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       <span className="text-xl">📈</span>
                       <div>
                         <p className="font-semibold text-blue-400">
-                          ROI Percentage
+                          ROI %
                         </p>
                         <p className="text-xs text-gray-500">
-                          Return on investment %
+                          Total PnL ÷ total starting capital × 100, across all
+                          contests/duels you&apos;ve entered.
                         </p>
                       </div>
                     </div>
@@ -2901,7 +2916,8 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       <div>
                         <p className="font-semibold text-cyan-400">Win Rate</p>
                         <p className="text-xs text-gray-500">
-                          % of winning trades
+                          % of winning closed trades, sourced from your
+                          unified trade history.
                         </p>
                       </div>
                     </div>
@@ -2916,13 +2932,13 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                           Profit Factor
                         </p>
                         <p className="text-xs text-gray-500">
-                          Gross profit ÷ gross loss
+                          Gross profit ÷ gross loss (sums of realized PnL on
+                          closed trades). If you have no losing trades, the
+                          system treats this as 0 to avoid runaway scores.
                         </p>
                       </div>
                     </div>
-                    <p className="text-sm text-purple-400 font-mono">
-                      × 10 pts
-                    </p>
+                    <p className="text-sm text-purple-400 font-mono">× 10 pts</p>
                   </div>
 
                   <div className="flex items-center justify-between p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
@@ -2933,13 +2949,13 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                           Competition Wins
                         </p>
                         <p className="text-xs text-gray-500">
-                          1st place finishes
+                          1st place finishes — only counted from{" "}
+                          <em>completed</em> competitions (not active or
+                          cancelled).
                         </p>
                       </div>
                     </div>
-                    <p className="text-sm text-yellow-400 font-mono">
-                      × 50 pts each
-                    </p>
+                    <p className="text-sm text-yellow-400 font-mono">× 50 pts each</p>
                   </div>
 
                   <div className="flex items-center justify-between p-3 bg-orange-500/10 rounded-lg border border-orange-500/30">
@@ -2949,12 +2965,14 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                         <p className="font-semibold text-orange-400">
                           Podium Finishes
                         </p>
-                        <p className="text-xs text-gray-500">Top 3 finishes</p>
+                        <p className="text-xs text-gray-500">
+                          Top-3 finishes in completed competitions (1st place
+                          counts for both this and the Competition Wins
+                          bucket).
+                        </p>
                       </div>
                     </div>
-                    <p className="text-sm text-orange-400 font-mono">
-                      × 20 pts each
-                    </p>
+                    <p className="text-sm text-orange-400 font-mono">× 20 pts each</p>
                   </div>
 
                   <div className="flex items-center justify-between p-3 bg-red-500/10 rounded-lg border border-red-500/30">
@@ -2965,30 +2983,28 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                           Challenge Wins
                         </p>
                         <p className="text-xs text-gray-500">
-                          1v1 challenge victories
+                          1v1 challenges you&apos;ve been declared the winner
+                          of after settlement.
                         </p>
                       </div>
                     </div>
-                    <p className="text-sm text-red-400 font-mono">
-                      × 25 pts each
-                    </p>
+                    <p className="text-sm text-red-400 font-mono">× 25 pts each</p>
                   </div>
 
                   <div className="flex items-center justify-between p-3 bg-pink-500/10 rounded-lg border border-pink-500/30">
                     <div className="flex items-center gap-3">
-                      <span className="text-xl">🏅</span>
+                      <span className="text-xl">🎖️</span>
                       <div>
                         <p className="font-semibold text-pink-400">
                           Total Badges
                         </p>
                         <p className="text-xs text-gray-500">
-                          All badges earned
+                          Every badge you&apos;ve unlocked (Common, Rare,
+                          Epic, Legendary) counts in this bucket.
                         </p>
                       </div>
                     </div>
-                    <p className="text-sm text-pink-400 font-mono">
-                      × 2 pts each
-                    </p>
+                    <p className="text-sm text-pink-400 font-mono">× 2 pts each</p>
                   </div>
 
                   <div className="flex items-center justify-between p-3 bg-indigo-500/10 rounded-lg border border-indigo-500/30">
@@ -2999,26 +3015,30 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                           Legendary Badges
                         </p>
                         <p className="text-xs text-gray-500">
-                          Legendary rarity badges
+                          Bonus on top of the per-badge points — Legendary
+                          rarity unlocks an extra 10 pts each (so a Legendary
+                          badge is worth 12 pts in total).
                         </p>
                       </div>
                     </div>
-                    <p className="text-sm text-indigo-400 font-mono">
-                      × 10 pts each
-                    </p>
+                    <p className="text-sm text-indigo-400 font-mono">× 10 pts each</p>
                   </div>
                 </div>
               </div>
 
+              {/* Example */}
               <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-                <h4 className="font-semibold text-white mb-2">
-                  💡 Example Calculation:
-                </h4>
+                <h3 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-blue-400" />
+                  Worked example
+                </h3>
                 <div className="bg-gray-900/50 rounded-lg p-3 text-sm">
-                  <p className="text-gray-400 mb-2">A trader with:</p>
+                  <p className="text-gray-400 mb-2">
+                    A trader with these stats would compute as follows:
+                  </p>
                   <ul className="space-y-1 text-gray-300 mb-3">
                     <li>
-                      • P&L: $500 → 500 × 0.3 ={" "}
+                      • P&amp;L: {settings.credits.symbol}500 → 500 × 0.3 ={" "}
                       <span className="text-green-400">150 pts</span>
                     </li>
                     <li>
@@ -3061,26 +3081,197 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                 </div>
               </div>
 
+              {/* Where the numbers come from */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Info className="h-4 w-4 text-blue-400" />
+                  Where each number comes from
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Total P&amp;L and ROI %</strong>{" "}
+                      are aggregated from your{" "}
+                      <strong>competition and challenge participation</strong>{" "}
+                      — not your wallet balance. PnL outside of contests
+                      (e.g. cash-flow movements) doesn&apos;t change your
+                      Score.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Win Rate and Profit Factor</strong>{" "}
+                      come from your unified <em>trade history</em> (every
+                      closed trade across every contest/duel). They&apos;re
+                      the same numbers shown on your dashboard and profile
+                      analytics, so all surfaces stay consistent.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Competition wins and podiums</strong>{" "}
+                      only count once a competition has been finalised — your
+                      Score updates the next time the leaderboard rebuilds
+                      after settlement.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Challenge wins</strong>{" "}
+                      come from the &quot;winner&quot; flag set on the
+                      challenge participant record at settlement.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Badges</strong> are
+                      counted directly from your unlocked-badges collection.
+                      Legendary badges are detected by their internal ID
+                      prefix, so newly added Legendary badges flow through
+                      automatically.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Refresh / caching */}
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+                <h3 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-purple-400" />
+                  How fresh is my Score?
+                </h3>
+                <ul className="space-y-2 text-sm text-gray-300">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-purple-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      The full leaderboard (and therefore everyone&apos;s
+                      Score) is rebuilt and cached for{" "}
+                      <strong className="text-white">about 5 minutes</strong>.
+                      Most page loads serve the cached snapshot for speed.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-purple-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Major events <strong className="text-white">invalidate the cache immediately</strong>{" "}
+                      — finishing a competition, winning a challenge or
+                      unlocking a badge triggers a rebuild on the next
+                      request.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-purple-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Closing a trade <em>inside</em> a live competition
+                      updates your live ranking on the contest&apos;s own
+                      leaderboard right away (~15s), but the global Score
+                      catches up on the next cache cycle.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Where score appears */}
               <div className="bg-gray-700/50 border border-gray-600 rounded-lg p-4">
-                <h4 className="font-semibold text-white mb-2">
-                  📍 Where Score is Shown:
-                </h4>
-                <div className="grid gap-2 sm:grid-cols-2">
+                <h3 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <LayoutDashboard className="h-4 w-4 text-purple-400" />
+                  Where you&apos;ll see your Score
+                </h3>
+                <div className="grid gap-2 sm:grid-cols-2 text-sm">
+                  <Link
+                    href="/leaderboard"
+                    className="p-3 bg-gray-800/50 rounded-lg hover:bg-gray-700/50 transition-colors flex items-center gap-2"
+                  >
+                    <Medal className="h-4 w-4 text-yellow-400 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Leaderboard.</strong> The
+                      sortable <em>Score</em> column drives ranking (default
+                      sort).
+                    </span>
+                  </Link>
                   <div className="p-3 bg-gray-800/50 rounded-lg flex items-center gap-2">
-                    <Medal className="h-4 w-4 text-yellow-400" />
-                    <span className="text-sm">Leaderboard rankings</span>
+                    <Heart className="h-4 w-4 text-pink-400 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Match Cards.</strong>{" "}
+                      Each card shows the trader&apos;s Score in their stats
+                      strip.
+                    </span>
                   </div>
                   <div className="p-3 bg-gray-800/50 rounded-lg flex items-center gap-2">
-                    <Heart className="h-4 w-4 text-pink-400" />
-                    <span className="text-sm">Match Cards</span>
+                    <User className="h-4 w-4 text-cyan-400 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Profile Card.</strong>{" "}
+                      When you click on a trader&apos;s name, their profile
+                      card surfaces their Score in the footer bar.
+                    </span>
                   </div>
                   <div className="p-3 bg-gray-800/50 rounded-lg flex items-center gap-2">
-                    <User className="h-4 w-4 text-cyan-400" />
-                    <span className="text-sm">Profile page</span>
+                    <Trophy className="h-4 w-4 text-orange-400 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Hall of Fame.</strong>{" "}
+                      Records of past champions and milestone Score levels
+                      are highlighted there.
+                    </span>
                   </div>
-                  <div className="p-3 bg-gray-800/50 rounded-lg flex items-center gap-2">
-                    <Swords className="h-4 w-4 text-red-400" />
-                    <span className="text-sm">VS Screen comparisons</span>
+                </div>
+              </div>
+
+              {/* Common questions */}
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                <h3 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <HelpCircle className="h-4 w-4 text-blue-400" />
+                  Common questions
+                </h3>
+                <div className="space-y-3 text-sm text-gray-300">
+                  <div>
+                    <p className="font-semibold text-white">
+                      Can my Score go down?
+                    </p>
+                    <p className="text-gray-400">
+                      Yes — if a big losing competition pulls your total PnL
+                      down, the PnL/ROI/profit-factor terms shrink and your
+                      overall Score drops. But Score is floored at 0;
+                      it will never display a negative number.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-white">
+                      Is the leaderboard Score the same as the Match %?
+                    </p>
+                    <p className="text-gray-400">
+                      No. Score is a power ranking (higher = stronger overall
+                      record). Match % is a <em>compatibility</em> score
+                      between you and a specific opponent — closer skills =
+                      higher Match %. They&apos;re completely independent
+                      formulas.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-white">
+                      Are unverified or hidden accounts on the leaderboard?
+                    </p>
+                    <p className="text-gray-400">
+                      No. Accounts that haven&apos;t verified their email
+                      address, and accounts admins have flagged as hidden
+                      from public (e.g. internal/support accounts), are
+                      excluded from the leaderboard and Match Cards entirely.
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-white">
+                      Why didn&apos;t my Score change after a trade?
+                    </p>
+                    <p className="text-gray-400">
+                      The global leaderboard cache is refreshed roughly every
+                      5 minutes. Settling a competition or a 1v1 invalidates
+                      the cache immediately, but a single mid-contest trade
+                      waits for the next refresh cycle.
+                    </p>
                   </div>
                 </div>
               </div>
