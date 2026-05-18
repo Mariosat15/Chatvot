@@ -7372,71 +7372,103 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
 
             <div className="space-y-4 text-gray-300">
               <p className="leading-relaxed">
-                Understanding margin levels is crucial to avoid liquidation and
-                succeed in competitions.
+                Trading on ChartVolt uses virtual capital, but it follows
+                the same{" "}
+                <strong className="text-white">margin and leverage
+                rules</strong>{" "}
+                you&apos;d find at a real broker. This section explains
+                how your account is monitored, what the platform does
+                automatically when a position goes against you, and the
+                guard-rails individual competitions can layer on top.
               </p>
 
+              {/* Margin formula */}
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-blue-400" />
+                  How margin level is calculated
+                </h4>
+                <p className="text-sm text-gray-300 mb-3">
+                  Every position you open locks a slice of your virtual
+                  capital as <strong className="text-white">margin</strong>{" "}
+                  (proportional to position size ÷ leverage). The
+                  platform constantly tracks one number — your{" "}
+                  <strong className="text-white">margin level</strong> —
+                  and that drives every guard-rail below:
+                </p>
+                <div className="bg-gray-900/60 rounded-lg p-3 font-mono text-sm text-cyan-300 mb-3 border border-gray-700">
+                  Margin Level (%) ={" "}
+                  <span className="text-yellow-300">Equity</span> ÷{" "}
+                  <span className="text-yellow-300">Used Margin</span> ×
+                  100
+                </div>
+                <p className="text-xs text-gray-400">
+                  <strong className="text-white">Equity</strong> = your
+                  current contest balance + the live unrealised P&amp;L
+                  on every open position. As prices move in your favour
+                  the number climbs; as they move against you it falls.
+                  When no positions are open, margin level is{" "}
+                  &quot;∞&quot; — there is nothing to liquidate.
+                </p>
+              </div>
+
+              {/* Margin tiers */}
               <div>
                 <h4 className="font-semibold text-white mb-3">
-                  Margin Levels:
+                  Margin levels &amp; what happens at each tier
                 </h4>
                 <div className="space-y-3">
                   <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                       <h5 className="font-semibold text-green-400">
-                        ✅ Safe Zone
+                        ✅ Safe
                       </h5>
                       <span className="text-sm text-green-400">
-                        Above {settings.margin.safe}%
+                        ≥ {settings.margin.warning}%
                       </span>
                     </div>
                     <p className="text-sm text-gray-400">
-                      Account is healthy with plenty of margin.
+                      Plenty of room to absorb adverse price moves. No
+                      automated action runs at this level. The order
+                      ticket will let you open more trades.
                     </p>
                   </div>
 
                   <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                       <h5 className="font-semibold text-yellow-400">
-                        ⚠️ Warning Zone
+                        ⚠️ Warning
                       </h5>
                       <span className="text-sm text-yellow-400">
-                        {settings.margin.warning + 1}% - {settings.margin.safe}%
+                        {settings.margin.marginCall}% –{" "}
+                        {settings.margin.warning}%
                       </span>
                     </div>
                     <p className="text-sm text-gray-400">
-                      Caution! Consider reducing position sizes.
+                      Your equity has dipped close to your used margin.
+                      Position sizes start to feel heavy. Consider
+                      reducing exposure or letting losers run only with
+                      defined Stop Losses.
                     </p>
                   </div>
 
                   <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                       <h5 className="font-semibold text-orange-400">
-                        🚨 Margin Call
+                        🚨 Margin Call zone
                       </h5>
                       <span className="text-sm text-orange-400">
-                        {settings.margin.marginCall + 1}% -{" "}
-                        {settings.margin.warning}%
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-400">
-                      Danger! Close positions or risk liquidation.
-                    </p>
-                  </div>
-
-                  <div className="p-4 bg-red-900/30 border border-red-500/50 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h5 className="font-semibold text-red-500">
-                        ⚠️ Danger Zone
-                      </h5>
-                      <span className="text-sm text-red-500">
-                        {settings.margin.liquidation + 1}% -{" "}
+                        {settings.margin.liquidation}% –{" "}
                         {settings.margin.marginCall}%
                       </span>
                     </div>
                     <p className="text-sm text-gray-400">
-                      Danger! You&apos;re approaching liquidation. Close some
-                      trades or risk automatic liquidation.
+                      You&apos;ve crossed below the margin-call line.
+                      The trading UI will highlight your account in red
+                      and the order ticket may{" "}
+                      <strong className="text-white">block new trades</strong>{" "}
+                      until you free up margin. Close losing trades or
+                      tighten stops before the next tier kicks in.
                     </p>
                   </div>
 
@@ -7446,41 +7478,245 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                         ❌ Liquidation
                       </h5>
                       <span className="text-sm text-red-400">
-                        Below {settings.margin.liquidation}%
+                        &lt; {settings.margin.liquidation}%
                       </span>
                     </div>
                     <p className="text-sm text-gray-400">
-                      All positions automatically closed by system.
+                      The platform takes over — see the &quot;What
+                      happens at liquidation&quot; block below for the
+                      exact steps.
                     </p>
                   </div>
                 </div>
               </div>
 
+              {/* Monitoring + liquidation */}
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-red-400" />
+                  Monitoring &amp; what happens at liquidation
+                </h4>
+                <ul className="space-y-1.5 text-sm text-gray-300 list-disc pl-5">
+                  <li>
+                    A background margin monitor evaluates every active
+                    participant{" "}
+                    <strong className="text-white">every minute</strong>
+                    , and the price stream also evaluates margin in
+                    real-time as quotes update on your chart.
+                  </li>
+                  <li>
+                    When your margin level drops below{" "}
+                    <strong className="text-red-300">
+                      {settings.margin.liquidation}%
+                    </strong>{" "}
+                    the platform{" "}
+                    <strong className="text-white">
+                      automatically closes every open position you
+                      have in that contest
+                    </strong>{" "}
+                    at the current market price.
+                  </li>
+                  <li>
+                    Your participant record is flagged as{" "}
+                    <code className="text-xs bg-gray-900 px-1.5 py-0.5 rounded">
+                      liquidated
+                    </code>{" "}
+                    and you{" "}
+                    <strong className="text-white">
+                      cannot open new trades in the same
+                      competition or 1v1
+                    </strong>{" "}
+                    afterwards.
+                  </li>
+                  <li>
+                    You get an in-app notification immediately, plus a
+                    second one if the competition&apos;s rules also{" "}
+                    <strong className="text-white">
+                      disqualify on liquidation
+                    </strong>{" "}
+                    (some competitions allow you to keep your final
+                    balance and ranking, others mark you eliminated).
+                  </li>
+                  <li>
+                    Liquidation is{" "}
+                    <strong className="text-white">contest-scoped</strong>{" "}
+                    — getting liquidated in one event does{" "}
+                    <em>not</em> affect your wallet credits, your
+                    profile stats, or your ability to join the next
+                    competition or challenge.
+                  </li>
+                </ul>
+              </div>
+
+              {/* Stop Loss / Take Profit */}
+              <div>
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Target className="h-4 w-4 text-cyan-400" />
+                  Stop Loss &amp; Take Profit
+                </h4>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-red-400 text-sm mb-1">
+                      Stop Loss (SL)
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      A price level that auto-closes the position at a
+                      loss to cap your downside. Set it on the order
+                      ticket or edit it on any open position.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-green-400 text-sm mb-1">
+                      Take Profit (TP)
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      A price level that auto-closes the position at a
+                      profit to lock in gains without watching the
+                      chart.
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  SL/TP triggers in real-time off the live price feed —
+                  there is no &quot;reaction delay&quot; from a
+                  background worker. When a level is hit, the position
+                  is closed at the next available tick. Trading with SL
+                  enabled is the single best protection against
+                  liquidation.
+                </p>
+              </div>
+
+              {/* Per-contest risk caps */}
+              <div>
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-purple-400" />
+                  Per-competition risk caps (optional)
+                </h4>
+                <p className="text-sm text-gray-400 mb-3">
+                  Individual competitions can enable extra risk rules
+                  on top of margin levels. When enabled, these are
+                  checked <strong className="text-white">before</strong>{" "}
+                  every order is placed — the platform will refuse the
+                  trade rather than let you exceed the cap.
+                </p>
+                <div className="grid gap-2 text-sm">
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">Max drawdown.</strong>{" "}
+                    A percentage of starting capital you&apos;re allowed
+                    to lose on closed positions (e.g.{" "}
+                    {settings.risk.maxDrawdown}% by default). Crossing
+                    it blocks new orders for the rest of the contest.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Daily loss limit.
+                    </strong>{" "}
+                    A cap on realised losses since UTC midnight (e.g.{" "}
+                    {settings.risk.dailyLossLimit}% by default). Resets
+                    each new day.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Equity drawdown.
+                    </strong>{" "}
+                    Stricter rule that includes unrealised P&amp;L on
+                    open positions — even paper losses count towards
+                    the cap. Only enabled in competitions that
+                    explicitly turn it on.
+                  </div>
+                </div>
+              </div>
+
+              {/* Position & leverage limits */}
+              <div>
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-orange-400" />
+                  Position &amp; leverage limits
+                </h4>
+                <div className="grid gap-2 sm:grid-cols-2 text-sm">
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">Leverage.</strong>{" "}
+                    Configurable per contest. Platform default is{" "}
+                    {settings.leverage.default}× with a maximum of{" "}
+                    {settings.leverage.max}× and a minimum of{" "}
+                    {settings.leverage.min}×. You can request a lower
+                    leverage on the order ticket — the contest cap is
+                    the ceiling, not a forced value.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600">
+                    <strong className="text-white">
+                      Max open positions.
+                    </strong>{" "}
+                    By default up to{" "}
+                    <strong className="text-white">
+                      {settings.positions.maxOpen}
+                    </strong>{" "}
+                    open positions at once. Competitions can tighten
+                    that cap further.
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600 sm:col-span-2">
+                    <strong className="text-white">Lot size.</strong>{" "}
+                    Bounded by per-symbol min/max lot sizes plus a
+                    safety cap of{" "}
+                    {settings.positions.maxSize} lots per trade.
+                    Symbol-specific limits always take priority — see
+                    the order ticket for the live range when you pick a
+                    pair.
+                  </div>
+                </div>
+              </div>
+
+              {/* Best practices */}
               <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
                 <h4 className="font-semibold text-white mb-2">
-                  🎓 Best Practices:
+                  🎓 Best practices
                 </h4>
                 <ul className="space-y-2 text-sm">
                   <li className="flex items-start gap-2">
                     <ChevronRight className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
                     <span>
-                      Never risk more than {settings.risk.dailyLossLimit}% of
-                      capital daily
+                      Always trade with a{" "}
+                      <strong className="text-white">Stop Loss</strong>
+                      . It is the cheapest insurance against a margin
+                      call.
                     </span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <ChevronRight className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                    <span>Always use Stop Loss orders</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <ChevronRight className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
                     <span>
-                      Keep max {settings.positions.maxOpen} positions open
+                      Aim to keep your margin level{" "}
+                      <strong className="text-white">above{" "}
+                      {settings.margin.warning}%</strong>{" "}
+                      — drops below the warning band are a signal to
+                      reduce, not to add.
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <ChevronRight className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                    <span>Stay above {settings.margin.safe}% margin level</span>
+                    <span>
+                      Don&apos;t max-leverage to chase a podium.
+                      Drawdown / daily-loss caps can lock you out of a
+                      contest just as effectively as a liquidation.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Spread risk — keeping{" "}
+                      <strong className="text-white">no more than {settings.positions.maxOpen}</strong>{" "}
+                      positions open at a time helps you actually watch
+                      each one. Treat it as a budget, not a target.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Before you join a competition, check its{" "}
+                      <strong className="text-white">terms screen</strong>{" "}
+                      — leverage cap, position cap, optional risk
+                      limits and the &quot;disqualify on
+                      liquidation&quot; flag are all shown there.
+                    </span>
                   </li>
                 </ul>
               </div>
