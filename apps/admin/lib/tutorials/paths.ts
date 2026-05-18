@@ -4,23 +4,25 @@ import { mkdir, writeFile, unlink } from "fs/promises";
 /**
  * Resolves possible disk locations for the Tutorials Videos folder.
  *
- * Reason: This repo can run from two cwd's depending on which Next.js
- * process is calling — the main app at the repo root or the admin app
- * under apps/admin. The Videos folder lives at the REPO ROOT (so it is
- * committed to git and shared between whitelabel deployments), so we
- * walk up to find it.
+ * Reason: PM2 launches the admin app with cwd=`<repo-root>/apps/admin`
+ * (see ecosystem.config.js). The Videos folder lives at the REPO
+ * ROOT, so from the admin's cwd that is `../../Videos`. We MUST try
+ * that path FIRST, otherwise mkdir() will happily create a stray
+ * `apps/admin/Videos/` that the main app (which runs from the repo
+ * root) can never see, and uploads will 404 on playback.
  *
  * Order matters: the FIRST writable directory found is used for new
- * uploads. The other directories are tried as fallbacks for reads.
+ * uploads. Subsequent directories are tried as fallbacks for reads.
  */
 export function getTutorialVideoDirCandidates(): string[] {
-  // From repo root (main app): cwd/Videos
-  // From apps/admin: cwd/../../Videos
-  // From any other monorepo layout: cwd/../Videos
+  const cwd = process.cwd();
   return [
-    path.join(process.cwd(), "Videos"),
-    path.join(process.cwd(), "..", "Videos"),
-    path.join(process.cwd(), "..", "..", "Videos"),
+    // Repo root from apps/admin (the canonical, shared location)
+    path.join(cwd, "..", "..", "Videos"),
+    // Repo root if admin ever runs from there directly
+    path.join(cwd, "Videos"),
+    // Other monorepo layouts (apps/* sibling)
+    path.join(cwd, "..", "Videos"),
   ];
 }
 

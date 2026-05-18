@@ -5,18 +5,26 @@ import { constants } from "fs";
 /**
  * Resolves possible disk locations for the Tutorials Videos folder.
  *
- * Reason: The Videos folder lives at the REPO ROOT and is committed
- * to git so it ships with every whitelabel deployment. The main app
- * runs at the repo root (cwd === root), but we still allow fallbacks
- * for unusual deployment layouts.
+ * Reason: The Videos folder lives at the REPO ROOT (the canonical
+ * location). The main app's cwd is the repo root, so cwd/Videos
+ * resolves directly. We also include `apps/admin/Videos` as a
+ * fallback so files that were uploaded BEFORE the admin's write path
+ * was reordered to canonical-first (and may therefore be sitting in
+ * the admin app's local Videos folder) are still served instead of
+ * 404'ing.
  *
  * Mirror of `apps/admin/lib/tutorials/paths.ts` — keep both in sync.
  */
 export function getTutorialVideoDirCandidates(): string[] {
+  const cwd = process.cwd();
   return [
-    path.join(process.cwd(), "Videos"),
-    path.join(process.cwd(), "..", "Videos"),
-    path.join(process.cwd(), "..", "..", "Videos"),
+    // Canonical: repo root (the main app's cwd)
+    path.join(cwd, "Videos"),
+    // Fallback: admin's local folder if older uploads landed there
+    path.join(cwd, "apps", "admin", "Videos"),
+    // Unusual layouts
+    path.join(cwd, "..", "Videos"),
+    path.join(cwd, "..", "..", "Videos"),
   ];
 }
 
