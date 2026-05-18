@@ -3875,45 +3875,411 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
               <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">🛒 Marketplace</h2>
             </div>
 
-            <div className="space-y-4 text-gray-300">
+            <div className="space-y-6 text-gray-300">
               <p className="leading-relaxed">
-                Purchase trading tools, indicators, and strategies to enhance
-                your trading.
+                The{" "}
+                <Link
+                  href="/marketplace"
+                  className="text-yellow-400 hover:text-yellow-300 underline underline-offset-2"
+                >
+                  Marketplace
+                </Link>{" "}
+                is where you spend your{" "}
+                {settings.credits.name.toLowerCase()} on platform unlocks —
+                Game Master packages that let you host your own
+                competitions, technical indicators that plug into your
+                charts, complete trading strategies, and cosmetic items
+                like avatars and profile frames. All prices are in{" "}
+                <span className="text-yellow-400">{settings.credits.symbol}</span>{" "}
+                {settings.credits.name.toLowerCase()} (paid from your
+                wallet); items you own are stored in your{" "}
+                <Link
+                  href="/profile?tab=arsenal"
+                  className="text-yellow-400 hover:text-yellow-300 underline underline-offset-2"
+                >
+                  Trading Arsenal
+                </Link>{" "}
+                on your profile.
               </p>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="p-4 bg-purple-500/10 rounded-lg border border-purple-500/30">
-                  <h5 className="font-semibold text-purple-400 mb-2 flex items-center gap-2">
-                    <LineChart className="h-4 w-4" /> Technical Indicators
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Custom indicators for your charts.
+              {/* Categories */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <ShoppingBag className="h-4 w-4 text-purple-400" />
+                  What you&apos;ll find
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
+                    <h5 className="font-semibold text-yellow-300 mb-2 flex items-center gap-2">
+                      <Trophy className="h-4 w-4" /> Game Master Packages
+                    </h5>
+                    <p className="text-sm text-gray-400">
+                      Subscription packs that let you{" "}
+                      <strong className="text-white">create and host your own competitions</strong>{" "}
+                      for other players. Each pack defines how many
+                      competitions you can run per day, how many players
+                      can join, and how much referral commission you earn
+                      from your players&apos; entry fees.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-purple-500/10 rounded-lg border border-purple-500/30">
+                    <h5 className="font-semibold text-purple-300 mb-2 flex items-center gap-2">
+                      <LineChart className="h-4 w-4" /> Indicators
+                    </h5>
+                    <p className="text-sm text-gray-400">
+                      Technical indicators that plug into your trading
+                      charts — trend, momentum, volume, volatility and
+                      oscillator types. Toggle them on or off from your
+                      Trading Arsenal.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                    <h5 className="font-semibold text-blue-300 mb-2 flex items-center gap-2">
+                      <Target className="h-4 w-4" /> Strategies
+                    </h5>
+                    <p className="text-sm text-gray-400">
+                      Complete trading systems with their own entry/exit
+                      rules, suggested risk caps and supported symbols.
+                      Strategies come with a default configuration and
+                      can be tuned from your Arsenal.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-pink-500/10 rounded-lg border border-pink-500/30">
+                    <h5 className="font-semibold text-pink-300 mb-2 flex items-center gap-2">
+                      <Sparkles className="h-4 w-4" /> Cosmetics
+                    </h5>
+                    <p className="text-sm text-gray-400">
+                      Avatar frames, profile decorations and other
+                      visual unlocks. Apply them from your Arsenal — no
+                      effect on trading, just bragging rights on the
+                      leaderboard and Match Cards.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* How to browse */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Eye className="h-4 w-4 text-cyan-400" />
+                  Browsing the store
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Featured strip</strong>{" "}
+                      at the top of the homepage (when no filter is
+                      active) highlights the items the admin is
+                      promoting.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Category chips</strong>{" "}
+                      let you filter to <em>All</em>, <em>Game Master</em>,{" "}
+                      <em>Indicators</em>, <em>Strategies</em> or{" "}
+                      <em>Cosmetics</em>.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Search</strong> by
+                      item name, short description or tag. Matches are
+                      case-insensitive.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Sort</strong> by
+                      popularity, price (low→high or high→low), rating,
+                      newest, or name. The store remembers your{" "}
+                      <em>card vs list</em> layout preference.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Click any card to open a detail modal with the
+                      full description, screenshots, supported assets,
+                      risk warnings, and the purchase / renew button.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Buying flow */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Coins className="h-4 w-4 text-yellow-400" />
+                  Buying an item
+                </h3>
+                <ol className="space-y-2 text-sm list-decimal list-inside marker:text-yellow-400">
+                  <li>
+                    Open the item&apos;s detail card and review the
+                    description, price (in{" "}
+                    {settings.credits.name.toLowerCase()}) and any risk
+                    warning.
+                  </li>
+                  <li>
+                    Click <strong className="text-white">Get</strong>{" "}
+                    (or <em>Buy</em> on the list view). You&apos;ll
+                    accept the Marketplace terms before the purchase is
+                    submitted.
+                  </li>
+                  <li>
+                    The price is debited from your wallet in a single
+                    transaction. The transaction is logged in your
+                    wallet history as{" "}
+                    <code className="bg-gray-800 px-1 rounded text-xs">
+                      marketplace_purchase
+                    </code>
+                    .
+                  </li>
+                  <li>
+                    The item is added to your Trading Arsenal
+                    instantly — the card flips to{" "}
+                    <strong className="text-white">Owned</strong> in the
+                    storefront.
+                  </li>
+                </ol>
+
+                <div className="mt-3 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-sm">
+                  <p className="text-amber-200 font-semibold mb-2 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Purchase rules
+                  </p>
+                  <ul className="space-y-1 text-gray-300">
+                    <li className="flex items-start gap-2">
+                      <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <span>
+                        Your email must be{" "}
+                        <strong className="text-white">verified</strong>{" "}
+                        — the marketplace is gated behind email
+                        verification platform-wide.
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <span>
+                        Your wallet must have at least the item&apos;s
+                        price in {settings.credits.name.toLowerCase()}.
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <span>
+                        Items can only be purchased{" "}
+                        <strong className="text-white">once per account</strong>.
+                        After that the button shows <em>Owned</em>.
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <span>
+                        Items that are unpublished or deprecated are
+                        hidden from the storefront and can&apos;t be
+                        purchased.
+                      </span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="mt-3 bg-rose-500/10 border border-rose-500/30 rounded-lg p-3 text-sm">
+                  <p className="text-rose-200 font-semibold mb-1">
+                    Refunds
+                  </p>
+                  <p className="text-gray-300">
+                    Marketplace purchases are{" "}
+                    <strong className="text-white">final and non-refundable</strong>.
+                    Items are licensed to your account for personal use
+                    only, and the platform doesn&apos;t guarantee
+                    specific trading results from indicators or
+                    strategies. Item availability and pricing can change
+                    without notice.
                   </p>
                 </div>
-                <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                  <h5 className="font-semibold text-blue-400 mb-2 flex items-center gap-2">
-                    <Target className="h-4 w-4" /> Trading Strategies
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Complete systems with entry/exit rules.
-                  </p>
-                </div>
-                <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/30">
-                  <h5 className="font-semibold text-green-400 mb-2 flex items-center gap-2">
-                    <Eye className="h-4 w-4" /> Signal Providers
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Real-time trade signals and alerts.
-                  </p>
-                </div>
-                <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
-                  <h5 className="font-semibold text-yellow-400 mb-2 flex items-center gap-2">
-                    <Sparkles className="h-4 w-4" /> Tool Bundles
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Discounted indicator packages.
-                  </p>
-                </div>
+              </div>
+
+              {/* Pricing & discounts */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-green-400" />
+                  Pricing &amp; discounts
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Every item is priced in{" "}
+                      <strong className="text-white">
+                        {settings.credits.name.toLowerCase()}{" "}
+                        ({settings.credits.symbol})
+                      </strong>{" "}
+                      and paid from your wallet balance. You don&apos;t
+                      pay with a card directly here — buy credits first,
+                      then shop.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Discounts</strong>{" "}
+                      show as a struck-through original price next to
+                      the current price (e.g.{" "}
+                      <span className="line-through text-gray-500">
+                        {settings.credits.symbol}500
+                      </span>{" "}
+                      <span className="text-green-400">{settings.credits.symbol}350</span>
+                      ).
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Some items can be marked{" "}
+                      <strong className="text-white">Free</strong> by
+                      the admin (e.g. introductory bonuses) — they show
+                      a green badge and require no balance to claim.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Game Master packages — special case */}
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Trophy className="h-4 w-4 text-yellow-400" />
+                  Game Master packages — what&apos;s different
+                </h3>
+                <p className="text-sm mb-3">
+                  Game Master (GM) packs aren&apos;t one-off purchases
+                  like indicators or cosmetics — they&apos;re{" "}
+                  <strong className="text-white">time-limited subscriptions</strong>{" "}
+                  that unlock the ability to host competitions for other
+                  players and earn referral commissions on their entry
+                  fees. Each pack defines its own limits.
+                </p>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Subscription duration.</strong>{" "}
+                      Each pack lasts a configurable number of days
+                      (default 30). Your GM Dashboard link in the menu
+                      appears the moment you own an active GM pack.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Per-pack limits.</strong>{" "}
+                      Pack details show how many{" "}
+                      <em>competitions per day</em> you can create, the
+                      maximum <em>players per competition</em>, and the{" "}
+                      <em>referral fee %</em> you earn on every entry
+                      fee from your referred players.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Auto-renewal.</strong>{" "}
+                      New GM purchases default to auto-renew —
+                      we&apos;ll charge the renewal price from your
+                      wallet on the expiry date and extend the
+                      subscription seamlessly. Auto-renew can be turned
+                      on or off from your GM Dashboard. If the wallet
+                      doesn&apos;t have enough{" "}
+                      {settings.credits.name.toLowerCase()} on renewal
+                      day, the subscription expires instead of charging.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Manual renew.</strong>{" "}
+                      Once a GM pack has expired, the storefront
+                      replaces the <em>Owned</em> badge with a{" "}
+                      <strong className="text-white">
+                        Renew now ({settings.credits.symbol} price)
+                      </strong>{" "}
+                      button — clicking it restores the subscription
+                      and the wallet transaction is logged as{" "}
+                      <code className="bg-gray-800 px-1 rounded text-xs">
+                        gamemaster_subscription
+                      </code>
+                      .
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Upgrading.</strong>{" "}
+                      Switching to a more powerful GM pack is supported
+                      — the new package becomes your active one and the
+                      new limits kick in immediately.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Trading Arsenal connection */}
+              <div className="bg-gray-900/40 border border-gray-700 rounded-lg p-4">
+                <h3 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Briefcase className="h-4 w-4 text-cyan-400" />
+                  Your Trading Arsenal
+                </h3>
+                <p className="text-sm text-gray-300 mb-2">
+                  Everything you buy lives in the{" "}
+                  <Link
+                    href="/profile?tab=arsenal"
+                    className="text-yellow-400 hover:text-yellow-300 underline underline-offset-2"
+                  >
+                    Trading Arsenal
+                  </Link>{" "}
+                  on your profile. From there you can:
+                </p>
+                <ul className="space-y-1 text-sm text-gray-300">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Enable / disable individual indicators and
+                      strategies.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Tweak indicator-specific settings (where the item
+                      exposes them).
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Apply avatar frames and cosmetic unlocks.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Manage your Game Master subscription — see
+                      renewal date, toggle auto-renew, or renew an
+                      expired pack.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Hop straight back to the marketplace via the{" "}
+                      <em>Browse Marketplace</em> button.
+                    </span>
+                  </li>
+                </ul>
               </div>
             </div>
           </section>
