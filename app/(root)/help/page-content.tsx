@@ -1944,12 +1944,13 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   <li>
                     Find an opponent — from a{" "}
                     <Link
-                      href="/match-cards"
+                      href="/leaderboard"
                       className="text-yellow-400 hover:text-yellow-300 underline underline-offset-2"
                     >
                       Match Card
                     </Link>{" "}
-                    swipe, a leaderboard row, or their profile page.
+                    swipe (Leaderboard → Match Cards tab), a leaderboard row,
+                    or their profile page.
                   </li>
                   <li>
                     Open the <strong className="text-white">Create Challenge</strong>{" "}
@@ -2340,15 +2341,15 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                     </p>
                   </div>
                   <Link
-                    href="/match-cards"
+                    href="/leaderboard"
                     className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg hover:bg-gray-800/40 transition-colors block"
                   >
                     <div className="font-semibold text-red-300">
-                      /match-cards
+                      /leaderboard → Match Cards
                     </div>
                     <p className="text-gray-400 mt-1">
                       Swipe-style matchmaking — find similar-skill opponents
-                      and send them a challenge directly from the card.
+                      and send them a challenge from a Tinder-like deck.
                     </p>
                   </Link>
                 </div>
@@ -2384,125 +2385,437 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
               <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">💖 Match Cards</h2>
             </div>
 
-            <div className="space-y-4 text-gray-300">
+            <div className="space-y-6 text-gray-300">
               <p className="leading-relaxed">
-                Find the perfect trading opponent using our smart matchmaking
-                system! Swipe through traders and challenge those with similar
-                skill levels.
+                Match Cards are a Tinder-style deck of fellow traders that
+                helps you pick a 1v1 opponent of similar skill. Each card
+                shows their stats, an at-a-glance{" "}
+                <strong className="text-pink-300">Match %</strong> and the
+                top reasons you&apos;re a good fit. Swipe right to open a
+                head-to-head VS screen and send them a challenge — swipe
+                left to skip and see the next trader.
               </p>
 
-              <div className="bg-pink-500/10 border border-pink-500/30 rounded-lg p-4">
-                <h4 className="font-semibold text-white mb-3">
-                  🎴 How Match Cards Work:
-                </h4>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="p-3 bg-gray-700/50 rounded-lg">
-                    <p className="text-sm">
-                      <span className="text-pink-400 font-bold">
-                        👈 Swipe Left
-                      </span>{" "}
-                      = Skip this trader
-                    </p>
-                  </div>
-                  <div className="p-3 bg-gray-700/50 rounded-lg">
-                    <p className="text-sm">
-                      <span className="text-green-400 font-bold">
-                        👉 Swipe Right
-                      </span>{" "}
-                      = Challenge this trader
-                    </p>
-                  </div>
-                </div>
+              {/* Where to find */}
+              <div className="bg-gray-900/40 border border-gray-700 rounded-lg p-4">
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Info className="h-4 w-4 text-blue-400" />
+                  Where to find Match Cards
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">
+                        <Link
+                          href="/leaderboard"
+                          className="text-yellow-400 hover:text-yellow-300 underline underline-offset-2"
+                        >
+                          /leaderboard
+                        </Link>{" "}
+                        → Match Cards tab.
+                      </strong>{" "}
+                      Toggle between the classic <em>Table</em> view and the
+                      <em> Match Cards</em> view at the top of the page.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Dashboard sidebar.</strong>{" "}
+                      A compact Match Cards deck is also embedded in the
+                      Contests sidebar on the dashboard so you can quickly
+                      find a duel without leaving the home screen.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Works on desktop and mobile — drag the card with mouse
+                      or finger, or use the buttons under the card.
+                    </span>
+                  </li>
+                </ul>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="p-4 bg-purple-500/10 rounded-lg border border-purple-500/30">
-                  <h5 className="font-semibold text-purple-400 mb-2 flex items-center gap-2">
-                    <Sparkles className="h-4 w-4" /> Find Best Match
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Our algorithm finds traders with similar stats, experience,
-                    and skill level for a fair competition.
-                  </p>
-                </div>
-                <div className="p-4 bg-cyan-500/10 rounded-lg border border-cyan-500/30">
-                  <h5 className="font-semibold text-cyan-400 mb-2 flex items-center gap-2">
-                    <Users className="h-4 w-4" /> VS Screen
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Before challenging, see a head-to-head comparison of you vs
-                    your opponent with stats and profile images.
-                  </p>
-                </div>
-              </div>
-
+              {/* How swipes work */}
               <div>
-                <h4 className="font-semibold text-white mb-3">
-                  📊 What the Card Shows:
-                </h4>
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  <div className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
-                    <p className="text-sm text-gray-400">
-                      💖 <span className="text-white">Match %</span> - How well
-                      you match
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Heart className="h-4 w-4 text-pink-400" />
+                  How swiping works
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="p-4 bg-pink-500/10 rounded-lg border border-pink-500/30">
+                    <p className="text-sm font-semibold text-pink-300 mb-2">
+                      👈 Swipe Left — Skip
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Hides the current trader from your local deck and
+                      shows the next one. Skips are{" "}
+                      <strong className="text-white">not persisted</strong> —
+                      reloading the page brings everyone back into the
+                      stack.
                     </p>
                   </div>
-                  <div className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
-                    <p className="text-sm text-gray-400">
-                      🟢 <span className="text-white">Online Status</span> - Is
-                      trader online
+                  <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/30">
+                    <p className="text-sm font-semibold text-green-300 mb-2">
+                      👉 Swipe Right — Open VS Screen
                     </p>
-                  </div>
-                  <div className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
-                    <p className="text-sm text-gray-400">
-                      🎯 <span className="text-white">Win Rate</span> - % of
-                      winning trades
-                    </p>
-                  </div>
-                  <div className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
-                    <p className="text-sm text-gray-400">
-                      💰 <span className="text-white">P&L</span> - Total
-                      profit/loss
-                    </p>
-                  </div>
-                  <div className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
-                    <p className="text-sm text-gray-400">
-                      🏆 <span className="text-white">Competitions</span> -
-                      Entries count
-                    </p>
-                  </div>
-                  <div className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
-                    <p className="text-sm text-gray-400">
-                      ⚔️ <span className="text-white">1v1 Challenges</span> -
-                      Entries count
+                    <p className="text-xs text-gray-400">
+                      Brings up a head-to-head <em>VS screen</em> with the
+                      opponent&apos;s key stats. From there, hit{" "}
+                      <strong className="text-white">Challenge Now!</strong>{" "}
+                      to open the standard 1v1 create dialog with this
+                      opponent pre-selected.
                     </p>
                   </div>
                 </div>
+                <div className="mt-3 p-3 bg-gray-900/40 border border-gray-700 rounded-lg text-sm space-y-1">
+                  <p>
+                    <strong className="text-white">Undo:</strong> The Undo
+                    button returns to the previous card (local only — it
+                    doesn&apos;t change anything server-side).
+                  </p>
+                  <p>
+                    <strong className="text-white">Offline opponents:</strong>{" "}
+                    The challenge button is disabled if the trader is
+                    offline. You&apos;ll get a toast like{" "}
+                    <code className="bg-gray-800 px-1 rounded text-xs">
+                      &quot;{"{username}"} is offline&quot;
+                    </code>{" "}
+                    instead of opening the VS screen.
+                  </p>
+                  <p>
+                    <strong className="text-white">No mutual match needed.</strong>{" "}
+                    Match Cards are <em>not</em> like Tinder&apos;s mutual
+                    likes — there&apos;s no waiting for the other person
+                    to swipe back. A right swipe goes straight to the
+                    challenge flow.
+                  </p>
+                </div>
               </div>
 
+              {/* Find Best Match */}
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+                <h3 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-purple-400" />
+                  Find Best Match
+                </h3>
+                <p className="text-sm">
+                  The <strong className="text-white">Find Best Match</strong>{" "}
+                  button at the top of the deck (also &quot;Auto Match&quot;
+                  on the empty-deck state) jumps straight to your{" "}
+                  <strong>highest-scoring</strong> available opponent. It
+                  prefers traders who are online and accepting challenges,
+                  but will fall back to the overall best match if nobody is
+                  currently available.
+                </p>
+              </div>
+
+              {/* What the card shows */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-yellow-400" />
+                  What every card shows
+                </h3>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <p>
+                      💖 <strong className="text-white">Match %</strong> —
+                      0–100 score of how compatible your stats look.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <p>
+                      🟢 <strong className="text-white">Online status</strong>{" "}
+                      — green dot when their last heartbeat was within the
+                      last ~2 minutes.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <p>
+                      🏷️ <strong className="text-white">Experience level</strong>{" "}
+                      — Beginner, Intermediate, Advanced, Expert or Master,
+                      derived from trades, contest history and badges.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <p>
+                      🎯 <strong className="text-white">Win rate</strong> —
+                      % of closed winning trades.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <p>
+                      💰 <strong className="text-white">P&amp;L</strong> —
+                      lifetime profit/loss in{" "}
+                      {settings.credits.name.toLowerCase()}.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <p>
+                      📈 <strong className="text-white">Trades</strong> —
+                      total number of trades they&apos;ve closed.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <p>
+                      ⚖️ <strong className="text-white">Profit factor</strong>{" "}
+                      — quality metric (wins ÷ losses ratio).
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <p>
+                      🏆 <strong className="text-white">Competitions</strong>{" "}
+                      — <em>won / entered</em> count.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <p>
+                      ⚔️ <strong className="text-white">1v1 Challenges</strong>{" "}
+                      — <em>won / entered</em> count.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <p>
+                      🎖️ <strong className="text-white">Badges</strong> —
+                      total badges they&apos;ve unlocked.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <p>
+                      ⚡ <strong className="text-white">Score</strong> —
+                      their overall ChartVolt score (see the Score System
+                      section below).
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <p>
+                      ✨ <strong className="text-white">Why you match</strong>{" "}
+                      — up to three short reasons (e.g. <em>Matching win
+                      rates</em>, <em>Online &amp; ready</em>).
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  If the trader has switched off &quot;accepting
+                  challenges&quot; you&apos;ll see a small warning on the
+                  card and the challenge button is disabled.
+                </p>
+              </div>
+
+              {/* How match % is calculated */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Target className="h-4 w-4 text-pink-400" />
+                  How the Match % is calculated
+                </h3>
+                <p className="text-sm mb-3">
+                  Each candidate starts at <strong>100</strong> and loses
+                  points the more your profiles differ. The result is
+                  clamped to 0–100 — so a perfect twin scores near 100 and
+                  a complete mismatch scores near 0.
+                </p>
+                <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg text-sm">
+                  <ul className="space-y-1">
+                    <li>
+                      −10 per <strong className="text-white">experience-level</strong>{" "}
+                      gap (Beginner ↔ Master is a 4-level gap = −40)
+                    </li>
+                    <li>
+                      up to −25 for a <strong className="text-white">win-rate</strong>{" "}
+                      gap (½ point per % difference)
+                    </li>
+                    <li>
+                      up to −15 if their <strong className="text-white">trade count</strong>{" "}
+                      is much lower than yours (scaled by ratio)
+                    </li>
+                    <li>
+                      up to −10 for a <strong className="text-white">profit-factor</strong>{" "}
+                      gap
+                    </li>
+                    <li>
+                      up to −5 each for <strong className="text-white">competition experience</strong>{" "}
+                      and <strong className="text-white">badge count</strong>{" "}
+                      gaps
+                    </li>
+                    <li>
+                      <span className="text-green-300">+5</span> bonus when
+                      the trader is online <em>and</em> accepting
+                      challenges
+                    </li>
+                  </ul>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  The platform&apos;s overall &quot;ChartVolt Score&quot;
+                  (the composite number used on the leaderboard) is{" "}
+                  <strong>not</strong> an input to the Match %. Match % is
+                  a fairness/compatibility metric, not a power ranking.
+                </p>
+              </div>
+
+              {/* Why you match */}
               <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
-                <h4 className="font-semibold text-white mb-2">
-                  ✨ Why You Match Section:
-                </h4>
-                <p className="text-sm text-gray-400 mb-3">
-                  Each card shows reasons why you&apos;re a good match:
+                <h3 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-green-400" />
+                  &quot;Why you match&quot; chips
+                </h3>
+                <p className="text-sm text-gray-300 mb-2">
+                  When the gap on a given dimension is small enough, the
+                  algorithm tags it as a positive reason. Possible chips
+                  include:
                 </p>
                 <ul className="space-y-1 text-sm">
                   <li className="flex items-center gap-2">
-                    <span className="text-green-400">✓</span> Similar experience
-                    level (beginner, intermediate, expert)
+                    <span className="text-green-400">✓</span> Same level /
+                    similar experience level
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-green-400">✓</span> Matching win
+                    rates
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-green-400">✓</span> Similar trading
+                    volume
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="text-green-400">✓</span> Similar profit
                     factor
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="text-green-400">✓</span> Online &amp; ready
-                    to compete
+                    <span className="text-green-400">✓</span> Online &amp;
+                    ready
                   </li>
-                  <li className="flex items-center gap-2">
-                    <span className="text-green-400">✓</span> Similar
-                    competition experience
+                </ul>
+                <p className="text-xs text-gray-500 mt-2">
+                  The card shows the top three matching reasons to keep the
+                  UI tidy.
+                </p>
+              </div>
+
+              {/* VS screen */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Users className="h-4 w-4 text-cyan-400" />
+                  The VS screen
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Shown right after a right-swipe. Displays{" "}
+                      <strong className="text-white">your avatar</strong>{" "}
+                      versus{" "}
+                      <strong className="text-white">your opponent&apos;s avatar</strong>{" "}
+                      in a dramatic head-to-head layout.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Below the hero you&apos;ll see the opponent&apos;s key
+                      stats: <em>win rate</em>, <em>total trades</em>,{" "}
+                      <em>competitions won / entered</em> and{" "}
+                      <em>1v1 won / entered</em>. Use the leaderboard or
+                      your own profile if you want to compare your numbers
+                      side by side.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Challenge Now!</strong>{" "}
+                      opens the standard 1v1 create dialog with this
+                      opponent pre-selected. Close the dialog to back out
+                      without sending anything.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Who appears + privacy */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-blue-400" />
+                  Who appears in the deck
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Anyone on the public leaderboard who isn&apos;t you
+                      (you&apos;re always filtered out).
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Users with <strong className="text-white">unverified
+                      emails</strong> are excluded — only fully verified
+                      accounts show up.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Accounts that admins have marked as{" "}
+                      <em>hidden from public</em> (e.g. internal/support
+                      accounts) don&apos;t appear.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Traders who&apos;ve toggled off{" "}
+                      <em>accepting challenges</em> can still show up in
+                      the deck, but the challenge button is disabled and a
+                      warning replaces it.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      The deck pulls the top 50 best-matched traders by
+                      default; the underlying leaderboard data is cached
+                      for about 5 minutes so the order can stay stable
+                      between refreshes.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Tips */}
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                <h3 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-yellow-400" />
+                  Tips
+                </h3>
+                <ul className="space-y-1 text-sm text-gray-300">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Hit <strong className="text-white">Find Best Match</strong>{" "}
+                      first — it skips the manual swiping and picks the
+                      most compatible opponent who&apos;s actually
+                      available right now.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Match Cards are a finder — you can always close the
+                      challenge dialog without committing if the duration
+                      or stake doesn&apos;t look right after seeing the VS
+                      screen.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Run out of cards? Refresh the page to rebuild the
+                      deck. New traders join the leaderboard as they
+                      complete activity, so the deck refills over time.
+                    </span>
                   </li>
                 </ul>
               </div>
