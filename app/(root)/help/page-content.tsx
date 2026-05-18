@@ -7737,154 +7737,366 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
 
             <div className="space-y-6 text-gray-300">
               <p className="leading-relaxed">
-                We are committed to providing a fair and secure trading competition
-                environment for all users. Our platform uses advanced automated systems
-                to detect and prevent unfair practices such as multi-accounting and
-                collusion. Here&apos;s everything you need to know.
+                ChartVolt protects you on two fronts: the{" "}
+                <strong className="text-white">controls you own</strong>{" "}
+                on your account (password, 2FA, KYC), and the{" "}
+                <strong className="text-white">
+                  automated platform integrity systems
+                </strong>{" "}
+                that keep competitions free of multi-accounting, mirror
+                trading, and payment fraud. Both run quietly in the
+                background so honest traders never have to think about
+                them.
               </p>
 
-              {/* Why We Monitor */}
-              <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-5">
-                <h3 className="text-lg font-bold text-green-400 mb-3">
-                  ✅ Why We Monitor Accounts
+              {/* Your own security controls */}
+              <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-5">
+                <h3 className="text-lg font-bold text-cyan-400 mb-3 flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Your account security controls
                 </h3>
                 <p className="text-sm text-gray-300 mb-3">
-                  To ensure every competition and challenge is fair, we monitor accounts
-                  for signs of manipulation. This is <strong>standard practice</strong> across
-                  all competitive trading platforms. The vast majority of users are never
-                  affected. If our system does flag your account, it is a routine check —
-                  not an accusation.
+                  Manage all of these from{" "}
+                  <Link
+                    href="/profile?tab=settings"
+                    className="text-cyan-400 hover:underline"
+                  >
+                    /profile?tab=settings
+                  </Link>
+                  .
                 </p>
-                <ul className="list-disc list-inside text-sm text-gray-400 space-y-1">
-                  <li>Protects your winnings from being diluted by cheaters</li>
-                  <li>Maintains fair prize distribution in competitions</li>
-                  <li>Keeps the leaderboard honest and competitive</li>
-                  <li>Required by our platform integrity policy</li>
-                </ul>
-              </div>
-
-              {/* What We Check */}
-              <div>
-                <h3 className="text-lg font-bold text-white mb-4">
-                  🔍 What Our System Checks
-                </h3>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                    <h5 className="font-semibold text-blue-400 mb-2">🖥️ Device Recognition</h5>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1 flex items-center gap-2">
+                      <BadgeCheck className="h-4 w-4 text-green-400" />
+                      Two-Factor Authentication (2FA)
+                    </p>
                     <p className="text-xs text-gray-400">
-                      We track device information to ensure one person isn&apos;t
-                      operating multiple accounts from the same computer or phone.
-                      Each account should belong to a unique individual.
+                      TOTP-based 2FA using any standard authenticator
+                      app (Google Authenticator, Authy, 1Password,
+                      etc.). Backup codes are issued at setup and there
+                      is an email-OTP fallback if you lose your
+                      authenticator.{" "}
+                      <strong className="text-white">
+                        Strongly recommended.
+                      </strong>
                     </p>
                   </div>
-                  <div className="p-4 bg-orange-500/10 rounded-lg border border-orange-500/30">
-                    <h5 className="font-semibold text-orange-400 mb-2">💳 Payment Verification</h5>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1 flex items-center gap-2">
+                      <LogIn className="h-4 w-4 text-blue-400" />
+                      Password
+                    </p>
                     <p className="text-xs text-gray-400">
-                      We check that each account uses its own unique payment method.
-                      Sharing a credit card or bank account across multiple accounts
-                      is flagged as a potential multi-account violation.
+                      Minimum 8 characters, maximum 128. Passwords are
+                      hashed with bcrypt server-side. Use a long,
+                      unique passphrase you don&apos;t reuse anywhere
+                      else.
                     </p>
                   </div>
-                  <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
-                    <h5 className="font-semibold text-yellow-400 mb-2">🌐 Network Analysis</h5>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1 flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-pink-400" />
+                      Email is read-only
+                    </p>
                     <p className="text-xs text-gray-400">
-                      We record login locations and network information. Multiple accounts
-                      frequently logging in from the same network may be reviewed.
-                      Using VPNs or proxies may also trigger a review.
+                      Your sign-in email cannot be changed from the
+                      profile UI — a deliberate choice to prevent
+                      account take-over. Contact support if you
+                      genuinely need to update it.
                     </p>
                   </div>
-                  <div className="p-4 bg-purple-500/10 rounded-lg border border-purple-500/30">
-                    <h5 className="font-semibold text-purple-400 mb-2">📊 Trading Pattern Review</h5>
-                    <p className="text-xs text-gray-400">
-                      We analyse trading patterns to detect if two accounts are making
-                      identical or suspiciously similar trades. This includes checking
-                      the timing, direction, size, and currency pairs traded. Accounts
-                      with highly similar behavior may be flagged for review.
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1 flex items-center gap-2">
+                      <BadgeCheck className="h-4 w-4 text-emerald-400" />
+                      Identity verification (KYC)
                     </p>
-                  </div>
-                  <div className="p-4 bg-cyan-500/10 rounded-lg border border-cyan-500/30">
-                    <h5 className="font-semibold text-cyan-400 mb-2">🏆 Competition Entry Review</h5>
                     <p className="text-xs text-gray-400">
-                      If accounts that are already linked by other signals enter the
-                      same competition, this is flagged as potential manipulation.
-                      Each competition is monitored independently.
-                    </p>
-                  </div>
-                  <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/30">
-                    <h5 className="font-semibold text-green-400 mb-2">🪪 Identity Verification</h5>
-                    <p className="text-xs text-gray-400">
-                      During KYC (Know Your Customer) verification, we check that identity
-                      documents haven&apos;t been used by another account. Each person should
-                      only have one account on the platform.
+                      Required for withdrawals
+                      {settings.kyc?.enabled &&
+                        settings.kyc?.requiredAmount > 0 && (
+                          <>
+                            {" "}
+                            at or above {settings.currency.symbol}
+                            {settings.kyc.requiredAmount}
+                          </>
+                        )}
+                      . Run the flow from the{" "}
+                      <Link
+                        href="/profile?tab=verification"
+                        className="text-cyan-400 hover:underline"
+                      >
+                        Verification tab
+                      </Link>{" "}
+                      whenever you&apos;re ready.
                     </p>
                   </div>
                 </div>
+                <div className="mt-3 text-xs text-gray-400">
+                  Card payments are handled end-to-end by a PCI-DSS
+                  compliant payment processor — ChartVolt never sees or
+                  stores your full card number. Repeated declined
+                  payments temporarily pause new deposit attempts on
+                  your account to protect against card-testing fraud.
+                </div>
               </div>
 
-              {/* What Happens If Flagged */}
+              {/* Why we monitor */}
+              <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-5">
+                <h3 className="text-lg font-bold text-green-400 mb-3">
+                  ✅ Why we monitor accounts
+                </h3>
+                <p className="text-sm text-gray-300 mb-3">
+                  Real prize pools are at stake in competitions and 1v1
+                  challenges. To make every event fair, ChartVolt runs
+                  background checks on the signals that typically come
+                  with multi-accounting or collusion. This is standard
+                  practice across competitive trading platforms — the
+                  vast majority of users are never affected, and a flag
+                  is a <strong>routine review, not an accusation</strong>
+                  .
+                </p>
+                <ul className="list-disc list-inside text-sm text-gray-400 space-y-1">
+                  <li>
+                    Protects your prize pool from being diluted by
+                    coordinated entries.
+                  </li>
+                  <li>
+                    Keeps the leaderboard honest and the Score System
+                    meaningful.
+                  </li>
+                  <li>
+                    Catches payment fraud (chargebacks, card testing)
+                    before it affects other users.
+                  </li>
+                  <li>
+                    Required by our platform integrity policy and
+                    payment-processor obligations.
+                  </li>
+                </ul>
+              </div>
+
+              {/* What our system checks */}
+              <div>
+                <h3 className="text-lg font-bold text-white mb-4">
+                  🔍 What our system checks
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                    <h5 className="font-semibold text-blue-400 mb-2">
+                      🖥️ Device recognition
+                    </h5>
+                    <p className="text-xs text-gray-400">
+                      Each browser session generates a privacy-respecting
+                      device fingerprint (no spyware, no personal data —
+                      just an anonymised identifier). If the same device
+                      is used to sign in to many different accounts, the
+                      cluster is flagged for review.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-orange-500/10 rounded-lg border border-orange-500/30">
+                    <h5 className="font-semibold text-orange-400 mb-2">
+                      💳 Payment verification
+                    </h5>
+                    <p className="text-xs text-gray-400">
+                      The platform stores an anonymised card / payment
+                      method fingerprint so the same card showing up on
+                      multiple accounts is detected. ChartVolt never
+                      sees your full card number; only the
+                      processor&apos;s opaque fingerprint is used.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
+                    <h5 className="font-semibold text-yellow-400 mb-2">
+                      🌐 IP &amp; network analysis
+                    </h5>
+                    <p className="text-xs text-gray-400">
+                      We record the IP address at sign-up, sign-in and
+                      deposit time. Known VPN, proxy and Tor exit nodes
+                      are flagged because they make multi-accounting
+                      easier — using one isn&apos;t a ban by itself,
+                      but it may trigger additional review.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-purple-500/10 rounded-lg border border-purple-500/30">
+                    <h5 className="font-semibold text-purple-400 mb-2">
+                      📊 Trading pattern review
+                    </h5>
+                    <p className="text-xs text-gray-400">
+                      After every trade closes, the platform builds an
+                      anonymised behavioural profile (preferred pairs,
+                      typical hold times, hour-of-day, risk style). Two
+                      accounts whose profiles are unusually similar, or
+                      whose trades fire within seconds of each other on
+                      the same pair, are flagged as possible mirror
+                      trading or collusion.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-cyan-500/10 rounded-lg border border-cyan-500/30">
+                    <h5 className="font-semibold text-cyan-400 mb-2">
+                      🏆 Competition entry review
+                    </h5>
+                    <p className="text-xs text-gray-400">
+                      When the same competition gets several entries
+                      within minutes of each other from accounts that
+                      were already linked by other signals, that
+                      cluster is reviewed independently for each
+                      competition.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/30">
+                    <h5 className="font-semibold text-green-400 mb-2">
+                      🪪 Identity verification (KYC)
+                    </h5>
+                    <p className="text-xs text-gray-400">
+                      During KYC the platform checks that the same
+                      identity document isn&apos;t already in use on
+                      another account. Each real person should have
+                      exactly one ChartVolt account.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 bg-gray-800/60 border border-gray-700 rounded-lg p-3 text-xs text-gray-400">
+                  <strong className="text-white">What we don&apos;t do:</strong>{" "}
+                  we don&apos;t record what you type, where your mouse
+                  moves, what tabs you open, or what other sites you
+                  visit. Nothing is shared with third parties for
+                  advertising. The only signals we use are the ones
+                  needed to keep competitions fair and payments safe.
+                </div>
+              </div>
+
+              {/* What happens if flagged */}
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-5">
                 <h3 className="text-lg font-bold text-yellow-400 mb-3">
-                  ⚠️ What Happens If My Account Is Flagged?
+                  ⚠️ What happens if my account is flagged?
                 </h3>
                 <div className="space-y-3 text-sm">
                   <p className="text-gray-300">
-                    If our system detects something unusual, you may see a notification
-                    on your dashboard. <strong>Don&apos;t panic</strong> — this is a routine
-                    security check, not an accusation. Here&apos;s what to expect:
+                    If our system detects something that looks like
+                    multi-accounting or coordination,{" "}
+                    <strong>don&apos;t panic</strong> — it is a routine
+                    review, not a verdict. Here&apos;s what happens:
                   </p>
                   <ol className="list-decimal list-inside space-y-2 text-gray-400">
                     <li>
-                      <strong className="text-white">Notification:</strong> You&apos;ll see a security
-                      notice on your dashboard explaining that your account is being reviewed.
+                      <strong className="text-white">
+                        In-app notification.
+                      </strong>{" "}
+                      You&apos;ll see a security notice in your
+                      notifications and on your dashboard explaining
+                      that your account is being reviewed.
                     </li>
                     <li>
-                      <strong className="text-white">Review period:</strong> Our team will review
-                      the flagged activity. During this time, you can usually continue using the
-                      platform normally unless your account requires temporary restrictions.
+                      <strong className="text-white">Review period.</strong>{" "}
+                      For most flags you can{" "}
+                      <em>continue using the platform normally</em>{" "}
+                      while the case is reviewed. If the flag is severe
+                      enough to need temporary restrictions, you may be
+                      blocked from one or more actions —{" "}
+                      <strong className="text-white">trading</strong>,{" "}
+                      <strong className="text-white">deposits</strong>,{" "}
+                      <strong className="text-white">withdrawals</strong>{" "}
+                      and{" "}
+                      <strong className="text-white">
+                        competition entries
+                      </strong>{" "}
+                      each have their own switch and can be applied
+                      individually.
                     </li>
                     <li>
-                      <strong className="text-white">Resolution:</strong> If the flag is a false
-                      positive (which happens — e.g., shared household WiFi), it will be dismissed
-                      and your account will be cleared. You won&apos;t be flagged for the same reason again.
+                      <strong className="text-white">Account Review page.</strong>{" "}
+                      When any action is blocked, attempting it
+                      redirects you to{" "}
+                      <Link
+                        href="/account/review"
+                        className="text-yellow-400 hover:underline"
+                      >
+                        /account/review
+                      </Link>
+                      , which spells out what&apos;s on hold and how to
+                      contact support. You can always sign in and view
+                      your account.
                     </li>
                     <li>
-                      <strong className="text-white">Contact support:</strong> If you believe the flag
-                      is incorrect, contact our support team with any relevant explanation.
-                      We&apos;re here to help and resolve any misunderstandings quickly.
+                      <strong className="text-white">Resolution.</strong>{" "}
+                      Common false positives (shared household Wi-Fi,
+                      family payment method, traveling and switching
+                      networks) get cleared by support after a quick
+                      check. Once a case is closed in your favour, your
+                      account is fully unblocked and the flag is
+                      retired.
+                    </li>
+                    <li>
+                      <strong className="text-white">Contact support.</strong>{" "}
+                      Reach out at any time with context — the more
+                      detail you give (relationship to other accounts
+                      on your network, etc.) the faster a human can
+                      clear it.
                     </li>
                   </ol>
                 </div>
               </div>
 
-              {/* What's Not Allowed */}
+              {/* What's not allowed */}
               <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-5">
                 <h3 className="text-lg font-bold text-red-400 mb-3">
-                  🚫 What&apos;s Not Allowed
+                  🚫 What&apos;s not allowed
                 </h3>
                 <ul className="list-disc list-inside text-sm text-gray-400 space-y-2">
                   <li>
-                    <strong className="text-white">Multiple accounts:</strong> Each person may only
-                    have one account. Creating or operating multiple accounts is strictly prohibited.
+                    <strong className="text-white">
+                      Multiple accounts.
+                    </strong>{" "}
+                    Each real person may only have one account.
+                    Creating or operating multiples — including
+                    &quot;backup&quot; accounts — is prohibited.
                   </li>
                   <li>
-                    <strong className="text-white">Account sharing:</strong> Sharing your account
-                    credentials with another person or letting someone else trade on your behalf is not allowed.
+                    <strong className="text-white">
+                      Account sharing.
+                    </strong>{" "}
+                    Don&apos;t hand over your credentials or let
+                    somebody else trade on your behalf. Anything done
+                    from your session is treated as you.
                   </li>
                   <li>
-                    <strong className="text-white">Collusion:</strong> Coordinating trades with another
-                    user to manipulate competition outcomes is prohibited.
+                    <strong className="text-white">Collusion.</strong>{" "}
+                    Coordinating trades or competition entries with
+                    another user to manipulate outcomes is prohibited.
                   </li>
                   <li>
-                    <strong className="text-white">Mirror trading:</strong> Copying trades between two
-                    accounts in real-time to guarantee outcomes is considered fraud.
+                    <strong className="text-white">Mirror trading.</strong>{" "}
+                    Running two accounts that open/close identical
+                    trades in the same window is treated as collusion
+                    even if you control both of them.
                   </li>
                   <li>
-                    <strong className="text-white">VPN abuse:</strong> Using VPNs or proxies to disguise
-                    your identity or location for the purpose of circumventing security measures.
+                    <strong className="text-white">VPN abuse.</strong>{" "}
+                    Casual VPN use is fine; using one to disguise that
+                    several accounts come from the same person — or to
+                    bypass a restriction — is not.
                   </li>
                   <li>
-                    <strong className="text-white">Document fraud:</strong> Submitting fake or someone
-                    else&apos;s identity documents during verification.
+                    <strong className="text-white">Document fraud.</strong>{" "}
+                    Submitting forged, stolen, or third-party identity
+                    documents at KYC results in a permanent ban.
+                  </li>
+                  <li>
+                    <strong className="text-white">
+                      Card-testing &amp; chargeback abuse.
+                    </strong>{" "}
+                    Cycling declined cards or filing fraudulent
+                    chargebacks on legitimate deposits is treated as
+                    payment fraud — see{" "}
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection("credits")}
+                      className="text-red-300 hover:underline"
+                    >
+                      Credits &amp; Wallet
+                    </button>{" "}
+                    for the clawback flow.
                   </li>
                 </ul>
               </div>
@@ -7892,26 +8104,39 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
               {/* Consequences */}
               <div>
                 <h3 className="text-lg font-bold text-white mb-3">
-                  ⚖️ Consequences of Violations
+                  ⚖️ Consequences of violations
                 </h3>
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30 text-center">
-                    <h5 className="font-semibold text-yellow-400">Warning</h5>
-                    <p className="text-xs text-gray-400 mt-1">
-                      First minor violations may receive a warning with an explanation.
+                  <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
+                    <h5 className="font-semibold text-yellow-400 mb-1 text-center">
+                      Warning &amp; Review
+                    </h5>
+                    <p className="text-xs text-gray-400 text-center">
+                      Minor or first-time signals trigger a routine
+                      review. You may keep using the platform while it
+                      runs.
                     </p>
                   </div>
-                  <div className="p-4 bg-orange-500/10 rounded-lg border border-orange-500/30 text-center">
-                    <h5 className="font-semibold text-orange-400">Suspension</h5>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Temporary suspension from competitions and challenges. Funds remain accessible.
+                  <div className="p-4 bg-orange-500/10 rounded-lg border border-orange-500/30">
+                    <h5 className="font-semibold text-orange-400 mb-1 text-center">
+                      Restrictions
+                    </h5>
+                    <p className="text-xs text-gray-400 text-center">
+                      Confirmed cases lead to{" "}
+                      <strong className="text-white">temporary</strong>{" "}
+                      restrictions — any combination of trading,
+                      deposits, withdrawals, and competition entries
+                      can be paused.
                     </p>
                   </div>
-                  <div className="p-4 bg-red-500/10 rounded-lg border border-red-500/30 text-center">
-                    <h5 className="font-semibold text-red-400">Permanent Ban</h5>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Severe or repeated violations result in permanent account deactivation.
-                      Remaining funds can be withdrawn.
+                  <div className="p-4 bg-red-500/10 rounded-lg border border-red-500/30">
+                    <h5 className="font-semibold text-red-400 mb-1 text-center">
+                      Permanent Ban
+                    </h5>
+                    <p className="text-xs text-gray-400 text-center">
+                      Severe or repeated violations result in a
+                      permanent ban. Legitimate remaining funds can
+                      still be released by support on request.
                     </p>
                   </div>
                 </div>
@@ -7920,36 +8145,85 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
               {/* Tips */}
               <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-5">
                 <h3 className="text-lg font-bold text-blue-400 mb-3">
-                  💡 Tips to Avoid Being Flagged
+                  💡 Tips to keep your account healthy
                 </h3>
                 <ul className="list-disc list-inside text-sm text-gray-400 space-y-2">
-                  <li>Use only <strong>one account</strong> — do not create backup or secondary accounts</li>
-                  <li>Use your <strong>own payment method</strong> — do not share cards with other users on the platform</li>
-                  <li>Avoid <strong>VPNs or proxies</strong> when using the platform unless necessary</li>
-                  <li>Trade independently — do not coordinate entries or trades with other users</li>
-                  <li>Submit your <strong>own genuine documents</strong> for KYC verification</li>
-                  <li>If you share a household with another user, <strong>contact support proactively</strong> to let us know — this helps us distinguish legitimate shared networks from multi-accounting</li>
+                  <li>
+                    Turn on{" "}
+                    <strong className="text-white">2FA</strong> as
+                    soon as you can — it stops 99% of password-leak
+                    attacks.
+                  </li>
+                  <li>
+                    Stick to{" "}
+                    <strong className="text-white">one account</strong>{" "}
+                    per person; don&apos;t make &quot;backup&quot;
+                    accounts.
+                  </li>
+                  <li>
+                    Use your{" "}
+                    <strong className="text-white">
+                      own payment method
+                    </strong>{" "}
+                    for deposits and withdrawals.
+                  </li>
+                  <li>
+                    If you share a household, a workplace or a college
+                    network with another trader,{" "}
+                    <strong className="text-white">
+                      tell support proactively
+                    </strong>{" "}
+                    — flags resolve much faster when context is on
+                    file.
+                  </li>
+                  <li>
+                    Trade <strong className="text-white">independently</strong>{" "}
+                    — don&apos;t coordinate entries, sizes, or close
+                    times with friends in the same competition.
+                  </li>
+                  <li>
+                    Submit your{" "}
+                    <strong className="text-white">
+                      own genuine documents
+                    </strong>{" "}
+                    at KYC, and keep them current if the platform asks
+                    for re-verification.
+                  </li>
+                  <li>
+                    Avoid VPNs when not strictly needed — they make
+                    legitimate use look like the kind of thing the
+                    fraud system flags.
+                  </li>
                 </ul>
               </div>
 
               {/* Support */}
               <div className="bg-gray-700/50 border border-gray-600 rounded-xl p-5 text-center">
                 <h3 className="text-lg font-bold text-white mb-2">
-                  Need Help?
+                  Need help?
                 </h3>
                 <p className="text-sm text-gray-400 mb-3">
-                  If your account has been flagged and you believe it&apos;s a mistake,
-                  or if you have any questions about our security measures, please
-                  don&apos;t hesitate to reach out to our support team. We&apos;re
-                  committed to resolving any issues fairly and promptly.
+                  If your account has been flagged and you believe
+                  it&apos;s a mistake, or if you have questions about
+                  our security measures, reach out to support. We are
+                  committed to resolving issues fairly and quickly —
+                  most reviews end with the account fully cleared.
                 </p>
                 {isLoggedIn && (
-                  <Link
-                    href="/profile"
-                    className="inline-block px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-medium text-sm"
-                  >
-                    Go to Profile & Settings
-                  </Link>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    <Link
+                      href="/profile?tab=settings"
+                      className="inline-block px-6 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg transition-colors font-medium text-sm"
+                    >
+                      Security settings
+                    </Link>
+                    <Link
+                      href="/account/review"
+                      className="inline-block px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-gray-900 rounded-lg transition-colors font-medium text-sm"
+                    >
+                      Account Review
+                    </Link>
+                  </div>
                 )}
               </div>
             </div>
