@@ -1801,29 +1801,575 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
               </h2>
             </div>
 
-            <div className="space-y-4 text-gray-300">
+            <div className="space-y-6 text-gray-300">
               <p className="leading-relaxed">
-                Head-to-head trading battles between two traders. Create or join
-                a challenge!
+                A 1v1 Challenge is a direct head-to-head trading duel between
+                two players. You pick a specific opponent, both of you stake
+                the same entry fee in{" "}
+                <strong>{settings.credits.name.toLowerCase()}</strong>{" "}
+                (<span className="text-yellow-400">{settings.credits.symbol}</span>),
+                you each trade a fresh virtual starting capital for the
+                challenge&apos;s duration, and the better performer takes the
+                pot minus a small platform fee. Unlike Competitions there&apos;s
+                no public lobby — every challenge is an invitation from one
+                player to another.
               </p>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="p-4 bg-red-500/10 rounded-lg border border-red-500/30">
-                  <h5 className="font-semibold text-red-400 mb-2">
-                    🎮 Create a Challenge
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Set the entry fee, duration, and wait for an opponent.
+              {/* How it works */}
+              <div className="bg-gray-900/40 border border-gray-700 rounded-lg p-4">
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Info className="h-4 w-4 text-blue-400" />
+                  How a 1v1 Challenge works
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Direct invite.</strong>{" "}
+                      You pick the opponent from a leaderboard, a Match Card
+                      swipe or a profile page, then send a challenge. There is
+                      no public &quot;open challenges&quot; list — your
+                      opponent has to be chosen before you can create the
+                      challenge.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">No money locked at create.</strong>{" "}
+                      Entry fees are <em>only</em> debited when your opponent{" "}
+                      <strong>accepts</strong>. Both stakes are deducted in the
+                      same atomic step — if your opponent declines, lets the
+                      invite expire, or you don&apos;t have enough{" "}
+                      {settings.credits.name.toLowerCase()} on accept,{" "}
+                      <strong>nothing</strong> is taken from either wallet.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Sandbox capital.</strong>{" "}
+                      Each side starts the duel with the configured{" "}
+                      <em>starting capital</em> (virtual). Your real{" "}
+                      {settings.credits.name.toLowerCase()} balance only moves
+                      twice: on accept (stake out) and at settlement (prize
+                      in, if you win).
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Auto-settlement.</strong>{" "}
+                      When the duration ends (or whenever a participant opens
+                      the challenge afterwards), the system closes any open
+                      positions, ranks both players, applies the platform fee
+                      and credits the winner&apos;s wallet automatically as a{" "}
+                      <code className="bg-gray-800 px-1 rounded text-xs">
+                        challenge_win
+                      </code>{" "}
+                      transaction.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Status lifecycle */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-cyan-400" />
+                  Status lifecycle
+                </h3>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/30 text-sm">
+                    <span className="font-semibold text-yellow-300">
+                      🟡 Pending
+                    </span>
+                    <p className="text-gray-400 mt-1">
+                      Invite sent, waiting for the opponent to Accept or
+                      Decline before the <em>accept deadline</em>. No credits
+                      have moved yet.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-red-500/10 rounded-lg border border-red-500/30 text-sm">
+                    <span className="font-semibold text-red-300">
+                      🔴 Active
+                    </span>
+                    <p className="text-gray-400 mt-1">
+                      Both stakes have been taken, both sandboxes are loaded,
+                      trading is live. The detail page shows live P&amp;L and
+                      countdown.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/30 text-sm">
+                    <span className="font-semibold text-green-300">
+                      🟢 Completed
+                    </span>
+                    <p className="text-gray-400 mt-1">
+                      End time hit and the winner was paid. Both players keep
+                      access to the trade view in read-only mode.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600 text-sm">
+                    <span className="font-semibold text-gray-300">
+                      ⚪ Declined
+                    </span>
+                    <p className="text-gray-400 mt-1">
+                      Opponent rejected the invite. No credits taken; you can
+                      challenge someone else.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600 text-sm sm:col-span-2">
+                    <span className="font-semibold text-gray-300">
+                      ⌛ Expired / Cancelled
+                    </span>
+                    <p className="text-gray-400 mt-1">
+                      <em>Expired</em> = the accept deadline passed without a
+                      response (no credits taken).{" "}
+                      <em>Cancelled</em> = an admin cancelled the challenge.
+                      If the challenge was already Active or Accepted, both
+                      stakes are <strong className="text-white">fully refunded</strong>{" "}
+                      to the participants&apos; wallets.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Creating a challenge */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Swords className="h-4 w-4 text-red-400" />
+                  Creating a challenge
+                </h3>
+                <ol className="space-y-2 text-sm list-decimal list-inside marker:text-red-400">
+                  <li>
+                    Find an opponent — from a{" "}
+                    <Link
+                      href="/match-cards"
+                      className="text-yellow-400 hover:text-yellow-300 underline underline-offset-2"
+                    >
+                      Match Card
+                    </Link>{" "}
+                    swipe, a leaderboard row, or their profile page.
+                  </li>
+                  <li>
+                    Open the <strong className="text-white">Create Challenge</strong>{" "}
+                    dialog. Pick the entry fee (within the admin-configured
+                    min/max), the duration, the ranking method (P&amp;L, ROI,
+                    Total Capital, Win Rate, Total Wins or Profit Factor) and
+                    optionally a primary / secondary tie-breaker.
+                  </li>
+                  <li>
+                    Accept the challenge terms when prompted. The invite is
+                    posted to the opponent — <strong>no credits leave your
+                    wallet at this point</strong>.
+                  </li>
+                  <li>
+                    Your opponent has until the <em>accept deadline</em> to
+                    Accept or Decline. They&apos;ll see your invite as a
+                    notification, an in-app popup, and an entry in their{" "}
+                    <Link
+                      href="/challenges"
+                      className="text-yellow-400 hover:text-yellow-300 underline underline-offset-2"
+                    >
+                      /challenges
+                    </Link>{" "}
+                    list.
+                  </li>
+                </ol>
+
+                <div className="mt-3 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-sm">
+                  <p className="text-amber-200 font-semibold mb-2 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Create-time guards
+                  </p>
+                  <ul className="space-y-1 text-gray-300">
+                    <li className="flex items-start gap-2">
+                      <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <span>
+                        Email must be <strong className="text-white">verified</strong>.
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <span>
+                        Your account must not be suspended, in chargeback or
+                        otherwise restricted from competition-style features.
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <span>
+                        Challenges must be{" "}
+                        <strong className="text-white">enabled</strong>{" "}
+                        platform-wide (admin toggle) and the relevant market
+                        must currently be open.
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <span>
+                        You can&apos;t challenge yourself.
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <span>
+                        Wallet must hold at least the entry fee (so the stake
+                        is collectable on accept).
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <span>
+                        Per-user limits apply:{" "}
+                        <em>max pending invites</em>,{" "}
+                        <em>max active challenges</em>, and an admin-set{" "}
+                        <em>cooldown</em> between repeat challenges against
+                        the same opponent.
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ChevronRight className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <span>
+                        The opponent must have{" "}
+                        <em>accepting challenges</em> enabled in their
+                        preferences (and, depending on admin config, be
+                        online).
+                      </span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Accepting */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <LogIn className="h-4 w-4 text-green-400" />
+                  Receiving &amp; accepting a challenge
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      You&apos;ll see a popup{" "}
+                      <em>Challenge Received!</em>, a notification, and a
+                      pending entry in your{" "}
+                      <Link
+                        href="/challenges"
+                        className="text-yellow-400 hover:text-yellow-300 underline underline-offset-2"
+                      >
+                        /challenges
+                      </Link>{" "}
+                      list with the full terms (stake, duration, scoring,
+                      tie-breakers).
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Click <strong className="text-white">Accept</strong>,
+                      review and confirm the challenge terms. At that moment{" "}
+                      <strong>both</strong> wallets are debited the entry fee
+                      in one transaction. If either side is now short of
+                      credits, the accept is rejected and the challenge stays
+                      Pending or auto-expires.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      You can <strong className="text-white">Decline</strong>{" "}
+                      instead — that closes the invite cleanly and no credits
+                      move. The challenger is notified.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      If you ignore the invite past the accept deadline, the
+                      system marks it <em>Expired</em> automatically.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Trading rules inside a challenge */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-orange-400" />
+                  Trading rules inside a challenge
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Dedicated trade screen</strong>{" "}
+                      at <code className="bg-gray-800 px-1 rounded text-xs">/challenges/[id]/trade</code>{" "}
+                      — chart, order ticket, your live PnL, your opponent&apos;s
+                      live PnL and the countdown to the end of the duel.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Leverage cap.</strong>{" "}
+                      Each challenge inherits a max leverage from the platform
+                      defaults (currently up to {settings.leverage.max}×) and
+                      the admin can lower it for challenges.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Position limits.</strong>{" "}
+                      Up to {settings.positions.maxOpen} open positions at a
+                      time and a per-trade size cap inherited from the global
+                      trading risk settings.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Asset class &amp; symbol scope.</strong>{" "}
+                      A challenge can be restricted to specific markets or a
+                      whitelist / blacklist of symbols. The order ticket
+                      reflects what&apos;s tradable.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-orange-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Live PnL refresh.</strong>{" "}
+                      Your scoreboard, your dashboard sidebar widget and your
+                      opponent&apos;s number update roughly every 10 seconds.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Ranking & tie rules */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-yellow-400" />
+                  Ranking &amp; tie rules
+                </h3>
+                <p className="text-sm mb-3">
+                  Challenges use the <strong>same six scoring methods</strong>{" "}
+                  as Competitions (P&amp;L, ROI, Total Capital, Win Rate, Total
+                  Wins, Profit Factor) — see the Competitions section for the
+                  full breakdown of each formula.
+                </p>
+                <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg text-sm space-y-2">
+                  <p>
+                    <strong className="text-white">Tie-breakers.</strong> The
+                    challenge optionally has a primary and secondary
+                    tie-breaker (trades count, win rate, total capital, ROI,
+                    join time, or split-prize). If both players are still
+                    exactly tied after that, the admin&apos;s{" "}
+                    <em>tie prize distribution</em> rule decides:
+                  </p>
+                  <ul className="space-y-1 pl-4">
+                    <li>
+                      • <strong className="text-white">Split equally</strong>{" "}
+                      — the pot (after platform fee) is divided 50/50.
+                    </li>
+                    <li>
+                      • <strong className="text-white">Challenger wins</strong>{" "}
+                      — on a perfect tie, the player who sent the invite
+                      takes the prize.
+                    </li>
+                    <li>
+                      • <strong className="text-white">Both lose</strong>{" "}
+                      — neither side is paid out and the stakes stay with the
+                      platform&apos;s unclaimed pool.
+                    </li>
+                  </ul>
+                  <p>
+                    The active rule for your challenge is shown on the
+                    detail page before you accept.
                   </p>
                 </div>
-                <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                  <h5 className="font-semibold text-blue-400 mb-2">
-                    🎯 Join a Challenge
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Browse open challenges and accept one.
-                  </p>
+              </div>
+
+              {/* Prize math */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Coins className="h-4 w-4 text-yellow-400" />
+                  Prize math
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Pot.</strong>{" "}
+                      <code className="bg-gray-800 px-1 rounded text-xs">
+                        pot = entry fee × 2
+                      </code>
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Platform fee.</strong> A
+                      percentage of the pot (configurable by the admin, e.g.
+                      10%) is taken from the prize before payout. The exact
+                      amount is shown on every challenge card.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Winner&apos;s prize.</strong>{" "}
+                      <code className="bg-gray-800 px-1 rounded text-xs">
+                        winnerPrize = pot − platformFee
+                      </code>{" "}
+                      credited automatically on settlement.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">No winner (both disqualified).</strong>{" "}
+                      The pot stays with the platform&apos;s unclaimed pool —
+                      it is <em>not</em> refunded as both players actively
+                      participated.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      <strong className="text-white">Game Master cut.</strong>{" "}
+                      If you (or your opponent) joined ChartVolt through a
+                      Game Master, that GM may earn a configurable percentage
+                      of their referred player&apos;s entry fee. The GM cut is
+                      taken <em>from</em> the platform fee, not from your
+                      prize — your payout is unaffected.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Liquidation */}
+              <div className="bg-rose-500/10 border border-rose-500/30 rounded-lg p-4">
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-rose-400" />
+                  Liquidation &amp; disqualification
+                </h3>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-rose-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Liquidation works the same way as in Competitions: if
+                      your sandbox margin hits{" "}
+                      <strong className="text-white">
+                        {settings.margin.liquidation}%
+                      </strong>{" "}
+                      or lower, all your open positions are force-closed and
+                      you&apos;re flagged as liquidated.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-rose-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Every challenge has{" "}
+                      <strong className="text-white">
+                        disqualify-on-liquidation
+                      </strong>{" "}
+                      enabled by design — once you&apos;re liquidated, you
+                      lose the duel for prize purposes and the other player
+                      becomes the winner if they finish qualified.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-rose-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      If <strong>both</strong> sides get liquidated, the
+                      challenge ends with <em>no winner</em>. Neither stake is
+                      refunded (both players participated).
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-rose-400 mt-0.5 flex-shrink-0" />
+                    <span>
+                      You can still revisit the challenge in{" "}
+                      <strong className="text-white">view-only mode</strong>{" "}
+                      to review your trade history.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Pages */}
+              <div>
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <LayoutDashboard className="h-4 w-4 text-purple-400" />
+                  Where to find what
+                </h3>
+                <div className="grid gap-2 sm:grid-cols-2 text-sm">
+                  <Link
+                    href="/challenges"
+                    className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg hover:bg-gray-800/40 transition-colors block"
+                  >
+                    <div className="font-semibold text-red-300">
+                      /challenges
+                    </div>
+                    <p className="text-gray-400 mt-1">
+                      All your invites and duels in one place. Tabs for{" "}
+                      <em>All</em>, <em>Pending</em>, <em>Active</em> and{" "}
+                      <em>Completed</em> (which also covers declined / expired
+                      / cancelled).
+                    </p>
+                  </Link>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <div className="font-semibold text-red-300">
+                      /challenges/[id]
+                    </div>
+                    <p className="text-gray-400 mt-1">
+                      Detail page — terms, opponent profile, live PnL of both
+                      sides, status badge, accept/decline buttons or the Trade
+                      Now CTA.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
+                    <div className="font-semibold text-red-300">
+                      /challenges/[id]/trade
+                    </div>
+                    <p className="text-gray-400 mt-1">
+                      The in-duel trading screen — chart, order ticket, open
+                      positions, your sandbox balance and the opponent ticker.
+                    </p>
+                  </div>
+                  <Link
+                    href="/match-cards"
+                    className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg hover:bg-gray-800/40 transition-colors block"
+                  >
+                    <div className="font-semibold text-red-300">
+                      /match-cards
+                    </div>
+                    <p className="text-gray-400 mt-1">
+                      Swipe-style matchmaking — find similar-skill opponents
+                      and send them a challenge directly from the card.
+                    </p>
+                  </Link>
                 </div>
+              </div>
+
+              {/* Fair play */}
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                <h3 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-blue-400" />
+                  Fair play
+                </h3>
+                <p className="text-sm text-gray-300">
+                  Both players trade independently — there is no shared book
+                  or position copying. Coordinated entries, mirror-trading
+                  with related accounts, and other manipulation patterns are
+                  monitored at the platform level and can result in
+                  disqualification and prize reversal. Per-opponent cooldowns
+                  and per-user pending/active limits prevent grinding the
+                  same matchup. Keep duels clean and your stats become a real
+                  reputation builder.
+                </p>
               </div>
             </div>
           </section>
