@@ -7020,62 +7020,78 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           >
             <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Award className="h-6 w-6 text-purple-500" />
-              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">🏅 Badge System</h2>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
+                🏅 Badge System
+              </h2>
             </div>
 
             <div className="space-y-4 text-gray-300">
-              <p className="leading-relaxed mb-4">
-                Earn badges by achieving milestones. Each badge grants XP
-                towards your trader level!
+              <p className="leading-relaxed">
+                Badges are how ChartVolt celebrates the things you
+                actually do — winning competitions, mastering a strategy,
+                running a clean risk book, surviving drawdowns,
+                stringing wins together. Every badge you earn{" "}
+                <strong className="text-white">adds XP</strong> to your
+                trader level and feeds into your{" "}
+                <button
+                  type="button"
+                  onClick={() => scrollToSection("score-system")}
+                  className="text-yellow-400 hover:underline"
+                >
+                  ChartVolt Score
+                </button>
+                . There is no cost to earn one — they unlock
+                automatically the moment you hit the criteria.
               </p>
 
-              <div>
-                <h4 className="font-semibold text-white mb-3">
-                  Badge Categories:
-                </h4>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                    <h5 className="font-semibold text-white mb-2">
-                      🏆 Competition
-                    </h5>
-                    <p className="text-sm text-gray-400">
-                      First place, podiums, streaks
-                    </p>
-                  </div>
-                  <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                    <h5 className="font-semibold text-white mb-2">
-                      📈 Trading
-                    </h5>
-                    <p className="text-sm text-gray-400">
-                      Milestones, diversity, volume
-                    </p>
-                  </div>
-                  <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                    <h5 className="font-semibold text-white mb-2">💰 Profit</h5>
-                    <p className="text-sm text-gray-400">
-                      ROI, win streaks, profit factor
-                    </p>
-                  </div>
-                  <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                    <h5 className="font-semibold text-white mb-2">
-                      🛡️ Risk Management
-                    </h5>
-                    <p className="text-sm text-gray-400">
-                      Stop loss usage, avoiding liquidation
-                    </p>
-                  </div>
-                </div>
+              {/* Where badges live */}
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3 text-xs text-gray-300">
+                <strong className="text-purple-300">Where to see them:</strong>{" "}
+                Open the{" "}
+                <Link
+                  href="/profile?tab=badges"
+                  className="text-purple-400 hover:underline"
+                >
+                  Badges tab
+                </Link>{" "}
+                in your profile for the full collection (earned and
+                locked), the{" "}
+                <button
+                  type="button"
+                  onClick={() => scrollToSection("dashboard")}
+                  className="text-purple-400 hover:underline"
+                >
+                  Dashboard
+                </button>{" "}
+                player card for your most-recent wins, and the{" "}
+                <button
+                  type="button"
+                  onClick={() => scrollToSection("leaderboard")}
+                  className="text-purple-400 hover:underline"
+                >
+                  Leaderboard
+                </button>{" "}
+                for every trader&apos;s badge count.
               </div>
 
+              {/* Rarities + XP */}
               <div>
-                <h4 className="font-semibold text-white mb-3">
-                  Badge Rarities & XP:
+                <h4 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-yellow-400" />
+                  Four rarities — XP they grant
                 </h4>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg border border-gray-600">
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">⭐</span>
-                      <p className="font-semibold text-gray-400">Common</p>
+                      <div>
+                        <p className="font-semibold text-gray-200">
+                          Common
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Everyday milestones and easy wins
+                        </p>
+                      </div>
                     </div>
                     <p className="text-sm text-green-400 font-bold">
                       +{settings.badgeXP.common} XP
@@ -7084,7 +7100,15 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   <div className="flex items-center justify-between p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">💎</span>
-                      <p className="font-semibold text-blue-400">Rare</p>
+                      <div>
+                        <p className="font-semibold text-blue-400">
+                          Rare
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Real consistency — you&apos;ve been at it for
+                          a while
+                        </p>
+                      </div>
                     </div>
                     <p className="text-sm text-blue-400 font-bold">
                       +{settings.badgeXP.rare} XP
@@ -7093,7 +7117,15 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   <div className="flex items-center justify-between p-3 bg-purple-500/10 rounded-lg border border-purple-500/30">
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">👑</span>
-                      <p className="font-semibold text-purple-400">Epic</p>
+                      <div>
+                        <p className="font-semibold text-purple-400">
+                          Epic
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Hard to fake — usually demands a podium or a
+                          tough drawdown survival
+                        </p>
+                      </div>
                     </div>
                     <p className="text-sm text-purple-400 font-bold">
                       +{settings.badgeXP.epic} XP
@@ -7102,13 +7134,226 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   <div className="flex items-center justify-between p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">🌟</span>
-                      <p className="font-semibold text-yellow-400">Legendary</p>
+                      <div>
+                        <p className="font-semibold text-yellow-400">
+                          Legendary
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Few traders ever see these — Hall-of-Fame
+                          tier
+                        </p>
+                      </div>
                     </div>
                     <p className="text-sm text-yellow-400 font-bold">
                       +{settings.badgeXP.legendary} XP
                     </p>
                   </div>
                 </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  XP per rarity is admin-configurable. The numbers above
+                  are pulled live from your platform&apos;s current
+                  settings.
+                </p>
+              </div>
+
+              {/* Real categories */}
+              <div>
+                <h4 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Medal className="h-4 w-4 text-yellow-400" />
+                  Nine badge categories
+                </h4>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-yellow-400 text-sm mb-1 flex items-center gap-2">
+                      <Trophy className="h-3.5 w-3.5" /> Competition
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Competitions entered, first wins, podium finishes,
+                      consecutive top-3 streaks.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-blue-400 text-sm mb-1 flex items-center gap-2">
+                      <TrendingUp className="h-3.5 w-3.5" /> Trading
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Total trades closed, daily/weekly volume, asset
+                      diversity, and time-of-day milestones.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-green-400 text-sm mb-1 flex items-center gap-2">
+                      <Coins className="h-3.5 w-3.5" /> Profit
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Profit factor, ROI thresholds, consecutive
+                      profitable days, and total P&amp;L crossed.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-cyan-400 text-sm mb-1 flex items-center gap-2">
+                      <Shield className="h-3.5 w-3.5" /> Risk
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Surviving drawdowns, holding low max-drawdown %,
+                      and competition risk discipline.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-orange-400 text-sm mb-1 flex items-center gap-2">
+                      <Zap className="h-3.5 w-3.5" /> Speed
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Fast scalps, quick competition climbs, rapid
+                      milestone unlocks.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-pink-400 text-sm mb-1 flex items-center gap-2">
+                      <Target className="h-3.5 w-3.5" /> Consistency
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Win streaks, consecutive trading days, and stable
+                      win rates over time.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-purple-400 text-sm mb-1 flex items-center gap-2">
+                      <BarChart3 className="h-3.5 w-3.5" /> Strategy
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Smart play markers — favourable risk-reward,
+                      Sharpe-style metrics, balanced entries.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-rose-400 text-sm mb-1 flex items-center gap-2">
+                      <Heart className="h-3.5 w-3.5" /> Social
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Community engagement (friends, messages,
+                      challenges accepted) — some entries are still
+                      being expanded.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600 sm:col-span-2">
+                    <p className="font-semibold text-amber-400 text-sm mb-1 flex items-center gap-2">
+                      <Award className="h-3.5 w-3.5" /> Legendary
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      A small pantheon of top-tier achievements
+                      (Hall-of-Fame ranks, undefeated runs, lifetime
+                      milestones). These are the badges the Score
+                      System highlights separately.
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Filter the full grid by category and rarity on{" "}
+                  <Link
+                    href="/profile?tab=badges"
+                    className="text-purple-400 hover:underline"
+                  >
+                    /profile?tab=badges
+                  </Link>
+                  . Locked badges stay visible (greyed out) so you can
+                  see what you&apos;re working towards.
+                </p>
+              </div>
+
+              {/* How they're awarded */}
+              <div>
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-400" />
+                  How badges are awarded
+                </h4>
+                <ul className="space-y-1.5 text-sm text-gray-300 list-disc pl-5">
+                  <li>
+                    Whenever you take a trading action — closing a
+                    position, entering or finishing a competition,
+                    completing a 1v1, completing a deposit, getting KYC
+                    approved — the platform re-evaluates the relevant
+                    badge group and unlocks any that you now qualify
+                    for.
+                  </li>
+                  <li>
+                    On top of those event hooks, there&apos;s a
+                    background pass{" "}
+                    <strong className="text-white">every hour</strong>{" "}
+                    that re-checks the full catalogue for any active
+                    competitor, so badges based on long-running streaks
+                    or aggregate stats never get missed.
+                  </li>
+                  <li>
+                    When a badge unlocks you get a real-time{" "}
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection("notifications")}
+                      className="text-pink-400 hover:underline"
+                    >
+                      notification
+                    </button>{" "}
+                    and the XP is added to your trader level the same
+                    moment.
+                  </li>
+                  <li>
+                    Higher-rarity badges have built-in
+                    &quot;earn-your-stripes&quot; gates — even if your
+                    condition technically fits, an{" "}
+                    <em>Epic</em> or <em>Legendary</em> badge will only
+                    fire once you have enough closed trades or finished
+                    competitions to prove it wasn&apos;t a one-off.
+                  </li>
+                  <li>
+                    Some badges are{" "}
+                    <strong className="text-white">level-gated</strong>{" "}
+                    — they appear on your profile as locked until you
+                    reach the required trader level.
+                  </li>
+                </ul>
+              </div>
+
+              {/* Pro tips */}
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-2">💡 Pro tips</h4>
+                <ul className="space-y-1 text-sm">
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Don&apos;t farm trades just for badges — the
+                      higher tiers explicitly check for closed-trade
+                      and competition counts, so quality counts more
+                      than quantity.
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Mixed-category collections pay off — every badge
+                      counts towards your Score&apos;s badge total, and
+                      Legendary badges add an extra boost in the
+                      ranking formula (
+                      <button
+                        type="button"
+                        onClick={() => scrollToSection("score-system")}
+                        className="text-yellow-400 hover:underline"
+                      >
+                        full formula here
+                      </button>
+                      ).
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <ChevronRight className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                    <span>
+                      If you think you should have a badge that
+                      hasn&apos;t triggered yet, give it up to an hour
+                      — the background pass will catch it. If
+                      it&apos;s still missing, contact support with
+                      the badge name.
+                    </span>
+                  </li>
+                </ul>
               </div>
             </div>
           </section>
