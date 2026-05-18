@@ -5585,19 +5585,32 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
           >
             <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
               <Award className="h-6 w-6 text-purple-500" />
-              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">👑 Game Master</h2>
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">
+                👑 Game Master
+              </h2>
             </div>
 
             <div className="space-y-4 text-gray-300">
               <p className="leading-relaxed">
-                Become a Game Master and earn passive income! Share your
-                referral link and earn a percentage of entry fees whenever your
-                referred users join competitions or challenges.
+                The Game Master (GM) program turns you into a
+                community-builder: you get a personal{" "}
+                <strong className="text-white">referral link</strong>,
+                you can <strong className="text-white">create your own
+                competitions</strong>, and you earn a percentage of every
+                entry fee paid by traders you refer. Everything lives at{" "}
+                <Link
+                  href="/gamemaster"
+                  className="text-purple-400 hover:underline"
+                >
+                  /gamemaster
+                </Link>{" "}
+                once you&apos;ve activated a package.
               </p>
 
+              {/* 4-step flow */}
               <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
                 <h4 className="font-semibold text-white mb-3">
-                  🎮 How to Become a Game Master:
+                  🎮 How to become a Game Master
                 </h4>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
@@ -5606,11 +5619,20 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                         1
                       </span>
                       <span className="font-semibold text-white">
-                        Purchase Package
+                        Buy a package
                       </span>
                     </div>
                     <p className="text-xs text-gray-400 ml-8">
-                      Buy a Game Master package from the Marketplace
+                      Open the{" "}
+                      <button
+                        type="button"
+                        onClick={() => scrollToSection("marketplace")}
+                        className="text-purple-400 hover:underline"
+                      >
+                        Marketplace
+                      </button>{" "}
+                      → <em>Game Master</em> category and pick a package
+                      that fits your audience size and goals.
                     </p>
                   </div>
                   <div className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
@@ -5618,10 +5640,15 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       <span className="w-6 h-6 rounded-full bg-purple-500/30 flex items-center justify-center text-purple-400 text-xs font-bold">
                         2
                       </span>
-                      <span className="font-semibold text-white">Activate</span>
+                      <span className="font-semibold text-white">
+                        Auto-activate
+                      </span>
                     </div>
                     <p className="text-xs text-gray-400 ml-8">
-                      Go to Arsenal and activate your package
+                      Your subscription activates the moment the purchase
+                      goes through, and a{" "}
+                      <strong className="text-white">GM Dashboard</strong>{" "}
+                      link appears in your sidebar.
                     </p>
                   </div>
                   <div className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
@@ -5630,11 +5657,16 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                         3
                       </span>
                       <span className="font-semibold text-white">
-                        Share Link
+                        Share your link
                       </span>
                     </div>
                     <p className="text-xs text-gray-400 ml-8">
-                      Get your unique referral link and share it
+                      Your unique{" "}
+                      <code className="bg-gray-900 px-1 py-0.5 rounded">
+                        /sign-up?ref=GM…
+                      </code>{" "}
+                      link is on the GM Dashboard with one-click copy and
+                      social-share buttons.
                     </p>
                   </div>
                   <div className="p-3 bg-gray-700/50 rounded-lg border border-gray-600">
@@ -5642,108 +5674,457 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       <span className="w-6 h-6 rounded-full bg-purple-500/30 flex items-center justify-center text-purple-400 text-xs font-bold">
                         4
                       </span>
-                      <span className="font-semibold text-white">Earn!</span>
+                      <span className="font-semibold text-white">
+                        Build &amp; earn
+                      </span>
                     </div>
                     <p className="text-xs text-gray-400 ml-8">
-                      Earn % of entry fees from your referrals
+                      Create competitions for your community and earn a %
+                      of every entry fee your referrals pay across the
+                      platform.
                     </p>
                   </div>
                 </div>
               </div>
 
+              {/* What's inside a package */}
               <div>
-                <h4 className="font-semibold text-white mb-3">
-                  📦 Available Packages:
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Briefcase className="h-4 w-4 text-purple-400" />
+                  What&apos;s inside a Game Master package
                 </h4>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600">
-                    <h5 className="font-bold text-white mb-1">Starter</h5>
-                    <p className="text-yellow-400 font-semibold text-sm">
-                      299 {settings.credits.name}
-                    </p>
-                    <ul className="text-xs text-gray-400 mt-2 space-y-1">
-                      <li>• 1 competition/day</li>
-                      <li>• 30 max users</li>
-                      <li>• 5% referral fee</li>
-                    </ul>
+                <p className="text-sm text-gray-400 mb-3">
+                  Every GM package is configured by the platform team and
+                  exposes the same set of levers. Exact numbers are shown
+                  on each package&apos;s Marketplace card and on your GM
+                  Dashboard.
+                </p>
+                <div className="grid gap-2 text-sm">
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600 flex items-start gap-2">
+                    <Clock className="h-4 w-4 text-cyan-400 flex-shrink-0 mt-0.5" />
+                    <span>
+                      <strong className="text-white">
+                        Subscription duration
+                      </strong>{" "}
+                      — typically 30 days. After that the subscription
+                      moves to <em>expired</em> unless you renew (or have
+                      auto-renew on).
+                    </span>
                   </div>
-                  <div className="p-4 bg-purple-500/20 rounded-lg border border-purple-500/30">
-                    <h5 className="font-bold text-purple-400 mb-1">Pro ⭐</h5>
-                    <p className="text-yellow-400 font-semibold text-sm">
-                      599 {settings.credits.name}
-                    </p>
-                    <ul className="text-xs text-gray-400 mt-2 space-y-1">
-                      <li>• 3 competitions/day</li>
-                      <li>• 75 max users</li>
-                      <li>• 7.5% referral fee</li>
-                    </ul>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600 flex items-start gap-2">
+                    <Trophy className="h-4 w-4 text-yellow-400 flex-shrink-0 mt-0.5" />
+                    <span>
+                      <strong className="text-white">
+                        Daily competition quota
+                      </strong>{" "}
+                      — how many competitions you can{" "}
+                      <em>create</em> per calendar day (
+                      <code className="text-xs bg-gray-900 px-1 py-0.5 rounded">
+                        maxCompetitionsPerDay
+                      </code>
+                      ). Counter resets every day automatically.
+                    </span>
                   </div>
-                  <div className="p-4 bg-yellow-500/20 rounded-lg border border-yellow-500/30">
-                    <h5 className="font-bold text-yellow-400 mb-1">Elite ⭐</h5>
-                    <p className="text-yellow-400 font-semibold text-sm">
-                      999 {settings.credits.name}
-                    </p>
-                    <ul className="text-xs text-gray-400 mt-2 space-y-1">
-                      <li>• 10 competitions/day</li>
-                      <li>• 150 max users</li>
-                      <li>• 10% referral fee</li>
-                    </ul>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600 flex items-start gap-2">
+                    <Users className="h-4 w-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                    <span>
+                      <strong className="text-white">
+                        Max participants per competition
+                      </strong>{" "}
+                      — the cap on how many traders can join one of your
+                      competitions.
+                    </span>
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600 flex items-start gap-2">
+                    <Coins className="h-4 w-4 text-green-400 flex-shrink-0 mt-0.5" />
+                    <span>
+                      <strong className="text-white">
+                        Competition referral fee %
+                      </strong>{" "}
+                      — your slice of every entry fee paid by a referred
+                      trader who joins <em>any</em> competition.
+                    </span>
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600 flex items-start gap-2">
+                    <Swords className="h-4 w-4 text-red-400 flex-shrink-0 mt-0.5" />
+                    <span>
+                      <strong className="text-white">
+                        1v1 challenge earnings (optional)
+                      </strong>{" "}
+                      — higher-tier packages unlock earnings on 1v1
+                      stakes too, with an optional separate referral fee
+                      % for challenges (
+                      <code className="text-xs bg-gray-900 px-1 py-0.5 rounded">
+                        canEarnFromChallenges
+                      </code>{" "}
+                      +{" "}
+                      <code className="text-xs bg-gray-900 px-1 py-0.5 rounded">
+                        challengeReferralFeePercentage
+                      </code>
+                      ).
+                    </span>
+                  </div>
+                  <div className="p-2.5 bg-gray-700/40 rounded border border-gray-600 flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-400 flex-shrink-0 mt-0.5" />
+                    <span>
+                      <strong className="text-white">
+                        Competition creation permission
+                      </strong>{" "}
+                      — most packages allow you to create your own
+                      competitions; some entry-level packs may not (
+                      <code className="text-xs bg-gray-900 px-1 py-0.5 rounded">
+                        canCreateCompetitions
+                      </code>
+                      ).
+                    </span>
                   </div>
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/30">
-                  <h5 className="font-semibold text-green-400 mb-2 flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4" /> Earning Potential
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    If you refer 50 users who each join a 100{" "}
-                    {settings.credits.name} competition with 10% referral fee,
-                    you earn{" "}
-                    <span className="text-green-400 font-bold">
-                      500 {settings.credits.name}
-                    </span>{" "}
-                    per competition!
-                  </p>
+              {/* GM Dashboard */}
+              <div>
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <LayoutDashboard className="h-4 w-4 text-purple-400" />
+                  Your GM Dashboard ({" "}
+                  <Link
+                    href="/gamemaster"
+                    className="text-purple-400 hover:underline"
+                  >
+                    /gamemaster
+                  </Link>{" "}
+                  )
+                </h4>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1">
+                      Overview &amp; KPIs
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Total earnings, pending earnings, total referrals,
+                      active referrals, competitions created, days left
+                      until renewal, current package and its limits.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1">
+                      Referral link &amp; code
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Your{" "}
+                      <code className="text-xs bg-gray-900 px-1 py-0.5 rounded">
+                        GM…
+                      </code>{" "}
+                      code plus a copy-to-clipboard ready{" "}
+                      <code className="text-xs bg-gray-900 px-1 py-0.5 rounded">
+                        /sign-up?ref=…
+                      </code>{" "}
+                      URL.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1">
+                      Competitions tab
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Every competition you have created with current
+                      status, participants, prize pool and entry fee.
+                      &quot;Create competition&quot; opens the wizard at{" "}
+                      <code className="text-xs bg-gray-900 px-1 py-0.5 rounded">
+                        /gamemaster/create-competition
+                      </code>
+                      .
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-white text-sm mb-1">
+                      Referrals tab
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Every trader who signed up via your link with their
+                      join date and active-status flag.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600 sm:col-span-2">
+                    <p className="font-semibold text-white text-sm mb-1">
+                      Earnings tab
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      A line-item ledger of every earning — source
+                      (competition or challenge), referred user, entry
+                      fee, your % at the time, gross, platform cut and
+                      net credited to your wallet. Status flips from{" "}
+                      <strong className="text-yellow-400">pending</strong>{" "}
+                      to{" "}
+                      <strong className="text-green-400">paid</strong>{" "}
+                      automatically when the source event settles.
+                    </p>
+                  </div>
                 </div>
-                <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
-                  <h5 className="font-semibold text-blue-400 mb-2 flex items-center gap-2">
-                    <Eye className="h-4 w-4" /> Dashboard Access
-                  </h5>
-                  <p className="text-sm text-gray-400">
-                    Track your referrals, view earnings history, and manage your
-                    subscription from your Game Master Dashboard.
+              </div>
+
+              {/* Creating competitions */}
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Trophy className="h-4 w-4 text-yellow-400" />
+                  Creating your own competitions
+                </h4>
+                <p className="text-sm text-gray-300 mb-3">
+                  GMs with{" "}
+                  <code className="text-xs bg-gray-900 px-1 py-0.5 rounded">
+                    canCreateCompetitions
+                  </code>{" "}
+                  enabled can spin up custom competitions from{" "}
+                  <code className="text-xs bg-gray-900 px-1 py-0.5 rounded">
+                    /gamemaster/create-competition
+                  </code>
+                  . You control:
+                </p>
+                <ul className="space-y-1 text-xs text-gray-400 list-disc pl-5">
+                  <li>
+                    Name, description, difficulty, level requirement,
+                    starting capital, leverage caps.
+                  </li>
+                  <li>
+                    <strong className="text-white">Entry fee</strong> and{" "}
+                    <strong className="text-white">
+                      prize distribution
+                    </strong>{" "}
+                    (1st / 2nd / 3rd splits).
+                  </li>
+                  <li>
+                    <strong className="text-white">Asset classes</strong>{" "}
+                    (Forex, Crypto, Stocks — currently Forex is the only
+                    live execution market, see{" "}
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection("trading")}
+                      className="text-cyan-400 hover:underline"
+                    >
+                      Trading Guide
+                    </button>
+                    ), risk limits, start &amp; end times.
+                  </li>
+                  <li>
+                    <strong className="text-white">Min / max
+                    participants</strong> — your max is capped at your
+                    package&apos;s{" "}
+                    <code className="text-xs bg-gray-900 px-1 py-0.5 rounded">
+                      maxUsersPerCompetition
+                    </code>
+                    .
+                  </li>
+                </ul>
+                <p className="text-xs text-gray-500 mt-3">
+                  Your competitions live in the same public catalogue as
+                  every other one (
+                  <Link
+                    href="/competitions"
+                    className="text-cyan-400 hover:underline"
+                  >
+                    /competitions
+                  </Link>
+                  ), so any trader can join — not just your referrals.
+                  Daily creation count is enforced against your
+                  package&apos;s{" "}
+                  <code className="text-xs bg-gray-900 px-1 py-0.5 rounded">
+                    maxCompetitionsPerDay
+                  </code>
+                  .
+                </p>
+              </div>
+
+              {/* How earnings work */}
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Coins className="h-4 w-4 text-green-400" />
+                  How earnings actually work
+                </h4>
+                <div className="space-y-2 text-sm text-gray-300">
+                  <p>
+                    <strong className="text-white">Attribution.</strong>{" "}
+                    When somebody opens your link
+                    (
+                    <code className="text-xs bg-gray-900 px-1 py-0.5 rounded">
+                      /sign-up?ref=GM…
+                    </code>
+                    ) and creates an account, they are permanently
+                    linked to you. Both the user record and a{" "}
+                    <code className="text-xs bg-gray-900 px-1 py-0.5 rounded">
+                      UserReferral
+                    </code>{" "}
+                    document are stamped at registration. Once linked,
+                    you keep earning from them for as long as your
+                    subscription stays active.
+                  </p>
+                  <p>
+                    <strong className="text-white">
+                      Competition entries.
+                    </strong>{" "}
+                    When a referred trader pays an entry fee, your share
+                    is calculated as{" "}
+                    <code className="text-xs bg-gray-900 px-1 py-0.5 rounded">
+                      entryFee × referralFeePercentage
+                    </code>
+                    . It is credited to your wallet{" "}
+                    <strong className="text-white">
+                      when the competition finalises
+                    </strong>{" "}
+                    — not at the moment they pay. The wallet line shows
+                    up as a{" "}
+                    <code className="text-xs bg-gray-900 px-1 py-0.5 rounded">
+                      gamemaster_earning
+                    </code>{" "}
+                    transaction.
+                  </p>
+                  <p>
+                    <strong className="text-white">
+                      1v1 challenge entries.
+                    </strong>{" "}
+                    Only paid when your package has{" "}
+                    <code className="text-xs bg-gray-900 px-1 py-0.5 rounded">
+                      canEarnFromChallenges
+                    </code>{" "}
+                    enabled. Calculated as{" "}
+                    <code className="text-xs bg-gray-900 px-1 py-0.5 rounded">
+                      entryFee × challengeReferralFeePercentage
+                    </code>{" "}
+                    (falls back to your competition rate when not set).
+                    Credited when the challenge settles as a{" "}
+                    <code className="text-xs bg-gray-900 px-1 py-0.5 rounded">
+                      gamemaster_challenge_referral
+                    </code>{" "}
+                    transaction.
+                  </p>
+                  <p>
+                    <strong className="text-white">Earnings cap.</strong>{" "}
+                    Total GM payouts for any single competition or
+                    challenge are <em>capped at the platform fee</em> on
+                    that event. If multiple GMs have referrals in the
+                    same event and the sum of their commissions would
+                    exceed the platform fee, every GM&apos;s share is
+                    scaled down proportionally — you cannot earn more
+                    than the platform actually collected.
                   </p>
                 </div>
               </div>
 
+              {/* Subscription lifecycle */}
+              <div>
+                <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-blue-400" />
+                  Subscription lifecycle
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-green-400 mb-1">
+                      Active
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Default state after purchase or successful
+                      renewal. You can create competitions (within your
+                      daily quota), earn fees, and view all dashboard
+                      tabs. Sidebar shows the{" "}
+                      <strong className="text-white">GM Dashboard</strong>{" "}
+                      link.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-orange-400 mb-1">
+                      Paused (optional)
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      You can pause earnings from the dashboard. The
+                      subscription stays valid, you keep all referrals,
+                      but no new fees are credited to your wallet while
+                      paused. Un-pause anytime to resume earning.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-yellow-400 mb-1">
+                      Expired
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Reached after{" "}
+                      <code className="text-xs bg-gray-900 px-1 py-0.5 rounded">
+                        endDate
+                      </code>{" "}
+                      when auto-renew is off or the renewal payment
+                      fails. The GM Dashboard link disappears from the
+                      sidebar; you can still visit{" "}
+                      <code className="text-xs bg-gray-900 px-1 py-0.5 rounded">
+                        /gamemaster
+                      </code>{" "}
+                      to see the &quot;Renew now&quot; banner. Already
+                      paid earnings remain in your wallet; no new fees
+                      accrue while expired.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gray-700/40 rounded-lg border border-gray-600">
+                    <p className="font-semibold text-cyan-400 mb-1">
+                      Renew anytime
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Click{" "}
+                      <strong className="text-white">
+                        &quot;Renew now&quot;
+                      </strong>{" "}
+                      on the GM Dashboard, in the Marketplace, or in your
+                      Trading Arsenal&apos;s package card. Your wallet is
+                      charged the package&apos;s current renewal price,
+                      the subscription returns to{" "}
+                      <strong className="text-green-400">active</strong>,
+                      and a new period begins immediately.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pro tips */}
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
-                <h4 className="font-semibold text-white mb-2">💡 Pro Tips:</h4>
+                <h4 className="font-semibold text-white mb-2">💡 Pro tips</h4>
                 <ul className="space-y-1 text-sm">
                   <li className="flex items-start gap-2">
                     <ChevronRight className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
                     <span>
-                      Referrals are permanent - once linked, you earn from them
-                      forever
+                      Once a trader signs up via your link they stay
+                      linked to you forever — even if you let your
+                      subscription expire and renew later (you simply
+                      stop earning while expired).
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <ChevronRight className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
                     <span>
-                      Enable auto-renewal to never lose your Game Master status
+                      Turn on{" "}
+                      <strong className="text-white">auto-renew</strong>{" "}
+                      so you never miss a payout window because your
+                      package expired between a referral entering and a
+                      competition finalising.
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <ChevronRight className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
                     <span>
-                      Create your own competitions to attract more users
+                      Running your own competitions is the best way to
+                      activate referrals — your audience already trusts
+                      you, and they will play in the events you create
+                      for them.
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <ChevronRight className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
                     <span>
-                      Earnings are credited directly to your wallet instantly
+                      GM earnings credit straight to your{" "}
+                      <button
+                        type="button"
+                        onClick={() => scrollToSection("credits")}
+                        className="text-yellow-400 hover:underline"
+                      >
+                        wallet
+                      </button>{" "}
+                      as standard wallet transactions — you can spend
+                      them, withdraw them, or stack them up like any
+                      other balance.
                     </span>
                   </li>
                 </ul>
