@@ -12,7 +12,6 @@ import {
   RefreshCw,
   FileVideo,
   AlertCircle,
-  Youtube,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -513,7 +512,7 @@ export default function TutorialsSection() {
       <Card className="bg-gray-800/40 border-gray-700/50">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
-            <Youtube className="h-5 w-5 text-red-500" />
+            <Play className="h-5 w-5 text-red-500" />
             Add a tutorial from YouTube
           </CardTitle>
           <p className="text-sm text-gray-400 mt-1">
@@ -853,7 +852,7 @@ export default function TutorialsSection() {
                               variant="outline"
                               className="bg-red-500/10 text-red-300 border-red-500/30 text-xs"
                             >
-                              <Youtube className="h-3 w-3 mr-1" />
+                              <Play className="h-3 w-3 mr-1" />
                               YouTube
                             </Badge>
                           ) : (
