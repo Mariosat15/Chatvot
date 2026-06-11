@@ -8,15 +8,29 @@
  */
 
 import { createServer } from "http";
+import path from "path";
 import { WebSocket, WebSocketServer } from "ws";
 import { verify } from "jsonwebtoken";
 import mongoose from "mongoose";
 import { MongoClient } from "mongodb";
 import dotenv from "dotenv";
 
-// Load environment variables
-dotenv.config({ path: "../.env" });
-dotenv.config({ path: "../.env.local" });
+// Load environment variables.
+// Reason: PM2 runs this with cwd = repo root, but the build output lives in
+// websocket-server/dist/, so a cwd-relative "../.env" is unreliable. Resolve
+// the repo-root .env from __dirname so it loads whether we run the compiled
+// dist/index.js (../../.env) or the TS source directly (../.env). Each
+// candidate is loaded without override, so PM2-injected env vars always win.
+const envCandidates = [
+  path.resolve(__dirname, "../../.env"), // websocket-server/dist/index.js -> repo root
+  path.resolve(__dirname, "../.env"), // websocket-server/index.ts -> repo root
+  path.resolve(process.cwd(), ".env"), // pm2 cwd (repo root) fallback
+  path.resolve(__dirname, "../../.env.local"),
+  path.resolve(__dirname, "../.env.local"),
+];
+for (const envPath of envCandidates) {
+  dotenv.config({ path: envPath });
+}
 
 const PORT = process.env.WEBSOCKET_PORT || 3003;
 const MONGODB_URI = process.env.MONGODB_URI || process.env.DATABASE_URL || "";
