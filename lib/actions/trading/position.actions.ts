@@ -1228,11 +1228,22 @@ export async function closePositionAutomatic(
           mongoSession,
         );
 
+    // Reason: Orphaned position — the parent participant no longer exists
+    // (e.g. the competition/challenge or participant record was deleted while
+    // the position stayed open). Previously this threw, which aborted the
+    // transaction and left the position status "open", so the realtime TP/SL
+    // service re-triggered it on every 30s cache refresh forever (log spam +
+    // wasted transactions). There is no participant left to credit, so we
+    // settle the position as closed and fall through to commit. This lets the
+    // position leave the "open" set permanently and stops the loop.
     if (!participant && !isSimulatorPositionSLTP) {
-      throw new Error("Participant not found");
+      console.warn(
+        `⚠️ [REALTIME TP/SL] Orphaned position ${position._id.toString()} — participant ${position.participantId?.toString()} not found. Settling as closed without participant update.`,
+      );
     }
 
-    // Only update participant stats for real positions (not simulator)
+    // Only update participant stats for real positions (not simulator) when
+    // the participant still exists. Orphaned positions skip this and commit.
     if (participant && !isSimulatorPositionSLTP) {
       const newCapital = participant.currentCapital + realizedPnl;
       const newAvailableCapital =
