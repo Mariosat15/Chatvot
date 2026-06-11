@@ -23,16 +23,26 @@ export const TUTORIAL_CATEGORIES = [
 
 export type TutorialCategory = (typeof TUTORIAL_CATEGORIES)[number];
 
+export type TutorialSource = "file" | "youtube";
+
 export interface ITutorialVideo extends Document {
   slug: string; // URL-safe identifier (unique)
   title: string;
   description?: string;
   category: TutorialCategory;
 
-  // File on disk
-  filename: string; // basename under <repo-root>/Videos/
-  mimeType: string; // e.g. video/mp4
-  sizeBytes: number;
+  // Where the video is hosted.
+  // "file"    — binary streamed from <repo-root>/Videos/ (legacy/local).
+  // "youtube" — hosted on YouTube; only the video id is stored.
+  source: TutorialSource;
+
+  // YouTube hosting (source === "youtube")
+  youtubeId?: string; // 11-char YouTube video id
+
+  // File on disk (source === "file")
+  filename?: string; // basename under <repo-root>/Videos/
+  mimeType?: string; // e.g. video/mp4
+  sizeBytes?: number;
   durationSec?: number;
 
   // Optional poster image
@@ -68,9 +78,38 @@ const TutorialVideoSchema = new Schema<ITutorialVideo>(
       index: true,
     },
 
-    filename: { type: String, required: true, trim: true },
-    mimeType: { type: String, required: true, trim: true },
-    sizeBytes: { type: Number, required: true, min: 0 },
+    source: {
+      type: String,
+      enum: ["file", "youtube"],
+      default: "file",
+      index: true,
+    },
+    youtubeId: { type: String, trim: true },
+
+    // Reason: file fields are only required for disk-hosted videos.
+    // YouTube-hosted tutorials store no file, so these become optional
+    // and are required conditionally based on `source`.
+    filename: {
+      type: String,
+      trim: true,
+      required: function (this: { source?: TutorialSource }): boolean {
+        return this.source !== "youtube";
+      },
+    },
+    mimeType: {
+      type: String,
+      trim: true,
+      required: function (this: { source?: TutorialSource }): boolean {
+        return this.source !== "youtube";
+      },
+    },
+    sizeBytes: {
+      type: Number,
+      min: 0,
+      required: function (this: { source?: TutorialSource }): boolean {
+        return this.source !== "youtube";
+      },
+    },
     durationSec: { type: Number, min: 0 },
 
     thumbnailFilename: { type: String, trim: true },

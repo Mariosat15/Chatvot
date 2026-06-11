@@ -22,15 +22,21 @@ export const TUTORIAL_CATEGORIES = [
 
 export type TutorialCategory = (typeof TUTORIAL_CATEGORIES)[number];
 
+export type TutorialSource = "file" | "youtube";
+
 export interface ITutorialVideo extends Document {
   slug: string;
   title: string;
   description?: string;
   category: TutorialCategory;
 
-  filename: string;
-  mimeType: string;
-  sizeBytes: number;
+  // "file" — streamed from disk; "youtube" — hosted on YouTube (id only).
+  source: TutorialSource;
+  youtubeId?: string;
+
+  filename?: string;
+  mimeType?: string;
+  sizeBytes?: number;
   durationSec?: number;
 
   thumbnailFilename?: string;
@@ -63,9 +69,38 @@ const TutorialVideoSchema = new Schema<ITutorialVideo>(
       index: true,
     },
 
-    filename: { type: String, required: true, trim: true },
-    mimeType: { type: String, required: true, trim: true },
-    sizeBytes: { type: Number, required: true, min: 0 },
+    source: {
+      type: String,
+      enum: ["file", "youtube"],
+      default: "file",
+      index: true,
+    },
+    youtubeId: { type: String, trim: true },
+
+    // Reason: file fields are only required for disk-hosted videos.
+    // YouTube-hosted tutorials store no file, so these are conditionally
+    // required based on `source`.
+    filename: {
+      type: String,
+      trim: true,
+      required: function (this: { source?: TutorialSource }): boolean {
+        return this.source !== "youtube";
+      },
+    },
+    mimeType: {
+      type: String,
+      trim: true,
+      required: function (this: { source?: TutorialSource }): boolean {
+        return this.source !== "youtube";
+      },
+    },
+    sizeBytes: {
+      type: Number,
+      min: 0,
+      required: function (this: { source?: TutorialSource }): boolean {
+        return this.source !== "youtube";
+      },
+    },
     durationSec: { type: Number, min: 0 },
 
     thumbnailFilename: { type: String, trim: true },

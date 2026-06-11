@@ -12,6 +12,7 @@ import {
   RefreshCw,
   FileVideo,
   AlertCircle,
+  Youtube,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,9 +55,11 @@ interface Tutorial {
   title: string;
   description: string;
   category: CategoryId;
-  filename: string;
-  mimeType: string;
-  sizeBytes: number;
+  source?: "file" | "youtube";
+  youtubeId?: string | null;
+  filename?: string;
+  mimeType?: string;
+  sizeBytes?: number;
   durationSec?: number | null;
   thumbnailFilename?: string;
   order: number;
@@ -111,6 +114,67 @@ export default function TutorialsSection() {
     });
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (thumbInputRef.current) thumbInputRef.current.value = "";
+  };
+
+  // YouTube tutorial form (preferred — works across all servers).
+  const [ytForm, setYtForm] = useState({
+    title: "",
+    description: "",
+    category: "getting-started" as CategoryId,
+    order: 100,
+    isActive: true,
+    youtubeUrl: "",
+  });
+  const [ytSaving, setYtSaving] = useState(false);
+
+  const resetYtForm = () => {
+    setYtForm({
+      title: "",
+      description: "",
+      category: "getting-started",
+      order: 100,
+      isActive: true,
+      youtubeUrl: "",
+    });
+  };
+
+  const handleAddYouTube = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ytForm.title.trim()) {
+      toast.error("Please enter a title");
+      return;
+    }
+    if (!ytForm.youtubeUrl.trim()) {
+      toast.error("Please paste a YouTube link");
+      return;
+    }
+    setYtSaving(true);
+    try {
+      const res = await fetch("/api/tutorials/youtube", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: ytForm.title.trim(),
+          description: ytForm.description.trim(),
+          category: ytForm.category,
+          order: ytForm.order,
+          isActive: ytForm.isActive,
+          youtubeUrl: ytForm.youtubeUrl.trim(),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || "Failed to add tutorial");
+      }
+      toast.success("YouTube tutorial added");
+      resetYtForm();
+      await fetchTutorials();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add tutorial");
+    } finally {
+      setYtSaving(false);
+    }
   };
 
   const fetchTutorials = useCallback(async () => {
@@ -361,11 +425,11 @@ export default function TutorialsSection() {
   };
 
   const handleDelete = async (item: Tutorial) => {
-    if (
-      !confirm(
-        `Delete "${item.title}"? This removes the video file from disk and cannot be undone.`,
-      )
-    ) {
+    const detail =
+      item.source === "youtube"
+        ? "This removes the tutorial entry (the YouTube video itself is not affected)."
+        : "This removes the video file from disk and cannot be undone.";
+    if (!confirm(`Delete "${item.title}"? ${detail}`)) {
       return;
     }
     try {
@@ -445,13 +509,132 @@ export default function TutorialsSection() {
         </Button>
       </div>
 
-      {/* Upload form */}
+      {/* Add from YouTube (preferred — works across all servers) */}
+      <Card className="bg-gray-800/40 border-gray-700/50">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Youtube className="h-5 w-5 text-red-500" />
+            Add a tutorial from YouTube
+          </CardTitle>
+          <p className="text-sm text-gray-400 mt-1">
+            Recommended. Paste a YouTube link and it plays the same on every
+            server — no file storage needed. Tip: set the video to{" "}
+            <strong>Unlisted</strong> on YouTube so it only plays here but
+            isn&apos;t publicly searchable.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleAddYouTube} className="space-y-4">
+            <div>
+              <Label htmlFor="yt-url">YouTube link *</Label>
+              <Input
+                id="yt-url"
+                value={ytForm.youtubeUrl}
+                onChange={(e) =>
+                  setYtForm((f) => ({ ...f, youtubeUrl: e.target.value }))
+                }
+                placeholder="https://www.youtube.com/watch?v=… or https://youtu.be/…"
+                required
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="yt-title">Title *</Label>
+                <Input
+                  id="yt-title"
+                  value={ytForm.title}
+                  onChange={(e) =>
+                    setYtForm((f) => ({ ...f, title: e.target.value }))
+                  }
+                  placeholder="e.g. How to place your first trade"
+                  maxLength={160}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="yt-category">Category</Label>
+                <Select
+                  value={ytForm.category}
+                  onValueChange={(v) =>
+                    setYtForm((f) => ({ ...f, category: v as CategoryId }))
+                  }
+                >
+                  <SelectTrigger id="yt-category">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="yt-desc">Description</Label>
+              <Textarea
+                id="yt-desc"
+                value={ytForm.description}
+                onChange={(e) =>
+                  setYtForm((f) => ({ ...f, description: e.target.value }))
+                }
+                rows={3}
+                maxLength={2000}
+                placeholder="Short summary that appears under the video title."
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div>
+                <Label htmlFor="yt-order">Order</Label>
+                <Input
+                  id="yt-order"
+                  type="number"
+                  value={ytForm.order}
+                  onChange={(e) =>
+                    setYtForm((f) => ({
+                      ...f,
+                      order: Number(e.target.value) || 0,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="submit"
+                disabled={ytSaving}
+                className="bg-red-500 hover:bg-red-600"
+              >
+                {ytSaving ? "Adding…" : "Add YouTube Tutorial"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={resetYtForm}
+                disabled={ytSaving}
+              >
+                Reset
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Upload form (file — local disk; does NOT sync across servers) */}
       <Card className="bg-gray-800/40 border-gray-700/50">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Upload className="h-5 w-5 text-rose-400" />
-            Upload a new tutorial
+            Upload a file instead (advanced)
           </CardTitle>
+          <p className="text-sm text-gray-400 mt-1">
+            Stores the video on this server&apos;s disk. Note: with multiple
+            servers, an uploaded file only exists on the server it was uploaded
+            to and may not play for all users. Prefer YouTube above unless you
+            run a single server.
+          </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleUpload} className="space-y-4">
@@ -664,9 +847,23 @@ export default function TutorialsSection() {
                           </Badge>
                         </div>
 
-                        <div className="text-xs text-gray-500 flex flex-wrap gap-x-3 gap-y-1">
-                          <span>{formatBytes(t.sizeBytes)}</span>
-                          <span>{t.mimeType.replace("video/", "")}</span>
+                        <div className="text-xs text-gray-500 flex flex-wrap gap-x-3 gap-y-1 items-center">
+                          {t.source === "youtube" ? (
+                            <Badge
+                              variant="outline"
+                              className="bg-red-500/10 text-red-300 border-red-500/30 text-xs"
+                            >
+                              <Youtube className="h-3 w-3 mr-1" />
+                              YouTube
+                            </Badge>
+                          ) : (
+                            <>
+                              <span>{formatBytes(t.sizeBytes || 0)}</span>
+                              <span>
+                                {(t.mimeType || "").replace("video/", "")}
+                              </span>
+                            </>
+                          )}
                           {t.uploadedByName && <span>by {t.uploadedByName}</span>}
                         </div>
 
@@ -824,24 +1021,40 @@ export default function TutorialsSection() {
           <DialogHeader>
             <DialogTitle>{previewing?.title}</DialogTitle>
           </DialogHeader>
-          {previewing && (
-            <video
-              key={previewing._id}
-              src={`/api/tutorials/videos/${encodeURIComponent(
-                previewing.filename,
-              )}`}
-              controls
-              autoPlay
-              className="w-full rounded-lg bg-black"
-              poster={
-                previewing.thumbnailFilename
-                  ? `/api/tutorials/videos/thumbnails/${encodeURIComponent(
-                      previewing.thumbnailFilename,
-                    )}`
-                  : undefined
-              }
-            />
-          )}
+          {previewing &&
+            (previewing.source === "youtube" && previewing.youtubeId ? (
+              <div className="relative w-full aspect-video">
+                <iframe
+                  key={previewing._id}
+                  src={`https://www.youtube-nocookie.com/embed/${previewing.youtubeId}?autoplay=1&rel=0&modestbranding=1`}
+                  title={previewing.title}
+                  className="absolute inset-0 h-full w-full rounded-lg bg-black"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              </div>
+            ) : previewing.filename ? (
+              <video
+                key={previewing._id}
+                src={`/api/tutorials/videos/${encodeURIComponent(
+                  previewing.filename,
+                )}`}
+                controls
+                autoPlay
+                className="w-full rounded-lg bg-black"
+                poster={
+                  previewing.thumbnailFilename
+                    ? `/api/tutorials/videos/thumbnails/${encodeURIComponent(
+                        previewing.thumbnailFilename,
+                      )}`
+                    : undefined
+                }
+              />
+            ) : (
+              <div className="w-full aspect-video bg-black rounded-lg flex items-center justify-center text-gray-400 text-sm">
+                This tutorial has no playable source.
+              </div>
+            ))}
         </DialogContent>
       </Dialog>
     </div>

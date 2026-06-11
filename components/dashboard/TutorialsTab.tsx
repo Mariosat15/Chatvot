@@ -11,10 +11,13 @@ interface Tutorial {
   title: string;
   description: string;
   category: string;
+  source: "file" | "youtube";
+  youtubeId: string | null;
+  embedUrl: string | null;
   mimeType: string;
   sizeBytes: number;
   durationSec: number | null;
-  videoUrl: string;
+  videoUrl: string | null;
   thumbnailUrl: string | null;
   order: number;
 }
@@ -255,15 +258,32 @@ export default function TutorialsTab() {
             >
               <X className="h-5 w-5" />
             </button>
-            <video
-              key={playing._id}
-              src={playing.videoUrl}
-              poster={playing.thumbnailUrl || undefined}
-              controls
-              autoPlay
-              playsInline
-              className="w-full bg-black"
-            />
+            {playing.embedUrl ? (
+              <div className="relative w-full aspect-video bg-black">
+                <iframe
+                  key={playing._id}
+                  src={`${playing.embedUrl}?autoplay=1&rel=0&modestbranding=1`}
+                  title={playing.title}
+                  className="absolute inset-0 h-full w-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              </div>
+            ) : playing.videoUrl ? (
+              <video
+                key={playing._id}
+                src={playing.videoUrl}
+                poster={playing.thumbnailUrl || undefined}
+                controls
+                autoPlay
+                playsInline
+                className="w-full bg-black"
+              />
+            ) : (
+              <div className="w-full aspect-video bg-black flex items-center justify-center text-gray-400 text-sm">
+                This tutorial is unavailable.
+              </div>
+            )}
             <div className="p-4">
               <h3 className="text-white font-semibold">{playing.title}</h3>
               {playing.description && (
