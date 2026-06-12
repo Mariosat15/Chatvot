@@ -1278,6 +1278,19 @@ async function saveCompletedHigherTimeframeCandle(
       close: finalClose,
     });
 
+    // Reason: this queue is only drained when the broadcast HTTP relay to the WS
+    // server (port 3003) returns OK. If that server is down/crash-looping, the
+    // queue would otherwise grow without bound (and the broadcast payload with it).
+    // Cap it so a dead relay can't leak memory — newest candles matter most for
+    // chart sync, so we drop the oldest overflow.
+    const MAX_BROADCAST_QUEUE = 2000;
+    if (state.completedCandlesToBroadcast.length > MAX_BROADCAST_QUEUE) {
+      state.completedCandlesToBroadcast.splice(
+        0,
+        state.completedCandlesToBroadcast.length - MAX_BROADCAST_QUEUE,
+      );
+    }
+
     // Log only EUR/USD as sample (to avoid log spam)
     if (candle.symbol === "EUR/USD") {
       // console.log(

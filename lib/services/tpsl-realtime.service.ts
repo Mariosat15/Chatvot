@@ -46,6 +46,14 @@ const closingPositions = new Set<string>();
 const recentlyTriggered = new Map<string, number>();
 const TRIGGER_COOLDOWN = 10000; // 10 second cooldown after trigger
 
+// Reason: initializeTPSLCache() is called from initializeWebSocket(), which is
+// re-invoked every minute by the Inngest cron whenever the price feed drops, and
+// again on every admin "reset websocket". Without a guard, each call created a new
+// 30s setInterval that was never cleared, so timers (and their full Mongo queries)
+// stacked up over long uptimes — a slow, compounding leak that only a reboot cleared.
+// We keep a single interval handle and make re-initialization idempotent.
+let refreshTimer: ReturnType<typeof setInterval> | null = null;
+
 /**
  * Check TP/SL for a symbol when price updates
  * Called from WebSocket price handler - must be FAST!
@@ -384,8 +392,11 @@ export function getTPSLCacheStats(): {
 export async function initializeTPSLCache(): Promise<void> {
   await refreshPositionsCache();
 
-  // Set up periodic refresh
-  setInterval(() => {
+  // Idempotent: only ever run one periodic refresh timer. Re-calls (cron re-init,
+  // admin websocket reset) refresh the cache above but must NOT stack a new interval.
+  if (refreshTimer) return;
+
+  refreshTimer = setInterval(() => {
     refreshPositionsCache().catch(console.error);
   }, CACHE_REFRESH_INTERVAL);
 
