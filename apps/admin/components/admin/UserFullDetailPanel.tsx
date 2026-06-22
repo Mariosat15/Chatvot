@@ -476,6 +476,10 @@ export default function UserFullDetailPanel({
   } | null>(null);
   const [unlockingAccount, setUnlockingAccount] = useState(false);
 
+  // Two-Factor Authentication State
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [resetting2FA, setResetting2FA] = useState(false);
+
   // Delete State
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -722,6 +726,13 @@ export default function UserFullDetailPanel({
         } else {
           setLockoutInfo(null);
         }
+      }
+
+      // Fetch 2FA enrolment status
+      const twoFactorResponse = await fetch(`/api/users/${user.id}/2fa`);
+      if (twoFactorResponse.ok) {
+        const twoFactorData = await twoFactorResponse.json();
+        setTwoFactorEnabled(Boolean(twoFactorData.enabled));
       }
 
       // Fetch invoices
@@ -1186,6 +1197,40 @@ export default function UserFullDetailPanel({
       console.error("Error unlocking account:", error);
     } finally {
       setUnlockingAccount(false);
+    }
+  };
+
+  // Reset two-factor authentication (account recovery when user lost their code)
+  const handleReset2FA = async () => {
+    if (
+      !confirm(
+        "Reset two-factor authentication for this user?\n\nThis removes their authenticator enrolment and backup codes so they can sign in with their password and set up 2FA again. Use this only when the user has lost access to their authenticator.",
+      )
+    )
+      return;
+
+    setResetting2FA(true);
+    try {
+      const response = await fetch(`/api/users/${user.id}/2fa`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "Admin 2FA reset (account recovery)" }),
+      });
+
+      if (response.ok) {
+        setTwoFactorEnabled(false);
+        toast.success(
+          "2FA reset. The user can now sign in with their password.",
+        );
+      } else {
+        const data = await response.json().catch(() => ({}));
+        toast.error(data.error || "Failed to reset 2FA.");
+      }
+    } catch (error) {
+      console.error("Error resetting 2FA:", error);
+      toast.error("Failed to reset 2FA. Please try again.");
+    } finally {
+      setResetting2FA(false);
     }
   };
 
@@ -1978,6 +2023,41 @@ export default function UserFullDetailPanel({
                                   </Button>
                                 )}
                               </div>
+                            </div>
+                          </div>
+
+                          {/* Two-Factor Authentication */}
+                          <div
+                            className={`p-3 rounded-lg border ${twoFactorEnabled ? "bg-green-500/10 border-green-500/30" : "bg-gray-700/30 border-gray-700"}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Shield
+                                  className={`h-5 w-5 ${twoFactorEnabled ? "text-green-400" : "text-gray-500"}`}
+                                />
+                                <div>
+                                  <p className="text-sm font-medium text-white">
+                                    Two-Factor Authentication
+                                  </p>
+                                  <p className="text-xs text-gray-400">
+                                    {twoFactorEnabled
+                                      ? "Enabled — reset if the user lost their authenticator"
+                                      : "Not enabled"}
+                                  </p>
+                                </div>
+                              </div>
+                              {twoFactorEnabled && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={handleReset2FA}
+                                  disabled={resetting2FA}
+                                  className="text-orange-400"
+                                >
+                                  <Unlock className="h-4 w-4 mr-1" />
+                                  {resetting2FA ? "Resetting..." : "Reset 2FA"}
+                                </Button>
+                              )}
                             </div>
                           </div>
 

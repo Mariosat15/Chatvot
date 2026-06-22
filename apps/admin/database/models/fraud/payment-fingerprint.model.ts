@@ -13,7 +13,14 @@ export interface IPaymentFingerprint extends Document {
   userId: mongoose.Types.ObjectId;
 
   // Payment Provider
-  paymentProvider: "stripe" | "paypal" | "nuvei" | "custom" | string; // Extensible for any provider
+  paymentProvider:
+    | "stripe"
+    | "paypal"
+    | "nuvei"
+    | "paddle"
+    | "atlas"
+    | "custom"
+    | string; // Extensible for any provider
 
   // Payment Method Fingerprint (unique identifier across providers)
   paymentFingerprint: string; // Card hash, PayPal account ID, etc.
@@ -60,7 +67,7 @@ const PaymentFingerprintSchema = new Schema<IPaymentFingerprint>(
     paymentProvider: {
       type: String,
       required: true,
-      enum: ["stripe", "paypal", "nuvei", "custom"],
+      enum: ["stripe", "paypal", "nuvei", "paddle", "atlas", "custom"],
       default: "stripe",
       index: true,
     },
