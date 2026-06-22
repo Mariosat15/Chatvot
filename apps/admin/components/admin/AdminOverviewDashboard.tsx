@@ -88,6 +88,8 @@ interface DashboardStats {
     payments: {
       stripe: "operational" | "degraded" | "down" | "not_configured";
       nuvei: "operational" | "degraded" | "down" | "not_configured";
+      paddle?: "operational" | "degraded" | "down" | "not_configured";
+      atlas?: "operational" | "degraded" | "down" | "not_configured";
     };
     massive: "operational" | "degraded" | "down" | "not_configured";
     redis: "operational" | "degraded" | "down" | "not_configured";
@@ -427,6 +429,18 @@ export default function AdminOverviewDashboard({
               <p className="text-xs text-gray-500 uppercase">Nuvei</p>
               <StatusIndicator status={stats.services.payments.nuvei} />
             </div>
+            {stats.services.payments.atlas && (
+              <div className="space-y-1">
+                <p className="text-xs text-gray-500 uppercase">Atlas</p>
+                <StatusIndicator status={stats.services.payments.atlas} />
+              </div>
+            )}
+            {stats.services.payments.paddle && (
+              <div className="space-y-1">
+                <p className="text-xs text-gray-500 uppercase">Paddle</p>
+                <StatusIndicator status={stats.services.payments.paddle} />
+              </div>
+            )}
             <div className="space-y-1">
               <p className="text-xs text-gray-500 uppercase">WebSocket</p>
               <StatusIndicator status={stats.services.massive} />

@@ -52,7 +52,7 @@ interface LookupPreview {
   depositWasCompleted?: boolean;
 }
 
-const PROVIDERS = ["nuvei", "stripe", "paddle", "paypal"] as const;
+const PROVIDERS = ["nuvei", "stripe", "paddle", "atlas", "paypal"] as const;
 
 /**
  * Unified "Create chargeback case" dialog.

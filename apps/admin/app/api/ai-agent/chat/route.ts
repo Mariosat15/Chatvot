@@ -77,7 +77,7 @@ const TOOLS: OpenAI.ChatCompletionTool[] = [
           },
           provider: {
             type: "string",
-            enum: ["stripe", "nuvei", "paypal", "all"],
+            enum: ["stripe", "nuvei", "paddle", "atlas", "paypal", "all"],
             description: "Payment provider to filter by",
           },
         },
@@ -243,7 +243,7 @@ const TOOLS: OpenAI.ChatCompletionTool[] = [
         properties: {
           provider: {
             type: "string",
-            enum: ["stripe", "nuvei", "all"],
+            enum: ["stripe", "nuvei", "paddle", "atlas", "all"],
             description: "Payment provider to reconcile",
           },
           period: {

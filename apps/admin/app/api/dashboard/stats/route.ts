@@ -80,6 +80,8 @@ interface DashboardStats {
     payments: {
       stripe: "operational" | "degraded" | "down" | "not_configured";
       nuvei: "operational" | "degraded" | "down" | "not_configured";
+      paddle: "operational" | "degraded" | "down" | "not_configured";
+      atlas: "operational" | "degraded" | "down" | "not_configured";
     };
     massive: "operational" | "degraded" | "down" | "not_configured";
     redis: "operational" | "degraded" | "down" | "not_configured";
@@ -131,6 +133,8 @@ async function checkServiceStatus(): Promise<DashboardStats["services"]> {
     payments: {
       stripe: "not_configured",
       nuvei: "not_configured",
+      paddle: "not_configured",
+      atlas: "not_configured",
     },
     massive: "not_configured",
     redis: "not_configured",
@@ -142,13 +146,13 @@ async function checkServiceStatus(): Promise<DashboardStats["services"]> {
     const paymentProviders = await PaymentProvider.find({ isActive: true });
     for (const provider of paymentProviders) {
       if (provider.slug === "stripe") {
-        services.payments.stripe = provider.testMode
-          ? "operational"
-          : "operational";
+        services.payments.stripe = "operational";
       } else if (provider.slug === "nuvei") {
-        services.payments.nuvei = provider.testMode
-          ? "operational"
-          : "operational";
+        services.payments.nuvei = "operational";
+      } else if (provider.slug === "paddle") {
+        services.payments.paddle = "operational";
+      } else if (provider.slug === "atlas") {
+        services.payments.atlas = "operational";
       }
     }
 
