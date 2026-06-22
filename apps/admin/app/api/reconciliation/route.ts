@@ -394,9 +394,11 @@ export async function POST(request: NextRequest) {
 
     switch (issueType) {
       case "balance_mismatch": {
+        // Reason: include "disputed" so a chargeback-disputed deposit's credits
+        // (which remain on the ledger until a clawback) are not erased by the fix.
         const transactions = await WalletTransaction.find({
           userId,
-          status: "completed",
+          status: { $in: ["completed", "disputed"] },
         }).session(session);
 
         const correctBalance = transactions.reduce(
@@ -420,10 +422,12 @@ export async function POST(request: NextRequest) {
       }
 
       case "deposit_total_mismatch": {
+        // Reason: include "disputed" — totalDeposited counts the deposit at
+        // completion and is not reduced when a chargeback flags it disputed.
         const depositTx = await WalletTransaction.find({
           userId,
           transactionType: "deposit",
-          status: "completed",
+          status: { $in: ["completed", "disputed"] },
         }).session(session);
 
         const correctTotal = depositTx.reduce(
@@ -949,10 +953,18 @@ async function getDetailedUserReconciliation(
     totalRefunded: (wallet as any)?.totalRefunded || 0,
   };
 
-  // Get all completed transactions
+  // Get all completed transactions.
+  // Reason: include "disputed" too. When a chargeback is received the original
+  // deposit is flagged status:"disputed", but the granted credits remain on the
+  // user's ledger until a chargeback_clawback reverses them. If we excluded
+  // disputed deposits, the deposit's +credits would vanish from the calculated
+  // balance while still sitting in the wallet, producing a FALSE critical
+  // balance_mismatch for every open/lost chargeback. Counting the disputed
+  // deposit keeps the math correct both before resolution (deposit only) and
+  // after (deposit + offsetting clawback net to zero).
   const transactions = await WalletTransaction.find({
     userId,
-    status: "completed",
+    status: { $in: ["completed", "disputed"] },
   }).lean();
 
   // Get pending withdrawal requests (credits already deducted from wallet but not in completed transactions)
@@ -1212,6 +1224,7 @@ async function getDetailedUserReconciliation(
           .map((t) =>
             String(
               (t.metadata as any)?.originalDepositTxId ||
+                (t.metadata as any)?.originalWalletTransactionId ||
                 (t.metadata as any)?.walletTransactionId ||
                 "",
             ),
