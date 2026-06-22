@@ -152,7 +152,12 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { amount, currency = "EUR", baseAmount, vatPercentage = 0 } = body;
 
-    const amountNum = parseFloat(amount);
+    // Reason: round the charge to 2 decimals. The client total can carry a 3rd
+    // decimal (base × (1+vat) × (1+fee)), and payment processors expect a clean
+    // minor-unit currency amount — sending e.g. 62.475 can be rejected or
+    // silently mishandled. Rounding here keeps the Atlas charge, `totalCharged`
+    // metadata, and bank-fee math all consistent.
+    const amountNum = Math.round(parseFloat(amount) * 100) / 100;
     if (!amount || isNaN(amountNum) || amountNum <= 0) {
       return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
     }
