@@ -178,6 +178,51 @@ const BUILT_IN_PROVIDERS = [
       },
     ],
   },
+  {
+    slug: "atlas",
+    displayName: "Atlas",
+    logo: "🗺️",
+    defaultCredentials: [
+      {
+        key: "client_id",
+        isSecret: false,
+        description: "Atlas ClientId (sent as X-Api-ClientId)",
+      },
+      {
+        key: "client_secret",
+        isSecret: true,
+        description: "Atlas ClientSecret (used to sign requests & verify callbacks)",
+      },
+      {
+        key: "user_id",
+        isSecret: false,
+        description: "Atlas UserId (payment-receiving member identifier)",
+      },
+      {
+        key: "api_base_url",
+        isSecret: false,
+        description:
+          "Atlas API base URL (e.g. https://api.7995-endpoint-b.com/api/v2)",
+      },
+      {
+        key: "callback_url",
+        isSecret: false,
+        description:
+          "Payment Callback URL — give this to Atlas - AUTO-POPULATED",
+      },
+      {
+        key: "success_url",
+        isSecret: false,
+        description:
+          "Success URL (redirect after successful payment) - AUTO-POPULATED",
+      },
+      {
+        key: "fail_url",
+        isSecret: false,
+        description: "Fail URL (redirect after failed payment) - AUTO-POPULATED",
+      },
+    ],
+  },
 ];
 
 export default function PaymentProvidersSection() {
@@ -359,9 +404,49 @@ export default function PaymentProvidersSection() {
     return { ...provider, credentials: updatedCredentials };
   };
 
+  // Auto-populate Atlas URLs (callback / success / fail)
+  const autoPopulateAtlasUrls = (
+    provider: PaymentProvider,
+  ): PaymentProvider => {
+    if (provider.slug !== "atlas") return provider;
+
+    const baseUrl = mainAppUrl || getBaseUrl();
+    const updatedCredentials = [...provider.credentials];
+
+    const autoUrls: Record<string, string> = {
+      callback_url: `${baseUrl}/api/atlas/webhook`,
+      success_url: `${baseUrl}/wallet?status=success&provider=atlas`,
+      fail_url: `${baseUrl}/wallet?status=failed&provider=atlas`,
+    };
+
+    for (const cred of updatedCredentials) {
+      if (autoUrls[cred.key] && !cred.value) {
+        cred.value = autoUrls[cred.key];
+      }
+    }
+
+    for (const [key, value] of Object.entries(autoUrls)) {
+      if (!updatedCredentials.find((c) => c.key === key)) {
+        updatedCredentials.push({
+          key,
+          value,
+          isSecret: false,
+          description:
+            key === "callback_url"
+              ? "Payment Callback URL — give this to Atlas"
+              : `${key.replace(/_/g, " ")} - auto-populated`,
+        });
+      }
+    }
+
+    return { ...provider, credentials: updatedCredentials };
+  };
+
   const handleOpenConfig = (provider: PaymentProvider) => {
-    // Auto-populate URLs for Nuvei
-    const populatedProvider = autoPopulateNuveiUrls(provider);
+    // Auto-populate URLs for Nuvei, then Atlas
+    const populatedProvider = autoPopulateAtlasUrls(
+      autoPopulateNuveiUrls(provider),
+    );
     setSelectedProvider(populatedProvider);
     setAutoConfigResult(null); // Reset auto-config result
     setConfigDialogOpen(true);

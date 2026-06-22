@@ -12,6 +12,9 @@ import {
   craftNuveiDmn,
   postCraftedDmn,
   resolveNuveiSecret,
+  craftAtlasCallback,
+  postCraftedAtlasCallback,
+  resolveAtlasCredentials,
 } from "./webhook-crafter";
 // Reason: relative import for dual-app (main + admin) resolution.
 import type { IAttackScenarioResult } from "../../../../database/models/simulator/attack-run.model";
@@ -958,6 +961,200 @@ export const scenarioNosqlInjection: AttackScenario = async (ctx) => {
   return finalize(result);
 };
 
+// ─── scenario 10: Atlas webhook HMAC rejection ───────────────────────────────
+
+export const scenarioAtlasHmacRejection: AttackScenario = async (ctx) => {
+  const id = "s10_atlas_hmac_rejection";
+  const result = newScenarioResult(
+    id,
+    "Atlas webhook signature rejection",
+    "Send a forged Atlas callback with an invalid X-Signature. Webhook must reject with 401 and credit nothing.",
+  );
+
+  try {
+    const creds = await resolveAtlasCredentials();
+    if (!creds) {
+      result.status = "skipped";
+      result.verdict =
+        "SKIP (Atlas credentials not configured — webhook cannot verify signatures)";
+      await ctx.log(
+        "warn",
+        "Skipping Atlas HMAC test because Atlas credentials are not configured",
+        id,
+      );
+      return finalize(result);
+    }
+
+    const userId = await setupTestUser(ctx);
+    const paymentId = `sim-atlas-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    const crafted = await craftAtlasCallback({
+      paymentId,
+      additionalData: `txn_sim_${Date.now()}`,
+      userId,
+      amount: 25,
+      statusCode: 2, // COMPLETED — must still be rejected due to bad signature
+      signatureMode: "invalid",
+    });
+
+    await ctx.log("info", `Posting forged Atlas callback for ${userId}`, id);
+    const { status, text, body } = await postCraftedAtlasCallback(
+      ctx.baseUrl,
+      crafted,
+    );
+
+    const bodyObj =
+      typeof body === "object" && body !== null
+        ? (body as Record<string, unknown>)
+        : {};
+    const bodyError =
+      typeof bodyObj.error === "string" ? (bodyObj.error as string) : "";
+
+    await ctx.log(
+      "info",
+      `Atlas webhook response: status=${status} error="${bodyError}"`,
+      id,
+    );
+
+    result.assertions.push({
+      label: "Webhook HTTP status is 401 (Unauthorized)",
+      passed: status === 401,
+      detail: `status=${status}`,
+    });
+    result.assertions.push({
+      label: "Response body indicates unauthorized / forged request",
+      passed: /unauthorized/i.test(bodyError) || /unauthorized/i.test(text),
+      detail: `error="${bodyError}"`,
+    });
+
+    const pass = result.assertions.every((a) => a.passed);
+    result.verdict = pass
+      ? "PASS (forged Atlas callback rejected with HTTP 401, no wallet impact)"
+      : "FAIL (forged Atlas callback was NOT rejected with 401 — investigate signature path)";
+  } catch (err) {
+    result.status = "failed";
+    result.errorMessage =
+      err instanceof Error ? err.message : "scenario threw unexpectedly";
+    await ctx.log("error", `Scenario ${id} crashed: ${result.errorMessage}`, id);
+  }
+
+  return finalize(result);
+};
+
+// ─── scenario 11: Atlas webhook replay idempotency ───────────────────────────
+
+export const scenarioAtlasReplayIdempotency: AttackScenario = async (ctx) => {
+  const id = "s11_atlas_replay_idempotency";
+  const result = newScenarioResult(
+    id,
+    "Atlas webhook replay idempotency",
+    "Replay the same valid Atlas callback for an already-completed transaction. Neither call may double-credit.",
+  );
+
+  try {
+    const creds = await resolveAtlasCredentials();
+    if (!creds) {
+      result.status = "skipped";
+      result.verdict =
+        "SKIP (Atlas credentials not configured — cannot send a valid-signature callback)";
+      await ctx.log(
+        "warn",
+        "Skipping Atlas idempotency test — credentials missing",
+        id,
+      );
+      return finalize(result);
+    }
+
+    const userId = await setupTestUser(ctx);
+
+    const { status: setupStatus, data: setupData } = await callAttack<{
+      success: boolean;
+      transactionId?: string;
+      paymentId?: string;
+      additionalData?: string;
+      error?: string;
+    }>(ctx, "/api/simulator/attack/setup", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "create-completed-atlas-tx",
+        userId,
+        amount: 25,
+      }),
+    });
+
+    if (
+      setupStatus !== 200 ||
+      !setupData.success ||
+      !setupData.transactionId ||
+      !setupData.paymentId ||
+      !setupData.additionalData
+    ) {
+      throw new Error(
+        `setup create-completed-atlas-tx failed: ${setupStatus} ${setupData.error ?? ""}`,
+      );
+    }
+    ctx.registerTransaction(setupData.transactionId);
+
+    const crafted = await craftAtlasCallback({
+      paymentId: setupData.paymentId,
+      additionalData: setupData.additionalData,
+      userId,
+      amount: 25,
+      statusCode: 2, // COMPLETED
+      signatureMode: "valid",
+    });
+
+    await ctx.log("info", "Posting valid Atlas callback #1 for completed txn", id);
+    const r1 = await postCraftedAtlasCallback(ctx.baseUrl, crafted);
+    await ctx.log(
+      "info",
+      `Response #1: status=${r1.status} body=${r1.text.slice(0, 140)}`,
+      id,
+    );
+
+    await ctx.log("info", "Posting valid Atlas callback #2 (replay)", id);
+    const r2 = await postCraftedAtlasCallback(ctx.baseUrl, crafted);
+    await ctx.log(
+      "info",
+      `Response #2: status=${r2.status} body=${r2.text.slice(0, 140)}`,
+      id,
+    );
+
+    const msg1 = extractMessage(r1.body, r1.text);
+    const msg2 = extractMessage(r2.body, r2.text);
+    const alreadyProcessedPattern =
+      /already (processed|processing)|not in pending state/i;
+
+    result.assertions.push({
+      label: "First response indicates already-processed (no credit)",
+      passed: r1.status === 200 && alreadyProcessedPattern.test(msg1),
+      detail: `status=${r1.status} msg="${msg1}"`,
+    });
+    result.assertions.push({
+      label: "Replayed response also indicates already-processed",
+      passed: r2.status === 200 && alreadyProcessedPattern.test(msg2),
+      detail: `status=${r2.status} msg="${msg2}"`,
+    });
+    result.assertions.push({
+      label: "Responses are identical (deterministic idempotency)",
+      passed: msg1 === msg2,
+      detail: `msg1==msg2=${msg1 === msg2}`,
+    });
+
+    const pass = result.assertions.every((a) => a.passed);
+    result.verdict = pass
+      ? "PASS (Atlas replay short-circuits on the 'already processed' branch, no double-credit)"
+      : "FAIL (Atlas replay did not short-circuit as expected)";
+  } catch (err) {
+    result.status = "failed";
+    result.errorMessage =
+      err instanceof Error ? err.message : "scenario threw unexpectedly";
+    await ctx.log("error", `Scenario ${id} crashed: ${result.errorMessage}`, id);
+  }
+
+  return finalize(result);
+};
+
 // Ordered export — scenario 4 depends on having cleared state from earlier
 // scenarios, which is why we always clear at its start. Scenarios can run in
 // sequence; isolation per test user keeps them independent.
@@ -971,4 +1168,6 @@ export const ALL_SCENARIOS: AttackScenario[] = [
   scenarioAtoBruteForce,
   scenarioChargebackRestriction,
   scenarioNosqlInjection,
+  scenarioAtlasHmacRejection,
+  scenarioAtlasReplayIdempotency,
 ];

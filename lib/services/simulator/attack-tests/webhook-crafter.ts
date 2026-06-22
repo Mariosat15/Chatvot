@@ -185,3 +185,172 @@ export async function postCraftedDmn(
   }
   return { status: res.status, body, text };
 }
+
+// ─── Atlas callback crafting ─────────────────────────────────────────────────
+//
+// Atlas posts JSON status-change callbacks with header:
+//   X-Signature = SHA-512(ClientId + rawBody + ClientSecret)
+// (see app/api/atlas/webhook/route.ts + payment.md §6). These helpers craft
+// callbacks the real Atlas webhook handler parses identically to genuine ones.
+
+export interface CraftedAtlasCallback {
+  body: string; // application/json body
+  signature?: string; // omitted entirely when signatureMode === "missing"
+  signatureMode: SignatureMode;
+  expectedComplete: boolean;
+}
+
+export interface CraftAtlasOptions {
+  paymentId: string;
+  /** Echoed correlation token — must equal `txn_<WalletTransaction._id>`. */
+  additionalData: string;
+  userId: string;
+  amount: number;
+  currency?: string;
+  /** -1 DECLINED, 0 NEW, 1 PROCESSING, 2 COMPLETED. */
+  statusCode: number;
+  signatureMode: SignatureMode;
+  /** Optional overrides; normally resolved from DB/env at runtime. */
+  clientIdOverride?: string;
+  clientSecretOverride?: string;
+}
+
+/**
+ * Locate the Atlas ClientId + ClientSecret the webhook handler verifies with.
+ * Mirrors atlas.service.ts::getCredentials lookup order (DB → env).
+ */
+export async function resolveAtlasCredentials(): Promise<{
+  clientId: string;
+  clientSecret: string;
+} | null> {
+  try {
+    const provider = await PaymentProvider.findOne({
+      slug: "atlas",
+      isActive: true,
+    }).lean();
+    const raw = provider as unknown as
+      | { credentials?: Array<{ key?: unknown; value?: unknown }> }
+      | null;
+    if (raw && Array.isArray(raw.credentials)) {
+      const get = (key: string): string | undefined => {
+        const match = raw.credentials!.find((c) => c?.key === key);
+        return match && typeof match.value === "string" ? match.value : undefined;
+      };
+      const clientId = get("client_id");
+      const clientSecret = get("client_secret");
+      if (clientId && clientSecret) return { clientId, clientSecret };
+    }
+  } catch {
+    // Fall through to env lookup
+  }
+  const clientId = process.env.ATLAS_CLIENT_ID;
+  const clientSecret = process.env.ATLAS_CLIENT_SECRET;
+  if (clientId && clientSecret) return { clientId, clientSecret };
+  return null;
+}
+
+function computeAtlasSignature(
+  clientId: string,
+  rawBody: string,
+  clientSecret: string,
+): string {
+  return crypto
+    .createHash("sha512")
+    .update(`${clientId}${rawBody}${clientSecret}`)
+    .digest("hex");
+}
+
+/**
+ * Build an Atlas callback payload. For "valid" mode the secret must be
+ * resolvable — we throw otherwise so the suite never silently skips the check.
+ */
+export async function craftAtlasCallback(
+  opts: CraftAtlasOptions,
+): Promise<CraftedAtlasCallback> {
+  const data = {
+    user_id: opts.userId,
+    sender: "sim-attack",
+    payment_id: opts.paymentId,
+    amount: opts.amount,
+    currency: opts.currency ?? "EUR",
+    message: "Attack-suite synthetic callback",
+    date: new Date().toISOString(),
+    recurring: false,
+    commission_included: true,
+    additional_data: opts.additionalData,
+    transaction_id: `sim-atlas-tx-${opts.paymentId}`,
+    transaction_status_code: opts.statusCode,
+    transaction_status_text:
+      opts.statusCode === 2
+        ? "COMPLETED"
+        : opts.statusCode === -1
+          ? "DECLINED"
+          : "PROCESSING",
+    transaction_status_data: opts.statusCode === -1 ? "simulated decline" : "",
+    payment_method_id: "sim-method",
+    payment_method_name: "VISA",
+    payment_method_data: "411111******1111",
+    payer_ip: "127.0.0.1",
+    payer_country: "GB",
+    payer_email: `${opts.userId}@test.simulator`,
+  };
+
+  const body = JSON.stringify({ data });
+
+  let signature: string | undefined;
+  if (opts.signatureMode === "valid") {
+    let clientId = opts.clientIdOverride;
+    let clientSecret = opts.clientSecretOverride;
+    if (!clientId || !clientSecret) {
+      const creds = await resolveAtlasCredentials();
+      if (!creds) {
+        throw new Error(
+          "Cannot craft valid-signature Atlas callback: credentials not configured",
+        );
+      }
+      clientId = creds.clientId;
+      clientSecret = creds.clientSecret;
+    }
+    signature = computeAtlasSignature(clientId, body, clientSecret);
+  } else if (opts.signatureMode === "invalid") {
+    signature = crypto.randomBytes(64).toString("hex");
+  }
+  // "missing" → leave signature undefined
+
+  return {
+    body,
+    signature,
+    signatureMode: opts.signatureMode,
+    expectedComplete:
+      opts.statusCode === 2 && opts.signatureMode === "valid",
+  };
+}
+
+/**
+ * Post a crafted Atlas callback to the real Atlas webhook. Returns the
+ * webhook's response so scenarios can assert how the handler reacted.
+ */
+export async function postCraftedAtlasCallback(
+  baseUrl: string,
+  crafted: CraftedAtlasCallback,
+): Promise<{ status: number; body: unknown; text: string }> {
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    "x-forwarded-for": "127.0.0.1",
+  };
+  if (crafted.signature) headers["x-signature"] = crafted.signature;
+
+  const res = await fetch(`${baseUrl}/api/atlas/webhook`, {
+    method: "POST",
+    headers,
+    body: crafted.body,
+  });
+  const text = await res.text();
+  let body: unknown = text;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    // Non-JSON response is fine
+  }
+  return { status: res.status, body, text };
+}

@@ -147,6 +147,53 @@ export async function POST(request: Request) {
       }
     }
 
+    // For Atlas transactions, verify payment status before completing.
+    // Reason: prevents an admin from manually crediting a payment Atlas
+    // actually declined (status_code -1). Mirrors the Nuvei verification above.
+    if (provider === "atlas" && transaction.providerTransactionId) {
+      console.log("🔍 Verifying Atlas payment status before completing...");
+      try {
+        const { atlasService, ATLAS_STATUS } = await import(
+          "@/lib/services/atlas.service"
+        );
+        const verifyResult = await atlasService.getPaymentStatus(
+          transaction.providerTransactionId,
+        );
+
+        if ("error" in verifyResult) {
+          // Could not verify (expired / not yet visible) — log and continue.
+          console.log(
+            "⚠️ Could not verify Atlas payment (may be expired or invalid):",
+            verifyResult.error,
+          );
+        } else {
+          const code = Number(verifyResult.transaction_status_code);
+          if (code === ATLAS_STATUS.DECLINED) {
+            // Atlas declined this payment — refuse and mark failed.
+            transaction.status = "failed";
+            transaction.failureReason =
+              verifyResult.transaction_status_data ||
+              verifyResult.transaction_status_text ||
+              "Atlas status: DECLINED";
+            await transaction.save();
+
+            return NextResponse.json(
+              {
+                error: "Payment was declined by Atlas",
+                details: `Atlas payment status: DECLINED. ${verifyResult.transaction_status_data || ""}`,
+                atlasStatusCode: code,
+              },
+              { status: 400 },
+            );
+          }
+          console.log(`✅ Atlas payment status code: ${code} - allowed`);
+        }
+      } catch (verifyError) {
+        console.error("⚠️ Error verifying Atlas payment:", verifyError);
+        // Don't block - continue with manual completion but log the warning
+      }
+    }
+
     // Update transaction status
     transaction.status = "completed";
     transaction.paymentIntentId =

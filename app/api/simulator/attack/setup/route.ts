@@ -155,6 +155,58 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  if (action === "create-completed-atlas-tx") {
+    const userId = typeof body.userId === "string" ? body.userId : "";
+    const amount = typeof body.amount === "number" ? body.amount : 25;
+
+    if (!isAttackTestUserId(userId)) {
+      return NextResponse.json(
+        { success: false, error: "userId must be a sim-attack-* id" },
+        { status: 400 },
+      );
+    }
+
+    try {
+      const paymentId = `sim-atlas-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
+      const tx = await WalletTransaction.create({
+        userId,
+        transactionType: "deposit",
+        amount,
+        balanceBefore: 0,
+        balanceAfter: 0,
+        currency: "EUR",
+        exchangeRate: 1,
+        status: "completed", // pre-marked so replay hits the "already processed" branch
+        provider: "atlas",
+        providerTransactionId: paymentId,
+        paymentId,
+        description: "Attack-suite Atlas replay test transaction (pre-completed)",
+        processedAt: new Date(),
+        metadata: {
+          simulatorMode: true,
+          simulatorAttack: true,
+          atlasPaymentId: paymentId,
+        },
+      });
+
+      // additional_data the Atlas webhook resolves back to this transaction.
+      const additionalData = `txn_${tx._id.toString()}`;
+
+      return NextResponse.json({
+        success: true,
+        transactionId: tx._id.toString(),
+        paymentId,
+        additionalData,
+      });
+    } catch (err) {
+      console.error("setup create-completed-atlas-tx failed:", err);
+      return NextResponse.json(
+        { success: false, error: "Atlas transaction create failed" },
+        { status: 500 },
+      );
+    }
+  }
+
   return NextResponse.json(
     { success: false, error: "Unknown action" },
     { status: 400 },

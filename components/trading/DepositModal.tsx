@@ -61,9 +61,13 @@ interface PaymentProviders {
     testMode: boolean;
     sdkUrl: string;
   };
+  atlas: {
+    available: boolean;
+    testMode: boolean;
+  };
 }
 
-type PaymentProvider = "stripe" | "paddle" | "nuvei";
+type PaymentProvider = "stripe" | "paddle" | "nuvei" | "atlas";
 
 // Declare SafeCharge global type
 declare global {
@@ -242,6 +246,8 @@ export default function DepositModal({ children }: DepositModalProps) {
             setStripePromise(stripe);
           } else if (config.providers.nuvei?.available) {
             setSelectedProvider("nuvei");
+          } else if (config.providers.atlas?.available) {
+            setSelectedProvider("atlas");
           } else if (config.providers.paddle?.available) {
             setSelectedProvider("paddle");
           }
@@ -376,6 +382,7 @@ export default function DepositModal({ children }: DepositModalProps) {
     const available: PaymentProvider[] = [];
     if (providers.stripe?.available) available.push("stripe");
     if (providers.nuvei?.available) available.push("nuvei");
+    if (providers.atlas?.available) available.push("atlas");
     if (providers.paddle?.available) available.push("paddle");
     return available;
   };
@@ -653,6 +660,41 @@ export default function DepositModal({ children }: DepositModalProps) {
         } else {
           throw new Error("No checkout URL received from Paddle");
         }
+      } else if (provider === "atlas") {
+        // Atlas: create a hosted-form payment, then full-page redirect.
+        const response = await fetch("/api/atlas/open-order", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Request-Id": requestId,
+          },
+          body: JSON.stringify({
+            amount: totalPayment,
+            baseAmount: amountNum,
+            currency: settings?.currency?.code || "EUR",
+            vatPercentage: vatEnabled ? vatPercentage : 0,
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to create Atlas payment");
+        }
+
+        if (data.paymentUrl) {
+          // Validate URL is HTTPS before redirect (security check).
+          try {
+            const url = new URL(data.paymentUrl);
+            if (url.protocol !== "https:" && url.hostname !== "localhost") {
+              throw new Error("Invalid payment URL protocol");
+            }
+            window.location.href = data.paymentUrl;
+          } catch {
+            throw new Error("Invalid payment URL received from Atlas");
+          }
+        } else {
+          throw new Error("No payment URL received from Atlas");
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -729,6 +771,8 @@ export default function DepositModal({ children }: DepositModalProps) {
         return <CreditCard className="h-5 w-5" />;
       case "nuvei":
         return <Gem className="h-5 w-5" />;
+      case "atlas":
+        return <Shield className="h-5 w-5" />;
       case "paddle":
         return <Globe className="h-5 w-5" />;
     }
@@ -740,6 +784,8 @@ export default function DepositModal({ children }: DepositModalProps) {
         return "Credit/Debit Card";
       case "nuvei":
         return "Nuvei Secure Payment";
+      case "atlas":
+        return "Atlas Secure Payment";
       case "paddle":
         return "Paddle (Global)";
     }
@@ -751,6 +797,8 @@ export default function DepositModal({ children }: DepositModalProps) {
         return "Pay securely with your card";
       case "nuvei":
         return "Fast & secure card payments";
+      case "atlas":
+        return "Secure card payment via Atlas";
       case "paddle":
         return "Multiple payment methods, taxes included";
     }

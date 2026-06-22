@@ -13,6 +13,7 @@ import { isEUCountry } from "@/lib/utils/country-vat";
 import { ObjectId } from "mongodb";
 import { isPaddleConfigured, getPaddleConfig } from "@/lib/paddle/config";
 import { nuveiService, NUVEI_SDK_URL } from "@/lib/services/nuvei.service";
+import { atlasService } from "@/lib/services/atlas.service";
 
 /**
  * Helper to find user by various ID formats
@@ -161,14 +162,26 @@ export async function GET() {
       // Nuvei not configured
     }
 
+    // Check Atlas availability
+    let atlasConfig: { enabled: boolean; testMode?: boolean } | null = null;
+    let atlasAvailable = false;
+    try {
+      atlasConfig = await atlasService.getClientConfig();
+      atlasAvailable = atlasConfig?.enabled || false;
+    } catch (e) {
+      console.error("💳 Atlas config error:", e);
+      // Atlas not configured
+    }
+
     // Check if ANY provider is available
     const anyProviderConfigured =
-      stripeAvailable || paddleAvailable || nuveiAvailable;
+      stripeAvailable || paddleAvailable || nuveiAvailable || atlasAvailable;
 
     console.log("💳 Payment providers available:", {
       stripeAvailable,
       paddleAvailable,
       nuveiAvailable,
+      atlasAvailable,
       anyProviderConfigured,
     });
 
@@ -187,6 +200,8 @@ export async function GET() {
       primaryProvider = "stripe";
     } else if (nuveiAvailable) {
       primaryProvider = "nuvei";
+    } else if (atlasAvailable) {
+      primaryProvider = "atlas";
     } else if (paddleAvailable) {
       primaryProvider = "paddle";
     }
@@ -234,6 +249,10 @@ export async function GET() {
           siteId: nuveiConfig?.siteId || null,
           testMode: nuveiConfig?.testMode ?? true,
           sdkUrl: nuveiConfig?.sdkUrl || NUVEI_SDK_URL,
+        },
+        atlas: {
+          available: atlasAvailable,
+          testMode: atlasConfig?.testMode ?? true,
         },
       },
     });
