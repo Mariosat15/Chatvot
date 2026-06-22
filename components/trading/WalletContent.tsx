@@ -129,20 +129,40 @@ export default function WalletContent({
     roi: isDateFiltered ? 0 : allTimeROI,
   };
 
-  // Handle payment return from Stripe/Paddle
+  // Handle payment return from Stripe/Paddle/Atlas
   useEffect(() => {
     const payment = searchParams.get("payment");
     const paddleSuccess = searchParams.get("paddle_status");
     const error = searchParams.get("error");
+    // Atlas redirects back with ?status=success|failed&provider=atlas
+    const status = searchParams.get("status");
+    const provider = searchParams.get("provider");
+    const atlasReturn = provider === "atlas";
 
-    if (payment === "success" || paddleSuccess === "completed") {
+    if (
+      payment === "success" ||
+      paddleSuccess === "completed" ||
+      (atlasReturn && status === "success")
+    ) {
       setPaymentStatus("success");
       // Clear URL params after showing message
       setTimeout(() => {
         router.replace("/wallet", { scroll: false });
       }, 5000);
-    } else if (error || payment === "failed" || paddleSuccess === "failed") {
+    } else if (
+      error ||
+      payment === "failed" ||
+      paddleSuccess === "failed" ||
+      (atlasReturn && (status === "failed" || status === "cancelled"))
+    ) {
       setPaymentStatus("error");
+      // Reason: Atlas uses a full-page redirect with no client "close" event,
+      // so when the user abandons/cancels on the hosted page we proactively
+      // cancel the pending deposit they left behind (no-op if it actually
+      // completed — the webhook claims it atomically).
+      if (atlasReturn) {
+        fetch("/api/atlas/cancel-pending", { method: "POST" }).catch(() => {});
+      }
       setTimeout(() => {
         router.replace("/wallet", { scroll: false });
       }, 5000);

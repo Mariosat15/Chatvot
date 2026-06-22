@@ -54,6 +54,7 @@ import { runEarlyEndCheck } from "./jobs/early-end-check.job";
 import { runGameMasterRenewalJob } from "./jobs/gamemaster-renewal.job";
 import { runScheduledTests } from "./jobs/scheduled-test-run.job";
 import { runAtlasRefundReconcile } from "./jobs/atlas-refund-reconcile.job";
+import { runAtlasPendingCleanup } from "./jobs/atlas-pending-cleanup.job";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -309,6 +310,29 @@ agenda.define("atlas-refund-reconcile", async () => {
 });
 
 /**
+ * Atlas Pending Deposit Cleanup Job
+ * Cancels abandoned Atlas checkouts (full-page redirect has no client close
+ * event) so they don't linger in the admin pending-deposits queue. Verifies
+ * with Atlas before cancelling so real payments are never clobbered.
+ */
+agenda.define("atlas-pending-cleanup", async () => {
+  try {
+    const result = await runAtlasPendingCleanup();
+    if (result.cancelled > 0 || result.failed > 0 || result.keptCompleted > 0) {
+      console.log(
+        `🧹 [ATLAS PENDING CLEANUP] Cancelled: ${result.cancelled}, failed: ${result.failed}, kept(completed): ${result.keptCompleted}, in-flight: ${result.keptInFlight}, scanned: ${result.scanned}`,
+      );
+    }
+    if (result.errors.length > 0) {
+      console.error(`🧹 [ATLAS PENDING CLEANUP] Errors: ${result.errors.length}`);
+      result.errors.forEach((e) => console.error(`     - ${e}`));
+    }
+  } catch (error) {
+    console.error(`🧹 [ATLAS PENDING CLEANUP] Failed:`, error);
+  }
+});
+
+/**
  * GAME MASTER RENEWAL JOB
  * Processes subscription renewals, expirations, and daily counter resets
  * Runs daily at 00:05 UTC
@@ -419,6 +443,7 @@ async function startWorker(): Promise<void> {
     await agenda.every("1 day", "gamemaster-renewal");
     await agenda.every("5 minutes", "scheduled-test-run");
     await agenda.every("1 hour", "atlas-refund-reconcile");
+    await agenda.every("15 minutes", "atlas-pending-cleanup");
 
     // Schedule withdrawal processing jobs
     await scheduleWithdrawalJobs(agenda);
