@@ -237,7 +237,7 @@ export async function validateWithdrawal(
       WithdrawalSettings.getSingleton(),
       CreditConversionSettings.getSingleton(),
       CreditWallet.findOne({ userId }),
-      AppSettings.findById("global-app-settings"),
+      AppSettings.findById("app-settings"),
       KYCSettings.findOne(),
     ]);
 

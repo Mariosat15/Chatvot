@@ -47,7 +47,7 @@ export async function GET() {
       WithdrawalSettings.getSingleton(),
       CreditConversionSettings.getSingleton(),
       CreditWallet.findOne({ userId: session.user.id }),
-      AppSettings.findById("global-app-settings"),
+      AppSettings.findById("app-settings"),
       KYCSettings.findOne(),
     ]);
 

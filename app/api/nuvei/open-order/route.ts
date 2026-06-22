@@ -199,13 +199,14 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
 
     // Get base currency settings
-    const appSettings = await AppSettings.findById("global-app-settings");
+    const appSettings = await AppSettings.findById("app-settings");
     const cs = appSettings?.currency?.symbol || "€";
     const baseCurrencyCode = appSettings?.currency?.code || "EUR";
 
     // SECURITY: Minimum deposit — honor the admin-configured value
     // (transactions.minimumDeposit), falling back to 10 only if unset.
     const minDeposit = appSettings?.transactions?.minimumDeposit ?? 10;
+    const maxDeposit = appSettings?.transactions?.maximumDeposit ?? 10000;
     if (amountNum < minDeposit) {
       return NextResponse.json(
         { error: `Minimum deposit is ${cs}${minDeposit}` },
@@ -214,9 +215,9 @@ export async function POST(req: NextRequest) {
     }
 
     // SECURITY: Maximum deposit to prevent money laundering
-    if (amountNum > 10000) {
+    if (amountNum > maxDeposit) {
       return NextResponse.json(
-        { error: `Maximum deposit is ${cs}10,000` },
+        { error: `Maximum deposit is ${cs}${maxDeposit.toLocaleString()}` },
         { status: 400 },
       );
     }

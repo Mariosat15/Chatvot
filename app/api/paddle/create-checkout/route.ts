@@ -112,9 +112,10 @@ export async function POST(req: NextRequest) {
     // Reason: honor the admin-configured minimum (transactions.minimumDeposit),
     // falling back to 10 only if unset — keeps every PSP consistent.
     await connectToDatabase();
-    const appSettings = await AppSettings.findById("global-app-settings");
+    const appSettings = await AppSettings.findById("app-settings");
     const cs = appSettings?.currency?.symbol || "€";
     const minDeposit = appSettings?.transactions?.minimumDeposit ?? 10;
+    const maxDeposit = appSettings?.transactions?.maximumDeposit ?? 10000;
     if (amount < minDeposit) {
       return NextResponse.json(
         { error: `Minimum deposit is ${cs}${minDeposit}` },
@@ -122,9 +123,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (amount > 10000) {
+    if (amount > maxDeposit) {
       return NextResponse.json(
-        { error: `Maximum deposit is ${cs}10,000` },
+        { error: `Maximum deposit is ${cs}${maxDeposit.toLocaleString()}` },
         { status: 400 },
       );
     }

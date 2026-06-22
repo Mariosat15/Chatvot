@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     await connectToDatabase();
 
     // Get base currency from settings
-    const appSettings = await AppSettings.findById("global-app-settings");
+    const appSettings = await AppSettings.findById("app-settings");
     const currencyCode = appSettings?.currency?.code || "EUR";
 
     // Build query

@@ -34,6 +34,7 @@ export async function GET() {
         },
         transactions: {
           minimumDeposit: 10,
+          maximumDeposit: 10000,
           minimumWithdrawal: 20,
           withdrawalFeePercentage: 2,
         },

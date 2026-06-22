@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
     await connectToDatabase();
 
     // Get base currency settings
-    const appSettings = await AppSettings.findById("global-app-settings");
+    const appSettings = await AppSettings.findById("app-settings");
     const cs = appSettings?.currency?.symbol || "€";
     const currencyCode = (appSettings?.currency?.code || "EUR").toLowerCase();
 
@@ -164,9 +164,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (amount > STRIPE_CONFIG.maximumDeposit) {
+    const maxDeposit =
+      appSettings?.transactions?.maximumDeposit ?? STRIPE_CONFIG.maximumDeposit;
+    if (amount > maxDeposit) {
       return NextResponse.json(
-        { error: `Maximum deposit is ${cs}${STRIPE_CONFIG.maximumDeposit}` },
+        { error: `Maximum deposit is ${cs}${maxDeposit.toLocaleString()}` },
         { status: 400 },
       );
     }

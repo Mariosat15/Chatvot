@@ -65,6 +65,11 @@ const AppSettingsSchema = new Schema({
       default: 10, // Minimum EUR/currency deposit
       min: 1,
     },
+    maximumDeposit: {
+      type: Number,
+      default: 10000, // Maximum EUR/currency deposit (AML ceiling)
+      min: 1,
+    },
     minimumWithdrawal: {
       type: Number,
       default: 20, // Minimum EUR/currency withdrawal

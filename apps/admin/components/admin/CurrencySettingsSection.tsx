@@ -29,6 +29,7 @@ export default function CurrencySettingsSection() {
     },
     transactions: {
       minimumDeposit: 10,
+      maximumDeposit: 10000,
       minimumWithdrawal: 20,
       withdrawalFeePercentage: 2,
     },
@@ -386,6 +387,28 @@ export default function CurrencySettingsSection() {
 
             <div>
               <Label className="text-gray-300">
+                Maximum Deposit ({settings.currency.symbol})
+              </Label>
+              <Input
+                type="number"
+                min="1"
+                value={settings.transactions.maximumDeposit}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value);
+                  setSettings((prev) => ({
+                    ...prev,
+                    transactions: {
+                      ...prev.transactions,
+                      maximumDeposit: isNaN(value) ? 10000 : value,
+                    },
+                  }));
+                }}
+                className="mt-2 bg-gray-700 border-gray-600 text-gray-100"
+              />
+            </div>
+
+            <div>
+              <Label className="text-gray-300">
                 Minimum Withdrawal ({settings.currency.symbol})
               </Label>
               <Input
@@ -464,7 +487,9 @@ export default function CurrencySettingsSection() {
             </div>
             <p className="text-xs text-gray-500 mt-3">
               Min deposit: {settings.currency.symbol}
-              {settings.transactions.minimumDeposit} • Min withdrawal:{" "}
+              {settings.transactions.minimumDeposit} • Max deposit:{" "}
+              {settings.currency.symbol}
+              {settings.transactions.maximumDeposit} • Min withdrawal:{" "}
               {settings.currency.symbol}
               {settings.transactions.minimumWithdrawal}
             </p>

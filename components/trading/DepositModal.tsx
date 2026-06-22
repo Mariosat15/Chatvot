@@ -200,6 +200,9 @@ export default function DepositModal({ children }: DepositModalProps) {
   const minDeposit =
     (settings as { transactions?: { minimumDeposit?: number } })?.transactions
       ?.minimumDeposit || 10;
+  const maxDeposit =
+    (settings as { transactions?: { maximumDeposit?: number } })?.transactions
+      ?.maximumDeposit || 10000;
 
   // Calculate VAT on the EUR amount
   const calculateVAT = (amountEur: number) => {
@@ -407,8 +410,8 @@ export default function DepositModal({ children }: DepositModalProps) {
       return;
     }
 
-    if (amountNum > 10000) {
-      setError(`Maximum is ${currencySymbol}10,000`);
+    if (amountNum > maxDeposit) {
+      setError(`Maximum is ${currencySymbol}${maxDeposit.toLocaleString()}`);
       return;
     }
 
@@ -458,7 +461,7 @@ export default function DepositModal({ children }: DepositModalProps) {
       const amountNum = parseFloat(amount);
 
       // SECURITY: Double-check amount validation client-side
-      if (isNaN(amountNum) || amountNum < minDeposit || amountNum > 10000) {
+      if (isNaN(amountNum) || amountNum < minDeposit || amountNum > maxDeposit) {
         throw new Error("Invalid amount");
       }
 
@@ -906,7 +909,7 @@ export default function DepositModal({ children }: DepositModalProps) {
                   type="number"
                   step="0.01"
                   min={minDeposit}
-                  max="10000"
+                  max={maxDeposit}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   className="pl-8 bg-gray-800 border-gray-700 text-gray-100"
@@ -917,7 +920,7 @@ export default function DepositModal({ children }: DepositModalProps) {
               <p className="text-xs text-gray-500">
                 Minimum: {settings?.currency?.symbol || "€"}
                 {minDeposit} • Maximum: {settings?.currency?.symbol || "€"}
-                10,000
+                {maxDeposit.toLocaleString()}
               </p>
             </div>
 
