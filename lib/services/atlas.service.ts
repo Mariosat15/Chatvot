@@ -353,18 +353,29 @@ class AtlasService {
       const respUserId = root?.user_id as string | number | undefined;
 
       if (!response.ok || !paymentUrl) {
+        // Atlas accepted the request and minted a payment_id but returned a
+        // null/empty payment_url — there is no hosted form to redirect to.
+        // This is an Atlas-side account state (no payment methods enabled for
+        // the ClientId/recipient, or still in test/pending setup), not an auth
+        // or signature problem (those return HTTP >= 400 with a code).
+        const createdWithoutUrl = Boolean(
+          response.ok && paymentId && !paymentUrl,
+        );
         console.error("❌ Atlas createPayment failed:", {
           status: response.status,
           contentType: response.headers.get("content-type"),
           code: data?.code,
           error: data?.error || data?.error_message,
+          createdWithoutUrl,
+          paymentId: paymentId ?? null,
           bodyPreview: rawText ? rawText.slice(0, 800) : "(empty body)",
         });
         return {
-          error:
-            (data?.error as string) ||
-            (data?.error_message as string) ||
-            "Failed to create Atlas payment",
+          error: createdWithoutUrl
+            ? "Atlas accepted the payment but returned no payment URL — no payment methods appear to be enabled for this account (or it is still in test/pending setup). Contact Atlas to enable payment methods for your ClientId."
+            : (data?.error as string) ||
+              (data?.error_message as string) ||
+              "Failed to create Atlas payment",
         };
       }
 
