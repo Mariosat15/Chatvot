@@ -9,6 +9,7 @@ export interface IEmailTemplate extends Document {
     | "inactive_reminder"
     | "deposit_completed"
     | "withdrawal_completed"
+    | "refund_completed"
     | "email_verification"
     | "account_manager_assigned"
     | "account_manager_changed"
@@ -61,6 +62,7 @@ const EmailTemplateSchema = new Schema<IEmailTemplate>(
         "inactive_reminder",
         "deposit_completed",
         "withdrawal_completed",
+        "refund_completed",
         "email_verification",
         "account_manager_assigned",
         "account_manager_changed",
@@ -238,6 +240,25 @@ function getTemplateDefaults(type: string): Partial<IEmailTemplate> {
           "Check your bank account or card statement for the incoming transfer",
           "Allow 3-5 business days for the funds to appear",
           "Contact support if you haven't received it after 7 days",
+        ],
+        closingText: "",
+        ctaButtonText: "View Wallet",
+        ctaButtonUrl: "{{baseUrl}}/wallet",
+        useAIPersonalization: false,
+      };
+
+    case "refund_completed":
+      return {
+        name: "Refund Completed Email",
+        subject: "Your refund of €{{refundAmount}} has been processed",
+        headingText: "Refund Processed",
+        introText:
+          "Your refund has been processed successfully and the money is on its way back to your original payment method.",
+        featureListLabel: "What happens next?",
+        featureItems: [
+          "The refunded amount will appear on your card/bank statement within 3-10 business days",
+          "Any credits granted by the original deposit may be adjusted from your wallet",
+          "Contact support if you have any questions about this refund",
         ],
         closingText: "",
         ctaButtonText: "View Wallet",

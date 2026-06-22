@@ -365,6 +365,20 @@ export default function FinancialDashboard() {
   // Reason: Debounce the search term so we don't fire an API request on every
   // keystroke. 400 ms gives the user time to finish typing before fetching.
   const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Atlas refunds queue (deposits refunded that may still need a clawback)
+  const [refundQueue, setRefundQueue] = useState<Transaction[]>([]);
+  const [refundQueueLoading, setRefundQueueLoading] = useState(false);
+  const [refundQueueFilter, setRefundQueueFilter] = useState<
+    "pending" | "all"
+  >("pending");
+  const [refundQueueCounts, setRefundQueueCounts] = useState({
+    pendingClawback: 0,
+    completed: 0,
+    processing: 0,
+    declined: 0,
+    total: 0,
+  });
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [exportingTransactions, setExportingTransactions] = useState(false);
 
@@ -741,6 +755,25 @@ export default function FinancialDashboard() {
     }
   }, [txPage, txFilters.type, txFilters.status, txFilters.startDate, txFilters.endDate, debouncedSearch]);
 
+  // Fetch the Atlas refunds queue (refunded deposits + clawback status).
+  const fetchRefundQueue = useCallback(async () => {
+    setRefundQueueLoading(true);
+    try {
+      const response = await fetch(
+        `/api/atlas/refunds/pending?status=${refundQueueFilter}`,
+      );
+      if (!response.ok) throw new Error("Failed to fetch refunds");
+      const result = await response.json();
+      setRefundQueue(result.data || []);
+      if (result.counts) setRefundQueueCounts(result.counts);
+    } catch (error) {
+      toast.error("Failed to load refunds queue");
+      console.error(error);
+    } finally {
+      setRefundQueueLoading(false);
+    }
+  }, [refundQueueFilter]);
+
   // Handle transaction click - fetch details and invoice if deposit
   const handleTransactionClick = async (tx: Transaction) => {
     setSelectedTransaction(tx);
@@ -793,6 +826,7 @@ export default function FinancialDashboard() {
       );
       setSelectedTransaction(null);
       fetchTransactions();
+      fetchRefundQueue();
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to initiate refund",
@@ -825,6 +859,7 @@ export default function FinancialDashboard() {
       toast.success(result.message || "Credits clawed back");
       setSelectedTransaction(null);
       fetchTransactions();
+      fetchRefundQueue();
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to claw back credits",
@@ -916,6 +951,12 @@ export default function FinancialDashboard() {
       fetchTransactions();
     }
   }, [activeTab, fetchTransactions]);
+
+  useEffect(() => {
+    if (activeTab === "refunds") {
+      fetchRefundQueue();
+    }
+  }, [activeTab, fetchRefundQueue]);
 
   useEffect(() => {
     if (activeTab === "invoices") {
@@ -1374,6 +1415,14 @@ export default function FinancialDashboard() {
           <TabsTrigger value="analytics">📊 Analytics</TabsTrigger>
           <TabsTrigger value="reconciliation">Reconciliation</TabsTrigger>
           <TabsTrigger value="chargebacks">Chargebacks</TabsTrigger>
+          <TabsTrigger value="refunds" className="relative">
+            Refunds
+            {refundQueueCounts.pendingClawback > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-black text-[10px] font-bold">
+                {refundQueueCounts.pendingClawback}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         {/* OVERVIEW TAB */}
@@ -4425,6 +4474,14 @@ export default function FinancialDashboard() {
                                   {tx.source === "platform" ? "Admin" : "VAT"}
                                 </Badge>
                               )}
+                              {tx.transactionType === "deposit" &&
+                                (tx.metadata?.refundStatus as
+                                  | string
+                                  | undefined) === "completed" && (
+                                  <Badge className="ml-1 bg-amber-600 text-white text-[10px]">
+                                    ↩ Refunded
+                                  </Badge>
+                                )}
                             </TableCell>
                             <TableCell
                               className={`font-semibold ${tx.amount >= 0 ? "text-green-400" : "text-red-400"}`}
@@ -5466,6 +5523,227 @@ export default function FinancialDashboard() {
         {/* CHARGEBACKS TAB */}
         <TabsContent value="chargebacks" className="space-y-6">
           <ChargebacksFinancialTab />
+        </TabsContent>
+
+        {/* REFUNDS TAB */}
+        <TabsContent value="refunds" className="space-y-6">
+          <Card className="bg-gray-900 border-gray-700">
+            <CardHeader>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <RefreshCw className="h-5 w-5 text-amber-400" />
+                    Atlas Refunds & Clawbacks
+                  </CardTitle>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Deposits refunded to the customer&apos;s card. Open one to
+                    claw back the matching credits and keep reconciliation
+                    balanced.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex rounded-lg border border-gray-700 overflow-hidden">
+                    <button
+                      onClick={() => setRefundQueueFilter("pending")}
+                      className={`px-3 py-1.5 text-sm ${
+                        refundQueueFilter === "pending"
+                          ? "bg-amber-500 text-black font-medium"
+                          : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                      }`}
+                    >
+                      Needs clawback
+                    </button>
+                    <button
+                      onClick={() => setRefundQueueFilter("all")}
+                      className={`px-3 py-1.5 text-sm ${
+                        refundQueueFilter === "all"
+                          ? "bg-amber-500 text-black font-medium"
+                          : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                      }`}
+                    >
+                      All refunds
+                    </button>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchRefundQueue}
+                    disabled={refundQueueLoading}
+                    className="border-gray-600"
+                  >
+                    <RefreshCw
+                      className={`h-4 w-4 ${refundQueueLoading ? "animate-spin" : ""}`}
+                    />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Summary chips */}
+              <div className="flex flex-wrap gap-2 mt-3">
+                <Badge className="bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                  {refundQueueCounts.pendingClawback} need clawback
+                </Badge>
+                <Badge className="bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                  {refundQueueCounts.processing} processing
+                </Badge>
+                <Badge className="bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  {refundQueueCounts.completed} clawed back
+                </Badge>
+                <Badge className="bg-gray-500/15 text-gray-300 border border-gray-500/30">
+                  {refundQueueCounts.declined} declined
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {refundQueueLoading ? (
+                <div className="py-10 text-center text-gray-400">
+                  Loading refunds…
+                </div>
+              ) : refundQueue.length === 0 ? (
+                <div className="py-10 text-center text-gray-500">
+                  {refundQueueFilter === "pending"
+                    ? "No refunds awaiting clawback. You're all caught up."
+                    : "No Atlas refunds recorded yet."}
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-gray-700 hover:bg-transparent">
+                        <TableHead className="text-gray-400">User</TableHead>
+                        <TableHead className="text-gray-400">
+                          Refund status
+                        </TableHead>
+                        <TableHead className="text-gray-400">
+                          Refunded
+                        </TableHead>
+                        <TableHead className="text-gray-400">
+                          Credits granted
+                        </TableHead>
+                        <TableHead className="text-gray-400">
+                          Clawback
+                        </TableHead>
+                        <TableHead className="text-gray-400">
+                          Refunded at
+                        </TableHead>
+                        <TableHead className="text-gray-400 text-right">
+                          Action
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {refundQueue.map((tx) => {
+                        const meta = tx.metadata || {};
+                        const refundStatus = meta.refundStatus as
+                          | string
+                          | undefined;
+                        const clawedBack = Boolean(meta.creditsClawedBack);
+                        const clawbackPending =
+                          refundStatus === "completed" && !clawedBack;
+                        const refundAmount =
+                          typeof meta.refundAmount === "number"
+                            ? meta.refundAmount
+                            : undefined;
+                        const refundedAt = meta.refundedAt as
+                          | string
+                          | undefined;
+                        return (
+                          <TableRow
+                            key={tx._id}
+                            className="border-gray-800 hover:bg-gray-800/50 cursor-pointer"
+                            onClick={() => handleTransactionClick(tx)}
+                          >
+                            <TableCell>
+                              <div className="font-medium text-white text-sm">
+                                {tx.userInfo?.name || "Unknown"}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {tx.userInfo?.email || tx.userId}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                className={`text-xs text-white ${
+                                  refundStatus === "completed"
+                                    ? "bg-amber-600"
+                                    : refundStatus === "processing"
+                                      ? "bg-blue-600"
+                                      : refundStatus === "declined"
+                                        ? "bg-gray-600"
+                                        : "bg-gray-700"
+                                }`}
+                              >
+                                {refundStatus || "—"}
+                              </Badge>
+                              {meta.refundReconciledBy &&
+                                String(meta.refundReconciledBy).startsWith(
+                                  "scheduler",
+                                ) && (
+                                  <span
+                                    className="ml-1 text-[10px] text-blue-400"
+                                    title="Detected by the scheduled reconciler (no callback received)"
+                                  >
+                                    auto
+                                  </span>
+                                )}
+                            </TableCell>
+                            <TableCell className="text-amber-300 font-semibold whitespace-nowrap">
+                              {refundAmount !== undefined
+                                ? `€${refundAmount.toFixed(2)}`
+                                : "—"}
+                            </TableCell>
+                            <TableCell className="text-gray-200 whitespace-nowrap">
+                              {Math.abs(tx.amount || 0).toLocaleString()}{" "}
+                              {currencySymbol}
+                            </TableCell>
+                            <TableCell>
+                              {clawedBack ? (
+                                <Badge className="bg-emerald-600 text-white text-xs">
+                                  Done
+                                </Badge>
+                              ) : clawbackPending ? (
+                                <Badge className="bg-amber-500 text-black text-xs">
+                                  Needed
+                                </Badge>
+                              ) : (
+                                <span className="text-gray-500 text-xs">
+                                  —
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-gray-400 text-sm whitespace-nowrap">
+                              {refundedAt
+                                ? new Date(refundedAt).toLocaleString()
+                                : "—"}
+                            </TableCell>
+                            <TableCell
+                              className="text-right"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className={
+                                  clawbackPending
+                                    ? "border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+                                    : "border-gray-600 text-gray-300"
+                                }
+                                onClick={() => handleTransactionClick(tx)}
+                              >
+                                {clawbackPending
+                                  ? "Claw back credits"
+                                  : "View"}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

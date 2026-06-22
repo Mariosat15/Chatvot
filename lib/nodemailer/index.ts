@@ -1049,6 +1049,239 @@ export const sendDepositCompletedEmail = async (
 };
 
 /**
+ * Data for refund completed email
+ */
+interface RefundCompletedEmailData {
+  email: string;
+  name: string;
+  refundAmount: number; // EUR magnitude refunded to the customer
+  currency?: string;
+  paymentMethod?: string;
+  transactionId: string; // original deposit transaction id
+  refundId?: string;
+}
+
+/**
+ * Build refund completed email HTML from the database template. Mirrors the
+ * deposit email shell for visual consistency but presents refund details.
+ */
+function buildRefundEmailHtml(
+  template: IEmailTemplate,
+  config: {
+    name: string;
+    refundAmount: number;
+    currency: string;
+    paymentMethod: string;
+    transactionId: string;
+    refundId: string;
+    platformName: string;
+    baseUrl: string;
+    logoUrl: string;
+    companyAddress: string;
+  },
+): string {
+  const vars: Record<string, string> = {
+    name: config.name,
+    refundAmount: config.refundAmount.toFixed(2),
+    currency: config.currency,
+    platformName: config.platformName,
+    baseUrl: config.baseUrl,
+  };
+  const replace = (text: string) => {
+    let out = text || "";
+    for (const [k, v] of Object.entries(vars)) {
+      out = out.split(`{{${k}}}`).join(v);
+    }
+    return out;
+  };
+
+  const features = (template.featureItems || []).map(replace);
+  const featureListHtml = features
+    .map(
+      (f) =>
+        `<li style="margin-bottom:8px;color:#CCDADC;font-size:14px;line-height:1.8;">${f}</li>`,
+    )
+    .join("");
+  const ctaUrl = replace(template.ctaButtonUrl || `${config.baseUrl}/wallet`);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Refund Processed - ${config.platformName}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#050505;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#050505;">
+        <tr>
+            <td align="center" style="padding:40px 20px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:600px;background-color:#141414;border-radius:8px;border:1px solid #30333A;">
+                    <tr>
+                        <td align="left" style="padding:40px 40px 20px 40px;">
+                            <img src="${config.logoUrl}" alt="${config.platformName}" width="150" style="max-width:100%;height:auto;">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:20px 40px 40px 40px;">
+                            <div style="background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);border-radius:8px;padding:24px;margin-bottom:24px;text-align:center;">
+                                <h1 style="margin:0 0 8px 0;font-size:24px;font-weight:600;color:#ffffff;">
+                                    ${replace(template.headingText || "Refund Processed")}
+                                </h1>
+                                <p style="margin:0;font-size:14px;color:rgba(255,255,255,0.9);">
+                                    Money is on its way back to you
+                                </p>
+                            </div>
+                            <p style="margin:0 0 24px 0;font-size:16px;line-height:1.6;color:#CCDADC;">Hi ${config.name},</p>
+                            <p style="margin:0 0 24px 0;font-size:16px;line-height:1.6;color:#CCDADC;">
+                                ${replace(template.introText || "Your refund has been processed successfully.")}
+                            </p>
+                            <div style="background-color:#1E1E1E;border-radius:8px;padding:24px;margin-bottom:24px;">
+                                <h2 style="margin:0 0 16px 0;font-size:18px;font-weight:600;color:#ffffff;">Refund Details</h2>
+                                <table style="width:100%;border-collapse:collapse;">
+                                    <tr>
+                                        <td style="padding:12px 0;color:#9ca3af;border-bottom:1px solid #30333A;">Refund Amount</td>
+                                        <td style="padding:12px 0;text-align:right;color:#f59e0b;font-weight:700;font-size:18px;border-bottom:1px solid #30333A;">${config.currency === "EUR" ? "€" : config.currency + " "}${config.refundAmount.toFixed(2)}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding:12px 0;color:#9ca3af;border-bottom:1px solid #30333A;">Refunded To</td>
+                                        <td style="padding:12px 0;text-align:right;color:#ffffff;border-bottom:1px solid #30333A;">${config.paymentMethod}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding:12px 0;color:#9ca3af;${config.refundId ? "border-bottom:1px solid #30333A;" : ""}">Original Transaction</td>
+                                        <td style="padding:12px 0;text-align:right;color:#9ca3af;font-family:monospace;font-size:12px;${config.refundId ? "border-bottom:1px solid #30333A;" : ""}">${config.transactionId}</td>
+                                    </tr>
+                                    ${config.refundId ? `<tr><td style="padding:12px 0;color:#9ca3af;">Refund Reference</td><td style="padding:12px 0;text-align:right;color:#9ca3af;font-family:monospace;font-size:12px;">${config.refundId}</td></tr>` : ""}
+                                </table>
+                            </div>
+                            ${featureListHtml ? `<div style="background-color:#050505;border-radius:8px;padding:20px;margin-bottom:24px;border:1px solid #30333A;"><h3 style="margin:0 0 12px 0;font-size:16px;font-weight:600;color:#f59e0b;">${replace(template.featureListLabel || "What happens next?")}</h3><ul style="margin:0;padding-left:20px;">${featureListHtml}</ul></div>` : ""}
+                            ${template.closingText ? `<p style="margin:0 0 24px 0;font-size:16px;line-height:1.6;color:#CCDADC;">${replace(template.closingText)}</p>` : ""}
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr><td align="center">
+                                    <a href="${ctaUrl}" style="display:inline-block;background:linear-gradient(135deg,#FDD458 0%,#E8BA40 100%);color:#000000;text-decoration:none;padding:16px 32px;border-radius:8px;font-size:16px;font-weight:500;line-height:1;">${replace(template.ctaButtonText || "View Wallet")}</a>
+                                </td></tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:20px 40px 40px 40px;border-top:1px solid #30333A;">
+                            <p style="margin:0 0 10px 0;font-size:12px;color:#6b7280;text-align:center;">${config.companyAddress}</p>
+                            <p style="margin:0;font-size:12px;color:#6b7280;text-align:center;">© ${new Date().getFullYear()} ${config.platformName} | <a href="${config.baseUrl}" style="color:#CCDADC !important;text-decoration:underline;">Visit Website</a></p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`;
+}
+
+/**
+ * Send refund completed email to user.
+ * Best-effort — never throws (must not break the refund callback).
+ */
+export const sendRefundCompletedEmail = async (
+  data: RefundCompletedEmailData,
+) => {
+  try {
+    await connectToDatabase();
+
+    const [companySettings, settings, whiteLabelSettings, template] =
+      await Promise.all([
+        CompanySettings.getSingleton(),
+        getSettings(),
+        WhiteLabel.findOne(),
+        getEmailTemplate("refund_completed"),
+      ]);
+
+    if (!template.isActive) {
+      console.log(
+        `ℹ️ [REFUND] Email template is disabled, skipping email to ${data.email}`,
+      );
+      return;
+    }
+
+    const platformName =
+      settings.appName || companySettings.companyName || "Chatvolt";
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    const isLocalhost =
+      baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1");
+
+    let logoUrl = whiteLabelSettings?.emailLogo || "/assets/images/logo.png";
+    if (!logoUrl.startsWith("http")) {
+      logoUrl = isLocalhost
+        ? "https://placehold.co/150x50/141414/FDD458?text=Logo"
+        : `${baseUrl}${logoUrl}`;
+    }
+
+    let companyAddress = "";
+    if (companySettings.addressLine1 || companySettings.city) {
+      companyAddress = [
+        companySettings.addressLine1,
+        companySettings.addressLine2,
+        companySettings.city,
+        companySettings.postalCode,
+        COUNTRY_NAMES[companySettings.country] || companySettings.country,
+      ]
+        .filter(Boolean)
+        .join(", ");
+    }
+
+    const currency = data.currency || "EUR";
+    const htmlTemplate = buildRefundEmailHtml(template, {
+      name: data.name,
+      refundAmount: data.refundAmount,
+      currency,
+      paymentMethod: data.paymentMethod || "your original payment method",
+      transactionId: data.transactionId,
+      refundId: data.refundId || "",
+      platformName,
+      baseUrl,
+      logoUrl,
+      companyAddress,
+    });
+
+    let subject =
+      template.subject || "Your refund of €{{refundAmount}} has been processed";
+    subject = subject
+      .replace(/\{\{refundAmount\}\}/g, data.refundAmount.toFixed(2))
+      .replace(/\{\{platformName\}\}/g, platformName)
+      .replace(/\{\{name\}\}/g, data.name);
+
+    const emailTransporter = await getTransporter();
+    await emailTransporter.sendMail({
+      from: `"${platformName}" <${settings.nodemailerEmail || process.env.NODEMAILER_EMAIL}>`,
+      to: data.email,
+      subject,
+      text: `Hi ${data.name}, your refund of ${currency === "EUR" ? "€" : currency + " "}${data.refundAmount.toFixed(2)} has been processed and will appear on your statement within 3-10 business days.`,
+      html: htmlTemplate,
+    });
+
+    console.log(
+      `✅ [REFUND] Email sent to ${data.email} for €${data.refundAmount.toFixed(2)}`,
+    );
+  } catch (error) {
+    console.error("❌ [REFUND] Failed to send refund email:", error);
+    // Don't throw - email failure must not break the refund flow.
+  }
+};
+
+/**
+ * Send a sample refund email for admin preview.
+ */
+export const sendTestRefundCompletedEmail = async (testEmail: string) => {
+  await sendRefundCompletedEmail({
+    email: testEmail,
+    name: "Test User",
+    refundAmount: 49.99,
+    currency: "EUR",
+    paymentMethod: "Visa •••• 4242",
+    transactionId: "test_txn_000000000000",
+    refundId: "test_refund_123",
+  });
+};
+
+/**
  * Data for withdrawal completed email
  */
 interface WithdrawalCompletedEmailData {

@@ -4018,6 +4018,14 @@ export default function UserFullDetailPanel({
                                           <Badge className="bg-gray-700 text-white text-xs">
                                             {tx.transactionType.replace(/_/g, " ")}
                                           </Badge>
+                                          {tx.transactionType === "deposit" &&
+                                            (tx.metadata?.refundStatus as
+                                              | string
+                                              | undefined) === "completed" && (
+                                              <Badge className="ml-1 bg-amber-600 text-white text-[10px]">
+                                                ↩ Refunded
+                                              </Badge>
+                                            )}
                                         </td>
                                         <td
                                           className={`px-4 py-3 font-semibold whitespace-nowrap ${amtPositive ? "text-green-400" : "text-red-400"}`}

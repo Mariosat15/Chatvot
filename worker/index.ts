@@ -53,6 +53,7 @@ import { runMarketDataMaintenance } from "./jobs/market-data-maintenance.job";
 import { runEarlyEndCheck } from "./jobs/early-end-check.job";
 import { runGameMasterRenewalJob } from "./jobs/gamemaster-renewal.job";
 import { runScheduledTests } from "./jobs/scheduled-test-run.job";
+import { runAtlasRefundReconcile } from "./jobs/atlas-refund-reconcile.job";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -286,6 +287,28 @@ agenda.define("market-data-maintenance", async () => {
 });
 
 /**
+ * Atlas Refund Reconciliation Job
+ * Hourly fallback that catches Atlas refunds without a matching callback
+ * (e.g. provider-side refunds initiated outside ChartVolt) and reconciles them.
+ */
+agenda.define("atlas-refund-reconcile", async () => {
+  try {
+    const result = await runAtlasRefundReconcile();
+    if (result.newlyReconciled > 0) {
+      console.log(
+        `💸 [ATLAS REFUND RECONCILE] Newly reconciled: ${result.newlyReconciled}, duplicates: ${result.duplicates}, scanned: ${result.scanned}`,
+      );
+    }
+    if (result.errors.length > 0) {
+      console.error(`💸 [ATLAS REFUND RECONCILE] Errors: ${result.errors.length}`);
+      result.errors.forEach((e) => console.error(`     - ${e}`));
+    }
+  } catch (error) {
+    console.error(`💸 [ATLAS REFUND RECONCILE] Failed:`, error);
+  }
+});
+
+/**
  * GAME MASTER RENEWAL JOB
  * Processes subscription renewals, expirations, and daily counter resets
  * Runs daily at 00:05 UTC
@@ -395,6 +418,7 @@ async function startWorker(): Promise<void> {
     await agenda.every("5 minutes", "market-data-maintenance");
     await agenda.every("1 day", "gamemaster-renewal");
     await agenda.every("5 minutes", "scheduled-test-run");
+    await agenda.every("1 hour", "atlas-refund-reconcile");
 
     // Schedule withdrawal processing jobs
     await scheduleWithdrawalJobs(agenda);

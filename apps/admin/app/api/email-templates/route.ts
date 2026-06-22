@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
       "inactive_reminder",
       "deposit_completed",
       "withdrawal_completed",
+      "refund_completed",
       "email_verification",
       "account_manager_assigned",
       "account_manager_changed",
@@ -153,6 +154,7 @@ export async function POST(request: NextRequest) {
       sendTestWelcomeEmail,
       sendTestDepositCompletedEmail,
       sendTestWithdrawalCompletedEmail,
+      sendTestRefundCompletedEmail,
       sendTestEmailVerificationEmail,
       sendTestAccountManagerAssignedEmail,
       sendTestAccountManagerChangedEmail,
@@ -168,6 +170,9 @@ export async function POST(request: NextRequest) {
       emailSent = true;
     } else if (templateType === "withdrawal_completed") {
       await sendTestWithdrawalCompletedEmail(testEmail);
+      emailSent = true;
+    } else if (templateType === "refund_completed") {
+      await sendTestRefundCompletedEmail(testEmail);
       emailSent = true;
     } else if (templateType === "email_verification") {
       await sendTestEmailVerificationEmail(testEmail);
@@ -237,6 +242,7 @@ function getDefaultName(type: string): string {
     inactive_reminder: "Inactive User Reminder",
     deposit_completed: "Deposit Completed Email",
     withdrawal_completed: "Withdrawal Completed Email",
+    refund_completed: "Refund Completed Email",
     email_verification: "Email Verification",
     account_manager_assigned: "Account Manager Assigned",
     account_manager_changed: "Account Manager Changed",

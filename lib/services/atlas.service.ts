@@ -598,6 +598,57 @@ class AtlasService {
     }
   }
 
+  /**
+   * List recent refunds (latest first) for reconciliation.
+   *
+   * Reason: Atlas may not always deliver a callback for provider-side refunds
+   * (refunds initiated directly with Atlas, outside ChartVolt). A scheduled
+   * reconciler uses this to discover refunds we haven't recorded yet so nothing
+   * slips through. Spec 5.1.2: GET /refunds?offset=&limit=&after_date=<ISO8601>.
+   */
+  async listRefunds(params?: {
+    afterDate?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<AtlasRefundRecord[] | { error: string }> {
+    const credentials = await this.getCredentials();
+    if (!credentials) {
+      return { error: "Atlas not configured or not active" };
+    }
+
+    try {
+      const qs = new URLSearchParams();
+      qs.set("limit", String(params?.limit ?? 100));
+      if (params?.offset) qs.set("offset", String(params.offset));
+      if (params?.afterDate) qs.set("after_date", params.afterDate);
+
+      const url = `${credentials.apiBaseUrl}/refunds?${qs.toString()}`;
+      const response = await fetch(url, {
+        method: "GET",
+        headers: this.authHeaders(credentials),
+      });
+
+      const data = await response.json().catch(() => null);
+      const list = Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data)
+          ? data
+          : null;
+      if (!response.ok || !list) {
+        return {
+          error:
+            data?.error_message ||
+            data?.error ||
+            "Failed to list Atlas refunds",
+        };
+      }
+      return list as AtlasRefundRecord[];
+    } catch (error) {
+      console.error("❌ Atlas listRefunds error:", error);
+      return { error: "Failed to list refunds" };
+    }
+  }
+
   /** True when Atlas has the minimum credentials to operate. */
   async isEnabled(): Promise<boolean> {
     const credentials = await this.getCredentials();
