@@ -8,6 +8,16 @@ const PUBLIC_ROUTES = ["/login", "/api/auth/login", "/api/auth/logout", "/api/as
 // API routes prefix
 const API_ROUTES_PREFIX = "/api/";
 
+// Reason: a JWT signature failure here is almost always a fleet-wide secret
+// mismatch (servers signing/verifying with different ADMIN_JWT_SECRET values —
+// e.g. a stale value in PM2's saved dump overriding .env). The raw error is
+// cryptic, so we attach an actionable hint pointing at the startup fingerprint
+// log and the fix, turning a multi-hour debug into a 30-second log comparison.
+const TOKEN_FAIL_HINT =
+  "If this repeats right after login, your servers likely have DIFFERENT ADMIN_JWT_SECRET values. " +
+  "Compare the '🔑 [admin-auth] ... fingerprint' log line on each server — they MUST match. " +
+  "Fix on the bad server: pm2 delete chartvolt-admin && pm2 start ecosystem.config.js --only chartvolt-admin && pm2 save";
+
 // Get JWT secret with production safety check
 function getJwtSecret(): string {
   const secret = process.env.ADMIN_JWT_SECRET;
@@ -54,6 +64,7 @@ export async function proxy(request: NextRequest) {
       return NextResponse.next();
     } catch (error) {
       console.error("Invalid admin token for API route:", error);
+      console.error(`⚠️ [admin-auth] ${TOKEN_FAIL_HINT}`);
       return NextResponse.json(
         { error: "Unauthorized - Invalid or expired token" },
         { status: 401 },
@@ -79,6 +90,7 @@ export async function proxy(request: NextRequest) {
   } catch (error) {
     // Invalid token - clear cookie and redirect to login
     console.error("Invalid admin token:", error);
+    console.error(`⚠️ [admin-auth] ${TOKEN_FAIL_HINT}`);
 
     const response = NextResponse.redirect(new URL("/login", request.url));
     response.cookies.delete("admin_token");
