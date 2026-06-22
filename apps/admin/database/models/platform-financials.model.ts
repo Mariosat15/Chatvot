@@ -16,6 +16,7 @@ export interface IPlatformTransaction extends Document {
     | "admin_withdrawal" // Admin withdrawing platform earnings to bank
     | "admin_adjustment" // Manual adjustment
     | "refund_clawback" // Refund that returns funds to platform
+    | "refund" // Funds paid back to a customer (money leaving the platform bank)
     | "retained_gm_fee" // GM referral fee retained by platform due to inactive GM subscription
     | "incident_compensation" // Platform expense for compensating users due to incidents
     | "chargeback_loss" // Platform funds lost when a chargeback is marked lost / completed
@@ -146,6 +147,7 @@ const PlatformTransactionSchema = new Schema<IPlatformTransaction>(
         "admin_withdrawal",
         "admin_adjustment",
         "refund_clawback",
+        "refund",
         "retained_gm_fee",
         "incident_compensation",
         "admin_balance_add",

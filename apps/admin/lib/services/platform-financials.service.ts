@@ -330,7 +330,8 @@ export const PlatformFinancialsService = {
     // Bank Reconciliation
     totalUserDeposits: number;
     totalUserWithdrawals: number;
-    theoreticalBankBalance: number; // What should be in bank
+    totalRefunds: number; // EUR — money paid back to customers (reduces bank)
+    theoreticalBankBalance: number; // What should be in bank (already minus refunds)
 
     // Risk Metrics
     coverageRatio: number;
@@ -588,10 +589,24 @@ export const PlatformFinancialsService = {
       totalVATPaid +
       totalVendorPayments +
       totalCustomExpenses;
+    // Refunds: money paid back to customers. Reason: a completed refund is real
+    // cash leaving the platform bank, so it must reduce the theoretical bank
+    // balance (same treatment as a payout). Stored as negative-EUR rows.
+    let totalRefunds = 0; // EUR (positive magnitude)
+    try {
+      const refundAgg = await PlatformTransaction.aggregate([
+        { $match: { transactionType: "refund" } },
+        { $group: { _id: null, totalEUR: { $sum: "$amountEUR" } } },
+      ]);
+      totalRefunds = Math.abs(refundAgg[0]?.totalEUR || 0);
+    } catch (e) {
+      console.error("⚠️ [financials] refund aggregation failed:", e);
+    }
+
     // FIXED: Subtract bank fees because they reduce what we actually have in bank
     // Add competition/challenge fees as they represent earnings from the platform (not deducted from user wallets directly)
     const theoreticalBankBalance =
-      totalMoneyReceivedGross - totalBankFees - totalMoneyPaidOut;
+      totalMoneyReceivedGross - totalBankFees - totalMoneyPaidOut - totalRefunds;
 
     // Coverage ratio: How much of total liabilities can be covered
     // Liabilities = User credit balances + Outstanding VAT
@@ -639,6 +654,7 @@ export const PlatformFinancialsService = {
 
       totalUserDeposits: walletStats.totalDeposited,
       totalUserWithdrawals: walletStats.totalWithdrawn,
+      totalRefunds,
       theoreticalBankBalance,
 
       coverageRatio,

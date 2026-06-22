@@ -216,6 +216,9 @@ interface PlatformFinancials {
   totalIncidentCompensationsEUR: number;
   incidentCompensationsCount: number;
 
+  // Customer refunds (money paid back to customers, reduces bank balance)
+  totalRefunds?: number;
+
   unclaimedPools: {
     totalAmount: number;
     totalAmountEUR: number;
@@ -316,6 +319,7 @@ interface Transaction {
   description?: string;
   competitionId?: string;
   paymentMethod?: string;
+  provider?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
   source?: "wallet" | "platform" | "vat";
@@ -515,6 +519,10 @@ export default function FinancialDashboard() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [transactionInvoice, setTransactionInvoice] = useState<any>(null);
   const [loadingInvoice, setLoadingInvoice] = useState(false);
+  // Atlas refund / clawback actions (deposit detail modal)
+  const [refundActionLoading, setRefundActionLoading] = useState<
+    "refund" | "clawback" | null
+  >(null);
 
   // Get dynamic currency settings
   const creditName = settings?.credits?.name || "Credits";
@@ -757,6 +765,72 @@ export default function FinancialDashboard() {
       } finally {
         setLoadingInvoice(false);
       }
+    }
+  };
+
+  // Issue an Atlas refund (sends the money back to the customer's card).
+  const handleAtlasRefund = async (tx: Transaction) => {
+    if (
+      !window.confirm(
+        `Refund this Atlas deposit back to the customer's card?\n\nThis returns the money via Atlas. It does NOT remove the user's credits — use "Claw back credits" for that once the refund completes.`,
+      )
+    ) {
+      return;
+    }
+    setRefundActionLoading("refund");
+    try {
+      const res = await fetch("/api/atlas/refund", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transactionId: tx._id }),
+      });
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || "Refund failed");
+      }
+      toast.success(
+        `Refund initiated (ref ${result.refundId}). Final status arrives via Atlas callback.`,
+      );
+      setSelectedTransaction(null);
+      fetchTransactions();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to initiate refund",
+      );
+    } finally {
+      setRefundActionLoading(null);
+    }
+  };
+
+  // Claw back the credits tied to an already-refunded Atlas deposit.
+  const handleAtlasClawback = async (tx: Transaction) => {
+    if (
+      !window.confirm(
+        `Remove the credits granted by this refunded deposit from the user's wallet?\n\nThis is recorded as an admin adjustment and keeps reconciliation balanced. It will be rejected if the user no longer has enough credits.`,
+      )
+    ) {
+      return;
+    }
+    setRefundActionLoading("clawback");
+    try {
+      const res = await fetch("/api/atlas/refund/clawback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transactionId: tx._id }),
+      });
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || "Clawback failed");
+      }
+      toast.success(result.message || "Credits clawed back");
+      setSelectedTransaction(null);
+      fetchTransactions();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to claw back credits",
+      );
+    } finally {
+      setRefundActionLoading(null);
     }
   };
 
@@ -2638,6 +2712,7 @@ export default function FinancialDashboard() {
             const incidentComp = platformFinancials?.totalIncidentCompensations || 0;
             const adminInjected = platformFinancials?.totalAdminBalanceAdded || 0;
             const netEarnings = platformFinancials?.totalNetEarningsEUR || 0;
+            const refunds = platformFinancials?.totalRefunds || 0;
 
             // Reason: Total obligations = everything still owed / reserved.
             // Vendor payments, bank fees, admin withdrawals etc. are already
@@ -2805,6 +2880,14 @@ export default function FinancialDashboard() {
                             <span className="text-gray-400">Incident Compensations</span>
                             <span className="text-gray-400">
                               {currencySymbol}{incidentComp.toFixed(2)}
+                            </span>
+                          </div>
+                        )}
+                        {refunds > 0 && (
+                          <div className="flex justify-between items-center py-1.5 border-b border-gray-800">
+                            <span className="text-gray-400">Customer Refunds</span>
+                            <span className="text-gray-400">
+                              {currencySymbol}{refunds.toFixed(2)}
                             </span>
                           </div>
                         )}
@@ -6557,6 +6640,79 @@ export default function FinancialDashboard() {
                   )}
                 </div>
               )}
+
+              {/* Atlas Refund / Clawback (Atlas deposits only) */}
+              {selectedTransaction.transactionType === "deposit" &&
+                (selectedTransaction.provider === "atlas" ||
+                  selectedTransaction.metadata?.paymentProvider ===
+                    "atlas") && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <RefreshCw className="h-4 w-4 text-amber-400" />
+                      <span className="text-white font-medium">
+                        Atlas Refund
+                      </span>
+                    </div>
+
+                    {selectedTransaction.metadata?.refundStatus && (
+                      <div className="text-sm text-gray-300 mb-3">
+                        Refund status:{" "}
+                        <span className="font-semibold text-amber-300">
+                          {selectedTransaction.metadata.refundStatus}
+                        </span>
+                        {selectedTransaction.metadata?.creditsClawedBack && (
+                          <span className="ml-2 text-emerald-400">
+                            • credits clawed back
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={
+                          refundActionLoading !== null ||
+                          selectedTransaction.status !== "completed" ||
+                          selectedTransaction.metadata?.refundStatus ===
+                            "processing" ||
+                          selectedTransaction.metadata?.refundStatus ===
+                            "completed"
+                        }
+                        className="flex-1 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                        onClick={() => handleAtlasRefund(selectedTransaction)}
+                      >
+                        {refundActionLoading === "refund" ? (
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        ) : null}
+                        Refund to card
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={
+                          refundActionLoading !== null ||
+                          selectedTransaction.metadata?.refundStatus !==
+                            "completed" ||
+                          selectedTransaction.metadata?.creditsClawedBack
+                        }
+                        className="flex-1 border-red-500/30 text-red-400 hover:bg-red-500/10"
+                        onClick={() => handleAtlasClawback(selectedTransaction)}
+                      >
+                        {refundActionLoading === "clawback" ? (
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        ) : null}
+                        Claw back credits
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Refund sends money back via Atlas. Claw back removes the
+                      matching credits (enabled once the refund completes) and
+                      keeps reconciliation balanced.
+                    </p>
+                  </div>
+                )}
             </div>
           )}
         </DialogContent>

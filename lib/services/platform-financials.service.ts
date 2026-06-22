@@ -240,6 +240,43 @@ export const PlatformFinancialsService = {
   },
 
   /**
+   * Record a refund paid back to a customer.
+   * Reason: a refund is real money leaving the platform bank (same economic
+   * effect as a chargeback loss), so it must reduce the theoretical bank
+   * balance. Stored as a negative-EUR PlatformTransaction and subtracted in
+   * getFinancialStats(). Recorded once, when the refund is confirmed completed.
+   */
+  recordRefund: async (params: {
+    userId: string;
+    amountEUR: number; // gross amount refunded to the customer (always treated as a positive magnitude)
+    transactionId: string; // original deposit WalletTransaction id
+    refundId?: string; // PSP refund identifier
+    provider?: string; // e.g. "atlas"
+    description?: string;
+  }): Promise<void> => {
+    await connectToDatabase();
+
+    const magnitude = Math.abs(params.amountEUR);
+
+    await PlatformTransaction.create({
+      transactionType: "refund",
+      amount: -magnitude,
+      amountEUR: -magnitude,
+      sourceType: "user_deposit",
+      sourceId: params.transactionId,
+      userId: params.userId,
+      description:
+        params.description ||
+        `Refund to customer: €${magnitude.toFixed(2)}${params.provider ? ` via ${params.provider}` : ""}`,
+      notes: params.refundId ? `Refund ID: ${params.refundId}` : undefined,
+    });
+
+    console.log(
+      `💸 [PLATFORM] Recorded refund outflow: €${magnitude.toFixed(2)} (deposit ${params.transactionId}${params.refundId ? `, refund ${params.refundId}` : ""})`,
+    );
+  },
+
+  /**
    * Record admin withdrawal (converting platform credits to real money)
    */
   recordAdminWithdrawal: async (
@@ -321,7 +358,8 @@ export const PlatformFinancialsService = {
     totalUserDeposits: number;
     totalUserWithdrawals: number;
     totalChargebackLoss: number; // EUR — platform funds lost to lost chargebacks
-    theoreticalBankBalance: number; // What should be in bank (already minus chargeback losses)
+    totalRefunds: number; // EUR — money paid back to customers (reduces bank)
+    theoreticalBankBalance: number; // What should be in bank (already minus chargeback losses & refunds)
 
     // Risk Metrics
     coverageRatio: number;
@@ -474,6 +512,20 @@ export const PlatformFinancialsService = {
       console.error("⚠️ [financials] chargeback_loss aggregation failed:", e);
     }
 
+    // Refunds: money paid back to customers — real cash leaving the bank.
+    // Stored as negative-EUR "refund" rows; subtracted from the bank balance
+    // below (same treatment as chargeback losses / payouts).
+    let totalRefunds = 0; // EUR (positive magnitude)
+    try {
+      const refundAgg = await PlatformTransaction.aggregate([
+        { $match: { transactionType: "refund" } },
+        { $group: { _id: null, totalEUR: { $sum: "$amountEUR" } } },
+      ]);
+      totalRefunds = Math.abs(refundAgg[0]?.totalEUR || 0);
+    } catch (e) {
+      console.error("⚠️ [financials] refund aggregation failed:", e);
+    }
+
     // Reason: All values below are now consistently in EUR
     const totalBankFees = totalBankDepositFees + totalBankWithdrawalFees;
     const totalGrossEarnings =
@@ -546,7 +598,8 @@ export const PlatformFinancialsService = {
       totalMoneyReceivedGross -
       totalBankFees -
       totalMoneyPaidOut -
-      totalChargebackLoss;
+      totalChargebackLoss -
+      totalRefunds;
 
     // Coverage ratio: How much of total liabilities can be covered
     // Liabilities = User credit balances + Outstanding VAT
@@ -592,6 +645,7 @@ export const PlatformFinancialsService = {
       totalUserDeposits: walletStats.totalDeposited, // EUR
       totalUserWithdrawals: totalUserWithdrawalsEUR, // EUR (converted from credits)
       totalChargebackLoss,
+      totalRefunds,
       theoreticalBankBalance,
 
       coverageRatio,

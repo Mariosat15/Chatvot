@@ -211,6 +211,12 @@ const BUILT_IN_PROVIDERS = [
           "Payment Callback URL — give this to Atlas - AUTO-POPULATED",
       },
       {
+        key: "refund_callback_url",
+        isSecret: false,
+        description:
+          "Refund Callback URL — give this to Atlas - AUTO-POPULATED",
+      },
+      {
         key: "success_url",
         isSecret: false,
         description:
@@ -415,6 +421,7 @@ export default function PaymentProvidersSection() {
 
     const autoUrls: Record<string, string> = {
       callback_url: `${baseUrl}/api/atlas/webhook`,
+      refund_callback_url: `${baseUrl}/api/atlas/refund-callback`,
       success_url: `${baseUrl}/wallet?status=success&provider=atlas`,
       fail_url: `${baseUrl}/wallet?status=failed&provider=atlas`,
     };
@@ -434,7 +441,9 @@ export default function PaymentProvidersSection() {
           description:
             key === "callback_url"
               ? "Payment Callback URL — give this to Atlas"
-              : `${key.replace(/_/g, " ")} - auto-populated`,
+              : key === "refund_callback_url"
+                ? "Refund Callback URL — give this to Atlas"
+                : `${key.replace(/_/g, " ")} - auto-populated`,
         });
       }
     }

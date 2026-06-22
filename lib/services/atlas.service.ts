@@ -104,6 +104,38 @@ export interface AtlasPaymentRecord {
   payer_email?: string;
 }
 
+export interface CreateRefundParams {
+  /** Atlas payment_id of the original deposit to refund. */
+  paymentId: string;
+  /** Refund amount (full or partial). */
+  amount: number;
+  /** Up to 100 chars echoed back on the refund callback (e.g. "txn_<id>"). */
+  additionalData?: string;
+}
+
+export interface AtlasRefundRecord {
+  refund_id: string;
+  user_id?: string;
+  payment_id?: string;
+  payment_amount?: number;
+  amount?: number;
+  payment_currency?: string;
+  currency?: string;
+  message?: string;
+  date?: string;
+  additional_data?: string;
+  transaction_id?: string;
+  transaction_status_code: number;
+  transaction_status_text?: string;
+  transaction_status_data?: string;
+  payment_method_id?: string;
+  payment_method_name?: string;
+  payment_method_data?: string;
+  payer_ip?: string;
+  payer_country?: string;
+  payer_email?: string;
+}
+
 function mask(value: string | undefined): string {
   if (!value) return "MISSING";
   return value.length <= 4 ? "***" : "***" + value.slice(-4);
@@ -368,6 +400,101 @@ class AtlasService {
     } catch (error) {
       console.error("❌ Atlas getPaymentStatus error:", error);
       return { error: "Failed to get payment status" };
+    }
+  }
+
+  /**
+   * Create a refund (full or partial) against an original Atlas payment.
+   * Returns the Atlas refund_id; the authoritative outcome arrives via the
+   * refund callback (/api/atlas/refund-callback).
+   */
+  async createRefund(
+    params: CreateRefundParams,
+  ): Promise<{ refundId: string } | { error: string }> {
+    const credentials = await this.getCredentials();
+    if (!credentials) {
+      return { error: "Atlas not configured or not active" };
+    }
+
+    const requestBody = {
+      payment_id: params.paymentId,
+      amount: Number(params.amount),
+      additional_data: (params.additionalData || "").slice(0, 100),
+    };
+
+    console.log("📤 Atlas createRefund request:", {
+      paymentId: params.paymentId,
+      amount: requestBody.amount,
+    });
+
+    try {
+      const response = await fetch(`${credentials.apiBaseUrl}/refunds`, {
+        method: "POST",
+        headers: this.authHeaders(credentials),
+        body: JSON.stringify(requestBody),
+      });
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.data?.refund_id) {
+        console.error("❌ Atlas createRefund failed:", {
+          status: response.status,
+          code: data?.code,
+          error: data?.error_message || data?.error,
+        });
+        return {
+          error:
+            data?.error_message ||
+            data?.error ||
+            "Failed to create Atlas refund",
+        };
+      }
+
+      console.log("📥 Atlas createRefund success:", {
+        refundId: data.data.refund_id,
+      });
+      return { refundId: String(data.data.refund_id) };
+    } catch (error) {
+      console.error("❌ Atlas createRefund error:", error);
+      return { error: "Failed to connect to Atlas" };
+    }
+  }
+
+  /**
+   * Server-to-server refund status poll (fallback when the callback is delayed).
+   */
+  async getRefundStatus(
+    refundId: string,
+  ): Promise<AtlasRefundRecord | { error: string }> {
+    const credentials = await this.getCredentials();
+    if (!credentials) {
+      return { error: "Atlas not configured or not active" };
+    }
+
+    try {
+      const url = `${credentials.apiBaseUrl}/refunds?refund_ids=${encodeURIComponent(refundId)}`;
+      const response = await fetch(url, {
+        method: "GET",
+        headers: this.authHeaders(credentials),
+      });
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !Array.isArray(data?.data)) {
+        return {
+          error:
+            data?.error_message ||
+            data?.error ||
+            "Failed to get Atlas refund status",
+        };
+      }
+
+      const record = (data.data as AtlasRefundRecord[]).find(
+        (r) => String(r.refund_id) === String(refundId),
+      );
+      if (!record) return { error: "Refund not found" };
+      return record;
+    } catch (error) {
+      console.error("❌ Atlas getRefundStatus error:", error);
+      return { error: "Failed to get refund status" };
     }
   }
 

@@ -1239,6 +1239,34 @@ async function getDetailedUserReconciliation(
     console.error("⚠️ [reconciliation] disputed-deposit check failed:", e);
   }
 
+  // Watchdog: deposits that were REFUNDED to the customer's card but whose
+  // credits were never clawed back. Reason: the refund returns real money while
+  // the user keeps the credits — a genuine economic gap the standard balance
+  // check can't see (the wallet still equals its transaction history). Surface
+  // it so an admin can claw back the credits (or accept the loss).
+  const refundedDepositsNoClawback = transactions.filter(
+    (tx) =>
+      tx.transactionType === "deposit" &&
+      tx.metadata?.refundStatus === "completed" &&
+      !tx.metadata?.creditsClawedBack,
+  );
+  for (const dep of refundedDepositsNoClawback) {
+    const refundAmount =
+      Number(dep.metadata?.refundAmount) || Math.abs(dep.amount || 0);
+    issues.push({
+      type: "refund_pending_clawback",
+      severity: "warning",
+      userId,
+      userEmail,
+      details: {
+        transactionId: dep._id.toString(),
+        description:
+          `Deposit ${dep._id} was refunded (${refundAmount}) but the credits were never clawed back. ` +
+          `Money left the platform while the user kept the credits — claw back the credits or accept the loss.`,
+      },
+    });
+  }
+
   // Check deposit total (should include manual_deposit_credit)
   // Reason: Legacy admin credits may have been added to totalDeposited — account for them
   const legacyAdminCreditsInDeposit = adminAdjustmentTotal > 0
