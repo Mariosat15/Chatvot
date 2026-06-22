@@ -363,6 +363,7 @@ export async function POST(req: NextRequest) {
       failUrl,
       additionalData,
       beneficiaryUrl: origin || undefined,
+      payerEmail: session.user.email || undefined,
     });
 
     if ("error" in result) {

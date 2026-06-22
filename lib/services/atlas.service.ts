@@ -75,6 +75,12 @@ export interface CreatePaymentParams {
    * exact amount our UI shows and the PSP commission is our cost.
    */
   commissionIncluded?: boolean;
+  /** Optional — prefilled on the Atlas card page; requested there if omitted. */
+  payerEmail?: string;
+  /** Optional cardholder name to prefill on the Atlas card page. */
+  cardholderName?: string;
+  /** Confirmation-page language (ISO 639-1, e.g. "en-US"). Defaults to English. */
+  displayLanguage?: string;
 }
 
 export interface CreatePaymentResult {
@@ -297,8 +303,26 @@ class AtlasService {
     };
   }
 
+  /** Parse a fetch Response body as JSON, tolerating non-JSON/empty bodies. */
+  private async readJson(
+    response: Response,
+  ): Promise<{ data: Record<string, unknown> | null; raw: string }> {
+    const raw = await response.text();
+    let data: Record<string, unknown> | null = null;
+    try {
+      data = raw ? JSON.parse(raw) : null;
+    } catch {
+      data = null;
+    }
+    return { data, raw };
+  }
+
   /**
-   * Create a hosted-form payment. Returns the redirect URL + payment id.
+   * Create a hosted-form payment. This is a TWO-step Atlas flow:
+   *   1) POST /payments         → mints a payment_id (payment_url is null here).
+   *   2) POST /payments/cardform → opens the Atlas-hosted card page for that
+   *      payment_id and returns the payment_url we redirect the payer to.
+   * Card data is entered on Atlas's page, so we never handle PAN/CVV (no PCI).
    */
   async createPayment(
     params: CreatePaymentParams,
@@ -328,63 +352,88 @@ class AtlasService {
       currency: requestBody.currency,
       additional_data: requestBody.additional_data,
       commission_included: requestBody.commission_included,
-      recurring: requestBody.recurring,
       success_url: requestBody.success_url,
       fail_url: requestBody.fail_url,
       beneficiary_url: requestBody.beneficiary_url ?? "(none)",
     });
 
     try {
-      const response = await fetch(`${credentials.apiBaseUrl}/payments`, {
+      // STEP 1 — create the payment. payment_url is expected to be null here;
+      // we only need the payment_id to open the hosted card page in step 2.
+      const createRes = await fetch(`${credentials.apiBaseUrl}/payments`, {
         method: "POST",
         headers: this.authHeaders(credentials),
         body: JSON.stringify(requestBody),
       });
+      const { data: createData, raw: createRaw } = await this.readJson(createRes);
+      const createRoot = (createData?.data ?? createData) as
+        | Record<string, unknown>
+        | undefined;
+      const paymentId = createRoot?.payment_id as string | number | undefined;
+      const respUserId = createRoot?.user_id as string | number | undefined;
 
-      // Reason: read raw text first so we can (a) tolerate both response
-      // envelopes — nested `{ data: { payment_url } }` (per spec) and a
-      // top-level `{ payment_url }` — and (b) log the real body when the shape
-      // is unexpected (a 200 with no payment_url previously failed silently).
-      const rawText = await response.text();
-      let data: Record<string, unknown> | null = null;
-      try {
-        data = rawText ? JSON.parse(rawText) : null;
-      } catch {
-        data = null;
-      }
-      const root = (data?.data ?? data) as Record<string, unknown> | undefined;
-      const paymentUrl = root?.payment_url as string | undefined;
-      const paymentId = root?.payment_id as string | number | undefined;
-      const respUserId = root?.user_id as string | number | undefined;
-
-      if (!response.ok || !paymentUrl) {
-        // Atlas accepted the request and minted a payment_id but returned a
-        // null/empty payment_url — there is no hosted form to redirect to.
-        // This is an Atlas-side account state (no payment methods enabled for
-        // the ClientId/recipient, or still in test/pending setup), not an auth
-        // or signature problem (those return HTTP >= 400 with a code).
-        const createdWithoutUrl = Boolean(
-          response.ok && paymentId && !paymentUrl,
-        );
-        console.error("❌ Atlas createPayment failed:", {
-          status: response.status,
-          contentType: response.headers.get("content-type"),
-          code: data?.code,
-          error: data?.error || data?.error_message,
-          createdWithoutUrl,
-          paymentId: paymentId ?? null,
-          bodyPreview: rawText ? rawText.slice(0, 800) : "(empty body)",
+      if (!createRes.ok || !paymentId) {
+        console.error("❌ Atlas create payment (step 1) failed:", {
+          status: createRes.status,
+          contentType: createRes.headers.get("content-type"),
+          code: createData?.code,
+          error: createData?.error_message || createData?.error,
+          bodyPreview: createRaw ? createRaw.slice(0, 800) : "(empty body)",
         });
         return {
-          error: createdWithoutUrl
-            ? "Atlas accepted the payment but returned no payment URL — no payment methods appear to be enabled for this account (or it is still in test/pending setup). Contact Atlas to enable payment methods for your ClientId."
-            : (data?.error as string) ||
-              (data?.error_message as string) ||
-              "Failed to create Atlas payment",
+          error:
+            (createData?.error_message as string) ||
+            (createData?.error as string) ||
+            "Failed to create Atlas payment",
         };
       }
 
-      console.log("📥 Atlas createPayment success:", { paymentId });
+      // STEP 2 — open the Atlas-hosted card page for this payment_id. The
+      // returned payment_url is what the browser redirects to.
+      const cardFormBody: Record<string, unknown> = {
+        payment_id: String(paymentId),
+      };
+      if (params.cardholderName)
+        cardFormBody.cardholder_name = params.cardholderName;
+      if (params.payerEmail) cardFormBody.payer_email = params.payerEmail;
+      if (params.displayLanguage)
+        cardFormBody.display_language = params.displayLanguage;
+
+      const formRes = await fetch(
+        `${credentials.apiBaseUrl}/payments/cardform`,
+        {
+          method: "POST",
+          headers: this.authHeaders(credentials),
+          body: JSON.stringify(cardFormBody),
+        },
+      );
+      const { data: formData, raw: formRaw } = await this.readJson(formRes);
+      const formRoot = (formData?.data ?? formData) as
+        | Record<string, unknown>
+        | undefined;
+      const paymentUrl = formRoot?.payment_url as string | undefined;
+
+      if (!formRes.ok || !paymentUrl) {
+        console.error("❌ Atlas card form (step 2) failed:", {
+          status: formRes.status,
+          contentType: formRes.headers.get("content-type"),
+          code: formData?.code,
+          error: formData?.error_message || formData?.error,
+          paymentId: String(paymentId),
+          bodyPreview: formRaw ? formRaw.slice(0, 800) : "(empty body)",
+        });
+        return {
+          error:
+            (formData?.error_message as string) ||
+            (formData?.error as string) ||
+            "Failed to open Atlas payment page",
+        };
+      }
+
+      console.log("📥 Atlas createPayment success:", {
+        paymentId: String(paymentId),
+        hasUrl: true,
+      });
 
       return {
         paymentUrl,
