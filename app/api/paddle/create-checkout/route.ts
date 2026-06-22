@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { getPaddleConfig, paddleRequest } from "@/lib/paddle/config";
 import { initiateDeposit } from "@/lib/actions/trading/wallet.actions";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import AppSettings from "@/database/models/app-settings.model";
 import { connectToDatabase } from "@/database/mongoose";
 import {
   RateLimiters,
@@ -104,16 +105,26 @@ export async function POST(req: NextRequest) {
     const { amount, currency = "EUR" } = await req.json();
 
     // Validate amount
-    if (!amount || typeof amount !== "number" || amount < 1) {
+    if (!amount || typeof amount !== "number") {
+      return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+    }
+
+    // Reason: honor the admin-configured minimum (transactions.minimumDeposit),
+    // falling back to 10 only if unset — keeps every PSP consistent.
+    await connectToDatabase();
+    const appSettings = await AppSettings.findById("global-app-settings");
+    const cs = appSettings?.currency?.symbol || "€";
+    const minDeposit = appSettings?.transactions?.minimumDeposit ?? 10;
+    if (amount < minDeposit) {
       return NextResponse.json(
-        { error: "Invalid amount (min: €1)" },
+        { error: `Minimum deposit is ${cs}${minDeposit}` },
         { status: 400 },
       );
     }
 
     if (amount > 10000) {
       return NextResponse.json(
-        { error: "Maximum deposit is €10,000" },
+        { error: `Maximum deposit is ${cs}10,000` },
         { status: 400 },
       );
     }

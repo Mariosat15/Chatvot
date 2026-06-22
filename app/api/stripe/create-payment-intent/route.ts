@@ -153,9 +153,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
     }
 
-    if (amount < STRIPE_CONFIG.minimumDeposit) {
+    // Reason: honor the admin-configured minimum (transactions.minimumDeposit),
+    // falling back to the static Stripe config only if unset.
+    const minDeposit =
+      appSettings?.transactions?.minimumDeposit ?? STRIPE_CONFIG.minimumDeposit;
+    if (amount < minDeposit) {
       return NextResponse.json(
-        { error: `Minimum deposit is ${cs}${STRIPE_CONFIG.minimumDeposit}` },
+        { error: `Minimum deposit is ${cs}${minDeposit}` },
         { status: 400 },
       );
     }

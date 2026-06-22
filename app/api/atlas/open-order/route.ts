@@ -167,9 +167,12 @@ export async function POST(req: NextRequest) {
     const cs = appSettings?.currency?.symbol || "€";
     const baseCurrencyCode = appSettings?.currency?.code || "EUR";
 
-    if (amountNum < 10) {
+    // Reason: honor the admin-configured minimum (transactions.minimumDeposit)
+    // instead of a hardcoded 10; fall back to 10 only if unset.
+    const minDeposit = appSettings?.transactions?.minimumDeposit ?? 10;
+    if (amountNum < minDeposit) {
       return NextResponse.json(
-        { error: `Minimum deposit is ${cs}10` },
+        { error: `Minimum deposit is ${cs}${minDeposit}` },
         { status: 400 },
       );
     }
