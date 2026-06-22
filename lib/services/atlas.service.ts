@@ -323,10 +323,15 @@ class AtlasService {
     if (params.beneficiaryUrl) requestBody.beneficiary_url = params.beneficiaryUrl;
 
     console.log("📤 Atlas createPayment request:", {
+      endpoint: `${credentials.apiBaseUrl}/payments`,
       amount: requestBody.amount,
       currency: requestBody.currency,
       additional_data: requestBody.additional_data,
       commission_included: requestBody.commission_included,
+      recurring: requestBody.recurring,
+      success_url: requestBody.success_url,
+      fail_url: requestBody.fail_url,
+      beneficiary_url: requestBody.beneficiary_url ?? "(none)",
     });
 
     try {
