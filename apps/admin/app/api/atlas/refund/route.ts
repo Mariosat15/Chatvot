@@ -65,7 +65,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const paymentId = transaction.providerTransactionId;
+    // Resolve the Atlas payment id. open-order persists it on the top-level
+    // `providerTransactionId` AND in `metadata.atlasPaymentId`; the webhook
+    // also sets `paymentId`. Fall back across all three so deposits created by
+    // older flows (or seeded fixtures) that only populated metadata can still
+    // be refunded.
+    const paymentId =
+      transaction.providerTransactionId ||
+      (transaction.metadata?.atlasPaymentId as string | undefined) ||
+      (transaction.paymentId as string | undefined) ||
+      "";
     if (!paymentId) {
       return NextResponse.json(
         { error: "Missing Atlas payment id on this transaction" },

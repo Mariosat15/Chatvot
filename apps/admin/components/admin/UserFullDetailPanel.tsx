@@ -500,6 +500,7 @@ export default function UserFullDetailPanel({
     createdAt: string;
     competitionId?: string;
     paymentMethod?: string;
+    provider?: string;
     metadata?: Record<string, unknown>;
   }
   const [userTxs, setUserTxs] = useState<UserTransaction[]>([]);
@@ -4004,6 +4005,7 @@ export default function UserFullDetailPanel({
                                             description: tx.description,
                                             competitionId: tx.competitionId,
                                             paymentMethod: tx.paymentMethod,
+                                            provider: tx.provider,
                                             metadata: tx.metadata,
                                           })
                                         }
@@ -4096,6 +4098,7 @@ export default function UserFullDetailPanel({
                       onClose={() => setSelectedUserTx(null)}
                       creditSymbol={creditsSymbol}
                       currencySymbol={cs}
+                      onActionComplete={() => fetchUserTransactions(userTxsPage)}
                     />
                   </div>
                 )}
