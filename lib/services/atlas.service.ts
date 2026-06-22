@@ -336,28 +336,44 @@ class AtlasService {
         body: JSON.stringify(requestBody),
       });
 
-      const data = await response.json().catch(() => null);
+      // Reason: read raw text first so we can (a) tolerate both response
+      // envelopes — nested `{ data: { payment_url } }` (per spec) and a
+      // top-level `{ payment_url }` — and (b) log the real body when the shape
+      // is unexpected (a 200 with no payment_url previously failed silently).
+      const rawText = await response.text();
+      let data: Record<string, unknown> | null = null;
+      try {
+        data = rawText ? JSON.parse(rawText) : null;
+      } catch {
+        data = null;
+      }
+      const root = (data?.data ?? data) as Record<string, unknown> | undefined;
+      const paymentUrl = root?.payment_url as string | undefined;
+      const paymentId = root?.payment_id as string | number | undefined;
+      const respUserId = root?.user_id as string | number | undefined;
 
-      if (!response.ok || !data?.data?.payment_url) {
+      if (!response.ok || !paymentUrl) {
         console.error("❌ Atlas createPayment failed:", {
           status: response.status,
+          contentType: response.headers.get("content-type"),
           code: data?.code,
           error: data?.error || data?.error_message,
+          bodyPreview: rawText ? rawText.slice(0, 800) : "(empty body)",
         });
         return {
           error:
-            data?.error || data?.error_message || "Failed to create Atlas payment",
+            (data?.error as string) ||
+            (data?.error_message as string) ||
+            "Failed to create Atlas payment",
         };
       }
 
-      console.log("📥 Atlas createPayment success:", {
-        paymentId: data.data.payment_id,
-      });
+      console.log("📥 Atlas createPayment success:", { paymentId });
 
       return {
-        paymentUrl: data.data.payment_url,
-        paymentId: String(data.data.payment_id),
-        userId: String(data.data.user_id ?? credentials.userId),
+        paymentUrl,
+        paymentId: String(paymentId),
+        userId: String(respUserId ?? credentials.userId),
       };
     } catch (error) {
       console.error("❌ Atlas createPayment error:", error);
@@ -385,14 +401,19 @@ class AtlasService {
       });
 
       const data = await response.json().catch(() => null);
-      if (!response.ok || !Array.isArray(data?.data)) {
+      const list = Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data)
+          ? data
+          : null;
+      if (!response.ok || !list) {
         return {
           error:
             data?.error || data?.error_message || "Failed to get Atlas status",
         };
       }
 
-      const record = (data.data as AtlasPaymentRecord[]).find(
+      const record = (list as AtlasPaymentRecord[]).find(
         (r) => String(r.payment_id) === String(paymentId),
       );
       if (!record) return { error: "Payment not found" };
@@ -434,25 +455,34 @@ class AtlasService {
         body: JSON.stringify(requestBody),
       });
 
-      const data = await response.json().catch(() => null);
-      if (!response.ok || !data?.data?.refund_id) {
+      const rawText = await response.text();
+      let data: Record<string, unknown> | null = null;
+      try {
+        data = rawText ? JSON.parse(rawText) : null;
+      } catch {
+        data = null;
+      }
+      const root = (data?.data ?? data) as Record<string, unknown> | undefined;
+      const refundId = root?.refund_id as string | number | undefined;
+
+      if (!response.ok || !refundId) {
         console.error("❌ Atlas createRefund failed:", {
           status: response.status,
+          contentType: response.headers.get("content-type"),
           code: data?.code,
           error: data?.error_message || data?.error,
+          bodyPreview: rawText ? rawText.slice(0, 800) : "(empty body)",
         });
         return {
           error:
-            data?.error_message ||
-            data?.error ||
+            (data?.error_message as string) ||
+            (data?.error as string) ||
             "Failed to create Atlas refund",
         };
       }
 
-      console.log("📥 Atlas createRefund success:", {
-        refundId: data.data.refund_id,
-      });
-      return { refundId: String(data.data.refund_id) };
+      console.log("📥 Atlas createRefund success:", { refundId });
+      return { refundId: String(refundId) };
     } catch (error) {
       console.error("❌ Atlas createRefund error:", error);
       return { error: "Failed to connect to Atlas" };
@@ -478,7 +508,12 @@ class AtlasService {
       });
 
       const data = await response.json().catch(() => null);
-      if (!response.ok || !Array.isArray(data?.data)) {
+      const list = Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data)
+          ? data
+          : null;
+      if (!response.ok || !list) {
         return {
           error:
             data?.error_message ||
@@ -487,7 +522,7 @@ class AtlasService {
         };
       }
 
-      const record = (data.data as AtlasRefundRecord[]).find(
+      const record = (list as AtlasRefundRecord[]).find(
         (r) => String(r.refund_id) === String(refundId),
       );
       if (!record) return { error: "Refund not found" };
