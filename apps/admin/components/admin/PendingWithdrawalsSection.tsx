@@ -149,6 +149,21 @@ interface AdminBankAccount {
 
 type TabType = "pending" | "history";
 
+// Payout methods where the payment provider (e.g. Nuvei) sends the money
+// directly to the user's card/account. For these NO company bank account is
+// debited, so the "Company Bank Account Used" reconciliation field does not
+// apply — only pure-manual bank transfers come out of a company bank account.
+const PROVIDER_HANDLED_PAYOUT_METHODS = new Set([
+  "original_method",
+  "nuvei_card_payout",
+  "card_payout",
+  "nuvei_bank_transfer",
+]);
+
+function isProviderHandledPayout(method?: string): boolean {
+  return !!method && PROVIDER_HANDLED_PAYOUT_METHODS.has(method);
+}
+
 export default function PendingWithdrawalsSection() {
   const [activeTab, setActiveTab] = useState<TabType>("pending");
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
@@ -355,19 +370,24 @@ export default function PendingWithdrawalsSection() {
               action: actionDialog.action,
               reason: actionReason,
               adminNote: actionNote,
-              // Include company bank details when completing (send full details, backend will mask)
-              companyBankUsed: selectedBank
-                ? {
-                    bankId: selectedBank._id,
-                    accountName: selectedBank.accountName,
-                    accountHolderName: selectedBank.accountHolderName,
-                    bankName: selectedBank.bankName,
-                    iban: selectedBank.iban,
-                    accountNumber: selectedBank.accountNumber,
-                    country: selectedBank.country,
-                    currency: selectedBank.currency,
-                  }
-                : undefined,
+              // Include company bank details when completing (send full details, backend will mask).
+              // Reason: provider-handled payouts (card / Nuvei) are NOT funded
+              // from a company bank account, so never attach one for them — even
+              // if a default bank is pre-selected in state.
+              companyBankUsed:
+                selectedBank &&
+                !isProviderHandledPayout(withdrawal.payoutMethod)
+                  ? {
+                      bankId: selectedBank._id,
+                      accountName: selectedBank.accountName,
+                      accountHolderName: selectedBank.accountHolderName,
+                      bankName: selectedBank.bankName,
+                      iban: selectedBank.iban,
+                      accountNumber: selectedBank.accountNumber,
+                      country: selectedBank.country,
+                      currency: selectedBank.currency,
+                    }
+                  : undefined,
             }),
           });
 
@@ -751,6 +771,18 @@ export default function PendingWithdrawalsSection() {
       </div>
     </div>
   );
+
+  // Reason: when completing a provider-handled payout (card / Nuvei), no
+  // company bank account is debited, so the reconciliation selector is hidden
+  // and not required. Bulk completions keep the selector (methods may differ).
+  const isBulkCompletion =
+    selectedIds.size > 1 &&
+    !!actionDialog.withdrawal &&
+    selectedIds.has(actionDialog.withdrawal._id);
+  const completionIsProviderHandled =
+    actionDialog.action === "completed" &&
+    !isBulkCompletion &&
+    isProviderHandledPayout(actionDialog.withdrawal?.payoutMethod);
 
   return (
     <div className="space-y-6">
@@ -1393,8 +1425,25 @@ export default function PendingWithdrawalsSection() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            {/* Bank selection for completed withdrawals */}
+            {/* Provider-handled payouts (card / Nuvei): money is sent by the
+                payment provider, not from a company bank account. */}
+            {completionIsProviderHandled && (
+              <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                <p className="text-blue-300 text-sm flex items-center gap-2">
+                  <CreditCard className="h-4 w-4" />
+                  Provider-handled payout — no company bank account needed
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  This withdrawal is sent by the payment provider (e.g. Nuvei)
+                  directly to the user&apos;s card/account. None of your company
+                  bank accounts are debited, so there is nothing to reconcile
+                  here — just confirm it was paid.
+                </p>
+              </div>
+            )}
+            {/* Bank selection for MANUAL (company-funded) completed withdrawals */}
             {actionDialog.action === "completed" &&
+              !completionIsProviderHandled &&
               adminBankAccounts.length > 0 && (
                 <div>
                   <Label className="text-gray-300">
@@ -1402,8 +1451,9 @@ export default function PendingWithdrawalsSection() {
                     <span className="text-red-400">*</span>
                   </Label>
                   <p className="text-xs text-gray-500 mb-2">
-                    Select which company bank account processed this withdrawal
-                    (required)
+                    Select which of <strong>your company&apos;s</strong> bank
+                    accounts you sent this withdrawal from (for reconciliation —
+                    this is not the user&apos;s bank)
                   </p>
                   <Select
                     value={selectedBankId}
@@ -1435,6 +1485,7 @@ export default function PendingWithdrawalsSection() {
                 </div>
               )}
             {actionDialog.action === "completed" &&
+              !completionIsProviderHandled &&
               adminBankAccounts.length === 0 && (
                 <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
                   <p className="text-amber-300 text-sm flex items-center gap-2">
@@ -1492,6 +1543,7 @@ export default function PendingWithdrawalsSection() {
                   actionDialog.action === "failed") &&
                   !actionReason) ||
                 (actionDialog.action === "completed" &&
+                  !completionIsProviderHandled &&
                   adminBankAccounts.length > 0 &&
                   !selectedBankId)
               }

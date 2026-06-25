@@ -20,7 +20,10 @@ import {
   notifyAdminsOfWithdrawal,
   type PayoutCategory,
 } from "@/lib/services/withdrawal-validator.service";
-import { resolveWithdrawalRouting } from "@/lib/services/payout/withdrawal-routing";
+import {
+  resolveWithdrawalRouting,
+  resolvePayoutExecution,
+} from "@/lib/services/payout/withdrawal-routing";
 
 /**
  * GET /api/wallet/withdraw
@@ -739,9 +742,17 @@ export async function POST(request: NextRequest) {
       // Reason: In manual mode, do NOT call Nuvei here. The /payout.do endpoint
       // directly sends money — it must only be called when admin processes the withdrawal.
       // Instead, just save the UPO info so the admin can trigger the payout later.
-      // Only relevant when outgoing provider payouts are enabled; when the
-      // master switch is off we never prep a processor payout.
-      if (withdrawalSettings.usePaymentProcessorForManual && routing.sendToProvider) {
+      // Method-aware: CARD payouts always go to the provider on processing (so
+      // we prep their UPO even when "Use provider for Manual" is OFF); BANK
+      // payouts only prep a UPO when the admin routes manual bank withdrawals
+      // through the provider. Provider capabilities drive this — see
+      // resolvePayoutExecution.
+      const execution = resolvePayoutExecution(withdrawalSettings, {
+        payoutMethod: payoutMethodType,
+        usePaymentProcessorForManual:
+          withdrawalSettings.usePaymentProcessorForManual,
+      });
+      if (execution.useProvider) {
         try {
           let userPaymentOptionId: string | undefined;
 

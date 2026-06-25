@@ -263,53 +263,46 @@ export async function PUT(
             const WithdrawalSettings = (
               await import("@/database/models/withdrawal-settings.model")
             ).default;
-            const { resolveWithdrawalRouting } = await import(
+            const { resolvePayoutExecution } = await import(
               "@/lib/services/payout/withdrawal-routing"
             );
             const wSettings = await WithdrawalSettings.getSingleton();
-            const routing = resolveWithdrawalRouting(wSettings);
 
-            // Decide whether to call the payout provider for this admin-processed
-            // withdrawal. Reason: "Use <provider> for Manual Withdrawals"
-            // (usePaymentProcessorForManual) is the switch that controls whether
-            // the PSP runs in the manual workflow. We only call the provider when:
-            //   • the master switch is ON, AND
-            //   • automatic processing is enabled for the provider, OR the admin
-            //     explicitly opted to route MANUAL withdrawals through it.
-            // Otherwise this is a pure-manual payout — the admin sends the money
-            // by hand and then marks the withdrawal COMPLETED (no PSP call).
-            const useProvider =
-              routing.sendToProvider &&
-              (routing.canAutoProcess ||
-                wSettings.usePaymentProcessorForManual === true);
+            // Method-aware payout decision. Reason: a CARD payout can only be
+            // executed by the PSP (card-network refund) — it is never manual,
+            // even when "Use <provider> for Manual Withdrawals" is OFF. Only
+            // BANK payouts are paid by hand in pure-manual mode. The provider's
+            // declared capabilities drive this, so new providers need no change.
+            const execution = resolvePayoutExecution(wSettings, {
+              payoutMethod: withdrawal.payoutMethod,
+              usePaymentProcessorForManual:
+                wSettings.usePaymentProcessorForManual,
+            });
 
-            if (!useProvider) {
-              const why = !routing.sendToProvider
-                ? "outgoing provider payouts are disabled"
-                : `${routing.providerLabel} is not used for manual withdrawals`;
+            if (!execution.useProvider) {
               console.log(
-                `🛠️ Withdrawal ${withdrawal._id} processed in manual mode (${why}).`,
+                `🛠️ Withdrawal ${withdrawal._id} processed in manual mode (${execution.reason}).`,
               );
               withdrawal.payoutProvider = "manual";
               withdrawal.adminNote =
                 (withdrawal.adminNote || "") +
-                `\nℹ️ Manual payout — pay this withdrawal yourself (bank transfer / card refund to the user's details), then mark COMPLETED. No payment provider was called.`;
+                `\nℹ️ Manual payout — ${execution.reason} Send the money to the user's bank details yourself, then mark COMPLETED. No payment provider was called.`;
             } else {
               const { getPayoutAdapter } = await import(
                 "@/lib/services/payout/payout-adapter-registry"
               );
-              const adapter = getPayoutAdapter(routing.providerId);
+              const adapter = getPayoutAdapter(execution.providerId);
 
               if (!adapter || !adapter.supportsPayout) {
                 console.log(
-                  `⚠️ Provider "${routing.providerId}" cannot execute payouts for withdrawal ${withdrawal._id} — manual handling required.`,
+                  `⚠️ Provider "${execution.providerId}" cannot execute payouts for withdrawal ${withdrawal._id} — manual handling required.`,
                 );
                 withdrawal.adminNote =
                   (withdrawal.adminNote || "") +
-                  `\n⚠️ Provider "${routing.providerLabel}" cannot execute payouts — process manually, then mark COMPLETED.`;
+                  `\n⚠️ Provider "${execution.providerLabel}" cannot execute payouts — process manually, then mark COMPLETED.`;
               } else {
                 console.log(
-                  `🏦 Submitting ${routing.providerLabel} payout for withdrawal ${withdrawal._id}...`,
+                  `🏦 Submitting ${execution.providerLabel} ${execution.category} payout for withdrawal ${withdrawal._id}...`,
                 );
                 const result = await adapter.executePayout({ withdrawal });
 
@@ -322,9 +315,9 @@ export async function PUT(
                     result.transactionId;
                   withdrawal.metadata.nuveiTransactionStatus =
                     result.transactionStatus;
-                  withdrawal.metadata.payoutProviderId = routing.providerId;
+                  withdrawal.metadata.payoutProviderId = execution.providerId;
                   withdrawal.metadata.usePaymentProcessor = true;
-                  withdrawal.payoutProvider = routing.providerId;
+                  withdrawal.payoutProvider = execution.providerId;
                   if (result.metadata) {
                     Object.assign(withdrawal.metadata, result.metadata);
                   }

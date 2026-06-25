@@ -4700,6 +4700,85 @@ export default function AdminWikiSection() {
             </CardContent>
           </Card>
 
+          {/* Card vs bank rule */}
+          <Card className="bg-purple-900/20 border-purple-500/40">
+            <CardHeader>
+              <CardTitle className="text-lg text-purple-300 flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Golden rule: the payout method decides the rail
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-gray-300 text-sm">
+              <p>
+                Whatever the manual settings say, the{" "}
+                <strong>method the user picks</strong> constrains how the money
+                can move:
+              </p>
+              <ul className="space-y-1">
+                <li>
+                  • <strong>Card withdrawal</strong> → can{" "}
+                  <em>only</em> be paid by the payment provider (a card refund).
+                  It is <strong>always</strong> sent via the provider (e.g.
+                  Nuvei) and <em>never</em> paid by hand — even when &quot;Use
+                  Nuvei for Manual Withdrawals&quot; is OFF.
+                </li>
+                <li>
+                  • <strong>Bank withdrawal</strong> → can go either way. It is
+                  paid by hand in manual mode, or sent via the provider when
+                  automatic is on / &quot;Use Nuvei for Manual Withdrawals&quot;
+                  is ON.
+                </li>
+              </ul>
+              <p className="text-xs text-gray-400">
+                This is driven by each provider&apos;s declared capabilities, so
+                adding a new payout provider needs no special-casing here.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Scenario B2 — method-aware mixed */}
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-green-400 flex items-center gap-2">
+                <ArrowRight className="h-5 w-5" />
+                B2. Card via Nuvei, bank by hand (review everything)
+              </CardTitle>
+              <CardDescription>
+                You review every withdrawal. Card payouts still go out
+                automatically via Nuvei (cards can&apos;t be paid by hand); bank
+                payouts you transfer yourself.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300 text-sm">
+              <div className="grid md:grid-cols-2 gap-2">
+                <div className="bg-gray-900 p-2 rounded">
+                  Send Withdrawals to Payment Provider →{" "}
+                  <span className="text-emerald-400 font-semibold">ON</span>
+                </div>
+                <div className="bg-gray-900 p-2 rounded">
+                  Withdrawal Provider →{" "}
+                  <span className="text-emerald-400 font-semibold">Nuvei</span>
+                </div>
+                <div className="bg-gray-900 p-2 rounded">
+                  Enable Automatic Withdrawals →{" "}
+                  <span className="text-red-400 font-semibold">OFF</span>
+                </div>
+                <div className="bg-gray-900 p-2 rounded">
+                  Use Nuvei for Manual Withdrawals →{" "}
+                  <span className="text-red-400 font-semibold">OFF</span>
+                </div>
+              </div>
+              <p>
+                <strong>How it behaves:</strong> every request lands in{" "}
+                <strong>Pending</strong>. When you process a{" "}
+                <strong>card</strong> request, Nuvei refunds the card. When you
+                process a <strong>bank</strong> request, you transfer the money
+                yourself and mark it <strong>Completed</strong> (no company bank
+                selector for the card ones — nothing was debited).
+              </p>
+            </CardContent>
+          </Card>
+
           {/* Scenario C */}
           <Card className="bg-gray-800 border-gray-700">
             <CardHeader>

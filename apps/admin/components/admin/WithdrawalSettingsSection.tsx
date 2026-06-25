@@ -663,8 +663,9 @@ export default function WithdrawalSettingsSection() {
                   )}
                 </CardTitle>
                 <CardDescription>
-                  Route manual withdrawals through Nuvei for automated payment
-                  processing
+                  Route manual <strong>bank</strong> withdrawals through Nuvei
+                  for automated payment processing. Card withdrawals always go
+                  through Nuvei — a card cannot be paid by hand.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -686,10 +687,11 @@ export default function WithdrawalSettingsSection() {
                         Use Nuvei for Manual Withdrawals
                       </h3>
                       <p className="text-sm text-gray-400">
-                        When ON, the request is stored in ChartVolt first —
-                        Nuvei is only called to send the money when you
-                        approve/process it. When OFF, you pay the user yourself
-                        (no Nuvei call).
+                        Controls <strong>bank</strong> withdrawals only. When
+                        ON, a bank request is stored in ChartVolt first and
+                        Nuvei sends the money when you approve/process it. When
+                        OFF, you pay the bank transfer yourself. Card
+                        withdrawals are always sent via Nuvei either way.
                       </p>
                     </div>
                   </div>
@@ -724,8 +726,8 @@ export default function WithdrawalSettingsSection() {
                             refunded (no Nuvei payout)
                           </li>
                           <li>
-                            • Nuvei moves the money once you approve — you never
-                            transfer it by hand
+                            • Nuvei moves the money once you approve (both card
+                            and bank payouts) — you never transfer it by hand
                           </li>
                         </ul>
                       </div>
@@ -737,26 +739,32 @@ export default function WithdrawalSettingsSection() {
                       <Info className="h-5 w-5 text-amber-400 mt-0.5" />
                       <div className="text-sm text-amber-200">
                         <p className="font-medium">
-                          How it works (Pure manual mode):
+                          How it works (manual bank mode):
                         </p>
                         <ul className="mt-2 space-y-1 text-amber-300/80">
                           <li>
-                            1. User requests withdrawal → Request stored in your
-                            system
+                            1. User requests withdrawal → Request stored in
+                            ChartVolt (PENDING)
                           </li>
                           <li>
-                            2. Admin reviews request and sees user&apos;s bank
-                            details
+                            2. Admin reviews the request and sees the
+                            user&apos;s bank details
                           </li>
                           <li>
-                            3. Admin manually transfers money via bank or card
-                            refund
+                            3. <strong>Bank withdrawal</strong> → you transfer
+                            the money by hand from your company bank account
                           </li>
                           <li>
-                            4. Admin marks withdrawal as completed after payment
+                            3b. <strong>Card withdrawal</strong> → still sent
+                            automatically via Nuvei (a card cannot be paid by
+                            hand)
                           </li>
                           <li>
-                            • You handle the actual money transfer manually
+                            4. Admin marks the withdrawal completed after payment
+                          </li>
+                          <li>
+                            • You handle bank transfers manually; Nuvei always
+                            handles card refunds
                           </li>
                         </ul>
                       </div>
