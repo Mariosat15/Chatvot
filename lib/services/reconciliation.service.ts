@@ -13,6 +13,12 @@ import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import WithdrawalRequest from "@/database/models/withdrawal-request.model";
 import { PlatformTransaction } from "@/database/models/platform-financials.model";
+import {
+  computeExpectedBalance,
+  balanceDifference as calcBalanceDifference,
+  isBalanceMismatch,
+  classifyBalanceMismatchSeverity,
+} from "@/lib/services/reconciliation-math";
 
 export interface ReconciliationIssue {
   type:
@@ -224,12 +230,6 @@ export async function verifyUserWallet(
     }).lean(),
   ]);
 
-  // Calculate balance from completed transactions
-  const completedBalance = completedTransactions.reduce(
-    (sum, tx) => sum + (tx.amount || 0),
-    0,
-  );
-
   // Calculate pending withdrawal amount (these credits are already deducted from wallet)
   // We need to account for this when checking balance
   const pendingWithdrawalCredits = pendingWithdrawalRequests.reduce(
@@ -246,9 +246,16 @@ export async function verifyUserWallet(
   // The wallet balance should equal:
   // completed transactions sum MINUS pending withdrawals (already deducted)
   // Note: pending deposits don't affect balance until completed
-  const expectedBalance = completedBalance - pendingWithdrawalCredits;
-  const balanceDifference =
-    Math.round((wallet.creditBalance - expectedBalance) * 100) / 100;
+  // Reason: shared, unit-tested math (see reconciliation-math.ts) so the
+  // dashboard, this service, and the admin route all agree on the rules.
+  const expectedBalance = computeExpectedBalance(
+    completedTransactions.map((tx) => tx.amount || 0),
+    pendingWithdrawalCredits,
+  );
+  const balanceDifference = calcBalanceDifference(
+    wallet.creditBalance,
+    expectedBalance,
+  );
 
   // All transactions for counting
   const transactions = [
@@ -258,14 +265,14 @@ export async function verifyUserWallet(
   ];
 
   // Check 1: Balance matches expected (accounting for pending withdrawals)
-  if (Math.abs(balanceDifference) > 0.01) {
-    // Only flag as critical if there are NO pending transactions that could explain the difference
-    const isPendingRelated =
-      pendingWithdrawalCredits > 0 || pendingDepositCredits > 0;
-
+  if (isBalanceMismatch(wallet.creditBalance, expectedBalance)) {
     issues.push({
       type: "balance_mismatch",
-      severity: isPendingRelated ? "info" : "critical", // Downgrade severity if pending txns exist
+      // Downgrade severity if pending txns can explain the difference
+      severity: classifyBalanceMismatchSeverity({
+        pendingWithdrawalCredits,
+        pendingDepositCredits,
+      }),
       userId,
       userEmail,
       details: {
@@ -612,11 +619,16 @@ export async function getUserReconciliation(
   // This is the source of truth — it accounts for deposits, withdrawals, wins, refunds,
   // admin adjustments, incident compensations, GM earnings, platform fees, and all other types.
   // Using wallet aggregate fields alone was incomplete and missed admin/incident/GM flows.
-  const balanceFromCompletedTransactions = completedTransactions.reduce(
-    (sum, tx) => sum + (tx.amount || 0),
-    0,
+  const balanceFromCompletedTransactions = Math.round(
+    completedTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0) * 100,
+  ) / 100;
+  // Reason: subtract in-flight withdrawal credits (already debited from the
+  // live wallet) so the expected balance matches the actual wallet for users
+  // with a pending withdrawal — same rule as verifyUserWallet and the admin route.
+  const expectedBalance = computeExpectedBalance(
+    completedTransactions.map((tx) => tx.amount || 0),
+    pendingWithdrawalCredits,
   );
-  const expectedBalance = Math.round(balanceFromCompletedTransactions * 100) / 100;
 
   const depositTotal = completedTransactions
     .filter((tx) => tx.transactionType === "deposit" || tx.transactionType === "manual_deposit_credit")
@@ -685,7 +697,7 @@ export async function getUserReconciliation(
     },
     calculated: {
       expectedBalance,
-      balanceFromTransactions: expectedBalance,
+      balanceFromTransactions: balanceFromCompletedTransactions,
       depositTotal,
       withdrawalTotal,
       marketplaceSpentTotal,

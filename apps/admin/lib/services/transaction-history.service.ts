@@ -71,7 +71,10 @@ export interface MergedTransactionsResult {
  * terms (email/name/id) to userIds. Returns whether the search narrowed to a
  * specific set of users (so platform-level rows can be excluded).
  */
-async function buildWalletQuery(filters: TransactionFilters): Promise<{
+async function buildWalletQuery(
+  filters: TransactionFilters,
+  exactDates = false,
+): Promise<{
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   query: Record<string, any>;
   searchIsUserScoped: boolean;
@@ -138,13 +141,14 @@ async function buildWalletQuery(filters: TransactionFilters): Promise<{
 
   // Reason: endDate is inclusive of the whole day. Without end-of-day, a raw
   // `new Date(endDate)` resolves to 00:00:00 and silently drops every row on
-  // the end date itself.
+  // the end date itself. When exactDates is true (streaming chunker), the
+  // caller passes precise ISO timestamps and we must NOT expand to end-of-day.
   if (startDate || endDate) {
     query.createdAt = {};
     if (startDate) query.createdAt.$gte = new Date(startDate);
     if (endDate) {
       const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
+      if (!exactDates) end.setHours(23, 59, 59, 999);
       query.createdAt.$lte = end;
     }
   }
@@ -159,14 +163,19 @@ async function buildWalletQuery(filters: TransactionFilters): Promise<{
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildDateRange(startDate?: string | null, endDate?: string | null): Record<string, any> | null {
+function buildDateRange(
+  startDate?: string | null,
+  endDate?: string | null,
+  exactDates = false,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Record<string, any> | null {
   if (!startDate && !endDate) return null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const range: Record<string, any> = {};
   if (startDate) range.$gte = new Date(startDate);
   if (endDate) {
     const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
+    if (!exactDates) end.setHours(23, 59, 59, 999);
     range.$lte = end;
   }
   return range;
@@ -178,13 +187,14 @@ function buildDateRange(startDate?: string | null, endDate?: string | null): Rec
  */
 export async function fetchMergedTransactions(
   filters: TransactionFilters,
-  options: { maxRecords?: number } = {},
+  options: { maxRecords?: number; exactDates?: boolean } = {},
 ): Promise<MergedTransactionsResult> {
   const maxRecords = options.maxRecords ?? 1000;
+  const exactDates = options.exactDates ?? false;
   const { type, status, userId, startDate, endDate, sortBy, sortOrder: rawSortOrder } = filters;
   const sortOrder: "asc" | "desc" = rawSortOrder === "asc" ? "asc" : "desc";
 
-  const { query, searchIsUserScoped } = await buildWalletQuery(filters);
+  const { query, searchIsUserScoped } = await buildWalletQuery(filters, exactDates);
 
   // Reason: allowlist sort field to prevent injection via dynamic key.
   const allowedSortFields = new Set(["createdAt", "amount", "transactionType", "status", "userId"]);
@@ -218,7 +228,7 @@ export async function fetchMergedTransactions(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let vendorPayments: any[] = [];
 
-  const dateRange = buildDateRange(startDate, endDate);
+  const dateRange = buildDateRange(startDate, endDate, exactDates);
 
   if (includeAdminTx) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -392,4 +402,83 @@ export async function fetchMergedTransactions(
   });
 
   return { transactions, walletQuery: query, sortOrder };
+}
+
+/**
+ * Stream ALL matching transactions in bounded date-window batches.
+ *
+ * Reason: a single in-memory fetch is capped (to avoid OOM), which can truncate
+ * very large exports. This generator walks the matching date range and yields
+ * batches. If a window holds more rows than `chunkCap`, it recursively splits
+ * the window in half by time until each batch fits — so it can stream an
+ * unlimited number of rows while never holding more than ~chunkCap×sources in
+ * memory at once. Completeness is guaranteed for any realistic data
+ * distribution (you would need >chunkCap rows within an unsplittable 1ms window
+ * to truncate, which is effectively impossible).
+ */
+export async function* streamMergedTransactions(
+  filters: TransactionFilters,
+  options: { chunkCap?: number } = {},
+): AsyncGenerator<MergedTransaction[]> {
+  const chunkCap = options.chunkCap ?? 5000;
+
+  // Lower bound: explicit startDate, else epoch (recursion quickly discards
+  // empty older windows, so an early floor costs only a few extra queries).
+  const startMs = filters.startDate ? new Date(filters.startDate).getTime() : 0;
+
+  // Upper bound: explicit endDate (inclusive end-of-day), else now.
+  let endMs: number;
+  if (filters.endDate) {
+    const end = new Date(filters.endDate);
+    end.setHours(23, 59, 59, 999);
+    endMs = end.getTime();
+  } else {
+    endMs = Date.now();
+  }
+
+  const ascending = filters.sortOrder === "asc";
+  yield* chunkByDate(filters, startMs, endMs, chunkCap, ascending);
+}
+
+async function* chunkByDate(
+  filters: TransactionFilters,
+  startMs: number,
+  endMs: number,
+  chunkCap: number,
+  ascending: boolean,
+): AsyncGenerator<MergedTransaction[]> {
+  if (startMs > endMs) return;
+
+  // Reason: fetch one more than the cap so we can detect an overflowing window.
+  const { transactions } = await fetchMergedTransactions(
+    {
+      ...filters,
+      startDate: new Date(startMs).toISOString(),
+      endDate: new Date(endMs).toISOString(),
+    },
+    { maxRecords: chunkCap + 1, exactDates: true },
+  );
+
+  if (transactions.length <= chunkCap) {
+    if (transactions.length > 0) yield transactions;
+    return;
+  }
+
+  const mid = Math.floor((startMs + endMs) / 2);
+  if (mid <= startMs || mid >= endMs) {
+    // Window is a single instant and still overflows — emit as-is to avoid an
+    // infinite loop. Practically unreachable.
+    yield transactions;
+    return;
+  }
+
+  // Reason: preserve global ordering — for descending (default) emit the newer
+  // half first; for ascending emit the older half first.
+  if (ascending) {
+    yield* chunkByDate(filters, startMs, mid, chunkCap, ascending);
+    yield* chunkByDate(filters, mid + 1, endMs, chunkCap, ascending);
+  } else {
+    yield* chunkByDate(filters, mid + 1, endMs, chunkCap, ascending);
+    yield* chunkByDate(filters, startMs, mid, chunkCap, ascending);
+  }
 }

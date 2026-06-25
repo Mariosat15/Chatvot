@@ -2,15 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/admin/auth";
 import { connectToDatabase } from "@/database/mongoose";
 import CreditConversionSettings from "@/database/models/credit-conversion-settings.model";
-import { fetchMergedTransactions } from "@/lib/services/transaction-history.service";
+import {
+  streamMergedTransactions,
+  type MergedTransaction,
+} from "@/lib/services/transaction-history.service";
 
 /**
  * GET /api/transactions/export
  * Export transactions to CSV (Excel-compatible).
  *
- * Reason: Uses the SAME fetchMergedTransactions() as the list endpoint so the
- * downloaded report contains exactly the rows the admin sees (including
- * platform / VAT / vendor records) and honours every active filter.
+ * Reason: Uses the SAME filtering/merging logic as the list endpoint (via
+ * transaction-history.service) so the download contains exactly the rows the
+ * admin sees. The CSV is STREAMED in bounded date-window batches, so an export
+ * of any size (well beyond the on-screen 1k page) completes without loading the
+ * full result set into memory at once.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -35,11 +40,6 @@ export async function GET(request: NextRequest) {
       sortBy: "createdAt",
       sortOrder: searchParams.get("sortOrder") || "desc",
     };
-
-    // Reason: Up to 10k rows for an export (vs 1k for the on-screen list).
-    const { transactions } = await fetchMergedTransactions(filters, {
-      maxRecords: 10000,
-    });
 
     // Reason: Convert credits → EUR using the real configured rate, not a
     // hardcoded /100, so the EUR column is accurate when a row lacks an
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
       custom_expense: "Custom Expense",
     };
 
-    // Build CSV content
+    // CSV column order
     const headers = [
       "Transaction ID",
       "Date",
@@ -103,9 +103,17 @@ export async function GET(request: NextRequest) {
       "Competition ID",
     ];
 
-    const rows = transactions.map((tx) => {
-      const userInfo = tx.userInfo || { name: "Unknown", email: "Unknown" };
+    // Escape a single CSV value (RFC 4180).
+    const escapeCSV = (value: string) => {
+      if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+        return `"${value.replace(/"/g, '""')}"`;
+      }
+      return value;
+    };
 
+    // Convert one transaction into a CSV line.
+    const txToCsvLine = (tx: MergedTransaction): string => {
+      const userInfo = tx.userInfo || { name: "Unknown", email: "Unknown" };
       // Reason: prefer an explicit EUR amount (set on platform/VAT/vendor rows
       // and on withdrawal metadata); otherwise derive from credits via the rate.
       const amountEUR =
@@ -115,7 +123,7 @@ export async function GET(request: NextRequest) {
             ? tx.metadata.amountEUR
             : (tx.amount || 0) / conversionRate;
 
-      return [
+      const cells = [
         tx._id.toString(),
         formatDate(tx.createdAt),
         typeLabels[tx.transactionType] || tx.transactionType,
@@ -130,27 +138,8 @@ export async function GET(request: NextRequest) {
         tx.paymentMethod || "",
         tx.competitionId || "",
       ];
-    });
-
-    // Escape CSV values
-    const escapeCSV = (value: string) => {
-      if (value.includes(",") || value.includes('"') || value.includes("\n")) {
-        return `"${value.replace(/"/g, '""')}"`;
-      }
-      return value;
+      return cells.map((c) => escapeCSV(String(c))).join(",");
     };
-
-    // Build CSV string
-    const csvContent = [
-      headers.map(escapeCSV).join(","),
-      ...rows.map((row) =>
-        row.map((cell) => escapeCSV(String(cell))).join(","),
-      ),
-    ].join("\n");
-
-    // Add BOM for Excel UTF-8 compatibility
-    const bom = "\uFEFF";
-    const csvWithBom = bom + csvContent;
 
     // Generate filename with date range
     const now = new Date();
@@ -161,11 +150,39 @@ export async function GET(request: NextRequest) {
       filename = `transactions_${type}_${now.toISOString().split("T")[0]}`;
     }
 
-    return new NextResponse(csvWithBom, {
+    // Reason: Stream the CSV in bounded date-window batches so an export of any
+    // size completes without buffering the whole result set in memory. Each
+    // batch is encoded and pushed to the client as it is produced.
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        try {
+          // BOM for Excel UTF-8 + header row.
+          controller.enqueue(
+            encoder.encode("\uFEFF" + headers.map(escapeCSV).join(",") + "\n"),
+          );
+
+          for await (const batch of streamMergedTransactions(filters, {
+            chunkCap: 5000,
+          })) {
+            if (batch.length === 0) continue;
+            const lines = batch.map(txToCsvLine).join("\n") + "\n";
+            controller.enqueue(encoder.encode(lines));
+          }
+          controller.close();
+        } catch (streamError) {
+          console.error("Error while streaming transaction export:", streamError);
+          controller.error(streamError);
+        }
+      },
+    });
+
+    return new NextResponse(stream, {
       status: 200,
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="${filename}.csv"`,
+        "Cache-Control": "no-store",
       },
     });
   } catch (error) {
