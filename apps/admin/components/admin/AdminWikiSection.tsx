@@ -4508,6 +4508,369 @@ export default function AdminWikiSection() {
       ),
     },
 
+    // ==================== WITHDRAWAL SCENARIOS ====================
+    {
+      id: "withdrawal-scenarios",
+      title: "Withdrawal Setup Scenarios",
+      icon: Wallet,
+      category: "Financial",
+      tags: [
+        "withdrawals",
+        "nuvei",
+        "manual",
+        "automatic",
+        "payouts",
+        "bank transfer",
+        "enable auto",
+        "provider",
+        "recipes",
+        "examples",
+      ],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-green-400 mb-3">
+              Withdrawal Setup Scenarios
+            </h2>
+            <p className="text-gray-300 mb-4">
+              Copy-paste &quot;recipes&quot; for the most common payout setups.
+              All of these are controlled from{" "}
+              <strong>Withdrawal Settings</strong>. Three switches decide
+              everything:
+            </p>
+            <div className="grid md:grid-cols-3 gap-3">
+              <div className="bg-indigo-500/10 border border-indigo-500/30 rounded p-3 text-sm text-gray-300">
+                <div className="font-semibold text-indigo-300 mb-1">
+                  1. Send Withdrawals to Payment Provider
+                </div>
+                Master switch. <strong>OFF</strong> = no provider is ever
+                called; you pay every withdrawal by hand.
+              </div>
+              <div className="bg-indigo-500/10 border border-indigo-500/30 rounded p-3 text-sm text-gray-300">
+                <div className="font-semibold text-indigo-300 mb-1">
+                  2. Withdrawal Provider
+                </div>
+                Which payout rail runs (e.g. Nuvei). Independent from your{" "}
+                <em>deposit</em> provider.
+              </div>
+              <div className="bg-indigo-500/10 border border-indigo-500/30 rounded p-3 text-sm text-gray-300">
+                <div className="font-semibold text-indigo-300 mb-1">
+                  3. Enable Automatic Withdrawals
+                </div>
+                <strong>ON</strong> = instant payouts. <strong>OFF</strong> =
+                every request waits for admin approval.
+              </div>
+            </div>
+          </div>
+
+          {/* Key concept: Enable Auto */}
+          <Card className="bg-amber-500/5 border-amber-500/30">
+            <CardHeader>
+              <CardTitle className="text-lg text-amber-300 flex items-center gap-2">
+                <Info className="h-5 w-5" />
+                First, understand the &quot;Enable Auto&quot; button
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300 text-sm">
+              <p>
+                On the user&apos;s saved bank account there is an{" "}
+                <strong>Enable Auto</strong> button. Clicking it links that
+                account to the payment provider (creates a Nuvei
+                &quot;UPO&quot;) so payouts can be sent <em>instantly</em>.
+              </p>
+              <ul className="space-y-1">
+                <li>
+                  • Account linked → badge shows{" "}
+                  <span className="text-emerald-400">
+                    Auto Withdrawals Enabled
+                  </span>
+                  .
+                </li>
+                <li>
+                  • Account not linked → badge shows{" "}
+                  <span className="text-amber-400">Manual Review Only</span>.
+                </li>
+              </ul>
+              <div className="bg-red-500/10 border border-red-500/30 rounded p-3">
+                <strong className="text-red-300">Important:</strong> When{" "}
+                <strong>Enable Automatic Withdrawals</strong> is ON, a bank
+                account that has <em>not</em> been linked cannot be paid
+                instantly — the user is asked to click &quot;Enable Auto&quot;
+                first. If you would rather review &amp; pay those by hand,
+                switch the platform to a <strong>manual</strong> mode (Scenarios
+                B or C below). In manual mode &quot;Enable Auto&quot; is never a
+                blocker.
+              </div>
+              <p>
+                You can also hide the button entirely with{" "}
+                <strong>
+                  &quot;Show &apos;Enable Auto&apos; Button to Users&quot;
+                </strong>{" "}
+                in the Withdrawal Methods card — useful for manual-only setups
+                so customers aren&apos;t offered a feature you don&apos;t use.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Scenario A */}
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-green-400 flex items-center gap-2">
+                <Zap className="h-5 w-5" />A. Fully automatic — Nuvei pays all
+                bank &amp; card withdrawals instantly
+              </CardTitle>
+              <CardDescription>
+                Best for hands-off operation. Users get money in 3–5 business
+                days with no admin action.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300 text-sm">
+              <div className="grid md:grid-cols-2 gap-2">
+                <div className="bg-gray-900 p-2 rounded">
+                  Send Withdrawals to Payment Provider →{" "}
+                  <span className="text-emerald-400 font-semibold">ON</span>
+                </div>
+                <div className="bg-gray-900 p-2 rounded">
+                  Withdrawal Provider →{" "}
+                  <span className="text-emerald-400 font-semibold">Nuvei</span>
+                </div>
+                <div className="bg-gray-900 p-2 rounded">
+                  Enable Automatic Withdrawals →{" "}
+                  <span className="text-emerald-400 font-semibold">ON</span>
+                </div>
+                <div className="bg-gray-900 p-2 rounded">
+                  Show &quot;Enable Auto&quot; Button →{" "}
+                  <span className="text-emerald-400 font-semibold">ON</span>{" "}
+                  (required)
+                </div>
+              </div>
+              <p>
+                <strong>How it behaves:</strong> Card refunds use the
+                user&apos;s original deposit card automatically. For bank
+                transfers, the user clicks <strong>Enable Auto</strong> once to
+                link the account, then every payout is instant. Unlinked
+                accounts are asked to Enable Auto first.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Scenario B */}
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-green-400 flex items-center gap-2">
+                <CheckCircle className="h-5 w-5" />B. Nuvei manual — you approve,
+                Nuvei pays
+              </CardTitle>
+              <CardDescription>
+                You want to review every withdrawal before money moves, but
+                still let Nuvei execute the transfer on approval.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300 text-sm">
+              <div className="grid md:grid-cols-2 gap-2">
+                <div className="bg-gray-900 p-2 rounded">
+                  Send Withdrawals to Payment Provider →{" "}
+                  <span className="text-emerald-400 font-semibold">ON</span>
+                </div>
+                <div className="bg-gray-900 p-2 rounded">
+                  Withdrawal Provider →{" "}
+                  <span className="text-emerald-400 font-semibold">Nuvei</span>
+                </div>
+                <div className="bg-gray-900 p-2 rounded">
+                  Enable Automatic Withdrawals →{" "}
+                  <span className="text-red-400 font-semibold">OFF</span>
+                </div>
+                <div className="bg-gray-900 p-2 rounded">
+                  Use Nuvei for Manual Withdrawals →{" "}
+                  <span className="text-emerald-400 font-semibold">ON</span>
+                </div>
+                <div className="bg-gray-900 p-2 rounded">
+                  Show &quot;Enable Auto&quot; Button →{" "}
+                  <span className="text-red-400 font-semibold">OFF</span> (not
+                  needed)
+                </div>
+              </div>
+              <p>
+                <strong>How it behaves:</strong> Every request lands in{" "}
+                <strong>Pending Withdrawals</strong> as{" "}
+                <em>Pending</em>. When you approve, Nuvei sends the payout
+                automatically. <strong>Enable Auto is NOT required</strong> —
+                any saved account works.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Scenario C */}
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-green-400 flex items-center gap-2">
+                <Building className="h-5 w-5" />C. Pure manual bank transfer —
+                you pay by hand
+              </CardTitle>
+              <CardDescription>
+                No provider is ever called. You transfer money yourself from
+                your company bank account. Ideal when your payout bank/provider
+                is not integrated.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300 text-sm">
+              <div className="grid md:grid-cols-2 gap-2">
+                <div className="bg-gray-900 p-2 rounded">
+                  Send Withdrawals to Payment Provider →{" "}
+                  <span className="text-red-400 font-semibold">OFF</span>
+                </div>
+                <div className="bg-gray-900 p-2 rounded">
+                  Show &quot;Enable Auto&quot; Button →{" "}
+                  <span className="text-gray-400 font-semibold">
+                    auto-hidden
+                  </span>
+                </div>
+              </div>
+              <p>
+                <strong>How it behaves:</strong> Card payouts are turned off
+                (no PSP to refund a card). Users <em>must</em> add a bank
+                account with the <strong>full</strong> set of details — account
+                holder, IBAN, BIC/SWIFT, bank name <em>and</em> bank address.
+                You see all of it in the request, transfer the Net Amount, then
+                mark the withdrawal <strong>Completed</strong>.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Scenario D */}
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-green-400 flex items-center gap-2">
+                <ArrowRight className="h-5 w-5" />D. Nuvei for deposits, but bank
+                / another rail for withdrawals
+              </CardTitle>
+              <CardDescription>
+                Deposits and withdrawals are fully independent — your deposit
+                provider does not have to be your payout provider.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300 text-sm">
+              <p>
+                Keep Nuvei active for deposits in{" "}
+                <strong>Payment Providers</strong>. For withdrawals choose one
+                of:
+              </p>
+              <ul className="space-y-1">
+                <li>
+                  • <strong>Another payout provider:</strong> pick it in{" "}
+                  <strong>Withdrawal Provider</strong> (only payout-capable
+                  providers appear in the list).
+                </li>
+                <li>
+                  • <strong>Manual bank transfer:</strong> turn the master
+                  switch <span className="text-red-400 font-semibold">OFF</span>{" "}
+                  (Scenario C) and pay from your own bank.
+                </li>
+              </ul>
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded p-3">
+                <strong className="text-blue-300">Atlas note:</strong> Atlas is
+                deposit-only (no payout API), so it never appears in the
+                Withdrawal Provider list. Customers who deposit with Atlas
+                withdraw via Nuvei or via manual bank transfer.
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* How to process manually */}
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-green-400 flex items-center gap-2">
+                <FileCheck className="h-5 w-5" />
+                How to manually process a withdrawal (step by step)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-gray-300 text-sm">
+              <ol className="space-y-1 list-decimal list-inside">
+                <li>
+                  Open <strong>Pending Withdrawals</strong> and click the
+                  request to expand its details.
+                </li>
+                <li>
+                  Read the <strong>User Bank Details for Transfer</strong> panel
+                  — it shows the full IBAN, BIC/SWIFT, bank name, bank address
+                  and the exact <strong>Amount to Transfer</strong> (net of
+                  fees).
+                </li>
+                <li>
+                  Log in to your company bank and send the Net Amount to that
+                  IBAN. (In Scenario B you instead click{" "}
+                  <strong>Approve</strong> and Nuvei sends it.)
+                </li>
+                <li>
+                  Come back and mark the withdrawal{" "}
+                  <strong>Completed</strong> (or <strong>Reject</strong> to
+                  refund the user&apos;s credits).
+                </li>
+              </ol>
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded p-3 mt-2">
+                <strong className="text-emerald-300">Tip:</strong> Use{" "}
+                <strong>Auto-Approval Rules</strong> (Manual Mode) to skip the
+                review step for small, trusted withdrawals while still keeping
+                large ones under manual control.
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick reference table */}
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-green-400">
+                Quick reference
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-gray-300 text-xs overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="text-left text-gray-400 border-b border-gray-700">
+                    <th className="p-2">Goal</th>
+                    <th className="p-2">Master switch</th>
+                    <th className="p-2">Provider</th>
+                    <th className="p-2">Auto Withdrawals</th>
+                    <th className="p-2">Enable-Auto button</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b border-gray-800">
+                    <td className="p-2">A. Instant via Nuvei</td>
+                    <td className="p-2 text-emerald-400">ON</td>
+                    <td className="p-2">Nuvei</td>
+                    <td className="p-2 text-emerald-400">ON</td>
+                    <td className="p-2 text-emerald-400">ON</td>
+                  </tr>
+                  <tr className="border-b border-gray-800">
+                    <td className="p-2">B. Approve, Nuvei pays</td>
+                    <td className="p-2 text-emerald-400">ON</td>
+                    <td className="p-2">Nuvei</td>
+                    <td className="p-2 text-red-400">OFF</td>
+                    <td className="p-2 text-red-400">OFF</td>
+                  </tr>
+                  <tr className="border-b border-gray-800">
+                    <td className="p-2">C. Pure manual bank</td>
+                    <td className="p-2 text-red-400">OFF</td>
+                    <td className="p-2">—</td>
+                    <td className="p-2">—</td>
+                    <td className="p-2 text-gray-500">hidden</td>
+                  </tr>
+                  <tr>
+                    <td className="p-2">D. Other rail / mixed</td>
+                    <td className="p-2 text-emerald-400">ON/OFF</td>
+                    <td className="p-2">Other / —</td>
+                    <td className="p-2">per provider</td>
+                    <td className="p-2">optional</td>
+                  </tr>
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        </div>
+      ),
+    },
+
     // ==================== NOTIFICATIONS ====================
     {
       id: "notifications",

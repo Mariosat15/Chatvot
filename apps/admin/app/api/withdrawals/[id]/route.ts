@@ -269,15 +269,31 @@ export async function PUT(
             const wSettings = await WithdrawalSettings.getSingleton();
             const routing = resolveWithdrawalRouting(wSettings);
 
-            if (!routing.sendToProvider) {
-              // Master switch OFF — never call a PSP. Admin pays out manually.
+            // Decide whether to call the payout provider for this admin-processed
+            // withdrawal. Reason: "Use <provider> for Manual Withdrawals"
+            // (usePaymentProcessorForManual) is the switch that controls whether
+            // the PSP runs in the manual workflow. We only call the provider when:
+            //   • the master switch is ON, AND
+            //   • automatic processing is enabled for the provider, OR the admin
+            //     explicitly opted to route MANUAL withdrawals through it.
+            // Otherwise this is a pure-manual payout — the admin sends the money
+            // by hand and then marks the withdrawal COMPLETED (no PSP call).
+            const useProvider =
+              routing.sendToProvider &&
+              (routing.canAutoProcess ||
+                wSettings.usePaymentProcessorForManual === true);
+
+            if (!useProvider) {
+              const why = !routing.sendToProvider
+                ? "outgoing provider payouts are disabled"
+                : `${routing.providerLabel} is not used for manual withdrawals`;
               console.log(
-                `🛠️ Withdrawal ${withdrawal._id} processed in manual mode (outgoing provider payouts disabled).`,
+                `🛠️ Withdrawal ${withdrawal._id} processed in manual mode (${why}).`,
               );
               withdrawal.payoutProvider = "manual";
               withdrawal.adminNote =
                 (withdrawal.adminNote || "") +
-                `\nℹ️ Outgoing provider payouts are disabled — pay this withdrawal manually (bank transfer to the user's bank details), then mark COMPLETED.`;
+                `\nℹ️ Manual payout — pay this withdrawal yourself (bank transfer / card refund to the user's details), then mark COMPLETED. No payment provider was called.`;
             } else {
               const { getPayoutAdapter } = await import(
                 "@/lib/services/payout/payout-adapter-registry"

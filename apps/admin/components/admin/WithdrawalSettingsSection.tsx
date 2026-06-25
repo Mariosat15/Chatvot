@@ -686,8 +686,10 @@ export default function WithdrawalSettingsSection() {
                         Use Nuvei for Manual Withdrawals
                       </h3>
                       <p className="text-sm text-gray-400">
-                        When enabled, withdrawal requests are sent to Nuvei.
-                        Admin approval triggers the actual payout.
+                        When ON, the request is stored in ChartVolt first —
+                        Nuvei is only called to send the money when you
+                        approve/process it. When OFF, you pay the user yourself
+                        (no Nuvei call).
                       </p>
                     </div>
                   </div>
@@ -709,20 +711,21 @@ export default function WithdrawalSettingsSection() {
                         </p>
                         <ul className="mt-2 space-y-1 text-blue-300/80">
                           <li>
-                            1. User requests withdrawal → Request created in
-                            Nuvei (PENDING)
+                            1. User requests withdrawal → Request stored in
+                            ChartVolt (PENDING). Nothing is sent to Nuvei yet.
                           </li>
-                          <li>2. Admin reviews request in your dashboard</li>
+                          <li>2. Admin reviews the request in your dashboard</li>
                           <li>
-                            3. Admin approves → Nuvei receives approval and
-                            processes the payout
-                          </li>
-                          <li>
-                            4. Admin declines → Nuvei cancels the request,
-                            credits refunded
+                            3. Admin approves/processes → ChartVolt calls Nuvei
+                            to send the payout
                           </li>
                           <li>
-                            • Nuvei handles the actual money transfer to user
+                            4. Admin declines → Request rejected, credits
+                            refunded (no Nuvei payout)
+                          </li>
+                          <li>
+                            • Nuvei moves the money once you approve — you never
+                            transfer it by hand
                           </li>
                         </ul>
                       </div>
