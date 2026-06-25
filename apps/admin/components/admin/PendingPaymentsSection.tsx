@@ -388,7 +388,9 @@ export default function PendingPaymentsSection() {
       "User",
       "Email",
       "Credits",
-      "EUR Amount",
+      "Total Charged (EUR)",
+      "VAT (EUR)",
+      "Fee (EUR)",
       "Status",
       "Provider",
       "Payment Method",
@@ -402,16 +404,24 @@ export default function PendingPaymentsSection() {
       (p.metadata?.totalCharged || p.metadata?.eurAmount || p.amount).toFixed(
         2,
       ),
+      // Reason: break VAT and platform fee out as their own numeric columns so
+      // the admin can sum/audit the fees the customer paid directly in Excel.
+      typeof p.metadata?.vatAmount === "number"
+        ? p.metadata.vatAmount.toFixed(2)
+        : "",
+      typeof p.metadata?.platformFeeAmount === "number"
+        ? p.metadata.platformFeeAmount.toFixed(2)
+        : "",
       p.status,
       p.metadata?.paymentProvider || "N/A",
       p.paymentMethod || "N/A",
       p.paymentIntentId || "N/A",
     ]);
 
-    // Reason: numeric columns (Credits, EUR Amount) are emitted UNQUOTED so
-    // Excel treats them as numbers for SUM/formulas; text columns are quoted
-    // and escaped. BOM prefix forces UTF-8 in Excel.
-    const numericCols = new Set([3, 4]);
+    // Reason: numeric columns (Credits, Total Charged, VAT, Fee) are emitted
+    // UNQUOTED so Excel treats them as numbers for SUM/formulas; text columns
+    // are quoted and escaped. BOM prefix forces UTF-8 in Excel.
+    const numericCols = new Set([3, 4, 5, 6]);
     const csv =
       "\uFEFF" +
       [

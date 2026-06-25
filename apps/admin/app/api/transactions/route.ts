@@ -65,16 +65,23 @@ export async function GET(request: NextRequest) {
       },
     ]);
 
-    // Get status breakdown
-    const statusBreakdown = await WalletTransaction.aggregate([
-      { $match: query },
-      {
-        $group: {
-          _id: "$status",
-          count: { $sum: 1 },
-        },
+    // Status breakdown.
+    // Reason: a withdrawal's DISPLAYED status is RE-DERIVED from its
+    // WithdrawalRequest after the DB query (and the status filter is applied
+    // post-enrichment). A raw `$status` aggregation over the wallet query would
+    // therefore disagree with the rows actually shown — e.g. filtering by
+    // "completed" could still tally withdrawals by their stale raw status.
+    // Computing the breakdown from the enriched, already-status-filtered merged
+    // set makes the summary 100% consistent with the rows, totals, and exports.
+    const byStatus = allTransactions.reduce(
+      (acc, t) => {
+        const s = String(t.status || "unknown");
+        // eslint-disable-next-line security/detect-object-injection
+        acc[s] = (acc[s] || 0) + 1;
+        return acc;
       },
-    ]);
+      {} as Record<string, number>,
+    );
 
     return NextResponse.json({
       success: true,
@@ -101,13 +108,7 @@ export async function GET(request: NextRequest) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             {} as Record<string, any>,
           ),
-          byStatus: statusBreakdown.reduce(
-            (acc, s) => {
-              acc[s._id] = s.count;
-              return acc;
-            },
-            {} as Record<string, number>,
-          ),
+          byStatus,
         },
       },
     });

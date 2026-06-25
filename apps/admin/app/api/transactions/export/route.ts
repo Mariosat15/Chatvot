@@ -4,6 +4,7 @@ import { connectToDatabase } from "@/database/mongoose";
 import CreditConversionSettings from "@/database/models/credit-conversion-settings.model";
 import {
   streamMergedTransactions,
+  extractFeeBreakdown,
   type MergedTransaction,
 } from "@/lib/services/transaction-history.service";
 
@@ -97,6 +98,9 @@ export async function GET(request: NextRequest) {
       "User Email",
       "Amount (Credits)",
       "Amount (EUR)",
+      "VAT (EUR)",
+      "Fee (EUR)",
+      "Total Charged (EUR)",
       "Status",
       "Description",
       "Payment Method",
@@ -132,6 +136,11 @@ export async function GET(request: NextRequest) {
           ? -Math.abs(rawAmountEUR)
           : Math.abs(rawAmountEUR);
 
+      // Reason: surface the fee breakdown (VAT / platform fee / gross total) as
+      // dedicated numeric columns instead of burying them in the description, so
+      // the admin can sum/audit fees directly in Excel. Blank when not a fee row.
+      const fees = extractFeeBreakdown(tx);
+
       const cells = [
         tx._id.toString(),
         formatDate(tx.createdAt),
@@ -142,6 +151,9 @@ export async function GET(request: NextRequest) {
         userInfo.email || "Unknown",
         (tx.amount || 0).toFixed(2),
         amountEUR.toFixed(2),
+        fees.vatEUR !== null ? fees.vatEUR.toFixed(2) : "",
+        fees.feeEUR !== null ? fees.feeEUR.toFixed(2) : "",
+        fees.totalChargedEUR !== null ? fees.totalChargedEUR.toFixed(2) : "",
         tx.status,
         tx.description || "",
         tx.paymentMethod || "",

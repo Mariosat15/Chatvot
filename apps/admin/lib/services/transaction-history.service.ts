@@ -66,6 +66,59 @@ const PLATFORM_TYPES = [
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type MergedTransaction = Record<string, any>;
 
+// Reason: coerce metadata values that may arrive as numbers OR strings
+// (Stripe stores vat/fee metadata as strings, Nuvei/Atlas as numbers).
+function toNumberOrNull(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = typeof value === "string" ? parseFloat(value) : typeof value === "number" ? value : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+export interface FeeBreakdown {
+  vatEUR: number | null;
+  feeEUR: number | null;
+  totalChargedEUR: number | null;
+}
+
+/**
+ * Extract the per-transaction fee breakdown (VAT, platform fee, gross total) in
+ * EUR from a merged transaction's metadata. Provider-agnostic — Nuvei, Atlas and
+ * Stripe deposits all store the same metadata keys. Returns nulls for rows that
+ * carry no fee data so reports can leave those cells blank (and Excel SUM skips
+ * them) rather than emitting misleading zeros.
+ *
+ * - deposit:    VAT = metadata.vatAmount, Fee = metadata.platformFeeAmount,
+ *               Total Charged = metadata.totalCharged (= base + VAT + fee).
+ * - withdrawal: Fee = platformFee + bankFee deducted, Total = gross amountEUR
+ *               debited (no VAT on payouts).
+ */
+export function extractFeeBreakdown(tx: MergedTransaction): FeeBreakdown {
+  const m = tx?.metadata || {};
+  const txType = tx?.transactionType;
+
+  if (txType === "deposit" || txType === "manual_deposit_credit") {
+    return {
+      vatEUR: toNumberOrNull(m.vatAmount),
+      feeEUR: toNumberOrNull(m.platformFeeAmount),
+      totalChargedEUR: toNumberOrNull(m.totalCharged),
+    };
+  }
+
+  if (txType === "withdrawal") {
+    const platformFee = toNumberOrNull(m.platformFee);
+    const bankFee = toNumberOrNull(m.bankFee);
+    const fee =
+      platformFee !== null || bankFee !== null ? (platformFee ?? 0) + (bankFee ?? 0) : null;
+    return {
+      vatEUR: null,
+      feeEUR: fee,
+      totalChargedEUR: toNumberOrNull(m.amountEUR),
+    };
+  }
+
+  return { vatEUR: null, feeEUR: null, totalChargedEUR: null };
+}
+
 export interface MergedTransactionsResult {
   transactions: MergedTransaction[];
   // The exact WalletTransaction query used — reused by the list route for
@@ -94,9 +147,35 @@ async function buildWalletQuery(
   let searchIsUserScoped = false;
 
   if (type && type !== "all") query.transactionType = type;
-  if (status && status !== "all") query.status = status;
   if (userId) query.userId = userId;
   if (competitionId) query.competitionId = competitionId;
+
+  // Conditions AND-ed together. Kept in an array so the search filter and the
+  // withdrawal-aware status filter below don't clobber each other's `$or`.
+  const andConditions: Record<string, unknown>[] = [];
+
+  // Reason: a withdrawal's DISPLAYED status is re-derived from its
+  // WithdrawalRequest (the source of truth) AFTER this query runs (see the
+  // enrichment in fetchMergedTransactions). Filtering withdrawals by their raw
+  // WalletTransaction.status HERE would both (a) leak failed/cancelled
+  // withdrawals into a "completed" report and (b) hide truly-completed ones
+  // whose raw row still says pending. So withdrawals are NOT status-constrained
+  // at the DB level — the final status filter is applied post-enrichment.
+  // Non-withdrawal rows are still filtered here for efficiency.
+  if (status && status !== "all") {
+    if (type === "withdrawal") {
+      // no DB status constraint; filtered on enriched status post-fetch
+    } else if (!type || type === "all") {
+      andConditions.push({
+        $or: [
+          { transactionType: { $ne: "withdrawal" }, status },
+          { transactionType: "withdrawal" },
+        ],
+      });
+    } else {
+      query.status = status;
+    }
+  }
 
   if (search && search.trim()) {
     // Reason: userInfo.email/name are NOT stored on WalletTransaction — they're
@@ -145,7 +224,7 @@ async function buildWalletQuery(
       searchConditions.push({ userId: { $regex: safeSearch, $options: "i" } });
     }
 
-    query.$or = searchConditions;
+    andConditions.push({ $or: searchConditions });
   }
 
   // Reason: endDate is inclusive of the whole day. Without end-of-day, a raw
@@ -167,6 +246,8 @@ async function buildWalletQuery(
     if (minAmount) query.amount.$gte = parseFloat(minAmount);
     if (maxAmount) query.amount.$lte = parseFloat(maxAmount);
   }
+
+  if (andConditions.length > 0) query.$and = andConditions;
 
   return { query, searchIsUserScoped };
 }
@@ -410,7 +491,17 @@ export async function fetchMergedTransactions(
     return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
   });
 
-  return { transactions, walletQuery: query, sortOrder };
+  // Reason: apply the status filter on the FINAL (post-enrichment) status so a
+  // "completed" report shows only genuinely completed rows — withdrawals whose
+  // displayed status was re-derived from the WithdrawalRequest are now correctly
+  // included/excluded. Without this, raw-status DB filtering leaked
+  // failed/cancelled withdrawals into the "completed" view and export.
+  const finalStatus = status && status !== "all" ? status : null;
+  const finalTransactions = finalStatus
+    ? transactions.filter((t) => t.status === finalStatus)
+    : transactions;
+
+  return { transactions: finalTransactions, walletQuery: query, sortOrder };
 }
 
 /**

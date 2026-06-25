@@ -36,6 +36,42 @@ function csvField(value: string): string {
  * Reason: We use CSV instead of xlsx to avoid adding a heavy dependency.
  * CSV opens in Excel by default on Windows and is universally compatible.
  */
+// Reason: coerce metadata values that may be numbers OR strings (Stripe stores
+// fee metadata as strings; Nuvei/Atlas as numbers).
+function metaNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = typeof value === "string" ? parseFloat(value) : typeof value === "number" ? value : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Extract the fees a customer paid on a transaction, from its metadata.
+ * - deposit:    VAT = vatAmount, Fee = platformFeeAmount, Total = totalCharged.
+ * - withdrawal: Fee = platformFee + bankFee deducted, Total = gross amountEUR.
+ * Returns nulls where no fee applies so reports leave the cell blank.
+ */
+function extractUserFees(tx: Transaction): {
+  vat: number | null;
+  fee: number | null;
+  total: number | null;
+} {
+  const m = tx.metadata || {};
+  if (tx.transactionType === "deposit" || tx.transactionType === "manual_deposit_credit") {
+    return {
+      vat: metaNumber(m.vatAmount),
+      fee: metaNumber(m.platformFeeAmount),
+      total: metaNumber(m.totalCharged),
+    };
+  }
+  if (tx.transactionType === "withdrawal") {
+    const pf = metaNumber(m.platformFee);
+    const bf = metaNumber(m.bankFee);
+    const fee = pf !== null || bf !== null ? (pf ?? 0) + (bf ?? 0) : null;
+    return { vat: null, fee, total: metaNumber(m.amountEUR) };
+  }
+  return { vat: null, fee: null, total: null };
+}
+
 function exportTransactionsToCSV(
   transactions: Transaction[],
   creditName: string,
@@ -48,6 +84,9 @@ function exportTransactionsToCSV(
     "Description",
     `Amount (${creditName})`,
     `Amount (${currencySymbol})`,
+    `VAT (${currencySymbol})`,
+    `Fee (${currencySymbol})`,
+    `Total Charged (${currencySymbol})`,
     "Status",
     "Payment Method",
   ];
@@ -96,12 +135,18 @@ function exportTransactionsToCSV(
     const eurAmount = creditsToEUR(Math.abs(tx.amount)).toFixed(2);
     const eurSigned = tx.amount >= 0 ? eurAmount : `-${eurAmount}`;
     const status = statusLabels[tx.status] || tx.status;
+    // Reason: expose fees as their own numeric columns so the user can audit /
+    // sum VAT and fees in Excel rather than reading them from the description.
+    const fees = extractUserFees(tx);
     return [
       csvField(date),
       csvField(type),
       csvField(desc),
       amount,
       eurSigned,
+      fees.vat !== null ? fees.vat.toFixed(2) : "",
+      fees.fee !== null ? fees.fee.toFixed(2) : "",
+      fees.total !== null ? fees.total.toFixed(2) : "",
       status,
       tx.paymentMethod || "",
     ].join(",");
@@ -1023,6 +1068,28 @@ function TransactionItem({
               {transaction.description}
             </p>
           )}
+
+          {/* Deposit fee breakdown — surface VAT and the fee the customer paid
+              as explicit values rather than only inside the description text. */}
+          {transaction.transactionType === "deposit" &&
+          transaction.metadata &&
+          (transaction.metadata.totalCharged ||
+            transaction.metadata.vatAmount ||
+            transaction.metadata.platformFeeAmount) ? (
+            <p className="text-xs text-gray-400 truncate">
+              {(() => {
+                const sym = settings?.currency?.symbol || "€";
+                const vat = Number(transaction.metadata.vatAmount) || 0;
+                const fee = Number(transaction.metadata.platformFeeAmount) || 0;
+                const total = Number(transaction.metadata.totalCharged) || 0;
+                const parts: string[] = [];
+                if (total) parts.push(`Total paid: ${sym}${total.toFixed(2)}`);
+                if (vat) parts.push(`VAT ${sym}${vat.toFixed(2)}`);
+                if (fee) parts.push(`Fee ${sym}${fee.toFixed(2)}`);
+                return parts.join(" • ");
+              })()}
+            </p>
+          ) : null}
 
           {/* Show failure/cancel reason for failed transactions */}
           {(transaction.status === "failed" ||
