@@ -112,11 +112,18 @@ interface UserReconciliationDetail {
     withdrawals: number;
     competitionJoins: number;
     competitionWins: number;
+    competitionRefunds?: number; // Entry fees returned on cancelled competitions
     challengeJoins: number;
     challengeWins: number;
+    challengeRefunds?: number; // Entry fees returned on cancelled/declined challenges
     marketplacePurchases: number;
     adminAdjustments: number;
-    refunds: number;
+    withdrawalRefunds?: number; // Credits returned on failed/cancelled withdrawals
+    manualCredits?: number; // Admin manual_deposit_credit rows
+    platformFees?: number; // Platform/withdrawal fee rows
+    incidentCompensations?: number; // Incident compensation credits
+    chargebackClawbacks?: number; // Credits reversed after a lost chargeback
+    refunds: number; // Legacy: combined refund count
     gmCompetitionEarnings?: number; // GM earnings from competition referrals
     gmChallengeEarnings?: number; // GM earnings from challenge referrals
     other: number;

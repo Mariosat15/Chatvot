@@ -4039,10 +4039,12 @@ export default function FinancialDashboard() {
                 <div>
                   <CardTitle className="text-white text-xl flex items-center gap-2">
                     <Wallet className="h-5 w-5 text-green-400" />
-                    User Wallets ({wallets.length})
+                    Top Client Wallets by Balance ({wallets.length})
                   </CardTitle>
                   <CardDescription>
-                    View all user credit balances and activity
+                    Showing the {wallets.length} highest credit balances. Platform
+                    totals above (liability, coverage) are calculated across all
+                    wallets. Use the search to find a specific client.
                   </CardDescription>
                 </div>
                 <div className="relative">

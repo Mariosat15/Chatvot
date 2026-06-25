@@ -43,7 +43,11 @@ export async function GET(request: NextRequest) {
 
     await connectToDatabase();
 
-    // Get all user wallets
+    // Get the top user wallets for the per-client display table ONLY.
+    // Reason: This capped list drives the "Top 100 clients by balance" table in the
+    // UI. It must NEVER be used to compute platform-wide totals (liability, credits
+    // in circulation, deposits, withdrawals) — those are aggregated across ALL
+    // wallets via PlatformFinancialsService.getFinancialStats() below.
     const wallets = await CreditWallet.find()
       .sort({ creditBalance: -1 })
       .limit(100)
@@ -267,19 +271,15 @@ export async function GET(request: NextRequest) {
     ];
     const txUsersMap = await getUsersByIds(txUserIds);
 
-    // Calculate totals from wallets (including both competitions and challenges)
-    const totalCreditsInCirculation = wallets.reduce(
-      (sum, w) => sum + (w.creditBalance || 0),
-      0,
-    );
-    const totalDeposited = wallets.reduce(
-      (sum, w) => sum + (w.totalDeposited || 0),
-      0,
-    );
-    const totalWithdrawn = wallets.reduce(
-      (sum, w) => sum + (w.totalWithdrawn || 0),
-      0,
-    );
+    // Reason: Platform-wide liability/flow totals MUST be aggregated across the
+    // ENTIRE CreditWallet collection, not the capped top-100 display list fetched
+    // above. `getFinancialStats()` runs a DB-side $group over all wallets, so we
+    // reuse those values. Summing the capped list previously UNDERSTATED what the
+    // platform owes users whenever there were more than 100 funded wallets, and
+    // produced two contradictory "total user credits" numbers on the same page.
+    const totalCreditsInCirculation = platformFinancialStats.totalUserCredits;
+    const totalDeposited = platformFinancialStats.totalUserDeposits;
+    const totalWithdrawn = platformFinancialStats.totalUserWithdrawals;
 
     // Reason: Use WalletTransaction as SINGLE source of truth for ALL financial totals.
     // CreditWallet fields were historically polluted by refunds.
@@ -409,8 +409,12 @@ export async function GET(request: NextRequest) {
     const activeChalPools = activeChalPoolAgg[0] || { totalPool: 0, totalWinnersShare: 0, count: 0 };
 
     // Calculate liability metrics
+    // Reason: Use the EUR liability computed by getFinancialStats() (aggregated over
+    // ALL wallets) instead of dividing the capped circulation figure, keeping the
+    // liability block consistent with coverageRatio/theoreticalBankBalance which are
+    // also global. This removes the global-vs-capped contradiction in the solvency UI.
     const conversionRate = conversionSettings.eurToCreditsRate;
-    const totalLiabilityEUR = totalCreditsInCirculation / conversionRate;
+    const totalLiabilityEUR = platformFinancialStats.totalUserCreditsEUR;
 
     const activeCompPoolObligationEUR = activeCompPools.totalWinnersShare / conversionRate;
     const activeChalPoolObligationEUR = activeChalPools.totalWinnersShare / conversionRate;

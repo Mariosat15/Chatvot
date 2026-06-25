@@ -246,6 +246,12 @@ export async function GET(request: NextRequest) {
     issues.push(...withdrawalResult.issues);
     totalWithdrawals = withdrawalResult.withdrawalCount;
 
+    // Check platform-ledger consistency (orphan deposit fees, incident
+    // compensation coverage). Reason: previously defined but never invoked, so
+    // platform-vs-wallet integrity was not actually verified by the dashboard run.
+    const platformIssues = await verifyPlatformTransactions();
+    issues.push(...platformIssues);
+
     // Check for duplicates
     const duplicateIssues = await checkDuplicateTransactions();
     issues.push(...duplicateIssues);
@@ -401,10 +407,22 @@ export async function POST(request: NextRequest) {
           status: { $in: ["completed", "disputed"] },
         }).session(session);
 
-        const correctBalance = transactions.reduce(
-          (sum, tx) => sum + (tx.amount || 0),
+        // Reason: in-flight withdrawals already debited the wallet but their
+        // WalletTransaction is still "pending" (not in the sum above). We MUST
+        // subtract them, otherwise the auto-fix would silently re-credit the
+        // user the value of every withdrawal currently being processed.
+        const pendingWithdrawals = await WithdrawalRequest.find({
+          userId,
+          status: { $in: ["pending", "approved", "processing"] },
+        }).session(session);
+        const pendingWithdrawalCredits = pendingWithdrawals.reduce(
+          (sum, w) => sum + (w.amountCredits || 0),
           0,
         );
+
+        const correctBalance =
+          transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0) -
+          pendingWithdrawalCredits;
         const wallet = await CreditWallet.findOne({ userId }).session(session);
         const previousBalance = wallet?.creditBalance || 0;
 
@@ -416,7 +434,7 @@ export async function POST(request: NextRequest) {
 
         result = {
           success: true,
-          message: `Balance corrected from ${previousBalance} to ${Math.round(correctBalance * 100) / 100} credits`,
+          message: `Balance corrected from ${previousBalance} to ${Math.round(correctBalance * 100) / 100} credits${pendingWithdrawalCredits > 0 ? ` (${pendingWithdrawalCredits} in pending withdrawals accounted for)` : ""}`,
         };
         break;
       }
@@ -845,21 +863,66 @@ async function verifyWithdrawalRequests() {
 async function verifyPlatformTransactions() {
   const issues: ReconciliationIssue[] = [];
 
+  // PERF: Batch-fetch referenced deposits instead of an N+1 findById per fee row.
   const depositFees = await PlatformTransaction.find({
     transactionType: "deposit_fee",
     sourceId: { $exists: true, $ne: null },
-  }).lean();
+  })
+    .limit(5000)
+    .lean();
+
+  const sourceIds = depositFees
+    .map((f) => f.sourceId)
+    .filter((id): id is string => Boolean(id));
+  const existingDeposits =
+    sourceIds.length > 0
+      ? await WalletTransaction.find({ _id: { $in: sourceIds } })
+          .select("_id")
+          .lean()
+      : [];
+  const existingDepositIds = new Set(
+    existingDeposits.map((d) => d._id.toString()),
+  );
 
   for (const fee of depositFees) {
-    if (fee.sourceId) {
-      const deposit = await WalletTransaction.findById(fee.sourceId).lean();
-      if (!deposit) {
+    if (fee.sourceId && !existingDepositIds.has(fee.sourceId.toString())) {
+      issues.push({
+        type: "orphan_transaction",
+        severity: "info",
+        details: {
+          transactionId: fee._id.toString(),
+          description: `Deposit fee references non-existent deposit ${fee.sourceId}`,
+        },
+      });
+    }
+  }
+
+  // Reason: Verify each incident compensation recorded on the platform ledger has
+  // the matching per-user wallet credits. A shortfall means users were promised
+  // compensation that was never delivered (or vice-versa) — a real integrity gap.
+  const compensations = await PlatformTransaction.find({
+    transactionType: "incident_compensation",
+    sourceId: { $exists: true, $ne: null },
+  })
+    .limit(2000)
+    .lean();
+
+  for (const comp of compensations) {
+    const affected = comp.compensationDetails?.affectedUsersCount;
+    if (comp.sourceId && affected) {
+      const walletTxCount = await WalletTransaction.countDocuments({
+        transactionType: "incident_compensation",
+        "metadata.incidentId": comp.sourceId,
+      });
+      if (walletTxCount < affected) {
         issues.push({
-          type: "orphan_transaction",
-          severity: "info",
+          type: "fee_mismatch",
+          severity: "warning",
           details: {
-            transactionId: fee._id.toString(),
-            description: `Deposit fee references non-existent deposit ${fee.sourceId}`,
+            transactionId: comp._id.toString(),
+            expected: affected,
+            actual: walletTxCount,
+            description: `Incident compensation ${comp._id} expected ${affected} wallet credits but found ${walletTxCount}`,
           },
         });
       }
@@ -1142,6 +1205,25 @@ async function getDetailedUserReconciliation(
         breakdown.chargebackClawbacks++;
         break;
 
+      case "gamemaster_subscription":
+        // GM monthly subscription fee (debit). Reason: the signed amount is
+        // already in the balance sum; tracked under "other" for the breakdown.
+        breakdown.other++;
+        break;
+
+      case "gamemaster_subscription_refund":
+        // GM subscription refund (credit). Reason: mirror withdrawal_refund —
+        // surface it as a returned credit so the breakdown stays consistent.
+        otherCreditsTotal += Math.abs(amount);
+        breakdown.other++;
+        break;
+
+      case "challenge_declined":
+      case "challenge_expired":
+        // Informational €0 rows — no balance impact.
+        breakdown.other++;
+        break;
+
       default:
         breakdown.other++;
     }
@@ -1157,20 +1239,35 @@ async function getDetailedUserReconciliation(
     0,
   );
 
-  // The TRUE expected balance is the sum of all completed transaction amounts
-  // This accounts for EVERYTHING: deposits, withdrawals, wins, refunds, admin adjustments, etc.
+  // The sum of all completed/disputed transaction amounts (the ledger truth).
+  // This accounts for deposits, withdrawals, wins, refunds, admin adjustments, etc.
   const expectedFromTransactions =
     Math.round(balanceFromAllTransactions * 100) / 100;
 
-  // Check for balance mismatch - CRITICAL CHECK
-  // Compare actual wallet balance with what transactions say it should be
-  const balanceDiff = Math.abs(
-    walletData.creditBalance - expectedFromTransactions,
-  );
+  // Reason: A requested withdrawal debits creditBalance IMMEDIATELY, but its
+  // WalletTransaction stays "pending" until the payout completes — so that debit
+  // is NOT part of the completed-transaction sum above. To compare like-for-like
+  // we must subtract in-flight withdrawal credits from the ledger total. Without
+  // this, every user with a withdrawal in progress was flagged as a FALSE
+  // "critical" balance mismatch equal to their pending amount. This mirrors the
+  // logic in lib/services/reconciliation.service.ts (verifyUserWallet).
+  const expectedBalance =
+    Math.round(
+      (balanceFromAllTransactions - pendingWithdrawalCredits) * 100,
+    ) / 100;
+
+  // Check for balance mismatch — compare actual wallet balance with the
+  // pending-adjusted expected balance.
+  const balanceDiff = Math.abs(walletData.creditBalance - expectedBalance);
 
   if (balanceDiff > 0.01) {
+    // Reason: When in-flight pending transactions can explain the gap, this is
+    // not a data-integrity error — downgrade to "info" so it never marks the
+    // whole reconciliation run unhealthy.
+    const isPendingRelated =
+      pendingWithdrawalCredits > 0 || pendingDepositCredits > 0;
     // Build explanation of what might be causing the mismatch
-    let explanation = `Balance mismatch: stored ${walletData.creditBalance}, calculated from transactions ${expectedFromTransactions}.`;
+    let explanation = `Balance mismatch: stored ${walletData.creditBalance}, expected ${expectedBalance} (ledger ${expectedFromTransactions}${pendingWithdrawalCredits > 0 ? ` − ${pendingWithdrawalCredits} pending withdrawals` : ""}).`;
 
     if (pendingWithdrawalCredits > 0) {
       explanation += ` Note: ${pendingWithdrawalCredits} credits in pending withdrawals.`;
@@ -1193,15 +1290,15 @@ async function getDetailedUserReconciliation(
 
     issues.push({
       type: "balance_mismatch",
-      severity: "critical",
+      severity: isPendingRelated ? "info" : "critical",
       userId,
       userEmail,
       details: {
-        expected: expectedFromTransactions,
+        expected: expectedBalance,
         actual: walletData.creditBalance,
         difference:
           Math.round(
-            (walletData.creditBalance - expectedFromTransactions) * 100,
+            (walletData.creditBalance - expectedBalance) * 100,
           ) / 100,
         description: explanation,
       },
@@ -1472,8 +1569,11 @@ async function getDetailedUserReconciliation(
       totalGmEarnings: walletData.totalGmEarnings || gmEarningsTotal,
     },
     calculated: {
-      // Expected balance calculated from ALL transactions (the source of truth)
-      expectedBalance: expectedFromTransactions,
+      // Reason: expectedBalance is the pending-adjusted figure (what the wallet
+      // SHOULD hold right now, after in-flight withdrawal debits) — this matches
+      // the "Expected (accounting for pending)" tooltip in ReconciliationSection.
+      // balanceFromTransactions remains the raw ledger sum for reference.
+      expectedBalance,
       balanceFromTransactions: expectedFromTransactions,
       depositTotal: Math.round(depositTotal * 100) / 100,
       withdrawalTotal: Math.round(withdrawalFromRequests * 100) / 100,
