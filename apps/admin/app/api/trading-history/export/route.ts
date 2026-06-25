@@ -116,6 +116,18 @@ export async function GET(request: NextRequest) {
       filteredTrades = filteredTrades.filter((t) => t.challengeId);
     }
 
+    // Escape a CSV value (RFC 4180): wrap in quotes if it contains a comma,
+    // quote or newline. Reason: contest names / symbols / close reasons can
+    // contain commas which would otherwise shift the numeric columns and break
+    // Excel formulas over the PnL columns.
+    const csvCell = (value: unknown): string => {
+      const s = value === null || value === undefined ? "" : String(value);
+      if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return s;
+    };
+
     // Build CSV
     const headers = [
       "Trade ID",
@@ -175,14 +187,18 @@ export async function GET(request: NextRequest) {
         trade.openedAt ? new Date(trade.openedAt).toISOString() : "",
         trade.closedAt ? new Date(trade.closedAt).toISOString() : "",
         trade.isWinner ? "Yes" : "No",
-      ].join(",");
+      ]
+        .map(csvCell)
+        .join(",");
     });
 
-    const csv = [headers.join(","), ...rows].join("\n");
+    // Reason: BOM prefix tells Excel to read the file as UTF-8 so names with
+    // accents/non-ASCII render correctly.
+    const csv = "\uFEFF" + [headers.join(","), ...rows].join("\n");
 
     return new NextResponse(csv, {
       headers: {
-        "Content-Type": "text/csv",
+        "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="trading-history-${new Date().toISOString().split("T")[0]}.csv"`,
       },
     });

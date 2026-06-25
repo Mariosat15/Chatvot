@@ -44,14 +44,23 @@ export interface TransactionFilters {
 }
 
 // Platform transaction types that live in the PlatformTransaction collection.
+// Reason: must cover EVERY PlatformTransaction.transactionType so that
+// filtering by any of these returns its platform rows (previously
+// challenge_platform_fee / retained_gm_fee / refund / chargeback_loss were
+// missing here, so selecting those filters silently returned nothing).
 const PLATFORM_TYPES = [
   "admin_withdrawal",
   "platform_fee",
+  "challenge_platform_fee",
   "unclaimed_pool",
   "deposit_fee",
   "withdrawal_fee",
   "admin_balance_add",
   "custom_expense",
+  "retained_gm_fee",
+  "refund",
+  "refund_clawback",
+  "chargeback_loss",
 ];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

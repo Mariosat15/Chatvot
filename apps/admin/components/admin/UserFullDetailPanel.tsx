@@ -16,6 +16,7 @@ import {
   Pin,
   PinOff,
   RefreshCw,
+  Download,
   FileText,
   Ban,
   MailCheck,
@@ -560,6 +561,45 @@ export default function UserFullDetailPanel({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, user.id]);
+
+  // Download this user's transactions as CSV, honouring the active filters.
+  // Reason: reuses the SAME streaming export endpoint as the Financials tab
+  // (scoped by userId) so the report matches the on-screen rows and the numbers
+  // are plain signed values that calculate correctly in Excel.
+  const [userTxsExporting, setUserTxsExporting] = useState(false);
+  const handleExportUserTransactions = useCallback(async () => {
+    if (!user.id) return;
+    setUserTxsExporting(true);
+    try {
+      const params = new URLSearchParams({ userId: user.id });
+      if (userTxFilters.type !== "all") params.set("type", userTxFilters.type);
+      if (userTxFilters.status !== "all") params.set("status", userTxFilters.status);
+      if (userTxFilters.search) params.set("search", userTxFilters.search);
+      if (userTxFilters.startDate) params.set("startDate", userTxFilters.startDate);
+      if (userTxFilters.endDate) params.set("endDate", userTxFilters.endDate);
+      if (userTxFilters.minAmount) params.set("minAmount", userTxFilters.minAmount);
+      if (userTxFilters.maxAmount) params.set("maxAmount", userTxFilters.maxAmount);
+
+      const res = await fetch(`/api/transactions/export?${params}`);
+      if (!res.ok) throw new Error("Export failed");
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const safeName = (user.email || user.id).replace(/[^a-z0-9]+/gi, "_");
+      a.download = `transactions_${safeName}_${new Date().toISOString().split("T")[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast.success("Transactions exported");
+    } catch {
+      toast.error("Failed to export transactions");
+    } finally {
+      setUserTxsExporting(false);
+    }
+  }, [user.id, user.email, userTxFilters]);
 
   // Fraud Investigation State
   interface FraudStatus {
@@ -3803,18 +3843,33 @@ export default function UserFullDetailPanel({
                         <CardTitle className="text-white text-base flex items-center gap-2">
                           <CreditCard className="h-4 w-4 text-cyan-400" />
                           Transactions
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => fetchUserTransactions(1)}
-                            disabled={userTxsLoading}
-                            className="ml-auto border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700"
-                          >
-                            <RefreshCw
-                              className={`h-4 w-4 mr-1 ${userTxsLoading ? "animate-spin" : ""}`}
-                            />
-                            Refresh
-                          </Button>
+                          <div className="ml-auto flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleExportUserTransactions}
+                              disabled={userTxsExporting || userTxsTotal === 0}
+                              title="Download this user's transactions (respects filters) as a CSV for Excel"
+                              className="border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700"
+                            >
+                              <Download
+                                className={`h-4 w-4 mr-1 ${userTxsExporting ? "animate-pulse" : ""}`}
+                              />
+                              {userTxsExporting ? "Exporting…" : "Download CSV"}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => fetchUserTransactions(1)}
+                              disabled={userTxsLoading}
+                              className="border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700"
+                            >
+                              <RefreshCw
+                                className={`h-4 w-4 mr-1 ${userTxsLoading ? "animate-spin" : ""}`}
+                              />
+                              Refresh
+                            </Button>
+                          </div>
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
@@ -3832,13 +3887,27 @@ export default function UserFullDetailPanel({
                             <SelectContent>
                               <SelectItem value="all">All Types</SelectItem>
                               <SelectItem value="deposit">Deposit</SelectItem>
+                              <SelectItem value="manual_deposit_credit">Manual Deposit Credit</SelectItem>
                               <SelectItem value="withdrawal">Withdrawal</SelectItem>
-                              <SelectItem value="competition_reward">Competition Reward</SelectItem>
+                              <SelectItem value="withdrawal_fee">Withdrawal Fee</SelectItem>
+                              <SelectItem value="withdrawal_refund">Withdrawal Refund</SelectItem>
                               <SelectItem value="competition_entry">Competition Entry</SelectItem>
-                              <SelectItem value="admin_credit">Admin Credit</SelectItem>
-                              <SelectItem value="admin_debit">Admin Debit</SelectItem>
-                              <SelectItem value="refund">Refund</SelectItem>
-                              <SelectItem value="fee">Fee</SelectItem>
+                              <SelectItem value="competition_win">Competition Win</SelectItem>
+                              <SelectItem value="competition_refund">Competition Refund</SelectItem>
+                              <SelectItem value="challenge_entry">Challenge Entry</SelectItem>
+                              <SelectItem value="challenge_win">Challenge Win</SelectItem>
+                              <SelectItem value="challenge_refund">Challenge Refund</SelectItem>
+                              <SelectItem value="challenge_declined">Challenge Declined</SelectItem>
+                              <SelectItem value="challenge_expired">Challenge Expired</SelectItem>
+                              <SelectItem value="marketplace_purchase">Marketplace Purchase</SelectItem>
+                              <SelectItem value="gamemaster_subscription">GM Subscription</SelectItem>
+                              <SelectItem value="gamemaster_subscription_refund">GM Subscription Refund</SelectItem>
+                              <SelectItem value="gamemaster_earning">GM Earning</SelectItem>
+                              <SelectItem value="gamemaster_challenge_referral">GM Challenge Referral</SelectItem>
+                              <SelectItem value="admin_adjustment">Admin Adjustment</SelectItem>
+                              <SelectItem value="incident_compensation">Incident Compensation</SelectItem>
+                              <SelectItem value="platform_fee">Platform Fee</SelectItem>
+                              <SelectItem value="chargeback_clawback">Chargeback Reversal</SelectItem>
                             </SelectContent>
                           </Select>
 
@@ -3858,6 +3927,7 @@ export default function UserFullDetailPanel({
                               <SelectItem value="pending">Pending</SelectItem>
                               <SelectItem value="failed">Failed</SelectItem>
                               <SelectItem value="cancelled">Cancelled</SelectItem>
+                              <SelectItem value="disputed">Disputed</SelectItem>
                             </SelectContent>
                           </Select>
 

@@ -72,6 +72,7 @@ function exportTransactionsToCSV(
     gamemaster_subscription: "GM Subscription",
     gamemaster_subscription_refund: "GM Subscription Refund",
     incident_compensation: "Compensation",
+    chargeback_clawback: "Chargeback Reversal",
     gamemaster_earning: "Referral Earning",
     gamemaster_challenge_referral: "Challenge Referral",
   };
@@ -81,6 +82,7 @@ function exportTransactionsToCSV(
     pending: "Pending",
     failed: "Failed",
     cancelled: "Cancelled",
+    disputed: "Disputed",
   };
 
   const rows = transactions.map((tx) => {
@@ -138,6 +140,7 @@ interface Transaction {
     | "gamemaster_subscription"
     | "gamemaster_subscription_refund"
     | "incident_compensation"
+    | "chargeback_clawback"
     | "gamemaster_earning"
     | "gamemaster_challenge_referral";
   amount: number;
@@ -172,9 +175,41 @@ type FilterType =
   | "competitions"
   | "challenges"
   | "marketplace"
-  | "referrals";
+  | "referrals"
+  | "adjustments";
 type StatusFilter = "all" | "completed" | "pending" | "failed" | "cancelled";
 type DatePreset = "all" | "30" | "60" | "90" | "120" | "custom";
+
+// Reason: Single source of truth mapping every wallet transaction type to a
+// filter category, so the tabs are EXHAUSTIVE — no type can be orphaned and
+// invisible to filtering. "all" intentionally bypasses this and shows them all.
+const FILTER_CATEGORIES: Record<
+  Exclude<FilterType, "all">,
+  Transaction["transactionType"][]
+> = {
+  deposits: ["deposit", "manual_deposit_credit"],
+  withdrawals: ["withdrawal", "withdrawal_fee", "withdrawal_refund"],
+  competitions: ["competition_entry", "competition_win", "competition_refund"],
+  challenges: [
+    "challenge_entry",
+    "challenge_win",
+    "challenge_refund",
+    "challenge_declined",
+    "challenge_expired",
+  ],
+  marketplace: [
+    "marketplace_purchase",
+    "gamemaster_subscription",
+    "gamemaster_subscription_refund",
+  ],
+  referrals: ["gamemaster_earning", "gamemaster_challenge_referral"],
+  adjustments: [
+    "admin_adjustment",
+    "incident_compensation",
+    "platform_fee",
+    "chargeback_clawback",
+  ],
+};
 
 const FILTER_OPTIONS: { value: FilterType; label: string }[] = [
   { value: "all", label: "All" },
@@ -184,6 +219,7 @@ const FILTER_OPTIONS: { value: FilterType; label: string }[] = [
   { value: "challenges", label: "Challenges" },
   { value: "marketplace", label: "Marketplace" },
   { value: "referrals", label: "Referrals" },
+  { value: "adjustments", label: "Adjustments" },
 ];
 
 const STATUS_OPTIONS: { value: StatusFilter; label: string; color: string }[] = [
@@ -303,44 +339,11 @@ export default function TransactionHistory({
   const filteredTransactions = useMemo(() => {
     if (filter === "all") return statusFilteredTransactions;
 
-    return statusFilteredTransactions.filter((tx) => {
-      switch (filter) {
-        case "deposits":
-          return tx.transactionType === "deposit";
-        case "withdrawals":
-          return (
-            tx.transactionType === "withdrawal" ||
-            tx.transactionType === "withdrawal_fee"
-          );
-        case "competitions":
-          return [
-            "competition_entry",
-            "competition_win",
-            "competition_refund",
-          ].includes(tx.transactionType);
-        case "challenges":
-          return [
-            "challenge_entry",
-            "challenge_win",
-            "challenge_refund",
-            "challenge_declined",
-            "challenge_expired",
-          ].includes(tx.transactionType);
-        case "marketplace":
-          return [
-            "marketplace_purchase",
-            "gamemaster_subscription",
-            "gamemaster_subscription_refund",
-          ].includes(tx.transactionType);
-        case "referrals":
-          return [
-            "gamemaster_earning",
-            "gamemaster_challenge_referral",
-          ].includes(tx.transactionType);
-        default:
-          return true;
-      }
-    });
+    // eslint-disable-next-line security/detect-object-injection -- `filter` is a typed FilterType (not user input)
+    const categoryTypes = FILTER_CATEGORIES[filter];
+    return statusFilteredTransactions.filter((tx) =>
+      categoryTypes.includes(tx.transactionType),
+    );
   }, [statusFilteredTransactions, filter]);
 
   // Calculate filtered stats and notify parent
@@ -433,6 +436,13 @@ export default function TransactionHistory({
       ),
     [transactions],
   );
+  const hasAdjustmentTransactions = useMemo(
+    () =>
+      transactions.some((tx) =>
+        FILTER_CATEGORIES.adjustments.includes(tx.transactionType),
+      ),
+    [transactions],
+  );
 
   // Only show filter tabs for categories that have transactions
   const availableFilters = useMemo(
@@ -440,9 +450,10 @@ export default function TransactionHistory({
       FILTER_OPTIONS.filter((f) => {
         if (f.value === "referrals") return hasReferralTransactions;
         if (f.value === "marketplace") return hasMarketplaceTransactions;
+        if (f.value === "adjustments") return hasAdjustmentTransactions;
         return true;
       }),
-    [hasReferralTransactions, hasMarketplaceTransactions],
+    [hasReferralTransactions, hasMarketplaceTransactions, hasAdjustmentTransactions],
   );
 
   // Reason: Reset pagination when filter/date/status changes so user always sees first page
@@ -793,11 +804,16 @@ function TransactionItem({
   const getTransactionIcon = () => {
     switch (transaction.transactionType) {
       case "deposit":
+      case "manual_deposit_credit":
         return <ArrowDownCircle className="h-5 w-5 text-green-500" />;
       case "withdrawal":
         return <ArrowUpCircle className="h-5 w-5 text-red-500" />;
       case "withdrawal_fee":
         return <ShieldAlert className="h-5 w-5 text-orange-500" />;
+      case "withdrawal_refund":
+        return <RefreshCw className="h-5 w-5 text-green-500" />;
+      case "chargeback_clawback":
+        return <ShieldAlert className="h-5 w-5 text-red-500" />;
       case "competition_entry":
         return <ShieldAlert className="h-5 w-5 text-blue-500" />;
       case "competition_win":
@@ -840,10 +856,22 @@ function TransactionItem({
     switch (transaction.transactionType) {
       case "deposit":
         return `Buy ${creditName}`;
+      case "manual_deposit_credit":
+        return "Manual Credit";
       case "withdrawal":
         return "Withdrawal";
       case "withdrawal_fee":
         return "Withdrawal Fee";
+      case "withdrawal_refund":
+        return "Withdrawal Refund";
+      case "chargeback_clawback":
+        return "Chargeback Reversal";
+      case "marketplace_purchase":
+        return "Marketplace Purchase";
+      case "gamemaster_subscription":
+        return "GM Subscription";
+      case "gamemaster_subscription_refund":
+        return "GM Subscription Refund";
       case "competition_entry":
         return "Competition Entry";
       case "competition_win":

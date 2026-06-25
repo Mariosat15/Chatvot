@@ -71,24 +71,35 @@ export async function GET(request: NextRequest) {
         ].join(","),
       ];
 
+      // Escape a text cell so commas/quotes can't shift the numeric columns.
+      const csvCell = (value: unknown): string => {
+        const s = value === null || value === undefined ? "" : String(value);
+        if (s.includes(",") || s.includes('"') || s.includes("\n")) {
+          return `"${s.replace(/"/g, '""')}"`;
+        }
+        return s;
+      };
+
       for (const invoice of invoices) {
         csvRows.push(
           [
-            invoice.invoiceNumber,
+            csvCell(invoice.invoiceNumber),
             new Date(invoice.invoiceDate).toISOString().split("T")[0],
-            `"${invoice.customerName?.replace(/"/g, '""') || ""}"`,
-            invoice.customerEmail || "",
+            csvCell(invoice.customerName || ""),
+            csvCell(invoice.customerEmail || ""),
+            // Numeric columns stay unquoted/plain so Excel SUM works directly.
             invoice.subtotal?.toFixed(2) || "0.00",
             invoice.vatRate?.toString() || "0",
             invoice.vatAmount?.toFixed(2) || "0.00",
             invoice.total?.toFixed(2) || "0.00",
-            invoice.currency || "EUR",
-            invoice.status || "unknown",
+            csvCell(invoice.currency || "EUR"),
+            csvCell(invoice.status || "unknown"),
           ].join(","),
         );
       }
 
-      const csvContent = csvRows.join("\n");
+      // Reason: BOM prefix → Excel reads the file as UTF-8.
+      const csvContent = "\uFEFF" + csvRows.join("\n");
       const dateRange =
         startDateStr && endDateStr ? `${startDateStr}_to_${endDateStr}` : "all";
 
@@ -114,7 +125,7 @@ export async function GET(request: NextRequest) {
 
       return new NextResponse(csvContent, {
         headers: {
-          "Content-Type": "text/csv",
+          "Content-Type": "text/csv; charset=utf-8",
           "Content-Disposition": `attachment; filename="invoices_${dateRange}.csv"`,
         },
       });

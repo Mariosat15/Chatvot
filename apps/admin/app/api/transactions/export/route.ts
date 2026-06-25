@@ -116,12 +116,21 @@ export async function GET(request: NextRequest) {
       const userInfo = tx.userInfo || { name: "Unknown", email: "Unknown" };
       // Reason: prefer an explicit EUR amount (set on platform/VAT/vendor rows
       // and on withdrawal metadata); otherwise derive from credits via the rate.
-      const amountEUR =
+      // Several sources store the EUR magnitude as a POSITIVE number even when
+      // the credit `amount` is an outflow (negative) — e.g. VAT/vendor payouts
+      // and withdrawals. We force the EUR cell to carry the SAME SIGN as the
+      // credit amount so a plain SUM of the EUR column in Excel is correct.
+      const rawAmountEUR =
         typeof tx.amountEUR === "number"
           ? tx.amountEUR
           : typeof tx.metadata?.amountEUR === "number"
             ? tx.metadata.amountEUR
             : (tx.amount || 0) / conversionRate;
+      const creditAmount = tx.amount || 0;
+      const amountEUR =
+        creditAmount < 0
+          ? -Math.abs(rawAmountEUR)
+          : Math.abs(rawAmountEUR);
 
       const cells = [
         tx._id.toString(),

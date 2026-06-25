@@ -408,11 +408,25 @@ export default function PendingPaymentsSection() {
       p.paymentIntentId || "N/A",
     ]);
 
-    const csv = [
-      headers.join(","),
-      ...rows.map((r) => r.map((c) => `"${c}"`).join(",")),
-    ].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
+    // Reason: numeric columns (Credits, EUR Amount) are emitted UNQUOTED so
+    // Excel treats them as numbers for SUM/formulas; text columns are quoted
+    // and escaped. BOM prefix forces UTF-8 in Excel.
+    const numericCols = new Set([3, 4]);
+    const csv =
+      "\uFEFF" +
+      [
+        headers.join(","),
+        ...rows.map((r) =>
+          r
+            .map((c, i) =>
+              numericCols.has(i)
+                ? String(c)
+                : `"${String(c).replace(/"/g, '""')}"`,
+            )
+            .join(","),
+        ),
+      ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
