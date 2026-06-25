@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/admin/auth";
 import { connectToDatabase } from "@/database/mongoose";
-import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
-import { getUsersByIds } from "@/lib/utils/user-lookup";
+import CreditConversionSettings from "@/database/models/credit-conversion-settings.model";
+import { fetchMergedTransactions } from "@/lib/services/transaction-history.service";
 
 /**
  * GET /api/transactions/export
- * Export transactions to CSV (Excel-compatible)
+ * Export transactions to CSV (Excel-compatible).
+ *
+ * Reason: Uses the SAME fetchMergedTransactions() as the list endpoint so the
+ * downloaded report contains exactly the rows the admin sees (including
+ * platform / VAT / vendor records) and honours every active filter.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -15,56 +19,33 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type") || "all";
-    const status = searchParams.get("status") || "all";
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
-    const search = searchParams.get("search") || "";
 
-    // Build query
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const query: any = {};
+    const filters = {
+      type,
+      status: searchParams.get("status") || "all",
+      userId: searchParams.get("userId"),
+      competitionId: searchParams.get("competitionId"),
+      search: searchParams.get("search") || "",
+      startDate,
+      endDate,
+      minAmount: searchParams.get("minAmount"),
+      maxAmount: searchParams.get("maxAmount"),
+      sortBy: "createdAt",
+      sortOrder: searchParams.get("sortOrder") || "desc",
+    };
 
-    if (type && type !== "all") {
-      query.transactionType = type;
-    }
+    // Reason: Up to 10k rows for an export (vs 1k for the on-screen list).
+    const { transactions } = await fetchMergedTransactions(filters, {
+      maxRecords: 10000,
+    });
 
-    if (status && status !== "all") {
-      query.status = status;
-    }
-
-    if (startDate || endDate) {
-      query.createdAt = {};
-      if (startDate) {
-        query.createdAt.$gte = new Date(startDate);
-      }
-      if (endDate) {
-        // Set end date to end of day
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        query.createdAt.$lte = end;
-      }
-    }
-
-    if (search) {
-      query.$or = [
-        { description: { $regex: search, $options: "i" } },
-        { userId: { $regex: search, $options: "i" } },
-      ];
-    }
-
-    // Fetch all matching transactions (limit to 10000 to prevent memory issues)
-    const transactions = await WalletTransaction.find(query)
-      .sort({ createdAt: -1 })
-      .limit(10000)
-      .lean();
-
-    // Get user info for all transactions
-    const userIds = [
-      ...new Set(
-        transactions.map((t) => t.userId).filter((id) => id !== "platform"),
-      ),
-    ];
-    const usersMap = await getUsersByIds(userIds);
+    // Reason: Convert credits → EUR using the real configured rate, not a
+    // hardcoded /100, so the EUR column is accurate when a row lacks an
+    // explicit EUR amount in its metadata.
+    const conversionSettings = await CreditConversionSettings.getSingleton();
+    const conversionRate = conversionSettings.eurToCreditsRate || 1;
 
     // Format date for Excel
     const formatDate = (date: Date | string) => {
@@ -76,6 +57,9 @@ export async function GET(request: NextRequest) {
     const typeLabels: Record<string, string> = {
       deposit: "User Deposit",
       withdrawal: "User Withdrawal",
+      withdrawal_fee: "Withdrawal Fee",
+      withdrawal_refund: "Withdrawal Refund",
+      manual_deposit_credit: "Manual Deposit Credit",
       competition_entry: "Competition Entry",
       competition_win: "Competition Win",
       competition_refund: "Competition Refund",
@@ -83,16 +67,21 @@ export async function GET(request: NextRequest) {
       admin_adjustment: "Admin Adjustment",
       admin_withdrawal: "Admin Withdrawal",
       vat_payment: "VAT Payment",
-      vendor_payment: "🏢 Vendor Payment",
+      vendor_payment: "Vendor Payment",
       unclaimed_pool: "Unclaimed Pool",
       deposit_fee: "Deposit Fee",
-      withdrawal_fee: "Withdrawal Fee",
       challenge_entry: "Challenge Entry",
       challenge_win: "Challenge Win",
       challenge_loss: "Challenge Loss",
       challenge_refund: "Challenge Refund",
+      challenge_declined: "Challenge Declined",
+      challenge_expired: "Challenge Expired",
       gamemaster_earning: "GM Competition Earning",
       gamemaster_challenge_referral: "GM Challenge Earning",
+      gamemaster_subscription: "GM Subscription",
+      gamemaster_subscription_refund: "GM Subscription Refund",
+      incident_compensation: "Incident Compensation",
+      chargeback_clawback: "Chargeback Clawback",
       admin_balance_add: "Admin Balance Add",
       custom_expense: "Custom Expense",
     };
@@ -102,6 +91,7 @@ export async function GET(request: NextRequest) {
       "Transaction ID",
       "Date",
       "Type",
+      "Source",
       "User ID",
       "User Name",
       "User Email",
@@ -114,23 +104,26 @@ export async function GET(request: NextRequest) {
     ];
 
     const rows = transactions.map((tx) => {
-      const userInfo =
-        tx.userId === "platform"
-          ? { name: "Platform", email: "system" }
-          : usersMap.get(tx.userId) || { name: "Unknown", email: "Unknown" };
+      const userInfo = tx.userInfo || { name: "Unknown", email: "Unknown" };
 
-      // Calculate EUR amount (if available in metadata)
+      // Reason: prefer an explicit EUR amount (set on platform/VAT/vendor rows
+      // and on withdrawal metadata); otherwise derive from credits via the rate.
       const amountEUR =
-        tx.metadata?.amountEUR || tx.metadata?.amount_eur || tx.amount / 100;
+        typeof tx.amountEUR === "number"
+          ? tx.amountEUR
+          : typeof tx.metadata?.amountEUR === "number"
+            ? tx.metadata.amountEUR
+            : (tx.amount || 0) / conversionRate;
 
       return [
         tx._id.toString(),
         formatDate(tx.createdAt),
         typeLabels[tx.transactionType] || tx.transactionType,
+        tx.source || "wallet",
         tx.userId,
         userInfo.name || "Unknown",
         userInfo.email || "Unknown",
-        tx.amount.toFixed(2),
+        (tx.amount || 0).toFixed(2),
         amountEUR.toFixed(2),
         tx.status,
         tx.description || "",

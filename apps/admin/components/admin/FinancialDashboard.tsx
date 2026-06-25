@@ -322,7 +322,7 @@ interface Transaction {
   provider?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
-  source?: "wallet" | "platform" | "vat";
+  source?: "wallet" | "platform" | "vat" | "vendor";
   userInfo?: {
     id: string;
     name: string;
