@@ -51,6 +51,7 @@ interface BankAccount {
   accountHolderName: string;
   accountHolderType: string;
   bankName?: string;
+  bankAddress?: string;
   country: string;
   currency: string;
   iban?: string; // Full IBAN for editing
@@ -60,6 +61,7 @@ interface BankAccount {
   isVerified: boolean;
   isDefault: boolean;
   isActive: boolean;
+  isComplete?: boolean; // has all details required for a manual bank transfer
   nickname?: string;
   addedAt: string;
   lastUsedAt?: string;
@@ -72,6 +74,7 @@ interface BankAccount {
 interface EditFormData {
   accountHolderName: string;
   bankName: string;
+  bankAddress: string;
   country: string;
   iban: string;
   swiftBic: string;
@@ -117,6 +120,8 @@ export default function BankAccountsSection() {
   const { settings } = useAppSettings();
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
+  // Master switch OFF → admin pays out manually → full bank details required.
+  const [manualPayoutMode, setManualPayoutMode] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<BankAccount | null>(
@@ -125,6 +130,7 @@ export default function BankAccountsSection() {
   const [editFormData, setEditFormData] = useState<EditFormData>({
     accountHolderName: "",
     bankName: "",
+    bankAddress: "",
     country: "",
     iban: "",
     swiftBic: "",
@@ -140,6 +146,7 @@ export default function BankAccountsSection() {
     accountHolderName: "",
     accountHolderType: "individual",
     bankName: "",
+    bankAddress: "",
     country: "DE",
     currency: "eur",
     iban: "",
@@ -173,6 +180,7 @@ export default function BankAccountsSection() {
       const data = await response.json();
       if (data.success) {
         setAccounts(data.accounts);
+        setManualPayoutMode(data.manualPayoutMode === true);
       }
     } catch (error) {
       console.error("Error fetching bank accounts:", error);
@@ -184,6 +192,20 @@ export default function BankAccountsSection() {
 
   const handleAddAccount = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // In manual payout mode the admin transfers funds by hand, so the full
+    // set of bank details is mandatory.
+    if (manualPayoutMode) {
+      const missing: string[] = [];
+      if (!formData.bankName.trim()) missing.push("Bank Name");
+      if (!formData.bankAddress.trim()) missing.push("Bank Address");
+      if (!formData.swiftBic.trim()) missing.push("BIC/SWIFT Code");
+      if (missing.length > 0) {
+        toast.error(`Please complete: ${missing.join(", ")}`);
+        return;
+      }
+    }
+
     setSubmitting(true);
 
     try {
@@ -209,6 +231,7 @@ export default function BankAccountsSection() {
         accountHolderName: "",
         accountHolderType: "individual",
         bankName: "",
+        bankAddress: "",
         country: "DE",
         currency: "eur",
         iban: "",
@@ -253,6 +276,7 @@ export default function BankAccountsSection() {
         setEditFormData({
           accountHolderName: data.account.accountHolderName || "",
           bankName: data.account.bankName || "",
+          bankAddress: data.account.bankAddress || "",
           country: data.account.country || "",
           iban: data.account.iban || "",
           swiftBic: data.account.swiftBic || "",
@@ -264,6 +288,7 @@ export default function BankAccountsSection() {
         setEditFormData({
           accountHolderName: account.accountHolderName || "",
           bankName: account.bankName || "",
+          bankAddress: account.bankAddress || "",
           country: account.country || "",
           iban: "", // Need to re-enter IBAN
           swiftBic: account.swiftBic || "",
@@ -277,6 +302,7 @@ export default function BankAccountsSection() {
       setEditFormData({
         accountHolderName: account.accountHolderName || "",
         bankName: account.bankName || "",
+        bankAddress: account.bankAddress || "",
         country: account.country || "",
         iban: "",
         swiftBic: account.swiftBic || "",
@@ -298,6 +324,18 @@ export default function BankAccountsSection() {
       return;
     }
 
+    // Manual payout mode requires the full set of bank details.
+    if (manualPayoutMode) {
+      const missing: string[] = [];
+      if (!editFormData.bankName.trim()) missing.push("Bank Name");
+      if (!editFormData.bankAddress.trim()) missing.push("Bank Address");
+      if (!editFormData.swiftBic.trim()) missing.push("BIC/SWIFT Code");
+      if (missing.length > 0) {
+        toast.error(`Please complete: ${missing.join(", ")}`);
+        return;
+      }
+    }
+
     setSubmitting(true);
 
     try {
@@ -309,6 +347,7 @@ export default function BankAccountsSection() {
           body: JSON.stringify({
             accountHolderName: editFormData.accountHolderName.trim(),
             bankName: editFormData.bankName.trim() || undefined,
+            bankAddress: editFormData.bankAddress.trim() || undefined,
             country: editFormData.country,
             iban:
               editFormData.iban.replace(/\s/g, "").toUpperCase() || undefined,
@@ -535,10 +574,22 @@ export default function BankAccountsSection() {
                       </p>
                     </div>
 
-                    {/* Bank Name (optional) */}
+                    {manualPayoutMode && (
+                      <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-3 flex items-start gap-2">
+                        <Info className="h-4 w-4 text-blue-400 mt-0.5 shrink-0" />
+                        <p className="text-xs text-blue-300">
+                          Withdrawals are paid by manual bank transfer. Please
+                          provide your <strong>full</strong> bank details
+                          (bank name, bank address and BIC/SWIFT) so we know
+                          where to send your money.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Bank Name */}
                     <div className="space-y-2">
                       <Label htmlFor="bankName" className="text-gray-300">
-                        Bank Name (optional)
+                        Bank Name {manualPayoutMode ? "*" : "(optional)"}
                       </Label>
                       <Input
                         id="bankName"
@@ -548,13 +599,34 @@ export default function BankAccountsSection() {
                         }
                         placeholder="e.g., Deutsche Bank"
                         className="bg-gray-800 border-gray-600 text-white"
+                        required={manualPayoutMode}
                       />
                     </div>
 
-                    {/* BIC/SWIFT (optional) */}
+                    {/* Bank Address */}
+                    <div className="space-y-2">
+                      <Label htmlFor="bankAddress" className="text-gray-300">
+                        Bank Address {manualPayoutMode ? "*" : "(optional)"}
+                      </Label>
+                      <Input
+                        id="bankAddress"
+                        value={formData.bankAddress}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            bankAddress: e.target.value,
+                          })
+                        }
+                        placeholder="Bank branch street, city, country"
+                        className="bg-gray-800 border-gray-600 text-white"
+                        required={manualPayoutMode}
+                      />
+                    </div>
+
+                    {/* BIC/SWIFT */}
                     <div className="space-y-2">
                       <Label htmlFor="swiftBic" className="text-gray-300">
-                        BIC/SWIFT Code (optional)
+                        BIC/SWIFT Code {manualPayoutMode ? "*" : "(optional)"}
                       </Label>
                       <Input
                         id="swiftBic"
@@ -568,6 +640,7 @@ export default function BankAccountsSection() {
                         placeholder="DEUTDEDB"
                         className="bg-gray-800 border-gray-600 text-white font-mono"
                         maxLength={11}
+                        required={manualPayoutMode}
                       />
                     </div>
 
@@ -940,7 +1013,7 @@ export default function BankAccountsSection() {
               {/* Bank Name */}
               <div className="space-y-2">
                 <Label htmlFor="editBankName" className="text-gray-300">
-                  Bank Name (optional)
+                  Bank Name {manualPayoutMode ? "*" : "(optional)"}
                 </Label>
                 <Input
                   id="editBankName"
@@ -953,13 +1026,34 @@ export default function BankAccountsSection() {
                   }
                   placeholder="e.g., Deutsche Bank"
                   className="bg-gray-800 border-gray-600 text-white"
+                  required={manualPayoutMode}
+                />
+              </div>
+
+              {/* Bank Address */}
+              <div className="space-y-2">
+                <Label htmlFor="editBankAddress" className="text-gray-300">
+                  Bank Address {manualPayoutMode ? "*" : "(optional)"}
+                </Label>
+                <Input
+                  id="editBankAddress"
+                  value={editFormData.bankAddress}
+                  onChange={(e) =>
+                    setEditFormData({
+                      ...editFormData,
+                      bankAddress: e.target.value,
+                    })
+                  }
+                  placeholder="Bank branch street, city, country"
+                  className="bg-gray-800 border-gray-600 text-white"
+                  required={manualPayoutMode}
                 />
               </div>
 
               {/* BIC/SWIFT */}
               <div className="space-y-2">
                 <Label htmlFor="editSwiftBic" className="text-gray-300">
-                  BIC/SWIFT Code (optional)
+                  BIC/SWIFT Code {manualPayoutMode ? "*" : "(optional)"}
                 </Label>
                 <Input
                   id="editSwiftBic"

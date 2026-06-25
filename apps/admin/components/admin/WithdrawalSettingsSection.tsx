@@ -41,7 +41,14 @@ import {
   Lock,
   RotateCcw,
   Info,
+  ArrowLeftRight,
+  PlugZap,
+  PowerOff,
 } from "lucide-react";
+import {
+  getPayoutCapableProviders,
+  getPayoutProvider,
+} from "@/lib/services/payout/payout-providers";
 
 interface WithdrawalSettings {
   // Processing Mode
@@ -98,6 +105,10 @@ interface WithdrawalSettings {
   // Sandbox Mode
   sandboxEnabled: boolean;
   sandboxAutoApprove: boolean;
+
+  // Multi-provider Payout Routing
+  withdrawalProvider: string;
+  sendWithdrawalsToProvider: boolean;
 
   // Nuvei Automatic Processing
   nuveiWithdrawalEnabled: boolean;
@@ -277,6 +288,19 @@ export default function WithdrawalSettingsSection() {
     );
   }
 
+  // Derived payout-routing state. Reason: a single source of truth for the UI
+  // so the provider sections, manual sections and banner all agree.
+  const sendToProvider = settings.sendWithdrawalsToProvider !== false;
+  const selectedProviderId = settings.withdrawalProvider || "nuvei";
+  const selectedProvider = getPayoutProvider(selectedProviderId);
+  const payoutProviders = getPayoutCapableProviders();
+  // Nuvei automatic processing is only "active" when the master switch is on,
+  // Nuvei is the chosen provider, and its toggle is enabled.
+  const nuveiAutoActive =
+    sendToProvider &&
+    selectedProviderId === "nuvei" &&
+    settings.nuveiWithdrawalEnabled;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -335,12 +359,10 @@ export default function WithdrawalSettingsSection() {
             <div className="flex items-center gap-4">
               <div
                 className={`h-12 w-12 rounded-xl flex items-center justify-center ${
-                  settings.nuveiWithdrawalEnabled
-                    ? "bg-purple-500/20"
-                    : "bg-amber-500/20"
+                  nuveiAutoActive ? "bg-purple-500/20" : "bg-amber-500/20"
                 }`}
               >
-                {settings.nuveiWithdrawalEnabled ? (
+                {nuveiAutoActive ? (
                   <Zap className="h-6 w-6 text-purple-400" />
                 ) : (
                   <Users className="h-6 w-6 text-amber-400" />
@@ -351,24 +373,130 @@ export default function WithdrawalSettingsSection() {
                   Current Status
                 </h3>
                 <p className="text-sm text-gray-400">
-                  {settings.nuveiWithdrawalEnabled
+                  {nuveiAutoActive
                     ? "⚡ Automatic via Nuvei - Users can withdraw instantly to their card/bank"
-                    : "👤 Manual - Admin reviews and processes withdrawals manually"}
+                    : !sendToProvider
+                      ? "🛠️ Manual / internal - No provider is called; you pay users yourself"
+                      : "👤 Manual - Admin reviews and processes withdrawals manually"}
                 </p>
               </div>
             </div>
             <Badge
               className={
-                settings.nuveiWithdrawalEnabled
+                nuveiAutoActive
                   ? "bg-purple-500/20 text-purple-300"
                   : "bg-amber-500/20 text-amber-300"
               }
             >
-              {settings.nuveiWithdrawalEnabled ? "⚡ AUTOMATIC" : "👤 MANUAL"}
+              {nuveiAutoActive ? "⚡ AUTOMATIC" : "👤 MANUAL"}
             </Badge>
           </div>
         </div>
       </div>
+
+      {/* Withdrawal Provider & Payout Routing */}
+      <Card className="bg-gradient-to-br from-indigo-900/30 to-purple-900/30 border-indigo-500/30">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <ArrowLeftRight className="h-5 w-5 text-indigo-400" />
+            Withdrawal Provider & Payouts
+          </CardTitle>
+          <CardDescription>
+            Choose who sends payouts to users — independent of your deposit
+            provider. You can also disable outgoing provider payouts entirely
+            and process every withdrawal manually.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Master switch: send withdrawals to a payment provider */}
+          <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+            <div className="flex items-center gap-4">
+              <div
+                className={`h-12 w-12 rounded-xl flex items-center justify-center ${
+                  sendToProvider ? "bg-indigo-500/20" : "bg-amber-500/20"
+                }`}
+              >
+                {sendToProvider ? (
+                  <PlugZap className="h-6 w-6 text-indigo-400" />
+                ) : (
+                  <PowerOff className="h-6 w-6 text-amber-400" />
+                )}
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">
+                  Send Withdrawals to Payment Provider
+                </h3>
+                <p className="text-sm text-gray-400">
+                  {sendToProvider
+                    ? "Payouts are sent automatically to the provider you select below."
+                    : "OFF — no provider is called. You pay users yourself (bank transfer) and mark each withdrawal complete here."}
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={sendToProvider}
+              onCheckedChange={(checked) =>
+                updateSetting("sendWithdrawalsToProvider", checked)
+              }
+            />
+          </div>
+
+          {sendToProvider ? (
+            <>
+              {/* Provider selector */}
+              <div>
+                <Label className="text-gray-300">Withdrawal Provider</Label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Only providers that support payouts are listed. Deposit-only
+                  providers (e.g. Atlas) cannot send withdrawals.
+                </p>
+                <Select
+                  value={selectedProviderId}
+                  onValueChange={(value) =>
+                    updateSetting("withdrawalProvider", value)
+                  }
+                >
+                  <SelectTrigger className="w-full bg-gray-700 border-gray-600">
+                    <SelectValue placeholder="Select provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {payoutProviders.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedProvider && (
+                  <p className="text-xs text-indigo-300/70 mt-2">
+                    {selectedProvider.description}
+                  </p>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <Info className="h-5 w-5 text-amber-400 mt-0.5" />
+                <div className="text-sm text-amber-200">
+                  <p className="font-medium">Manual / internal payout mode</p>
+                  <ul className="mt-2 space-y-1 text-amber-300/80">
+                    <li>• No request is sent to any payment provider.</li>
+                    <li>
+                      • Users must withdraw to a bank account and provide full
+                      details (IBAN, BIC/SWIFT, bank name & address).
+                    </li>
+                    <li>
+                      • You approve, transfer the money yourself, then mark the
+                      withdrawal as completed.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Withdrawal Methods - NEW SECTION */}
       <Card className="bg-gradient-to-br from-cyan-900/30 to-blue-900/30 border-cyan-500/30">
@@ -1061,8 +1189,9 @@ export default function WithdrawalSettingsSection() {
         </CardContent>
       </Card>
 
-      {/* Nuvei Automatic Withdrawal */}
-      <Card className="bg-gradient-to-br from-purple-900/30 to-blue-900/30 border-purple-500/30">
+      {/* Nuvei Automatic Withdrawal — only when Nuvei is the selected payout provider */}
+      {sendToProvider && selectedProviderId === "nuvei" && (
+        <Card className="bg-gradient-to-br from-purple-900/30 to-blue-900/30 border-purple-500/30">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
             <Zap className="h-5 w-5 text-purple-400" />
@@ -1161,7 +1290,8 @@ export default function WithdrawalSettingsSection() {
             </>
           )}
         </CardContent>
-      </Card>
+        </Card>
+      )}
 
       {/* Payout Methods */}
       <Card className="bg-gray-800/50 border-gray-700">
@@ -1337,10 +1467,12 @@ export default function WithdrawalSettingsSection() {
         </Card>
       </div>
 
-      {/* Manual Mode Settings - Only show when Nuvei automatic is NOT enabled */}
-      {!settings.nuveiWithdrawalEnabled && (
+      {/* Manual Mode Settings - shown whenever automatic Nuvei processing is not active */}
+      {!nuveiAutoActive && (
         <>
-          {/* Payment Processor Integration for Manual Mode */}
+          {/* Payment Processor Integration for Manual Mode — only relevant when
+              outgoing provider payouts are allowed (master switch ON). */}
+          {sendToProvider && (
           <Card className="bg-gradient-to-br from-blue-900/30 to-cyan-900/30 border-blue-500/30">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
@@ -1448,6 +1580,7 @@ export default function WithdrawalSettingsSection() {
               )}
             </CardContent>
           </Card>
+          )}
 
           <Card className="bg-gray-800/50 border-emerald-500/30">
             <CardHeader>

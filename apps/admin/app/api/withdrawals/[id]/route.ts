@@ -253,150 +253,82 @@ export async function PUT(
         withdrawal.status = "processing";
         withdrawal.processedAt = new Date();
 
-        // Reason: When manual withdrawals don't have a Nuvei reference yet,
-        // create one now so the "completed" step can approve it in Nuvei,
-        // triggering the actual payout to the user.
-        // Reason: Check if payout wasn't already submitted (e.g., via a previous processing attempt)
+        // Reason: payout execution now goes through the plug-and-play payout
+        // router. It decides between (a) manual/internal processing when the
+        // admin has disabled outgoing PSP payouts, or (b) dispatching to the
+        // selected provider's adapter. Adding a new provider requires no
+        // change here — only a new adapter + registry entry.
         if (!withdrawal.metadata?.nuveiTransactionId) {
           try {
-            // Find user payment option ID from the withdrawal data
-            let userPaymentOptionId: string | undefined;
+            const WithdrawalSettings = (
+              await import("@/database/models/withdrawal-settings.model")
+            ).default;
+            const { resolveWithdrawalRouting } = await import(
+              "@/lib/services/payout/withdrawal-routing"
+            );
+            const wSettings = await WithdrawalSettings.getSingleton();
+            const routing = resolveWithdrawalRouting(wSettings);
 
-            // Reason: Main app now saves the UPO ID in metadata.savedUpoId during withdrawal creation
-            if (withdrawal.metadata?.savedUpoId) {
-              userPaymentOptionId = String(withdrawal.metadata.savedUpoId);
-            } else if (withdrawal.originalCardDetails?.userPaymentOptionId) {
-              // Card payout — UPO stored at creation time
-              userPaymentOptionId =
-                withdrawal.originalCardDetails.userPaymentOptionId;
-            } else if (withdrawal.bankDetails?.nuveiUpoId) {
-              // Bank transfer — UPO stored at creation time
-              userPaymentOptionId = withdrawal.bankDetails.nuveiUpoId;
-            }
-
-            // Reason: Fallback — if UPO wasn't stored on the withdrawal document
-            // (e.g., created before schema update), look it up from NuveiUserPaymentOption collection.
-            // This uses the same shared MongoDB connection (both apps share the same DB).
-            if (!userPaymentOptionId && withdrawal.userId) {
-              try {
-                const mongoose = (await import("mongoose")).default;
-                // Reason: Avoid registering the model twice; reuse if already registered
-                const NuveiUPO =
-                  mongoose.models?.NuveiUserPaymentOption ||
-                  mongoose.model(
-                    "NuveiUserPaymentOption",
-                    new mongoose.Schema({
-                      userId: String,
-                      userPaymentOptionId: String,
-                      type: String,
-                      isActive: Boolean,
-                      lastUsed: Date,
-                    }),
-                  );
-                const upo = await NuveiUPO.findOne({
-                  userId: withdrawal.userId,
-                  isActive: true,
-                })
-                  .sort({ lastUsed: -1 })
-                  .lean();
-
-                if (upo && (upo as Record<string, unknown>).userPaymentOptionId) {
-                  userPaymentOptionId = String(
-                    (upo as Record<string, unknown>).userPaymentOptionId,
-                  );
-                  console.log(
-                    `🔍 Found UPO ${userPaymentOptionId} from NuveiUserPaymentOption collection (fallback)`,
-                  );
-                }
-              } catch (upoLookupErr) {
-                console.warn(
-                  "⚠️ Failed to look up UPO from NuveiUserPaymentOption:",
-                  upoLookupErr,
-                );
-              }
-            }
-
-            if (userPaymentOptionId) {
+            if (!routing.sendToProvider) {
+              // Master switch OFF — never call a PSP. Admin pays out manually.
               console.log(
-                `🏦 Submitting Nuvei payout for manual withdrawal ${withdrawal._id}...`,
+                `🛠️ Withdrawal ${withdrawal._id} processed in manual mode (outgoing provider payouts disabled).`,
               );
-
-              // Reason: default export is already the singleton instance, not the class
-              const nuveiService = (
-                await import("@/lib/services/nuvei.service")
-              ).default;
-
-              // Reason: /payout.do uses clientUniqueId (not merchantWDRequestId)
-              const clientUniqueId = `wd_${withdrawal.userId.slice(-8)}_${Date.now()}`;
-              const origin =
-                process.env.NEXT_PUBLIC_APP_URL ||
-                process.env.NEXT_PUBLIC_BASE_URL ||
-                "https://chartvolt.app";
-
-              // Reason: /withdraw.do returns 404 for REST API integrations.
-              // /payout.do is the correct endpoint for REST API payouts.
-              const nuveiResult = await nuveiService.submitPayout({
-                userTokenId: `user_${withdrawal.userId}`,
-                amount: (withdrawal.netAmountEUR || withdrawal.amountEUR).toFixed(2),
-                currency: "EUR",
-                clientUniqueId,
-                userPaymentOptionId,
-                email: withdrawal.userEmail || undefined,
-                firstName: withdrawal.userName?.split(" ")[0] || undefined,
-                lastName:
-                  withdrawal.userName?.split(" ").slice(1).join(" ") ||
-                  undefined,
-                notificationUrl: `${origin}/api/nuvei/webhook`,
-              });
-
-              if ("error" in nuveiResult && nuveiResult.error) {
-                console.error(
-                  "❌ Failed to submit Nuvei payout:",
-                  nuveiResult.error,
-                );
-                withdrawal.adminNote =
-                  (withdrawal.adminNote || "") +
-                  `\n⚠️ Nuvei payout failed: ${nuveiResult.error}. Manual bank transfer required.`;
-              } else if ("transactionId" in nuveiResult && nuveiResult.transactionId) {
-                console.log(
-                  "✅ Nuvei payout submitted:",
-                  nuveiResult.transactionId,
-                  "Status:",
-                  nuveiResult.transactionStatus,
-                );
-                withdrawal.metadata = withdrawal.metadata || {};
-                withdrawal.metadata.nuveiTransactionId =
-                  nuveiResult.transactionId;
-                withdrawal.metadata.nuveiTransactionStatus =
-                  nuveiResult.transactionStatus;
-                withdrawal.metadata.nuveiClientUniqueId = clientUniqueId;
-                withdrawal.metadata.usePaymentProcessor = true;
-                // Reason: payout.do directly processes the payout — no separate approve step needed
-                withdrawal.metadata.payoutMethod = "payout_api";
-                withdrawal.adminNote =
-                  (withdrawal.adminNote || "") +
-                  `\n✅ Nuvei payout submitted: ${nuveiResult.transactionId} (${nuveiResult.transactionStatus})`;
-              }
-            } else {
-              console.log(
-                `⚠️ No Nuvei UPO available for withdrawal ${withdrawal._id} — requires manual bank transfer`,
-              );
+              withdrawal.payoutProvider = "manual";
               withdrawal.adminNote =
                 (withdrawal.adminNote || "") +
-                `\n⚠️ No Nuvei payment option — process via manual bank transfer`;
+                `\nℹ️ Outgoing provider payouts are disabled — pay this withdrawal manually (bank transfer to the user's bank details), then mark COMPLETED.`;
+            } else {
+              const { getPayoutAdapter } = await import(
+                "@/lib/services/payout/payout-adapter-registry"
+              );
+              const adapter = getPayoutAdapter(routing.providerId);
+
+              if (!adapter || !adapter.supportsPayout) {
+                console.log(
+                  `⚠️ Provider "${routing.providerId}" cannot execute payouts for withdrawal ${withdrawal._id} — manual handling required.`,
+                );
+                withdrawal.adminNote =
+                  (withdrawal.adminNote || "") +
+                  `\n⚠️ Provider "${routing.providerLabel}" cannot execute payouts — process manually, then mark COMPLETED.`;
+              } else {
+                console.log(
+                  `🏦 Submitting ${routing.providerLabel} payout for withdrawal ${withdrawal._id}...`,
+                );
+                const result = await adapter.executePayout({ withdrawal });
+
+                withdrawal.metadata = withdrawal.metadata || {};
+                if (result.outcome === "submitted") {
+                  // Reason: keep the legacy `nuveiTransactionId` key so the
+                  // downstream "completed" step (which checks it) keeps working.
+                  withdrawal.metadata.nuveiTransactionId = result.transactionId;
+                  withdrawal.metadata.providerTransactionId =
+                    result.transactionId;
+                  withdrawal.metadata.nuveiTransactionStatus =
+                    result.transactionStatus;
+                  withdrawal.metadata.payoutProviderId = routing.providerId;
+                  withdrawal.metadata.usePaymentProcessor = true;
+                  withdrawal.payoutProvider = routing.providerId;
+                  if (result.metadata) {
+                    Object.assign(withdrawal.metadata, result.metadata);
+                  }
+                }
+                withdrawal.adminNote =
+                  (withdrawal.adminNote || "") + `\n${result.note}`;
+              }
             }
-          } catch (nuveiError) {
+          } catch (payoutError) {
             console.error(
-              "❌ Error creating Nuvei withdrawal request during processing:",
-              nuveiError,
+              "❌ Error during payout processing:",
+              payoutError,
             );
             withdrawal.adminNote =
               (withdrawal.adminNote || "") +
-              `\n⚠️ Nuvei API error — manual follow-up may be needed`;
+              `\n⚠️ Payout provider error — manual follow-up may be needed`;
           }
         } else {
           console.log(
-            `🏦 Withdrawal ${withdrawal._id} already has Nuvei payout: ${withdrawal.metadata.nuveiTransactionId}`,
+            `🏦 Withdrawal ${withdrawal._id} already has a payout reference: ${withdrawal.metadata.nuveiTransactionId}`,
           );
         }
         break;

@@ -23,6 +23,7 @@ import {
   notifyAdminsOfWithdrawal,
   type PayoutCategory,
 } from "@/lib/services/withdrawal-validator.service";
+import { resolveWithdrawalRouting } from "@/lib/services/payout/withdrawal-routing";
 
 /**
  * POST - Submit a withdrawal request via Nuvei
@@ -120,14 +121,25 @@ export async function POST(req: NextRequest) {
     } = computed;
 
     // The shared validator doesn't know this is the automatic route, so we
-    // still have to guard on the "Nuvei automatic processing" toggle here.
-    // Reason: users must fall back to the manual route when the admin turns
-    // Nuvei off.
-    if (!withdrawalSettings.nuveiWithdrawalEnabled) {
+    // still have to guard on the payout routing here. Reason: this endpoint is
+    // the Nuvei fast-path — it must only run when the master switch is on AND
+    // the selected provider is Nuvei with automatic processing enabled.
+    // Otherwise users fall back to the manual route.
+    const routing = resolveWithdrawalRouting(withdrawalSettings);
+    if (!routing.sendToProvider) {
       return NextResponse.json(
         {
           error:
-            "Automatic withdrawals are not enabled. Please use manual withdrawal.",
+            "Outgoing provider payouts are disabled. Please submit a manual withdrawal request.",
+        },
+        { status: 400 },
+      );
+    }
+    if (routing.providerId !== "nuvei" || !routing.canAutoProcess) {
+      return NextResponse.json(
+        {
+          error:
+            "Automatic withdrawals via Nuvei are not enabled. Please use manual withdrawal.",
         },
         { status: 400 },
       );

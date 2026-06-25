@@ -54,6 +54,7 @@ interface WithdrawalMethod {
   ibanLast4?: string;
   country?: string;
   isDefault?: boolean;
+  isComplete?: boolean; // bank account has all fields required for manual payout
   userPaymentOptionId?: string; // Nuvei UPO ID for card refunds
 }
 
@@ -87,6 +88,8 @@ interface WithdrawalInfo {
   availableWithdrawalMethods: WithdrawalMethod[];
   hasWithdrawalMethod: boolean;
   nuveiEnabled?: boolean; // Whether Nuvei automatic withdrawals are enabled by admin
+  manualPayoutMode?: boolean; // Master switch OFF: admin pays manually, full bank details required
+  bankDetailsRequired?: boolean; // Convenience flag mirroring manualPayoutMode
 }
 
 export default function WithdrawalModal({ children }: WithdrawalModalProps) {
@@ -181,6 +184,26 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
     if (!selectedMethodId) {
       setError("Please select a withdrawal method");
       return;
+    }
+
+    // Manual/internal payout mode: the admin transfers the money by hand, so
+    // the user must pick a bank account that has the complete set of details.
+    if (withdrawalInfo?.manualPayoutMode) {
+      const selected = withdrawalInfo.availableWithdrawalMethods?.find(
+        (m) => m.id === selectedMethodId,
+      );
+      if (!selected || selected.type !== "bank_account") {
+        setError(
+          "Withdrawals are processed by bank transfer. Please select a bank account.",
+        );
+        return;
+      }
+      if (selected.isComplete === false) {
+        setError(
+          "This bank account is missing required details (IBAN, BIC/SWIFT, bank name and address). Please complete it in your wallet settings before withdrawing.",
+        );
+        return;
+      }
     }
 
     // Reason: Only show the T&C dialog the first time the user submits in
@@ -659,6 +682,18 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
               ))}
             </div>
 
+            {/* Manual payout mode notice — bank transfer with full details only */}
+            {withdrawalInfo.manualPayoutMode && (
+              <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-3 flex items-start gap-2">
+                <Building2 className="h-4 w-4 text-blue-400 mt-0.5 shrink-0" />
+                <p className="text-xs text-blue-300">
+                  Withdrawals are sent by bank transfer. Make sure your bank
+                  account includes your full details (IBAN, BIC/SWIFT, bank name
+                  and bank address) so we know where to send your money.
+                </p>
+              </div>
+            )}
+
             {/* Withdrawal Method Selection */}
             <div className="space-y-2">
               <Label className="text-gray-300">Where to Send Funds</Label>
@@ -744,15 +779,29 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                         );
                       } else {
                         return (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Building2 className="h-4 w-4 text-green-400" />
-                            <span className="text-gray-400">
-                              Bank transfer to:
-                            </span>
-                            <span className="text-white font-medium">
-                              {selected.bankName ? `${selected.bankName} ` : ""}
-                              ****{selected.ibanLast4}
-                            </span>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm">
+                              <Building2 className="h-4 w-4 text-green-400" />
+                              <span className="text-gray-400">
+                                Bank transfer to:
+                              </span>
+                              <span className="text-white font-medium">
+                                {selected.bankName
+                                  ? `${selected.bankName} `
+                                  : ""}
+                                ****{selected.ibanLast4}
+                              </span>
+                            </div>
+                            {withdrawalInfo.manualPayoutMode &&
+                              selected.isComplete === false && (
+                                <p className="text-xs text-amber-400 flex items-start gap-1">
+                                  <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                                  This account is missing details required for a
+                                  bank transfer. Add your BIC/SWIFT, bank name
+                                  and bank address in wallet settings before
+                                  withdrawing.
+                                </p>
+                              )}
                           </div>
                         );
                       }
@@ -886,7 +935,12 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                   withdrawal.eurAmount <
                     withdrawalInfo.settings.minimumWithdrawal ||
                   !selectedMethodId ||
-                  !withdrawalInfo.hasWithdrawalMethod
+                  !withdrawalInfo.hasWithdrawalMethod ||
+                  // Block when manual mode requires complete bank details
+                  (withdrawalInfo.manualPayoutMode === true &&
+                    withdrawalInfo.availableWithdrawalMethods?.find(
+                      (m) => m.id === selectedMethodId,
+                    )?.isComplete === false)
                 }
                 className="flex-1 font-semibold bg-yellow-500 hover:bg-yellow-600 text-gray-900"
               >

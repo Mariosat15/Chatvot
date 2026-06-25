@@ -74,6 +74,13 @@ export interface IWithdrawalSettings extends Document {
   // When disabled in manual mode: User requests → Admin approves → Admin manually sends money
   usePaymentProcessorForManual: boolean; // Use Nuvei for manual withdrawals (create pending requests in Nuvei)
 
+  // Multi-provider Payout Routing
+  // Reason: deposits and withdrawals can use different providers (e.g. Atlas
+  // for deposits, Nuvei for payouts). These two fields decouple the payout
+  // rail from the deposit provider and allow disabling outgoing PSP payouts.
+  withdrawalProvider: string; // Which payout provider executes automatic payouts (e.g. "nuvei")
+  sendWithdrawalsToProvider: boolean; // Master switch: false = never call a PSP, process every withdrawal manually/internally
+
   // Notifications
   notifyAdminOnRequest: boolean; // Email admin on new withdrawal request
   notifyAdminOnHighValue: boolean; // Email admin on high-value withdrawals
@@ -290,6 +297,16 @@ const WithdrawalSettingsSchema = new Schema<IWithdrawalSettings>(
     usePaymentProcessorForManual: {
       type: Boolean,
       default: false, // Pure manual mode by default
+    },
+
+    // Multi-provider Payout Routing
+    withdrawalProvider: {
+      type: String,
+      default: "nuvei", // Default keeps existing Nuvei-only behaviour
+    },
+    sendWithdrawalsToProvider: {
+      type: Boolean,
+      default: true, // Default true = preserve current behaviour; admin can disable to force manual payouts
     },
 
     // Notifications

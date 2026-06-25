@@ -20,6 +20,7 @@ import {
   notifyAdminsOfWithdrawal,
   type PayoutCategory,
 } from "@/lib/services/withdrawal-validator.service";
+import { resolveWithdrawalRouting } from "@/lib/services/payout/withdrawal-routing";
 
 /**
  * GET /api/wallet/withdraw
@@ -111,6 +112,12 @@ export async function GET() {
     const conversionRate = creditSettings.eurToCreditsRate || 100;
     const balanceEUR = wallet.creditBalance / conversionRate;
 
+    // Resolve payout routing. When the master switch is OFF, withdrawals are
+    // processed manually/internally — so card refunds (which need a PSP) are
+    // not offered and the user must provide a complete bank account.
+    const routing = resolveWithdrawalRouting(withdrawalSettings);
+    const manualPayoutMode = !routing.sendToProvider;
+
     // Build available withdrawal methods
     const availableWithdrawalMethods: Array<{
       id: string;
@@ -123,6 +130,7 @@ export async function GET() {
       ibanLast4?: string;
       country?: string;
       isDefault?: boolean;
+      isComplete?: boolean; // bank account has all fields needed for manual payout
       userPaymentOptionId?: string; // Nuvei UPO ID for card refunds
     }> = [];
 
@@ -185,6 +193,16 @@ export async function GET() {
 
     if (bankWithdrawalsEnabled) {
       for (const bankAccount of bankAccounts) {
+        // For manual/internal payouts the admin needs the full set of bank
+        // details to send the money. Flag whether this account is complete.
+        const isComplete = !!(
+          bankAccount.accountHolderName &&
+          (bankAccount.iban || bankAccount.accountNumber) &&
+          bankAccount.swiftBic &&
+          bankAccount.bankName &&
+          bankAccount.bankAddress &&
+          bankAccount.country
+        );
         availableWithdrawalMethods.push({
           id: bankAccount._id.toString(),
           type: "bank_account",
@@ -197,19 +215,33 @@ export async function GET() {
           ibanLast4: bankAccount.ibanLast4,
           country: bankAccount.country,
           isDefault: bankAccount.isDefault,
+          isComplete,
         });
       }
     }
 
     // Filter out card methods if card withdrawals are disabled
-    const filteredWithdrawalMethods = cardWithdrawalsEnabled
+    let filteredWithdrawalMethods = cardWithdrawalsEnabled
       ? availableWithdrawalMethods
       : availableWithdrawalMethods.filter((m) => m.type !== "original_method");
+
+    // In manual/internal payout mode there is no PSP to refund a card, so only
+    // bank accounts (with full details) can receive the money. Reason: the
+    // admin transfers funds manually and needs the user's bank details.
+    if (manualPayoutMode) {
+      filteredWithdrawalMethods = filteredWithdrawalMethods.filter(
+        (m) => m.type === "bank_account",
+      );
+    }
 
     // Update warning if no methods available
     if (filteredWithdrawalMethods.length === 0 && eligibility.eligible) {
       eligibility.warnings = eligibility.warnings || [];
-      if (!bankWithdrawalsEnabled && !cardWithdrawalsEnabled) {
+      if (manualPayoutMode) {
+        eligibility.warnings.push(
+          "Withdrawals are processed by bank transfer. Please add a bank account with your full details (IBAN, BIC/SWIFT, bank name and address) in your wallet settings.",
+        );
+      } else if (!bankWithdrawalsEnabled && !cardWithdrawalsEnabled) {
         eligibility.warnings.push(
           "Withdrawals are currently disabled by the administrator.",
         );
@@ -263,8 +295,14 @@ export async function GET() {
       // Withdrawal method settings
       bankWithdrawalsEnabled,
       cardWithdrawalsEnabled,
-      // Nuvei automatic withdrawal enabled
-      nuveiEnabled: withdrawalSettings.nuveiWithdrawalEnabled === true,
+      // Automatic withdrawal enabled (only when routing actually resolves to
+      // an enabled Nuvei fast-path — respects the master switch + provider).
+      nuveiEnabled:
+        routing.providerId === "nuvei" && routing.canAutoProcess,
+      // Manual/internal payout mode (master switch OFF): admin pays out
+      // manually, so the user must supply complete bank details.
+      manualPayoutMode,
+      bankDetailsRequired: manualPayoutMode,
       // Legacy bank account info (only if bank withdrawals enabled)
       hasBankAccount: bankWithdrawalsEnabled && hasBankAccount,
       bankAccount: defaultBankAccount
@@ -372,6 +410,7 @@ export async function POST(request: NextRequest) {
 
     const amountEUR = validation.amountEUR;
     const withdrawalSettings = validation.settings;
+    const routing = resolveWithdrawalRouting(withdrawalSettings);
     const appSettings = validation.appSettings;
     const {
       isSandbox,
@@ -506,6 +545,46 @@ export async function POST(request: NextRequest) {
       payoutMethodType = "bank_transfer";
     }
 
+    // Manual/internal payout mode (master switch OFF): no PSP will be called,
+    // so the admin must transfer the money by hand. Require a bank transfer
+    // with the FULL set of details so we know exactly where to send funds.
+    if (!routing.sendToProvider) {
+      if (payoutMethodType !== "bank_transfer" || !bankAccount) {
+        await mongoSession.abortTransaction();
+        mongoSession.endSession();
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Withdrawals are currently processed by bank transfer only. Please withdraw to a bank account with your full details.",
+          },
+          { status: 400 },
+        );
+      }
+
+      const missingFields: string[] = [];
+      if (!bankAccount.accountHolderName) missingFields.push("account holder name");
+      if (!bankAccount.iban && !bankAccount.accountNumber)
+        missingFields.push("IBAN or account number");
+      if (!bankAccount.swiftBic) missingFields.push("BIC/SWIFT code");
+      if (!bankAccount.bankName) missingFields.push("bank name");
+      if (!bankAccount.bankAddress) missingFields.push("bank address");
+      if (!bankAccount.country) missingFields.push("country");
+
+      if (missingFields.length > 0) {
+        await mongoSession.abortTransaction();
+        mongoSession.endSession();
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Your bank account is missing required details (${missingFields.join(", ")}). Please complete your bank account in wallet settings before withdrawing.`,
+            code: "INCOMPLETE_BANK_DETAILS",
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     // Transactional balance re-check. The validator already compared the
     // snapshot balance but between that read and the transactional write a
     // parallel request could have changed it. Cheap safety net.
@@ -584,6 +663,7 @@ export async function POST(request: NextRequest) {
           : undefined,
         fullIban: bankAccount.iban, // Store full IBAN for processing
         bankName: bankAccount.bankName,
+        bankAddress: bankAccount.bankAddress,
         swiftBic: bankAccount.swiftBic,
         country: bankAccount.country,
         // Include Nuvei UPO if available (required for automatic processing)
@@ -647,7 +727,10 @@ export async function POST(request: NextRequest) {
     // Important: Only auto-approve if Nuvei automatic processing is enabled
     // When Nuvei automatic is OFF (manual mode), withdrawals should stay in 'pending' for admin review
     let autoApproved = false;
-    const isManualMode = !withdrawalSettings.nuveiWithdrawalEnabled;
+    // Reason: "manual" now means "no automatic provider payout will run" —
+    // this respects the master switch, the selected provider and its enable
+    // flag (resolved centrally) instead of only the legacy Nuvei toggle.
+    const isManualMode = !routing.canAutoProcess;
 
     if (isManualMode) {
       // In manual mode, all withdrawals stay in 'pending' status
@@ -656,7 +739,9 @@ export async function POST(request: NextRequest) {
       // Reason: In manual mode, do NOT call Nuvei here. The /payout.do endpoint
       // directly sends money — it must only be called when admin processes the withdrawal.
       // Instead, just save the UPO info so the admin can trigger the payout later.
-      if (withdrawalSettings.usePaymentProcessorForManual) {
+      // Only relevant when outgoing provider payouts are enabled; when the
+      // master switch is off we never prep a processor payout.
+      if (withdrawalSettings.usePaymentProcessorForManual && routing.sendToProvider) {
         try {
           let userPaymentOptionId: string | undefined;
 

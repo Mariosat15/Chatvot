@@ -21,12 +21,26 @@ export async function GET() {
 
     const accounts = await UserBankAccount.getUserAccounts(session.user.id);
 
+    // Determine whether the platform is in manual/internal payout mode so the
+    // UI can require the full set of bank details. Reason: with no PSP, the
+    // admin transfers money by hand and needs complete details.
+    const WithdrawalSettings = (
+      await import("@/database/models/withdrawal-settings.model")
+    ).default;
+    const { resolveWithdrawalRouting } = await import(
+      "@/lib/services/payout/withdrawal-routing"
+    );
+    const withdrawalSettings = await WithdrawalSettings.getSingleton();
+    const manualPayoutMode =
+      !resolveWithdrawalRouting(withdrawalSettings).sendToProvider;
+
     // Mask sensitive data for response
     const maskedAccounts = accounts.map((account: any) => ({
       id: account._id,
       accountHolderName: account.accountHolderName,
       accountHolderType: account.accountHolderType,
       bankName: account.bankName,
+      bankAddress: account.bankAddress,
       country: account.country,
       currency: account.currency,
       // Only show last 4 of IBAN/account number
@@ -40,6 +54,15 @@ export async function GET() {
       addedAt: account.addedAt,
       lastUsedAt: account.lastUsedAt,
       totalPayouts: account.totalPayouts,
+      // Whether this account has every field needed for a manual bank transfer
+      isComplete: !!(
+        account.accountHolderName &&
+        (account.iban || account.accountNumber) &&
+        account.swiftBic &&
+        account.bankName &&
+        account.bankAddress &&
+        account.country
+      ),
       // Nuvei connection status - from database or computed
       nuveiConnected:
         account.nuveiConnected ||
@@ -51,6 +74,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       accounts: maskedAccounts,
+      manualPayoutMode,
     });
   } catch (error) {
     console.error("Error fetching bank accounts:", error);
@@ -77,6 +101,7 @@ export async function POST(request: NextRequest) {
       accountHolderName,
       accountHolderType = "individual",
       bankName,
+      bankAddress,
       country,
       currency = "eur",
       iban,
@@ -217,6 +242,7 @@ export async function POST(request: NextRequest) {
       accountHolderName: accountHolderName.trim(),
       accountHolderType,
       bankName: bankName?.trim(),
+      bankAddress: bankAddress?.trim(),
       country: country.toUpperCase(),
       currency: currency.toLowerCase(),
       iban: cleanIban,

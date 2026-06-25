@@ -40,6 +40,7 @@ export async function GET(
         accountHolderName: account.accountHolderName,
         accountHolderType: account.accountHolderType,
         bankName: account.bankName,
+        bankAddress: account.bankAddress,
         country: account.country,
         currency: account.currency,
         iban: account.iban, // Return full IBAN for editing
@@ -85,6 +86,7 @@ export async function PATCH(
     const {
       accountHolderName,
       bankName,
+      bankAddress,
       country,
       iban,
       swiftBic,
@@ -115,6 +117,11 @@ export async function PATCH(
     // Update bank name
     if (bankName !== undefined) {
       account.bankName = bankName.trim() || undefined;
+    }
+
+    // Update bank address
+    if (bankAddress !== undefined) {
+      account.bankAddress = bankAddress.trim() || undefined;
     }
 
     // Update country
@@ -180,6 +187,7 @@ export async function PATCH(
         id: account._id,
         accountHolderName: account.accountHolderName,
         bankName: account.bankName,
+        bankAddress: account.bankAddress,
         country: account.country,
         ibanLast4: account.ibanLast4,
         swiftBic: account.swiftBic,

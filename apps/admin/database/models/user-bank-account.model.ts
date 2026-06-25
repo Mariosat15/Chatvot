@@ -18,6 +18,7 @@ export interface IUserBankAccount extends Document {
 
   // Bank Details
   bankName?: string; // Bank name (optional)
+  bankAddress?: string; // Bank branch / address — required for manual (internal) payouts
   country: string; // ISO 3166-1 alpha-2 country code (e.g., 'DE', 'NL')
   currency: string; // Currency code (e.g., 'eur', 'usd')
 
@@ -84,6 +85,10 @@ const UserBankAccountSchema = new Schema<IUserBankAccount>(
 
     // Bank Details
     bankName: {
+      type: String,
+      trim: true,
+    },
+    bankAddress: {
       type: String,
       trim: true,
     },
