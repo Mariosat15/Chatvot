@@ -93,6 +93,7 @@ interface WithdrawalRequest {
     accountHolderName: string;
     iban: string;
     bankName?: string;
+    bankAddress?: string;
     swiftBic?: string;
     country: string;
     nickname?: string;
@@ -1973,6 +1974,14 @@ export default function PendingWithdrawalsSection() {
                         <p className="text-xs text-gray-500">BIC/SWIFT Code</p>
                         <p className="text-white font-mono">
                           {detailDialog.withdrawal.userBankDetails.swiftBic}
+                        </p>
+                      </div>
+                    )}
+                    {detailDialog.withdrawal.userBankDetails.bankAddress && (
+                      <div className="col-span-2">
+                        <p className="text-xs text-gray-500">Bank Address</p>
+                        <p className="text-white">
+                          {detailDialog.withdrawal.userBankDetails.bankAddress}
                         </p>
                       </div>
                     )}

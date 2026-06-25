@@ -50,6 +50,27 @@ import {
   getPayoutProvider,
 } from "@/lib/services/payout/payout-providers";
 
+/**
+ * Section group heading — used to break the long settings page into clearly
+ * labelled, scannable groups (Payout Processing, Methods, Limits & Rules, etc.).
+ */
+function SectionHeading({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle?: string;
+}) {
+  return (
+    <div className="pt-4 pb-1 border-b border-gray-700/60">
+      <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-emerald-400">
+        {title}
+      </h3>
+      {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
+    </div>
+  );
+}
+
 interface WithdrawalSettings {
   // Processing Mode
   processingMode: "automatic" | "manual";
@@ -57,6 +78,7 @@ interface WithdrawalSettings {
   // Withdrawal Methods
   bankWithdrawalsEnabled: boolean;
   cardWithdrawalsEnabled: boolean;
+  showAutoWithdrawalToggle: boolean;
 
   // Withdrawal Limits
   minimumWithdrawal: number;
@@ -394,6 +416,12 @@ export default function WithdrawalSettingsSection() {
         </div>
       </div>
 
+      {/* === PAYOUT PROCESSING === */}
+      <SectionHeading
+        title="Payout Processing"
+        subtitle="Decide how money leaves the platform: an automatic provider payout, or manual/internal processing."
+      />
+
       {/* Withdrawal Provider & Payout Routing */}
       <Card className="bg-gradient-to-br from-indigo-900/30 to-purple-900/30 border-indigo-500/30">
         <CardHeader>
@@ -497,6 +525,367 @@ export default function WithdrawalSettingsSection() {
           )}
         </CardContent>
       </Card>
+
+      {/* Nuvei Automatic Withdrawal — only when Nuvei is the selected payout provider */}
+      {sendToProvider && selectedProviderId === "nuvei" && (
+        <Card className="bg-gradient-to-br from-purple-900/30 to-blue-900/30 border-purple-500/30">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              <Zap className="h-5 w-5 text-purple-400" />
+              Automatic Withdrawal Processing (Nuvei)
+              {settings.nuveiWithdrawalEnabled && (
+                <Badge className="bg-purple-500/20 text-purple-300">
+                  Active
+                </Badge>
+              )}
+            </CardTitle>
+            <CardDescription>
+              Enable automatic withdrawal processing via Nuvei payment gateway
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+              <div className="flex items-center gap-4">
+                <div
+                  className={`h-12 w-12 rounded-xl flex items-center justify-center ${
+                    settings.nuveiWithdrawalEnabled
+                      ? "bg-purple-500/20"
+                      : "bg-gray-600/20"
+                  }`}
+                >
+                  <Zap
+                    className={`h-6 w-6 ${settings.nuveiWithdrawalEnabled ? "text-purple-400" : "text-gray-500"}`}
+                  />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">
+                    Enable Automatic Withdrawals
+                  </h3>
+                  <p className="text-sm text-gray-400">
+                    When enabled, users can withdraw directly to their card or
+                    bank account via Nuvei
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={settings.nuveiWithdrawalEnabled}
+                onCheckedChange={(checked) =>
+                  updateSetting("nuveiWithdrawalEnabled", checked)
+                }
+              />
+            </div>
+
+            {!settings.nuveiWithdrawalEnabled && (
+              <div className="bg-gray-700/30 border border-gray-600 rounded-lg p-3 text-sm text-gray-400">
+                <Info className="h-4 w-4 inline mr-2" />
+                Automatic payout is off. Nuvei is still your payout provider —
+                an admin triggers each Nuvei payout from the withdrawal queue
+                when approving a request. Use the card below to fine-tune this
+                manual flow.
+              </div>
+            )}
+
+            {settings.nuveiWithdrawalEnabled && (
+              <>
+                <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <Info className="h-5 w-5 text-purple-400 mt-0.5" />
+                    <div className="text-sm text-purple-200">
+                      <p className="font-medium">How it works:</p>
+                      <ul className="mt-2 space-y-1 text-purple-300/80">
+                        <li>
+                          • Users can withdraw to their original deposit card
+                          (refund) or enter bank details
+                        </li>
+                        <li>
+                          • Withdrawals are processed automatically through
+                          Nuvei
+                        </li>
+                        <li>
+                          • Card refunds typically arrive in 3-5 business days
+                        </li>
+                        <li>
+                          • Bank transfers typically arrive in 3-5 business days
+                        </li>
+                        <li>
+                          • Nuvei must be configured in Payment Providers
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-gray-300">Prefer Card Refund</Label>
+                    <p className="text-xs text-gray-500">
+                      Suggest card refund over bank transfer to users
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.nuveiPreferCardRefund}
+                    onCheckedChange={(checked) =>
+                      updateSetting("nuveiPreferCardRefund", checked)
+                    }
+                  />
+                </div>
+
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-400" />
+                    <p className="text-xs text-amber-300">
+                      Make sure Nuvei is properly configured in Payment
+                      Providers before enabling automatic withdrawals.
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Manual Mode Settings - shown whenever automatic Nuvei processing is not active */}
+      {!nuveiAutoActive && (
+        <>
+          {/* Payment Processor Integration for Manual Mode — only relevant when
+              outgoing provider payouts are allowed (master switch ON). */}
+          {sendToProvider && (
+            <Card className="bg-gradient-to-br from-blue-900/30 to-cyan-900/30 border-blue-500/30">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-blue-400" />
+                  Payment Processor for Manual Withdrawals
+                  {settings.usePaymentProcessorForManual && (
+                    <Badge className="bg-blue-500/20 text-blue-300">
+                      Active
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  Route manual withdrawals through Nuvei for automated payment
+                  processing
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`h-12 w-12 rounded-xl flex items-center justify-center ${
+                        settings.usePaymentProcessorForManual
+                          ? "bg-blue-500/20"
+                          : "bg-gray-600/20"
+                      }`}
+                    >
+                      <CreditCard
+                        className={`h-6 w-6 ${settings.usePaymentProcessorForManual ? "text-blue-400" : "text-gray-500"}`}
+                      />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-white">
+                        Use Nuvei for Manual Withdrawals
+                      </h3>
+                      <p className="text-sm text-gray-400">
+                        When enabled, withdrawal requests are sent to Nuvei.
+                        Admin approval triggers the actual payout.
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={settings.usePaymentProcessorForManual}
+                    onCheckedChange={(checked) =>
+                      updateSetting("usePaymentProcessorForManual", checked)
+                    }
+                  />
+                </div>
+
+                {settings.usePaymentProcessorForManual ? (
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <Info className="h-5 w-5 text-blue-400 mt-0.5" />
+                      <div className="text-sm text-blue-200">
+                        <p className="font-medium">
+                          How it works (Nuvei-managed manual mode):
+                        </p>
+                        <ul className="mt-2 space-y-1 text-blue-300/80">
+                          <li>
+                            1. User requests withdrawal → Request created in
+                            Nuvei (PENDING)
+                          </li>
+                          <li>2. Admin reviews request in your dashboard</li>
+                          <li>
+                            3. Admin approves → Nuvei receives approval and
+                            processes the payout
+                          </li>
+                          <li>
+                            4. Admin declines → Nuvei cancels the request,
+                            credits refunded
+                          </li>
+                          <li>
+                            • Nuvei handles the actual money transfer to user
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <Info className="h-5 w-5 text-amber-400 mt-0.5" />
+                      <div className="text-sm text-amber-200">
+                        <p className="font-medium">
+                          How it works (Pure manual mode):
+                        </p>
+                        <ul className="mt-2 space-y-1 text-amber-300/80">
+                          <li>
+                            1. User requests withdrawal → Request stored in your
+                            system
+                          </li>
+                          <li>
+                            2. Admin reviews request and sees user&apos;s bank
+                            details
+                          </li>
+                          <li>
+                            3. Admin manually transfers money via bank or card
+                            refund
+                          </li>
+                          <li>
+                            4. Admin marks withdrawal as completed after payment
+                          </li>
+                          <li>
+                            • You handle the actual money transfer manually
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          <Card className="bg-gray-800/50 border-emerald-500/30">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-emerald-400" />
+                Auto-Approval Rules
+                <Badge className="bg-amber-500/20 text-amber-300">
+                  Manual Mode
+                </Badge>
+              </CardTitle>
+              <CardDescription>
+                Auto-approve certain withdrawals without admin review (still
+                processed{" "}
+                {settings.usePaymentProcessorForManual
+                  ? "via Nuvei"
+                  : "manually via bank transfer"}
+                )
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-gray-300">Enable Auto-Approval</Label>
+                  <p className="text-xs text-gray-500">
+                    Automatically approve qualifying withdrawals
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.autoApproveEnabled}
+                  onCheckedChange={(checked) =>
+                    updateSetting("autoApproveEnabled", checked)
+                  }
+                />
+              </div>
+              {settings.autoApproveEnabled && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-gray-300">
+                        Max Auto-Approve Amount (EUR)
+                      </Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={settings.autoApproveMaxAmount}
+                        onChange={(e) =>
+                          updateSetting(
+                            "autoApproveMaxAmount",
+                            parseInt(e.target.value) || 0,
+                          )
+                        }
+                        className="bg-gray-700 border-gray-600"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Larger amounts require manual review
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-gray-300">
+                        Min Account Age (days)
+                      </Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={settings.autoApproveMinAccountAge}
+                        onChange={(e) =>
+                          updateSetting(
+                            "autoApproveMinAccountAge",
+                            parseInt(e.target.value) || 0,
+                          )
+                        }
+                        className="bg-gray-700 border-gray-600"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-gray-300">
+                        Require KYC for Auto-Approve
+                      </Label>
+                      <p className="text-xs text-gray-500">
+                        Only auto-approve KYC-verified users
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.autoApproveRequireKYC}
+                      onCheckedChange={(checked) =>
+                        updateSetting("autoApproveRequireKYC", checked)
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-gray-300">
+                      Min Previous Successful Withdrawals
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={settings.autoApproveMinSuccessfulWithdrawals}
+                      onChange={(e) =>
+                        updateSetting(
+                          "autoApproveMinSuccessfulWithdrawals",
+                          parseInt(e.target.value) || 0,
+                        )
+                      }
+                      className="bg-gray-700 border-gray-600"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Trust established users more
+                    </p>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* === WITHDRAWAL METHODS === */}
+      <SectionHeading
+        title="Withdrawal Methods"
+        subtitle="What users can choose, plus the payout method options offered to them."
+      />
 
       {/* Withdrawal Methods - NEW SECTION */}
       <Card className="bg-gradient-to-br from-cyan-900/30 to-blue-900/30 border-cyan-500/30">
@@ -612,8 +1001,113 @@ export default function WithdrawalSettingsSection() {
                 </div>
               </div>
             )}
+
+          {/* Show/hide the user-facing "Enable Auto" button on saved bank accounts */}
+          <div className="mt-4 flex items-center justify-between p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+            <div className="flex items-center gap-3">
+              <div
+                className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+                  settings.showAutoWithdrawalToggle
+                    ? "bg-emerald-500/20"
+                    : "bg-gray-600/20"
+                }`}
+              >
+                <Zap
+                  className={`h-5 w-5 ${settings.showAutoWithdrawalToggle ? "text-emerald-400" : "text-gray-500"}`}
+                />
+              </div>
+              <div>
+                <Label className="text-gray-300">
+                  Show &quot;Enable Auto&quot; Button to Users
+                </Label>
+                <p className="text-xs text-gray-500">
+                  Lets customers connect a saved bank account to the payment
+                  provider for instant automatic payouts. Turn this off if you
+                  process withdrawals manually — customers won&apos;t see the
+                  button and their accounts stay &quot;Manual Review&quot;.
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={settings.showAutoWithdrawalToggle ?? true}
+              onCheckedChange={(checked) =>
+                updateSetting("showAutoWithdrawalToggle", checked)
+              }
+            />
+          </div>
         </CardContent>
       </Card>
+
+      {/* Payout Methods */}
+      <Card className="bg-gray-800/50 border-gray-700">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <CreditCard className="h-5 w-5 text-cyan-400" />
+            Payout Methods
+          </CardTitle>
+          <CardDescription>
+            Configure which payout methods are offered and the default
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {PAYOUT_METHODS.map((method) => (
+              <div
+                key={method.value}
+                className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                  settings.allowedPayoutMethods.includes(method.value)
+                    ? "bg-emerald-500/10 border-emerald-500/50"
+                    : "bg-gray-700/30 border-gray-600 hover:border-gray-500"
+                }`}
+                onClick={() => togglePayoutMethod(method.value)}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-white">{method.label}</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {method.description}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.allowedPayoutMethods.includes(
+                      method.value,
+                    )}
+                    onCheckedChange={() => togglePayoutMethod(method.value)}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4">
+            <Label className="text-gray-300">Preferred Method</Label>
+            <Select
+              value={settings.preferredPayoutMethod}
+              onValueChange={(value) =>
+                updateSetting("preferredPayoutMethod", value)
+              }
+            >
+              <SelectTrigger className="w-full bg-gray-700 border-gray-600 mt-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAYOUT_METHODS.filter((m) =>
+                  settings.allowedPayoutMethods.includes(m.value),
+                ).map((method) => (
+                  <SelectItem key={method.value} value={method.value}>
+                    {method.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* === LIMITS, RULES & SECURITY === */}
+      <SectionHeading
+        title="Limits, Rules & Security"
+        subtitle="Amounts, timing, fees, eligibility, fraud controls and 2FA step-up."
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Withdrawal Limits */}
@@ -1189,174 +1683,11 @@ export default function WithdrawalSettingsSection() {
         </CardContent>
       </Card>
 
-      {/* Nuvei Automatic Withdrawal — only when Nuvei is the selected payout provider */}
-      {sendToProvider && selectedProviderId === "nuvei" && (
-        <Card className="bg-gradient-to-br from-purple-900/30 to-blue-900/30 border-purple-500/30">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Zap className="h-5 w-5 text-purple-400" />
-            Automatic Withdrawal Processing (Nuvei)
-            {settings.nuveiWithdrawalEnabled && (
-              <Badge className="bg-purple-500/20 text-purple-300">Active</Badge>
-            )}
-          </CardTitle>
-          <CardDescription>
-            Enable automatic withdrawal processing via Nuvei payment gateway
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg border border-gray-700">
-            <div className="flex items-center gap-4">
-              <div
-                className={`h-12 w-12 rounded-xl flex items-center justify-center ${
-                  settings.nuveiWithdrawalEnabled
-                    ? "bg-purple-500/20"
-                    : "bg-gray-600/20"
-                }`}
-              >
-                <Zap
-                  className={`h-6 w-6 ${settings.nuveiWithdrawalEnabled ? "text-purple-400" : "text-gray-500"}`}
-                />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-white">
-                  Enable Automatic Withdrawals
-                </h3>
-                <p className="text-sm text-gray-400">
-                  When enabled, users can withdraw directly to their card or
-                  bank account via Nuvei
-                </p>
-              </div>
-            </div>
-            <Switch
-              checked={settings.nuveiWithdrawalEnabled}
-              onCheckedChange={(checked) =>
-                updateSetting("nuveiWithdrawalEnabled", checked)
-              }
-            />
-          </div>
-
-          {settings.nuveiWithdrawalEnabled && (
-            <>
-              <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <Info className="h-5 w-5 text-purple-400 mt-0.5" />
-                  <div className="text-sm text-purple-200">
-                    <p className="font-medium">How it works:</p>
-                    <ul className="mt-2 space-y-1 text-purple-300/80">
-                      <li>
-                        • Users can withdraw to their original deposit card
-                        (refund) or enter bank details
-                      </li>
-                      <li>
-                        • Withdrawals are processed automatically through Nuvei
-                      </li>
-                      <li>
-                        • Card refunds typically arrive in 3-5 business days
-                      </li>
-                      <li>
-                        • Bank transfers typically arrive in 3-5 business days
-                      </li>
-                      <li>• Nuvei must be configured in Payment Providers</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-gray-300">Prefer Card Refund</Label>
-                  <p className="text-xs text-gray-500">
-                    Suggest card refund over bank transfer to users
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.nuveiPreferCardRefund}
-                  onCheckedChange={(checked) =>
-                    updateSetting("nuveiPreferCardRefund", checked)
-                  }
-                />
-              </div>
-
-              <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-400" />
-                  <p className="text-xs text-amber-300">
-                    Make sure Nuvei is properly configured in Payment Providers
-                    before enabling automatic withdrawals.
-                  </p>
-                </div>
-              </div>
-            </>
-          )}
-        </CardContent>
-        </Card>
-      )}
-
-      {/* Payout Methods */}
-      <Card className="bg-gray-800/50 border-gray-700">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <CreditCard className="h-5 w-5 text-cyan-400" />
-            Payout Methods
-          </CardTitle>
-          <CardDescription>
-            Configure available withdrawal methods
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {PAYOUT_METHODS.map((method) => (
-              <div
-                key={method.value}
-                className={`p-4 rounded-lg border cursor-pointer transition-all ${
-                  settings.allowedPayoutMethods.includes(method.value)
-                    ? "bg-emerald-500/10 border-emerald-500/50"
-                    : "bg-gray-700/30 border-gray-600 hover:border-gray-500"
-                }`}
-                onClick={() => togglePayoutMethod(method.value)}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-white">{method.label}</p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {method.description}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={settings.allowedPayoutMethods.includes(
-                      method.value,
-                    )}
-                    onCheckedChange={() => togglePayoutMethod(method.value)}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4">
-            <Label className="text-gray-300">Preferred Method</Label>
-            <Select
-              value={settings.preferredPayoutMethod}
-              onValueChange={(value) =>
-                updateSetting("preferredPayoutMethod", value)
-              }
-            >
-              <SelectTrigger className="w-full bg-gray-700 border-gray-600 mt-2">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PAYOUT_METHODS.filter((m) =>
-                  settings.allowedPayoutMethods.includes(m.value),
-                ).map((method) => (
-                  <SelectItem key={method.value} value={method.value}>
-                    {method.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      {/* === SYSTEM & NOTIFICATIONS === */}
+      <SectionHeading
+        title="System & Notifications"
+        subtitle="Sandbox/test behaviour and admin alerting."
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Sandbox Settings */}
@@ -1466,238 +1797,6 @@ export default function WithdrawalSettingsSection() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Manual Mode Settings - shown whenever automatic Nuvei processing is not active */}
-      {!nuveiAutoActive && (
-        <>
-          {/* Payment Processor Integration for Manual Mode — only relevant when
-              outgoing provider payouts are allowed (master switch ON). */}
-          {sendToProvider && (
-          <Card className="bg-gradient-to-br from-blue-900/30 to-cyan-900/30 border-blue-500/30">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <CreditCard className="h-5 w-5 text-blue-400" />
-                Payment Processor for Manual Withdrawals
-                {settings.usePaymentProcessorForManual && (
-                  <Badge className="bg-blue-500/20 text-blue-300">Active</Badge>
-                )}
-              </CardTitle>
-              <CardDescription>
-                Route manual withdrawals through Nuvei for automated payment
-                processing
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg border border-gray-700">
-                <div className="flex items-center gap-4">
-                  <div
-                    className={`h-12 w-12 rounded-xl flex items-center justify-center ${
-                      settings.usePaymentProcessorForManual
-                        ? "bg-blue-500/20"
-                        : "bg-gray-600/20"
-                    }`}
-                  >
-                    <CreditCard
-                      className={`h-6 w-6 ${settings.usePaymentProcessorForManual ? "text-blue-400" : "text-gray-500"}`}
-                    />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-white">
-                      Use Nuvei for Manual Withdrawals
-                    </h3>
-                    <p className="text-sm text-gray-400">
-                      When enabled, withdrawal requests are sent to Nuvei. Admin
-                      approval triggers the actual payout.
-                    </p>
-                  </div>
-                </div>
-                <Switch
-                  checked={settings.usePaymentProcessorForManual}
-                  onCheckedChange={(checked) =>
-                    updateSetting("usePaymentProcessorForManual", checked)
-                  }
-                />
-              </div>
-
-              {settings.usePaymentProcessorForManual ? (
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <Info className="h-5 w-5 text-blue-400 mt-0.5" />
-                    <div className="text-sm text-blue-200">
-                      <p className="font-medium">
-                        How it works (Nuvei-managed manual mode):
-                      </p>
-                      <ul className="mt-2 space-y-1 text-blue-300/80">
-                        <li>
-                          1. User requests withdrawal → Request created in Nuvei
-                          (PENDING)
-                        </li>
-                        <li>2. Admin reviews request in your dashboard</li>
-                        <li>
-                          3. Admin approves → Nuvei receives approval and
-                          processes the payout
-                        </li>
-                        <li>
-                          4. Admin declines → Nuvei cancels the request, credits
-                          refunded
-                        </li>
-                        <li>
-                          • Nuvei handles the actual money transfer to user
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <Info className="h-5 w-5 text-amber-400 mt-0.5" />
-                    <div className="text-sm text-amber-200">
-                      <p className="font-medium">
-                        How it works (Pure manual mode):
-                      </p>
-                      <ul className="mt-2 space-y-1 text-amber-300/80">
-                        <li>
-                          1. User requests withdrawal → Request stored in your
-                          system
-                        </li>
-                        <li>
-                          2. Admin reviews request and sees user&apos;s bank
-                          details
-                        </li>
-                        <li>
-                          3. Admin manually transfers money via bank or card
-                          refund
-                        </li>
-                        <li>
-                          4. Admin marks withdrawal as completed after payment
-                        </li>
-                        <li>• You handle the actual money transfer manually</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          )}
-
-          <Card className="bg-gray-800/50 border-emerald-500/30">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-emerald-400" />
-                Auto-Approval Rules
-                <Badge className="bg-amber-500/20 text-amber-300">
-                  Manual Mode
-                </Badge>
-              </CardTitle>
-              <CardDescription>
-                Auto-approve certain withdrawals without admin review (still
-                processed{" "}
-                {settings.usePaymentProcessorForManual
-                  ? "via Nuvei"
-                  : "manually via bank transfer"}
-                )
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-gray-300">Enable Auto-Approval</Label>
-                  <p className="text-xs text-gray-500">
-                    Automatically approve qualifying withdrawals
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.autoApproveEnabled}
-                  onCheckedChange={(checked) =>
-                    updateSetting("autoApproveEnabled", checked)
-                  }
-                />
-              </div>
-              {settings.autoApproveEnabled && (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-gray-300">
-                        Max Auto-Approve Amount (EUR)
-                      </Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        value={settings.autoApproveMaxAmount}
-                        onChange={(e) =>
-                          updateSetting(
-                            "autoApproveMaxAmount",
-                            parseInt(e.target.value) || 0,
-                          )
-                        }
-                        className="bg-gray-700 border-gray-600"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Larger amounts require manual review
-                      </p>
-                    </div>
-                    <div>
-                      <Label className="text-gray-300">
-                        Min Account Age (days)
-                      </Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        value={settings.autoApproveMinAccountAge}
-                        onChange={(e) =>
-                          updateSetting(
-                            "autoApproveMinAccountAge",
-                            parseInt(e.target.value) || 0,
-                          )
-                        }
-                        className="bg-gray-700 border-gray-600"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label className="text-gray-300">
-                        Require KYC for Auto-Approve
-                      </Label>
-                      <p className="text-xs text-gray-500">
-                        Only auto-approve KYC-verified users
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings.autoApproveRequireKYC}
-                      onCheckedChange={(checked) =>
-                        updateSetting("autoApproveRequireKYC", checked)
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-gray-300">
-                      Min Previous Successful Withdrawals
-                    </Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={settings.autoApproveMinSuccessfulWithdrawals}
-                      onChange={(e) =>
-                        updateSetting(
-                          "autoApproveMinSuccessfulWithdrawals",
-                          parseInt(e.target.value) || 0,
-                        )
-                      }
-                      className="bg-gray-700 border-gray-600"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Trust established users more
-                    </p>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
 
       {/* Last Updated Info */}
       <div className="text-center text-sm text-gray-500">

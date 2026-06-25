@@ -122,6 +122,8 @@ export default function BankAccountsSection() {
   const [loading, setLoading] = useState(true);
   // Master switch OFF → admin pays out manually → full bank details required.
   const [manualPayoutMode, setManualPayoutMode] = useState(false);
+  // Admin-controlled: whether the "Enable Auto" button is offered to users.
+  const [showAutoToggle, setShowAutoToggle] = useState(true);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<BankAccount | null>(
@@ -181,6 +183,7 @@ export default function BankAccountsSection() {
       if (data.success) {
         setAccounts(data.accounts);
         setManualPayoutMode(data.manualPayoutMode === true);
+        setShowAutoToggle(data.showAutoWithdrawalToggle !== false);
       }
     } catch (error) {
       console.error("Error fetching bank accounts:", error);
@@ -818,7 +821,7 @@ export default function BankAccountsSection() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      {!account.nuveiConnected && (
+                      {!account.nuveiConnected && showAutoToggle && (
                         <Button
                           variant="outline"
                           size="sm"

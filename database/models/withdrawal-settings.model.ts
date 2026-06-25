@@ -60,6 +60,10 @@ export interface IWithdrawalSettings extends Document {
   // Withdrawal Methods
   bankWithdrawalsEnabled: boolean; // Enable bank transfer withdrawals for users
   cardWithdrawalsEnabled: boolean; // Enable card payout/refund withdrawals for users
+  // Whether users see the "Enable Auto" button on their saved bank accounts
+  // (connects the account to the PSP for automatic payouts). Hide it when you
+  // process payouts manually so customers aren't offered a feature you don't use.
+  showAutoWithdrawalToggle: boolean;
 
   // Nuvei Automatic Processing
   nuveiWithdrawalEnabled: boolean; // Enable automatic processing via Nuvei
@@ -282,6 +286,10 @@ const WithdrawalSettingsSchema = new Schema<IWithdrawalSettings>(
     cardWithdrawalsEnabled: {
       type: Boolean,
       default: true, // Card payouts enabled by default
+    },
+    showAutoWithdrawalToggle: {
+      type: Boolean,
+      default: true, // Preserve existing behaviour; admin can hide for manual-only setups
     },
 
     // Nuvei Automatic Processing

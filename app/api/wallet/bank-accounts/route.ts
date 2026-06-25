@@ -33,6 +33,11 @@ export async function GET() {
     const withdrawalSettings = await WithdrawalSettings.getSingleton();
     const manualPayoutMode =
       !resolveWithdrawalRouting(withdrawalSettings).sendToProvider;
+    // Admin can hide the user-facing "Enable Auto" button entirely. It only
+    // makes sense when payouts are actually sent to a provider (not manual).
+    const showAutoWithdrawalToggle =
+      (withdrawalSettings?.showAutoWithdrawalToggle ?? true) &&
+      !manualPayoutMode;
 
     // Mask sensitive data for response
     const maskedAccounts = accounts.map((account: any) => ({
@@ -75,6 +80,7 @@ export async function GET() {
       success: true,
       accounts: maskedAccounts,
       manualPayoutMode,
+      showAutoWithdrawalToggle,
     });
   } catch (error) {
     console.error("Error fetching bank accounts:", error);

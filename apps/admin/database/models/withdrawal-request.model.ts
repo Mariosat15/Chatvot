@@ -68,9 +68,12 @@ export interface IWithdrawalRequest extends Document {
   // Bank Details (for bank transfers)
   bankDetails?: {
     accountHolderName?: string;
-    iban?: string; // Last 4 characters only for security
+    iban?: string; // Masked IBAN (****1234) for safe display
+    fullIban?: string; // Full IBAN — required by admin to process manual transfers
     bankName?: string;
+    bankAddress?: string; // Bank branch address (required in manual payout mode)
     swiftBic?: string;
+    country?: string;
     nuveiUpoId?: string; // Nuvei UPO ID for bank payouts
   };
 
@@ -260,8 +263,11 @@ const WithdrawalRequestSchema = new Schema<IWithdrawalRequest>(
     bankDetails: {
       accountHolderName: String,
       iban: String,
+      fullIban: String,
       bankName: String,
+      bankAddress: String,
       swiftBic: String,
+      country: String,
       nuveiUpoId: String,
     },
 

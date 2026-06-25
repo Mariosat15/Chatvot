@@ -160,10 +160,28 @@ export async function GET(request: NextRequest) {
 
         // If the withdrawal has embedded bank details, use those
         if (w.bankDetails && w.bankDetails.accountHolderName) {
+          // Older withdrawals (created before fullIban was persisted) may only
+          // carry a masked IBAN. Resolve the full IBAN + bank address from the
+          // linked bank account so the admin can actually process the transfer.
+          let resolvedFullIban = w.bankDetails.fullIban;
+          let resolvedBankAddress = w.bankDetails.bankAddress;
+          if ((!resolvedFullIban || !resolvedBankAddress) && w.bankAccountId) {
+            const linkedAccount = await UserBankAccount.findById(
+              w.bankAccountId,
+            ).lean();
+            if (linkedAccount) {
+              resolvedFullIban =
+                resolvedFullIban || (linkedAccount as any).iban;
+              resolvedBankAddress =
+                resolvedBankAddress || (linkedAccount as any).bankAddress;
+            }
+          }
+
           userBankDetails = {
             accountHolderName: w.bankDetails.accountHolderName,
-            iban: w.bankDetails.fullIban || w.bankDetails.iban,
+            iban: resolvedFullIban || w.bankDetails.iban,
             bankName: w.bankDetails.bankName,
+            bankAddress: resolvedBankAddress,
             swiftBic: w.bankDetails.swiftBic,
             country: w.bankDetails.country,
             nickname: null,
@@ -183,6 +201,7 @@ export async function GET(request: NextRequest) {
               accountHolderName: (bankAccount as any).accountHolderName,
               iban: (bankAccount as any).iban,
               bankName: (bankAccount as any).bankName,
+              bankAddress: (bankAccount as any).bankAddress,
               swiftBic: (bankAccount as any).swiftBic,
               country: (bankAccount as any).country,
               nickname: (bankAccount as any).nickname,
