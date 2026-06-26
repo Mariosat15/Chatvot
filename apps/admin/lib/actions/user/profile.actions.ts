@@ -138,8 +138,12 @@ export async function getUserCompetitionStats(
       if (p.totalTrades > mostTrades) mostTrades = p.totalTrades;
 
       // Count wins and podiums
-      if (p.currentRank === 1) competitionsWon++;
-      if (p.currentRank && p.currentRank <= 3) podiumFinishes++;
+      // Reason: ONLY count COMPLETED competitions — an active competition's rank
+      // is temporary and would over-count wins/podiums here. This matches the
+      // user dashboard, user profile and both global leaderboards.
+      if (p.status === "completed" && p.currentRank === 1) competitionsWon++;
+      if (p.status === "completed" && p.currentRank && p.currentRank <= 3)
+        podiumFinishes++;
     });
 
     const overallWinRate =
