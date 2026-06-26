@@ -604,7 +604,11 @@ export default function LeaderboardContent({
                 Trader
               </span>
               <SortHeader column="pnl" label="P&L" className="justify-end" />
-              <SortHeader column="roi" label="ROI" className="justify-end" />
+              <SortHeader
+                column="roi"
+                label="Trade ROI"
+                className="justify-end"
+              />
               <SortHeader
                 column="winrate"
                 label="Win Rate"
@@ -767,7 +771,7 @@ export default function LeaderboardContent({
                           )}
                         >
                           {entry.totalPnlPercentage >= 0 ? "+" : ""}
-                          {entry.totalPnlPercentage.toFixed(1)}%
+                          {entry.totalPnlPercentage.toFixed(2)}%
                         </p>
                       </div>
 
@@ -1012,9 +1016,10 @@ export default function LeaderboardContent({
                             : "text-red-400",
                         )}
                       >
-                        {entry.totalPnlPercentage.toFixed(1)}%
+                        {entry.totalPnlPercentage >= 0 ? "+" : ""}
+                        {entry.totalPnlPercentage.toFixed(2)}%
                       </p>
-                      <p className="text-[11px] text-gray-500">ROI</p>
+                      <p className="text-[11px] text-gray-500">Trade ROI</p>
                     </div>
                     <div className="text-center p-2 rounded-lg bg-gray-800/50">
                       <p className="font-bold text-xs text-white">
@@ -1086,7 +1091,7 @@ export default function LeaderboardContent({
                       <span className="w-12 text-primary-400 font-mono">
                         25%
                       </span>{" "}
-                      ROI %
+                      Trade ROI %
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="w-12 text-primary-400 font-mono">
