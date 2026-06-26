@@ -63,7 +63,7 @@ const STAT_CONFIG = [
   },
   {
     key: "roi",
-    label: "ROI",
+    label: "Net ROI",
     icon: Percent,
     color: "#06B6D4",
     gradient: "from-cyan-500/20 to-blue-600/5",
@@ -138,7 +138,7 @@ export default function HeroStatsBar({
       {
         ...STAT_CONFIG[3],
         value: `${roi >= 0 ? "+" : ""}${roi.toFixed(1)}%`,
-        sub: "return on investment",
+        sub: "prizes vs entry fees",
         isNeg: roi < 0,
       },
       {

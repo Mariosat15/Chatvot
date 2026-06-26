@@ -110,8 +110,10 @@ export default function CompetitionsHelpPage() {
                   </h3>
                   <p className="text-sm text-dark-200">
                     Winner has the highest{" "}
-                    <strong>Return on Investment percentage</strong>. Rewards
-                    efficiency over absolute gains.
+                    <strong>Trade ROI %</strong> (trading P&amp;L ÷ that
+                    contest&apos;s starting capital). Rewards efficiency over
+                    absolute gains. This is Trade ROI, not your wallet&apos;s Net
+                    ROI.
                   </p>
                   <p className="text-xs text-blue-300/60 mt-2">
                     Example: User A has +50% ROI, User B has +45% ROI → User A

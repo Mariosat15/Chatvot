@@ -944,7 +944,9 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                     <span>
                       <strong className="text-white">Hero Stats</strong> (4
                       cards): Credit Balance ({settings.credits.symbol}), Win
-                      Rate, ROI %, and Total Prizes Won.
+                      Rate, <strong className="text-white">Net ROI</strong> %
+                      (prizes won vs entry fees — see &quot;Net ROI vs Trade
+                      ROI&quot; in the Performance tab), and Total Prizes Won.
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
@@ -1047,8 +1049,11 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                     <Target className="h-4 w-4 text-purple-400 mt-0.5 flex-shrink-0" />
                     <span>
                       <strong className="text-white">Performance Rings</strong>{" "}
-                      — Win Rate, ROI, Profit Factor, plus Average Win,
-                      Average Loss, Largest Win and Largest Loss.
+                      — Win Rate, <strong className="text-white">Net ROI</strong>{" "}
+                      and <strong className="text-white">Trade ROI</strong>{" "}
+                      (two different ROIs — see &quot;Net ROI vs Trade ROI&quot;
+                      below), Profit Factor, plus Average Win, Average Loss,
+                      Largest Win and Largest Loss.
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
@@ -1077,6 +1082,110 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                     </span>
                   </li>
                 </ul>
+              </div>
+
+              {/* ── Net ROI vs Trade ROI explainer ───────────────────── */}
+              <div className="p-4 bg-gray-700/50 rounded-lg border border-cyan-600/40">
+                <h5 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Target className="h-5 w-5 text-cyan-400" /> Net ROI vs Trade
+                  ROI — what&apos;s the difference?
+                </h5>
+                <p className="text-sm text-gray-400 mb-3">
+                  The dashboard shows{" "}
+                  <strong className="text-white">two</strong> ROI rings because
+                  they answer two completely different questions. Don&apos;t mix
+                  them up.
+                </p>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {/* Net ROI */}
+                  <div className="p-3 bg-cyan-500/10 rounded-lg border border-cyan-500/30 text-sm">
+                    <p className="font-semibold text-cyan-300 mb-1">
+                      💶 Net ROI — &quot;Did I make money as a player?&quot;
+                    </p>
+                    <p className="text-gray-300">
+                      A <strong className="text-white">wallet / money</strong>{" "}
+                      metric. It compares the prize credits you won against the
+                      entry fees you paid:
+                    </p>
+                    <p className="font-mono text-xs text-cyan-200 bg-gray-900/50 rounded p-2 my-2">
+                      Net ROI = (prizes won − entry fees) ÷ entry fees × 100
+                    </p>
+                    <ul className="text-gray-400 text-xs space-y-1 list-disc ml-4">
+                      <li>Uses your real credit wallet.</li>
+                      <li>
+                        Counts{" "}
+                        <strong className="text-white">
+                          competition &amp; challenge entry fees
+                        </strong>{" "}
+                        (minus refunds) vs.{" "}
+                        <strong className="text-white">prizes won</strong>.
+                      </li>
+                      <li>
+                        Does{" "}
+                        <strong className="text-white">NOT</strong> count
+                        marketplace purchases, GM earnings, or admin
+                        adjustments.
+                      </li>
+                      <li>
+                        Shown on the{" "}
+                        <strong className="text-white">Dashboard</strong> and{" "}
+                        <strong className="text-white">Profile</strong> only —
+                        it never affects rankings.
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Trade ROI */}
+                  <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/30 text-sm">
+                    <p className="font-semibold text-purple-300 mb-1">
+                      📈 Trade ROI — &quot;How good is my trading?&quot;
+                    </p>
+                    <p className="text-gray-300">
+                      A{" "}
+                      <strong className="text-white">
+                        trading-performance
+                      </strong>{" "}
+                      metric. It compares your trading P&amp;L against the
+                      virtual starting balance you traded with:
+                    </p>
+                    <p className="font-mono text-xs text-purple-200 bg-gray-900/50 rounded p-2 my-2">
+                      Trade ROI = trading P&amp;L ÷ starting capital × 100
+                    </p>
+                    <ul className="text-gray-400 text-xs space-y-1 list-disc ml-4">
+                      <li>Uses the virtual contest balance (not real money).</li>
+                      <li>
+                        Often looks close to{" "}
+                        <strong className="text-white">0%</strong> because the
+                        virtual starting balance (e.g. 10,000) is huge next to
+                        the actual P&amp;L — that&apos;s normal.
+                      </li>
+                      <li>
+                        Shown on the{" "}
+                        <strong className="text-white">Dashboard</strong> and the{" "}
+                        <strong className="text-white">
+                          Leaderboard ROI column
+                        </strong>
+                        .
+                      </li>
+                      <li>
+                        This is the ROI used to{" "}
+                        <strong className="text-white">rank players</strong> and
+                        to decide winners in ROI-based competitions.
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="mt-3 p-3 bg-gray-900/40 border border-gray-700 rounded-lg text-sm">
+                  <p className="text-gray-300">
+                    <strong className="text-white">Quick rule of thumb:</strong>{" "}
+                    Net ROI = &quot;was playing worth it for my wallet?&quot;
+                    (personal money stat). Trade ROI = &quot;how skilled is my
+                    trading?&quot; (the competitive stat that drives the
+                    leaderboard and ROI contests).
+                  </p>
+                </div>
               </div>
 
               {/* ── Tab 4: Contests ──────────────────────────────────── */}
@@ -1424,11 +1533,14 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   </div>
                   <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/30 text-sm">
                     <span className="font-semibold text-green-300">
-                      📊 ROI
+                      📊 ROI (Trade ROI)
                     </span>
                     <p className="text-gray-400 mt-1">
-                      Return on starting capital, in %. Levels the field for
-                      contests with different starting balances.
+                      Return on that contest&apos;s starting capital, in %
+                      (trading P&amp;L ÷ starting capital). Levels the field for
+                      contests with different starting balances. This is{" "}
+                      <strong className="text-white">Trade ROI</strong>, not your
+                      wallet&apos;s Net ROI.
                     </p>
                   </div>
                   <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/30 text-sm">
@@ -2802,7 +2914,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                   <p className="text-green-400 ml-4">totalPnl × 0.3 +</p>
                   <p className="text-blue-400 ml-4">totalPnlPercentage × 5 +</p>
                   <p className="text-cyan-400 ml-4">winRate × 2 +</p>
-                  <p className="text-purple-400 ml-4">profitFactor × 10 +</p>
+                  <p className="text-purple-400 ml-4">min(profitFactor, 5) × 10 +</p>
                   <p className="text-yellow-400 ml-4">competitionsWon × 50 +</p>
                   <p className="text-orange-400 ml-4">podiumFinishes × 20 +</p>
                   <p className="text-red-400 ml-4">challengesWon × 25 +</p>
@@ -2845,11 +2957,12 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       <span className="text-xl">📈</span>
                       <div>
                         <p className="font-semibold text-blue-400">
-                          ROI %
+                          Trade ROI %
                         </p>
                         <p className="text-xs text-gray-500">
-                          Total PnL ÷ total starting capital × 100, across all
-                          contests/duels you&apos;ve entered.
+                          Total trading PnL ÷ total virtual starting capital ×
+                          100, across all contests/duels you&apos;ve entered.
+                          This is Trade ROI (not your wallet&apos;s Net ROI).
                         </p>
                       </div>
                     </div>
@@ -2862,8 +2975,9 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                       <div>
                         <p className="font-semibold text-cyan-400">Win Rate</p>
                         <p className="text-xs text-gray-500">
-                          % of winning closed trades, sourced from your
-                          unified trade history.
+                          % of decisive closed trades that were winners — wins ÷
+                          (wins + losses). Breakeven trades (exactly 0 PnL) are
+                          excluded. Sourced from your unified trade history.
                         </p>
                       </div>
                     </div>
@@ -2879,8 +2993,12 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                         </p>
                         <p className="text-xs text-gray-500">
                           Gross profit ÷ gross loss (sums of realized PnL on
-                          closed trades). If you have no losing trades, the
-                          system treats this as 0 to avoid runaway scores.
+                          closed trades). Shown as{" "}
+                          <strong className="text-gray-300">999</strong> when you
+                          have no losing trades yet; for scoring it is{" "}
+                          <strong className="text-gray-300">capped at 5</strong>{" "}
+                          so a flawless record can&apos;t run away with the
+                          ranking.
                         </p>
                       </div>
                     </div>
@@ -4335,21 +4453,27 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                     </span>
                   </div>
                   <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
-                    <strong className="text-white">ROI</strong>{" "}
+                    <strong className="text-white">Trade ROI</strong>{" "}
                     <span className="text-gray-400">
-                      — return % on total starting capital.
+                      — trading P&amp;L ÷ total virtual starting capital, in %.
+                      This is <strong className="text-white">Trade ROI</strong>{" "}
+                      (trading performance), not your wallet&apos;s Net ROI.
+                      Often near 0% because virtual balances are large.
                     </span>
                   </div>
                   <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
                     <strong className="text-white">Win Rate</strong>{" "}
                     <span className="text-gray-400">
-                      — % of winning closed trades.
+                      — % of decisive closed trades that were winners (wins ÷
+                      (wins + losses); breakeven trades are excluded).
                     </span>
                   </div>
                   <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
                     <strong className="text-white">P. Factor</strong>{" "}
                     <span className="text-gray-400">
-                      — profit factor (gross profit ÷ gross loss).
+                      — profit factor (gross profit ÷ gross loss). Shows{" "}
+                      <strong className="text-white">999</strong> when you have
+                      no losing trades yet.
                     </span>
                   </div>
                   <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">
@@ -4390,7 +4514,7 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                     <ChevronRight className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
                     <span>
                       <strong className="text-white">Sort by any column.</strong>{" "}
-                      Click a column header (Rank, P&amp;L, ROI, Win
+                      Click a column header (Rank, P&amp;L, Trade ROI, Win
                       Rate, P. Factor, Comps, Badges or Score) to sort
                       by that stat. Click again to flip ascending /
                       descending. Default: <em>Score, descending</em>.
