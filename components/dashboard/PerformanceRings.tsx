@@ -139,7 +139,10 @@ export default function PerformanceRings({
             label: "Trade ROI",
             value: Math.min(Math.abs(tradeRoi), 100),
             max: 100,
-            displayValue: `${tradeRoi >= 0 ? "+" : ""}${tradeRoi.toFixed(1)}%`,
+            // Reason: Trade ROI is tiny relative to virtual starting capital, so
+            // 1 decimal would round real values like 0.03% down to 0.0%. Use 2
+            // decimals to match the leaderboard and admin performance view.
+            displayValue: `${tradeRoi >= 0 ? "+" : ""}${tradeRoi.toFixed(2)}%`,
             color: tradeRoi >= 0 ? "#8B5CF6" : "#EF4444",
             glow: tradeRoi >= 0 ? "rgba(139,92,246,0.5)" : "rgba(239,68,68,0.5)",
           },

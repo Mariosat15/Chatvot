@@ -152,6 +152,10 @@ export async function getGlobalLeaderboard(
               // Reason: only genuine losses (PnL < 0); breakeven trades excluded
               // so win rate / profit factor match the dashboard and profile.
               losingTrades: { $sum: { $cond: [{ $lt: ["$realizedPnl", 0] }, 1, 0] } },
+              // Reason: realized PnL is the SINGLE SOURCE OF TRUTH for P&L and
+              // Trade ROI — matches dashboard/profile/admin. Participant.pnl can
+              // include unrealized/open-position PnL and drift from this.
+              totalPnL: { $sum: "$realizedPnl" },
               grossProfit: {
                 $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, "$realizedPnl", 0] },
               },
@@ -166,13 +170,14 @@ export async function getGlobalLeaderboard(
     // Build a map of TradeHistory-based stats per userId
     const tradeHistoryMap = new Map<
       string,
-      { totalTrades: number; winningTrades: number; losingTrades: number; grossProfit: number; grossLoss: number }
+      { totalTrades: number; winningTrades: number; losingTrades: number; totalPnL: number; grossProfit: number; grossLoss: number }
     >();
     for (const row of tradeStatsByUser) {
       tradeHistoryMap.set(row._id, {
         totalTrades: row.totalTrades,
         winningTrades: row.winningTrades,
         losingTrades: row.losingTrades,
+        totalPnL: row.totalPnL || 0,
         grossProfit: row.grossProfit,
         grossLoss: row.grossLoss,
       });
@@ -276,6 +281,7 @@ export async function getGlobalLeaderboard(
         totalTrades: 0,
         winningTrades: 0,
         losingTrades: 0,
+        totalPnL: 0,
         grossProfit: 0,
         grossLoss: 0,
       };
@@ -284,15 +290,19 @@ export async function getGlobalLeaderboard(
       // Reason: shared helper — a flawless (no-loss) trader now gets the same
       // 999 sentinel shown on the dashboard/profile instead of 0.
       const profitFactor = computeProfitFactor(th.grossProfit, th.grossLoss);
+      // Reason: P&L and Trade ROI use realized PnL from TradeHistory (single
+      // source of truth) so the leaderboard matches the dashboard/profile/admin
+      // exactly. Capital denominator still comes from participant records.
+      const realizedPnl = th.totalPnL;
       const totalPnlPercentage =
         stats.totalCapital > 0
-          ? (stats.totalPnl / stats.totalCapital) * 100
+          ? (realizedPnl / stats.totalCapital) * 100
           : 0;
 
       const badges = badgeCounts.get(userId) || { total: 0, legendary: 0 };
 
       const overallScore = calculateOverallScore({
-        totalPnl: stats.totalPnl,
+        totalPnl: realizedPnl,
         totalPnlPercentage,
         winRate,
         profitFactor,
@@ -311,7 +321,7 @@ export async function getGlobalLeaderboard(
         rank: 0,
         isTied: false,
         tiedWith: [],
-        totalPnl: stats.totalPnl,
+        totalPnl: realizedPnl,
         totalPnlPercentage,
         totalTrades: th.totalTrades,
         winRate,
