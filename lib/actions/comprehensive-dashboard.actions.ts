@@ -14,6 +14,7 @@ import TradeHistory from "@/database/models/trading/trade-history.model";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import { getUserFinancialSummary } from "@/lib/services/user-financial-summary.service";
+import { computeProfitFactor, computeWinRate } from "@/lib/services/trading-metrics";
 import { fetchRealForexPrices } from "@/lib/services/real-forex-prices.service";
 import {
   ForexSymbol,
@@ -431,11 +432,22 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   // Reason: Include "rules" to access rules.rankingMethod for correct dashboard metric display
   const challengeSelect = "_id challengerId challengedId status startTime endTime entryFee challengerName challengedName rules";
 
+  // Reason: Charts (win/loss donut, top symbols, by-hour, monthly) and streaks
+  // must reflect ALL closed trades — competitions AND challenges — to stay
+  // consistent with the Performance rings (which aggregate every trade). The
+  // previous single `.limit(100)` query silently undercounted analytics and made
+  // the donut total disagree with the rings for anyone past 100 trades.
+  // We therefore use a tiny full-field query for the Recent Trades feed and a
+  // separate lightweight projection (4 fields) over the full trade history for
+  // the analytics — keeping memory small even for very active traders.
+  const chartTradeSelect = "symbol realizedPnl closedAt isWinner competitionId";
+
   const [
     competitionParticipations,
     challengeParticipations,
     allChallenges,
-    allTrades,
+    recentTradesRaw,
+    chartTrades,
     wallet,
     walletTransactions,
   ] = await Promise.all([
@@ -444,7 +456,8 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     Challenge.find({
       $or: [{ challengerId: userId }, { challengedId: userId }],
     }).select(challengeSelect).sort({ createdAt: -1 }).limit(100).lean(),
-    TradeHistory.find({ userId }).select(tradeSelect).sort({ closedAt: -1 }).limit(100).lean(),
+    TradeHistory.find({ userId }).select(tradeSelect).sort({ closedAt: -1 }).limit(20).lean(),
+    TradeHistory.find({ userId }).select(chartTradeSelect).sort({ closedAt: -1 }).lean(),
     // Reason: Select all wallet fields needed by dashboard hero stats and charts
     CreditWallet.findOne({ userId }).select("creditBalance totalDeposited totalWithdrawn totalWonFromCompetitions totalWonFromChallenges totalSpentOnCompetitions totalSpentOnChallenges totalSpentOnMarketplace").lean(),
     // Reason: No limit — all transactions needed for accurate dashboard totals.
@@ -794,8 +807,11 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       $group: {
         _id: null,
         totalTrades: { $sum: 1 },
-        winningTrades: { $sum: { $cond: ["$isWinner", 1, 0] } },
-        losingTrades: { $sum: { $cond: ["$isWinner", 0, 1] } },
+        winningTrades: { $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, 1, 0] } },
+        // Reason: count ONLY genuine losses (PnL < 0). Breakeven trades
+        // (PnL === 0) are excluded here and shown separately in the donut, so
+        // losingTrades / avgLoss / winRate are not inflated by breakevens.
+        losingTrades: { $sum: { $cond: [{ $lt: ["$realizedPnl", 0] }, 1, 0] } },
         totalPnL: { $sum: "$realizedPnl" },
         grossWins: {
           $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, "$realizedPnl", 0] },
@@ -861,13 +877,8 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   const wROI = financialSummary.roi;
   const wGMEarnings = financialSummary.gmEarnings;
 
-  const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
-  const profitFactor =
-    totalGrossLosses > 0
-      ? totalGrossWins / totalGrossLosses
-      : totalGrossWins > 0
-        ? 999
-        : 0;
+  const winRate = computeWinRate(winningTrades, losingTrades);
+  const profitFactor = computeProfitFactor(totalGrossWins, totalGrossLosses);
   const averageWin = winningTrades > 0 ? totalGrossWins / winningTrades : 0;
   const averageLoss = losingTrades > 0 ? totalGrossLosses / losingTrades : 0;
 
@@ -875,15 +886,23 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   const currentWalletBalance = walletData?.creditBalance || 0;
   const charts = await buildChartData(
     userId,
-    allTrades as any[],
+    chartTrades as any[],
     walletTransactions as any[],
     currentWalletBalance,
   );
 
+  // Reason: Trades/positions store the contest id in `competitionId` for BOTH
+  // modes (the schema has no `challengeId`). To label a row correctly we check
+  // whether that id belongs to one of the user's challenges, otherwise it's a
+  // competition. Without this, every challenge trade was mislabeled "Competition".
+  const userChallengeIdSet = new Set(userChallengeIds);
+  const contestTypeFor = (contestId: unknown): "competition" | "challenge" =>
+    userChallengeIdSet.has(String(contestId)) ? "challenge" : "competition";
+
   // Get recent trades and positions
-  const recentTrades: TradeData[] = (allTrades as any[])
-    .slice(0, 20)
-    .map((t: any) => ({
+  const recentTrades: TradeData[] = (recentTradesRaw as any[]).map((t: any) => {
+    const type = contestTypeFor(t.competitionId);
+    return {
       id: t._id.toString(),
       symbol: t.symbol,
       side: t.side,
@@ -899,9 +918,10 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
           : 0,
       openedAt: t.openedAt,
       closedAt: t.closedAt,
-      contestName: t.competitionId ? "Competition" : "Challenge",
-      contestType: t.competitionId ? "competition" : "challenge",
-    }));
+      contestName: type === "challenge" ? "Challenge" : "Competition",
+      contestType: type,
+    };
+  });
 
   const openPositions = await TradingPosition.find({
     userId,
@@ -950,14 +970,17 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
         unrealizedPnLPercentage:
           pos.marginUsed > 0 ? (unrealizedPnL / pos.marginUsed) * 100 : 0,
         openedAt: pos.openedAt,
-        contestName: pos.competitionId ? "Competition" : "Challenge",
-        contestType: pos.competitionId ? "competition" : "challenge",
+        contestName:
+          contestTypeFor(pos.competitionId) === "challenge"
+            ? "Challenge"
+            : "Competition",
+        contestType: contestTypeFor(pos.competitionId),
       };
     },
   );
 
   // Calculate streaks
-  const streaks = calculateStreaks(allTrades as any[]);
+  const streaks = calculateStreaks(chartTrades as any[]);
 
   // Calculate starting capital for percentage
   const totalStartingCapital = allParticipations.reduce(

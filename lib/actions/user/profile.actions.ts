@@ -11,6 +11,10 @@ import Challenge from "@/database/models/trading/challenge.model";
 import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
 import { getUserFinancialSummary } from "@/lib/services/user-financial-summary.service";
 import TradeHistory from "@/database/models/trading/trade-history.model";
+import {
+  computeProfitFactor,
+  computeWinRate,
+} from "@/lib/services/trading-metrics";
 
 /**
  * Combined trading stats (competitions + challenges)
@@ -61,8 +65,9 @@ export async function getCombinedTradingStats(
         $group: {
           _id: null,
           totalTrades: { $sum: 1 },
-          winningTrades: { $sum: { $cond: ["$isWinner", 1, 0] } },
-          losingTrades: { $sum: { $cond: ["$isWinner", 0, 1] } },
+          winningTrades: { $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, 1, 0] } },
+          // Reason: count ONLY genuine losses (PnL < 0); breakeven excluded.
+          losingTrades: { $sum: { $cond: [{ $lt: ["$realizedPnl", 0] }, 1, 0] } },
           totalPnL: { $sum: "$realizedPnl" },
           grossWins: {
             $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, "$realizedPnl", 0] },
@@ -104,16 +109,8 @@ export async function getCombinedTradingStats(
     );
 
     // Calculate derived stats
-    const winRate =
-      stats.totalTrades > 0
-        ? (stats.winningTrades / stats.totalTrades) * 100
-        : 0;
-    const profitFactor =
-      stats.grossLosses > 0
-        ? stats.grossWins / stats.grossLosses
-        : stats.grossWins > 0
-          ? 999
-          : 0;
+    const winRate = computeWinRate(stats.winningTrades, stats.losingTrades);
+    const profitFactor = computeProfitFactor(stats.grossWins, stats.grossLosses);
     const averageWin =
       stats.winningTrades > 0 ? stats.grossWins / stats.winningTrades : 0;
     const averageLoss =
@@ -301,12 +298,9 @@ export async function getUserCompetitionStats(
       totalTrades > 0 ? (totalWinningTrades / totalTrades) * 100 : 0;
     const averageRoi =
       participations.length > 0 ? totalRoi / participations.length : 0;
-    const profitFactor =
-      totalLoss > 0
-        ? totalGross / totalLoss
-        : totalWinningTrades > 0
-          ? 9999
-          : 0;
+    // Reason: shared helper for a single, consistent no-loss sentinel (999)
+    // across dashboard, profile and leaderboard (was an inconsistent 9999 here).
+    const profitFactor = computeProfitFactor(totalGross, totalLoss);
     const totalPnlPercentage =
       totalCapitalTraded > 0 ? (totalPnl / totalCapitalTraded) * 100 : 0;
 

@@ -7,6 +7,7 @@ import CompetitionParticipant from "@/database/models/trading/competition-partic
 import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
 import { UserPurchase } from "@/database/models/marketplace/user-purchase.model";
 import TradeHistory from "@/database/models/trading/trade-history.model";
+import { computeWinRate } from "@/lib/services/trading-metrics";
 import UserRestriction from "@/database/models/user-restriction.model";
 // Force model registration before populate is called
 import "@/database/models/marketplace/marketplace-item.model";
@@ -259,13 +260,23 @@ export async function GET(request: NextRequest) {
         $group: {
           _id: "$userId",
           totalTrades: { $sum: 1 },
-          winningTrades: { $sum: { $cond: ["$isWinner", 1, 0] } },
+          winningTrades: { $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, 1, 0] } },
+          // Reason: only genuine losses (PnL < 0); breakeven excluded so win
+          // rate matches dashboard/profile/leaderboard exactly.
+          losingTrades: { $sum: { $cond: [{ $lt: ["$realizedPnl", 0] }, 1, 0] } },
         },
       },
     ]);
-    const tradeStatsMap = new Map<string, { totalTrades: number; winningTrades: number }>();
+    const tradeStatsMap = new Map<
+      string,
+      { totalTrades: number; winningTrades: number; losingTrades: number }
+    >();
     for (const row of tradeStatsByUser) {
-      tradeStatsMap.set(row._id, { totalTrades: row.totalTrades, winningTrades: row.winningTrades });
+      tradeStatsMap.set(row._id, {
+        totalTrades: row.totalTrades,
+        winningTrades: row.winningTrades,
+        losingTrades: row.losingTrades,
+      });
     }
 
     // Get active restrictions for displayed users (one per user, most recent).
@@ -337,11 +348,17 @@ export async function GET(request: NextRequest) {
 
       // Reason: Use TradeHistory aggregate as SINGLE SOURCE OF TRUTH for totalTrades/winRate.
       // This matches getCombinedTradingStats (profile) and getComprehensiveDashboardData (dashboard).
-      const userTradeStats = tradeStatsMap.get(userId) || { totalTrades: 0, winningTrades: 0 };
+      const userTradeStats = tradeStatsMap.get(userId) || {
+        totalTrades: 0,
+        winningTrades: 0,
+        losingTrades: 0,
+      };
       const totalTrades = userTradeStats.totalTrades;
       const totalWinningTrades = userTradeStats.winningTrades;
-      const overallWinRate =
-        totalTrades > 0 ? (totalWinningTrades / totalTrades) * 100 : 0;
+      const overallWinRate = computeWinRate(
+        totalWinningTrades,
+        userTradeStats.losingTrades,
+      );
 
       const totalPnl = userComps.reduce(
         (sum: number, p: any) => sum + (p.pnl || 0),

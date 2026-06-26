@@ -4,7 +4,10 @@ import { motion } from "framer-motion";
 
 interface PerformanceRingsProps {
   winRate: number;
+  /** Net/prize ROI: net prize profit ÷ entry fees staked (money return). */
   roi?: number;
+  /** Trade ROI: realized trade PnL ÷ starting capital (trading performance). */
+  tradeRoi?: number;
   profitFactor: number;
   avgWin: number;
   avgLoss: number;
@@ -95,6 +98,7 @@ function AnimatedRing({
 export default function PerformanceRings({
   winRate,
   roi,
+  tradeRoi,
   profitFactor,
   avgWin,
   avgLoss,
@@ -110,10 +114,14 @@ export default function PerformanceRings({
       color: "#22C55E",
       glow: "rgba(34,197,94,0.5)",
     },
+    // Reason: "Net ROI" is the money return (prizes won ÷ entry fees staked),
+    // shared with the profile page. "Trade ROI" is trading performance
+    // (realized PnL ÷ starting capital). They answer different questions, so we
+    // show both rather than overloading one ambiguous "ROI" ring.
     ...(roi !== undefined
       ? [
           {
-            label: "ROI",
+            label: "Net ROI",
             // Reason: ROI can be negative; use absolute value for ring fill,
             // capped at 100% for visual consistency. Color switches red/cyan.
             value: Math.min(Math.abs(roi), 100),
@@ -121,6 +129,18 @@ export default function PerformanceRings({
             displayValue: `${roi >= 0 ? "+" : ""}${roi.toFixed(1)}%`,
             color: roi >= 0 ? "#06B6D4" : "#EF4444",
             glow: roi >= 0 ? "rgba(6,182,212,0.5)" : "rgba(239,68,68,0.5)",
+          },
+        ]
+      : []),
+    ...(tradeRoi !== undefined
+      ? [
+          {
+            label: "Trade ROI",
+            value: Math.min(Math.abs(tradeRoi), 100),
+            max: 100,
+            displayValue: `${tradeRoi >= 0 ? "+" : ""}${tradeRoi.toFixed(1)}%`,
+            color: tradeRoi >= 0 ? "#8B5CF6" : "#EF4444",
+            glow: tradeRoi >= 0 ? "rgba(139,92,246,0.5)" : "rgba(239,68,68,0.5)",
           },
         ]
       : []),
@@ -184,7 +204,7 @@ export default function PerformanceRings({
           <p className="text-xs text-gray-500">Complete trades to see your metrics here</p>
         </div>
       ) : (
-        <div className={`grid gap-3 sm:gap-4 ${rings.length <= 6 ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6" : "grid-cols-2 sm:grid-cols-4 lg:grid-cols-7"}`}>
+        <div className={`grid gap-3 sm:gap-4 ${rings.length <= 6 ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6" : "grid-cols-2 sm:grid-cols-4 lg:grid-cols-8"}`}>
           {rings.map((datum, i) => (
             <AnimatedRing
               key={datum.label}

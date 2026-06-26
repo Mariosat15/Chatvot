@@ -7,6 +7,7 @@ import ChallengeParticipant from "@/database/models/trading/challenge-participan
 import TradingPosition from "@/database/models/trading/trading-position.model";
 import PriceSnapshot from "@/database/models/trading/price-snapshot.model";
 import mongoose from "mongoose";
+import { computeProfitFactor } from "@/lib/services/trading-metrics";
 
 export const dynamic = "force-dynamic";
 
@@ -263,12 +264,12 @@ export async function GET() {
       else if (rankingMethod === "total_capital") rankValue = liveEquity;
       else if (rankingMethod === "win_rate") rankValue = winRate;
 
-      const profitFactor =
-        (p.averageLoss as number) > 0
-          ? (p.averageWin as number) / (p.averageLoss as number)
-          : (p.averageWin as number) > 0
-            ? 99
-            : 0;
+      // Reason: shared total-based profit factor + consistent no-loss sentinel
+      // (999) across all surfaces. gross = average × count from stored counters.
+      const profitFactor = computeProfitFactor(
+        ((p.averageWin as number) || 0) * ((p.winningTrades as number) || 0),
+        ((p.averageLoss as number) || 0) * ((p.losingTrades as number) || 0),
+      );
 
       return {
         userId: p.userId,

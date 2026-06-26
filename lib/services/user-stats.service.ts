@@ -16,6 +16,10 @@ import TradeHistory from "@/database/models/trading/trade-history.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
 import mongoose from "mongoose";
+import {
+  computeProfitFactor,
+  computeWinRate,
+} from "@/lib/services/trading-metrics";
 
 export interface UserTradingStats {
   userId: string;
@@ -91,8 +95,10 @@ export async function getUserTradingStats(
       $group: {
         _id: "$userId",
         totalTrades: { $sum: 1 },
-        winningTrades: { $sum: { $cond: ["$isWinner", 1, 0] } },
-        losingTrades: { $sum: { $cond: ["$isWinner", 0, 1] } },
+        winningTrades: { $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, 1, 0] } },
+        // Reason: count ONLY genuine losses (PnL < 0); breakeven excluded so
+        // win rate / profit factor stay consistent across every surface.
+        losingTrades: { $sum: { $cond: [{ $lt: ["$realizedPnl", 0] }, 1, 0] } },
         totalPnL: { $sum: "$realizedPnl" },
         grossProfit: {
           $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, "$realizedPnl", 0] },
@@ -130,8 +136,7 @@ export async function getUserTradingStats(
     largestLoss: 0,
   };
 
-  const winRate =
-    stats.totalTrades > 0 ? (stats.winningTrades / stats.totalTrades) * 100 : 0;
+  const winRate = computeWinRate(stats.winningTrades, stats.losingTrades);
 
   const averageWin =
     stats.winningTrades > 0 ? stats.grossProfit / stats.winningTrades : 0;
@@ -139,12 +144,7 @@ export async function getUserTradingStats(
   const averageLoss =
     stats.losingTrades > 0 ? -(stats.grossLoss / stats.losingTrades) : 0;
 
-  const profitFactor =
-    stats.grossLoss > 0
-      ? stats.grossProfit / stats.grossLoss
-      : stats.winningTrades > 0
-        ? Infinity
-        : 0;
+  const profitFactor = computeProfitFactor(stats.grossProfit, stats.grossLoss);
 
   // Calculate win streak (optional - can be expensive for many trades)
   const { winStreak, currentStreak } = await calculateWinStreak(userId);
@@ -158,7 +158,7 @@ export async function getUserTradingStats(
     totalPnL: stats.totalPnL,
     averageWin,
     averageLoss,
-    profitFactor: profitFactor === Infinity ? 9999 : profitFactor,
+    profitFactor,
     largestWin: stats.largestWin || 0,
     largestLoss: stats.largestLoss || 0,
     competitions: competitionCount,
@@ -191,8 +191,10 @@ export async function getContestStats(
       $group: {
         _id: null,
         totalTrades: { $sum: 1 },
-        winningTrades: { $sum: { $cond: ["$isWinner", 1, 0] } },
-        losingTrades: { $sum: { $cond: ["$isWinner", 0, 1] } },
+        winningTrades: { $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, 1, 0] } },
+        // Reason: count ONLY genuine losses (PnL < 0); breakeven excluded so
+        // win rate / profit factor stay consistent across every surface.
+        losingTrades: { $sum: { $cond: [{ $lt: ["$realizedPnl", 0] }, 1, 0] } },
         totalPnL: { $sum: "$realizedPnl" },
         totalHoldingTime: { $sum: "$holdingTimeSeconds" },
         largestWin: {
@@ -221,10 +223,7 @@ export async function getContestStats(
     totalTrades: result.totalTrades,
     winningTrades: result.winningTrades,
     losingTrades: result.losingTrades,
-    winRate:
-      result.totalTrades > 0
-        ? (result.winningTrades / result.totalTrades) * 100
-        : 0,
+    winRate: computeWinRate(result.winningTrades, result.losingTrades),
     totalPnL: result.totalPnL,
     averageHoldingTime:
       result.totalTrades > 0 ? result.totalHoldingTime / result.totalTrades : 0,
@@ -329,8 +328,10 @@ export async function getBulkUserStats(options?: {
       $group: {
         _id: "$userId",
         totalTrades: { $sum: 1 },
-        winningTrades: { $sum: { $cond: ["$isWinner", 1, 0] } },
-        losingTrades: { $sum: { $cond: ["$isWinner", 0, 1] } },
+        winningTrades: { $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, 1, 0] } },
+        // Reason: count ONLY genuine losses (PnL < 0); breakeven excluded so
+        // win rate / profit factor stay consistent across every surface.
+        losingTrades: { $sum: { $cond: [{ $lt: ["$realizedPnl", 0] }, 1, 0] } },
         totalPnL: { $sum: "$realizedPnl" },
         grossProfit: {
           $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, "$realizedPnl", 0] },
@@ -393,16 +394,14 @@ export async function getBulkUserStats(options?: {
       .filter((stats) => userMap.has(stats._id))
       .map((stats) => {
         const user = userMap.get(stats._id)!;
-        const winRate =
-          stats.totalTrades > 0
-            ? (stats.winningTrades / stats.totalTrades) * 100
-            : 0;
-        const profitFactor =
-          stats.grossLoss > 0
-            ? stats.grossProfit / stats.grossLoss
-            : stats.winningTrades > 0
-              ? 9999
-              : 0;
+        const winRate = computeWinRate(
+          stats.winningTrades,
+          stats.losingTrades,
+        );
+        const profitFactor = computeProfitFactor(
+          stats.grossProfit,
+          stats.grossLoss,
+        );
 
         return {
           userId: stats._id,
@@ -506,8 +505,10 @@ export async function syncParticipantStats(
       $group: {
         _id: null,
         totalTrades: { $sum: 1 },
-        winningTrades: { $sum: { $cond: ["$isWinner", 1, 0] } },
-        losingTrades: { $sum: { $cond: ["$isWinner", 0, 1] } },
+        winningTrades: { $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, 1, 0] } },
+        // Reason: count ONLY genuine losses (PnL < 0); breakeven excluded so
+        // win rate / profit factor stay consistent across every surface.
+        losingTrades: { $sum: { $cond: [{ $lt: ["$realizedPnl", 0] }, 1, 0] } },
         totalPnL: { $sum: "$realizedPnl" },
         grossProfit: {
           $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, "$realizedPnl", 0] },
@@ -522,10 +523,7 @@ export async function syncParticipantStats(
   ]);
 
   if (stats) {
-    const winRate =
-      stats.totalTrades > 0
-        ? (stats.winningTrades / stats.totalTrades) * 100
-        : 0;
+    const winRate = computeWinRate(stats.winningTrades, stats.losingTrades);
 
     await Model.findByIdAndUpdate(participantId, {
       totalTrades: stats.totalTrades,

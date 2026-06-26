@@ -10,6 +10,11 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { getAllUsers } from "@/lib/utils/user-lookup";
 import { getHiddenUserIds } from "@/lib/services/user-restriction.service";
+import {
+  computeProfitFactor,
+  computeWinRate,
+  clampProfitFactorForScore,
+} from "@/lib/services/trading-metrics";
 // Titles are added per-page in the API to avoid loading 4000+ UserLevel docs on every cache build
 
 export interface GlobalLeaderboardEntry {
@@ -143,8 +148,10 @@ export async function getGlobalLeaderboard(
             $group: {
               _id: "$userId",
               totalTrades: { $sum: 1 },
-              winningTrades: { $sum: { $cond: ["$isWinner", 1, 0] } },
-              losingTrades: { $sum: { $cond: ["$isWinner", 0, 1] } },
+              winningTrades: { $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, 1, 0] } },
+              // Reason: only genuine losses (PnL < 0); breakeven trades excluded
+              // so win rate / profit factor match the dashboard and profile.
+              losingTrades: { $sum: { $cond: [{ $lt: ["$realizedPnl", 0] }, 1, 0] } },
               grossProfit: {
                 $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, "$realizedPnl", 0] },
               },
@@ -273,12 +280,10 @@ export async function getGlobalLeaderboard(
         grossLoss: 0,
       };
 
-      const winRate =
-        th.totalTrades > 0
-          ? (th.winningTrades / th.totalTrades) * 100
-          : 0;
-      const profitFactor =
-        th.grossLoss > 0 ? th.grossProfit / th.grossLoss : 0;
+      const winRate = computeWinRate(th.winningTrades, th.losingTrades);
+      // Reason: shared helper — a flawless (no-loss) trader now gets the same
+      // 999 sentinel shown on the dashboard/profile instead of 0.
+      const profitFactor = computeProfitFactor(th.grossProfit, th.grossLoss);
       const totalPnlPercentage =
         stats.totalCapital > 0
           ? (stats.totalPnl / stats.totalCapital) * 100
@@ -396,7 +401,9 @@ function calculateOverallScore(params: {
     totalPnl * 0.3 + // 30% weight on absolute P&L
     totalPnlPercentage * 5 + // 25% weight on ROI (scaled)
     winRate * 2 + // 20% weight on win rate
-    profitFactor * 10 + // 10% weight on profit factor
+    // Reason: cap profit factor before scoring so a no-loss trader's 999
+    // sentinel cannot dominate the ranking (clamped to PROFIT_FACTOR_SCORE_CAP).
+    clampProfitFactorForScore(profitFactor) * 10 + // 10% weight on profit factor
     competitionsWon * 50 + // 5% weight on competition wins
     podiumFinishes * 20 + // 5% weight on podiums
     challengesWon * 25 + // Weight on challenge wins

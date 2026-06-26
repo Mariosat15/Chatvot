@@ -172,6 +172,7 @@ export default function DashboardLayout({ data }: DashboardLayoutProps) {
           <PerformanceRings
             winRate={overview.winRate}
             roi={overview.roi}
+            tradeRoi={overview.totalPnLPercentage}
             profitFactor={overview.profitFactor}
             avgWin={overview.averageWin}
             avgLoss={overview.averageLoss}

@@ -10,6 +10,7 @@ import Competition from "@/database/models/trading/competition.model";
 import Challenge from "@/database/models/trading/challenge.model";
 import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
 import { getUserFinancialSummary } from "@/lib/services/user-financial-summary.service";
+import { computeProfitFactor } from "@/lib/services/trading-metrics";
 
 export interface UserCompetitionStats {
   // Overall Stats
@@ -145,12 +146,9 @@ export async function getUserCompetitionStats(
       totalTrades > 0 ? (totalWinningTrades / totalTrades) * 100 : 0;
     const averageRoi =
       participations.length > 0 ? totalRoi / participations.length : 0;
-    const profitFactor =
-      totalLoss > 0
-        ? totalGross / totalLoss
-        : totalWinningTrades > 0
-          ? 9999
-          : 0;
+    // Reason: shared helper for a single, consistent no-loss sentinel (999)
+    // across dashboard, profile and leaderboard (was an inconsistent 9999 here).
+    const profitFactor = computeProfitFactor(totalGross, totalLoss);
     const totalPnlPercentage =
       totalCapitalTraded > 0 ? (totalPnl / totalCapitalTraded) * 100 : 0;
 

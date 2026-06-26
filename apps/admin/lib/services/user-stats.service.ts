@@ -7,6 +7,10 @@
 
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
+import {
+  computeProfitFactor,
+  computeWinRate,
+} from "@/lib/services/trading-metrics";
 
 export interface UserTradingStats {
   userId: string;
@@ -79,8 +83,10 @@ export async function getBulkUserStats(options?: {
         $group: {
           _id: "$userId",
           totalTrades: { $sum: 1 },
-          winningTrades: { $sum: { $cond: ["$isWinner", 1, 0] } },
-          losingTrades: { $sum: { $cond: ["$isWinner", 0, 1] } },
+          winningTrades: { $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, 1, 0] } },
+          // Reason: count ONLY genuine losses (PnL < 0); breakeven excluded so
+          // win rate / profit factor stay consistent across every surface.
+          losingTrades: { $sum: { $cond: [{ $lt: ["$realizedPnl", 0] }, 1, 0] } },
           totalPnL: { $sum: "$realizedPnl" },
           grossProfit: {
             $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, "$realizedPnl", 0] },
@@ -150,16 +156,14 @@ export async function getBulkUserStats(options?: {
       .filter((stats) => userMap.has(stats._id))
       .map((stats) => {
         const user = userMap.get(stats._id)!;
-        const winRate =
-          stats.totalTrades > 0
-            ? (stats.winningTrades / stats.totalTrades) * 100
-            : 0;
-        const profitFactor =
-          stats.grossLoss > 0
-            ? stats.grossProfit / stats.grossLoss
-            : stats.winningTrades > 0
-              ? 9999
-              : 0;
+        const winRate = computeWinRate(
+          stats.winningTrades,
+          stats.losingTrades,
+        );
+        const profitFactor = computeProfitFactor(
+          stats.grossProfit,
+          stats.grossLoss,
+        );
 
         return {
           userId: stats._id,

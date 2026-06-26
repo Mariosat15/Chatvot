@@ -7,6 +7,11 @@ import UserBadge from "@/database/models/user-badge.model";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { getAllUsers } from "@/lib/utils/user-lookup";
+import {
+  computeProfitFactor,
+  computeWinRate,
+  clampProfitFactorForScore,
+} from "@/lib/services/trading-metrics";
 
 export interface GlobalLeaderboardEntry {
   userId: string;
@@ -201,12 +206,13 @@ export async function getGlobalLeaderboard(
     const leaderboardEntries: GlobalLeaderboardEntry[] = [];
 
     for (const [userId, stats] of userStatsMap.entries()) {
-      const winRate =
-        stats.totalTrades > 0
-          ? (stats.winningTrades / stats.totalTrades) * 100
-          : 0;
-      const profitFactor =
-        stats.grossLoss > 0 ? stats.grossProfit / stats.grossLoss : 0;
+      const winRate = computeWinRate(stats.winningTrades, stats.losingTrades);
+      // Reason: shared helper — a flawless (no-loss) trader now gets the same
+      // 999 sentinel shown on the dashboard/profile instead of 0.
+      const profitFactor = computeProfitFactor(
+        stats.grossProfit,
+        stats.grossLoss,
+      );
       const totalPnlPercentage =
         stats.totalCapital > 0
           ? (stats.totalPnl / stats.totalCapital) * 100
@@ -381,7 +387,9 @@ function calculateOverallScore(params: {
     totalPnl * 0.3 + // 30% weight on absolute P&L
     totalPnlPercentage * 5 + // 25% weight on ROI (scaled)
     winRate * 2 + // 20% weight on win rate
-    profitFactor * 10 + // 10% weight on profit factor
+    // Reason: cap profit factor before scoring so a no-loss trader's 999
+    // sentinel cannot dominate the ranking (clamped to PROFIT_FACTOR_SCORE_CAP).
+    clampProfitFactorForScore(profitFactor) * 10 + // 10% weight on profit factor
     competitionsWon * 50 + // 5% weight on competition wins
     podiumFinishes * 20 + // 5% weight on podiums
     challengesWon * 25 + // Weight on challenge wins

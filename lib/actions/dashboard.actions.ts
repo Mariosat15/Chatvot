@@ -10,6 +10,10 @@ import TradingPosition from "@/database/models/trading/trading-position.model";
 import TradeHistory from "@/database/models/trading/trade-history.model";
 import { getRealPrice, fetchRealForexPrices } from "@/lib/services/real-forex-prices.service";
 import {
+  computeProfitFactor,
+  computeWinRate,
+} from "@/lib/services/trading-metrics";
+import {
   ForexSymbol,
   calculateUnrealizedPnL,
   getQuoteToUsdRate,
@@ -164,8 +168,9 @@ export const getUserDashboardDataForApi = async (userId: string) => {
         $group: {
           _id: null,
           totalTrades: { $sum: 1 },
-          winningTrades: { $sum: { $cond: ["$isWinner", 1, 0] } },
-          losingTrades: { $sum: { $cond: ["$isWinner", 0, 1] } },
+          winningTrades: { $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, 1, 0] } },
+          // Reason: only genuine losses (PnL < 0); breakeven excluded.
+          losingTrades: { $sum: { $cond: [{ $lt: ["$realizedPnl", 0] }, 1, 0] } },
         },
       },
     ]);
@@ -178,8 +183,7 @@ export const getUserDashboardDataForApi = async (userId: string) => {
     const totalTrades = stats.totalTrades;
     const totalWinningTrades = stats.winningTrades;
     const totalLosingTrades = stats.losingTrades;
-    const overallWinRate =
-      totalTrades > 0 ? (totalWinningTrades / totalTrades) * 100 : 0;
+    const overallWinRate = computeWinRate(totalWinningTrades, totalLosingTrades);
 
     return {
       activeCompetitions: validCompetitions,
@@ -508,8 +512,9 @@ export const getUserDashboardData = async () => {
         $group: {
           _id: null,
           totalTrades: { $sum: 1 },
-          winningTrades: { $sum: { $cond: ["$isWinner", 1, 0] } },
-          losingTrades: { $sum: { $cond: ["$isWinner", 0, 1] } },
+          winningTrades: { $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, 1, 0] } },
+          // Reason: only genuine losses (PnL < 0); breakeven excluded.
+          losingTrades: { $sum: { $cond: [{ $lt: ["$realizedPnl", 0] }, 1, 0] } },
         },
       },
     ]);
@@ -523,9 +528,8 @@ export const getUserDashboardData = async () => {
     const totalWinningTrades = stats.winningTrades;
     const totalLosingTrades = stats.losingTrades;
 
-    // Calculate true overall win rate (not average of win rates)
-    const overallWinRate =
-      totalTrades > 0 ? (totalWinningTrades / totalTrades) * 100 : 0;
+    // Calculate true overall win rate (decisive trades only, excl. breakeven)
+    const overallWinRate = computeWinRate(totalWinningTrades, totalLosingTrades);
 
     // Calculate profit factor
     let totalGrossProfit = 0;
@@ -539,12 +543,7 @@ export const getUserDashboardData = async () => {
         totalGrossLoss += Math.abs(p.averageLoss) * p.losingTrades;
       }
     });
-    const profitFactor =
-      totalGrossLoss > 0
-        ? totalGrossProfit / totalGrossLoss
-        : totalWinningTrades > 0
-          ? 9999
-          : 0;
+    const profitFactor = computeProfitFactor(totalGrossProfit, totalGrossLoss);
 
     // Generate global daily P&L across all competitions
     const aggregatedDailyPnL = new Map<

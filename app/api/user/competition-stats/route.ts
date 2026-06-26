@@ -8,6 +8,7 @@ import Competition from "@/database/models/trading/competition.model";
 import Challenge from "@/database/models/trading/challenge.model";
 import TradingPosition from "@/database/models/trading/trading-position.model";
 import TradeHistory from "@/database/models/trading/trade-history.model";
+import { computeProfitFactor } from "@/lib/services/trading-metrics";
 
 export const dynamic = "force-dynamic";
 
@@ -520,12 +521,15 @@ export async function GET(req: NextRequest) {
                 losingTrades.reduce((sum, t) => sum + (t.realizedPnl || 0), 0),
               ) / losingTrades.length
             : 0;
-        const profitFactor =
-          avgLossAmount > 0
-            ? avgWinAmount / avgLossAmount
-            : avgWinAmount > 0
-              ? Infinity
-              : 0;
+        // Reason: total-based profit factor (gross profit / gross loss) via the
+        // shared helper — matches dashboard/profile/leaderboard exactly. Was an
+        // average-of-averages ratio with an Infinity sentinel before.
+        const grossProfitAmount = avgWinAmount * winningTrades.length;
+        const grossLossAmount = avgLossAmount * losingTrades.length;
+        const profitFactor = computeProfitFactor(
+          grossProfitAmount,
+          grossLossAmount,
+        );
 
         currentCompetitionStats = {
           competitionName: competition?.name || "Unknown",
@@ -571,7 +575,7 @@ export async function GET(req: NextRequest) {
           // Advanced stats from TradeHistory
           avgWin: avgWinAmount,
           avgLoss: avgLossAmount,
-          profitFactor: profitFactor === Infinity ? 999 : profitFactor,
+          profitFactor,
           largestWin:
             tradeHistory.length > 0
               ? Math.max(...tradeHistory.map((t) => t.realizedPnl || 0), 0)
