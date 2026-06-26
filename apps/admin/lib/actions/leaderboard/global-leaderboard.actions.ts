@@ -3,6 +3,7 @@
 import { connectToDatabase } from "@/database/mongoose";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
+import TradeHistory from "@/database/models/trading/trade-history.model";
 import UserBadge from "@/database/models/user-badge.model";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
@@ -71,6 +72,58 @@ export async function getGlobalLeaderboard(
     // Get all challenge participants
     const allChallengeParticipants = await ChallengeParticipant.find({}).lean();
 
+    // Reason: TradeHistory is the SINGLE SOURCE OF TRUTH for trades, win rate,
+    // profit factor and realized P&L — this keeps the admin leaderboard exactly
+    // consistent with the user dashboard, profile, user leaderboard and the
+    // admin per-user Performance tab. Participant docs are only used for the
+    // capital denominator and competition/challenge enter/win counts.
+    const tradeStatsByUser = await TradeHistory.aggregate([
+      {
+        $group: {
+          _id: "$userId",
+          totalTrades: { $sum: 1 },
+          winningTrades: {
+            $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, 1, 0] },
+          },
+          // Reason: only genuine losses (PnL < 0); breakeven trades excluded.
+          losingTrades: {
+            $sum: { $cond: [{ $lt: ["$realizedPnl", 0] }, 1, 0] },
+          },
+          totalPnL: { $sum: "$realizedPnl" },
+          grossProfit: {
+            $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, "$realizedPnl", 0] },
+          },
+          grossLoss: {
+            $sum: {
+              $cond: [{ $lt: ["$realizedPnl", 0] }, { $abs: "$realizedPnl" }, 0],
+            },
+          },
+        },
+      },
+    ]);
+
+    const tradeHistoryMap = new Map<
+      string,
+      {
+        totalTrades: number;
+        winningTrades: number;
+        losingTrades: number;
+        totalPnL: number;
+        grossProfit: number;
+        grossLoss: number;
+      }
+    >();
+    for (const row of tradeStatsByUser) {
+      tradeHistoryMap.set(row._id, {
+        totalTrades: row.totalTrades || 0,
+        winningTrades: row.winningTrades || 0,
+        losingTrades: row.losingTrades || 0,
+        totalPnL: row.totalPnL || 0,
+        grossProfit: row.grossProfit || 0,
+        grossLoss: row.grossLoss || 0,
+      });
+    }
+
     // Group by userId - start with all users (even those with no history)
     // Users are identified by EMAIL (role-based filtering already done in getAllUsers)
     const userStatsMap = new Map<
@@ -80,18 +133,12 @@ export async function getGlobalLeaderboard(
         email: string;
         username: string;
         profileImage?: string;
-        totalPnl: number;
         totalCapital: number;
-        totalTrades: number;
-        winningTrades: number;
-        losingTrades: number;
         competitionsEntered: number;
         competitionsWon: number;
         podiumFinishes: number;
         challengesEntered: number;
         challengesWon: number;
-        grossProfit: number;
-        grossLoss: number;
       }
     >();
 
@@ -105,57 +152,45 @@ export async function getGlobalLeaderboard(
         email: user.email, // Primary identifier
         username: user.name || user.email.split("@")[0] || "Unknown", // Display name
         profileImage: user.profileImage,
-        totalPnl: 0,
         totalCapital: 0,
-        totalTrades: 0,
-        winningTrades: 0,
-        losingTrades: 0,
         competitionsEntered: 0,
         competitionsWon: 0,
         podiumFinishes: 0,
         challengesEntered: 0,
         challengesWon: 0,
-        grossProfit: 0,
-        grossLoss: 0,
       });
     }
 
-    // Add competition stats
+    // Add competition stats (capital + enter/win counts only)
     for (const participant of allCompetitionParticipants) {
       const userId = participant.userId;
 
       // Skip if user is not in our trader list (they might be admin or deleted)
       if (!userStatsMap.has(userId)) {
-        // Only add if they have valid data - but since they're from competitions,
-        // they should already be in our map if they're traders
         continue;
       }
 
       const userStats = userStatsMap.get(userId)!;
-      userStats.totalPnl += participant.pnl || 0;
       userStats.totalCapital += participant.startingCapital || 0;
-      userStats.totalTrades += participant.totalTrades || 0;
-      userStats.winningTrades += participant.winningTrades || 0;
-      userStats.losingTrades += participant.losingTrades || 0;
       userStats.competitionsEntered += 1;
 
-      if (participant.currentRank === 1) {
+      // Reason: only count wins/podiums from COMPLETED competitions — active
+      // ranks shift, so counting them would be misleading (matches user side).
+      const isCompleted =
+        (participant as Record<string, unknown>).status === "completed";
+      if (isCompleted && participant.currentRank === 1) {
         userStats.competitionsWon += 1;
       }
-      if (participant.currentRank && participant.currentRank <= 3) {
+      if (
+        isCompleted &&
+        participant.currentRank &&
+        participant.currentRank <= 3
+      ) {
         userStats.podiumFinishes += 1;
-      }
-
-      // Calculate profit/loss for profit factor
-      const pnl = participant.pnl || 0;
-      if (pnl > 0) {
-        userStats.grossProfit += pnl;
-      } else {
-        userStats.grossLoss += Math.abs(pnl);
       }
     }
 
-    // Add challenge stats
+    // Add challenge stats (capital + enter/win counts only)
     for (const participant of allChallengeParticipants) {
       const userId = participant.userId;
 
@@ -165,23 +200,11 @@ export async function getGlobalLeaderboard(
       }
 
       const userStats = userStatsMap.get(userId)!;
-      userStats.totalPnl += participant.pnl || 0;
       userStats.totalCapital += participant.startingCapital || 0;
-      userStats.totalTrades += participant.totalTrades || 0;
-      userStats.winningTrades += participant.winningTrades || 0;
-      userStats.losingTrades += participant.losingTrades || 0;
       userStats.challengesEntered += 1;
 
       if (participant.isWinner) {
         userStats.challengesWon += 1;
-      }
-
-      // Calculate profit/loss for profit factor
-      const pnl = participant.pnl || 0;
-      if (pnl > 0) {
-        userStats.grossProfit += pnl;
-      } else {
-        userStats.grossLoss += Math.abs(pnl);
       }
     }
 
@@ -206,23 +229,34 @@ export async function getGlobalLeaderboard(
     const leaderboardEntries: GlobalLeaderboardEntry[] = [];
 
     for (const [userId, stats] of userStatsMap.entries()) {
-      const winRate = computeWinRate(stats.winningTrades, stats.losingTrades);
+      // Reason: pull all trade-derived metrics from TradeHistory (single source
+      // of truth) so admin matches the user dashboard/leaderboard exactly.
+      const th = tradeHistoryMap.get(userId) || {
+        totalTrades: 0,
+        winningTrades: 0,
+        losingTrades: 0,
+        totalPnL: 0,
+        grossProfit: 0,
+        grossLoss: 0,
+      };
+
+      const winRate = computeWinRate(th.winningTrades, th.losingTrades);
       // Reason: shared helper — a flawless (no-loss) trader now gets the same
       // 999 sentinel shown on the dashboard/profile instead of 0.
-      const profitFactor = computeProfitFactor(
-        stats.grossProfit,
-        stats.grossLoss,
-      );
+      const profitFactor = computeProfitFactor(th.grossProfit, th.grossLoss);
+      // Reason: P&L and Trade ROI use realized PnL from TradeHistory; capital
+      // denominator still comes from participant records.
+      const realizedPnl = th.totalPnL;
       const totalPnlPercentage =
         stats.totalCapital > 0
-          ? (stats.totalPnl / stats.totalCapital) * 100
+          ? (realizedPnl / stats.totalCapital) * 100
           : 0;
 
       const badges = badgeCounts.get(userId) || { total: 0, legendary: 0 };
 
       // Calculate overall score (weighted formula)
       const overallScore = calculateOverallScore({
-        totalPnl: stats.totalPnl,
+        totalPnl: realizedPnl,
         totalPnlPercentage,
         winRate,
         profitFactor,
@@ -241,9 +275,9 @@ export async function getGlobalLeaderboard(
         rank: 0, // Will be assigned after sorting
         isTied: false,
         tiedWith: [],
-        totalPnl: stats.totalPnl,
+        totalPnl: realizedPnl,
         totalPnlPercentage,
-        totalTrades: stats.totalTrades,
+        totalTrades: th.totalTrades,
         winRate,
         profitFactor,
         competitionsEntered: stats.competitionsEntered,
