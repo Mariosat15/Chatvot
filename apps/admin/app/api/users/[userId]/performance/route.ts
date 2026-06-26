@@ -11,7 +11,7 @@ import {
 import { verifyAdminAuth } from "@/lib/admin/auth";
 
 /**
- * GET /api/users/[id]/performance
+ * GET /api/users/[userId]/performance
  *
  * Returns the SAME trading-performance metrics the customer sees on their
  * dashboard "Performance" rings, so an admin can review any client's numbers:
@@ -23,7 +23,7 @@ import { verifyAdminAuth } from "@/lib/admin/auth";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
     const admin = await verifyAdminAuth();
@@ -31,7 +31,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id: userId } = await params;
+    const { userId } = await params;
     if (!userId) {
       return NextResponse.json(
         { success: false, error: "Missing user id" },
