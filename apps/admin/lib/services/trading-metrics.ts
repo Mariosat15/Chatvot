@@ -26,3 +26,16 @@ export function computeWinRate(winningTrades: number, losingTrades: number): num
   const decisive = winningTrades + losingTrades;
   return decisive > 0 ? (winningTrades / decisive) * 100 : 0;
 }
+
+/**
+ * Format a profit factor for DISPLAY — shows ∞ for the no-loss sentinel (999)
+ * since the ratio is mathematically infinite, otherwise `decimals` places.
+ */
+export function formatProfitFactor(
+  profitFactor: number | null | undefined,
+  decimals = 2,
+): string {
+  const pf = typeof profitFactor === "number" ? profitFactor : 0;
+  if (!Number.isFinite(pf) || pf >= PROFIT_FACTOR_NO_LOSS) return "∞";
+  return pf.toFixed(decimals);
+}

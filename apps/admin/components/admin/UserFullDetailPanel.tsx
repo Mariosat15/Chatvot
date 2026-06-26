@@ -319,10 +319,27 @@ const RESTRICTION_REASONS = [
   { value: "other", label: "Other" },
 ];
 
+interface PerformanceStats {
+  totalTrades: number;
+  winningTrades: number;
+  losingTrades: number;
+  winRate: number;
+  netRoi: number;
+  tradeRoi: number;
+  profitFactor: number;
+  averageWin: number;
+  averageLoss: number;
+  largestWin: number;
+  largestLoss: number;
+  totalPnL: number;
+  totalPrizesWon: number;
+}
+
 type TabType =
   | "overview"
   | "edit"
   | "wallet"
+  | "performance"
   | "kyc"
   | "notes"
   | "restrictions"
@@ -558,6 +575,34 @@ export default function UserFullDetailPanel({
   useEffect(() => {
     if (activeTab === "transactions" && user.id) {
       fetchUserTransactions(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, user.id]);
+
+  // ── Performance metrics (mirrors the customer dashboard rings) ──────────
+  const [perfStats, setPerfStats] = useState<PerformanceStats | null>(null);
+  const [perfLoading, setPerfLoading] = useState(false);
+  const fetchPerformance = useCallback(async () => {
+    if (!user.id) return;
+    setPerfLoading(true);
+    try {
+      const res = await fetch(`/api/users/${user.id}/performance`);
+      const data = await res.json();
+      if (data.success) {
+        setPerfStats(data.performance as PerformanceStats);
+      } else {
+        toast.error("Failed to load performance stats");
+      }
+    } catch {
+      toast.error("Failed to load performance stats");
+    } finally {
+      setPerfLoading(false);
+    }
+  }, [user.id]);
+
+  useEffect(() => {
+    if (activeTab === "performance" && user.id && !perfStats) {
+      fetchPerformance();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, user.id]);
@@ -1512,6 +1557,7 @@ export default function UserFullDetailPanel({
       icon: UserPlus,
     },
     { id: "wallet", label: "Wallet", icon: Wallet },
+    { id: "performance", label: "Performance", icon: BarChart3 },
     ...(isGameMaster
       ? [{ id: "gamemaster", label: "🎮 Game Master", icon: Crown }]
       : []),
@@ -2439,6 +2485,189 @@ export default function UserFullDetailPanel({
                         </div>
                       </CardContent>
                     </Card>
+                  </div>
+                )}
+
+                {/* Performance Tab */}
+                {activeTab === "performance" && (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-white text-lg font-semibold flex items-center gap-2">
+                          <BarChart3 className="h-5 w-5 text-purple-400" />
+                          Trading Performance
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-1">
+                          The same metrics this client sees on their dashboard
+                          rings.
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fetchPerformance()}
+                        disabled={perfLoading}
+                      >
+                        <RefreshCw
+                          className={`h-4 w-4 mr-2 ${perfLoading ? "animate-spin" : ""}`}
+                        />
+                        Refresh
+                      </Button>
+                    </div>
+
+                    {perfLoading && !perfStats ? (
+                      <div className="text-center py-12 text-gray-400">
+                        <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2" />
+                        Loading performance…
+                      </div>
+                    ) : !perfStats || perfStats.totalTrades === 0 ? (
+                      <Card className="bg-gray-800/50 border-gray-700">
+                        <CardContent className="p-8 text-center text-gray-400">
+                          <Activity className="h-8 w-8 mx-auto mb-2 text-gray-500" />
+                          This client has no closed trades yet.
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <>
+                        {/* Metric tiles — mirrors the dashboard performance rings */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          {[
+                            {
+                              label: "Win Rate",
+                              value: `${perfStats.winRate.toFixed(1)}%`,
+                              color: "text-green-400",
+                              hint: "wins ÷ (wins + losses)",
+                            },
+                            {
+                              label: "Net ROI",
+                              value: `${perfStats.netRoi >= 0 ? "+" : ""}${perfStats.netRoi.toFixed(1)}%`,
+                              color:
+                                perfStats.netRoi >= 0
+                                  ? "text-cyan-400"
+                                  : "text-red-400",
+                              hint: "prizes vs entry fees (wallet)",
+                            },
+                            {
+                              label: "Trade ROI",
+                              value: `${perfStats.tradeRoi >= 0 ? "+" : ""}${perfStats.tradeRoi.toFixed(2)}%`,
+                              color:
+                                perfStats.tradeRoi >= 0
+                                  ? "text-purple-400"
+                                  : "text-red-400",
+                              hint: "PnL ÷ starting capital",
+                            },
+                            {
+                              label: "Profit Factor",
+                              value:
+                                perfStats.profitFactor >= 999
+                                  ? "∞"
+                                  : perfStats.profitFactor.toFixed(2),
+                              color: "text-blue-400",
+                              hint: "gross profit ÷ gross loss",
+                            },
+                            {
+                              label: "Avg Win",
+                              value: `${cs}${perfStats.averageWin.toFixed(2)}`,
+                              color: "text-green-400",
+                              hint: "average winning trade",
+                            },
+                            {
+                              label: "Avg Loss",
+                              value: `${cs}${perfStats.averageLoss.toFixed(2)}`,
+                              color: "text-red-400",
+                              hint: "average losing trade",
+                            },
+                            {
+                              label: "Best Trade",
+                              value: `${cs}${perfStats.largestWin.toFixed(2)}`,
+                              color: "text-green-400",
+                              hint: "largest single win",
+                            },
+                            {
+                              label: "Worst Trade",
+                              value: `${cs}${Math.abs(perfStats.largestLoss).toFixed(2)}`,
+                              color: "text-red-400",
+                              hint: "largest single loss",
+                            },
+                          ].map((m) => (
+                            <Card
+                              key={m.label}
+                              className="bg-gray-800/50 border-gray-700"
+                            >
+                              <CardContent className="p-4 text-center">
+                                <p
+                                  className={`text-xl font-bold tabular-nums ${m.color}`}
+                                >
+                                  {m.value}
+                                </p>
+                                <p className="text-xs text-gray-300 mt-1">
+                                  {m.label}
+                                </p>
+                                <p className="text-[10px] text-gray-500 mt-0.5">
+                                  {m.hint}
+                                </p>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+
+                        {/* Trade summary */}
+                        <Card className="bg-gray-800/50 border-gray-700">
+                          <CardHeader>
+                            <CardTitle className="text-white text-base flex items-center gap-2">
+                              <Activity className="h-4 w-4 text-cyan-400" />
+                              Trade Summary
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                            <div>
+                              <p className="text-gray-500">Total Trades</p>
+                              <p className="text-white font-semibold">
+                                {perfStats.totalTrades}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500">Wins / Losses</p>
+                              <p className="text-white font-semibold">
+                                <span className="text-green-400">
+                                  {perfStats.winningTrades}
+                                </span>{" "}
+                                /{" "}
+                                <span className="text-red-400">
+                                  {perfStats.losingTrades}
+                                </span>
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500">Total PnL</p>
+                              <p
+                                className={`font-semibold ${perfStats.totalPnL >= 0 ? "text-green-400" : "text-red-400"}`}
+                              >
+                                {perfStats.totalPnL >= 0 ? "+" : ""}
+                                {cs}
+                                {perfStats.totalPnL.toFixed(2)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500">Total Prizes Won</p>
+                              <p className="text-yellow-400 font-semibold">
+                                {creditsSymbol}{" "}
+                                {perfStats.totalPrizesWon.toFixed(2)}
+                              </p>
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg text-xs text-gray-400">
+                          <strong className="text-gray-300">Net ROI</strong> =
+                          prizes won vs entry fees (real wallet money, excludes
+                          marketplace).{" "}
+                          <strong className="text-gray-300">Trade ROI</strong> =
+                          trading P&amp;L vs virtual starting capital (this is
+                          what the leaderboard and ROI competitions use).
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 

@@ -39,6 +39,23 @@ export function clampProfitFactorForScore(profitFactor: number): number {
 }
 
 /**
+ * Format a profit factor for DISPLAY.
+ *
+ * When a trader has no losing trades the stored value is the
+ * PROFIT_FACTOR_NO_LOSS sentinel (999) — mathematically the ratio is infinite
+ * (divide by zero). Show the ∞ symbol instead of a misleading "999.00".
+ * Every real profit factor is shown exactly, with `decimals` places.
+ */
+export function formatProfitFactor(
+  profitFactor: number | null | undefined,
+  decimals = 2,
+): string {
+  const pf = typeof profitFactor === "number" ? profitFactor : 0;
+  if (!Number.isFinite(pf) || pf >= PROFIT_FACTOR_NO_LOSS) return "∞";
+  return pf.toFixed(decimals);
+}
+
+/**
  * Win rate as a percentage of DECISIVE trades (wins + losses), excluding
  * breakeven trades (realized PnL exactly 0). This matches the win/loss donut,
  * which shows breakeven as its own separate segment.

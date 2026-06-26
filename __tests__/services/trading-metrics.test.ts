@@ -12,6 +12,7 @@ import {
   computeProfitFactor,
   clampProfitFactorForScore,
   computeWinRate,
+  formatProfitFactor,
 } from "@/lib/services/trading-metrics";
 
 describe("computeProfitFactor", () => {
@@ -46,6 +47,29 @@ describe("clampProfitFactorForScore", () => {
   it("floors negative / non-finite values to 0", () => {
     expect(clampProfitFactorForScore(-1)).toBe(0);
     expect(clampProfitFactorForScore(Number.NaN)).toBe(0);
+  });
+});
+
+describe("formatProfitFactor", () => {
+  it("shows ∞ for the no-loss sentinel (infinite ratio)", () => {
+    expect(formatProfitFactor(PROFIT_FACTOR_NO_LOSS)).toBe("∞");
+    expect(formatProfitFactor(9999)).toBe("∞");
+    expect(formatProfitFactor(Infinity)).toBe("∞");
+  });
+
+  it("shows real profit factors with 2 decimals by default", () => {
+    expect(formatProfitFactor(1.73)).toBe("1.73");
+    expect(formatProfitFactor(8.4)).toBe("8.40");
+    expect(formatProfitFactor(0)).toBe("0.00");
+  });
+
+  it("respects a custom decimal count", () => {
+    expect(formatProfitFactor(2.5, 1)).toBe("2.5");
+  });
+
+  it("treats null/undefined as 0", () => {
+    expect(formatProfitFactor(null)).toBe("0.00");
+    expect(formatProfitFactor(undefined)).toBe("0.00");
   });
 });
 

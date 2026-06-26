@@ -2994,11 +2994,13 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                         <p className="text-xs text-gray-500">
                           Gross profit ÷ gross loss (sums of realized PnL on
                           closed trades). Shown as{" "}
-                          <strong className="text-gray-300">999</strong> when you
-                          have no losing trades yet; for scoring it is{" "}
+                          <strong className="text-gray-300">∞</strong> when you
+                          have no losing trades yet (the ratio is mathematically
+                          infinite); for scoring it is{" "}
                           <strong className="text-gray-300">capped at 5</strong>{" "}
                           so a flawless record can&apos;t run away with the
-                          ranking.
+                          ranking. The displayed value is always exact —
+                          only the ranking points are capped.
                         </p>
                       </div>
                     </div>
@@ -4472,8 +4474,8 @@ export default function HelpPageContent({ isLoggedIn }: HelpPageContentProps) {
                     <strong className="text-white">P. Factor</strong>{" "}
                     <span className="text-gray-400">
                       — profit factor (gross profit ÷ gross loss). Shows{" "}
-                      <strong className="text-white">999</strong> when you have
-                      no losing trades yet.
+                      <strong className="text-white">∞</strong> when you have
+                      no losing trades yet (infinite ratio).
                     </span>
                   </div>
                   <div className="p-3 bg-gray-900/40 border border-gray-700 rounded-lg">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { formatProfitFactor } from "@/lib/services/trading-metrics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -794,7 +795,7 @@ export default function LeaderboardContent({
                                 : "text-red-400",
                           )}
                         >
-                          {entry.profitFactor.toFixed(2)}
+                          {formatProfitFactor(entry.profitFactor)}
                         </p>
                       </div>
 

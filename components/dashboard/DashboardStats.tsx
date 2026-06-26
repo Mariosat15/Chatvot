@@ -87,7 +87,7 @@ export default function DashboardStats({ overallStats }: DashboardStatsProps) {
           : "bg-orange-500/10",
       trend:
         overallStats.profitFactor > 0
-          ? `PF: ${overallStats.profitFactor === 9999 ? "∞" : overallStats.profitFactor.toFixed(2)}`
+          ? `PF: ${overallStats.profitFactor >= 999 ? "∞" : overallStats.profitFactor.toFixed(2)}`
           : null,
     },
   ];

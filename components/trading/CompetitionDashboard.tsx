@@ -850,7 +850,9 @@ export default function CompetitionDashboard({
                     <p
                       className={`text-lg font-bold ${(currentStats?.profitFactor || 0) >= 1 ? "text-green-400" : (currentStats?.profitFactor || 0) === 0 ? "text-slate-400" : "text-red-400"}`}
                     >
-                      {(currentStats?.profitFactor || 0).toFixed(2)}
+                      {(currentStats?.profitFactor || 0) >= 999
+                        ? "∞"
+                        : (currentStats?.profitFactor || 0).toFixed(2)}
                     </p>
                   </div>
 

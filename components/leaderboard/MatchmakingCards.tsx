@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
+import { formatProfitFactor } from "@/lib/services/trading-metrics";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import Image from "next/image";
@@ -871,7 +872,7 @@ function TraderCard({
                         : "text-red-400",
                   )}
                 >
-                  {trader.profitFactor.toFixed(1)}
+                  {formatProfitFactor(trader.profitFactor, 1)}
                 </p>
                 <p className="text-[10px] text-gray-500 uppercase">P.Factor</p>
               </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { formatProfitFactor } from "@/lib/services/trading-metrics";
 
 interface PerformanceRingsProps {
   winRate: number;
@@ -148,7 +149,7 @@ export default function PerformanceRings({
       label: "Profit Factor",
       value: Math.min(profitFactor, 5),
       max: 5,
-      displayValue: profitFactor.toFixed(2),
+      displayValue: formatProfitFactor(profitFactor),
       color: "#3B82F6",
       glow: "rgba(59,130,246,0.5)",
     },

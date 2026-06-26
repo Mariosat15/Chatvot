@@ -405,7 +405,7 @@ export default function ProfileContent({
                       : "text-red-400"
                 }`}
               >
-                {competitionStats?.profitFactor === 9999
+                {(competitionStats?.profitFactor || 0) >= 999
                   ? "∞"
                   : (competitionStats?.profitFactor || 0).toFixed(2)}
               </p>
