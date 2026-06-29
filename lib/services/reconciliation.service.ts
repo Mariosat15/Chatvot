@@ -14,7 +14,8 @@ import WalletTransaction from "@/database/models/trading/wallet-transaction.mode
 import WithdrawalRequest from "@/database/models/withdrawal-request.model";
 import { PlatformTransaction } from "@/database/models/platform-financials.model";
 import {
-  computeExpectedBalance,
+  computeExpectedBalanceFromRequests,
+  isWithdrawalFlowTransaction,
   balanceDifference as calcBalanceDifference,
   isBalanceMismatch,
   classifyBalanceMismatchSeverity,
@@ -237,20 +238,33 @@ export async function verifyUserWallet(
     0,
   );
 
+  // Completed withdrawal credits (source of truth for finished withdrawals).
+  const completedWithdrawalCredits = completedWithdrawals.reduce(
+    (sum, w) => sum + (w.amountCredits || 0),
+    0,
+  );
+
   // Pending deposits not yet credited (don't affect wallet balance yet)
   const pendingDepositCredits = pendingDepositTx.reduce(
     (sum, tx) => sum + Math.abs(tx.amount || 0),
     0,
   );
 
-  // The wallet balance should equal:
-  // completed transactions sum MINUS pending withdrawals (already deducted)
-  // Note: pending deposits don't affect balance until completed
-  // Reason: shared, unit-tested math (see reconciliation-math.ts) so the
-  // dashboard, this service, and the admin route all agree on the rules.
-  const expectedBalance = computeExpectedBalance(
-    completedTransactions.map((tx) => tx.amount || 0),
-    pendingWithdrawalCredits,
+  // Reason: WithdrawalRequest is the single source of truth for withdrawals.
+  // We sum the completed ledger EXCLUDING every withdrawal-flow tx (the debit
+  // and any reversal refund), then subtract all non-refunded withdrawal request
+  // credits (pending/approved/processing/completed). This makes the expected
+  // balance correct for manual & automatic, bank & card withdrawals even when a
+  // withdrawal's WalletTransaction was never flipped out of "pending" — which
+  // previously produced phantom balance_mismatch criticals (masked as "info" by
+  // any later pending withdrawal). See reconciliation-math.ts.
+  const ledgerExcludingWithdrawalFlows = completedTransactions.reduce(
+    (sum, tx) => (isWithdrawalFlowTransaction(tx) ? sum : sum + (tx.amount || 0)),
+    0,
+  );
+  const expectedBalance = computeExpectedBalanceFromRequests(
+    ledgerExcludingWithdrawalFlows,
+    pendingWithdrawalCredits + completedWithdrawalCredits,
   );
   const balanceDifference = calcBalanceDifference(
     wallet.creditBalance,
@@ -308,7 +322,7 @@ export async function verifyUserWallet(
     .filter((tx) => tx.transactionType === "admin_adjustment" && (tx.amount || 0) > 0)
     .reduce((sum, tx) => sum + (tx.amount || 0), 0);
   // Subtract what's now tracked separately in totalAdminCredits
-  const adminCreditsField = (wallet as any).totalAdminCredits || 0;
+  const adminCreditsField = (wallet as { totalAdminCredits?: number }).totalAdminCredits || 0;
   const legacyAdminInDeposits = Math.max(0, legacyAdminCreditsInDeposits - adminCreditsField);
   const expectedDeposits = calculatedDeposits + legacyAdminInDeposits;
 
@@ -339,7 +353,7 @@ export async function verifyUserWallet(
   const legacyAdminDebitsInWithdrawals = completedTransactions
     .filter((tx) => tx.transactionType === "admin_adjustment" && (tx.amount || 0) < 0)
     .reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0);
-  const adminDebitsField = (wallet as any).totalAdminDebits || 0;
+  const adminDebitsField = (wallet as { totalAdminDebits?: number }).totalAdminDebits || 0;
   const legacyAdminInWithdrawals = Math.max(0, legacyAdminDebitsInWithdrawals - adminDebitsField);
   const expectedWithdrawals = calculatedWithdrawals + legacyAdminInWithdrawals;
 
@@ -491,7 +505,9 @@ async function verifyPlatformTransactions(): Promise<ReconciliationIssue[]> {
   const existingDeposits = sourceIds.length > 0
     ? await WalletTransaction.find({ _id: { $in: sourceIds } }).select("_id").lean()
     : [];
-  const existingDepositIds = new Set(existingDeposits.map((d: any) => d._id.toString()));
+  const existingDepositIds = new Set(
+    existingDeposits.map((d: { _id: { toString(): string } }) => d._id.toString()),
+  );
 
   for (const fee of depositFees) {
     if (fee.sourceId && !existingDepositIds.has(fee.sourceId)) {
@@ -615,6 +631,16 @@ export async function getUserReconciliation(
     0,
   );
 
+  // Completed withdrawals are the source of truth for finished withdrawals.
+  const completedWithdrawalsForBalance = await WithdrawalRequest.find({
+    userId,
+    status: "completed",
+  }).lean();
+  const completedWithdrawalCredits = completedWithdrawalsForBalance.reduce(
+    (sum, w) => sum + (w.amountCredits || 0),
+    0,
+  );
+
   // Reason: The TRUE expected balance is the SUM of all completed transaction amounts.
   // This is the source of truth — it accounts for deposits, withdrawals, wins, refunds,
   // admin adjustments, incident compensations, GM earnings, platform fees, and all other types.
@@ -622,12 +648,18 @@ export async function getUserReconciliation(
   const balanceFromCompletedTransactions = Math.round(
     completedTransactions.reduce((sum, tx) => sum + (tx.amount || 0), 0) * 100,
   ) / 100;
-  // Reason: subtract in-flight withdrawal credits (already debited from the
-  // live wallet) so the expected balance matches the actual wallet for users
-  // with a pending withdrawal — same rule as verifyUserWallet and the admin route.
-  const expectedBalance = computeExpectedBalance(
-    completedTransactions.map((tx) => tx.amount || 0),
-    pendingWithdrawalCredits,
+  // Reason: WithdrawalRequest is the single source of truth for withdrawals, so
+  // we exclude every withdrawal-flow tx from the ledger and subtract all
+  // non-refunded withdrawal request credits instead. This stays correct even
+  // when a withdrawal's WalletTransaction is left "pending" by a completion
+  // path (manual/automatic, bank/card). Same rule as verifyUserWallet + admin route.
+  const ledgerExcludingWithdrawalFlows = completedTransactions.reduce(
+    (sum, tx) => (isWithdrawalFlowTransaction(tx) ? sum : sum + (tx.amount || 0)),
+    0,
+  );
+  const expectedBalance = computeExpectedBalanceFromRequests(
+    ledgerExcludingWithdrawalFlows,
+    pendingWithdrawalCredits + completedWithdrawalCredits,
   );
 
   const depositTotal = completedTransactions
@@ -726,28 +758,43 @@ export async function fixReconciliationIssue(
   try {
     switch (issueType) {
       case "balance_mismatch": {
-        // Recalculate balance from completed transactions
+        // Recalculate balance from completed transactions.
+        // Reason: MUST mirror the request-based expected-balance check exactly,
+        // otherwise "fixing" a phantom mismatch could overwrite a CORRECT wallet
+        // balance with a wrong one. We exclude withdrawal-flow txs and rely on
+        // WithdrawalRequest as the source of truth for withdrawals.
         const completedTx = await WalletTransaction.find({
           userId,
-          status: "completed",
+          status: { $in: ["completed", "disputed"] },
         }).session(session);
 
-        // Also account for pending withdrawals (credits already deducted)
         const pendingWithdrawals = await WithdrawalRequest.find({
           userId,
           status: { $in: ["pending", "approved", "processing"] },
+        }).session(session);
+        const completedWithdrawals = await WithdrawalRequest.find({
+          userId,
+          status: "completed",
         }).session(session);
 
         const pendingWithdrawalCredits = pendingWithdrawals.reduce(
           (sum, w) => sum + (w.amountCredits || 0),
           0,
         );
-
-        const completedBalance = completedTx.reduce(
-          (sum, tx) => sum + (tx.amount || 0),
+        const completedWithdrawalCredits = completedWithdrawals.reduce(
+          (sum, w) => sum + (w.amountCredits || 0),
           0,
         );
-        const correctBalance = completedBalance - pendingWithdrawalCredits;
+
+        const ledgerExcludingWithdrawalFlows = completedTx.reduce(
+          (sum, tx) =>
+            isWithdrawalFlowTransaction(tx) ? sum : sum + (tx.amount || 0),
+          0,
+        );
+        const correctBalance = computeExpectedBalanceFromRequests(
+          ledgerExcludingWithdrawalFlows,
+          pendingWithdrawalCredits + completedWithdrawalCredits,
+        );
 
         await CreditWallet.updateOne(
           { userId },
@@ -756,7 +803,7 @@ export async function fixReconciliationIssue(
             $push: {
               adjustmentHistory: {
                 date: new Date(),
-                reason: `Reconciliation fix - balance recalculated from transactions (${pendingWithdrawals.length} pending withdrawals accounted for)`,
+                reason: `Reconciliation fix - balance recalculated from ledger + withdrawal requests (${pendingWithdrawals.length} pending, ${completedWithdrawals.length} completed withdrawals accounted for)`,
                 adjustedBy: adminId,
                 previousBalance: undefined, // Will be set by pre-save
                 newBalance: correctBalance,
@@ -769,7 +816,7 @@ export async function fixReconciliationIssue(
         await session.commitTransaction();
         return {
           success: true,
-          message: `Balance corrected to ${correctBalance} credits (including ${pendingWithdrawalCredits} in pending withdrawals)`,
+          message: `Balance corrected to ${correctBalance} credits (including ${pendingWithdrawalCredits} pending + ${completedWithdrawalCredits} completed withdrawal credits)`,
         };
       }
 

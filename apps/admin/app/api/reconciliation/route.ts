@@ -407,22 +407,37 @@ export async function POST(request: NextRequest) {
           status: { $in: ["completed", "disputed"] },
         }).session(session);
 
-        // Reason: in-flight withdrawals already debited the wallet but their
-        // WalletTransaction is still "pending" (not in the sum above). We MUST
-        // subtract them, otherwise the auto-fix would silently re-credit the
-        // user the value of every withdrawal currently being processed.
+        // Reason: MUST mirror the request-based expected-balance check exactly,
+        // or "fixing" a phantom mismatch could overwrite a CORRECT wallet balance
+        // with a wrong one. Withdrawals are reconciled from WithdrawalRequest:
+        // exclude every withdrawal-flow tx, then subtract all non-refunded
+        // (pending/approved/processing/completed) withdrawal request credits.
         const pendingWithdrawals = await WithdrawalRequest.find({
           userId,
           status: { $in: ["pending", "approved", "processing"] },
+        }).session(session);
+        const completedWithdrawals = await WithdrawalRequest.find({
+          userId,
+          status: "completed",
         }).session(session);
         const pendingWithdrawalCredits = pendingWithdrawals.reduce(
           (sum, w) => sum + (w.amountCredits || 0),
           0,
         );
+        const completedWithdrawalCredits = completedWithdrawals.reduce(
+          (sum, w) => sum + (w.amountCredits || 0),
+          0,
+        );
 
+        const ledgerExcludingWithdrawalFlows = transactions.reduce(
+          (sum, tx) =>
+            isWithdrawalFlowTx(tx) ? sum : sum + (tx.amount || 0),
+          0,
+        );
         const correctBalance =
-          transactions.reduce((sum, tx) => sum + (tx.amount || 0), 0) -
-          pendingWithdrawalCredits;
+          ledgerExcludingWithdrawalFlows -
+          pendingWithdrawalCredits -
+          completedWithdrawalCredits;
         const wallet = await CreditWallet.findOne({ userId }).session(session);
         const previousBalance = wallet?.creditBalance || 0;
 
@@ -434,7 +449,7 @@ export async function POST(request: NextRequest) {
 
         result = {
           success: true,
-          message: `Balance corrected from ${previousBalance} to ${Math.round(correctBalance * 100) / 100} credits${pendingWithdrawalCredits > 0 ? ` (${pendingWithdrawalCredits} in pending withdrawals accounted for)` : ""}`,
+          message: `Balance corrected from ${previousBalance} to ${Math.round(correctBalance * 100) / 100} credits (${pendingWithdrawalCredits} pending + ${completedWithdrawalCredits} completed withdrawal credits accounted for)`,
         };
         break;
       }
@@ -697,6 +712,23 @@ export async function POST(request: NextRequest) {
 }
 
 // Helper functions
+
+/**
+ * True when a completed/disputed wallet tx is part of a WITHDRAWAL flow — the
+ * debit itself, or a reversal that refunds it. Reason: withdrawals are
+ * reconciled from WithdrawalRequest (single source of truth), so these txs are
+ * excluded from the generic ledger sum to avoid double counting and to stay
+ * correct even when a withdrawal's tx is left "pending" by a completion path.
+ * Mirrors isWithdrawalFlowTransaction in lib/services/reconciliation-math.ts.
+ */
+function isWithdrawalFlowTx(tx: any): boolean {
+  const type = tx?.transactionType;
+  if (type === "withdrawal" || type === "withdrawal_refund") return true;
+  if (type === "admin_adjustment" && tx?.metadata?.withdrawalRequestId) {
+    return true;
+  }
+  return false;
+}
 
 async function verifyUserWallet(userId: string, userEmail: string) {
   const issues: ReconciliationIssue[] = [];
@@ -1244,16 +1276,26 @@ async function getDetailedUserReconciliation(
   const expectedFromTransactions =
     Math.round(balanceFromAllTransactions * 100) / 100;
 
-  // Reason: A requested withdrawal debits creditBalance IMMEDIATELY, but its
-  // WalletTransaction stays "pending" until the payout completes — so that debit
-  // is NOT part of the completed-transaction sum above. To compare like-for-like
-  // we must subtract in-flight withdrawal credits from the ledger total. Without
-  // this, every user with a withdrawal in progress was flagged as a FALSE
-  // "critical" balance mismatch equal to their pending amount. This mirrors the
-  // logic in lib/services/reconciliation.service.ts (verifyUserWallet).
+  // Reason: WithdrawalRequest is the single source of truth for withdrawals.
+  // We exclude every withdrawal-flow tx (the debit AND any reversal refund) from
+  // the ledger, then subtract all NON-REFUNDED withdrawal request credits
+  // (pending/approved/processing via pendingWithdrawalCredits + completed via
+  // withdrawalFromRequests). This stays correct even when a withdrawal's
+  // WalletTransaction was never flipped out of "pending" by a completion path
+  // (manual/automatic, bank/card) — which previously produced a phantom
+  // "critical" balance_mismatch that a later pending withdrawal masked as "info".
+  const withdrawalFlowSigned = transactions.reduce(
+    (sum, tx) => (isWithdrawalFlowTx(tx) ? sum + (tx.amount || 0) : sum),
+    0,
+  );
+  const ledgerExcludingWithdrawalFlows =
+    balanceFromAllTransactions - withdrawalFlowSigned;
   const expectedBalance =
     Math.round(
-      (balanceFromAllTransactions - pendingWithdrawalCredits) * 100,
+      (ledgerExcludingWithdrawalFlows -
+        pendingWithdrawalCredits -
+        withdrawalFromRequests) *
+        100,
     ) / 100;
 
   // Check for balance mismatch — compare actual wallet balance with the

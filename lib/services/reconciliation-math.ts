@@ -49,6 +49,70 @@ export function computeExpectedBalance(
   );
 }
 
+/**
+ * Withdrawal REQUEST statuses where the credits have left (or are leaving) the
+ * live wallet and must NOT be treated as refunded. Anything outside this set
+ * (rejected, cancelled, failed) returns the credits to the wallet.
+ */
+export const NON_REFUNDED_WITHDRAWAL_STATES = [
+  "pending",
+  "approved",
+  "processing",
+  "completed",
+] as const;
+
+/**
+ * True when a completed/disputed wallet transaction is part of a WITHDRAWAL
+ * flow — either the debit itself or a reversal that refunds it.
+ *
+ * Reason: the expected balance is derived from WithdrawalRequest (the single
+ * source of truth for withdrawals), so every withdrawal-related wallet tx must
+ * be excluded from the generic ledger sum to avoid double counting. Withdrawal
+ * debits can be left "pending" by some completion paths, and reversals are
+ * recorded inconsistently (sometimes the debit is zeroed, sometimes a separate
+ * `admin_adjustment` / `withdrawal_refund` credit is added that carries the
+ * originating `withdrawalRequestId`). Excluding all of them makes the math
+ * immune to that drift.
+ */
+export function isWithdrawalFlowTransaction(tx: {
+  transactionType?: string | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  metadata?: Record<string, any> | null;
+}): boolean {
+  const type = tx.transactionType;
+  if (type === "withdrawal" || type === "withdrawal_refund") return true;
+  // Cancel/reject refunds are stored as admin_adjustment tied to a withdrawal.
+  if (type === "admin_adjustment" && tx?.metadata?.withdrawalRequestId) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Robust expected wallet balance that treats WithdrawalRequest as the single
+ * source of truth for withdrawals.
+ *
+ * @param ledgerExcludingWithdrawalFlows  Signed sum of every completed/disputed
+ *   wallet-tx amount EXCEPT withdrawal flows (see {@link isWithdrawalFlowTransaction}).
+ * @param nonRefundedWithdrawalCredits  Σ amountCredits of WithdrawalRequests in
+ *   {@link NON_REFUNDED_WITHDRAWAL_STATES} (pending/approved/processing/completed).
+ *
+ * Reason: a completed withdrawal whose WalletTransaction was never flipped from
+ * "pending" used to vanish from the completed-tx sum, producing a phantom
+ * `balance_mismatch` that a later pending withdrawal would mask as "info". By
+ * counting every withdrawal exactly once from the request, the result is correct
+ * for manual & automatic, bank & card withdrawals regardless of tx status drift.
+ */
+export function computeExpectedBalanceFromRequests(
+  ledgerExcludingWithdrawalFlows: number,
+  nonRefundedWithdrawalCredits: number,
+): number {
+  return round2(
+    (ledgerExcludingWithdrawalFlows || 0) -
+      (nonRefundedWithdrawalCredits || 0),
+  );
+}
+
 /** Signed difference between the stored balance and the expected balance. */
 export function balanceDifference(
   storedBalance: number,

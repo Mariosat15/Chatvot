@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 import WithdrawalRequest from "@/database/models/withdrawal-request.model";
-import WithdrawalSettings from "@/database/models/withdrawal-settings.model";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import UserBankAccount from "@/database/models/user-bank-account.model";
@@ -192,12 +191,18 @@ export async function completeWithdrawal(
       await wallet.save({ session });
     }
 
-    // Update wallet transaction to completed
+    // Update wallet transaction to completed.
+    // Reason: match by ObjectId OR string — the id is stored as a raw ObjectId
+    // (manual route) or a string (Nuvei route) in the Mixed metadata field, so an
+    // ObjectId-only match silently failed to flip Nuvei txs out of "pending".
     await WalletTransaction.updateOne(
       {
         userId: withdrawal.userId,
-        "metadata.withdrawalRequestId": withdrawal._id,
         transactionType: "withdrawal",
+        $or: [
+          { "metadata.withdrawalRequestId": withdrawal._id },
+          { "metadata.withdrawalRequestId": withdrawal._id.toString() },
+        ],
       },
       {
         status: "completed",
@@ -361,12 +366,16 @@ export async function rejectWithdrawal(
       );
     }
 
-    // Update original withdrawal transaction
+    // Update original withdrawal transaction.
+    // Reason: match by ObjectId OR string (Mixed metadata stores either form).
     await WalletTransaction.updateOne(
       {
         userId: withdrawal.userId,
-        "metadata.withdrawalRequestId": withdrawal._id,
         transactionType: "withdrawal",
+        $or: [
+          { "metadata.withdrawalRequestId": withdrawal._id },
+          { "metadata.withdrawalRequestId": withdrawal._id.toString() },
+        ],
       },
       {
         status: "failed",
@@ -490,7 +499,7 @@ export async function getWithdrawalStats(): Promise<{
     },
   ]);
 
-  const extractStats = (arr: any[]) => ({
+  const extractStats = (arr: Array<{ count?: number; totalEUR?: number }>) => ({
     count: arr[0]?.count || 0,
     totalEUR: arr[0]?.totalEUR || 0,
   });
@@ -507,7 +516,7 @@ export async function getWithdrawalStats(): Promise<{
 /**
  * Get pending withdrawals with user bank details for admin
  */
-export async function getPendingWithdrawalsForAdmin(): Promise<any[]> {
+export async function getPendingWithdrawalsForAdmin() {
   const withdrawals = await WithdrawalRequest.find({
     status: { $in: ["pending", "approved", "processing"] },
   })

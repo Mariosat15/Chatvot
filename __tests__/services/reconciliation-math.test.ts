@@ -13,6 +13,9 @@ import {
   round2,
   sumAmounts,
   computeExpectedBalance,
+  computeExpectedBalanceFromRequests,
+  isWithdrawalFlowTransaction,
+  NON_REFUNDED_WITHDRAWAL_STATES,
   balanceDifference,
   isBalanceMismatch,
   classifyBalanceMismatchSeverity,
@@ -88,6 +91,96 @@ describe("computeExpectedBalance — the source of truth", () => {
   it("refund-clawback removes exactly the refunded credits", () => {
     // +50 Atlas deposit, refunded to card, then -50 clawback adjustment
     expect(computeExpectedBalance([50, -50])).toBe(0);
+  });
+});
+
+describe("isWithdrawalFlowTransaction", () => {
+  it("flags the withdrawal debit", () => {
+    expect(isWithdrawalFlowTransaction({ transactionType: "withdrawal" })).toBe(
+      true,
+    );
+  });
+
+  it("flags a withdrawal_refund reversal", () => {
+    expect(
+      isWithdrawalFlowTransaction({ transactionType: "withdrawal_refund" }),
+    ).toBe(true);
+  });
+
+  it("flags an admin_adjustment that reverses a withdrawal (carries withdrawalRequestId)", () => {
+    expect(
+      isWithdrawalFlowTransaction({
+        transactionType: "admin_adjustment",
+        metadata: { withdrawalRequestId: "abc123" },
+      }),
+    ).toBe(true);
+  });
+
+  it("does NOT flag a genuine admin_adjustment (no withdrawalRequestId)", () => {
+    expect(
+      isWithdrawalFlowTransaction({
+        transactionType: "admin_adjustment",
+        metadata: { reason: "manual credit" },
+      }),
+    ).toBe(false);
+  });
+
+  it("does NOT flag deposits, wins, or withdrawal_fee debits", () => {
+    expect(isWithdrawalFlowTransaction({ transactionType: "deposit" })).toBe(
+      false,
+    );
+    expect(
+      isWithdrawalFlowTransaction({ transactionType: "competition_win" }),
+    ).toBe(false);
+    // withdrawal_fee is a real wallet debit (legacy) and must stay in the ledger.
+    expect(
+      isWithdrawalFlowTransaction({ transactionType: "withdrawal_fee" }),
+    ).toBe(false);
+  });
+});
+
+describe("computeExpectedBalanceFromRequests — withdrawals from the request, not the tx", () => {
+  it("exposes the non-refunded withdrawal states", () => {
+    expect(NON_REFUNDED_WITHDRAWAL_STATES).toEqual([
+      "pending",
+      "approved",
+      "processing",
+      "completed",
+    ]);
+  });
+
+  it("completed withdrawal: counted once via the request even if its tx never flipped", () => {
+    // Deposit +100 only in the ledger (withdrawal debit excluded as a flow tx),
+    // request completed for 40 -> live wallet should be 60.
+    expect(computeExpectedBalanceFromRequests(100, 40)).toBe(60);
+  });
+
+  it("REGRESSION: a stuck-pending withdrawal tx no longer creates a phantom mismatch", () => {
+    // Scenario: deposit 100, withdraw 40 (completed request) but the withdrawal
+    // WalletTransaction was left "pending" (never flipped). Old formula summed
+    // only the +100 deposit and got expected=100 vs wallet 60 -> false critical.
+    // New formula: ledger excluding withdrawal flows = 100, minus completed
+    // request 40 = 60, matching the live wallet exactly.
+    const ledgerExcludingWithdrawals = 100; // withdrawal -40 tx excluded
+    const completedWithdrawalCredits = 40;
+    const expected = computeExpectedBalanceFromRequests(
+      ledgerExcludingWithdrawals,
+      completedWithdrawalCredits,
+    );
+    expect(expected).toBe(60);
+    expect(isBalanceMismatch(60, expected)).toBe(false);
+  });
+
+  it("REGRESSION: a cancelled withdrawal with a separate refund tx reconciles", () => {
+    // Deposit 100, withdraw 40 (tx -40), cancel -> refund +40 admin_adjustment
+    // carrying withdrawalRequestId. Both the -40 debit and +40 refund are
+    // withdrawal-flow txs and excluded -> ledger = 100. Request is "cancelled"
+    // so it is NOT in NON_REFUNDED_WITHDRAWAL_STATES -> subtract 0. Wallet = 100.
+    expect(computeExpectedBalanceFromRequests(100, 0)).toBe(100);
+  });
+
+  it("pending withdrawal: subtracted via the request", () => {
+    expect(computeExpectedBalanceFromRequests(100, 30)).toBe(70);
   });
 });
 

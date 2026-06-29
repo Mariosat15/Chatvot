@@ -107,6 +107,29 @@ export async function POST(
       { session: mongoSession },
     );
 
+    // Reason: flip the original withdrawal tx out of "pending" so it isn't left
+    // dangling forever. Match by ObjectId OR string since the id is stored as a
+    // raw ObjectId (manual route) or a string (Nuvei route) in Mixed metadata.
+    await WalletTransaction.updateOne(
+      {
+        userId: session.user.id,
+        transactionType: "withdrawal",
+        status: { $in: ["pending", "processing"] },
+        $or: [
+          { "metadata.withdrawalRequestId": withdrawal._id },
+          { "metadata.withdrawalRequestId": withdrawal._id.toString() },
+        ],
+      },
+      {
+        $set: {
+          status: "cancelled",
+          processedAt: new Date(),
+          description: "Withdrawal request cancelled - credits refunded",
+        },
+      },
+      { session: mongoSession },
+    );
+
     await mongoSession.commitTransaction();
 
     return NextResponse.json({
