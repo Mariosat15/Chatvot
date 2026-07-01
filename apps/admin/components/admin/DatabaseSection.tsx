@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -484,16 +483,18 @@ export default function DatabaseSection() {
                 <span className="text-red-400 font-semibold">
                   Reset All Data (Red):
                 </span>{" "}
-                Deletes ALL trading data, financial records, fraud data,
-                notifications, sessions, customer assignments, audit trails.
-                Keeps user accounts & employees.
+                Deletes ALL activity — both user and admin actions (trades,
+                financials, fraud data, notifications, sessions, audit &amp;
+                admin-operation logs, visitor analytics). Keeps user accounts
+                (wallets zeroed) and every setting/config, so the admin panel
+                works exactly as before.
               </div>
               <div>
                 <span className="text-orange-400 font-semibold">
                   Reset All Users (Orange):
                 </span>{" "}
-                Deletes ONLY user accounts, login credentials, wallets,
-                lockouts, online status, and restrictions. Keeps employees.
+                Same activity wipe as above AND deletes the user accounts +
+                wallets themselves. Keeps employees and every setting/config.
               </div>
               <div>
                 <span className="text-purple-400 font-semibold">
@@ -947,9 +948,8 @@ export default function DatabaseSection() {
                 <span>🔄 Challenge winnings → 0</span>
                 <span>🔄 Marketplace spending → 0</span>
                 <span>🔄 KYC status → none</span>
-                <span>🔄 Badge configs → defaults</span>
-                <span>🔄 XP configs → defaults</span>
                 <span>🔄 Item purchase counts → 0</span>
+                <span>🔄 Landing page visit counters → 0</span>
               </div>
             </div>
 
@@ -963,12 +963,14 @@ export default function DatabaseSection() {
                 <span>✅ Login credentials</span>
                 <span>✅ Employee accounts</span>
                 <span>✅ Role templates</span>
-                <span>✅ Admin settings</span>
-                <span>✅ Fee settings</span>
-                <span>✅ Payment providers</span>
+                <span>✅ All settings (app/fee/KYC/…)</span>
+                <span>✅ Payment provider keys</span>
                 <span>✅ Marketplace items</span>
-                <span>✅ KYC settings</span>
-                <span>✅ App settings</span>
+                <span>✅ Vendors</span>
+                <span>✅ Notification templates</span>
+                <span>✅ Journey milestones & maps</span>
+                <span>✅ Badge & XP configs</span>
+                <span>✅ Landing pages & blocked rules</span>
               </div>
             </div>
 
@@ -1072,7 +1074,9 @@ export default function DatabaseSection() {
                 📊 User Trading Data
               </p>
               <div className="grid grid-cols-2 gap-1 text-xs">
+                <span>❌ All competitions</span>
                 <span>❌ All competition participants</span>
+                <span>❌ All challenges</span>
                 <span>❌ All challenge participants</span>
                 <span>❌ All trading positions</span>
                 <span>❌ All trade history</span>
@@ -1117,12 +1121,14 @@ export default function DatabaseSection() {
                 ✅ KEEPS (will NOT delete):
               </p>
               <div className="grid grid-cols-2 gap-1 text-xs text-green-300">
-                <span>✅ Competitions (templates)</span>
-                <span>✅ Challenges (templates)</span>
-                <span>✅ Admin settings</span>
-                <span>✅ Fraud settings</span>
-                <span>✅ Payment providers</span>
+                <span>✅ Employee & admin accounts</span>
+                <span>✅ Role templates</span>
+                <span>✅ All settings (app/fee/KYC/…)</span>
+                <span>✅ Payment provider keys</span>
                 <span>✅ Marketplace items</span>
+                <span>✅ Vendors</span>
+                <span>✅ Notification templates</span>
+                <span>✅ Journey / badge / XP configs</span>
               </div>
             </div>
 
