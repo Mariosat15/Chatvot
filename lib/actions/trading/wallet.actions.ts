@@ -312,12 +312,20 @@ export const completeDeposit = async (
         throw new Error("Transaction not found");
       }
 
-      // Accept both 'pending' and 'processing' statuses
-      // 'processing' is set by webhook's atomic claim before calling completeDeposit
-      if (
-        transaction.status !== "pending" &&
-        transaction.status !== "processing"
-      ) {
+      // ATOMIC IDEMPOTENT CLAIM: move pending/processing → completed in a single
+      // conditional write, so only ONE caller can ever credit this deposit — even
+      // if the payment provider delivers the same webhook multiple times at once.
+      // Reason: every processor (Stripe, Nuvei, Paddle, Atlas, and any future PSP)
+      // funnels through completeDeposit, so this single guard makes them all safe
+      // without per-processor idempotency code. The wallet $inc below only runs
+      // for the caller that wins this claim; a duplicate delivery modifies nothing
+      // and is rejected as "already processed".
+      const depositClaim = await WalletTransaction.updateOne(
+        { _id: transaction._id, status: { $in: ["pending", "processing"] } },
+        { $set: { status: "completed", processedAt: new Date() } },
+        { session: mongoSession },
+      );
+      if (depositClaim.modifiedCount === 0) {
         throw new Error("Transaction already processed");
       }
 
@@ -622,244 +630,25 @@ export const completeDeposit = async (
   }
 };
 
-// Initiate withdrawal request (will be processed manually or via Stripe)
-export const initiateWithdrawal = async (creditsAmount: number) => {
-  try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) redirect("/sign-in");
-
-    await connectToDatabase();
-
-    // ✅ CHECK USER RESTRICTIONS
-    console.log(
-      `🔐 Checking withdrawal restrictions for user ${session.user.id}`,
-    );
-    const { canUserPerformAction } =
-      await import("@/lib/services/user-restriction.service");
-    const restrictionCheck = await canUserPerformAction(
-      session.user.id,
-      "withdraw",
-    );
-
-    console.log(`   Restriction check result:`, restrictionCheck);
-
-    if (!restrictionCheck.allowed) {
-      console.log(`   ❌ Withdrawal blocked due to restrictions`);
-      throw new Error(
-        restrictionCheck.reason || "You are not allowed to withdraw",
-      );
-    }
-
-    console.log(`   ✅ User allowed to withdraw`);
-
-    // Get conversion settings
-    const CreditConversionSettings = (
-      await import("@/database/models/credit-conversion-settings.model")
-    ).default;
-    const conversionSettings = await CreditConversionSettings.getSingleton();
-    const {
-      eurToCreditsRate,
-      minimumWithdrawal,
-      platformWithdrawalFeePercentage,
-      bankWithdrawalFeePercentage,
-      bankWithdrawalFeeFixed,
-      withdrawalFeePercentage, // fallback
-    } = conversionSettings;
-
-    // Use platform withdrawal fee (with fallback to legacy field)
-    const actualPlatformFeePercentage =
-      platformWithdrawalFeePercentage ?? withdrawalFeePercentage ?? 2;
-
-    const wallet = await CreditWallet.findOne({ userId: session.user.id });
-    if (!wallet) throw new Error("Wallet not found");
-
-    // Check withdrawal settings - KYC requirement is now configurable in admin
-    const WithdrawalSettings = (
-      await import("@/database/models/withdrawal-settings.model")
-    ).default;
-    const settings = await WithdrawalSettings.getSingleton();
-
-    // Validate KYC only if required in settings
-    if (settings.requireKYC && !wallet.kycVerified) {
-      throw new Error("KYC verification required for withdrawals");
-    }
-
-    // Validate wallet is active
-    if (!wallet.isActive) {
-      throw new Error("Wallet is not active");
-    }
-
-    // Validate amount
-    if (creditsAmount <= 0) {
-      throw new Error("Invalid amount");
-    }
-
-    // Calculate EUR gross amount
-    const eurGross = creditsAmount / eurToCreditsRate;
-
-    // Calculate platform withdrawal fee (what we charge user)
-    const platformFeeAmountEUR = eurGross * (actualPlatformFeePercentage / 100);
-    const feeAmountCredits = Math.ceil(platformFeeAmountEUR * eurToCreditsRate);
-
-    // Calculate bank withdrawal fee (what bank charges us for payout)
-    const bankFeePercentageAmount =
-      eurGross * ((bankWithdrawalFeePercentage ?? 0.25) / 100);
-    const bankFeeTotalEUR =
-      bankFeePercentageAmount + (bankWithdrawalFeeFixed ?? 0.25);
-
-    // Calculate net EUR user receives
-    const eurNet = eurGross - platformFeeAmountEUR;
-
-    // Calculate net platform earning from this withdrawal
-    const netPlatformEarningEUR = platformFeeAmountEUR - bankFeeTotalEUR;
-
-    // Total credits to deduct (withdrawal + fee)
-    const totalCreditsDeducted = creditsAmount + feeAmountCredits;
-
-    console.log(`💸 Withdrawal calculation:`);
-    console.log(`   Credits: ${creditsAmount}`);
-    console.log(`   EUR Gross: €${eurGross.toFixed(2)}`);
-    console.log(
-      `   Platform Fee (${actualPlatformFeePercentage}%): €${platformFeeAmountEUR.toFixed(2)}`,
-    );
-    console.log(
-      `   Bank Fee (${bankWithdrawalFeePercentage ?? 0.25}% + €${bankWithdrawalFeeFixed ?? 0.25}): €${bankFeeTotalEUR.toFixed(2)}`,
-    );
-    console.log(`   Net to User: €${eurNet.toFixed(2)}`);
-    console.log(
-      `   Net Platform Earning: €${netPlatformEarningEUR.toFixed(2)}`,
-    );
-
-    // Validate sufficient balance for withdrawal + fee
-    if (totalCreditsDeducted > wallet.creditBalance) {
-      throw new Error(
-        `Insufficient balance. Need ${totalCreditsDeducted} Credits (${creditsAmount} + ${feeAmountCredits} fee), but you have ${wallet.creditBalance} Credits`,
-      );
-    }
-
-    // Minimum withdrawal check
-    const minCredits = minimumWithdrawal * eurToCreditsRate;
-    if (creditsAmount < minCredits) {
-      throw new Error(
-        `Minimum withdrawal is ${minCredits} Credits (€${minimumWithdrawal})`,
-      );
-    }
-
-    // Start MongoDB transaction
-    const mongoSession = await mongoose.startSession();
-    mongoSession.startTransaction();
-
-    try {
-      // Deduct credits + fee from wallet
-      await CreditWallet.findOneAndUpdate(
-        { userId: session.user.id },
-        {
-          $inc: {
-            creditBalance: -totalCreditsDeducted,
-            totalWithdrawn: creditsAmount, // Track only the withdrawal amount, not fee
-          },
-        },
-        { session: mongoSession },
-      );
-
-      // Create withdrawal transaction (for the amount user requested)
-      const withdrawalTransaction = await WalletTransaction.create(
-        [
-          {
-            userId: session.user.id,
-            transactionType: "withdrawal",
-            amount: -creditsAmount,
-            balanceBefore: wallet.creditBalance,
-            balanceAfter: wallet.creditBalance - totalCreditsDeducted,
-            currency: "EUR",
-            exchangeRate: eurToCreditsRate,
-            status: "pending",
-            description: `Withdrawal of ${creditsAmount} Credits (€${eurNet.toFixed(2)} net)`,
-            metadata: {
-              creditsAmount,
-              eurGross: eurGross.toFixed(2),
-              eurNet: eurNet.toFixed(2),
-              // Platform fees
-              platformFeePercentage: actualPlatformFeePercentage,
-              platformFeeAmountEUR: parseFloat(platformFeeAmountEUR.toFixed(2)),
-              feeAmountCredits,
-              // Bank fees
-              bankFeePercentage: bankWithdrawalFeePercentage ?? 0.25,
-              bankFeeFixed: bankWithdrawalFeeFixed ?? 0.25,
-              bankFeeTotalEUR: parseFloat(bankFeeTotalEUR.toFixed(2)),
-              // Net calculations
-              netPlatformEarningEUR: parseFloat(
-                netPlatformEarningEUR.toFixed(2),
-              ),
-              totalCreditsDeducted,
-            },
-          },
-        ],
-        { session: mongoSession },
-      );
-
-      // NOTE: Don't create withdrawal_fee transaction here!
-      // Withdrawal fees should ONLY be recorded when the withdrawal is actually COMPLETED by admin.
-      // This prevents charging users fees for failed/rejected withdrawals.
-      // The fee will be recorded in:
-      // - apps/admin/app/api/withdrawals/[id]/route.ts when admin marks as 'completed'
-
-      await mongoSession.commitTransaction();
-
-      console.log(
-        `💸 Withdrawal initiated: ${creditsAmount} Credits (€${eurNet.toFixed(2)} net) for user ${session.user.id}`,
-      );
-      console.log(
-        `💵 Withdrawal fee (€${platformFeeAmountEUR.toFixed(2)}) will be recorded when withdrawal is completed`,
-      );
-
-      // Send withdrawal initiated notification
-      try {
-        const { notificationService } =
-          await import("@/lib/services/notification.service");
-        await notificationService.notifyWithdrawalInitiated(
-          session.user.id,
-          eurNet,
-        );
-      } catch (notifError) {
-        console.error("Error sending withdrawal notification:", notifError);
-      }
-
-      // NOTE: Don't record withdrawal fee to platform financials here!
-      // It will be recorded when the withdrawal is completed by admin.
-
-      revalidatePath("/wallet");
-
-      return {
-        success: true,
-        message: `Withdrawal request submitted. You will receive €${eurNet.toFixed(2)}`,
-        // Reason: Mongoose create() returns array; guard for safety
-        transaction: JSON.parse(JSON.stringify(withdrawalTransaction[0] ?? {})),
-        breakdown: {
-          creditsWithdrawn: creditsAmount,
-          feeCredits: feeAmountCredits,
-          totalDeducted: totalCreditsDeducted,
-          eurGross: eurGross.toFixed(2),
-          eurFee: platformFeeAmountEUR.toFixed(2),
-          eurNet: eurNet.toFixed(2),
-        },
-      };
-    } catch (error) {
-      await mongoSession.abortTransaction();
-      throw error;
-    } finally {
-      mongoSession.endSession();
-    }
-  } catch (error) {
-    // Re-throw redirect errors so Next.js can handle them
-    if (error instanceof Error && error.message.includes("NEXT_REDIRECT")) {
-      throw error;
-    }
-    console.error("Error initiating withdrawal:", error);
-    throw new Error(
-      error instanceof Error ? error.message : "Failed to initiate withdrawal",
-    );
-  }
+/**
+ * @deprecated DISABLED legacy withdrawal path — do not use.
+ *
+ * Reason: this path debited the wallet and created a `withdrawal`
+ * WalletTransaction WITHOUT creating a `WithdrawalRequest`. Reconciliation
+ * treats `WithdrawalRequest` as the single source of truth for withdrawals
+ * (see lib/services/reconciliation-math.ts), so a withdrawal made this way is
+ * invisible to the expected-balance math and would surface as a phantom
+ * `balance_mismatch`. It is unused in production (all withdrawals go through
+ * `POST /api/wallet/withdraw` for manual and `POST /api/nuvei/withdrawal` for
+ * automatic payouts). Kept as a guarded no-op stub so any accidental future
+ * import can never corrupt wallet balances or reconciliation.
+ */
+export const initiateWithdrawal = async (_creditsAmount: number) => {
+  return {
+    success: false as const,
+    error:
+      "This withdrawal path is disabled. Use the current withdrawal flow (POST /api/wallet/withdraw or /api/nuvei/withdrawal).",
+  };
 };
 
 // Cancel a pending deposit (payment failed, canceled, or expired)

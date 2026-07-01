@@ -13,6 +13,7 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { nuveiService } from "@/lib/services/nuvei.service";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WithdrawalRequest from "@/database/models/withdrawal-request.model";
 import WithdrawalSettings from "@/database/models/withdrawal-settings.model";
 import { getRequestGeo } from "@/lib/utils/request-geo";
@@ -283,10 +284,25 @@ export async function POST(req: NextRequest) {
       isBankTransfer,
     });
 
-    // Deduct credits from wallet FIRST (optimistic)
-    const balanceBefore = wallet.creditBalance;
-    wallet.creditBalance -= creditsNeeded;
-    await wallet.save();
+    // Deduct credits from wallet FIRST (optimistic) using an ATOMIC conditional
+    // debit. Reason: the previous read-modify-write (wallet.save) had no session
+    // and could lose updates or overdraw when two withdrawals ran concurrently.
+    // The { $gte } guard makes the debit succeed only if the balance still
+    // covers it, so it is both race-safe and overdraw-safe.
+    const debitedWallet = await CreditWallet.findOneAndUpdate(
+      { userId, creditBalance: { $gte: creditsNeeded } },
+      { $inc: { creditBalance: -creditsNeeded } },
+      { new: true },
+    );
+    if (!debitedWallet) {
+      return NextResponse.json(
+        { error: "Insufficient balance for this withdrawal." },
+        { status: 400 },
+      );
+    }
+    const balanceBefore = debitedWallet.creditBalance + creditsNeeded;
+    // Keep the in-memory wallet doc in sync so downstream reads/logs are correct.
+    wallet.creditBalance = debitedWallet.creditBalance;
 
     // Compute once so the DB insert stays clean.
     const reqGeo = getRequestGeo(req);
@@ -421,9 +437,13 @@ export async function POST(req: NextRequest) {
           "🏦 No Nuvei UPO found for bank account - user needs to complete accountCapture flow",
         );
 
-        // Rollback balance
+        // Atomic reversal — add the credits back without clobbering any
+        // concurrent balance change (mirrors the atomic debit above).
+        await CreditWallet.updateOne(
+          { userId },
+          { $inc: { creditBalance: creditsNeeded } },
+        );
         wallet.creditBalance = balanceBefore;
-        await wallet.save();
 
         // Update withdrawal request as failed
         await WithdrawalRequest.findByIdAndUpdate(withdrawalRequest._id, {
@@ -524,9 +544,13 @@ export async function POST(req: NextRequest) {
       // BUSINESS ERROR - Actually failed, refund credits
       console.log("💸 Business error detected - refunding credits");
 
-      // Restore balance
+      // Atomic reversal — add the credits back without clobbering any
+      // concurrent balance change (mirrors the atomic debit above).
+      await CreditWallet.updateOne(
+        { userId },
+        { $inc: { creditBalance: creditsNeeded } },
+      );
       wallet.creditBalance = balanceBefore;
-      await wallet.save();
 
       console.log(
         `💸 Refunded ${creditsNeeded} credits to user ${userId} due to failure`,
@@ -655,9 +679,13 @@ export async function POST(req: NextRequest) {
 
     // IMPORTANT: If withdrawal completed immediately (APPROVED), update wallet stats and record platform fee
     if (finalStatus === "completed") {
-      // Update wallet's totalWithdrawn counter
-      wallet.totalWithdrawn = (wallet.totalWithdrawn || 0) + creditsNeeded;
-      await wallet.save();
+      // Update wallet's totalWithdrawn counter atomically. Reason: a plain
+      // wallet.save() here would also rewrite creditBalance from the in-memory
+      // doc and could clobber a concurrent balance change.
+      await CreditWallet.updateOne(
+        { userId },
+        { $inc: { totalWithdrawn: creditsNeeded } },
+      );
       console.log(
         `💸 Updated wallet totalWithdrawn: +${creditsNeeded} credits`,
       );
@@ -704,8 +732,13 @@ export async function POST(req: NextRequest) {
 
     // If failed, refund the credits
     if (finalStatus === "failed") {
+      // Atomic reversal — add the credits back without clobbering any
+      // concurrent balance change (mirrors the atomic debit above).
+      await CreditWallet.updateOne(
+        { userId },
+        { $inc: { creditBalance: creditsNeeded } },
+      );
       wallet.creditBalance = balanceBefore;
-      await wallet.save();
 
       // Update the wallet transaction - mark as completed with 0 amount (reversed)
       // This ensures reconciliation is correct (no net effect since reversed)

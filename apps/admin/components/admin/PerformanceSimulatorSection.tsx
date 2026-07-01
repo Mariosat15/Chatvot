@@ -58,6 +58,7 @@ import DatabaseIndexesTab from "./DatabaseIndexesTab";
 import BadgeSimulatorTab from "./BadgeSimulatorTab";
 import MilestoneSimulatorTab from "./MilestoneSimulatorTab";
 import UnitTestsTab from "./UnitTestsTab";
+import DataIntegrityTab from "./DataIntegrityTab";
 import AttackSuitePanel from "./AttackSuitePanel";
 import {
   XAxis,
@@ -882,6 +883,13 @@ export default function PerformanceSimulatorSection() {
           >
             <ShieldCheck className="h-4 w-4 mr-2" />
             Attack Suite
+          </TabsTrigger>
+          <TabsTrigger
+            value="data-integrity"
+            className="data-[state=active]:bg-gray-700"
+          >
+            <Wallet className="h-4 w-4 mr-2" />
+            Data Integrity
           </TabsTrigger>
         </TabsList>
 
@@ -3076,6 +3084,11 @@ export default function PerformanceSimulatorSection() {
         {/* Card-Testing Attack Suite Tab */}
         <TabsContent value="attack-suite">
           <AttackSuitePanel />
+        </TabsContent>
+
+        {/* Data Integrity Tab */}
+        <TabsContent value="data-integrity">
+          <DataIntegrityTab />
         </TabsContent>
       </Tabs>
     </div>
