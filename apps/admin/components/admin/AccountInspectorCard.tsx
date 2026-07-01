@@ -32,6 +32,16 @@ interface CompareField {
   history: number;
   match: boolean;
 }
+interface OpenPositionRow {
+  id: string;
+  symbol: string;
+  side: string;
+  contextId: string;
+  parentType: string;
+  parentStatus: string;
+  openedAt: string | null;
+  orphaned: boolean;
+}
 interface AccountMatch {
   userId: string;
   name: string;
@@ -47,6 +57,8 @@ interface AccountMatch {
     byCloseReason: Array<{ reason: string; count: number }>;
   };
   openPositions: number;
+  openPositionDetails: OpenPositionRow[];
+  orphanOpenPositions: number;
   comparison: {
     realizedPnl: CompareField;
     winners: CompareField;
@@ -150,9 +162,11 @@ export default function AccountInspectorCard() {
 
 function AccountMatchView({ match: m }: { match: AccountMatch }) {
   const rows = [...m.competitionParticipants, ...m.challengeParticipants];
+  const orphanOpen = m.orphanOpenPositions ?? 0;
   const hasDrift =
     m.driftSources.orphanParticipants.length > 0 ||
-    m.driftSources.orphanContexts.length > 0;
+    m.driftSources.orphanContexts.length > 0 ||
+    orphanOpen > 0;
 
   return (
     <div className="border border-gray-700 rounded-lg p-4 space-y-4">
@@ -216,6 +230,52 @@ function AccountMatchView({ match: m }: { match: AccountMatch }) {
         </div>
       </div>
 
+      {/* Open positions (with parent-contest status) */}
+      {m.openPositionDetails?.length > 0 && (
+        <div>
+          <p className="text-xs text-gray-400 mb-1">
+            Open positions ({m.openPositionDetails.length})
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="text-gray-500">
+                <tr className="text-left">
+                  <th className="py-1 pr-2">symbol</th>
+                  <th className="py-1 pr-2">side</th>
+                  <th className="py-1 pr-2">contest</th>
+                  <th className="py-1 pr-2">contest status</th>
+                  <th className="py-1 pr-2">opened</th>
+                  <th className="py-1 pr-2">verdict</th>
+                </tr>
+              </thead>
+              <tbody className="text-gray-300 font-mono">
+                {m.openPositionDetails.map((p) => (
+                  <tr key={p.id} className="border-t border-gray-800">
+                    <td className="py-1 pr-2">{p.symbol}</td>
+                    <td className="py-1 pr-2">{p.side}</td>
+                    <td className="py-1 pr-2">
+                      {p.parentType !== "unknown" ? `${p.parentType.slice(0, 4)}·` : ""}
+                      {p.contextId.slice(-8)}
+                    </td>
+                    <td className="py-1 pr-2">{p.parentStatus}</td>
+                    <td className="py-1 pr-2">
+                      {p.openedAt ? p.openedAt.slice(0, 10) : "-"}
+                    </td>
+                    <td className="py-1 pr-2">
+                      {p.orphaned ? (
+                        <span className="text-red-400">orphaned</span>
+                      ) : (
+                        <span className="text-green-400">live</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* TradeHistory summary */}
       <div className="text-xs text-gray-400">
         <span className="text-gray-300">TradeHistory:</span> {m.tradeHistory.count}{" "}
@@ -256,6 +316,17 @@ function AccountMatchView({ match: m }: { match: AccountMatch }) {
             <p className="text-xs text-gray-300">
               {m.driftSources.orphanContexts.length} competition/challenge(s) in
               history have no participant row for this user.
+            </p>
+          )}
+          {orphanOpen > 0 && (
+            <p className="text-xs text-gray-300">
+              {orphanOpen} open position(s) belong to a contest that is already
+              ended/cancelled (see the &ldquo;Open positions&rdquo; table). The
+              contest finalized but this position was never closed — this happens
+              when the price feed had no price for its symbol at finalization, so
+              the close loop skipped it. The position lingers as{" "}
+              <span className="font-mono">open</span> while the participant row is
+              marked completed with 0 open positions.
             </p>
           )}
         </div>

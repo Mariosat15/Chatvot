@@ -372,14 +372,20 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
       try {
         // Get price from pre-fetched batch (instant!)
         const priceData = pricesMap.get(position.symbol as ForexSymbol);
+        // Reason: NEVER leave a position open on a finalized competition. If the
+        // feed returns no price for this symbol, fall back to the position's last
+        // known price (currentPrice → entryPrice) so the close loop cannot skip
+        // it and orphan an "open" position on a completed contest.
+        const exitPrice = priceData
+          ? position.side === "long"
+            ? priceData.bid
+            : priceData.ask
+          : (position.currentPrice ?? position.entryPrice);
         if (!priceData) {
-          console.error(
-            `  ❌ Could not get price for ${position.symbol}, skipping`,
+          console.warn(
+            `  ⚠️ No live price for ${position.symbol}; closing at fallback ${exitPrice} (last known price)`,
           );
-          continue;
         }
-        const exitPrice =
-          position.side === "long" ? priceData.bid : priceData.ask;
 
         console.log(
           `  Closing ${position.symbol} ${position.side} for user ${position.userId} at ${exitPrice}`,
@@ -1467,6 +1473,33 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
       });
       console.log(
         `   ✅ Updated final ranks for ${rankResult.modifiedCount} participants`,
+      );
+    }
+
+    // SAFETY NET: guarantee no position survives finalization, regardless of any
+    // per-position error in the close loop above. Force-close any straggler still
+    // "open" for this competition at its last known price (currentPrice →
+    // entryPrice). Works for both long and short (exit uses the mark price).
+    // Reason: the primary loop already closes with a price fallback; this is the
+    // last-resort guard so a completed contest can NEVER leave an open position.
+    const ceStrayClose = await TradingPosition.updateMany(
+      { competitionId: competition._id.toString(), status: "open" },
+      [
+        {
+          $set: {
+            status: "closed",
+            exitPrice: { $ifNull: ["$currentPrice", "$entryPrice"] },
+            currentPrice: { $ifNull: ["$currentPrice", "$entryPrice"] },
+            closedAt: "$$NOW",
+            closeReason: "competition_end",
+          },
+        },
+      ],
+      { session },
+    );
+    if (ceStrayClose.modifiedCount > 0) {
+      console.warn(
+        `⚠️ [SAFETY NET] Force-closed ${ceStrayClose.modifiedCount} straggler open position(s) at competition end (competition ${competition._id.toString()}). Investigate the close loop for errors.`,
       );
     }
 

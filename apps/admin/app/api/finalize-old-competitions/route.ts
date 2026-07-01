@@ -95,6 +95,9 @@ export async function POST(_request: Request) {
                 : position.entryPrice - exitPrice;
             const positionPnL = priceDiff * position.quantity * 10000; // Forex pip value
             const isWinner = positionPnL > 0;
+            // Reason: breakeven (positionPnL === 0) counts as neither win nor loss,
+            // matching TradeHistory (win = pnl>0, loss = pnl<0).
+            const isLoser = positionPnL < 0;
 
             console.log(
               `      Entry: ${position.entryPrice}, Exit: ${exitPrice}, P&L: $${positionPnL.toFixed(2)}`,
@@ -198,7 +201,7 @@ export async function POST(_request: Request) {
               const newWinningTrades =
                 participant.winningTrades + (isWinner ? 1 : 0);
               const _newLosingTrades =
-                participant.losingTrades + (isWinner ? 0 : 1);
+                participant.losingTrades + (isLoser ? 1 : 0);
               const winRate =
                 newTotalTrades > 0
                   ? (newWinningTrades / newTotalTrades) * 100
@@ -210,7 +213,7 @@ export async function POST(_request: Request) {
                   $inc: {
                     totalTrades: 1,
                     winningTrades: isWinner ? 1 : 0,
-                    losingTrades: isWinner ? 0 : 1,
+                    losingTrades: isLoser ? 1 : 0,
                     currentOpenPositions: -1,
                   },
                   $set: {

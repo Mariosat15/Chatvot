@@ -254,14 +254,20 @@ async function _finalizeChallengeAttempt(challengeId: string) {
       try {
         // Get price from pre-fetched batch (instant!)
         const priceData = pricesMap.get(position.symbol as ForexSymbol);
+        // Reason: NEVER leave a position open on a finalized challenge. If the
+        // feed returns no price for this symbol, fall back to the position's last
+        // known price (currentPrice → entryPrice) so the close loop cannot skip
+        // it and orphan an "open" position on a completed contest.
+        const exitPrice = priceData
+          ? position.side === "long"
+            ? priceData.bid
+            : priceData.ask
+          : (position.currentPrice ?? position.entryPrice);
         if (!priceData) {
-          console.error(
-            `  ❌ Could not get price for ${position.symbol}, skipping`,
+          console.warn(
+            `  ⚠️ No live price for ${position.symbol}; closing at fallback ${exitPrice} (last known price)`,
           );
-          continue;
         }
-        const exitPrice =
-          position.side === "long" ? priceData.bid : priceData.ask;
 
         const priceDiff =
           position.side === "long"
@@ -1183,6 +1189,33 @@ async function _finalizeChallengeAttempt(challengeId: string) {
         await challenged.save({ session });
       }
       // 'both_lose' - platform keeps prize, already recorded above
+    }
+
+    // SAFETY NET: guarantee no position survives finalization, regardless of any
+    // per-position error in the close loop above. Force-close any straggler still
+    // "open" for this challenge at its last known price (currentPrice →
+    // entryPrice). Works for both long and short (exit uses the mark price).
+    // Reason: the primary loop already closes with a price fallback; this is the
+    // last-resort guard so a finished challenge can NEVER leave an open position.
+    const cfStrayClose = await TradingPosition.updateMany(
+      { competitionId: challengeId, status: "open" },
+      [
+        {
+          $set: {
+            status: "closed",
+            exitPrice: { $ifNull: ["$currentPrice", "$entryPrice"] },
+            currentPrice: { $ifNull: ["$currentPrice", "$entryPrice"] },
+            closedAt: "$$NOW",
+            closeReason: "challenge_end",
+          },
+        },
+      ],
+      { session },
+    );
+    if (cfStrayClose.modifiedCount > 0) {
+      console.warn(
+        `⚠️ [SAFETY NET] Force-closed ${cfStrayClose.modifiedCount} straggler open position(s) at challenge end (challenge ${challengeId}). Investigate the close loop for errors.`,
+      );
     }
 
     await session.commitTransaction();

@@ -570,8 +570,12 @@ export const closePosition = async (
       );
 
       const isWinner = realizedPnl > 0;
+      // Reason: breakeven (realizedPnl === 0) counts as neither win nor loss,
+      // matching TradeHistory (win = pnl>0, loss = pnl<0). `isWinner ? 0 : 1`
+      // wrongly booked breakevens as losses.
+      const isLoser = realizedPnl < 0;
       const winningTrades = participant.winningTrades + (isWinner ? 1 : 0);
-      const losingTrades = participant.losingTrades + (isWinner ? 0 : 1);
+      const losingTrades = participant.losingTrades + (isLoser ? 1 : 0);
       const totalTrades = participant.totalTrades + 1; // INCREMENT total trades!
       const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
 
@@ -596,7 +600,7 @@ export const closePosition = async (
             currentOpenPositions: -1,
             totalTrades: 1, // INCREMENT total trades!
             winningTrades: isWinner ? 1 : 0,
-            losingTrades: isWinner ? 0 : 1,
+            losingTrades: isLoser ? 1 : 0,
           },
           $set: {
             currentCapital: newCapital,
@@ -1129,8 +1133,12 @@ export async function closePositionAutomatic(
       100;
 
     const isWinner = realizedPnl > 0;
+    // Reason: breakeven (realizedPnl === 0) counts as neither win nor loss,
+    // matching TradeHistory (win = pnl>0, loss = pnl<0). `isWinner ? 0 : 1`
+    // wrongly booked breakevens as losses.
+    const isLoser = realizedPnl < 0;
     const winningTrades = participant.winningTrades + (isWinner ? 1 : 0);
-    const losingTrades = participant.losingTrades + (isWinner ? 0 : 1);
+    const losingTrades = participant.losingTrades + (isLoser ? 1 : 0);
     const totalTrades = participant.totalTrades + 1; // INCREMENT total trades!
     const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
 
@@ -1154,7 +1162,7 @@ export async function closePositionAutomatic(
           currentOpenPositions: -1,
           totalTrades: 1, // INCREMENT total trades!
           winningTrades: isWinner ? 1 : 0,
-          losingTrades: isWinner ? 0 : 1,
+          losingTrades: isLoser ? 1 : 0,
           marginCallWarnings: closeReason === "margin_call" ? 1 : 0,
         },
         $set: {

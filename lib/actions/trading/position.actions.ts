@@ -1256,8 +1256,12 @@ export async function closePositionAutomatic(
         100;
 
       const isWinner = realizedPnl > 0;
+      // Reason: breakeven (realizedPnl === 0) must count as neither win nor loss —
+      // consistent with the manual close path and TradeHistory (win = pnl>0,
+      // loss = pnl<0). `isWinner ? 0 : 1` wrongly booked breakevens as losses.
+      const isLoser = realizedPnl < 0;
       const winningTrades = participant.winningTrades + (isWinner ? 1 : 0);
-      const losingTrades = participant.losingTrades + (isWinner ? 0 : 1);
+      const losingTrades = participant.losingTrades + (isLoser ? 1 : 0);
       // Note: totalTrades was already incremented when position was opened
       const totalTrades = participant.totalTrades;
       const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
@@ -1282,7 +1286,7 @@ export async function closePositionAutomatic(
             currentOpenPositions: -1,
             // totalTrades already counted on position open
             winningTrades: isWinner ? 1 : 0,
-            losingTrades: isWinner ? 0 : 1,
+            losingTrades: isLoser ? 1 : 0,
             marginCallWarnings: closeReason === "margin_call" ? 1 : 0,
           },
           $set: {

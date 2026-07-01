@@ -23,6 +23,7 @@ import {
   Users,
 } from "lucide-react";
 import AccountInspectorCard from "./AccountInspectorCard";
+import OrphanedPositionsCard from "./OrphanedPositionsCard";
 
 // ---- Duplicate-deposit scan types (match /api/simulator/scan-duplicate-deposits)
 interface DuplicateGroup {
@@ -66,6 +67,8 @@ interface WinLossDivergence {
   thLosers: number;
   opens: number;
   closedTrades: number;
+  orphanClosedTrades: number;
+  orphanRealizedPnl: number;
   openPositions: number;
   flags: {
     compWinDiff: boolean;
@@ -92,6 +95,7 @@ interface WinLossResult {
   };
   divergences?: WinLossDivergence[];
   divergencesTruncated?: boolean;
+  orphanResidue?: { users: number; trades: number; pnl: number };
   anomalies?: {
     rank1_partNotCompleted: AnomalyBucket;
     isWinner_challNotCompleted: AnomalyBucket;
@@ -184,8 +188,10 @@ export default function DataIntegrityTab() {
       {/* Intro */}
       <Card className="border-blue-500/30 bg-blue-500/5">
         <CardContent className="pt-4 pb-4 text-sm text-muted-foreground">
-          Read-only integrity checks. They never modify data — they only compare
-          the live records against what they should be and report mismatches.
+          Integrity checks. Scans are read-only — they compare the live records
+          against what they should be and report mismatches. Only the{" "}
+          <span className="text-gray-300">Orphaned Open Positions</span> card can
+          modify data, and only when you explicitly press its Close button.
         </CardContent>
       </Card>
 
@@ -353,6 +359,18 @@ export default function DataIntegrityTab() {
               </div>
             )}
 
+            {wlResult.orphanResidue && wlResult.orphanResidue.trades > 0 && (
+              <div className="rounded-lg bg-gray-900/50 border border-gray-700 p-3 text-xs text-gray-400">
+                <span className="text-gray-300">
+                  Historical residue (excluded):
+                </span>{" "}
+                {wlResult.orphanResidue.trades} orphan trade(s) across{" "}
+                {wlResult.orphanResidue.users} user(s) from reset / re-created /
+                deleted participants. Expected on reused test accounts — not
+                counted as a divergence.
+              </div>
+            )}
+
             {wlResult.clean ? (
               <div className="flex items-center gap-3 rounded-lg bg-green-500/10 border border-green-700 p-4">
                 <CheckCircle className="h-6 w-6 text-green-400" />
@@ -419,6 +437,12 @@ export default function DataIntegrityTab() {
                             </Badge>
                           )}
                         </div>
+                        {d.orphanClosedTrades > 0 && (
+                          <p className="text-gray-500 mt-1">
+                            + {d.orphanClosedTrades} orphan history trade(s)
+                            excluded (realized {d.orphanRealizedPnl})
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -455,6 +479,9 @@ export default function DataIntegrityTab() {
           </CardContent>
         )}
       </Card>
+
+      {/* ---- Orphaned Open Positions (scan + close) ---- */}
+      <OrphanedPositionsCard />
 
       {/* ---- Account Inspector ---- */}
       <AccountInspectorCard />

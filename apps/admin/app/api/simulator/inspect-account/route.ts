@@ -59,6 +59,8 @@ export async function GET(request: NextRequest) {
     const challPartCol = pick("challengeparticipants");
     const tradeCol = pick("tradehistories", "trade_histories");
     const posCol = pick("tradingpositions", "trading_positions");
+    const compCol = pick("competitions");
+    const challCol = pick("challenges");
 
     if (!compPartCol || !challPartCol || !tradeCol) {
       return NextResponse.json(
@@ -148,9 +150,74 @@ export async function GET(request: NextRequest) {
         byPart.set(String(t.participantId), (byPart.get(String(t.participantId)) || 0) + 1);
       }
 
-      const openPositions = posCol
-        ? await db.collection(posCol).countDocuments({ userId, status: "open" })
-        : pOpenPos;
+      // Fetch the raw open-position docs (not just a count) so we can resolve
+      // each one's parent contest status. An open position is only legitimate
+      // while its parent contest is "active"; anything else means the contest
+      // ended but the position was left open (e.g. finalization skipped it
+      // because no price was available for its symbol).
+      const openDocs: Doc[] = posCol
+        ? await db
+            .collection(posCol)
+            .find({ userId, status: "open" })
+            .limit(50)
+            .toArray()
+        : [];
+      const openPositions = posCol ? openDocs.length : pOpenPos;
+
+      // Resolve parent contest status for every open position in one batched
+      // query per collection. competitionId on a position may be a competition
+      // _id OR a challenge _id (challenges reuse the field), so we look in both.
+      const ctxIds = [
+        ...new Set(openDocs.map((p: Doc) => String(p.competitionId))),
+      ];
+      const idCandidates: (string | mongoose.Types.ObjectId)[] = [];
+      for (const id of ctxIds) {
+        idCandidates.push(id);
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          idCandidates.push(new mongoose.Types.ObjectId(id));
+        }
+      }
+      const [comps, challs] = await Promise.all([
+        compCol && idCandidates.length
+          ? db.collection(compCol).find({ _id: { $in: idCandidates } }).toArray()
+          : Promise.resolve([] as Doc[]),
+        challCol && idCandidates.length
+          ? db.collection(challCol).find({ _id: { $in: idCandidates } }).toArray()
+          : Promise.resolve([] as Doc[]),
+      ]);
+      const compStatus = new Map(
+        (comps as Doc[]).map((c: Doc) => [String(c._id), String(c.status)]),
+      );
+      const challStatus = new Map(
+        (challs as Doc[]).map((c: Doc) => [String(c._id), String(c.status)]),
+      );
+
+      let orphanOpenPositions = 0;
+      const openPositionDetails = openDocs.map((p: Doc) => {
+        const ctxId = String(p.competitionId);
+        let parentType: "competition" | "challenge" | "unknown" = "unknown";
+        let parentStatus = "missing";
+        if (compStatus.has(ctxId)) {
+          parentType = "competition";
+          parentStatus = compStatus.get(ctxId) as string;
+        } else if (challStatus.has(ctxId)) {
+          parentType = "challenge";
+          parentStatus = challStatus.get(ctxId) as string;
+        }
+        // Reason: "active" is the only state in which an open position is valid.
+        const orphaned = parentStatus !== "active";
+        if (orphaned) orphanOpenPositions += 1;
+        return {
+          id: String(p._id),
+          symbol: String(p.symbol || "?"),
+          side: String(p.side || "?"),
+          contextId: ctxId,
+          parentType,
+          parentStatus,
+          openedAt: p.openedAt ? new Date(p.openedAt).toISOString() : null,
+          orphaned,
+        };
+      });
 
       const partIdSet = new Set([...compParts, ...challParts].map((p: Doc) => String(p._id)));
       const partCtxIds = new Set([
@@ -186,6 +253,8 @@ export async function GET(request: NextRequest) {
           })),
         },
         openPositions,
+        openPositionDetails,
+        orphanOpenPositions,
         comparison: {
           realizedPnl: {
             participants: r2(pRealized),
