@@ -99,31 +99,71 @@ export async function finalizeCompetition(competitionId: string) {
 
     const symConfigs = await getMultipleSymbolConfigs(allPositionSymbols);
 
+    // Import required models (needed for both the closed-position reconciliation
+    // below and the open-position close loop further down).
+    const TradeHistory = (
+      await import("@/database/models/trading/trade-history.model")
+    ).default;
+    const TradingOrder = (
+      await import("@/database/models/trading/trading-order.model")
+    ).default;
+
+    // Reason: Trust the realized P&L recorded in TradeHistory at each close
+    // instead of re-deriving with the CURRENT conversion rate (see the main-app
+    // competition-end.actions.ts for the full rationale). Map positionId → P&L.
+    const ceClosedHistory = (await TradeHistory.find(
+      { competitionId: competition._id.toString() },
+      { positionId: 1, realizedPnl: 1 },
+    )
+      .session(session)
+      .lean()) as Array<{ positionId?: string; realizedPnl?: number }>;
+    const ceRealizedByPositionId = new Map<string, number>();
+    for (const h of ceClosedHistory) {
+      const pid = h?.positionId ? String(h.positionId) : "";
+      if (!pid) continue;
+      const val =
+        typeof h.realizedPnl === "number" && Number.isFinite(h.realizedPnl)
+          ? h.realizedPnl
+          : 0;
+      ceRealizedByPositionId.set(
+        pid,
+        (ceRealizedByPositionId.get(pid) || 0) + val,
+      );
+    }
+
     // First, process already-closed positions
-    // NOTE: TradingPosition doesn't have 'profitLoss' field - calculate from entry/exit prices
     for (const position of allPositions) {
       if (position.status === "closed" || position.status === "liquidated") {
         const userId = position.userId.toString();
         const stats = participantStats.get(userId);
         if (stats) {
-          const exitPrice =
-            position.exitPrice ??
-            position.currentPrice ??
-            position.entryPrice;
-          const ceRate = getQuoteToUsdRate(
-            position.symbol as ForexSymbol,
-            pricesMap as Map<string, { bid: number; ask: number }>,
-          );
-          const sc = symConfigs.get(position.symbol);
-          const positionPnL = calculateUnrealizedPnL(
-            position.side,
-            position.entryPrice,
-            exitPrice,
-            position.quantity,
-            position.symbol,
-            ceRate > 0 ? ceRate : 1,
-            sc ? { pip: sc.pip, contractSize: sc.contractSize } : undefined,
-          );
+          // Reason: Prefer the realized P&L recorded in TradeHistory at close
+          // time; only re-derive (legacy/edge data with no history row) so the
+          // participant total always reconciles with Σ TradeHistory.realizedPnl.
+          const recorded = ceRealizedByPositionId.get(String(position._id));
+          let positionPnL: number;
+          if (typeof recorded === "number") {
+            positionPnL = recorded;
+          } else {
+            const exitPrice =
+              position.exitPrice ??
+              position.currentPrice ??
+              position.entryPrice;
+            const ceRate = getQuoteToUsdRate(
+              position.symbol as ForexSymbol,
+              pricesMap as Map<string, { bid: number; ask: number }>,
+            );
+            const sc = symConfigs.get(position.symbol);
+            positionPnL = calculateUnrealizedPnL(
+              position.side,
+              position.entryPrice,
+              exitPrice,
+              position.quantity,
+              position.symbol,
+              ceRate > 0 ? ceRate : 1,
+              sc ? { pip: sc.pip, contractSize: sc.contractSize } : undefined,
+            );
+          }
 
           stats.totalPnL += positionPnL;
           stats.currentCapital += positionPnL;
@@ -142,14 +182,6 @@ export async function finalizeCompetition(competitionId: string) {
       `Processed ${allPositions.filter((p) => p.status === "closed" || p.status === "liquidated").length} already-closed positions`,
     );
 
-    // Import required models
-    const TradeHistory = (
-      await import("@/database/models/trading/trade-history.model")
-    ).default;
-    const TradingOrder = (
-      await import("@/database/models/trading/trading-order.model")
-    ).default;
-
     // Now, close open positions and calculate their P&L
     const openPositions = allPositions.filter((p) => p.status === "open");
     console.log(`Closing ${openPositions.length} open positions...`);
@@ -158,14 +190,20 @@ export async function finalizeCompetition(competitionId: string) {
       try {
         // Get price from pre-fetched batch (instant!)
         const priceData = pricesMap.get(position.symbol as ForexSymbol);
+        // Reason: NEVER leave a position open on a finalized competition. If the
+        // feed returns no price for this symbol, fall back to the position's last
+        // known price (currentPrice → entryPrice) so the close loop cannot skip
+        // it and orphan an "open" position on a completed contest.
+        const exitPrice = priceData
+          ? position.side === "long"
+            ? priceData.bid
+            : priceData.ask
+          : (position.currentPrice ?? position.entryPrice);
         if (!priceData) {
-          console.error(
-            `  ❌ Could not get price for ${position.symbol}, skipping`,
+          console.warn(
+            `  ⚠️ No live price for ${position.symbol}; closing at fallback ${exitPrice} (last known price)`,
           );
-          continue;
         }
-        const exitPrice =
-          position.side === "long" ? priceData.bid : priceData.ask;
 
         console.log(
           `  Closing ${position.symbol} ${position.side} for user ${position.userId} at ${exitPrice}`,
@@ -717,6 +755,31 @@ export async function finalizeCompetition(competitionId: string) {
       });
       console.log(
         `   ✅ Updated final ranks for ${rankResult.modifiedCount} participants`,
+      );
+    }
+
+    // SAFETY NET: guarantee no position survives finalization, regardless of any
+    // per-position error in the close loop above. Force-close any straggler still
+    // "open" for this competition at its last known price (currentPrice →
+    // entryPrice). Works for both long and short (exit uses the mark price).
+    const ceStrayClose = await TradingPosition.updateMany(
+      { competitionId: competition._id.toString(), status: "open" },
+      [
+        {
+          $set: {
+            status: "closed",
+            exitPrice: { $ifNull: ["$currentPrice", "$entryPrice"] },
+            currentPrice: { $ifNull: ["$currentPrice", "$entryPrice"] },
+            closedAt: "$$NOW",
+            closeReason: "competition_end",
+          },
+        },
+      ],
+      { session },
+    );
+    if (ceStrayClose.modifiedCount > 0) {
+      console.warn(
+        `⚠️ [SAFETY NET] Force-closed ${ceStrayClose.modifiedCount} straggler open position(s) at competition end (competition ${competition._id.toString()}). Investigate the close loop for errors.`,
       );
     }
 

@@ -189,35 +189,65 @@ async function _finalizeChallengeAttempt(challengeId: string) {
 
     const symConfigs = await getMultipleSymbolConfigs(cfAllPosSymbols);
 
+    // Reason: Trust the realized P&L recorded in TradeHistory at each close
+    // instead of re-deriving with the CURRENT conversion rate (see
+    // competition-end.actions.ts for the full rationale). Positions on a
+    // challenge store the challengeId in the competitionId field.
+    const cfClosedHistory = (await TradeHistory.find(
+      { competitionId: challengeId },
+      { positionId: 1, realizedPnl: 1 },
+    )
+      .session(session)
+      .lean()) as Array<{ positionId?: string; realizedPnl?: number }>;
+    const cfRealizedByPositionId = new Map<string, number>();
+    for (const h of cfClosedHistory) {
+      const pid = h?.positionId ? String(h.positionId) : "";
+      if (!pid) continue;
+      const val =
+        typeof h.realizedPnl === "number" && Number.isFinite(h.realizedPnl)
+          ? h.realizedPnl
+          : 0;
+      cfRealizedByPositionId.set(
+        pid,
+        (cfRealizedByPositionId.get(pid) || 0) + val,
+      );
+    }
+
     // Process already-closed positions
     for (const position of allPositions) {
       if (position.status === "closed" || position.status === "liquidated") {
         const userId = position.userId.toString();
         const stats = participantStats.get(userId);
         if (stats) {
-          const exitPrice =
-            position.exitPrice ?? position.currentPrice ?? position.entryPrice;
-          const priceDiff =
-            position.side === "long"
-              ? exitPrice - position.entryPrice
-              : position.entryPrice - exitPrice;
-          const cfRate = getQuoteToUsdRate(
-            position.symbol as ForexSymbol,
-            cfConvPrices,
-          );
-          const sc = symConfigs.get(position.symbol);
-          const positionPnL = calculateUnrealizedPnL(
-            position.side,
-            position.entryPrice,
-            exitPrice,
-            position.quantity,
-            position.symbol,
-            cfRate > 0 ? cfRate : 1,
-            sc ? { pip: sc.pip, contractSize: sc.contractSize } : undefined,
-          );
+          // Reason: Prefer the realized P&L recorded in TradeHistory at close
+          // time; only re-derive when no history row exists for this position.
+          const recorded = cfRealizedByPositionId.get(String(position._id));
+          let positionPnL: number;
+          if (typeof recorded === "number") {
+            positionPnL = recorded;
+          } else {
+            const exitPrice =
+              position.exitPrice ??
+              position.currentPrice ??
+              position.entryPrice;
+            const cfRate = getQuoteToUsdRate(
+              position.symbol as ForexSymbol,
+              cfConvPrices,
+            );
+            const sc = symConfigs.get(position.symbol);
+            positionPnL = calculateUnrealizedPnL(
+              position.side,
+              position.entryPrice,
+              exitPrice,
+              position.quantity,
+              position.symbol,
+              cfRate > 0 ? cfRate : 1,
+              sc ? { pip: sc.pip, contractSize: sc.contractSize } : undefined,
+            );
+          }
 
           console.log(
-            `  Closed position: ${position.symbol} ${position.side}, Entry: ${position.entryPrice}, Exit: ${exitPrice}, P&L: $${positionPnL.toFixed(2)}`,
+            `  Closed position: ${position.symbol} ${position.side}, P&L: $${positionPnL.toFixed(2)} (${typeof recorded === "number" ? "from history" : "re-derived"})`,
           );
 
           stats.totalPnL += positionPnL;

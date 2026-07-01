@@ -143,35 +143,77 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
 
     const symConfigs = await getMultipleSymbolConfigs(allPosSymbols);
 
+    // Import required models (needed for both the closed-position reconciliation
+    // below and the open-position close loop further down).
+    const TradeHistory = (
+      await import("@/database/models/trading/trade-history.model")
+    ).default;
+    const TradingOrder = (
+      await import("@/database/models/trading/trading-order.model")
+    ).default;
+
+    // Reason: Trust the realized P&L recorded in TradeHistory at each close
+    // (immutable, correct conversion rate) instead of re-deriving it here with
+    // the CURRENT rate. Re-deriving overwrote participant.realizedPnl with a
+    // value that no longer equaled Σ TradeHistory.realizedPnl for non-USD-quote
+    // pairs (and could be badly distorted when a conversion price was momentarily
+    // missing and the rate fell back to 1). Map positionId → realized P&L.
+    const ceClosedHistory = (await TradeHistory.find(
+      { competitionId: competition._id.toString() },
+      { positionId: 1, realizedPnl: 1 },
+    )
+      .session(session)
+      .lean()) as Array<{ positionId?: string; realizedPnl?: number }>;
+    const ceRealizedByPositionId = new Map<string, number>();
+    for (const h of ceClosedHistory) {
+      const pid = h?.positionId ? String(h.positionId) : "";
+      if (!pid) continue;
+      const val =
+        typeof h.realizedPnl === "number" && Number.isFinite(h.realizedPnl)
+          ? h.realizedPnl
+          : 0;
+      ceRealizedByPositionId.set(
+        pid,
+        (ceRealizedByPositionId.get(pid) || 0) + val,
+      );
+    }
+
     // First, process already-closed positions
     for (const position of allPositions) {
       if (position.status === "closed" || position.status === "liquidated") {
         const userId = position.userId.toString();
         const stats = participantStats.get(userId);
         if (stats) {
-          const exitPrice =
-            position.exitPrice ?? position.currentPrice ?? position.entryPrice;
-          const priceDiff =
-            position.side === "long"
-              ? exitPrice - position.entryPrice
-              : position.entryPrice - exitPrice;
-          const ceRate = getQuoteToUsdRate(
-            position.symbol as ForexSymbol,
-            convPricesMap,
-          );
-          const sc = symConfigs.get(position.symbol);
-          const positionPnL = calculateUnrealizedPnL(
-            position.side,
-            position.entryPrice,
-            exitPrice,
-            position.quantity,
-            position.symbol,
-            ceRate > 0 ? ceRate : 1,
-            sc ? { pip: sc.pip, contractSize: sc.contractSize } : undefined,
-          );
+          // Reason: Prefer the realized P&L recorded in TradeHistory at close
+          // time; only re-derive (legacy/edge data with no history row) so the
+          // participant total always reconciles with Σ TradeHistory.realizedPnl.
+          const recorded = ceRealizedByPositionId.get(String(position._id));
+          let positionPnL: number;
+          if (typeof recorded === "number") {
+            positionPnL = recorded;
+          } else {
+            const exitPrice =
+              position.exitPrice ??
+              position.currentPrice ??
+              position.entryPrice;
+            const ceRate = getQuoteToUsdRate(
+              position.symbol as ForexSymbol,
+              convPricesMap,
+            );
+            const sc = symConfigs.get(position.symbol);
+            positionPnL = calculateUnrealizedPnL(
+              position.side,
+              position.entryPrice,
+              exitPrice,
+              position.quantity,
+              position.symbol,
+              ceRate > 0 ? ceRate : 1,
+              sc ? { pip: sc.pip, contractSize: sc.contractSize } : undefined,
+            );
+          }
 
           console.log(
-            `    📈 Position ${position._id}: entry=${position.entryPrice}, exit=${exitPrice}, side=${position.side}, qty=${position.quantity}, PNL=$${positionPnL.toFixed(2)}`,
+            `    📈 Position ${position._id}: PNL=$${positionPnL.toFixed(2)} (${typeof recorded === "number" ? "from history" : "re-derived"})`,
           );
 
           stats.totalPnL += positionPnL;
@@ -190,14 +232,6 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
     console.log(
       `Processed ${allPositions.filter((p) => p.status === "closed" || p.status === "liquidated").length} already-closed positions`,
     );
-
-    // Import required models
-    const TradeHistory = (
-      await import("@/database/models/trading/trade-history.model")
-    ).default;
-    const TradingOrder = (
-      await import("@/database/models/trading/trading-order.model")
-    ).default;
 
     // Now, close open positions and calculate their P&L
     const openPositions = allPositions.filter((p) => p.status === "open");

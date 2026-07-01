@@ -182,34 +182,65 @@ async function _finalizeChallengeAttempt(challengeId: string) {
 
     const symConfigs = await getMultipleSymbolConfigs(cfAllPositionSymbols);
 
+    // Reason: Trust the realized P&L recorded in TradeHistory at each close
+    // instead of re-deriving with the CURRENT conversion rate (see the main-app
+    // competition-end.actions.ts for the full rationale). Positions on a
+    // challenge store the challengeId in the competitionId field.
+    const cfClosedHistory = (await TradeHistory.find(
+      { competitionId: challengeId },
+      { positionId: 1, realizedPnl: 1 },
+    )
+      .session(session)
+      .lean()) as Array<{ positionId?: string; realizedPnl?: number }>;
+    const cfRealizedByPositionId = new Map<string, number>();
+    for (const h of cfClosedHistory) {
+      const pid = h?.positionId ? String(h.positionId) : "";
+      if (!pid) continue;
+      const val =
+        typeof h.realizedPnl === "number" && Number.isFinite(h.realizedPnl)
+          ? h.realizedPnl
+          : 0;
+      cfRealizedByPositionId.set(
+        pid,
+        (cfRealizedByPositionId.get(pid) || 0) + val,
+      );
+    }
+
     // Process already-closed positions
-    // NOTE: TradingPosition doesn't have 'profitLoss' field - calculate from entry/exit prices
     for (const position of allPositions) {
       if (position.status === "closed" || position.status === "liquidated") {
         const userId = position.userId.toString();
         const stats = participantStats.get(userId);
         if (stats) {
-          const exitPrice =
-            position.exitPrice ??
-            position.currentPrice ??
-            position.entryPrice;
-          const cfRate = getQuoteToUsdRate(
-            position.symbol as ForexSymbol,
-            pricesMap as Map<string, { bid: number; ask: number }>,
-          );
-          const sc = symConfigs.get(position.symbol);
-          const positionPnL = calculateUnrealizedPnL(
-            position.side,
-            position.entryPrice,
-            exitPrice,
-            position.quantity,
-            position.symbol,
-            cfRate > 0 ? cfRate : 1,
-            sc ? { pip: sc.pip, contractSize: sc.contractSize } : undefined,
-          );
+          // Reason: Prefer the realized P&L recorded in TradeHistory at close
+          // time; only re-derive when no history row exists for this position.
+          const recorded = cfRealizedByPositionId.get(String(position._id));
+          let positionPnL: number;
+          if (typeof recorded === "number") {
+            positionPnL = recorded;
+          } else {
+            const exitPrice =
+              position.exitPrice ??
+              position.currentPrice ??
+              position.entryPrice;
+            const cfRate = getQuoteToUsdRate(
+              position.symbol as ForexSymbol,
+              pricesMap as Map<string, { bid: number; ask: number }>,
+            );
+            const sc = symConfigs.get(position.symbol);
+            positionPnL = calculateUnrealizedPnL(
+              position.side,
+              position.entryPrice,
+              exitPrice,
+              position.quantity,
+              position.symbol,
+              cfRate > 0 ? cfRate : 1,
+              sc ? { pip: sc.pip, contractSize: sc.contractSize } : undefined,
+            );
+          }
 
           console.log(
-            `  Closed position: ${position.symbol} ${position.side}, Entry: ${position.entryPrice}, Exit: ${exitPrice}, P&L: $${positionPnL.toFixed(2)}`,
+            `  Closed position: ${position.symbol} ${position.side}, P&L: $${positionPnL.toFixed(2)} (${typeof recorded === "number" ? "from history" : "re-derived"})`,
           );
 
           stats.totalPnL += positionPnL;
@@ -233,14 +264,20 @@ async function _finalizeChallengeAttempt(challengeId: string) {
       try {
         // Get price from pre-fetched batch (instant!)
         const priceData = pricesMap.get(position.symbol as ForexSymbol);
+        // Reason: NEVER leave a position open on a finalized challenge. If the
+        // feed returns no price for this symbol, fall back to the position's last
+        // known price (currentPrice → entryPrice) so the close loop cannot skip
+        // it and orphan an "open" position on a completed challenge.
+        const exitPrice = priceData
+          ? position.side === "long"
+            ? priceData.bid
+            : priceData.ask
+          : (position.currentPrice ?? position.entryPrice);
         if (!priceData) {
-          console.error(
-            `  ❌ Could not get price for ${position.symbol}, skipping`,
+          console.warn(
+            `  ⚠️ No live price for ${position.symbol}; closing at fallback ${exitPrice} (last known price)`,
           );
-          continue;
         }
-        const exitPrice =
-          position.side === "long" ? priceData.bid : priceData.ask;
 
         const cfRate2 = getQuoteToUsdRate(
           position.symbol as ForexSymbol,
@@ -866,6 +903,31 @@ async function _finalizeChallengeAttempt(challengeId: string) {
         await challenged.save({ session });
       }
       // 'both_lose' - platform keeps prize, already recorded above
+    }
+
+    // SAFETY NET: guarantee no position survives finalization, regardless of any
+    // per-position error in the close loop above. Force-close any straggler still
+    // "open" for this challenge at its last known price (currentPrice →
+    // entryPrice). Works for both long and short (exit uses the mark price).
+    const cfStrayClose = await TradingPosition.updateMany(
+      { competitionId: challengeId, status: "open" },
+      [
+        {
+          $set: {
+            status: "closed",
+            exitPrice: { $ifNull: ["$currentPrice", "$entryPrice"] },
+            currentPrice: { $ifNull: ["$currentPrice", "$entryPrice"] },
+            closedAt: "$$NOW",
+            closeReason: "challenge_end",
+          },
+        },
+      ],
+      { session },
+    );
+    if (cfStrayClose.modifiedCount > 0) {
+      console.warn(
+        `⚠️ [SAFETY NET] Force-closed ${cfStrayClose.modifiedCount} straggler open position(s) at challenge end (challenge ${challengeId}). Investigate the close loop for errors.`,
+      );
     }
 
     await session.commitTransaction();
