@@ -306,6 +306,11 @@ function NuveiPaymentForm({ data }: { data: PaymentData }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  // Reason: On any failed charge attempt we lock the form behind a terminal
+  // "Declined" screen (Close only). This makes it impossible to submit a second
+  // card on the SAME Nuvei order — the root cause of charged-but-uncredited
+  // deposits. A retry must start a brand-new order from the app.
+  const [declined, setDeclined] = useState(false);
   const [cardHolderName, setCardHolderName] = useState("");
   const [email, setEmail] = useState(data.userEmail || "");
   const [cardFieldReady, setCardFieldReady] = useState(false);
@@ -344,6 +349,18 @@ function NuveiPaymentForm({ data }: { data: PaymentData }) {
       } catch {
         // sessionStorage may be unavailable in some contexts
       }
+    }
+  };
+
+  // ── Close the payment window without re-notifying the server ───────────
+  // Reason: On a decline we already reported the failure (cancel-order +
+  // sendResult). Closing must NOT re-send a "cancelled" result or re-hit
+  // cancel-order, otherwise the parent would stop treating this as a decline.
+  const closeWindow = () => {
+    if (isPopupMode) {
+      window.close();
+    } else {
+      window.location.href = returnUrl;
     }
   };
 
@@ -478,9 +495,14 @@ function NuveiPaymentForm({ data }: { data: PaymentData }) {
           transactionId?: string;
         }) => {
           if (result.result === "APPROVED" && result.errCode === "0") {
-            // Verify payment on server
+            // Reason: APPROVED means the card was charged. This screen must become
+            // terminal and NEVER re-enable the card form — otherwise the user
+            // could submit a second card on the same order (charged, not
+            // credited). The Nuvei DMN webhook is the source of truth for
+            // crediting; the status check below is best-effort confirmation only.
+            isSubmittingRef.current = false;
             try {
-              const verifyResponse = await fetch("/api/nuvei/payment-status", {
+              await fetch("/api/nuvei/payment-status", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -488,37 +510,22 @@ function NuveiPaymentForm({ data }: { data: PaymentData }) {
                   clientUniqueId: data.clientUniqueId,
                 }),
               });
-
-              const verifyData = await verifyResponse.json();
-
-              if (verifyData.success || verifyData.status === "APPROVED") {
-                setSuccess(true);
-                isSubmittingRef.current = false;
-                sendResult({
-                  success: true,
-                  transactionId: result.transactionId,
-                });
-                // Auto-close popup (desktop) or redirect back (mobile) after 3s
-                setTimeout(() => {
-                  if (isPopupMode) {
-                    window.close();
-                  } else {
-                    window.location.href = returnUrl;
-                  }
-                }, 3000);
-              } else {
-                const errMsg = verifyData.reason || "Payment verification failed";
-                setError(errMsg);
-                setLoading(false);
-                isSubmittingRef.current = false;
-                sendResult({ success: false, error: errMsg });
-              }
             } catch {
-              setError("Payment verification failed. Please check your wallet.");
-              setLoading(false);
-              isSubmittingRef.current = false;
-              sendResult({ success: false, error: "Verification failed" });
+              // Best-effort — the webhook still credits the approved charge.
             }
+            setSuccess(true);
+            sendResult({
+              success: true,
+              transactionId: result.transactionId,
+            });
+            // Auto-close popup (desktop) or redirect back (mobile) after 3s
+            setTimeout(() => {
+              if (isPopupMode) {
+                window.close();
+              } else {
+                window.location.href = returnUrl;
+              }
+            }, 3000);
           } else {
             // Payment failed
             const failReason =
@@ -555,6 +562,10 @@ function NuveiPaymentForm({ data }: { data: PaymentData }) {
             setLoading(false);
             isSubmittingRef.current = false;
             sendResult({ success: false, error: userError });
+            // Reason: Lock the form behind a terminal "Declined" screen so this
+            // same order can't be re-submitted with another card. Retrying must
+            // create a brand-new order from the app.
+            setDeclined(true);
           }
         },
       );
@@ -579,6 +590,7 @@ function NuveiPaymentForm({ data }: { data: PaymentData }) {
       setLoading(false);
       isSubmittingRef.current = false;
       sendResult({ success: false, error: errorMsg });
+      setDeclined(true);
     }
   };
 
@@ -630,6 +642,35 @@ function NuveiPaymentForm({ data }: { data: PaymentData }) {
               Return to App
             </button>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Declined / failed screen (terminal — Close only) ──────────────────
+  // Reason: After a failed charge the card form is gone. The only action is to
+  // close this window; the user then starts a brand-new deposit in the app.
+  if (declined) {
+    return (
+      <div className="h-full flex items-center justify-center p-6">
+        <div className="text-center space-y-4 max-w-md">
+          <div className="mx-auto w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center">
+            <XIcon className="h-10 w-10 text-red-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-100">Payment Declined</h2>
+          <p className="text-gray-400">
+            {error || "Your payment could not be completed."}
+          </p>
+          <p className="text-sm text-gray-500">
+            No charge was applied. To try again, close this window and start a
+            new payment.
+          </p>
+          <button
+            onClick={closeWindow}
+            className="mt-4 px-8 py-3 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors"
+          >
+            {isPopupMode ? "Close" : "Return to App"}
+          </button>
         </div>
       </div>
     );

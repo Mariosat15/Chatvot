@@ -341,11 +341,26 @@ export default function DepositModal({ children }: DepositModalProps) {
         setLoading(false);
         setStep("provider");
       } else {
-        // Payment failed — cancel the pending transaction and show error
+        // Reason: Card declined / payment failed. The Nuvei popup now shows a
+        // terminal "Declined" screen whose only action is Close. We reset THIS
+        // modal to a brand-new deposit (amount step) and drop the declined
+        // session, so the only way forward is a fresh transaction (new order +
+        // new session). No same-order retry → no race, no charged-but-uncredited.
         cancelPendingDepositTransaction("Payment failed");
         setNuveiPopupOpen(false);
         setLoading(false);
-        setError(event.data.error || "Payment failed. Please try again.");
+        setError("");
+        setNuveiSessionToken("");
+        setNuveiClientUniqueId("");
+        setNuveiUserEmail("");
+        setNuveiUserTokenId("");
+        isProcessingRef.current = false;
+        lastRequestIdRef.current = null;
+        setStep("amount");
+        toast.error(
+          event.data.error ||
+            "Your card was declined. Please start a new payment.",
+        );
       }
 
       nuveiPopupRef.current = null;
@@ -1254,7 +1269,9 @@ export default function DepositModal({ children }: DepositModalProps) {
         ) : step === "payment" &&
           selectedProvider === "nuvei" &&
           !nuveiPopupOpen ? (
-          // Popup was closed without result — show retry
+          // Reason: The payment window was closed / declined. We never reuse the
+          // old Nuvei session (that caused charged-but-uncredited retries). The
+          // only path forward is a brand-new deposit with a fresh order.
           <div className="py-8 text-center space-y-4">
             {error && (
               <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3 flex items-start gap-2 text-left">
@@ -1262,30 +1279,20 @@ export default function DepositModal({ children }: DepositModalProps) {
                 <p className="text-xs text-red-400">{error}</p>
               </div>
             )}
-            <div className="flex gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setError("");
-                  setStep("provider");
-                }}
-                className="flex-1 bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-100"
-              >
-                Back
-              </Button>
-              <Button
-                type="button"
-                onClick={() => {
-                  setError("");
-                  setStep("provider");
-                  // User can re-select Nuvei to try again
-                }}
-                className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold"
-              >
-                Try Again
-              </Button>
-            </div>
+            <Button
+              type="button"
+              onClick={() => {
+                setError("");
+                setNuveiSessionToken("");
+                setNuveiClientUniqueId("");
+                setNuveiUserEmail("");
+                setNuveiUserTokenId("");
+                setStep("amount");
+              }}
+              className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold"
+            >
+              Start New Deposit
+            </Button>
           </div>
         ) : null}
       </DialogContent>
