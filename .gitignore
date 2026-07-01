@@ -76,6 +76,12 @@ public/uploads/marketplace/*
 # Tutorial chunked-upload temp folder (never commit in-flight chunks)
 Videos/.tmp-uploads/
 
+# Database backups (server-side snapshots created from Admin > Database > Backup)
+# Reason: snapshots contain every document incl. secrets — never commit them.
+# Anchored to the repo root so it does NOT match source folders named "backups"
+# (e.g. app/api/database/backups route handlers).
+/backups/
+
 # Logs
 logs/
 *.log

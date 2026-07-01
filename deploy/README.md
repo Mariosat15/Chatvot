@@ -867,9 +867,34 @@ grep -A5 "location /ws" /etc/nginx/sites-available/chartvolt
 
 ## Backup
 
-### MongoDB
+### In-App Backup & Restore (Admin Panel)
 
-MongoDB Atlas provides automatic backups. For manual backup:
+The admin panel has a built-in restore-point system: **Admin > Database > Backup & Restore**.
+
+- **Create Backup** takes a full snapshot of every collection and stores it on the
+  server as a folder of gzipped Extended-JSON files (BSON types are preserved).
+- **Restore** reverts the database to a chosen snapshot. It **automatically creates a
+  safety snapshot first**, so any restore can itself be undone. Restore requires the
+  admin password + typing `RESTORE`.
+- Snapshots are saved under `<repo-root>/backups/` by default. Override the location
+  with the `BACKUP_DIR` env var (e.g. a mounted volume with more disk):
+
+  ```env
+  BACKUP_DIR=/var/backups/chartvolt
+  ```
+
+- The `backups/` folder is **gitignored** and never served over HTTP because snapshots
+  contain every document, including secrets stored in settings collections. Keep the
+  server's disk secure and monitor free space (a snapshot is roughly the compressed
+  size of the database).
+
+> Tip: take backups during low-traffic periods for the most consistent snapshot, and
+> note you may be logged out right after a restore (sessions are part of the snapshot).
+
+### MongoDB (CLI alternative)
+
+MongoDB Atlas also provides automatic cloud backups. For a manual CLI backup
+(requires `mongodb-database-tools` installed on the server):
 ```bash
 mongodump --uri="YOUR_MONGODB_URI" --out=/backup/$(date +%Y%m%d)
 mongorestore --uri="YOUR_MONGODB_URI" /backup/20260217

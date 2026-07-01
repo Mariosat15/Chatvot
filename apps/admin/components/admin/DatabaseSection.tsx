@@ -34,6 +34,7 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
+import DatabaseBackupSection from "./DatabaseBackupSection";
 
 export default function DatabaseSection() {
   const router = useRouter();
@@ -457,6 +458,9 @@ export default function DatabaseSection() {
           </div>
         </div>
       </div>
+
+      {/* Backup & Restore */}
+      <DatabaseBackupSection />
 
       {/* Danger Zone */}
       <div className="bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-red-500/50 rounded-2xl shadow-2xl shadow-red-500/20 overflow-hidden">
