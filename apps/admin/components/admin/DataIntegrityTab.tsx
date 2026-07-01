@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import AccountInspectorCard from "./AccountInspectorCard";
 import OrphanedPositionsCard from "./OrphanedPositionsCard";
+import RecomputeStatsCard from "./RecomputeStatsCard";
 
 // ---- Duplicate-deposit scan types (match /api/simulator/scan-duplicate-deposits)
 interface DuplicateGroup {
@@ -190,8 +191,10 @@ export default function DataIntegrityTab() {
         <CardContent className="pt-4 pb-4 text-sm text-muted-foreground">
           Integrity checks. Scans are read-only — they compare the live records
           against what they should be and report mismatches. Only the{" "}
-          <span className="text-gray-300">Orphaned Open Positions</span> card can
-          modify data, and only when you explicitly press its Close button.
+          <span className="text-gray-300">Orphaned Open Positions</span> and{" "}
+          <span className="text-gray-300">Recompute Finished-Contest Stats</span>{" "}
+          cards can modify data, and only when you explicitly press their action
+          button.
         </CardContent>
       </Card>
 
@@ -482,6 +485,9 @@ export default function DataIntegrityTab() {
 
       {/* ---- Orphaned Open Positions (scan + close) ---- */}
       <OrphanedPositionsCard />
+
+      {/* ---- Recompute Finished-Contest Stats (scan + apply) ---- */}
+      <RecomputeStatsCard />
 
       {/* ---- Account Inspector ---- */}
       <AccountInspectorCard />
