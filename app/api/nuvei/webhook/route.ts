@@ -535,35 +535,16 @@ export async function POST(req: NextRequest) {
 
     // Update transaction based on status
     if (status === "APPROVED" && errCode === 0) {
-      // ATOMIC check and claim: move a not-yet-credited transaction → 'processing'.
-      // This prevents duplicate processing if two webhooks arrive at the same time.
-      //
-      // RECOVERY: we also claim from 'failed'/'cancelled'. Nuvei reuses ONE order
-      // (clientUniqueId = txn_<id>) across multiple card attempts in the same
-      // checkout window. If an earlier card was declined we marked this transaction
-      // terminal (via cancel-order and/or the DECLINED DMN); a later APPROVED
-      // capture on the same order must still credit the user — otherwise the card
-      // is charged with no credits. An APPROVED + errCode 0 DMN is a positive
-      // capture confirmation (and the HMAC signature + amount checks already ran),
-      // so recovering a prior-declined transaction here is always correct.
-      const wasTerminalBeforeClaim =
-        transaction.status === "failed" || transaction.status === "cancelled";
+      // ATOMIC check and claim: Update status from 'pending' to 'processing'
+      // This prevents duplicate processing if two webhooks arrive at the same time
       const claimed = await WalletTransaction.findOneAndUpdate(
         {
           _id: transaction._id,
-          status: {
-            $in: ["pending", "awaiting_payment", "failed", "cancelled"],
-          },
+          status: { $in: ["pending", "awaiting_payment"] },
         },
         { $set: { status: "processing" } },
         { new: false }, // Return the old document to check if we claimed it
       );
-
-      if (claimed && wasTerminalBeforeClaim) {
-        console.warn(
-          `♻️ Recovered Nuvei deposit ${transaction._id}: a prior declined/cancelled attempt on the same order had marked it terminal, but Nuvei confirms an APPROVED capture — crediting now.`,
-        );
-      }
 
       if (!claimed) {
         // Check if already completed or being processed by another request
@@ -780,51 +761,24 @@ export async function POST(req: NextRequest) {
         );
       }
     } else if (status === "DECLINED" || status === "ERROR") {
-      // Payment failed — mark the transaction failed ONLY if it is still
-      // claimable. Reason: Nuvei reuses one order across multiple card attempts,
-      // and DMNs can arrive out of order. A conditional update prevents a stale
-      // DECLINED DMN (from an earlier declined card) from downgrading a deposit
-      // that a later APPROVED retry already moved to processing/completed.
-      const declineFailureReason =
-        params.Reason || params.errApmDescription || "Payment declined";
-      // Merge AVS / CVV / 3DS facts under metadata.* without bracket assignment
-      // (avoids object-injection and never overwrites the whole metadata object).
-      // Reason: on declines we still want card-testing signals for the fraud
-      // dashboard.
-      const declineAuthFacts = Object.fromEntries(
-        Object.entries(extractAuthenticationFacts(params)).map(([k, v]) => [
-          `metadata.${k}`,
-          v,
-        ]),
+      // Payment failed
+      transaction.status = "failed";
+      transaction.providerTransactionId = nuveiTransactionId;
+      transaction.metadata = {
+        ...transaction.metadata,
+        dmnStatus: status,
+        dmnTransactionId: nuveiTransactionId,
+        errorCode: errCode,
+        errorReason:
+          params.Reason || params.errApmDescription || "Payment declined",
+        // Reason: Even on declines we want AVS / CVV mismatches and 3DS flags
+        // recorded so the fraud dashboard can surface card-testing patterns.
+        ...extractAuthenticationFacts(params),
+      };
+      await transaction.save();
+      console.log(
+        `Transaction ${transaction._id} marked as failed: ${params.Reason}`,
       );
-      const declineResult = await WalletTransaction.findOneAndUpdate(
-        {
-          _id: transaction._id,
-          status: { $in: ["pending", "awaiting_payment"] },
-        },
-        {
-          $set: {
-            status: "failed",
-            providerTransactionId: nuveiTransactionId,
-            failureReason: declineFailureReason,
-            "metadata.dmnStatus": status,
-            "metadata.dmnTransactionId": nuveiTransactionId,
-            "metadata.errorCode": errCode,
-            "metadata.errorReason": declineFailureReason,
-            ...declineAuthFacts,
-          },
-        },
-        { new: true },
-      );
-      if (declineResult) {
-        console.log(
-          `Transaction ${transaction._id} marked as failed: ${params.Reason}`,
-        );
-      } else {
-        console.warn(
-          `⚠️ Skipped marking Nuvei tx ${transaction._id} as failed — it is no longer pending (likely superseded by an approved retry on the same order).`,
-        );
-      }
 
       // SECURITY: Track decline velocity against both the user and the
       // originating IP. Defends against card-testing campaigns that would

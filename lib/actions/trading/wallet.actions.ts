@@ -312,38 +312,17 @@ export const completeDeposit = async (
         throw new Error("Transaction not found");
       }
 
-      // ATOMIC IDEMPOTENT CLAIM: move a not-yet-credited deposit → completed in a
-      // single conditional write, so only ONE caller can ever credit this deposit —
-      // even if the payment provider delivers the same webhook multiple times at once.
+      // ATOMIC IDEMPOTENT CLAIM: move pending/processing → completed in a single
+      // conditional write, so only ONE caller can ever credit this deposit — even
+      // if the payment provider delivers the same webhook multiple times at once.
       // Reason: every processor (Stripe, Nuvei, Paddle, Atlas, and any future PSP)
       // funnels through completeDeposit, so this single guard makes them all safe
       // without per-processor idempotency code. The wallet $inc below only runs
       // for the caller that wins this claim; a duplicate delivery modifies nothing
       // and is rejected as "already processed".
-      //
-      // RECOVERY: the claim also accepts "failed"/"cancelled" states. This is
-      // required because some PSPs (Nuvei, Atlas) reuse a SINGLE order/transaction
-      // across multiple card attempts in the same checkout window. When an earlier
-      // attempt is declined we mark this transaction terminal, so a subsequent
-      // APPROVED capture on the same order would otherwise be impossible to credit
-      // (money charged, no credits). completeDeposit is only ever called with a
-      // POSITIVE capture confirmation, so recovering a prior-declined transaction is
-      // always correct. Only "completed" (already credited) and "disputed"
-      // (charged back) are excluded — they must never be (re)credited.
       const depositClaim = await WalletTransaction.updateOne(
-        {
-          _id: transaction._id,
-          status: {
-            $in: ["pending", "processing", "awaiting_payment", "failed", "cancelled"],
-          },
-        },
-        {
-          $set: {
-            status: "completed",
-            processedAt: new Date(),
-            failureReason: null,
-          },
-        },
+        { _id: transaction._id, status: { $in: ["pending", "processing"] } },
+        { $set: { status: "completed", processedAt: new Date() } },
         { session: mongoSession },
       );
       if (depositClaim.modifiedCount === 0) {
