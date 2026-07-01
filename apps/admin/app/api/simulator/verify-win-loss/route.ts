@@ -10,9 +10,15 @@ import { verifyAdminAuth } from "@/lib/admin/auth";
  * across the user dashboard, profile, leaderboard and admin surfaces agree with
  * the raw source collections?
  *
- * For every user it recomputes each surface's exact definition from the source
- * data and flags any divergence, plus raw-data anomalies (e.g. rank-1 in a
- * completed competition whose participant row isn't "completed").
+ * LIKE-FOR-LIKE comparison (only flags GENUINE problems):
+ *   - PnL is compared realized-to-realized: participant.realizedPnl (accumulated
+ *     on close) vs Σ TradeHistory.realizedPnl (one row per closed trade).
+ *   - Trade counts are compared closed-to-closed: participant.winningTrades /
+ *     losingTrades (incremented on close) vs TradeHistory rows split by P&L sign.
+ *   Reason: participant.totalTrades counts positions OPENED and participant.pnl
+ *   includes UNREALIZED P&L, so comparing those to closed-trade history produces
+ *   expected differences (open positions, costs) that are not real bugs. Open
+ *   positions are still reported as context.
  *
  * Mirrors verify-win-loss.mjs, but reuses the pooled Mongoose connection, is
  * admin-authenticated, and returns structured JSON instead of console output.
@@ -20,6 +26,7 @@ import { verifyAdminAuth } from "@/lib/admin/auth";
 
 const num = (v: unknown): number =>
   typeof v === "number" && isFinite(v) ? v : 0;
+const round2 = (v: number): number => Math.round(v * 100) / 100;
 
 // Caps to keep the response payload sane on large datasets.
 const MAX_ACTIVE = 200;
@@ -38,8 +45,13 @@ interface UserAcc {
   challWon_isWinner: number;
   challWon_completedIsWinner: number;
   challWon_winnerId: number;
-  partPnlSum: number;
-  partTradesSum: number;
+  // Like-for-like (realized/closed) accumulators from participant rows.
+  partRealizedPnl: number;
+  partWinning: number;
+  partLosing: number;
+  // Context only (not used for flagging).
+  partOpens: number;
+  partOpenPositions: number;
 }
 
 export async function GET() {
@@ -66,6 +78,7 @@ export async function GET() {
     const compCol = pick("competitions");
     const challCol = pick("challenges");
     const tradeCol = pick("tradehistories", "trade_histories");
+    const posCol = pick("tradingpositions", "trading_positions");
 
     if (!compPartCol || !challPartCol || !compCol || !challCol || !tradeCol) {
       return NextResponse.json(
@@ -79,31 +92,54 @@ export async function GET() {
     }
 
      
-    const [compParts, challParts, comps, challs, tradeAgg] = (await Promise.all([
-      db.collection(compPartCol).find({}).toArray(),
-      db.collection(challPartCol).find({}).toArray(),
-      db.collection(compCol).find({}, { projection: { status: 1 } }).toArray(),
-      db
-        .collection(challCol)
-        .find(
-          {},
-          { projection: { status: 1, winnerId: 1, isTie: 1, noWinner: 1 } },
-        )
-        .toArray(),
-      db
-        .collection(tradeCol)
-        .aggregate([
-          {
-            $group: {
-              _id: "$userId",
-              totalTrades: { $sum: 1 },
-              totalPnL: { $sum: "$realizedPnl" },
+    const [compParts, challParts, comps, challs, tradeAgg, openPosAgg] =
+      (await Promise.all([
+        db.collection(compPartCol).find({}).toArray(),
+        db.collection(challPartCol).find({}).toArray(),
+        db
+          .collection(compCol)
+          .find({}, { projection: { status: 1 } })
+          .toArray(),
+        db
+          .collection(challCol)
+          .find(
+            {},
+            { projection: { status: 1, winnerId: 1, isTie: 1, noWinner: 1 } },
+          )
+          .toArray(),
+        // Split closed trades by realized P&L sign so counts are like-for-like
+        // with participant.winningTrades / losingTrades (breakeven excluded).
+        db
+          .collection(tradeCol)
+          .aggregate([
+            {
+              $group: {
+                _id: "$userId",
+                totalPnL: { $sum: "$realizedPnl" },
+                winners: {
+                  $sum: { $cond: [{ $gt: ["$realizedPnl", 0] }, 1, 0] },
+                },
+                losers: {
+                  $sum: { $cond: [{ $lt: ["$realizedPnl", 0] }, 1, 0] },
+                },
+                closedTrades: { $sum: 1 },
+              },
             },
-          },
-        ])
-        .toArray(),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw driver docs
-    ])) as any[];
+          ])
+          .toArray(),
+        // Open positions per user (source of truth = live positions, not a
+        // possibly-drifted counter). Empty result if the collection is absent.
+        posCol
+          ? db
+              .collection(posCol)
+              .aggregate([
+                { $match: { status: "open" } },
+                { $group: { _id: "$userId", openPositions: { $sum: 1 } } },
+              ])
+              .toArray()
+          : Promise.resolve([]),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw driver docs
+      ])) as any[];
 
     const compStatus = new Map<string, string>(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw driver docs
@@ -124,12 +160,24 @@ export async function GET() {
         },
       ]),
     );
-    const tradeMap = new Map<string, { totalTrades: number; totalPnL: number }>(
+    const tradeMap = new Map<
+      string,
+      { totalPnL: number; winners: number; losers: number; closedTrades: number }
+    >(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw driver docs
       tradeAgg.map((t: any) => [
         String(t._id),
-        { totalTrades: num(t.totalTrades), totalPnL: num(t.totalPnL) },
+        {
+          totalPnL: num(t.totalPnL),
+          winners: num(t.winners),
+          losers: num(t.losers),
+          closedTrades: num(t.closedTrades),
+        },
       ]),
+    );
+    const openPosMap = new Map<string, number>(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw driver docs
+      openPosAgg.map((p: any) => [String(p._id), num(p.openPositions)]),
     );
 
     const users = new Map<string, UserAcc>();
@@ -148,8 +196,11 @@ export async function GET() {
           challWon_isWinner: 0,
           challWon_completedIsWinner: 0,
           challWon_winnerId: 0,
-          partPnlSum: 0,
-          partTradesSum: 0,
+          partRealizedPnl: 0,
+          partWinning: 0,
+          partLosing: 0,
+          partOpens: 0,
+          partOpenPositions: 0,
         });
       }
       return users.get(userId)!;
@@ -159,7 +210,22 @@ export async function GET() {
       rank1_partNotCompleted: [] as Array<Record<string, unknown>>,
       isWinner_challNotCompleted: [] as Array<Record<string, unknown>>,
       winnerId_vs_isWinner_mismatch: [] as Array<Record<string, unknown>>,
-      compCompleted_multipleRank1: [] as Array<{ competitionId: string; rank1Count: number }>,
+      compCompleted_multipleRank1: [] as Array<{
+        competitionId: string;
+        rank1Count: number;
+      }>,
+    };
+
+    const accumulateParticipant = (
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- raw driver docs
+      p: any,
+      acc: UserAcc,
+    ) => {
+      acc.partRealizedPnl += num(p.realizedPnl);
+      acc.partWinning += num(p.winningTrades);
+      acc.partLosing += num(p.losingTrades);
+      acc.partOpens += num(p.totalTrades);
+      acc.partOpenPositions += num(p.currentOpenPositions);
     };
 
     const rank1ByComp = new Map<string, number>();
@@ -167,8 +233,7 @@ export async function GET() {
     for (const p of compParts as any[]) {
       const acc = u(String(p.userId), p.username, p.email);
       acc.compEntered += 1;
-      acc.partPnlSum += num(p.pnl);
-      acc.partTradesSum += num(p.totalTrades);
+      accumulateParticipant(p, acc);
 
       const compCompleted =
         compStatus.get(String(p.competitionId)) === "completed";
@@ -206,8 +271,7 @@ export async function GET() {
     for (const p of challParts as any[]) {
       const acc = u(String(p.userId), p.username, p.email);
       acc.challEntered += 1;
-      acc.partPnlSum += num(p.pnl);
-      acc.partTradesSum += num(p.totalTrades);
+      accumulateParticipant(p, acc);
 
       const ch = challMap.get(String(p.challengeId)) || {};
       const challCompleted = ch.status === "completed";
@@ -243,15 +307,32 @@ export async function GET() {
 
     const divergent: Array<Record<string, unknown>> = [];
     for (const acc of users.values()) {
-      const th = tradeMap.get(acc.userId) || { totalTrades: 0, totalPnL: 0 };
+      const th = tradeMap.get(acc.userId) || {
+        totalPnL: 0,
+        winners: 0,
+        losers: 0,
+        closedTrades: 0,
+      };
+      const openPositions = openPosMap.get(acc.userId) ?? acc.partOpenPositions;
+
       const compWinDiff = acc.compWon_compStatus !== acc.compWon_partStatus;
       const podiumDiff = acc.podium_compStatus !== acc.podium_partStatus;
       const challWinDiff =
         acc.challWon_isWinner !== acc.challWon_completedIsWinner ||
         acc.challWon_isWinner !== acc.challWon_winnerId;
-      const pnlDiff = Math.abs(acc.partPnlSum - num(th.totalPnL)) > 0.01;
-      const tradesDiff = acc.partTradesSum !== num(th.totalTrades);
-      if (compWinDiff || podiumDiff || challWinDiff || pnlDiff || tradesDiff) {
+      // Like-for-like realized comparisons.
+      const realizedPnlDiff = Math.abs(acc.partRealizedPnl - th.totalPnL) > 0.01;
+      const winnersDiff = acc.partWinning !== th.winners;
+      const losersDiff = acc.partLosing !== th.losers;
+
+      if (
+        compWinDiff ||
+        podiumDiff ||
+        challWinDiff ||
+        realizedPnlDiff ||
+        winnersDiff ||
+        losersDiff
+      ) {
         divergent.push({
           userId: acc.userId,
           username: acc.username,
@@ -263,16 +344,22 @@ export async function GET() {
           challWon_isWinner: acc.challWon_isWinner,
           challWon_completedIsWinner: acc.challWon_completedIsWinner,
           challWon_winnerId: acc.challWon_winnerId,
-          partPnlSum: Math.round(acc.partPnlSum * 100) / 100,
-          thPnL: Math.round(num(th.totalPnL) * 100) / 100,
-          partTradesSum: acc.partTradesSum,
-          thTrades: num(th.totalTrades),
+          partRealizedPnl: round2(acc.partRealizedPnl),
+          thRealizedPnl: round2(th.totalPnL),
+          partWinning: acc.partWinning,
+          thWinners: th.winners,
+          partLosing: acc.partLosing,
+          thLosers: th.losers,
+          opens: acc.partOpens,
+          closedTrades: th.closedTrades,
+          openPositions,
           flags: {
             compWinDiff,
             podiumDiff,
             challWinDiff,
-            pnlDiff,
-            tradesDiff,
+            realizedPnlDiff,
+            winnersDiff,
+            losersDiff,
           },
         });
       }
@@ -280,6 +367,14 @@ export async function GET() {
 
     const active = [...users.values()]
       .filter((a) => a.compEntered > 0 || a.challEntered > 0)
+      .map((a) => ({
+        userId: a.userId,
+        username: a.username,
+        email: a.email,
+        compEntered: a.compEntered,
+        challEntered: a.challEntered,
+        openPositions: openPosMap.get(a.userId) ?? a.partOpenPositions,
+      }))
       .sort(
         (a, b) =>
           b.compEntered + b.challEntered - (a.compEntered + a.challEntered),
@@ -288,7 +383,14 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       clean: divergent.length === 0,
-      collections: { compPartCol, challPartCol, compCol, challCol, tradeCol },
+      collections: {
+        compPartCol,
+        challPartCol,
+        compCol,
+        challCol,
+        tradeCol,
+        posCol: posCol ?? null,
+      },
       totals: {
         users: users.size,
         active: active.length,

@@ -22,6 +22,7 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
+import AccountInspectorCard from "./AccountInspectorCard";
 
 // ---- Duplicate-deposit scan types (match /api/simulator/scan-duplicate-deposits)
 interface DuplicateGroup {
@@ -57,16 +58,22 @@ interface WinLossDivergence {
   challWon_isWinner: number;
   challWon_completedIsWinner: number;
   challWon_winnerId: number;
-  partPnlSum: number;
-  thPnL: number;
-  partTradesSum: number;
-  thTrades: number;
+  partRealizedPnl: number;
+  thRealizedPnl: number;
+  partWinning: number;
+  thWinners: number;
+  partLosing: number;
+  thLosers: number;
+  opens: number;
+  closedTrades: number;
+  openPositions: number;
   flags: {
     compWinDiff: boolean;
     podiumDiff: boolean;
     challWinDiff: boolean;
-    pnlDiff: boolean;
-    tradesDiff: boolean;
+    realizedPnlDiff: boolean;
+    winnersDiff: boolean;
+    losersDiff: boolean;
   };
 }
 interface AnomalyBucket {
@@ -297,9 +304,11 @@ export default function DataIntegrityTab() {
                 Win / Loss Consistency
               </CardTitle>
               <CardDescription className="text-gray-400">
-                Recomputes each user&apos;s wins, podiums, P&amp;L and trade
-                counts from the raw data and flags any user whose numbers would
-                differ between the dashboard, profile, leaderboard and admin.
+                Recomputes each user&apos;s wins, podiums and{" "}
+                <span className="text-gray-300">realized</span> P&amp;L / trade
+                counts from the raw data and flags genuine mismatches. Compares
+                like-for-like (realized-to-realized), so open positions and
+                unrealized P&amp;L don&apos;t cause false alarms.
               </CardDescription>
             </div>
             <Button
@@ -364,9 +373,20 @@ export default function DataIntegrityTab() {
                         key={d.userId}
                         className="bg-gray-900/50 border border-gray-700 rounded p-3 text-xs"
                       >
-                        <p className="text-white font-medium">
-                          {d.username || d.email || d.userId}
-                        </p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-white font-medium">
+                            {d.username || d.email || d.userId}
+                          </p>
+                          {d.openPositions > 0 && (
+                            <Badge
+                              variant="outline"
+                              className="border-blue-700 text-blue-400"
+                            >
+                              {d.openPositions} open position
+                              {d.openPositions === 1 ? "" : "s"}
+                            </Badge>
+                          )}
+                        </div>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {d.flags.compWinDiff && (
                             <Badge variant="outline" className="border-red-700 text-red-400">
@@ -383,14 +403,19 @@ export default function DataIntegrityTab() {
                               chall win {d.challWon_isWinner}/{d.challWon_completedIsWinner}/{d.challWon_winnerId}
                             </Badge>
                           )}
-                          {d.flags.pnlDiff && (
+                          {d.flags.realizedPnlDiff && (
                             <Badge variant="outline" className="border-red-700 text-red-400">
-                              PnL {d.partPnlSum}≠{d.thPnL}
+                              realized PnL {d.partRealizedPnl}≠{d.thRealizedPnl}
                             </Badge>
                           )}
-                          {d.flags.tradesDiff && (
+                          {d.flags.winnersDiff && (
                             <Badge variant="outline" className="border-red-700 text-red-400">
-                              trades {d.partTradesSum}≠{d.thTrades}
+                              wins {d.partWinning}≠{d.thWinners}
+                            </Badge>
+                          )}
+                          {d.flags.losersDiff && (
+                            <Badge variant="outline" className="border-red-700 text-red-400">
+                              losses {d.partLosing}≠{d.thLosers}
                             </Badge>
                           )}
                         </div>
@@ -430,6 +455,9 @@ export default function DataIntegrityTab() {
           </CardContent>
         )}
       </Card>
+
+      {/* ---- Account Inspector ---- */}
+      <AccountInspectorCard />
     </div>
   );
 }
