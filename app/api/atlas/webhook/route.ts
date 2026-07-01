@@ -156,15 +156,28 @@ export async function POST(req: NextRequest) {
 
     // STEP 3: status handling.
     if (statusCode === ATLAS_STATUS.COMPLETED) {
-      // Atomic claim: pending/awaiting_payment → processing.
+      // Atomic claim: move a not-yet-credited transaction → processing.
+      // RECOVERY: also claim from "failed"/"cancelled" so a COMPLETED capture on an
+      // order whose earlier attempt was declined still credits the user (money
+      // charged must never leave the user without credits). A COMPLETED Atlas
+      // callback is a positive capture confirmation and the signature was already
+      // verified, so recovering a prior-declined transaction here is correct.
+      const wasTerminalBeforeClaim =
+        transaction.status === "failed" || transaction.status === "cancelled";
       const claimed = await WalletTransaction.findOneAndUpdate(
         {
           _id: transaction._id,
-          status: { $in: ["pending", "awaiting_payment"] },
+          status: { $in: ["pending", "awaiting_payment", "failed", "cancelled"] },
         },
         { $set: { status: "processing" } },
         { new: false },
       );
+
+      if (claimed && wasTerminalBeforeClaim) {
+        console.warn(
+          `♻️ Recovered Atlas deposit ${transaction._id}: a prior declined/cancelled attempt had marked it terminal, but Atlas confirms a COMPLETED capture — crediting now.`,
+        );
+      }
 
       if (!claimed) {
         const currentTxn = await WalletTransaction.findById(transaction._id);
@@ -286,19 +299,38 @@ export async function POST(req: NextRequest) {
         );
       }
     } else if (statusCode === ATLAS_STATUS.DECLINED) {
-      transaction.status = "failed";
-      transaction.providerTransactionId = paymentId;
-      transaction.metadata = {
-        ...transaction.metadata,
-        atlasStatusCode: statusCode,
-        atlasStatusText: record.transaction_status_text,
-        errorReason:
-          record.transaction_status_data ||
-          record.transaction_status_text ||
-          "Payment declined",
-      };
-      await transaction.save();
-      console.log(`Atlas tx ${transaction._id} marked as failed (declined)`);
+      // Mark failed ONLY if still claimable. Reason: Atlas can reuse one order
+      // across attempts and callbacks can arrive out of order — a conditional
+      // update prevents a stale DECLINED callback from downgrading a deposit that a
+      // later COMPLETED capture already moved to processing/completed.
+      const declineReason =
+        record.transaction_status_data ||
+        record.transaction_status_text ||
+        "Payment declined";
+      const declineResult = await WalletTransaction.findOneAndUpdate(
+        {
+          _id: transaction._id,
+          status: { $in: ["pending", "awaiting_payment"] },
+        },
+        {
+          $set: {
+            status: "failed",
+            providerTransactionId: paymentId,
+            failureReason: declineReason,
+            "metadata.atlasStatusCode": statusCode,
+            "metadata.atlasStatusText": record.transaction_status_text,
+            "metadata.errorReason": declineReason,
+          },
+        },
+        { new: true },
+      );
+      if (declineResult) {
+        console.log(`Atlas tx ${transaction._id} marked as failed (declined)`);
+      } else {
+        console.warn(
+          `⚠️ Skipped marking Atlas tx ${transaction._id} as failed — it is no longer pending (likely superseded by a completed retry on the same order).`,
+        );
+      }
 
       // Decline-velocity (user + IP).
       try {

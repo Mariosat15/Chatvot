@@ -15,7 +15,6 @@ import { headers } from "next/headers";
 import { nuveiService } from "@/lib/services/nuvei.service";
 import { connectToDatabase } from "@/database/mongoose";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
-import CreditWallet from "@/database/models/trading/credit-wallet.model";
 
 export async function POST(req: NextRequest) {
   try {
@@ -93,16 +92,30 @@ export async function POST(req: NextRequest) {
       // Payment approved
       let invoiceGenerated = false;
 
-      if (transaction && transaction.status === "pending") {
-        // Update transaction with Nuvei details before completing
-        transaction.paymentId = result.transactionId;
-        transaction.providerTransactionId = result.transactionId;
-        transaction.metadata = {
-          ...transaction.metadata,
-          paymentStatus: result.transactionStatus,
-          authCode: result.authCode,
-        };
-        await transaction.save();
+      // RECOVERY: credit whenever the transaction is not already terminal in a way
+      // that must never be (re)credited. Reason: Nuvei reuses one order across
+      // multiple card attempts, so a prior declined attempt may have marked this
+      // transaction "failed"/"cancelled". Since Nuvei confirms APPROVED here, the
+      // money was captured and the user must be credited. The atomic idempotent
+      // claim inside completeDeposit guarantees the wallet is credited exactly once
+      // even if the DMN webhook is crediting the same transaction concurrently.
+      const alreadyCredited = transaction?.status === "completed";
+      const isDisputed = transaction?.status === "disputed";
+
+      if (transaction && !alreadyCredited && !isDisputed) {
+        // Persist Nuvei references WITHOUT clobbering status — a concurrent DMN may
+        // be moving this same transaction through processing/completed right now.
+        await WalletTransaction.updateOne(
+          { _id: transaction._id, status: { $ne: "completed" } },
+          {
+            $set: {
+              paymentId: result.transactionId,
+              providerTransactionId: result.transactionId,
+              "metadata.paymentStatus": result.transactionStatus,
+              "metadata.authCode": result.authCode,
+            },
+          },
+        );
 
         // Use completeDeposit to handle wallet crediting, fee recording, and invoice
         // This ensures Nuvei deposits are tracked the same way as Stripe
@@ -122,36 +135,56 @@ export async function POST(req: NextRequest) {
           );
           invoiceGenerated = true; // completeDeposit handles invoice
         } catch (completeError) {
-          // CRITICAL: Do NOT credit wallet if completeDeposit fails
-          console.error("❌ CRITICAL: completeDeposit failed:", completeError);
+          const msg =
+            completeError instanceof Error
+              ? completeError.message
+              : "Unknown error";
 
-          // Mark transaction as failed - requires manual intervention
-          transaction.status = "failed";
-          transaction.failureReason = `completeDeposit error: ${completeError instanceof Error ? completeError.message : "Unknown error"}`;
-          transaction.metadata = {
-            ...transaction.metadata,
-            processingError:
-              completeError instanceof Error
-                ? completeError.message
-                : "Unknown error",
-            requiresManualReview: true,
-            nuveiPaymentApproved: true,
-          };
-          await transaction.save();
+          // Idempotent success: the DMN webhook (or a concurrent verify) already
+          // credited this deposit, so the claim was rejected as "already
+          // processed". That is a SUCCESS, not a failure — do not mark it failed.
+          if (msg.includes("already processed")) {
+            console.log(
+              `✅ Nuvei deposit ${transaction._id} already credited by another path (idempotent).`,
+            );
+            invoiceGenerated = true;
+          } else {
+            // CRITICAL: Do NOT credit wallet if completeDeposit fails for a real
+            // reason — flag for manual review (race-safe, never clobbers a
+            // completed/disputed transaction).
+            console.error("❌ CRITICAL: completeDeposit failed:", completeError);
+            await WalletTransaction.updateOne(
+              {
+                _id: transaction._id,
+                status: { $nin: ["completed", "disputed"] },
+              },
+              {
+                $set: {
+                  status: "failed",
+                  failureReason: `completeDeposit error: ${msg}`,
+                  "metadata.processingError": msg,
+                  "metadata.requiresManualReview": true,
+                  "metadata.nuveiPaymentApproved": true,
+                },
+              },
+            );
 
-          console.error(
-            `🚨 ALERT: Deposit ${transaction._id} needs manual review!`,
-          );
+            console.error(
+              `🚨 ALERT: Deposit ${transaction._id} needs manual review!`,
+            );
 
-          // Return error to client so they know something went wrong
-          return NextResponse.json({
-            success: false,
-            status: "PROCESSING_ERROR",
-            error:
-              "Payment was received but there was an error processing your deposit. Please contact support.",
-            transactionId: result.transactionId,
-          });
+            // Return error to client so they know something went wrong
+            return NextResponse.json({
+              success: false,
+              status: "PROCESSING_ERROR",
+              error:
+                "Payment was received but there was an error processing your deposit. Please contact support.",
+              transactionId: result.transactionId,
+            });
+          }
         }
+      } else if (alreadyCredited) {
+        invoiceGenerated = true;
       }
 
       return NextResponse.json({

@@ -246,15 +246,35 @@ export const completeDeposit = async (
         throw new Error("Transaction not found");
       }
 
-      // ATOMIC IDEMPOTENT CLAIM: move pending/processing → completed in a single
-      // conditional write, so only ONE caller can ever credit this deposit — even
-      // if the payment provider delivers the same webhook multiple times at once.
+      // ATOMIC IDEMPOTENT CLAIM: move a not-yet-credited deposit → completed in a
+      // single conditional write, so only ONE caller can ever credit this deposit —
+      // even if the payment provider delivers the same webhook multiple times at once.
       // Reason: every processor funnels through completeDeposit, so this single
       // guard makes them all safe. The wallet $inc below only runs for the caller
       // that wins this claim; a duplicate delivery modifies nothing.
+      //
+      // RECOVERY: the claim also accepts "failed"/"cancelled" states because some
+      // PSPs (Nuvei, Atlas) reuse a SINGLE order/transaction across multiple card
+      // attempts. When an earlier attempt is declined we mark the transaction
+      // terminal, so a later APPROVED capture on the same order would otherwise be
+      // impossible to credit (money charged, no credits). completeDeposit is only
+      // ever called with a POSITIVE capture confirmation, so recovering a
+      // prior-declined transaction is always correct. Only "completed" (already
+      // credited) and "disputed" (charged back) are excluded.
       const depositClaim = await WalletTransaction.updateOne(
-        { _id: transaction._id, status: { $in: ["pending", "processing"] } },
-        { $set: { status: "completed", processedAt: new Date() } },
+        {
+          _id: transaction._id,
+          status: {
+            $in: ["pending", "processing", "awaiting_payment", "failed", "cancelled"],
+          },
+        },
+        {
+          $set: {
+            status: "completed",
+            processedAt: new Date(),
+            failureReason: null,
+          },
+        },
         { session: mongoSession },
       );
       if (depositClaim.modifiedCount === 0) {
