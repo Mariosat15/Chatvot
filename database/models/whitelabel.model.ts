@@ -65,6 +65,9 @@ export interface WhiteLabelDocument extends Document {
   // Pexels API (stock images for landing pages)
   pexelsApiKey: string;
 
+  // Fraud & Security — IP intelligence (proxycheck.io) for VPN/proxy/Tor detection
+  ipIntelligenceApiKey: string;
+
   // Price Feed Configuration
   priceFeedMode: "websocket" | "api" | "both"; // both = websocket primary, api fallback
   priceFeedWebsocketEnabled: boolean;
@@ -254,6 +257,12 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
 
     // Pexels API (stock images for landing pages)
     pexelsApiKey: {
+      type: String,
+      default: "",
+    },
+
+    // Fraud & Security — IP intelligence (proxycheck.io)
+    ipIntelligenceApiKey: {
       type: String,
       default: "",
     },

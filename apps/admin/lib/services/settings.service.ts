@@ -1,5 +1,7 @@
 "use server";
 
+/* eslint-disable security/detect-object-injection -- object/env access uses keys from our own static maps and known env var names, never raw user input. */
+
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import PaymentProvider from "@/database/models/payment-provider.model";
@@ -191,6 +193,7 @@ export async function getEnv(
       OPENAI_MODEL: "openaiModel",
       OPENAI_ENABLED: "openaiEnabled",
       OPENAI_FOR_EMAILS: "openaiForEmails",
+      IP_INTELLIGENCE_API_KEY: "ipIntelligenceApiKey",
     };
 
     const dbKey = dbKeyMap[key];
@@ -200,7 +203,7 @@ export async function getEnv(
 
     // Fall back to process.env
     return process.env[key] || fallback;
-  } catch (error) {
+  } catch {
     // If database is unavailable, fall back to process.env
     return process.env[key] || fallback;
   }

@@ -225,10 +225,17 @@ const SKIPPED_RESULT = (ip: string): IPDetectionResult => ({
 async function detectViaProxyCheck(
   ip: string,
 ): Promise<IPDetectionResult | null> {
-  const key =
-    process.env.IP_INTELLIGENCE_API_KEY ||
-    process.env.PROXYCHECK_API_KEY ||
-    "";
+  // Reason: load the key like other admin-managed settings — WhiteLabel DB
+  // first, then .env / process.env (via getEnv). PROXYCHECK_API_KEY remains a
+  // legacy env alias. This lets admins set it from Settings → Environment.
+  let key = "";
+  try {
+    const { getEnv } = await import("@/lib/services/settings.service");
+    key = (await getEnv("IP_INTELLIGENCE_API_KEY", "")) || "";
+  } catch {
+    key = process.env.IP_INTELLIGENCE_API_KEY || "";
+  }
+  if (!key) key = process.env.PROXYCHECK_API_KEY || "";
   if (!key) return null;
 
   try {

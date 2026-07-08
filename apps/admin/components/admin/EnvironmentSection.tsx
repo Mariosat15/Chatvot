@@ -48,6 +48,7 @@ export default function EnvironmentSection() {
     // API Keys & URLs
     massiveApiKey: "",
     nextPublicMassiveApiKey: "",
+    ipIntelligenceApiKey: "",
 
     // OpenAI Configuration
     openaiApiKey: "",
@@ -90,6 +91,7 @@ export default function EnvironmentSection() {
     veriffApiKey: false,
     veriffApiSecret: false,
     pexelsApiKey: false,
+    ipIntelligenceApiKey: false,
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -590,6 +592,61 @@ export default function EnvironmentSection() {
                         massive.com
                       </a>
                     </p>
+                  </div>
+
+                  <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
+                      <Key className="h-5 w-5 text-emerald-400" />
+                      Fraud Detection — IP Intelligence
+                    </h3>
+                    <div>
+                      <Label className="text-gray-300 flex items-center gap-2 mb-2">
+                        <Key className="h-4 w-4 text-emerald-400" />
+                        IP_INTELLIGENCE_API_KEY
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          type={
+                            showPasswords.ipIntelligenceApiKey
+                              ? "text"
+                              : "password"
+                          }
+                          value={formData.ipIntelligenceApiKey}
+                          onChange={(e) =>
+                            updateField("ipIntelligenceApiKey", e.target.value)
+                          }
+                          className="bg-gray-800 border-gray-600 text-gray-100 h-11 pr-10"
+                          placeholder="proxycheck.io API key"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            togglePasswordVisibility("ipIntelligenceApiKey")
+                          }
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                        >
+                          {showPasswords.ipIntelligenceApiKey ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        Enables accurate VPN / proxy / Tor / datacenter detection
+                        via{" "}
+                        <a
+                          href="https://proxycheck.io"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-emerald-400 hover:text-emerald-300"
+                        >
+                          proxycheck.io
+                        </a>
+                        . Saved to the database and .env. Without it, detection
+                        falls back to a basic heuristic.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </TabsContent>

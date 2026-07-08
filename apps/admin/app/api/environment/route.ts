@@ -29,6 +29,7 @@ const FIELD_TO_ENV_KEY: Record<string, string> = {
   veriffApiSecret: "VERIFF_API_SECRET",
   veriffBaseUrl: "VERIFF_BASE_URL",
   pexelsApiKey: "PEXELS_API_KEY",
+  ipIntelligenceApiKey: "IP_INTELLIGENCE_API_KEY",
   isPrimary: "IS_PRIMARY",
   serverId: "SERVER_ID",
 };
@@ -49,6 +50,7 @@ const DB_FIELDS = new Set([
   "betterAuthSecret",
   "betterAuthUrl",
   "pexelsApiKey",
+  "ipIntelligenceApiKey",
   "arenaEnabled",
 ]);
 
@@ -141,6 +143,13 @@ export async function GET() {
 
       // Pexels (Landing Pages)
       pexelsApiKey: getVal("pexelsApiKey", "PEXELS_API_KEY", ""),
+
+      // Fraud & Security — IP intelligence (proxycheck.io)
+      ipIntelligenceApiKey: getVal(
+        "ipIntelligenceApiKey",
+        "IP_INTELLIGENCE_API_KEY",
+        "",
+      ),
 
       // Feature Toggles
       arenaEnabled:

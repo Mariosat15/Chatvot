@@ -195,6 +195,7 @@ export async function getEnv(
       ["OPENAI_ENABLED", "openaiEnabled"],
       ["OPENAI_FOR_EMAILS", "openaiForEmails"],
       ["PEXELS_API_KEY", "pexelsApiKey"],
+      ["IP_INTELLIGENCE_API_KEY", "ipIntelligenceApiKey"],
     ]);
 
     const dbKey = dbKeyMap.get(key);
