@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Mongo query builders and lean() documents are dynamically shaped in this module. */
+/* eslint-disable security/detect-non-literal-regexp -- every RegExp input is escapeRegex()'d before interpolation (see escapeRegex usage below). */
+/* eslint-disable security/detect-object-injection -- object/array access uses trusted loop indices and queried keys, never raw user input. */
 import crypto from "crypto";
 import mongoose from "mongoose";
 import KYCSession from "@/database/models/kyc-session.model";
@@ -342,6 +345,7 @@ export async function checkForDuplicateKYC(
       duplicateKYCSuspendMessage?: string;
       duplicateKYCBlockTrading?: boolean;
       duplicateKYCBlockCompetitions?: boolean;
+      duplicateKYCBlockChallenges?: boolean;
       duplicateKYCBlockDeposits?: boolean;
       duplicateKYCAllowWithdrawals?: boolean;
     } | null;
@@ -370,6 +374,7 @@ export async function checkForDuplicateKYC(
             customReason: `Duplicate KYC detected. Same identity document used across multiple accounts. Alert ID: ${alert._id}`,
             canTrade: !fraudSettings.duplicateKYCBlockTrading,
             canEnterCompetitions: !fraudSettings.duplicateKYCBlockCompetitions,
+            canEnterChallenges: !fraudSettings.duplicateKYCBlockChallenges,
             canDeposit: !fraudSettings.duplicateKYCBlockDeposits,
             canWithdraw: fraudSettings.duplicateKYCAllowWithdrawals,
             restrictedBy: "system",

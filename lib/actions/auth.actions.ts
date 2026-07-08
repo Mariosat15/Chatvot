@@ -26,7 +26,14 @@ export const signUpWithEmail = async ({
   postalCode,
   honeypot,
   referralCode,
-}: SignUpFormData & { honeypot?: string; referralCode?: string }) => {
+  captchaToken,
+  fingerprint,
+}: SignUpFormData & {
+  honeypot?: string;
+  referralCode?: string;
+  captchaToken?: string;
+  fingerprint?: string;
+}) => {
   try {
     // Get client IP for security checks
     const ip = await getClientIP();
@@ -90,6 +97,8 @@ export const signUpWithEmail = async ({
       name: fullName,
       honeypot,
       ip,
+      captchaToken,
+      fingerprint,
     });
 
     if (!securityResult.allowed) {

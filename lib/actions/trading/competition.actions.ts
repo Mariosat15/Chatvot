@@ -391,6 +391,29 @@ export const enterCompetition = async (competitionId: string) => {
 
     console.log(`   ✅ User allowed to enter competition`);
 
+    // 🛡️ FRAUD ENTRY GATE — enforces VPN/Proxy/Tor/Datacenter blocks, the
+    // device-risk & suspicion-score thresholds, and the per-hour entry throttle.
+    // All are admin-configurable and fail OPEN, so legitimate users are never
+    // blocked by a detection error.
+    const entryHeaders = await headers();
+    const entryIp =
+      entryHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      entryHeaders.get("x-real-ip") ||
+      entryHeaders.get("cf-connecting-ip") ||
+      undefined;
+    const { assertEntryFraudGate } = await import(
+      "@/lib/services/fraud/entry-fraud-gate.service"
+    );
+    const fraudGate = await assertEntryFraudGate({
+      userId: session.user.id,
+      ip: entryIp || undefined,
+    });
+    if (!fraudGate.allowed) {
+      throw new Error(
+        fraudGate.reason || "Entry is not allowed at this time.",
+      );
+    }
+
     // Start MongoDB transaction
     const mongoSession = await mongoose.startSession();
     mongoSession.startTransaction();

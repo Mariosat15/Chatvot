@@ -160,14 +160,20 @@ export async function POST(request: NextRequest) {
     // Skip most validation in simulator mode
     const isInSimulatorMode = allowSimulatorMode;
 
-    // ✅ CHECK USER RESTRICTIONS - Blocked users cannot create challenges
+    // ✅ CHECK USER RESTRICTIONS - Blocked users cannot create challenges.
+    // Reason: check BOTH the competition gate (legacy behaviour) and the
+    // dedicated challenge gate so `duplicateKYCBlockChallenges` is honoured
+    // independently of the competition block.
     if (!isInSimulatorMode) {
       const { canUserPerformAction } =
         await import("@/lib/services/user-restriction.service");
-      const restrictionCheck = await canUserPerformAction(
-        challengerId,
-        "enterCompetition",
-      );
+      const [competitionCheck, challengeCheck] = await Promise.all([
+        canUserPerformAction(challengerId, "enterCompetition"),
+        canUserPerformAction(challengerId, "enterChallenge"),
+      ]);
+      const restrictionCheck = !competitionCheck.allowed
+        ? competitionCheck
+        : challengeCheck;
 
       if (!restrictionCheck.allowed) {
         console.log(
@@ -176,6 +182,30 @@ export async function POST(request: NextRequest) {
         return errorResponse(
           restrictionCheck.reason ||
             "Your account is restricted and cannot create challenges. Please contact support.",
+          403,
+        );
+      }
+
+      // 🛡️ FRAUD ENTRY GATE — VPN/Proxy/Tor/Datacenter blocks + device/risk
+      // thresholds + per-hour throttle (admin-configurable, fail-open).
+      const gateIp =
+        request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+        request.headers.get("x-real-ip") ||
+        request.headers.get("cf-connecting-ip") ||
+        undefined;
+      const { assertEntryFraudGate } = await import(
+        "@/lib/services/fraud/entry-fraud-gate.service"
+      );
+      const entryGate = await assertEntryFraudGate({
+        userId: challengerId,
+        ip: gateIp || undefined,
+      });
+      if (!entryGate.allowed) {
+        console.log(
+          `❌ Challenge creation blocked by fraud gate for user ${challengerId}: ${entryGate.reason}`,
+        );
+        return errorResponse(
+          entryGate.reason || "Entry is not allowed at this time.",
           403,
         );
       }

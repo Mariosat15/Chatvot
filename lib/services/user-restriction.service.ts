@@ -39,7 +39,12 @@ export async function getUserRestrictions(userId: string) {
  */
 export async function canUserPerformAction(
   userId: string,
-  action: "trade" | "enterCompetition" | "deposit" | "withdraw",
+  action:
+    | "trade"
+    | "enterCompetition"
+    | "enterChallenge"
+    | "deposit"
+    | "withdraw",
 ): Promise<{ allowed: boolean; reason?: string; restrictionType?: string }> {
   console.log(
     `🔍 Checking restrictions for user ${userId} - Action: ${action}`,
@@ -76,6 +81,14 @@ export async function canUserPerformAction(
         isBlocked = !restriction.canEnterCompetitions;
         console.log(
           `   Competition check: canEnterCompetitions=${restriction.canEnterCompetitions}, isBlocked=${isBlocked}`,
+        );
+        break;
+      case "enterChallenge":
+        // Reason: only an explicit `false` blocks — older restrictions predate
+        // this field (undefined) and must remain allowed for challenges.
+        isBlocked = restriction.canEnterChallenges === false;
+        console.log(
+          `   Challenge check: canEnterChallenges=${restriction.canEnterChallenges}, isBlocked=${isBlocked}`,
         );
         break;
       case "deposit":

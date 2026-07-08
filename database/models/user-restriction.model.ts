@@ -25,6 +25,7 @@ export interface IUserRestriction extends Document {
   // What actions are blocked
   canTrade: boolean;
   canEnterCompetitions: boolean;
+  canEnterChallenges: boolean;
   canDeposit: boolean;
   canWithdraw: boolean;
 
@@ -91,6 +92,10 @@ const UserRestrictionSchema = new Schema<IUserRestriction>(
     // What actions are blocked
     canTrade: { type: Boolean, default: false },
     canEnterCompetitions: { type: Boolean, default: false },
+    // Reason: default true so pre-existing restrictions (created before this
+    // field existed) never accidentally block challenges. Only an explicit
+    // `false` blocks — see canUserPerformAction("enterChallenge").
+    canEnterChallenges: { type: Boolean, default: true },
     canDeposit: { type: Boolean, default: false },
     canWithdraw: { type: Boolean, default: false },
 

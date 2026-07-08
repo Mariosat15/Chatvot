@@ -92,6 +92,23 @@ export async function POST(request: Request) {
     // Get fraud settings
     const fraudSettings = await getFraudSettings();
 
+    // Reason: whitelisted devices bypass all fraud tracking/alerting. The
+    // `whitelistedFingerprints` setting existed but was never consulted — this
+    // lets admins exempt known-good devices (e.g. office/test machines).
+    if (
+      fingerprintData?.fingerprintId &&
+      Array.isArray(fraudSettings.whitelistedFingerprints) &&
+      fraudSettings.whitelistedFingerprints.includes(
+        fingerprintData.fingerprintId,
+      )
+    ) {
+      return NextResponse.json({
+        success: true,
+        suspicious: false,
+        message: "Whitelisted device",
+      });
+    }
+
     // Get IP address
     const headersList = await headers();
     const forwarded = headersList.get("x-forwarded-for");

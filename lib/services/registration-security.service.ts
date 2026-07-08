@@ -17,6 +17,8 @@ import FraudSettings, {
   DEFAULT_FRAUD_SETTINGS,
 } from "@/database/models/fraud/fraud-settings.model";
 import { headers } from "next/headers";
+import { evaluateIpRisk } from "./ip-detection.service";
+import { verifyCaptcha } from "./captcha.service";
 
 // In-memory rate limiting cache (consider Redis for production clusters)
 interface RateLimitEntry {
@@ -27,6 +29,13 @@ interface RateLimitEntry {
 
 const registrationRateLimit: Map<string, RateLimitEntry> = new Map();
 const loginRateLimit: Map<string, RateLimitEntry> = new Map();
+// Reason: enforces `registrationCooldownMinutes` — the minimum gap between
+// successful registrations from the same IP. Maps IP → last-registration ms.
+const registrationCooldown: Map<string, number> = new Map();
+// Reason: enforces `maxSignupsPerHour` per device fingerprint (when the signup
+// form supplies one). Maps fingerprint → { count, windowStart ms }.
+const signupsByFingerprint: Map<string, { count: number; windowStart: number }> =
+  new Map();
 const failedLoginAttempts: Map<
   string,
   { count: number; lastAttempt: number; lockedUntil?: number }
@@ -112,6 +121,14 @@ setInterval(
       } else if (now - entry.lastAttempt > oneHour) {
         failedLoginAttempts.delete(key);
       }
+    }
+
+    for (const [key, last] of registrationCooldown.entries()) {
+      if (now - last > oneHour) registrationCooldown.delete(key);
+    }
+
+    for (const [key, entry] of signupsByFingerprint.entries()) {
+      if (now - entry.windowStart > oneHour) signupsByFingerprint.delete(key);
     }
   },
   10 * 60 * 1000,
@@ -544,6 +561,7 @@ export async function validateRegistration(data: {
   honeypot?: string;
   ip?: string;
   fingerprint?: string;
+  captchaToken?: string;
 }): Promise<RegistrationSecurityResult> {
   const settings = await getFraudSettings();
   const ip = data.ip || (await getClientIP());
@@ -583,6 +601,63 @@ export async function validateRegistration(data: {
       code: "BAD_IP",
       riskScore: 100,
     };
+  }
+
+  // 2c. CAPTCHA challenge (server-side verification)
+  // Reason: the "Require CAPTCHA" toggle previously verified nothing. Now we
+  // validate the token with the provider. Skips gracefully when disabled or the
+  // server secret isn't configured, so it can't accidentally lock out signups.
+  const captcha = await verifyCaptcha({
+    enabled: settings.registrationChallengeEnabled,
+    provider: settings.registrationChallengeProvider,
+    token: data.captchaToken,
+    ip,
+  });
+  if (!captcha.ok) {
+    console.log(`🛡️ Registration blocked: CAPTCHA failed for IP ${ip}`);
+    return {
+      allowed: false,
+      reason: captcha.reason || "Verification failed. Please try again.",
+      code: "CAPTCHA_FAILED",
+      riskScore: 90,
+    };
+  }
+
+  // 2d. Registration cooldown — minimum gap between signups from the same IP.
+  const cooldownMinutes = settings.registrationCooldownMinutes ?? 0;
+  if (cooldownMinutes > 0) {
+    const lastReg = registrationCooldown.get(ip);
+    if (lastReg && Date.now() - lastReg < cooldownMinutes * 60_000) {
+      console.log(`🛡️ Registration blocked: cooldown active for IP ${ip}`);
+      return {
+        allowed: false,
+        reason:
+          "You're creating accounts too quickly. Please wait a moment and try again.",
+        code: "REGISTRATION_COOLDOWN",
+        riskScore: 70,
+      };
+    }
+  }
+
+  // 2e. Per-fingerprint hourly signup cap (only when the client supplies one).
+  const maxSignups = settings.maxSignupsPerHour ?? 0;
+  if (data.fingerprint && maxSignups > 0) {
+    const now = Date.now();
+    const entry = signupsByFingerprint.get(data.fingerprint);
+    if (entry && now - entry.windowStart < 60 * 60 * 1000) {
+      if (entry.count >= maxSignups) {
+        console.log(
+          `🛡️ Registration blocked: fingerprint ${data.fingerprint} exceeded ${maxSignups}/hour`,
+        );
+        return {
+          allowed: false,
+          reason:
+            "Too many accounts created from this device. Please try again later.",
+          code: "FINGERPRINT_SIGNUP_LIMIT",
+          riskScore: 85,
+        };
+      }
+    }
   }
 
   // 3. Check rate limiting
@@ -795,6 +870,41 @@ export async function validateRegistration(data: {
     };
   }
 
+  // 12. IP-risk gate — enforces the Block VPN / Proxy / Tor / Datacenter
+  // toggles. Whitelisted IPs pass; detection errors fail OPEN. Runs last
+  // because it is the only network call in this path.
+  const ipGate = await evaluateIpRisk(ip, settings);
+  if (ipGate.blocked) {
+    console.log(
+      `🛡️ Registration blocked by IP gate (${ip}) via ${ipGate.detection.source} — ` +
+        `VPN:${ipGate.detection.isVPN} Proxy:${ipGate.detection.isProxy} ` +
+        `Tor:${ipGate.detection.isTor} Hosting:${ipGate.detection.isHosting}`,
+    );
+    return {
+      allowed: false,
+      reason: settings.genericErrorMessages
+        ? "Registration failed. Please try again."
+        : ipGate.reason || "Registration is not allowed from this network.",
+      code: "IP_BLOCKED",
+      riskScore: 100,
+    };
+  }
+
+  // Record success markers for cooldown + per-fingerprint hourly cap.
+  if (cooldownMinutes > 0) registrationCooldown.set(ip, Date.now());
+  if (data.fingerprint && maxSignups > 0) {
+    const nowTs = Date.now();
+    const fp = signupsByFingerprint.get(data.fingerprint);
+    if (fp && nowTs - fp.windowStart < 60 * 60 * 1000) {
+      fp.count += 1;
+    } else {
+      signupsByFingerprint.set(data.fingerprint, {
+        count: 1,
+        windowStart: nowTs,
+      });
+    }
+  }
+
   return { allowed: true, riskScore };
 }
 
@@ -899,6 +1009,27 @@ export async function validateLogin(data: {
   // NOTE: We do NOT check in-memory for lockouts anymore
   // In-memory is only used for tracking failed attempts within a single instance
   // The database is the ONLY source of truth for lockout state
+
+  // Short throttle between attempts after a failure. Reason: enforces the
+  // `loginCooldownAfterFailedAttempts` setting (seconds) — it slows credential
+  // stuffing without waiting for the full lockout threshold. Only applies once
+  // the account/IP already has at least one recent failed attempt.
+  const cooldownSeconds = settings.loginCooldownAfterFailedAttempts ?? 0;
+  if (cooldownSeconds > 0) {
+    const failed = failedLoginAttempts.get(key);
+    if (failed && failed.count > 0) {
+      const sinceLast = now - failed.lastAttempt;
+      const cooldownMs = cooldownSeconds * 1000;
+      if (sinceLast < cooldownMs) {
+        const waitSec = Math.ceil((cooldownMs - sinceLast) / 1000);
+        return {
+          allowed: false,
+          reason: `Please wait ${waitSec} second${waitSec !== 1 ? "s" : ""} before trying again.`,
+          code: "LOGIN_COOLDOWN",
+        };
+      }
+    }
+  }
 
   // Check login rate (per hour)
   const rateEntry = loginRateLimit.get(ip);

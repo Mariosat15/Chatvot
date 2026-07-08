@@ -11,6 +11,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useDeviceFingerprint } from "@/hooks/useDeviceFingerprint";
 import { Check, X } from "lucide-react";
+import CaptchaWidget from "@/components/security/CaptchaWidget";
 
 // Extended form data with honeypot
 interface ExtendedSignUpFormData extends SignUpFormData {
@@ -55,6 +56,9 @@ const SignUp = () => {
   >({});
   const [showRequirements, setShowRequirements] = useState(false);
   const formStartTime = useRef(Date.now()); // Track form load time for bot detection
+  // Registration CAPTCHA challenge (configured in admin Fraud Settings)
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaEnabled, setCaptchaEnabled] = useState(false);
 
   // Capture referral code from URL (e.g., ?ref=GM123ABC)
   const referralCode = searchParams.get("ref") || undefined;
@@ -91,11 +95,6 @@ const SignUp = () => {
     setPasswordStrength(strength);
   }, [password]);
 
-  // Check if all password requirements are met
-  const allRequirementsMet = PASSWORD_REQUIREMENTS.every(
-    (req) => passwordStrength[req.id],
-  );
-
   const onSubmit = async (data: ExtendedSignUpFormData) => {
     // SECURITY: Check honeypot (bot trap) - should always be empty
     if (data.website && data.website.trim().length > 0) {
@@ -123,13 +122,24 @@ const SignUp = () => {
       return;
     }
 
+    // SECURITY: If the admin enabled a CAPTCHA challenge, require it before submit.
+    if (captchaEnabled && !captchaToken) {
+      toast.error("Please complete the verification challenge.");
+      return;
+    }
+
     try {
       // Pass honeypot value and referral code to server for additional validation
       const result = await signUpWithEmail({
         ...data,
         honeypot: data.website,
         referralCode, // Game master referral code if present
-      } as SignUpFormData & { honeypot?: string; referralCode?: string });
+        captchaToken: captchaToken || undefined,
+      } as SignUpFormData & {
+        honeypot?: string;
+        referralCode?: string;
+        captchaToken?: string;
+      });
 
       if (result.success) {
         // Track device fingerprint after successful sign-up
@@ -263,7 +273,10 @@ const SignUp = () => {
         <CountrySelectField
           name="country"
           label="Country"
-          control={control as any}
+          control={
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            control as any
+          }
           error={errors.country}
           required
         />
@@ -297,9 +310,15 @@ const SignUp = () => {
           />
         </div>
 
+        {/* Bot-challenge (rendered only when enabled in admin Fraud Settings) */}
+        <CaptchaWidget
+          onToken={setCaptchaToken}
+          onEnabledChange={setCaptchaEnabled}
+        />
+
         <Button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || (captchaEnabled && !captchaToken)}
           className="yellow-btn w-full mt-5"
         >
           {isSubmitting ? "Creating Account" : "Create Account"}

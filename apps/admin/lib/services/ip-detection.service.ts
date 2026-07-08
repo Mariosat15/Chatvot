@@ -1,11 +1,17 @@
 /**
- * IP Detection Service
+ * IP Detection Service (admin mirror)
  *
- * Detects VPN, Proxy, Tor, and provides geolocation data
- * Uses free IP-API.com service (15,000 requests/hour)
+ * Detects VPN, Proxy, Tor, hosting/datacenter usage and provides geolocation.
+ * Keep in sync with the main app copy at lib/services/ip-detection.service.ts.
+ *
+ * Detection strategy (best available first):
+ *   1. proxycheck.io — accurate VPN/Proxy/Tor flags. Enabled automatically when
+ *      IP_INTELLIGENCE_API_KEY (or PROXYCHECK_API_KEY) is set. Free tier: 1,000
+ *      queries/day.
+ *   2. ip-api.com free fallback — geolocation + provider-name heuristics.
  */
 
-interface IPDetectionResult {
+export interface IPDetectionResult {
   success: boolean;
   ip: string;
   country?: string;
@@ -17,21 +23,19 @@ interface IPDetectionResult {
   org?: string;
   asn?: string;
 
-  // Risk indicators
   isVPN: boolean;
   isProxy: boolean;
   isTor: boolean;
   isHosting: boolean;
-  riskScore: number; // 0-100
+  riskScore: number;
 
-  // Additional data
+  source?: string;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   rawData?: any;
 }
 
-// Known VPN/Proxy/Hosting providers
-const SUSPICIOUS_ISPS = [
-  // VPN Providers
+const VPN_PROVIDERS = [
   "nordvpn",
   "expressvpn",
   "surfshark",
@@ -40,6 +44,7 @@ const SUSPICIOUS_ISPS = [
   "cyberghost",
   "ipvanish",
   "protonvpn",
+  "proton ",
   "tunnelbear",
   "windscribe",
   "mullvad",
@@ -47,60 +52,102 @@ const SUSPICIOUS_ISPS = [
   "zenmate",
   "hotspot shield",
   "vyprvpn",
+  "atlas vpn",
+  "private internet access",
+  "torguard",
+  "airvpn",
+  "ivpn",
+  "hide.me",
+  "hidemyass",
+  "perfect privacy",
+  "strongvpn",
+  "malwarebytes",
+  "vpn",
+];
 
-  // Proxy Services
-  "proxy",
-  "proxies",
-  "anonymizer",
-  "hideip",
-  "hideme",
+const VPN_HOSTING_PROVIDERS = [
+  "m247",
+  "datacamp",
+  "31173",
+  "xtom",
+  "leaseweb",
+  "packethub",
+  "tzulo",
+  "creanova",
+  "clouvider",
+  "flokinet",
+];
 
-  // Hosting/Datacenter (often used for VPN/Proxy)
+const PROXY_KEYWORDS = ["proxy", "proxies", "anonymizer", "hideip", "hideme"];
+
+const TOR_KEYWORDS = ["tor exit", "tor-exit", "tor node", "torservers", "exit node"];
+
+const HOSTING_KEYWORDS = [
   "digitalocean",
-  "amazonaws",
+  "amazon",
+  "aws",
   "google cloud",
   "microsoft azure",
+  "azure",
   "linode",
   "vultr",
   "ovh",
   "hetzner",
   "contabo",
   "scaleway",
-
-  // Tor Exit Nodes
-  "tor",
-  "exit node",
-  "relay",
+  "hosting",
+  "datacenter",
+  "data center",
+  "server",
+  "colocation",
+  "cloud",
 ];
 
-// Known hosting ASNs (Autonomous System Numbers)
 const HOSTING_ASNS = [
-  "AS14061", // DigitalOcean
-  "AS16509", // Amazon AWS
-  "AS15169", // Google Cloud
-  "AS8075", // Microsoft Azure
-  "AS20473", // Vultr
-  "AS63949", // Linode
-  "AS16276", // OVH
-  "AS24940", // Hetzner
+  "AS14061",
+  "AS16509",
+  "AS15169",
+  "AS8075",
+  "AS20473",
+  "AS63949",
+  "AS16276",
+  "AS24940",
+  "AS9009",
+  "AS212238",
+  "AS60068",
+  "AS51396",
+  "AS62240",
 ];
 
-/**
- * Check if IP is from a suspicious provider
- */
-function isSuspiciousProvider(isp: string, org: string, asn: string): boolean {
-  const combinedText = `${isp} ${org} ${asn}`.toLowerCase();
-
-  return (
-    SUSPICIOUS_ISPS.some((suspicious) =>
-      combinedText.includes(suspicious.toLowerCase()),
-    ) || HOSTING_ASNS.some((hostingAsn) => asn.includes(hostingAsn))
-  );
+function includesAny(haystack: string, needles: string[]): boolean {
+  return needles.some((n) => haystack.includes(n));
 }
 
-/**
- * Calculate risk score based on detection results
- */
+function classifyFromNames(
+  isp: string,
+  org: string,
+  asn: string,
+): { isVPN: boolean; isProxy: boolean; isTor: boolean; isHosting: boolean } {
+  const text = `${isp} ${org} ${asn}`.toLowerCase();
+  const asnUpper = asn.toUpperCase();
+
+  const isTor = includesAny(text, TOR_KEYWORDS);
+  const isProxy = !isTor && includesAny(text, PROXY_KEYWORDS);
+  const isVPN =
+    !isTor &&
+    !isProxy &&
+    (includesAny(text, VPN_PROVIDERS) ||
+      includesAny(text, VPN_HOSTING_PROVIDERS));
+  const isHosting =
+    !isVPN &&
+    !isProxy &&
+    !isTor &&
+    (includesAny(text, HOSTING_KEYWORDS) ||
+      HOSTING_ASNS.some((a) => asnUpper.includes(a)));
+
+  return { isVPN, isProxy, isTor, isHosting };
+}
+
 function calculateRiskScore(
   isVPN: boolean,
   isProxy: boolean,
@@ -108,182 +155,186 @@ function calculateRiskScore(
   isHosting: boolean,
 ): number {
   let score = 0;
-
-  if (isTor) score += 50; // Tor is highest risk
-  if (isVPN) score += 30; // VPN is medium-high risk
-  if (isProxy) score += 25; // Proxy is medium risk
-  if (isHosting) score += 20; // Datacenter IP is medium-low risk
-
+  if (isTor) score += 50;
+  if (isVPN) score += 30;
+  if (isProxy) score += 25;
+  if (isHosting) score += 20;
   return Math.min(score, 100);
 }
 
-/**
- * Detect VPN/Proxy using IP-API.com (free service)
- * Rate limit: 45 requests per minute
- *
- * For production, consider upgrading to:
- * - IP-API Pro ($13/month for 150,000 requests/month)
- * - IPQualityScore (more accurate VPN/Proxy detection)
- * - IPHub (specialized in proxy detection)
- */
-export async function detectVPNProxy(
-  ipAddress: string,
-): Promise<IPDetectionResult> {
-  // Skip detection for localhost/private IPs (IPv4 and IPv6)
-  if (
-    ipAddress === "unknown" ||
-    ipAddress === "::1" || // IPv6 localhost
-    ipAddress === "::ffff:127.0.0.1" || // IPv4-mapped IPv6 localhost
-    ipAddress.startsWith("127.") ||
-    ipAddress.startsWith("192.168.") ||
-    ipAddress.startsWith("10.") ||
-    ipAddress.startsWith("172.") ||
-    ipAddress.startsWith("::ffff:127.") ||
-    ipAddress.startsWith("::ffff:192.168.") ||
-    ipAddress.startsWith("::ffff:10.") ||
-    ipAddress.startsWith("fe80:") // IPv6 link-local
-  ) {
-    return {
-      success: true,
-      ip: ipAddress,
-      isVPN: false,
-      isProxy: false,
-      isTor: false,
-      isHosting: false,
-      riskScore: 0,
-    };
-  }
+function isLocalOrPrivate(ip: string): boolean {
+  return (
+    !ip ||
+    ip === "unknown" ||
+    ip === "::1" ||
+    ip === "::ffff:127.0.0.1" ||
+    ip.startsWith("127.") ||
+    ip.startsWith("192.168.") ||
+    ip.startsWith("10.") ||
+    ip.startsWith("172.") ||
+    ip.startsWith("::ffff:127.") ||
+    ip.startsWith("::ffff:192.168.") ||
+    ip.startsWith("::ffff:10.") ||
+    ip.startsWith("fe80:")
+  );
+}
+
+const SKIPPED_RESULT = (ip: string): IPDetectionResult => ({
+  success: true,
+  ip,
+  isVPN: false,
+  isProxy: false,
+  isTor: false,
+  isHosting: false,
+  riskScore: 0,
+  source: "skipped",
+});
+
+async function detectViaProxyCheck(
+  ip: string,
+): Promise<IPDetectionResult | null> {
+  const key =
+    process.env.IP_INTELLIGENCE_API_KEY ||
+    process.env.PROXYCHECK_API_KEY ||
+    "";
+  if (!key) return null;
 
   try {
-    // Use IP-API.com free service
-    // Fields: status,message,country,countryCode,region,city,timezone,isp,org,as
-    const response = await fetch(
-      `http://ip-api.com/json/${ipAddress}?fields=status,message,country,countryCode,region,city,timezone,isp,org,as`,
-      {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-        },
-        // Set timeout
-        signal: AbortSignal.timeout(5000), // 5 second timeout
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(`IP-API returned ${response.status}`);
-    }
+    const url = `https://proxycheck.io/v2/${encodeURIComponent(
+      ip,
+    )}?key=${encodeURIComponent(key)}&vpn=3&asn=1&risk=1`;
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) return null;
 
     const data = await response.json();
+    if (data.status !== "ok" && data.status !== "warning") return null;
 
-    if (data.status === "fail") {
-      console.warn(`IP-API detection failed for ${ipAddress}: ${data.message}`);
-      return {
-        success: false,
-        ip: ipAddress,
-        isVPN: false,
-        isProxy: false,
-        isTor: false,
-        isHosting: false,
-        riskScore: 0,
-      };
-    }
+    // eslint-disable-next-line security/detect-object-injection -- `ip` is the address we queried, not a user-controlled object traversal key
+    const node = data[ip] as Record<string, unknown> | undefined;
+    if (!node) return null;
 
-    // Extract data
-    const isp = data.isp || "";
-    const org = data.org || "";
-    const asn = data.as || "";
+    const proxy = String(node.proxy || "no").toLowerCase() === "yes";
+    const type = String(node.type || "").toLowerCase();
+    const providerRisk = Number(node.risk ?? 0);
 
-    // Detect VPN/Proxy/Hosting
-    const isSuspicious = isSuspiciousProvider(isp, org, asn);
-    const isHostingProvider = HOSTING_ASNS.some((hostingAsn) =>
-      asn.includes(hostingAsn),
+    const isTor = type.includes("tor");
+    const isVPN = !isTor && (type.includes("vpn") || (proxy && type === "vpn"));
+    const isProxy = !isTor && !isVPN && proxy;
+    const isHosting =
+      !isVPN &&
+      !isProxy &&
+      !isTor &&
+      (type.includes("hosting") || type.includes("compromised server"));
+
+    const derived = calculateRiskScore(isVPN, isProxy, isTor, isHosting);
+    const riskScore = Math.max(
+      derived,
+      Number.isFinite(providerRisk) ? Math.min(providerRisk, 100) : 0,
     );
 
-    // Simple heuristics (can be improved)
-    const isVPN =
-      isSuspicious &&
-      (isp.toLowerCase().includes("vpn") || org.toLowerCase().includes("vpn"));
-
-    const isProxy =
-      isSuspicious &&
-      (isp.toLowerCase().includes("proxy") ||
-        org.toLowerCase().includes("proxy") ||
-        isp.toLowerCase().includes("anonymizer"));
-
-    const isTor =
-      isSuspicious &&
-      (isp.toLowerCase().includes("tor") ||
-        org.toLowerCase().includes("tor") ||
-        isp.toLowerCase().includes("exit"));
-
-    const isHosting = isHostingProvider && !isVPN && !isProxy && !isTor;
-
-    const riskScore = calculateRiskScore(isVPN, isProxy, isTor, isHosting);
-
-    const result: IPDetectionResult = {
+    return {
       success: true,
-      ip: ipAddress,
-      country: data.country,
-      countryCode: data.countryCode,
-      region: data.region,
-      city: data.city,
-      timezone: data.timezone,
-      isp: data.isp,
-      org: data.org,
-      asn: data.as,
+      ip,
+      country: node.country as string | undefined,
+      countryCode: (node.isocode as string | undefined) || undefined,
+      region: node.region as string | undefined,
+      city: node.city as string | undefined,
+      isp: (node.provider as string | undefined) || (node.isp as string | undefined),
+      org: node.organisation as string | undefined,
+      asn: node.asn as string | undefined,
       isVPN,
       isProxy,
       isTor,
       isHosting,
       riskScore,
-      rawData: data,
+      source: "proxycheck",
+      rawData: node,
     };
-
-    // Log suspicious IPs
-    if (riskScore > 0) {
-      console.log(`🔍 Suspicious IP detected: ${ipAddress}`);
-      console.log(`   ISP: ${isp}`);
-      console.log(`   Org: ${org}`);
-      console.log(`   ASN: ${asn}`);
-      console.log(
-        `   VPN: ${isVPN}, Proxy: ${isProxy}, Tor: ${isTor}, Hosting: ${isHosting}`,
-      );
-      console.log(`   Risk Score: ${riskScore}`);
-    }
-
-    return result;
   } catch (error) {
-    console.error(`Error detecting VPN/Proxy for ${ipAddress}:`, error);
-
-    // Return safe default on error (don't block users due to API issues)
-    return {
-      success: false,
-      ip: ipAddress,
-      isVPN: false,
-      isProxy: false,
-      isTor: false,
-      isHosting: false,
-      riskScore: 0,
-    };
+    console.warn("⚠️ proxycheck.io lookup failed, falling back to ip-api:", error);
+    return null;
   }
 }
 
-/**
- * Check if IP should be flagged as high risk
- */
+async function detectViaIpApi(ip: string): Promise<IPDetectionResult> {
+  try {
+    const response = await fetch(
+      `http://ip-api.com/json/${ip}?fields=status,message,country,countryCode,region,city,timezone,isp,org,as`,
+      {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(5000),
+      },
+    );
+
+    if (!response.ok) throw new Error(`IP-API returned ${response.status}`);
+
+    const data = await response.json();
+    if (data.status === "fail") {
+      console.warn(`IP-API detection failed for ${ip}: ${data.message}`);
+      return { ...SKIPPED_RESULT(ip), success: false, source: "ip-api" };
+    }
+
+    const isp = data.isp || "";
+    const org = data.org || "";
+    const asn = data.as || "";
+
+    const { isVPN, isProxy, isTor, isHosting } = classifyFromNames(
+      isp,
+      org,
+      asn,
+    );
+    const riskScore = calculateRiskScore(isVPN, isProxy, isTor, isHosting);
+
+    return {
+      success: true,
+      ip,
+      country: data.country,
+      countryCode: data.countryCode,
+      region: data.region,
+      city: data.city,
+      timezone: data.timezone,
+      isp,
+      org,
+      asn,
+      isVPN,
+      isProxy,
+      isTor,
+      isHosting,
+      riskScore,
+      source: "ip-api",
+      rawData: data,
+    };
+  } catch (error) {
+    console.error(`Error detecting VPN/Proxy for ${ip}:`, error);
+    return { ...SKIPPED_RESULT(ip), success: false, source: "error" };
+  }
+}
+
+export async function detectVPNProxy(
+  ipAddress: string,
+): Promise<IPDetectionResult> {
+  if (isLocalOrPrivate(ipAddress)) {
+    return SKIPPED_RESULT(ipAddress);
+  }
+
+  const viaProvider = await detectViaProxyCheck(ipAddress);
+  if (viaProvider) return viaProvider;
+
+  return detectViaIpApi(ipAddress);
+}
+
 export function isHighRiskIP(detection: IPDetectionResult): boolean {
-  // Tor is always high risk
   if (detection.isTor) return true;
-
-  // VPN + Hosting is suspicious (common cheater setup)
   if (detection.isVPN && detection.isHosting) return true;
-
-  // Multiple indicators
   const indicators = [
     detection.isVPN,
     detection.isProxy,
     detection.isHosting,
   ].filter(Boolean).length;
-
   return indicators >= 2 || detection.riskScore >= 40;
 }
