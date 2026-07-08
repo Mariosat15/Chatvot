@@ -67,6 +67,99 @@ async function checkAlertStatus(
 }
 
 /**
+ * Create (or merge) a VPN / Proxy / Tor / high-risk-IP alert for a user.
+ *
+ * Reason: this runs on EVERY tracked request — not only when a brand-new device
+ * is registered — so a returning user who switches on a VPN is still flagged.
+ * AlertManagerService merges into any existing alert, so repeat logins don't
+ * spam duplicates. No-ops for clean IPs and for already-restricted users.
+ */
+async function maybeCreateVpnAlert(params: {
+  userId: string;
+  ipAddress: string;
+  ipRiskScore: number;
+  ipDetection: {
+    isVPN: boolean;
+    isProxy: boolean;
+    isTor: boolean;
+    isHosting: boolean;
+    country?: string;
+    city?: string;
+    isp?: string;
+    org?: string;
+    asn?: string;
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  fraudSettings: any;
+}): Promise<void> {
+  const { userId, ipAddress, ipRiskScore, ipDetection, fraudSettings } = params;
+  const { isVPN, isProxy, isTor } = ipDetection;
+
+  if (
+    !fraudSettings.vpnDetectionEnabled ||
+    !(isTor || isVPN || isProxy || ipRiskScore >= fraudSettings.alertThreshold)
+  ) {
+    return;
+  }
+
+  let alertType: "vpn_usage" | "high_risk_device" = "vpn_usage";
+  let severity: "medium" | "high" | "critical" = "medium";
+  let title = "VPN/Proxy Usage Detected";
+  let description = "";
+
+  if (isTor) {
+    severity = "critical";
+    title = "Tor Network Detected";
+    description = `User ${userId} is connecting through Tor network`;
+  } else if (isVPN) {
+    severity = "high";
+    title = "VPN Usage Detected";
+    description = `User ${userId} is connecting through a VPN (${ipDetection.isp})`;
+  } else if (isProxy) {
+    severity = "high";
+    title = "Proxy Server Detected";
+    description = `User ${userId} is connecting through a proxy (${ipDetection.isp})`;
+  } else {
+    severity = "medium";
+    alertType = "high_risk_device";
+    title = "High-Risk IP Detected";
+    description = `User ${userId} is connecting from a suspicious IP (Risk: ${ipRiskScore}%)`;
+  }
+
+  // Suppress only when the triggering user is already restricted.
+  const alertStatus = await checkAlertStatus(userId, [userId]);
+  if (alertStatus.shouldSuppress) return;
+
+  await AlertManagerService.createOrUpdateAlert({
+    alertType,
+    userIds: [userId],
+    title,
+    description,
+    severity,
+    confidence: ipRiskScore / 100,
+    evidence: [
+      {
+        type: "ip_detection",
+        description: "IP Analysis Results",
+        data: {
+          ip: ipAddress,
+          country: ipDetection.country,
+          city: ipDetection.city,
+          isp: ipDetection.isp,
+          org: ipDetection.org,
+          asn: ipDetection.asn,
+          isVPN,
+          isProxy,
+          isTor,
+          isHosting: ipDetection.isHosting,
+          riskScore: ipRiskScore,
+        },
+      },
+    ],
+  });
+}
+
+/**
  * POST /api/fraud/track-device
  * Track device fingerprint and detect multi-accounting
  */
@@ -155,6 +248,17 @@ export async function POST(request: Request) {
       else if (isProxy) ipRiskScore += fraudSettings.proxyRiskScore;
       else if (ipDetection.isHosting) ipRiskScore += 20;
     }
+
+    // 🛡️ VPN/Proxy/Tor alerting — runs for EVERY tracked request (including
+    // returning users on a known device), not only when a new device is first
+    // seen. Independent of device fingerprinting being enabled.
+    await maybeCreateVpnAlert({
+      userId,
+      ipAddress,
+      ipRiskScore,
+      ipDetection,
+      fraudSettings,
+    });
 
     // Check if device fingerprinting is enabled
     if (!fraudSettings.deviceFingerprintingEnabled) {
@@ -921,81 +1025,8 @@ export async function POST(request: Request) {
         riskScore: baseRiskScore,
       });
 
-      // Create alert if VPN/Proxy/Tor detected (and risk exceeds threshold)
-      if (
-        (isTor ||
-          isVPN ||
-          isProxy ||
-          ipRiskScore >= fraudSettings.alertThreshold) &&
-        fraudSettings.vpnDetectionEnabled
-      ) {
-        let alertType: "vpn_usage" | "high_risk_device" = "vpn_usage";
-        let severity: "medium" | "high" | "critical" = "medium";
-        let title = "VPN/Proxy Usage Detected";
-        let description = "";
-
-        if (isTor) {
-          severity = "critical";
-          title = "Tor Network Detected";
-          description = `User ${userId} is connecting through Tor network`;
-        } else if (isVPN) {
-          severity = "high";
-          title = "VPN Usage Detected";
-          description = `User ${userId} is connecting through a VPN (${ipDetection.isp})`;
-        } else if (isProxy) {
-          severity = "high";
-          title = "Proxy Server Detected";
-          description = `User ${userId} is connecting through a proxy (${ipDetection.isp})`;
-        } else {
-          severity = "medium";
-          alertType = "high_risk_device";
-          title = "High-Risk IP Detected";
-          description = `User ${userId} is connecting from a suspicious IP (Risk: ${ipRiskScore}%)`;
-        }
-
-        // Check if we should suppress alerts for this user
-        const alertStatus = await checkAlertStatus(userId, [userId]);
-
-        if (alertStatus.shouldSuppress) {
-          return NextResponse.json({
-            success: true,
-            suspicious: false,
-            message:
-              "High-risk IP detected but alert suppressed (account restricted)",
-          });
-        }
-
-        // NOTE: If alertStatus.hasActiveAlert is true, AlertManagerService will MERGE
-
-        await AlertManagerService.createOrUpdateAlert({
-          alertType,
-          userIds: [userId],
-          title,
-          description,
-          severity,
-          confidence: ipRiskScore / 100,
-          evidence: [
-            {
-              type: "ip_detection",
-              description: "IP Analysis Results",
-              data: {
-                ip: ipAddress,
-                country: ipDetection.country,
-                city: ipDetection.city,
-                isp: ipDetection.isp,
-                org: ipDetection.org,
-                asn: ipDetection.asn,
-                isVPN,
-                isProxy,
-                isTor,
-                isHosting: ipDetection.isHosting,
-                riskScore: ipRiskScore,
-              },
-            },
-          ],
-        });
-      }
-
+      // VPN/Proxy/Tor alerting is handled up-front by maybeCreateVpnAlert(),
+      // which runs for every tracked request (including this new device).
 
       return NextResponse.json({
         success: true,
