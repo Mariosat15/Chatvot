@@ -323,6 +323,47 @@ Template:
 
 ---
 
+### 1 Sep 2026 - Defect 1 tests 1 and 2: Gate A admits one join in twenty under contention
+
+`__tests__/services/competition-entry-concurrency.test.ts`, 5 tests, passing. **No
+production code changed.** Suite now at **193 tests**, from 154 this morning.
+
+Run 20 joins **sequentially**: all 20 succeed, and `prizePool`, `currentParticipants`, the
+participant documents and the wallet debits agree exactly. **The accounting is correct** -
+that test exists so the next result cannot be misread as broken arithmetic.
+
+Run the same 20 **simultaneously**: **one succeeds.** The other 19 fail with
+`Write conflict during plan execution ... Please retry your operation or multi-document
+transaction`. Gate A wraps entry in a transaction with **no retry**; Gate B retries five
+times for exactly this reason. The plan inferred this from the code. It is now measured.
+
+Two caveats, because the number will get quoted. The ratio is **not** a production
+prediction - a single-node in-memory replica set has tighter lock timeouts and reports
+`yielding is disabled`, so production loses fewer. And the test pins the *mechanism*, not
+the ratio: assertions are written against the observed success count rather than against 20,
+so they keep passing once the retry is added.
+
+**A false finding was nearly recorded, and this is the part worth remembering.** The first
+run also said 1 in 20 - but most failures were `Unable to write to collection ... due to
+catalog changes`, which is **MongoDB refusing to create a collection inside a transaction**.
+That is a property of a fresh test database, and it is indistinguishable from a contention
+failure at a glance. Had it gone unnoticed, "the entry path collapses under load" would have
+been written down as a production fact on the strength of a test-server artifact.
+
+`ensureCollections()` was added to the Mongo helper to pre-create every collection the code
+under test writes, the finding was re-measured, and the real write conflicts remained. Any
+future concurrency test must call it **before** drawing a conclusion. Two smaller mock gaps
+were fixed the same way - a partial mock of `user-restriction.service` was throwing
+"No export is defined", and the noise buried the real failure.
+
+Also fixed a fidelity bug in the harness: the default test user id was `"test-user-1"`,
+which is not ObjectId-shaped. Most models type `userId` as `String` and accept it, but the
+fraud models declare `Schema.Types.ObjectId`, so the coordinated-entry detection threw a
+`CastError` that the entry path catches and logs. The tests still passed while **a whole
+branch of the code under test silently never ran.** Better Auth uses the MongoDB adapter, so
+real ids are ObjectId strings; the fixture now matches. A fixture that cannot reach the code
+under test is worse than none, because it looks like coverage.
+
 ### 1 Sep 2026 - The other half of the same emit: 113 stale `.js` files, and they were NOT inert
 
 **This is the most important finding of the day, and it was found by accident.** Building the

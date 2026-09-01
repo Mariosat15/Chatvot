@@ -82,6 +82,22 @@ get wrong and are worth stating here:
  Gate B's market-hours check, because doing so would block weekend sign-ups for Monday
  contests. Locked in by Defect 1 test 12, which fails both a fix that blocks the join and
  one that lets the order through.
+- **Before writing any concurrency test, call `ensureCollections()`** from
+ `__tests__/helpers/mongo-test-server.ts` with every collection the code under test writes.
+ MongoDB **cannot create a collection inside a transaction**, so the first test to touch a
+ new collection fails with `due to catalog changes` — which is indistinguishable at a glance
+ from a contention failure. This nearly put a false finding on record: a 20-way join test
+ reported 1 success in 20, and most of the failures were this artifact. **Measured after the
+ fix, Gate A really does admit only 1 in 20 concurrent joins** (`Write conflict`, no retry,
+ while Gate B retries five times) — but the ratio is not a production prediction, because a
+ single-node in-memory replica set has tighter lock timeouts. Assert against the *observed*
+ success count, never against the attempt count, so the test survives the fix.
+- **Test fixtures must use ObjectId-shaped user ids** (24 hex chars), not readable labels.
+ Better Auth uses the MongoDB adapter so real ids are ObjectId strings; most models type
+ `userId` as `String` and would accept anything, but the fraud models declare
+ `Schema.Types.ObjectId` and throw a `CastError` that the entry path catches and logs. The
+ test then passes while a whole branch of the code under test never runs — coverage that
+ only looks like coverage.
 - **Testing a server action needs `__tests__/helpers/server-action-context.ts`**, which
  supplies the session, headers, restriction and fraud outcomes that ambient request state
  would normally provide. Two things will waste your time otherwise. Server actions

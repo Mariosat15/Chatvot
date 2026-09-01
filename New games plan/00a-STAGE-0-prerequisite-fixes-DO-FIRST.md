@@ -304,8 +304,8 @@ refused. That pair is now a required test - number 12 below.
 
 | # | Test | Asserts |
 |---|---|---|
-| 1 | 20 simultaneous joins through both entry points | `prizePool == successful joins x entryFee`, `currentParticipants` matches, no wallet drift |
-| 2 | Join with insufficient balance | No partial state - no participant without a debit, no debit without a participant |
+| 1 | 20 simultaneous joins through both entry points | `prizePool == successful joins x entryFee`, `currentParticipants` matches, no wallet drift. **Written 1 Sep 2026** - `__tests__/services/competition-entry-concurrency.test.ts`, 5 tests, passing. See the measurement below |
+| 2 | Join with insufficient balance | No partial state - no participant without a debit, no debit without a participant. **Written 1 Sep 2026**, passing |
 | 3 | Join with unverified email, via **all** entry points | All refuse |
 | 4 | Join while account-restricted, via **all** entry points | All refuse |
 | 5 | Join below the level requirement, via **all** entry points | All refuse |
@@ -320,6 +320,37 @@ refused. That pair is now a required test - number 12 below.
 Test 8 matters because there is an existing recovery process that resets a stuck
 competition back to `active` after 5 minutes - so a slow finalization really can be run
 twice.
+
+### What test 1 measured: Gate A admits 1 join in 20 under contention
+
+Run 20 joins **sequentially** and all 20 succeed, with `prizePool`, `currentParticipants`,
+the participant documents and the wallet debits all in exact agreement. **The accounting is
+correct.** That test exists precisely so the next result cannot be misread as broken
+arithmetic.
+
+Run the same 20 **simultaneously** and **one succeeds.** The other 19 fail with
+`Write conflict during plan execution ... Please retry your operation or multi-document
+transaction`. This is the defect the plan predicted from reading the code - Gate A wraps the
+entry in a transaction but has **no retry**, while Gate B retries five times for exactly this
+reason. It is no longer an inference.
+
+**Two honest caveats, because the number will be quoted.** The ratio is not a production
+prediction: a single-node in-memory replica set reports `yielding is disabled` and has
+tighter lock timeouts than a real deployment, so production would lose fewer. And the
+*mechanism* is what the test pins, not the ratio - the assertions are written against the
+observed success count rather than against 20, so they keep passing once the retry is added
+and the count rises.
+
+**What is not in doubt:** a lost join is a player who clicked Join on a popular contest and
+was refused, and the fix for it already exists in the other gate.
+
+**A false finding was nearly recorded here, and the trap is worth knowing.** The first run
+also reported 1 in 20, but most of those failures were `Unable to write to collection ... due
+to catalog changes`, which is **MongoDB refusing to create a collection inside a
+transaction** - a property of a fresh test database, not of the code. It looks exactly like a
+contention failure. `ensureCollections()` in the Mongo helper now pre-creates every
+collection the entry path writes, and the finding above was re-measured after that. **Any
+future concurrency test must call it before drawing a conclusion.**
 
 ## Risks of making this change
 

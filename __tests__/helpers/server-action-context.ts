@@ -34,6 +34,17 @@ export interface FraudOutcome {
 interface ActionContext {
   /** null means "nobody is logged in", which makes the action redirect. */
   session: { user: TestSessionUser } | null;
+  /**
+   * When set, each session lookup consumes the next id instead of using `session`.
+   *
+   * Reason: concurrency tests fire many calls at once and every one of them must be a
+   * different player, or the test proves nothing - a competition cannot be joined twice by
+   * the same account, so a shared session would just exercise the duplicate-entry guard 19
+   * times. A single mutable `session` cannot express "a different caller per call", because
+   * all the calls are in flight together. Which caller gets which slot does not matter;
+   * only that they are distinct.
+   */
+  sessionQueue: string[] | null;
   /** Request headers the action reads, e.g. x-forwarded-for for the fraud gate. */
   headers: Record<string, string>;
   restriction: RestrictionOutcome;
@@ -68,6 +79,7 @@ export { DEFAULT_USER_ID };
 function defaults(): ActionContext {
   return {
     session: { user: { ...DEFAULT_USER } },
+    sessionQueue: null,
     headers: { "x-forwarded-for": "203.0.113.10" },
     restriction: { allowed: true },
     fraud: { allowed: true },
@@ -91,6 +103,31 @@ export function signInAs(user: Partial<TestSessionUser>): void {
 
 export function signOut(): void {
   ctx.session = null;
+}
+
+/**
+ * The session lookup the auth mock should perform. Handles the queue case.
+ *
+ * Reason: keeping this beside the queue means every test file's mock behaves identically.
+ * A file that reimplemented it and forgot the queue would silently run its concurrency
+ * test as one player twenty times, and still pass.
+ */
+export function currentSession(): { user: TestSessionUser } | null {
+  if (ctx.sessionQueue && ctx.sessionQueue.length > 0) {
+    const id = ctx.sessionQueue.shift() as string;
+    return { user: { ...DEFAULT_USER, id, email: `${id}@example.com` } };
+  }
+  return ctx.session;
+}
+
+/** Generates `count` distinct ObjectId-shaped ids and queues them, returning the list. */
+export function signInAsDistinctPlayers(count: number): string[] {
+  const ids = Array.from({ length: count }, (_, i) =>
+    // 24 hex characters, unique per index. Must be ObjectId-shaped - see DEFAULT_USER_ID.
+    (i + 1).toString(16).padStart(24, "b"),
+  );
+  ctx.sessionQueue = [...ids];
+  return ids;
 }
 
 export function withUnverifiedEmail(): void {

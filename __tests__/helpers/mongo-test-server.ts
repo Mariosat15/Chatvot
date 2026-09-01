@@ -98,6 +98,36 @@ export async function clearTestMongo(): Promise<void> {
 }
 
 /**
+ * Creates the named collections up front, if they do not already exist.
+ *
+ * Call this in `beforeAll`, listing every collection the code under test will write to.
+ *
+ * Reason: MongoDB cannot create a collection inside a multi-document transaction on a
+ * single-node replica set - the attempt fails with "Unable to write to collection ... due
+ * to catalog changes; please retry the operation". The first test to write a given
+ * collection therefore fails, and every later one passes, which reads exactly like a
+ * concurrency or ordering bug in the application. It is neither; it is a property of the
+ * test server.
+ *
+ * This mattered concretely: without it, a 20-way concurrent join test reported that only
+ * one join in twenty succeeded, and the obvious conclusion - that the entry path cannot
+ * handle contention - would have been recorded as a production finding. Most of those
+ * failures were this. Pre-create the collections before drawing any conclusion about
+ * contention.
+ */
+export async function ensureCollections(names: string[]): Promise<void> {
+  const db = mongoose.connection.db;
+  if (!db) throw new Error("ensureCollections called before startTestMongo");
+
+  const existing = new Set((await db.collections()).map((c) => c.collectionName));
+  await Promise.all(
+    names
+      .filter((name) => !existing.has(name))
+      .map((name) => db.createCollection(name)),
+  );
+}
+
+/**
  * True when a transaction can actually be started. Lets a suite skip with a clear
  * message rather than reporting a misleading failure.
  */
