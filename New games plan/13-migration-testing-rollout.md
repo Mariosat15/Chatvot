@@ -66,18 +66,42 @@ Every backfill is reversible: `$unset` the added fields, or drop `UserGameStats`
 
 Highest value-per-line item in the whole plan. Prevents risk R2 permanently.
 
+**Delivered 1 September 2026** in Stage 0, as `tools/model-mirror/`. Run with
+`npm run check:mirrors`, or `npm run check:mirrors:list` for the full report.
+
 ```
-scripts/check-model-mirrors.ts
+tools/model-mirror/
+  parse-schema.ts   extract field paths and enum values from the TypeScript AST
+  compare.ts        discover mirrored pairs by walking both directories, then diff
+  allowlist.ts      differences that are deliberate, each with a reason
+  cli.ts            the build gate
 
-For each known mirrored pair:
-  parse both files (regex over schema definitions is sufficient - no AST needed)
-  extract the set of top-level field names
-  fail the build with a diff if the sets differ
+For every pair present in both directories:
+  extract field paths AND enum values from each side
+  report anything present on one side only, unless the allowlist names it
+  exit non-zero if anything remains
 ```
 
-Seed the pair list from `01` section 11. Run in CI and as a pre-push hook. Note the repo already uses husky with `eslint --max-warnings=0`, so there is an established hook mechanism to extend.
+Three design points that were **not** obvious when this section was first written, and each
+of which would have produced a useless guard:
 
-Add `whitelabel.model.d.ts` as a special case - it is a hand-maintained declaration that must match the schema.
+- **The AST is required; a regex is not sufficient.** This section originally said "regex
+  over schema definitions is sufficient - no AST needed". That is wrong. A regex over
+  `field: {` misses nested paths, array subdocuments and the `type: { ... }` subdocument
+  form, and this codebase uses all three. It would have missed the real
+  `hero-settings.model.ts` drift entirely.
+- **Enum values must be compared, not just field names.** A missing enum value **rejects
+  the write**, which is the worst case, and a name-only comparison cannot see it.
+- **The pair list must be derived, never seeded from a document.** A hand-maintained list
+  goes stale exactly like the models it is watching. The earlier instruction to "seed the
+  pair list from `01` section 11" would have frozen the guard at four pairs out of 75.
+
+Runs in CI as its own step and in `.husky/pre-push`. The repo already used husky, but only
+`pre-commit`, running `lint-staged`.
+
+**Do not** treat the committed `.d.ts` files as declarations to keep in step. There are 31
+of them, all stale orphaned build output, and TypeScript ignores them in favour of the
+sibling `.ts`. See `00a` - they are pending deletion.
 
 ---
 

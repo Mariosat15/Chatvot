@@ -14,6 +14,12 @@ export interface WhiteLabelDocument extends Document {
   ogImageUrl: string;
   siteUrl: string;
 
+  // Branding file backup (base64-encoded file data stored in DB for persistence)
+  brandingFiles: Map<
+    string,
+    { data: string; contentType: string; updatedAt: Date }
+  >;
+
   // General Settings
   nodeEnv: string;
   nextPublicBaseUrl: string;
@@ -114,6 +120,20 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
     seoDescription: { type: String, default: "" },
     ogImageUrl: { type: String, default: "" },
     siteUrl: { type: String, default: "" },
+
+    // Branding file backup (base64-encoded, auto-restored if disk files are lost)
+    brandingFiles: {
+      type: Map,
+      of: new Schema(
+        {
+          data: { type: String, required: true },
+          contentType: { type: String, required: true },
+          updatedAt: { type: Date, default: Date.now },
+        },
+        { _id: false },
+      ),
+      default: new Map(),
+    },
 
     // General Settings
     nodeEnv: {

@@ -1,4 +1,4 @@
-# STAGE 0 - Prerequisite Fixes (SEPARATE PROJECT - DO FIRST)
+﻿# STAGE 0 - Prerequisite Fixes (SEPARATE PROJECT - DO FIRST)
 
 > **This is NOT part of the New Games Plan.**
 >
@@ -13,8 +13,8 @@
 
 The two defects were first documented on 17 August 2026. They were **re-verified against
 the codebase on 1 September 2026**, immediately before work started. Both are still
-present and unfixed. The re-verification also corrected four claims and found four
-additional defects, all recorded below.
+present and unfixed. The re-verification corrected six claims and found seven additional
+defects, all recorded below.
 
 | Date | Finding |
 |---|---|
@@ -24,6 +24,13 @@ additional defects, all recorded below.
 | 1 Sep 2026 | **New:** the challenge *accept* path skips account restrictions and the fraud gate, on a route real players use |
 | 1 Sep 2026 | **New:** Gate A writes a ledger field that is not in the schema, so production entry-fee rows carry no competition reference |
 | 1 Sep 2026 | **New:** `platform-financials.model.ts` has *bidirectional* enum drift, which fails writes rather than merely hiding fields |
+| 1 Sep 2026 | **Correction, measured:** drift is a **write-side** defect. An ordinary `save()` does **not** strip undeclared fields, and `.lean()` / `toObject()` do **not** hide them - both earlier claims were wrong. What actually happens: a missing enum value rejects the write, and the narrower app cannot write the field at all. Evidence: `__tests__/helpers/mirror-drift-behaviour.test.ts` |
+| 1 Sep 2026 | **Correction to the correction:** one read *does* break, and it is the one code uses. **Ordinary `doc.field` access returns `undefined`** for an undeclared field, because Mongoose defines getters only for declared paths. The field survives a debug dump while the code beside it reads nothing and takes the wrong branch |
+| 1 Sep 2026 | **New, live in production:** `whitelabel.brandingFiles` missing from the admin copy meant **hero and branding images could never be restored after a redeploy**, and deleting one left the database copy behind forever. Three routes affected. Found by diffing the typecheck against a pre-sync baseline - the admin app went from 229 standing errors to 225, and all four were this field |
+| 1 Sep 2026 | **New:** an **eleventh** drifted pair - `user-notification-preferences.model.ts`. The admin app cannot represent a player muting challenge, social or messaging notifications, so it ignores that choice |
+| 1 Sep 2026 | **New, live in production:** the main app writes `failedAt` and `failedReason` on every failed withdrawal into a schema declaring neither, and `failedReason` was in **neither** app's copy. Every failed withdrawal has been stored with no failure time and no processor reason |
+| 1 Sep 2026 | **New:** the `hero-settings` drift is 42 fields, not 26, and made the Game Master, competition-types, marketplace, journey-badges, trust-badge and enterprise landing sections **un-administrable** rather than merely invisible |
+| 1 Sep 2026 | **Correction:** there are **31** stale `.d.ts` files plus 31 `.d.ts.map`, not two. All are orphaned build output from February and provably inert. Plan changed from "update" to "delete", pending owner sign-off |
 
 ---
 
@@ -291,10 +298,11 @@ database. But each app keeps its **own separate copy** of the "blueprint" that d
 what a competition is, what a wallet transaction is, and so on.
 
 If a field is added to the player app's blueprint and someone forgets the admin app's
-copy, the admin app becomes **blind to that field** - it cannot see it, cannot display it,
-and in whole-document save operations it can strip it out.
+copy, the admin app **cannot write that field**. Not "writes it wrongly" - the write is
+discarded, silently, and the operation reports success.
 
-This is not a theoretical risk. **It has already happened.**
+This is not a theoretical risk. **It has already happened, and it is still happening
+in production today** - see the withdrawal finding below.
 
 ## The evidence (re-verified 1 September 2026)
 
@@ -310,7 +318,11 @@ The real numbers are larger.
 | Admin-app-only (no mirror) | 14 |
 | Byte-identical pairs | 38 |
 | Pairs differing in file content | 37 |
-| **Pairs with real schema field drift** | **10** |
+| **Pairs with real schema drift** | **11** |
+
+(The guard enumerates 104 files under `database/models`, being the 98 models plus six
+non-model helpers - three `index.ts` barrels and the three `hero-settings.*` helper files.
+It compares the 75 that exist on both sides.)
 
 The four originally documented claims are **all still true**:
 
@@ -321,42 +333,130 @@ The four originally documented claims are **all still true**:
 | `database/models/whitelabel.model.ts` | `brandingFiles` |
 | `database/models/trading/competition-participant.model.ts` | Field sets match; the main app has 4 compound indexes the admin copy lacks |
 
-And six more pairs drift that were not previously recorded:
+And seven more pairs drift that were not previously recorded:
 
 | Blueprint file | Drift |
 |---|---|
-| `platform-financials.model.ts` | **Bidirectional.** Main has `retainedGmFeeDetails`; admin has `balanceAddDetails`, `expenseDetails` |
-| `hero-settings.model.ts` | 26 marketing / Game Master / journey fields missing from admin |
+| `platform-financials.model.ts` | **Bidirectional.** Main has `retainedGmFeeDetails`; admin has `balanceAddDetails`, `expenseDetails`, **and two enum values the main app rejects** |
+| `hero-settings.model.ts` | **42** marketing / Game Master / journey / enterprise fields missing from admin |
 | `user-bank-account.model.ts` | 5 Nuvei UPO fields missing from admin |
 | `trading/challenge-settings.model.ts` | `tiePrizeDistribution` missing from admin |
 | `trading/trading-position.model.ts` | `metadata` missing from admin |
-| `withdrawal-request.model.ts` | Admin-only: `failedAt`, `withdrawalMethod`, `userPaymentOptionId` |
+| `user-notification-preferences.model.ts` | `categoryPreferences.challenge`, `.social`, `.messaging` missing from admin |
+| `withdrawal-request.model.ts` | Missing from **main**: `failedAt`, `withdrawalMethod`, `originalCardDetails.userPaymentOptionId` |
 
-`admin.model.ts` also differs by 24 admin-only RBAC fields. **That difference is correct
-and must stay** - see the allowlist risk below.
+`admin.model.ts` also differs by **26** admin-only RBAC and staff-profile fields. **That
+difference is correct and must stay** - see the allowlist section below.
 
-## Two severities, and one that is worse than invisibility
+Two of these were worse than the file-level summary suggests:
 
-- **Always: invisibility.** The admin app cannot see drifted fields through its own
-  models. Any admin screen that appears to show this data must be querying the raw
-  database to work around the gap.
-- **Only on whole-document writes: data loss.** Mongoose strips unknown fields when a
-  document is replaced wholesale. Targeted `$set` updates do **not** strip other fields.
-  So the realistic present-day symptom is "the admin does not show this", not "money
-  disappeared".
-- **New, and worse: write rejection.** `platform-financials.model.ts` drifts in *both*
-  directions. The admin schema's `transactionType` enum includes `admin_balance_add` and
-  `custom_expense`; the main app's does not. A missing enum value is a **validation
-  failure at write time**, not merely a field you cannot read.
+- **`hero-settings.model.ts` was not cosmetic.** The 42 fields are the Game Master
+  showcase, the competition-types showcase, the marketplace preview, the journey-and-badges
+  section, the trust badges, the live-data refresh settings and the enterprise case
+  studies. The admin app is the **editor** for landing-page content, and
+  `apps/admin/app/api/hero-settings/route.ts` saves it with `Object.assign(settings,
+  body)` followed by `save()`. An admin posting any of those fields got a success
+  response and no change. In effect **those landing sections were not administrable at
+  all.**
+- **`user-notification-preferences.model.ts` silently overrides player choices.** A player
+  who mutes challenge, social or messaging notifications is honoured by the player app and
+  ignored by the admin app, because the admin model cannot represent the preference.
 
-## The stale type declarations
+## What drift actually does - MEASURED, and not what this document used to say
 
-`database/models/whitelabel.model.d.ts` is a hand-maintained third file and has fallen
-**eleven fields** behind: `brandingFiles`, `favicon`, `seoTitle`, `seoDescription`,
-`ogImageUrl`, `siteUrl`, `redisHost`, `redisPort`, `redisPassword`, `pexelsApiKey`,
-`ipIntelligenceApiKey`. There is no admin equivalent.
-`database/models/trading/wallet-transaction.model.d.ts` is stale too, missing several
-`transactionType` values including `chargeback_clawback` and the `gamemaster_*` family.
+This document previously claimed the main harm was that "the admin app cannot see the
+field" and that "whole-document saves strip it". Both claims were wrong. The behaviour was
+measured against a real MongoDB on 1 September 2026 and the evidence is in
+`__tests__/helpers/mirror-drift-behaviour.test.ts` (8 tests, all passing).
+
+In descending order of harm:
+
+| # | What happens | Severity |
+|---|---|---|
+| 1 | A **missing enum value rejects the entire write.** The record is never created | **Severe** - the money movement that needed recording is not recorded |
+| 2 | The narrower app **cannot write the field.** `create`, assignment-then-`save`, and `$set` all discard it in silence and report success | **Severe** - the feature appears to work and does nothing |
+| 3 | `replaceOne` / `findOneAndReplace` **do delete** undeclared fields, because they send a whole document | High, but rare in this codebase |
+| 4 | An ordinary `save()` of a loaded document does **not** delete them - it `$set`s modified paths only | Not a harm. **The old claim was wrong** |
+| 5 | `.lean()` and `toObject()` do **not** hide the field - it is present in both | Not a harm. **The old claim was wrong** |
+| 6 | But **ordinary property access, `doc.field`, returns `undefined`**, because Mongoose defines getters only for declared paths | **Severe, and the subtlest of the six** - see live bug 2 |
+
+Rows 5 and 6 together are the reason drift survives review for months. A dump of the
+document shows the value; the line of code next to it reads `undefined` and quietly takes
+the wrong branch. That is exactly how `brandingFiles` disabled hero-image recovery.
+
+Two consequences follow, and both change how the work is done:
+
+- **Drift is a write-side defect first, and a read-side trap second.** A `.lean()` read
+  returns the field perfectly while every write through the same model drops it, so a read
+  is useless as evidence that two copies agree. Only the guard can tell you.
+- **The guard must compare enum VALUES, not just field names.** Row 1 is the worst case and
+  a field-name comparison cannot see it at all. `platform-financials.model.ts` was exactly
+  this: same `transactionType` field on both sides, but the main app's enum omitted
+  `admin_balance_add` and `custom_expense`, so those writes would fail validation.
+
+### Live bug 1, now fixed - failed withdrawals recorded no time and no reason
+
+`withdrawal-request.model.ts` drifted in the direction nobody expected - the **main** app
+was the narrower copy. `app/api/nuvei/withdrawal/route.ts` writes `failedAt` and
+`failedReason` on **all three** of its failure paths (lines 451, 562, 651). The main app's
+schema declared neither, and `failedReason` was declared in **neither** app's copy.
+
+By harm #2 above, that means **every failed withdrawal has been stored with no failure
+timestamp and no processor reason**, for as long as the field has been written. Admin
+screens showing "failed at" had nothing to show. This is the same class of bug as the
+`WalletTransaction.referenceId` mismatch recorded under Defect 1, found the same way, and
+it is the strongest available argument for the guard: nobody was looking for this.
+
+### Live bug 2, now fixed - hero images could never be restored after a redeploy
+
+Found by the typecheck, not the guard, and only visible **after** the sync: syncing
+`whitelabel.model.ts` removed four pre-existing TypeScript errors in the admin app
+(229 errors before, 225 after). All four were the same missing field, `brandingFiles` -
+the Map that stores a base64 copy of every uploaded branding image so it survives a deploy
+onto ephemeral disk.
+
+The admin schema did not declare it, so in three routes the field read as `undefined`:
+
+| Route | Line | What silently did nothing |
+|---|---|---|
+| `app/api/assets/hero/[filename]/route.ts` | 52 | Serving a hero image missing from disk. The database restore path never ran, so the image stayed 404 and was never auto-restored |
+| `app/api/assets/images/[filename]/route.ts` | 96 | The same, for general branding images |
+| `app/api/hero-settings/upload/route.ts` | 186-187 | Deleting a hero image. The disk file went; the database copy stayed forever |
+
+The first two are the more serious: `brandingFiles` **exists precisely to survive a
+redeploy**, and the code that reads it could not see it. The backup was being written by
+the main app and never read by the admin app.
+
+This one also sharpens *how* drift hides, and the difference is worth stating because it
+is counter-intuitive. Reads are not uniformly safe. `.lean()` and `toObject()` return the
+undeclared field perfectly, but **ordinary property access returns `undefined`**, because
+Mongoose defines getters only for declared paths. So a debug dump of the document shows
+the value while the line of code beside it reads nothing and takes the wrong branch. Both
+behaviours are pinned in `mirror-drift-behaviour.test.ts`.
+
+## The stale type declarations - larger than recorded, and the plan changed
+
+The plan said "two stale `.d.ts` files, update them". What is actually there is **31
+`.d.ts` files and 31 matching `.d.ts.map` files**, all under `database/`, all committed in
+February 2026, and every one of them stale.
+
+They are **orphaned build output**, not hand-maintained declarations:
+
+- Each ends with a `sourceMappingURL` comment, and the `.map` files are committed beside
+  them.
+- `tsconfig.json` sets `noEmit: true`, so nothing regenerates them. They are frozen at
+  whatever the schemas looked like in February.
+- They are **inert**: TypeScript resolves `./competition.model` to the `.ts` file, which
+  wins over a sibling `.d.ts`. Verified by measurement - moving all 62 files out of the
+  repository produced a **byte-identical set of 16 pre-existing type errors** and a
+  **clean production build**.
+
+**Deviation from the plan, recorded deliberately:** updating them by hand was rejected.
+Doing so would create a third copy of every schema to keep in step - the very disease this
+defect is about - for files that nothing reads. The recommendation is to **delete all 62
+and add a `.gitignore` rule** so a stray `tsc` run cannot commit them again. This is a
+deletion of tracked files and therefore an owner decision; it is listed in the sign-off
+gate below rather than done silently.
 
 ## Beyond models - noted, not in scope
 
@@ -384,53 +484,99 @@ starts.
 
 ## The fix
 
-1. **Add an automatic guard** - `scripts/check-model-mirrors.ts`:
-   - Enumerates the 75 mirrored pairs (do not hard-code a stale list - derive it).
-   - Extracts schema field names and enum values from each side and compares them.
-   - **Fails the build** with a readable diff when they diverge.
-   - Carries an **explicit allowlist of intentional differences**, starting with
-     `admin.model.ts`'s 24 RBAC fields and `withdrawal-request.model.ts`'s admin-only
-     fields.
-   - Runs in CI and as a pre-push hook. The repo already uses husky, but currently only
-     `pre-commit` exists and it only runs `lint-staged` - there is no `pre-push` hook yet.
-2. **Sync the drift that already exists** - the 10 pairs above. **Only ever add fields and
-   enum values, never remove them.**
-3. **Include the special cases** - the two stale `.d.ts` files.
+1. **Add an automatic guard.** Built as four small modules under **`tools/model-mirror/`**:
+   `parse-schema.ts` (TypeScript AST extraction), `compare.ts` (pair discovery and diff),
+   `allowlist.ts` (intentional differences), `cli.ts` (the build gate).
+   - Enumerates the mirrored pairs by walking both directories - no hard-coded list to go
+     stale.
+   - Extracts field paths **and enum values** from the AST, not with regular expressions.
+     A regex over `field: {` misses nested paths, array subdocuments and the
+     `type: { ... }` subdocument form, all of which this codebase uses.
+   - **Fails the build** with a message naming each file, field and enum value, and which
+     side is missing it.
+   - Carries an **explicit allowlist**, which in the end needed exactly **one** entry:
+     `admin.model.ts`. Every other difference turned out to be a real defect.
+   - `npm run check:mirrors` (gate) and `npm run check:mirrors:list` (full report,
+     always exits 0).
+   - Wired into CI as its own step and into a new `.husky/pre-push` hook. The repo already
+     used husky but had only `pre-commit`, running `lint-staged`.
+
+   **Note on location:** this lives in `tools/`, not `scripts/`, because `.cursorignore`
+   excludes `scripts/` and the guard is maintained, tested code rather than a one-off
+   script.
+
+2. **Sync the drift that already exists** - the 11 pairs above. **Only ever add fields and
+   enum values, never remove them.** Removing an enum value to make two sides agree
+   orphans every document already storing it.
+
+3. **Handle the `.d.ts` files** - see the deviation recorded above. Delete rather than
+   update, pending owner sign-off.
+
 4. **Add a PR checklist item**: "model changed - mirror updated?"
+
+### Why the allowlist has only one entry
+
+`admin.model.ts` differs by 26 staff fields - RBAC role, permissions, lockout, presence,
+support-chat availability, credential lifecycle and profile. This is deliberate: the main
+app's **only** use of the model is `lib/admin/auth.ts` calling
+`findById().select('name').lean()` to put a name in the header. It never creates or saves
+an Admin document, so harm #2 and #3 cannot occur.
+
+The entry records that reasoning **and the condition that would invalidate it**: if the
+main app ever writes an Admin document, the entry must be deleted and the model synced,
+because the lockout and permission fields that gate admin access would then be silently
+discarded. An allowlist entry is a claim that two apps *should* disagree; "we have not got
+round to it" is not that claim, and the guard's tests prove an entry suppresses only the
+fields it names.
 
 ## Tests that must pass
 
+Delivered as **20 tests across two files**, all passing.
+
+`__tests__/services/model-mirror.test.ts` - 12 tests proving the guard guards:
+
 | # | Test | Asserts |
 |---|---|---|
-| 1 | Run the mirror check on the repo as-is, after syncing | Passes cleanly |
-| 2 | Deliberately add a field to one side of a pair only, then build | **Build fails** with a clear message naming the file and field |
-| 3 | Deliberately add an enum value to one side only | **Build fails** |
-| 4 | Write a competition in the player app, edit it in the admin app, re-read it | Every field survives, including `gameMasterId` |
-| 5 | Read a Game-Master-created competition through the admin model | `gameMasterId` and `gameMasterName` are visible |
-| 6 | Read a deposit transaction through the admin model | `provider` and `providerTransactionId` are visible |
-| 7 | Write a `PlatformTransaction` with `admin_balance_add` from **both** apps | Both accept it |
-| 8 | An intentionally-different pair (`admin.model.ts`) | Does **not** fail the check |
+| 1 | Field missing from the admin copy | Reported as `main-only` |
+| 2 | Field missing from the main copy | Reported as `admin-only` |
+| 3 | **Enum value** missing from one side | Reported, with **no** field drift - the case a name-only check misses |
+| 4 | Nested path missing from one side (the `hero-settings` shape) | Reported at its dotted path |
+| 5 | Field missing inside an array subdocument | Reported at its dotted path |
+| 6 | **Cosmetic differences only** - comments, key order, whitespace, different `default` / `required` / `index` / `trim` / `maxlength`, reordered enum values | Reports **nothing** |
+| 7 | `type: { ... }` subdocument form vs the nested-path form | Reports **nothing** - both spell the same document shape |
+| 8 | An enum computed at runtime (`Object.values(...)`) | Listed as **not checked**, rather than guessed either way |
+| 9 | Allowlisted fields plus one field the entry does not name | Suppresses the two named; **still reports** the third |
+| 10 | `[String]` and `{ type: [String] }` | One field each, not an element |
+| 11 | Enum declared on an array element | Attached to the array's path |
+| 12 | **The real repository** | Zero drift, and at least 70 pairs compared so it cannot pass vacuously |
 
-Tests 2 and 3 are the important ones - they prove the guard actually guards, rather than
-being a script that always passes. Test 8 proves it will not cry wolf.
+Tests 1-5 prove it fails on drift that really happened. Tests 6-8 prove it will not cry
+wolf, which matters more than it sounds: a guard that blocks a commit for a reordered
+enum or a changed default gets bypassed, and then it guards nothing. Test 12 is what CI
+enforces, and its lower bound on pair count is deliberate - without it, a broken pair
+discovery would make the test pass by comparing nothing.
+
+`__tests__/helpers/mirror-drift-behaviour.test.ts` - 7 tests against a real MongoDB,
+establishing the severity table above rather than assuming it. These are the tests that
+corrected this document.
 
 ## Risks of making this change
 
 | Risk | Why | Mitigation |
 |---|---|---|
-| **Removing an enum value orphans data** | `platform-financials` drifts both ways; "making them match" by deletion would strand every document already carrying `admin_balance_add` | Add-only rule, stated in the script's own comments |
-| **Turning the guard on before syncing blocks all commits** | 10 pairs are drifted today | Sync first, enable second, prove third |
-| **A guard that flags legitimate differences gets disabled** | `admin.model.ts` has 24 correct admin-only fields | The allowlist is a required feature, not a nice-to-have (test 8) |
-| **Admin whole-document saves change behaviour** | After the fix the admin preserves fields it used to strip - that is the point, but it is a behaviour change | Covered by test 4 |
+| **Removing an enum value orphans data** | `platform-financials` drifts both ways; "making them match" by deletion would strand every document already carrying `admin_balance_add` | Add-only rule, stated in the guard's own output and in the allowlist's header comment |
+| **Turning the guard on before syncing blocks all commits** | 11 pairs were drifted | Sync first, enable second, prove third - which is the order followed |
+| **A guard that flags legitimate differences gets disabled** | `admin.model.ts` has 26 correct admin-only fields | The allowlist is a required feature, not a nice-to-have (tests 6-9) |
+| **Fields start being written where they previously were not** | This is the point of the fix, but it *is* a behaviour change: `failedAt`, `failedReason` and `withdrawalMethod` will now persist on failed withdrawals, and admin hero-settings edits will now take effect | Additive only. No existing field changes type, becomes required, or loses an enum value, so no existing document becomes invalid |
+| **Defaults differ between the two copies** | The admin copy of `hero-settings` uses `default: []` for the rich array fields, because the main app's defaults live in main-app-only helper files that the admin app must not import | Only matters if the admin app creates the singleton from nothing, which it does not in practice - the document exists. Recorded rather than papered over |
 
-Everything else here is additive. Adding a field to an admin schema stops it stripping
-that field; the guard can be disabled without touching application code.
+Everything here is additive. The guard can be disabled without touching application code.
 
 ## Estimated effort
 
-**3 to 5 working days**, revised up from 2 to 3. The script is roughly half a day; the
-rest is auditing 75 pairs rather than 21, building the allowlist, and syncing 10 drifted
-pairs carefully.
+**3 to 5 working days**, revised up from 2 to 3. The guard is roughly half a day; the rest
+is auditing 75 pairs rather than 21, building the allowlist, and syncing 11 drifted pairs
+carefully - `hero-settings` alone is 42 fields across a schema and two interfaces.
 
 ---
 
@@ -496,11 +642,29 @@ and should not delay it.
 
 ## Owner test checklist - Defect 2 (model mirrors)
 
+The guard, the sync and the tests are built. These are the checks that need a human and a
+running system.
+
+**Prove the guard guards**
+
+- [ ] Run `npm run check:mirrors`. It reports 75 pairs, 0 drifted, 1 allowlist entry.
+- [ ] Ask the developer to add a field to one side of a pair only. Confirm the check **fails** and names the file and field.
+- [ ] Ask the developer to remove one enum value from one side only. Confirm the check **fails** - this is the case that rejects writes.
+- [ ] Confirm `admin.model.ts`, which is intentionally different, does **not** fail.
+- [ ] Confirm a `git push` is blocked while drift exists (the new `.husky/pre-push` hook).
+
+**Prove the sync fixed real behaviour**
+
 - [ ] Open a Game-Master-created competition in the admin panel. Confirm the Game Master is shown correctly.
 - [ ] Open a card deposit in the admin transactions view. Confirm the payment provider is shown.
-- [ ] Edit a competition in the admin panel, save, then re-open it. Confirm no information was lost.
-- [ ] Ask the developer to demonstrate the build **failing** when a field is added to only one side of a mirrored pair.
-- [ ] Ask the developer to demonstrate the build **passing** for `admin.model.ts`, which is intentionally different.
+- [ ] **Force a withdrawal to fail.** Confirm the record now stores a failure time and the processor's reason - before this fix it stored neither.
+- [ ] **Edit a landing-page section in admin that was previously unwritable** - Game Master showcase, competition types, marketplace, journey and badges, or trust badges. Save, reload, confirm the change persisted. Before this fix the save reported success and changed nothing.
+- [ ] Mute challenge, social or messaging notifications as a player. Confirm the admin app now honours it.
+- [ ] Record an admin balance addition and a custom expense. Confirm both still work (their enum values were added to the main app's copy).
+
+**Decide the outstanding question**
+
+- [ ] Decide whether to **delete the 31 `.d.ts` and 31 `.d.ts.map` files** under `database/`. They are orphaned February build output, provably inert, and every one is stale. Recommendation: delete and add a `.gitignore` rule. Left in place pending this decision.
 
 ## Owner test checklist - Prerequisite A (already shipped)
 
@@ -511,10 +675,16 @@ and should not delay it.
 ## Automated gate
 
 - [ ] All 11 money tests from Defect 1 pass.
-- [ ] All 8 mirror tests from Defect 2 pass.
-- [ ] Mirror check runs in CI and blocks merges on drift.
+- [x] All **20** mirror tests from Defect 2 pass (12 guard tests, 8 drift-behaviour tests).
+- [x] Mirror check runs in CI as its own step and as a `pre-push` hook.
 - [ ] The 25 simulator-auth tests from Prerequisite A still pass.
 - [ ] Full production build succeeds (`next build`), per the project rule that fixes are verified in production build mode, not just dev.
+  - **Note, 1 Sep 2026:** the build **compiles** cleanly, but `next build` cannot complete
+    on the current machine - it fails exporting `/arena` with `ReplicaSetNoPrimary`
+    against MongoDB Atlas, because static export needs a reachable database. This is
+    environmental and unrelated to Stage 0, but it means the build gate cannot be
+    satisfied locally without database access. Worth resolving before Defect 1, whose
+    verification depends on it.
 
 ## On sign-off
 

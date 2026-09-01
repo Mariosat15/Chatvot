@@ -47,32 +47,50 @@ provider data, which removes an entire class of migration risk from this program
 
 ## 2. The mirror-drift CI check
 
-`scripts/check-model-mirrors.ts` compares each of the **75** mirrored model files against
-its `apps/admin` counterpart and **fails the build on divergence**. Delivered in X0.
+**Delivered 1 September 2026** as part of Stage 0 Defect 2. `tools/model-mirror/` compares
+each of the **75** mirrored model files against its `apps/admin` counterpart and **fails the
+build on divergence**. Run with `npm run check:mirrors`, or `npm run check:mirrors:list` for
+the full report.
+
+It lives in `tools/`, not `scripts/`, because `.cursorignore` excludes `scripts/` - which
+would make the guard unreadable to AI sessions expected to maintain it.
 
 Counts confirmed on 1 September 2026: 98 models in the main app, 89 in the admin app, 75
-mirrored in both, 38 byte-identical, and **10 with real schema field drift**. It must
-compare **enum values as well as field names** - `platform-financials.model.ts` drifts in
-both directions, and a missing enum value fails the write rather than merely hiding a field.
+mirrored in both, 38 byte-identical, and **11 with real schema drift**. It compares **enum
+values as well as field names**, because a missing enum value **fails the write** rather
+than merely dropping a field - `platform-financials.model.ts` drifted in both directions
+this way.
 
-Two requirements that are easy to miss:
+Requirements that turned out to matter:
 
-- **An allowlist of intentional differences.** `admin.model.ts` legitimately carries 24
-  admin-only RBAC fields and `withdrawal-request.model.ts` has admin-only fields. A guard
-  that flags those is noise, and a noisy guard gets disabled.
+- **Parse the AST, not a regex.** A regex over `field: {` misses nested paths, array
+  subdocuments and the `type: { ... }` subdocument form, all of which this codebase uses.
+  Getting any of those wrong means the guard either misses real drift or blocks commits on
+  imaginary drift.
+- **An allowlist of intentional differences.** `admin.model.ts` legitimately carries 26
+  admin-only staff fields. A guard that flags those is noise, and a noisy guard gets
+  disabled. In practice the allowlist needed exactly **one** entry -
+  `withdrawal-request.model.ts` had been expected to need one too, but its difference turned
+  out to be a live bug rather than a decision.
+- **Do not cry wolf.** Comments, key order, whitespace, differing `default` / `required` /
+  `index` values and reordered enum values must all pass silently. Four of the guard's 12
+  tests exist for this alone.
 - **Add-only when syncing.** Removing an enum value to "make them match" orphans every
   document already carrying it.
 
-Special cases: `database/models/whitelabel.model.d.ts` and
-`database/models/trading/wallet-transaction.model.d.ts` are hand-maintained third copies of
-the same shapes and must be included. Both are currently stale.
+Special case, and the plan changed here: there are **31 committed `.d.ts` files** under
+`database/` plus 31 `.d.ts.map`, not the two previously recorded. All are stale, and all are
+**orphaned build output** - each carries a `sourceMappingURL`, `tsconfig.json` is `noEmit`
+so nothing regenerates them, and TypeScript resolves the sibling `.ts` first, so they are
+inert. Updating them would create a *third* copy of every schema to maintain. The
+recommendation is deletion plus a `.gitignore` rule, pending owner sign-off.
 
 Out of scope but worth recording: 19 action files and 51 service files are duplicated the
 same way, and the money-critical ones have diverged badly (`competition-end.actions.ts` is
 72 KB against 38 KB). A field-comparison script cannot help there.
 
-The existing husky **pre-commit** hook runs `lint-staged` only; there is no `pre-push` hook
-yet, so one must be added.
+The guard runs in CI as its own step and in a new `.husky/pre-push` hook. The existing
+husky **pre-commit** hook runs `lint-staged` only.
 
 Without this check, **R2 recurs**. It has already happened once.
 

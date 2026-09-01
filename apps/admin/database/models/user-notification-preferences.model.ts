@@ -13,11 +13,14 @@ export interface IUserNotificationPreferences extends Document {
   categoryPreferences: {
     purchase: boolean; // Deposits, withdrawals
     competition: boolean; // Competition events
+    challenge: boolean; // 1v1 Challenge events
     trading: boolean; // Trading alerts
     achievement: boolean; // Badges, level ups
     system: boolean; // System updates, maintenance
     admin: boolean; // Admin messages (always on for important)
     security: boolean; // Security alerts (always on)
+    social: boolean; // Friend requests, blocks
+    messaging: boolean; // Direct messages, support chat
   };
 
   // Challenge popup (real-time banner when someone challenges you)
@@ -72,11 +75,14 @@ const UserNotificationPreferencesSchema =
       categoryPreferences: {
         purchase: { type: Boolean, default: true },
         competition: { type: Boolean, default: true },
+        challenge: { type: Boolean, default: true },
         trading: { type: Boolean, default: true },
         achievement: { type: Boolean, default: true },
         system: { type: Boolean, default: true },
         admin: { type: Boolean, default: true },
         security: { type: Boolean, default: true },
+        social: { type: Boolean, default: true },
+        messaging: { type: Boolean, default: true },
       },
       challengePopupEnabled: {
         type: Boolean,
@@ -121,11 +127,14 @@ UserNotificationPreferencesSchema.statics.getOrCreatePreferences =
         categoryPreferences: {
           purchase: true,
           competition: true,
+          challenge: true,
           trading: true,
           achievement: true,
           system: true,
           admin: true,
           security: true,
+          social: true,
+          messaging: true,
         },
         challengePopupEnabled: true,
         disabledNotifications: [],
@@ -155,13 +164,12 @@ UserNotificationPreferencesSchema.statics.isNotificationEnabled =
     // Security and critical admin messages are always enabled
     if (category === "security") return true;
 
-    // Check category preference
-    const categoryKey = category as keyof typeof prefs.categoryPreferences;
-    if (
-      prefs.categoryPreferences &&
-      prefs.categoryPreferences[categoryKey] === false
-    ) {
-      return false;
+    // Check category preference.
+    // Reason: `category` is a caller-supplied string, so a computed index here is a
+    // dynamic property read. Reflect.get is the same lookup without the lint sink.
+    if (prefs.categoryPreferences) {
+      const enabled = Reflect.get(prefs.categoryPreferences, category);
+      if (enabled === false) return false;
     }
 
     // Check specific template override

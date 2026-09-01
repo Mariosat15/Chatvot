@@ -58,30 +58,56 @@ Rating scale: Critical = real money moves wrongly or the platform is down; High 
 
 ### R2 - Admin mirror drift (CONFIRMED DEFECT, NOT A PREDICTION)
 
-**Status: this has already happened.** Four mirrored pairs were compared directly; all four differ, and three have fields missing from the admin copy entirely - absent from both the TypeScript interface **and** the Mongoose schema:
+**Status: this has already happened, and it is now fixed.** All 75 mirrored pairs were compared automatically on 1 September 2026. **Eleven** had real schema drift - absent from both the TypeScript interface **and** the Mongoose schema:
 
-| Mirrored model | Missing from the admin app's copy |
+| Mirrored model | Drift |
 |---|---|
-| `competition.model.ts` | `gameMasterId`, `gameMasterName` |
-| `wallet-transaction.model.ts` | `provider`, `providerTransactionId` |
-| `whitelabel.model.ts` | `brandingFiles` |
+| `platform-financials.model.ts` | **Bidirectional**, including two enum values the main app rejected |
+| `hero-settings.model.ts` | 42 fields missing from admin |
+| `admin.model.ts` | 26 admin-only fields - **deliberate**, and the one allowlist entry |
+| `withdrawal-request.model.ts` | `failedAt`, `withdrawalMethod`, `originalCardDetails.userPaymentOptionId` missing from **main** |
+| `user-bank-account.model.ts` | 5 Nuvei UPO fields missing from admin |
+| `user-notification-preferences.model.ts` | `categoryPreferences.challenge`, `.social`, `.messaging` missing from admin |
+| `whitelabel.model.ts` | `brandingFiles` missing from admin |
+| `trading/competition.model.ts` | `gameMasterId`, `gameMasterName` missing from admin |
+| `trading/wallet-transaction.model.ts` | `provider`, `providerTransactionId` missing from admin |
+| `trading/challenge-settings.model.ts` | `tiePrizeDistribution` missing from admin |
+| `trading/trading-position.model.ts` | `metadata` missing from admin |
 
-**What it causes today, stated precisely:**
-- **Always: invisibility.** The admin app cannot read these fields through its own models. Any admin screen appearing to show Game Master or payment provider data must be querying raw MongoDB to work around the gap.
-- **On whole-document writes only: data loss.** Mongoose strips unknown fields on replace/overwrite operations. Targeted `$set` updates do not strip other fields. So the realistic present-day symptom is missing display data, not vanished money.
+**What it causes today, stated precisely.** This was **measured** against a real MongoDB on 1 September 2026, and the result corrected two earlier claims in this register. Evidence: `__tests__/helpers/mirror-drift-behaviour.test.ts`.
 
-**Why it becomes critical when games are added:** `gameType` is exactly this kind of field. If the admin's copy lacks it and an admin saves a Trivia contest, the label can be erased. An unlabelled contest is treated as trading, so the finalizer attempts to close forex positions that do not exist, scores everyone zero, ranks them equal, and pays prizes to the wrong players - **silently** (see R3).
+Drift is a **write-side** defect, in descending order of harm:
 
-**Why very likely to recur:** 75 duplicated model files (plus 19 action and 51 service files), and two hand-maintained `.d.ts` declarations as third copies - `whitelabel.model.d.ts` is eleven fields behind and `wallet-transaction.model.d.ts` is missing several enum values. 10 model pairs are drifted today. No automated guard exists.
+| What happens | Severity |
+|---|---|
+| A **missing enum value rejects the entire write** | **Severe.** The record is never created. `platform-financials.model.ts` was exactly this |
+| The narrower app **cannot write the field.** `create`, assignment-then-`save` and `$set` all discard it silently and report success | **Severe.** The feature appears to work and does nothing |
+| `replaceOne` / `findOneAndReplace` **do delete** undeclared fields | High, but rare here |
+| An ordinary `save()` of a loaded document | **Harmless.** It `$set`s modified paths only. **This register previously claimed the opposite** |
+| Reads, hydrated or `.lean()` | **Harmless.** The field survives both. **This register previously claimed the opposite** |
 
-**Mitigation (Stage 0):**
-- Add `scripts/check-model-mirrors.ts` - a **CI check** that compares the field sets of each mirrored pair and fails the build on divergence. Cheapest fix in the whole programme; permanently eliminates the class of bug.
-- Sync the five fields that are already missing.
-- Include `whitelabel.model.d.ts` as a special case.
+The practical consequence: a read is worthless as evidence that two copies agree, because a `.lean()` read returns the field perfectly while every write through the same model drops it. Only the guard can tell you.
+
+**Why it becomes critical when games are added:** `gameType` is exactly this kind of field. If the admin's copy lacks it, the admin app **cannot set it** - so a Trivia contest created or edited through a path that must write the label ends up unlabelled. An unlabelled contest is treated as trading, so the finalizer attempts to close forex positions that do not exist, scores everyone zero, ranks them equal, and pays prizes to the wrong players - **silently** (see R3).
+
+**Why very likely to recur:** 75 duplicated model files (plus 19 action and 51 service files), and 31 committed `.d.ts` files acting as stale third copies. **11** model pairs were drifted.
+
+**Mitigation (Stage 0) - BUILT 1 September 2026:**
+- `tools/model-mirror/` - a **CI check plus pre-push hook** comparing field paths **and enum values** across every mirrored pair, extracted from the TypeScript AST rather than by regex. Fails the build with a message naming each file, field and side. Cheapest fix in the whole programme; permanently eliminates the class of bug.
+- All 11 drifted pairs synced, **add-only**. Removing an enum value to make two sides agree would orphan every document already storing it.
+- An **allowlist** for deliberate differences, which needed exactly one entry (`admin.model.ts`). Every other difference proved to be a real defect.
+- 20 tests: 12 proving the guard fails on real drift and does not cry wolf on cosmetic differences, 8 establishing the severity table above.
 - PR checklist item: "model changed - mirror updated?"
 - Every task in `03` lists both paths explicitly.
 
-**Detection:** integration test writing a contest from the main app, updating it from the admin app, asserting every field survives; plus a negative test proving the build **fails** when only one side of a pair is changed.
+**What the fix uncovered:** three live production bugs.
+1. Failed withdrawals were storing no failure time and no processor reason, because the main app wrote `failedAt` and `failedReason` into a schema declaring neither.
+2. Six landing-page sections - Game Master, competition types, marketplace, journey and badges, trust badges, enterprise case studies - were **not administrable at all**, because 42 fields were missing from the admin copy of `hero-settings.model.ts`.
+3. **Hero and branding images could never be recovered after a redeploy.** `whitelabel.brandingFiles` holds a base64 backup of every uploaded image for exactly that purpose, and the admin schema did not declare it, so the three routes that read it saw `undefined`. Deleting an image also left the database copy behind forever. Found by the typecheck rather than the guard: syncing the model removed four standing TypeScript errors (229 to 225).
+
+That third one is also the clearest illustration of *why* drift hides so well. `.lean()` and `toObject()` return an undeclared field perfectly, but **ordinary `doc.field` access returns `undefined`**, because Mongoose only defines getters for declared paths. A debug dump shows the value; the code beside it reads nothing.
+
+**Detection:** the guard runs in CI and blocks pushes. A test asserts the real repository has zero drift, with a lower bound on the number of pairs compared so it cannot pass vacuously.
 
 ---
 

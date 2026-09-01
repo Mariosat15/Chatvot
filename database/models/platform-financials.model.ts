@@ -19,7 +19,9 @@ export interface IPlatformTransaction extends Document {
     | "refund" // Funds paid back to a customer (money leaving the platform bank)
     | "retained_gm_fee" // GM referral fee retained by platform due to inactive GM subscription
     | "incident_compensation" // Platform expense for compensating users due to incidents
-    | "chargeback_loss"; // Platform funds lost when a chargeback is marked lost / completed
+    | "chargeback_loss" // Platform funds lost when a chargeback is marked lost / completed
+    | "admin_balance_add" // Admin adding funds to operating balance
+    | "custom_expense"; // Custom expense (e.g., marketing, software, etc.)
 
   amount: number; // Amount in credits (positive = platform gains, negative = platform pays out)
   amountEUR: number; // EUR equivalent at time of transaction
@@ -76,6 +78,20 @@ export interface IPlatformTransaction extends Document {
     originalFeePercentage: number; // What % GM would have earned
     subscriptionStatus: string; // Why GM didn't get paid (expired, suspended, etc.)
     referredUserIds?: string[]; // List of referred users in this competition
+  };
+
+  // For admin balance additions
+  balanceAddDetails?: {
+    source: string; // Where the money came from (e.g., "Bank transfer", "Personal funds")
+    reference?: string; // Transfer reference number
+  };
+
+  // For custom expenses
+  expenseDetails?: {
+    category: string; // Expense category (marketing, software, legal, etc.)
+    vendor?: string; // Who was paid (if applicable)
+    invoiceNumber?: string; // Invoice/receipt number
+    paymentMethod?: string; // How it was paid
   };
 
   // For incident compensations (platform expense)
@@ -145,6 +161,11 @@ const PlatformTransactionSchema = new Schema<IPlatformTransaction>(
         "retained_gm_fee",
         "incident_compensation",
         "chargeback_loss",
+        // Reason: written only by the admin app today, but a missing enum value is a
+        // write-time validation failure, not a hidden field. Both copies must accept
+        // every value either app can store.
+        "admin_balance_add",
+        "custom_expense",
       ],
       index: true,
     },
@@ -209,6 +230,16 @@ const PlatformTransactionSchema = new Schema<IPlatformTransaction>(
       originalFeePercentage: Number,
       subscriptionStatus: String,
       referredUserIds: [String],
+    },
+    balanceAddDetails: {
+      source: String,
+      reference: String,
+    },
+    expenseDetails: {
+      category: String,
+      vendor: String,
+      invoiceNumber: String,
+      paymentMethod: String,
     },
     compensationDetails: {
       incidentId: String,

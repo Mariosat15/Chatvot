@@ -83,7 +83,7 @@ money involved. **Fixed and signed off in X0, before anything else.**
 ### R2 - Admin mirror drift (a confirmed defect, not a prediction)
 
 Counted on 1 September 2026: **75 model files** exist twice - once in the main app, once in
-`apps/admin` - of which 38 are byte-identical and **10 have real schema field drift**. The
+`apps/admin` - of which 38 are byte-identical and **11 have real schema drift**. The
 original figure of "roughly 21" was an undercount. On top of the models, **19 action files
 and 51 service files** are duplicated the same way.
 
@@ -92,31 +92,61 @@ and 51 service files** are duplicated the same way.
 | `competition.model.ts` | Admin missing `gameMasterId`, `gameMasterName` |
 | `wallet-transaction.model.ts` | Admin missing `provider`, `providerTransactionId` |
 | `whitelabel.model.ts` | Admin missing `brandingFiles` |
-| `hero-settings.model.ts` | Admin missing 26 marketing / Game Master / journey fields |
+| `hero-settings.model.ts` | Admin missing **42** marketing / Game Master / journey / enterprise fields |
 | `user-bank-account.model.ts` | Admin missing 5 Nuvei UPO fields |
-| `platform-financials.model.ts` | **Bidirectional** - each side has enum values the other lacks |
+| `platform-financials.model.ts` | **Bidirectional** - each side has fields the other lacks, and the main app rejected two of the admin's enum values |
 | `trading/challenge-settings.model.ts` | Admin missing `tiePrizeDistribution` |
 | `trading/trading-position.model.ts` | Admin missing `metadata` |
-| `withdrawal-request.model.ts` | Admin-only: `failedAt`, `withdrawalMethod`, `userPaymentOptionId` |
+| `user-notification-preferences.model.ts` | Admin missing `categoryPreferences.challenge`, `.social`, `.messaging` |
+| `withdrawal-request.model.ts` | **Main** missing `failedAt`, `withdrawalMethod`, `originalCardDetails.userPaymentOptionId` |
 | `trading/competition-participant.model.ts` | Fields match; admin lacks 4 compound indexes |
 
-`whitelabel.model.d.ts` and `wallet-transaction.model.d.ts` are hand-maintained third
-copies. Both are stale - the first by eleven fields.
+There are also **31 committed `.d.ts` files** under `database/`, all stale, acting as third
+copies. They turned out to be orphaned build output from February 2026 and provably inert.
 
-**`platform-financials.model.ts` is the one to understand**, because it is a different and
-worse failure mode. Its `transactionType` enum drifts in both directions, and a missing
-enum value **fails the write** rather than merely hiding a field. Everywhere else the
-present-day symptom is "the admin cannot see this"; here it is "the write is rejected".
+#### What drift actually does - measured, and not what these documents used to say
 
-The failure mode is severe once a game label exists: **if the admin copy lacks it, an
-admin save can strip the label from a contest.** An unlabelled contest reads as trading,
-and trading settlement then runs against a provider contest - R3, silently, with prizes
-attached.
+Both plans claimed the main harm was that "the admin app cannot see the field" and that "a
+whole-document save strips it". Measured against a real MongoDB on 1 September 2026, both
+claims were wrong. Evidence: `__tests__/helpers/mirror-drift-behaviour.test.ts`.
 
-Fixed in X0, with `scripts/check-model-mirrors.ts` in CI so it cannot recur. Two
-requirements on that script: it must compare **enum values as well as field names**, and it
-must carry an **allowlist** - `admin.model.ts` legitimately differs by 24 RBAC fields, and a
-guard that cries wolf gets switched off. Syncing is **add-only**; removing an enum value to
+Drift is a **write-side** defect, in descending order of harm:
+
+1. A **missing enum value rejects the entire write.** The record is never created.
+2. The narrower app **cannot write the field** - `create`, assignment-then-`save` and `$set`
+   all discard it silently while reporting success.
+3. `replaceOne` / `findOneAndReplace` **do delete** undeclared fields.
+4. An ordinary `save()` does **not** delete them. The old claim was wrong.
+5. `.lean()` and `toObject()` do **not** hide them. The old claim was wrong.
+6. **But ordinary `doc.field` access returns `undefined`** - Mongoose defines getters only
+   for declared paths. Severe, and the subtlest of the six: the field survives a debug dump
+   while the code beside it reads nothing. This is how `whitelabel.brandingFiles` disabled
+   branding-image recovery in three admin routes without anyone noticing.
+
+**Why this matters for a provider integration specifically:** the danger to a game label is
+not that "an admin save strips it". It is that **the admin app cannot set it at all**. A
+path that must write `gameType` - or a provider's `roundId`, or a score - fails silently and
+reports success. An unlabelled contest reads as trading, and trading settlement then runs
+against a provider contest: R3, silently, with prizes attached.
+
+Harm 6 has a second edge that is specific to this programme. Callback-handling code will
+naturally be written as `if (round.providerRoundId === payload.roundId)` or
+`if (!round.contentSeed) { ... }`. If the field is missing from that app's copy, the read is
+`undefined` and the branch inverts - a replayed callback passes an idempotency check it
+should fail, or a seeded round is treated as unseeded. **Never gate provider logic on a
+field without confirming the guard passes on the model that declares it.**
+
+And point 1 is the reason the guard must compare **enum values**, not just field names. When
+provider result statuses (`completed`, `abandoned`, `expired`, `voided`) become an enum, a
+copy missing one of them will **reject** the result callback rather than mis-store it - so a
+finished round is never recorded, and the contest never settles.
+
+Fixed in X0 by **`tools/model-mirror/`** in CI and as a `pre-push` hook, so it cannot recur.
+(It lives in `tools/`, not `scripts/`, because `.cursorignore` excludes `scripts/`.) Two
+requirements held: it compares **enum values as well as field names**, and it carries an
+**allowlist** - `admin.model.ts` legitimately differs by 26 staff fields, and a guard that
+cries wolf gets switched off. In the end the allowlist needed exactly **one** entry; every
+other difference was a real defect. Syncing is **add-only**; removing an enum value to
 force a match orphans every document already carrying it.
 
 ### R3 - Trading settlement runs against a provider contest

@@ -49,8 +49,28 @@ get wrong and are worth stating here:
   never accept a request because configuration is missing**, and **test the route, not just
   the helper.**
 - **The finalize-time prize-pool safeguard does not mask the join-path defect.** It only
-  fires when the pool is too *high*. An under-counted pool is under-distributed silently.
-  Several documents used to claim the opposite; if you find that claim, it is stale.
+ fires when the pool is too *high*. An under-counted pool is under-distributed silently.
+ Several documents used to claim the opposite; if you find that claim, it is stale.
+- **Model mirror drift is a WRITE-side defect, with one read-side trap.** Measured against
+ a real MongoDB on 1 Sep 2026 (`__tests__/helpers/mirror-drift-behaviour.test.ts`, 8
+ tests). An ordinary `save()` does **not** strip fields the schema lacks, and `.lean()` /
+ `toObject()` do **not** hide them — several documents used to claim both, and both are
+ stale. What actually happens: a **missing enum value rejects the whole write**, and the
+ app with the narrower copy **cannot write the field at all**, silently, while reporting
+ success. **The exception, and the subtlest part: ordinary `doc.field` access returns
+ `undefined`**, because Mongoose defines getters only for declared paths — so the field
+ survives a debug dump while the code beside it reads nothing and takes the wrong branch.
+ Two rules follow: **compare enum values, not just field names**, and **never cite a read
+ as evidence that two copies agree.**
+- **Defect 2 is built** (1 Sep 2026, awaiting owner test): the guard in
+ `tools/model-mirror/`, all 11 drifted pairs synced, 20 tests, and the
+ `mongodb-memory-server` replica-set harness the money tests need. It found **three** live
+ production bugs on the way — failed withdrawals recording no time or reason, six
+ landing-page sections that could not be edited at all, and hero/branding images that
+ could never be restored after a redeploy. The third was found by **diffing the typecheck
+ against a pre-sync baseline** (admin app 229 → 225 errors); errors that *disappear* after
+ a sync mark code that was already reaching for a field its schema denied it. Worth
+ repeating whenever models are synced.
 - **The order is Defect 2 before Defect 1**, so the mirror guard exists before Defect 1
   edits the admin copy of the entry path.
 
@@ -87,10 +107,11 @@ On every change during implementation:
 | `External game plans/10-external-only-programme.md` section 3, `PROGRESS.md`'s X-phase table, and section 15 of `ChartVolt-External-Games-Plan.html` | The X0–X12 phase list, effort figures and the 18–24 week total appear in all three. Changing one means changing all three |
 | `External game plans/11`–`18` and their `New games plan` sources (`01`, `02`, `07`, `08`, `09`, `11`, `12`, `13`, `15`) | The external chapters restate load-bearing facts — line numbers, the five finalization entry points, the eight missing RBAC IDs — rather than duplicating whole chapters. **If a fact changes in the source, change it in the restatement too**, or the two plans will disagree about the codebase |
 | `14-implementation-phases.md`, `00-README.md`, `PROGRESS.md` and the roadmap sections of both New-Games-Plan HTMLs | Phase list, effort estimates and totals appear in five places. Changing one means changing all five. Currently: Stage 0 (**6–9 days**), P1–P7 (**14–19 weeks**), plus the unscheduled per-game marketplace. The partner HTML's timeline SVG is drawn to scale — rescale the bars, not just the labels. Note the partner HTML must not carry the Stage 0 figure at all |
-| The mirror-drift counts, wherever they appear | `New games plan` `00-README.md`, `12-risk-register.md`, `00a`; `External game plans` `17-risk-register.md`, `18-migration-testing-rollout.md`. Verified 1 Sep 2026: **75 mirrored model pairs, 10 drifted**, plus 19 action and 51 service files. Earlier documents said "~21 files, 3 drifted" — if you find that phrasing anywhere, it is stale |
+| The mirror-drift counts, wherever they appear | `New games plan` `00-README.md`, `12-risk-register.md`, `00a`, `03-data-model-changes.md`; `External game plans` `17-risk-register.md`, `18-migration-testing-rollout.md`; both internal HTMLs. Measured 1 Sep 2026 by the guard itself: **75 mirrored model pairs, 11 drifted** (all now synced), plus 19 action and 51 service files and **31 stale committed `.d.ts` files**. Earlier documents said "~21 files, 3 drifted", or "10 drifted" — both are stale. Do not hand-count these; run `npm run check:mirrors:list` |
 | `External game plans/19-game-masters.md`, `New games plan/15` section 5, and the Game Master sections of the internal HTMLs | The Game Master system is the same system in both scenarios. `19` sections 1–4 are the authoritative analysis; `New games plan/15` section 5 restates it. **A fact corrected in one must be corrected in the other** |
 | `ChartVolt-New-Games-Plan.html` and `-Partners.html` | The partner version must **never** mention Stage 0, the duplicate join paths, the admin mirror drift, or any current defect |
-| Any model change | Exists twice: `database/models/` and `apps/admin/database/models/`. Update both in the same commit |
+| Any model change | Exists twice: `database/models/` and `apps/admin/database/models/`. Update both in the same commit. **`npm run check:mirrors` now enforces this** in CI and on `git push`, comparing field paths *and* enum values. Do not "fix" a failure by deleting an enum value to make two sides agree — that orphans every document already storing it. Add to the side that lacks it. Deliberate differences go in `tools/model-mirror/allowlist.ts` **with a reason** |
+| The 31 committed `.d.ts` files under `database/` | Orphaned February 2026 build output, all stale, and **inert** — TypeScript resolves the sibling `.ts` first. Proven by removing all 62 files (`.d.ts` + `.d.ts.map`) and getting a byte-identical set of 16 pre-existing type errors. **Do not treat them as a third copy to maintain.** Deletion is recommended and awaiting owner sign-off; until then, leave them alone |
 
 ## Direction of travel (owner, 30 Aug 2026)
 

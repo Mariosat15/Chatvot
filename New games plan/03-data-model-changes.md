@@ -6,9 +6,13 @@ Every schema change, field by field. **All changes are additive** - no field is 
 
 ## 0. The mirror discipline (read first)
 
-The admin app keeps its own copies of the models. A field added in one app and not the other causes Mongoose to **silently strip** it on write from the app that lacks it. That is data loss with no error message.
+The admin app keeps its own copies of the models. A field added in one app and not the other means the app that lacks it **cannot write that field** - the write is discarded silently and the operation reports success. And if an *enum value* is missing rather than a field, the write is **rejected outright**, so the record is never created at all.
 
-**Rule for every task below: change both paths in the same commit.** Where a `.d.ts` exists, that is a third file.
+Measured 1 September 2026; see `12-risk-register.md` R2 for the full severity table and `__tests__/helpers/mirror-drift-behaviour.test.ts` for the evidence.
+
+**Rule for every task below: change both paths in the same commit.** `npm run check:mirrors` enforces this in CI and on `git push`, so forgetting it fails the build rather than reaching production.
+
+Note on `.d.ts` files: 31 of them are committed under `database/`, but they are stale, orphaned build output and TypeScript ignores them in favour of the sibling `.ts`. Do **not** treat them as a third file to maintain. They are pending deletion - see `00a`.
 
 | Main app | Admin mirror | Extra |
 |---|---|---|

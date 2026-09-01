@@ -56,6 +56,12 @@ export interface ITradingPosition extends Document {
   lastPriceUpdate: Date; // When price was last updated
   priceUpdateCount: number; // How many times updated
 
+  // Flexible metadata for extra info (e.g., simulator mode)
+  metadata?: {
+    simulatorMode?: boolean;
+    [key: string]: unknown;
+  };
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -201,6 +207,11 @@ const TradingPositionSchema = new Schema<ITradingPosition>(
       required: true,
       default: 0,
       min: 0,
+    },
+    // Flexible metadata for extra info (e.g., simulator mode)
+    metadata: {
+      type: Schema.Types.Mixed,
+      default: {},
     },
   },
   {

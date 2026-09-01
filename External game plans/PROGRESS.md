@@ -30,11 +30,29 @@ from it change facts stated in this folder:
   production. Recorded here as **R27** in `17-risk-register.md`, because this programme adds
   a provider webhook and the same class of mistake is available there.
 - Re-verification corrected four facts this folder restates from the `New games plan`. The
-  mirror count is **75 pairs with 10 drifted**, not ~21 with 3; the finalize-time safeguard
+  mirror count is **75 pairs with 11 drifted**, not ~21 with 3; the finalize-time safeguard
   does **not** mask the prize-pool gap; there are **four** competition-entry writers; and the
   challenge *accept* path skips restriction and fraud checks on a route real players use.
   `17-risk-register.md` R1 and R2 and `18-migration-testing-rollout.md` section 2 have been
   updated. **Stage 0 is now 6-9 days, not 5-8.**
+- **Stage 0 Defect 2 (model mirrors) is built** as of 1 September 2026, and it changed a
+  load-bearing fact this folder repeats. Drift is a **write-side** defect, measured against
+  a real MongoDB rather than assumed. An ordinary `save()` does **not** strip undeclared
+  fields, and `.lean()` and `toObject()` do **not** hide them - both earlier claims were
+  wrong. What actually happens: a **missing enum value rejects the write**, and the
+  narrower app **cannot write the field at all**, silently, while reporting success.
+
+  One read *does* break, and it is the one application code uses: **ordinary `doc.field`
+  access returns `undefined`**, because Mongoose defines getters only for declared paths.
+  So a drifted field survives a debug dump intact while the code beside it reads nothing
+  and takes the wrong branch. Assume nothing from a read; run `npm run check:mirrors`.
+
+  **This matters more to this programme than to the in-house one.** Provider integration
+  introduces exactly the enum that breaks this way - the four terminal round statuses in
+  `01-provider-contract-specification.md` (`completed`, `abandoned`, `expired`, `voided`).
+  A copy missing one of them **rejects the result callback** rather than mis-storing it, so
+  a finished round is never recorded and the contest never settles. The guard
+  (`tools/model-mirror/`) compares enum values for this reason.
 
 ### THE OPEN DECISION - which scenario
 
@@ -383,8 +401,8 @@ provider webhook this plan specifies.
 
 | Was | Is |
 |---|---|
-| ~21 mirrored files, 3 drifted | **75 mirrored model files, 10 drifted.** Plus 19 action and 51 service files duplicated |
-| Mirror drift means "the admin cannot see the field" | Also **"the write is rejected"** - `platform-financials.model.ts` drifts bidirectionally, and a missing *enum value* fails validation |
+| ~21 mirrored files, 3 drifted | **75 mirrored model files, 11 drifted.** Plus 19 action and 51 service files duplicated, and 31 stale committed `.d.ts` files |
+| Mirror drift means "the admin cannot see the field" | **Wrong as stated, measured 1 Sep 2026.** `.lean()` and `toObject()` do not hide the field, and an ordinary `save()` does not strip it. Drift is **write-side**: a missing *enum value* rejects the write outright, and the narrower app cannot write the field at all - silently, while reporting success. The one exception is real and severe: **ordinary `doc.field` access reads `undefined`**, which is how three admin routes lost the ability to restore branding images after a redeploy |
 | The finalize-time safeguard masks the prize-pool gap | It does **not**. It only fires when the pool is too *high*, so an under-counted pool is under-distributed with no correction and no log |
 | Two competition join paths | **Four** entry writers, one of which has no callers. Also the challenge *accept* path skips restriction and fraud checks, on a route real players use |
 | Stage 0 is 5-8 days | **6-9 days** |

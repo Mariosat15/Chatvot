@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -165,6 +165,10 @@
   .chk div:last-child{border-bottom:none}
   .box{flex:none;width:15px;height:15px;border:2px solid var(--navy3);border-radius:3px;
     margin-top:3px}
+  /* Already satisfied - shown ticked so the remaining work is obvious at a glance. */
+  .box.done{background:var(--green);border-color:var(--green);position:relative}
+  .box.done::after{content:"";position:absolute;left:3px;top:0;width:5px;height:9px;
+    border-right:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(40deg)}
 
   /* ---------- key-value strip ---------- */
   .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;
@@ -453,7 +457,8 @@
 
       <div class="cal plain">
         <div class="t">In plain words</div>
-        <p>ChartVolt is really <b>two applications</b> &mdash; the player app and the admin app &mdash; sharing one database. But each keeps its <b>own separate copy of the blueprint</b> describing what a competition is, what a payment is, and so on. There are <b>75 of these duplicated blueprints</b> &mdash; counted on 1 September 2026, up from the &ldquo;about 21&rdquo; this document first claimed &mdash; and <b>10 of them are out of step today</b>. If someone updates one copy and forgets the other, the second app goes <b>blind</b> to that information.</p>
+        <p>ChartVolt is really <b>two applications</b> &mdash; the player app and the admin app &mdash; sharing one database. But each keeps its <b>own separate copy of the blueprint</b> describing what a competition is, what a payment is, and so on. There are <b>75 of these duplicated blueprints</b> &mdash; counted on 1 September 2026, up from the &ldquo;about 21&rdquo; this document first claimed &mdash; and <b>11 of them were out of step</b>. If someone updates one copy and forgets the other, the second app <b>cannot write</b> that piece of information. Not &ldquo;writes it wrongly&rdquo; &mdash; the write is thrown away, in silence, and the screen reports success.</p>
+        <p style="margin-bottom:0"><b>Fixed on 1 September 2026.</b> All 11 were brought back into line, and an automatic check now blocks any push that lets them drift again.</p>
       </div>
 
       <figure>
@@ -505,47 +510,91 @@
           <text x="450" y="186" text-anchor="middle" font-family="Consolas, monospace" font-size="11" fill="#a02a38">gameType</text>
           <text x="450" y="202" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">field, a quiz can be mistaken for a trade</text>
         </svg>
-        <figcaption><b>This is confirmed, not predicted.</b> Four blueprint pairs were compared directly; all four differ, and three have fields missing from the admin copy entirely &mdash; absent from both the type definition and the database schema.</figcaption>
+        <figcaption><b>This is confirmed, not predicted.</b> All 75 blueprint pairs were compared automatically on 1 September 2026. Eleven had real differences &mdash; fields or permitted values absent from one side's type definition <i>and</i> its database schema.</figcaption>
       </figure>
 
       <div class="tw"><table>
-        <thead><tr><th>Blueprint</th><th>Fields the admin app cannot see</th></tr></thead>
+        <thead><tr><th>Blueprint</th><th>What was out of step</th></tr></thead>
         <tbody>
+          <tr><td><code>platform-financials.model.ts</code></td><td><b>Both directions</b>, including two permitted values the player app rejected &mdash; the case that refuses the write</td></tr>
+          <tr><td><code>hero-settings.model.ts</code></td><td><b>42 fields</b>, making six landing-page sections un-editable</td></tr>
+          <tr><td><code>withdrawal-request.model.ts</code></td><td>Failure time, failure reason and method &mdash; missing from the <b>player</b> app. A live bug</td></tr>
           <tr><td><code>competition.model.ts</code></td><td><code>gameMasterId</code>, <code>gameMasterName</code></td></tr>
           <tr><td><code>wallet-transaction.model.ts</code></td><td><code>provider</code>, <code>providerTransactionId</code></td></tr>
           <tr><td><code>whitelabel.model.ts</code></td><td><code>brandingFiles</code></td></tr>
+          <tr><td><code>user-bank-account.model.ts</code></td><td>5 payout-account fields</td></tr>
+          <tr><td><code>user-notification-preferences.model.ts</code></td><td>Challenge, social and messaging mute settings &mdash; so the admin app ignored a player's choice</td></tr>
+          <tr><td><code>challenge-settings.model.ts</code></td><td><code>tiePrizeDistribution</code> &mdash; how a tied challenge splits the prize</td></tr>
+          <tr><td><code>trading-position.model.ts</code></td><td><code>metadata</code></td></tr>
+          <tr><td><code>admin.model.ts</code></td><td>26 staff fields &mdash; <b>deliberate</b>, and the one allowed exception</td></tr>
           <tr><td><code>competition-participant.model.ts</code></td><td>Content differs; field names still match</td></tr>
         </tbody>
       </table></div>
 
-      <h4>What it causes today &mdash; stated honestly</h4>
+      <h4>What it causes &mdash; measured, not assumed</h4>
+
+      <div class="cal gold">
+        <div class="t">This document used to say something different, and it was wrong</div>
+        <p style="margin-bottom:0">It previously said the harm was that &ldquo;the admin app cannot see the field&rdquo;, and that saving a record would strip it. Both claims were tested against a real database on 1 September 2026 and <b>both were wrong</b>. Reading works fine. An ordinary save keeps everything. The real harm is on <b>writing</b>, and in one respect it is worse than the old description.</p>
+      </div>
+
       <div class="grid g2">
         <div class="card">
-          <h4 style="margin-top:0">Always: things become invisible</h4>
-          <p style="margin-bottom:0">The admin app cannot read these fields through its own blueprint. Right now that means it cannot see which Game Master created a competition, or which payment provider handled a transaction. Any admin screen that <i>appears</i> to show this must be reading the raw database to work around the gap.</p>
+          <h4 style="margin-top:0">Worst: the write is refused outright</h4>
+          <p style="margin-bottom:0">If the two copies disagree about the <b>list of permitted values</b> for a field &mdash; not the field itself, just its allowed values &mdash; the database <b>rejects the whole record</b>. Nothing is saved. This had really happened: two kinds of money movement recorded by the admin app would have failed validation in the player app. <b>A check that only compares field names cannot see this at all</b>, which is why the guard compares values too.</p>
         </div>
         <div class="card">
-          <h4 style="margin-top:0">Only sometimes: information is lost</h4>
-          <p style="margin-bottom:0">Data is stripped only when a whole record is replaced wholesale, not when specific fields are updated. So the realistic symptom today is <b>&ldquo;the admin does not display this&rdquo;</b>, not <b>&ldquo;money vanished&rdquo;</b>. Worth fixing, not worth panicking about.</p>
+          <h4 style="margin-top:0">Nearly as bad: the write vanishes</h4>
+          <p style="margin-bottom:0">The app with the older copy <b>cannot save that field</b>. It does not fail, warn, or log &mdash; it reports success and stores nothing. A feature built on it looks like it works and does nothing at all. That is not hypothetical: see the withdrawal finding below.</p>
         </div>
       </div>
 
       <div class="cal bad">
-        <div class="t">Why this becomes serious the moment games are added</div>
-        <p>The games plan introduces <code>gameType</code> &mdash; the label saying whether a contest is trading or trivia. It is exactly the kind of field that drifts. If the admin blueprint lacks it and an admin edits a quiz contest, the label can be silently erased. An unlabelled contest is treated as a trading contest, so the system tries to close trading positions that do not exist, gives every player a score of zero, ranks them all equal, and <b>pays prize money to the wrong players &mdash; with no error message and nothing in the logs.</b> This is the single worst failure in the whole project, and this defect is its most likely cause.</p>
+        <div class="t">A live bug this uncovered &mdash; nobody was looking for it</div>
+        <p style="margin-bottom:0">When a withdrawal fails, the player app records <b>when</b> it failed and <b>why the processor declined it</b>. Its blueprint declared neither field, and the reason field was missing from <i>both</i> copies. So for as long as this code has been live, <b>every failed withdrawal has been stored with no time and no reason</b>, and the admin screens meant to show them had nothing to show. Both fields have been added to both copies. This is the strongest argument for the guard: it found a real defect that no one had reported.</p>
       </div>
 
-      <h4>The fix</h4>
+      <div class="cal plain">
+        <div class="t">And six landing-page sections could not be edited at all</div>
+        <p style="margin-bottom:0">The admin copy of the landing-page blueprint was missing <b>42 fields</b> &mdash; the Game Master showcase, the competition types, the marketplace preview, the journey and badges section, the trust badges and the enterprise case studies. The admin panel is where that content is <i>supposed</i> to be edited. An administrator changing any of it got a success message and no change whatsoever.</p>
+      </div>
+
+      <div class="cal bad">
+        <div class="t">Why this becomes serious the moment games are added</div>
+        <p>The games plan introduces <code>gameType</code> &mdash; the label saying whether a contest is trading or trivia. It is exactly the kind of field that drifts. If the admin blueprint lacks it, the admin app <b>cannot set the label at all</b>, so a quiz contest created or edited through that path ends up unlabelled. An unlabelled contest is treated as a trading contest, so the system tries to close trading positions that do not exist, gives every player a score of zero, ranks them all equal, and <b>pays prize money to the wrong players &mdash; with no error message and nothing in the logs.</b> This is the single worst failure in the whole project, and this defect is its most likely cause.</p>
+      </div>
+
+      <h4>The fix &mdash; built on 1 September 2026</h4>
       <ol>
-        <li><b>Add an automatic guard</b> &mdash; a small script that compares all 75 blueprint pairs and <b>refuses to build</b> when they differ, with a clear message naming the file and field. It runs on every build. It has to compare <b>lists of allowed values</b> as well as field names, and it has to carry a short list of differences that are <b>deliberate</b> &mdash; the admin blueprint genuinely has 24 extra fields about staff permissions, and a guard that complains about those would soon be switched off.</li>
-        <li><b>Sync the five fields</b> that are already missing.</li>
-        <li><b>Include the third file</b> &mdash; there is also a hand-maintained type file that must match.</li>
-        <li><b>Add a review checklist item</b>: &ldquo;blueprint changed &mdash; was the mirror updated?&rdquo;</li>
+        <li><b>An automatic guard</b> that compares all 75 blueprint pairs and <b>refuses to build</b> when they differ, naming the file, the field and which side is missing it. It runs in the shared build pipeline and blocks any <code>git push</code>. It compares <b>lists of allowed values</b> as well as field names &mdash; without that it would have missed the worst case entirely.</li>
+        <li><b>A short list of differences that are deliberate.</b> The admin blueprint genuinely has 26 extra fields about staff permissions and profiles, and a guard that complains about those would soon be switched off. In the end that list needed <b>exactly one entry</b> &mdash; every other difference turned out to be a real defect, which was not the expectation going in.</li>
+        <li><b>All 11 out-of-step pairs brought back into line</b>, by <b>adding</b> only. Deleting a permitted value to make two copies agree would orphan every record already using it.</li>
+        <li><b>20 tests.</b> Twelve prove the guard actually catches drift &mdash; and, just as important, that it stays quiet about harmless differences like reordered lists, changed comments or different default values. A guard that blocks work for cosmetic reasons gets bypassed, and then it protects nothing. The other eight are the measurements that corrected this document.</li>
+        <li><b>A review checklist item</b>: &ldquo;blueprint changed &mdash; was the mirror updated?&rdquo;</li>
       </ol>
 
       <div class="cal good">
-        <div class="t">Best value in the whole programme</div>
-        <p>This guard is roughly half a day of work and it <b>permanently eliminates an entire category of bug</b> that has already caught this project at least three times. It keeps paying for itself long after the games work is finished.</p>
+        <div class="t">Best value in the whole programme &mdash; and it proved it immediately</div>
+        <p style="margin-bottom:0">This guard was roughly half a day of work and it <b>permanently eliminates an entire category of bug</b> that has already caught this project at least three times. Before it was even finished it had found <b>three live defects nobody had reported</b>. It keeps paying for itself long after the games work is finished.</p>
+      </div>
+
+      <div class="cal bad">
+        <div class="t">The three live defects it found on the way</div>
+        <ol style="margin-bottom:0">
+          <li><b>Failed withdrawals recorded neither the time nor the reason.</b> The payment provider was reporting why a payout failed and the platform was discarding it, so the admin screen had nothing to show and nobody could tell a customer what had gone wrong.</li>
+          <li><b>Six landing-page sections could not be edited at all.</b> Game Master, competition types, the marketplace, journey and badges, trust badges and the enterprise case studies. Saving a change returned a success message and changed nothing.</li>
+          <li><b>Hero and branding images could never be recovered after a deployment.</b> The platform keeps a copy of every uploaded image in the database precisely so images survive a redeploy onto fresh disks &mdash; and the code that reads that copy could not see it, so the images simply stayed missing. Deleting an image was the mirror image of the same fault: the file went, the database copy stayed forever.</li>
+        </ol>
+      </div>
+
+      <div class="cal plain">
+        <div class="t">Why nobody spotted these</div>
+        <p style="margin-bottom:0">Worth understanding, because it explains why a guard was needed rather than more careful review. When a field is missing from one blueprint, that side <b>still reads the value correctly</b> in most contexts &mdash; it shows up in logs and debug output exactly as expected. But the ordinary way code reads a field returns <b>nothing at all</b>, so the program quietly takes the wrong branch. The evidence and the code disagree, and the evidence looks fine. That is the whole reason this survived unnoticed for months, and why the check has to be automatic.</p>
+      </div>
+
+      <div class="cal plain">
+        <div class="t">One decision still needed from you</div>
+        <p style="margin-bottom:0">There are <b>62 leftover files</b> in the codebase from a one-off command run in February. They are automatically generated copies of the blueprints, they are all out of date, and nothing reads them &mdash; proven by removing them all and confirming the code still compiles identically. Keeping them would mean maintaining a <i>third</i> copy of every blueprint, which is the very problem this defect is about. <b>The recommendation is to delete them</b> and add a rule so they cannot come back. They have been left in place because deleting files is your call, not ours.</p>
       </div>
 
       <!-- ---------- OPTIONAL ---------- -->
@@ -599,9 +648,9 @@
       <h4>Automated gate</h4>
       <div class="chk">
         <div><span class="box"></span><span>All 11 money tests pass.</span></div>
-        <div><span class="box"></span><span>All 8 blueprint tests pass.</span></div>
-        <div><span class="box"></span><span>The blueprint guard runs on every build and blocks merges when things drift.</span></div>
-        <div><span class="box"></span><span>The full production build succeeds &mdash; not just the development server.</span></div>
+        <div><span class="box done"></span><span>All <b>20</b> blueprint tests pass. <span class="b ok">Done 1 Sep</span></span></div>
+        <div><span class="box done"></span><span>The blueprint guard runs on every build and blocks pushes when things drift. <span class="b ok">Done 1 Sep</span></span></div>
+        <div><span class="box"></span><span>The full production build succeeds &mdash; not just the development server. <b>Currently blocked by the environment, not by this work:</b> the code compiles cleanly, but the build cannot finish on the development machine because it needs to reach the live database and cannot. Worth resolving before Defect 1, which needs the same check.</span></div>
         <div><span class="box"></span><span>The 25 tests from the security fix still pass.</span></div>
       </div>
 
@@ -1798,7 +1847,7 @@
 
 <footer class="foot">
   <span><b>ChartVolt</b> &mdash; New Games Plan &middot; Plan only, no code changed &middot; Based on six audits of the live codebase</span>
-  <span>17 August 2026 &middot; v1.2, revised 1 September 2026 (Stage 0 re-verified against the code; simulator security fix recorded)</span>
+  <span>17 August 2026 &middot; v1.3, revised 1 September 2026 (Stage 0 Defect 2 built; drift severity corrected by measurement; two live defects found and fixed)</span>
 </footer>
 
 <script>

@@ -67,12 +67,18 @@ export interface ISectionVisibility {
   hero: boolean;
   features: boolean;
   stats: boolean;
+  liveStats: boolean;
   howItWorks: boolean;
+  gameMaster: boolean;
+  competitionTypes: boolean;
   competitions: boolean;
   challenges: boolean;
   leaderboard: boolean;
+  activityFeed: boolean;
   marketplace: boolean;
+  journeyBadges: boolean;
   testimonials: boolean;
+  trustBadges: boolean;
   adminShowcase: boolean;
   whiteLabel: boolean;
   pricing: boolean;
@@ -260,6 +266,20 @@ export interface IHeroSettings extends Document {
   challengesCTAText: string;
   challengesCTALink: string;
 
+  // Game Master Showcase
+  gameMasterTitle: string;
+  gameMasterSubtitle: string;
+  gameMasterDescription: string;
+  gameMasterBenefits: Record<string, unknown>[];
+  gameMasterCTAText: string;
+  gameMasterCTALink: string;
+
+  // Competition Types Showcase
+  competitionTypesTitle: string;
+  competitionTypesSubtitle: string;
+  competitionTypesDescription: string;
+  competitionTypes: Record<string, unknown>[];
+
   // Leaderboard Preview
   leaderboardTitle: string;
   leaderboardSubtitle: string;
@@ -269,7 +289,32 @@ export interface IHeroSettings extends Document {
   // Marketplace Preview
   marketplaceTitle: string;
   marketplaceSubtitle: string;
+  marketplaceDescription: string;
+  marketplaceItems: Record<string, unknown>[];
+  marketplaceCTAText: string;
+  marketplaceCTALink: string;
   marketplaceShowItems: number;
+
+  // Journey & Badges
+  journeyBadgesTitle: string;
+  journeyBadgesSubtitle: string;
+  journeyBadgesDescription: string;
+  journeyBadgeFeatures: Record<string, unknown>[];
+  journeyBadgesCTAText: string;
+  journeyBadgesCTALink: string;
+
+  // Trust Badges (Landing Page)
+  trustBadges: Record<string, unknown>[];
+  trustBadgesTitle: string;
+
+  // Live Data Settings
+  liveDataSettings: {
+    showRealStats: boolean;
+    showActivityFeed: boolean;
+    showLeaderboardPreview: boolean;
+    activityFeedRefreshRate: number;
+    statsRefreshRate: number;
+  };
 
   // Testimonials
   testimonialsTitle: string;
@@ -444,12 +489,27 @@ export interface IHeroSettings extends Document {
   enterpriseContactPhone: string;
   enterpriseContactCTAText: string;
 
+  // Enterprise Case Studies
+  enterpriseCaseStudies: Record<string, unknown>[];
+  enterpriseCaseStudiesTitle: string;
+  enterpriseCaseStudiesSubtitle: string;
+
+  // Demo Scheduling
+  enterpriseDemoScheduling: {
+    enabled: boolean;
+    calendlyUrl: string;
+    buttonText: string;
+  };
+
   // Enterprise Section Visibility
   enterpriseSectionVisibility: {
     hero: boolean;
     trustBadges: boolean;
     whiteLabel: boolean;
+    platformCapabilities: boolean;
+    gameMasterProgram: boolean;
     adminShowcase: boolean;
+    caseStudies: boolean;
     pricing: boolean;
     contact: boolean;
     footer: boolean;
@@ -995,6 +1055,35 @@ const HeroSettingsSchema = new Schema<IHeroSettings>(
     challengesCTAText: { type: String, default: "Start a Challenge" },
     challengesCTALink: { type: String, default: "/challenges" },
 
+    // Game Master Showcase
+    gameMasterTitle: { type: String, default: "BECOME A GAME MASTER" },
+    gameMasterSubtitle: {
+      type: String,
+      default: "Host competitions. Build a business. Earn from every trade.",
+    },
+    gameMasterDescription: {
+      type: String,
+      default:
+        "Game Masters are the entrepreneurial backbone of the platform. Subscribe, create competitions & challenges, invite players, and earn referral fees from every prize pool. Build your own competitive trading empire.",
+    },
+    gameMasterBenefits: { type: [Object], default: [] },
+    gameMasterCTAText: { type: String, default: "Become a Game Master" },
+    gameMasterCTALink: { type: String, default: "/sign-up" },
+
+    // Competition Types Showcase
+    competitionTypesTitle: { type: String, default: "6 WAYS TO COMPETE" },
+    competitionTypesSubtitle: {
+      type: String,
+      default:
+        "Choose your battlefield. Every competition type tests a different edge.",
+    },
+    competitionTypesDescription: {
+      type: String,
+      default:
+        "Whether you are a steady grinder, a high-risk sniper, or a consistency machine - there is a competition format designed for your style.",
+    },
+    competitionTypes: { type: [Object], default: [] },
+
     // Leaderboard
     leaderboardTitle: { type: String, default: "TOP TRADERS" },
     leaderboardSubtitle: { type: String, default: "The elite of the elite" },
@@ -1008,7 +1097,46 @@ const HeroSettingsSchema = new Schema<IHeroSettings>(
     // Marketplace
     marketplaceTitle: { type: String, default: "TRADING ARSENAL" },
     marketplaceSubtitle: { type: String, default: "Upgrade your style" },
+    marketplaceDescription: {
+      type: String,
+      default:
+        "Customize your trading experience with exclusive items, boosters, and premium tools from the marketplace.",
+    },
+    marketplaceItems: { type: [Object], default: [] },
+    marketplaceCTAText: { type: String, default: "Browse Marketplace" },
+    marketplaceCTALink: { type: String, default: "/marketplace" },
     marketplaceShowItems: { type: Number, default: 4 },
+
+    // Journey & Badges
+    journeyBadgesTitle: { type: String, default: "YOUR TRADING JOURNEY" },
+    journeyBadgesSubtitle: {
+      type: String,
+      default: "Level up, earn badges, and climb the ranks",
+    },
+    journeyBadgesDescription: {
+      type: String,
+      default:
+        "Every trade brings you closer to the next milestone. Track your progression, unlock achievements, and prove your trading mastery.",
+    },
+    journeyBadgeFeatures: { type: [Object], default: [] },
+    journeyBadgesCTAText: { type: String, default: "Start Your Journey" },
+    journeyBadgesCTALink: { type: String, default: "/sign-up" },
+
+    // Trust Badges (Landing Page)
+    trustBadges: { type: [Object], default: [] },
+    trustBadgesTitle: {
+      type: String,
+      default: "Trusted By Traders Worldwide",
+    },
+
+    // Live Data Settings
+    liveDataSettings: {
+      showRealStats: { type: Boolean, default: true },
+      showActivityFeed: { type: Boolean, default: true },
+      showLeaderboardPreview: { type: Boolean, default: true },
+      activityFeedRefreshRate: { type: Number, default: 30000 },
+      statsRefreshRate: { type: Number, default: 60000 },
+    },
 
     // Testimonials
     testimonialsTitle: { type: String, default: "TRADER TESTIMONIALS" },
@@ -1170,12 +1298,18 @@ const HeroSettingsSchema = new Schema<IHeroSettings>(
       hero: { type: Boolean, default: true },
       features: { type: Boolean, default: true },
       stats: { type: Boolean, default: true },
+      liveStats: { type: Boolean, default: true },
       howItWorks: { type: Boolean, default: true },
+      gameMaster: { type: Boolean, default: true },
+      competitionTypes: { type: Boolean, default: true },
       competitions: { type: Boolean, default: true },
       challenges: { type: Boolean, default: true },
       leaderboard: { type: Boolean, default: true },
+      activityFeed: { type: Boolean, default: true },
       marketplace: { type: Boolean, default: true },
+      journeyBadges: { type: Boolean, default: true },
       testimonials: { type: Boolean, default: false },
+      trustBadges: { type: Boolean, default: true },
       adminShowcase: { type: Boolean, default: true },
       whiteLabel: { type: Boolean, default: true },
       pricing: { type: Boolean, default: false },
@@ -1519,10 +1653,29 @@ const HeroSettingsSchema = new Schema<IHeroSettings>(
       hero: { type: Boolean, default: true },
       trustBadges: { type: Boolean, default: true },
       whiteLabel: { type: Boolean, default: true },
+      platformCapabilities: { type: Boolean, default: true },
+      gameMasterProgram: { type: Boolean, default: true },
       adminShowcase: { type: Boolean, default: true },
+      caseStudies: { type: Boolean, default: false },
       pricing: { type: Boolean, default: true },
       contact: { type: Boolean, default: true },
       footer: { type: Boolean, default: true },
+    },
+
+    // Enterprise Case Studies
+    enterpriseCaseStudies: { type: [Object], default: [] },
+    enterpriseCaseStudiesTitle: { type: String, default: "Success Stories" },
+    enterpriseCaseStudiesSubtitle: {
+      type: String,
+      default:
+        "See how our clients are succeeding with their trading platforms",
+    },
+
+    // Demo Scheduling
+    enterpriseDemoScheduling: {
+      enabled: { type: Boolean, default: false },
+      calendlyUrl: { type: String, default: "" },
+      buttonText: { type: String, default: "Schedule a Demo" },
     },
 
     // Auth Page (Login/Signup) Settings

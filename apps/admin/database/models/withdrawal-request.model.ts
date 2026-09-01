@@ -128,7 +128,11 @@ export interface IWithdrawalRequest extends Document {
   metadata?: Record<string, any>;
 
   // Failure tracking
+  // Reason: the Nuvei withdrawal route writes failedAt and failedReason together on
+  // every failure path. failedReason was declared in neither schema, so the reason a
+  // withdrawal failed was silently discarded on both sides.
   failedAt?: Date;
+  failedReason?: string;
 
   // Withdrawal method (alternative to payoutMethod for display purposes)
   withdrawalMethod?: string;
@@ -342,6 +346,7 @@ const WithdrawalRequestSchema = new Schema<IWithdrawalRequest>(
 
     // Failure tracking
     failedAt: Date,
+    failedReason: String,
 
     // Withdrawal method
     withdrawalMethod: String,

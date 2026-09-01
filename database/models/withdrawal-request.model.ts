@@ -38,6 +38,12 @@ export interface IWithdrawalRequest extends Document {
   rejectedAt?: Date;
   failureReason?: string;
   failureDetails?: string;
+  // Reason: the Nuvei withdrawal route writes failedAt and failedReason on every
+  // failure path, but this schema never declared them, so Mongoose silently dropped
+  // both. Failed withdrawals therefore carried no timestamp and no processor reason.
+  failedAt?: Date;
+  failedReason?: string;
+  withdrawalMethod?: string;
 
   // Payout Details
   payoutMethod: string; // 'stripe_refund', 'stripe_payout', 'bank_transfer', 'original_method'
@@ -55,6 +61,7 @@ export interface IWithdrawalRequest extends Document {
     expMonth?: number; // Expiration month
     expYear?: number; // Expiration year
     country?: string; // Card country
+    userPaymentOptionId?: string; // Nuvei UPO ID for card payouts
   };
 
   // Stripe Connect (for direct payouts to user's connected account)
@@ -242,6 +249,7 @@ const WithdrawalRequestSchema = new Schema<IWithdrawalRequest>(
       expMonth: Number,
       expYear: Number,
       country: String,
+      userPaymentOptionId: String,
     },
 
     // Stripe Connect
@@ -331,6 +339,13 @@ const WithdrawalRequestSchema = new Schema<IWithdrawalRequest>(
       type: Schema.Types.Mixed,
       default: {},
     },
+
+    // Failure tracking
+    failedAt: Date,
+    failedReason: String,
+
+    // Withdrawal method
+    withdrawalMethod: String,
 
     // KYC Status
     kycVerified: {

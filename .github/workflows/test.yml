@@ -30,6 +30,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Reason: run before the tests so drift fails with a message naming the fields,
+      # rather than as an assertion inside the suite. The suite checks it too, so this
+      # step is for readability, not coverage.
+      - name: Check admin model mirrors
+        run: npm run check:mirrors
+
+      # Reason: mongodb-memory-server downloads a MongoDB binary on first use. Without
+      # a cache that is a fresh ~100MB download on every run, which is slow and makes
+      # the suite depend on an external host being up.
+      - name: Cache MongoDB binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}
+
       - name: Run unit tests
         run: npx vitest run --reporter=json --reporter=default --outputFile=test-results.json
 

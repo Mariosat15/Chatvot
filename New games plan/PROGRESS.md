@@ -1,4 +1,4 @@
-# PROGRESS - New Games Plan
+﻿# PROGRESS - New Games Plan
 
 > **Read this file first in any new chat about the games plan.**
 >
@@ -15,8 +15,8 @@
 
 | | |
 |---|---|
-| **Status** | **STAGE 0 STARTED.** Prerequisite A shipped; Defects 1 and 2 not started |
-| **Next action** | **Defect 2** (model mirror sync + CI guard), beginning with the test-database decision |
+| **Status** | **STAGE 0 IN PROGRESS.** Prerequisite A shipped. **Defect 2 built, awaiting owner test.** Defect 1 not started |
+| **Next action** | Owner runs the Defect 2 test checklist in `00a`, and decides the `.d.ts` question. Then **Defect 1** |
 | **Owner instruction on record** | "I will need to start today" (1 Sep 2026), superseding "don't start anything" (17 Aug 2026) |
 | **Last updated** | 1 September 2026 |
 
@@ -28,9 +28,33 @@ route authentication. It was found while re-verifying Defect 1, not planned. It 
 security fix, unrelated to games, and is recorded in
 `00a-STAGE-0-prerequisite-fixes-DO-FIRST.md`.
 
-**Recommended order agreed with the owner (1 Sep 2026):** Defect 2 before Defect 1. Defect
-2 is lower risk and self-contained, and it puts the mirror guard in place before Defect 1
-edits the admin copy of the entry path.
+**Order agreed with the owner (1 Sep 2026):** Defect 2 before Defect 1. Defect 2 is lower
+risk and self-contained, and it puts the mirror guard in place before Defect 1 edits the
+admin copy of the entry path.
+
+**Defect 2 is now built.** The guard, the sync of all 11 drifted pairs and 20 tests are
+in place; `npm run check:mirrors` reports zero drift. Three things it turned up are worth
+reading before anything else, because they contradict what the plan said:
+
+1. **Drift is a write-side defect, not a read-side one.** Measured, not assumed. An
+   ordinary `save()` does not strip undeclared fields and `.lean()` does not hide them -
+   the plan claimed both. What actually happens is that a missing enum value **rejects
+   the write**, and the narrower app **cannot write the field at all**, silently, while
+   reporting success.
+2. **The one read that DOES break is the one code actually uses.** `.lean()` and
+   `toObject()` return an undeclared field perfectly, but ordinary `doc.field` access
+   returns `undefined`, because Mongoose defines getters only for declared paths. So a
+   debug dump shows the value while the line beside it reads nothing. This is the single
+   best explanation of why drift survives review, and it is now pinned by a test.
+3. **It found three live production bugs nobody was looking for.** Failed withdrawals
+   stored with no failure time and no processor reason; six landing-page sections that
+   could not be edited at all; and hero and branding images that could never be restored
+   after a redeploy, because the admin app could not see the database backup that exists
+   for exactly that purpose. The third was found by the typecheck, not the guard - syncing
+   `whitelabel.model.ts` removed four standing TypeScript errors (229 to 225).
+
+**One decision is outstanding:** whether to delete the 31 `.d.ts` and 31 `.d.ts.map` files
+under `database/`. See the work log entry below.
 
 ---
 
@@ -89,7 +113,7 @@ Legend: `NOT STARTED` / `IN PROGRESS` / `BUILT - AWAITING OWNER TEST` / `SIGNED 
 | Stage | Description | Estimate | Status | Signed off |
 |---|---|---|---|---|
 | **Prereq A** | Simulator route authentication (unplanned; live security fix, commit `d5d3a328`) | 1 day | `BUILT - AWAITING OWNER TEST` | - |
-| **Stage 0 / Defect 2** | Model mirror sync (10 drifted pairs of 75) + CI guard with allowlist | 3-5 days | `NOT STARTED` | - |
+| **Stage 0 / Defect 2** | Model mirror sync (**11** drifted pairs of 75) + CI guard with allowlist + test-database harness | 3-5 days | `BUILT - AWAITING OWNER TEST` | - |
 | **Stage 0 / Defect 1** | Single contest-entry path across all four writers, plus challenge accept (1b) | 3-4 days, +1 for 1b | `NOT STARTED` | - |
 | **Phase 1** | Foundation: game label, general score, game registry, ranking seam, trading module, **Game Master insert game label (a gate)** | 2.5-3.5 weeks | `NOT STARTED` | - |
 | **Phase 2** | The Trivia game: question bank, gameplay, scoring, settlement, player screens | 2-3 weeks | `NOT STARTED` | - |
@@ -143,20 +167,28 @@ the owner confirms each item, with the date.
 
 ### Defect 2 - model mirrors
 
+- [ ] `npm run check:mirrors` reports 75 pairs, 0 drifted
+- [ ] Check **demonstrated failing** when a field is added to one side of a mirrored pair only
+- [ ] Check **demonstrated failing** when an *enum value* is removed from one side only
+- [ ] Check **demonstrated passing** for `admin.model.ts`, which is intentionally different
+- [ ] `git push` **demonstrated blocked** by the new `pre-push` hook while drift exists
 - [ ] Game Master shown correctly on a GM-created competition in admin
 - [ ] Payment provider shown on a card deposit in admin transactions
-- [ ] Competition edited in admin, saved, reopened - nothing lost
-- [ ] Build **demonstrated failing** when a field is added to one side of a mirrored pair only
-- [ ] Build **demonstrated failing** when an *enum value* is added to one side only
-- [ ] Build **demonstrated passing** for `admin.model.ts`, which is intentionally different
+- [ ] A **forced withdrawal failure** now records a failure time and processor reason
+- [ ] A **landing-page section that was previously unwritable** (Game Master, competition types, marketplace, journey and badges, or trust badges) saves and persists
+- [ ] A player muting challenge / social / messaging notifications is honoured by the admin app
+- [ ] Admin balance addition and custom expense still record correctly
+- [ ] **Decision given** on deleting the 31 `.d.ts` and 31 `.d.ts.map` files under `database/`
 
 ### Automated gate
 
 - [ ] All 11 money tests pass
-- [ ] All 8 mirror tests pass
-- [ ] Mirror check runs on every build and blocks merges on drift
+- [x] All **20** mirror tests pass (12 guard, 8 drift-behaviour)
+- [x] Mirror check runs in CI and as a `pre-push` hook
 - [ ] The 25 simulator-auth tests from Prerequisite A still pass
-- [ ] Full production build succeeds (`next build`) - not just dev mode
+- [ ] Full production build succeeds (`next build`) - not just dev mode.
+      **Currently blocked by environment**, not by Stage 0: the build compiles but fails
+      exporting `/arena` because MongoDB Atlas is unreachable from this machine.
 
 **Owner sign-off date:** _not yet given_
 
@@ -176,39 +208,37 @@ Confirmed by the owner and by inspection on 17 August 2026.
 | Git remote | `github.com/Mariosat15/Chatvot.git`, working branch `main` |
 | Staging environment | **None identified.** Local development and production only |
 
-### Test database - DECISION NOW DUE (this is the current blocker)
+### Test database - DECIDED AND BUILT (1 September 2026)
 
-Stage 0 has started, so this is no longer deferred. **It blocks the first line of code on
-Defect 1** and should be settled before Defect 2 finishes.
+**Decision: `mongodb-memory-server` configured as a single-node `MongoMemoryReplSet`.**
+Chosen by the owner over the two Atlas options because it needs no cloud dependency, runs
+in GitHub Actions where CI already runs `npx vitest run`, and cannot touch any real data.
 
-Verified on 1 September 2026: **`mongodb-memory-server` is not installed.** It appears only
-in a comment inside `__tests__/helpers/db-mock.ts`, which *mocks* the database rather than
-running one. Every one of the five existing test files tests pure functions. `apps/admin`
-has no test setup at all. So today there is **no way to execute a transaction in a test**,
-and every money path in Defect 1 runs inside one.
+Built and proven:
 
-**Recommendation: `mongodb-memory-server` configured as `MongoMemoryReplSet`.** It is the
-only option that also works in GitHub Actions, where CI already runs `npx vitest run` on
-push to `main`.
+| | |
+|---|---|
+| Harness | `__tests__/helpers/mongo-test-server.ts` - start, stop, clear, plus `waitForPrimary` so a transaction is never attempted before the replica set has elected one |
+| Proof | `__tests__/helpers/mongo-test-server.test.ts` - a two-collection transaction that commits atomically, the same transaction aborting and rolling back atomically, and no data leaking between tests |
+| First real use | `__tests__/helpers/mirror-drift-behaviour.test.ts`, which measured what model drift actually does and corrected the plan |
 
-Local and production are **separate databases**, so there is no risk of tests
-touching live customer data. Good.
+**Install note worth keeping:** `npm install mongodb-memory-server` failed at first on a
+**pre-existing** peer-dependency conflict - `vitest@3.2.4` against
+`@vitest/coverage-v8@4.0.18`. The versions were aligned to `3.2.4` and all existing tests
+were re-run to confirm nothing regressed. This was latent before Stage 0 and would have
+broken the next person to add a test dependency.
 
-A dedicated **test** database is still worth having, but for tidiness rather than
-safety. Stage 0's tests create competitions, run 20 simultaneous paid joins, debit
-wallets, finalize contests and pay prizes. Pointed at the local development
-database, that leaves behind junk contests and altered balances which make manual
-testing confusing.
+**CI note:** `mongodb-memory-server` downloads a MongoDB binary on first use, so
+`.github/workflows/test.yml` now caches `~/.cache/mongodb-binaries`. Without it every CI
+run re-downloads roughly 100 MB and the suite depends on an external host being up.
 
-Options, to be chosen when Stage 0 starts:
+For historical reference, the options that were considered:
 
 | Option | Notes |
 |---|---|
 | Separate database name in the same Atlas cluster (`MONGODB_URI_TEST`) | Cheapest. Still a replica set, so transactions work |
 | Separate free Atlas cluster | Strongest isolation |
-| `mongodb-memory-server` locally | No cloud dependency, fastest. **Must use `MongoMemoryReplSet`, not the standalone default** - see the transaction note below |
-
-**Owner decision on record (17 Aug 2026):** decide this at Stage 0 kickoff, not now.
+| `mongodb-memory-server` locally | **Chosen.** No cloud dependency, fastest. **Must use `MongoMemoryReplSet`, not the standalone default** - see the transaction note below |
 
 ### CRITICAL TECHNICAL NOTE - transactions need a replica set
 
@@ -286,6 +316,111 @@ Template:
 
 ---
 
+### 1 Sep 2026 - Stage 0 Defect 2 (model mirrors) - BUILT, AWAITING OWNER TEST
+
+**Shipped:** the mirror guard, the sync of every drifted pair, and the test database the
+rest of Stage 0 depends on. `npm run check:mirrors` reports **75 pairs, 0 drifted, 1
+allowlist entry**. Nothing is deployed - this is code and tests only.
+
+**Files touched:**
+- `tools/model-mirror/{parse-schema,compare,allowlist,cli}.ts` - the guard, four small
+  modules so the comparison logic is importable by tests
+- `__tests__/helpers/mongo-test-server.ts` + `.test.ts` - real in-process MongoDB replica
+  set, with a proof that a two-collection transaction commits and rolls back atomically
+- `__tests__/helpers/mirror-drift-behaviour.test.ts` - 8 tests measuring what drift does
+- `__tests__/services/model-mirror.test.ts` - 12 tests proving the guard guards
+- 11 model pairs synced across `database/models/` and `apps/admin/database/models/`
+- `.husky/pre-push`, `.github/workflows/test.yml`, `package.json`
+
+**Three corrections to the plan, all measured rather than argued:**
+
+1. **Drift is a write-side defect.** The plan said a whole-document `save()` strips fields
+   the schema lacks, and that the admin app "cannot see" drifted fields. Both are wrong.
+   An ordinary `save()` `$set`s modified paths only and preserves the rest; `.lean()` and
+   `toObject()` return the field intact. What actually happens is worse in one way and
+   narrower in another: a **missing enum value rejects the whole write**, and the
+   narrower app **cannot write the field at all** - silently, while reporting success.
+   This is why the guard compares enum *values* and not just field names.
+2. **But `doc.field` DOES read as `undefined`** - the one read that breaks is the one
+   application code actually uses, because Mongoose defines getters only for declared
+   paths. This was not understood when correction 1 was first written and it matters
+   more: it is how a drifted field passes a debug inspection and still takes the wrong
+   branch at runtime. It is what made live bug 3 below invisible.
+3. **Eleven pairs were drifted, not ten.** The new one is
+   `user-notification-preferences.model.ts`: the admin app cannot represent a player
+   muting challenge, social or messaging notifications, so it ignores that choice.
+
+**Three live production bugs found while syncing:**
+
+- **Failed withdrawals record neither a time nor a reason.**
+  `app/api/nuvei/withdrawal/route.ts` writes `failedAt` and `failedReason` on all three of
+  its failure paths. The main app's schema declared neither, and `failedReason` was
+  declared in **neither** app's copy. Both have been added to both copies. Same class of
+  bug as the `WalletTransaction.referenceId` mismatch under Defect 1, and found the same
+  way - which is the strongest argument for the guard, since nobody was looking for it.
+- **Six landing-page sections were not administrable.** `hero-settings.model.ts` was
+  missing **42** fields from the admin copy, not 26 - the Game Master showcase,
+  competition types, marketplace, journey and badges, trust badges and enterprise case
+  studies. The admin app is the editor for this content and saves it with
+  `Object.assign(settings, body)` then `save()`, so an admin posting any of those fields
+  got a success response and no change.
+- **Hero and branding images could never be restored after a redeploy.**
+  `whitelabel.brandingFiles` is a Map holding a base64 copy of every uploaded branding
+  image, kept for exactly the case where the container comes back with an empty disk. The
+  admin schema did not declare it, so `settings?.brandingFiles?.get(name)` read
+  `undefined` in `app/api/assets/hero/[filename]/route.ts:52` and
+  `app/api/assets/images/[filename]/route.ts:96` - the restore path never ran and the
+  image stayed 404. The delete path,
+  `app/api/hero-settings/upload/route.ts:186-187`, had the mirror-image fault: the disk
+  file was removed and the database copy left behind permanently. **Found by the
+  typecheck, not the guard** - syncing `whitelabel.model.ts` took the admin app from 229
+  standing TypeScript errors to 225, and all four were this field. Worth noting as a
+  method: after syncing, diff the typecheck against the pre-sync baseline, because errors
+  that *disappear* mark code that was already reaching for a field its schema denied it.
+
+**Deviated from plan, three times, each recorded deliberately:**
+
+1. **The guard lives in `tools/model-mirror/`, not `scripts/`.** `.cursorignore` excludes
+   `scripts/`, which makes the guard unreadable and unwritable to AI sessions - a poor
+   home for maintained, tested code that future sessions must extend.
+2. **The 31 stale `.d.ts` files will be deleted, not updated.** The plan said "two stale
+   `.d.ts` files, update them". There are **31 `.d.ts` plus 31 `.d.ts.map`**, all
+   committed in February 2026, all stale, and all **orphaned build output** - each carries
+   a `sourceMappingURL`, and `tsconfig.json` is `noEmit`, so nothing regenerates them.
+   They are also **inert**: TypeScript resolves the sibling `.ts` first. Proven by moving
+   all 62 out of the repository, which produced a byte-identical set of 16 pre-existing
+   type errors and a clean compile. Updating them by hand would create a *third* copy of
+   every schema to keep in step - exactly the disease this defect is about.
+   **They have been left in place**, because deleting tracked files is an owner decision.
+   It is on the Defect 2 checklist in `00a`.
+3. **The allowlist has one entry, not the several anticipated.** `withdrawal-request.model.ts`
+   was expected to need one; it turned out to be a real bug instead. Only `admin.model.ts`
+   is genuinely deliberate, and the entry records both why and the condition that would
+   invalidate it - if the main app ever writes an Admin document, the lockout and
+   permission fields would be silently discarded.
+
+**Owner tested:** not yet. The checklist is in `00a`, "Owner test checklist - Defect 2".
+
+**Deferred:**
+- The `.d.ts` deletion, pending the decision above.
+- The 19 duplicated action files and 51 duplicated service files. Explicitly out of Stage
+  0 scope, and a field-comparison guard cannot help with them.
+- Index drift. `competition-participant.model.ts` has matching fields but the main app has
+  four compound indexes the admin copy lacks. The guard does not compare indexes; this is
+  a performance difference, not a correctness one.
+
+**Blocker found, unrelated to Stage 0 but it obstructs the sign-off gate:** `next build`
+**compiles** cleanly but cannot complete on this machine. It fails exporting `/arena` with
+`ReplicaSetNoPrimary` against MongoDB Atlas, because static export needs a reachable
+database. The gate requires a passing production build, and Defect 1's verification will
+need the same. Worth resolving before Defect 1 starts.
+
+**Next chat should:** run the Defect 2 owner checklist in `00a`, settle the `.d.ts`
+question, then start **Defect 1** - the four competition-entry writers - beginning with
+the money tests now that the transaction harness exists.
+
+---
+
 ### 1 Sep 2026 - Stage 0 started; Prerequisite A shipped - PARTIALLY SHIPPED
 
 **Trigger:** owner said "I will need to start today" and asked what the two defects were
@@ -329,7 +464,9 @@ existed but was called by one route, and it accepted the header alone when
    the email check and fraud gate, and a `join-batch` route with no callers at all
 4. **75 mirrored model pairs, not ~21; 10 drifted, not 3.** Plus `platform-financials.model.ts`
    drifting in *both* directions, which fails writes rather than hiding fields, and 19
-   action + 51 service files duplicated the same way (out of scope, now recorded)
+   action + 51 service files duplicated the same way (out of scope, now recorded).
+   *(Superseded the same day by the Defect 2 entry above: the count is **11** drifted, and
+   the mechanism of harm was measured and turned out to be write-side, not read-side.)*
 
 **Three new defects found:**
 
