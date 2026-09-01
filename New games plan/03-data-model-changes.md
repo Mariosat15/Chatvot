@@ -12,7 +12,7 @@ Measured 1 September 2026; see `12-risk-register.md` R2 for the full severity ta
 
 **Rule for every task below: change both paths in the same commit.** `npm run check:mirrors` enforces this in CI and on `git push`, so forgetting it fails the build rather than reaching production.
 
-Note on `.d.ts` files: 31 of them are committed under `database/`, but they are stale, orphaned build output and TypeScript ignores them in favour of the sibling `.ts`. Do **not** treat them as a third file to maintain. They are pending deletion - see `00a`.
+Note on `.d.ts` files: there is nothing to maintain here any more. 112 stale declaration files (57 `.d.ts` + 55 `.d.ts.map`) were committed by accident in February 2026, were orphaned build output that TypeScript ignored in favour of the sibling `.ts`, and were **all deleted on 1 September 2026**. A `.gitignore` rule prevents recurrence. If you ever see one reappear, it is a stray `tsc -d` run, not a file to update - see `00a`.
 
 | Main app | Admin mirror | Extra |
 |---|---|---|

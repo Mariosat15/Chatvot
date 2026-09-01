@@ -98,3 +98,18 @@ desktop.ini
 
 # eslint output
 eslint-output.txt
+
+# Emitted TypeScript declarations.
+# Reason: 57 of these plus their source maps were committed by accident in Feb 2026,
+# went stale immediately, and were mistaken for a third copy of the models that had to
+# be kept in step with database/ and apps/admin/database/. They never were: TypeScript
+# resolves the sibling .ts first, so they were inert. Deleted 1 Sep 2026 after proving
+# removal left the typecheck byte-identical (16 errors main, 225 admin, before and after).
+# tsconfig is noEmit, so nothing regenerates them - these rules only stop a stray
+# `tsc -d` run putting them back.
+# Note the negation below: types/global.d.ts is hand-written and must stay tracked.
+*.d.ts
+*.d.ts.map
+!types/global.d.ts
+!next-env.d.ts
+!websocket-server/dist/index.d.ts

@@ -78,12 +78,22 @@ Requirements that turned out to matter:
 - **Add-only when syncing.** Removing an enum value to "make them match" orphans every
   document already carrying it.
 
-Special case, and the plan changed here: there are **31 committed `.d.ts` files** under
-`database/` plus 31 `.d.ts.map`, not the two previously recorded. All are stale, and all are
-**orphaned build output** - each carries a `sourceMappingURL`, `tsconfig.json` is `noEmit`
-so nothing regenerates them, and TypeScript resolves the sibling `.ts` first, so they are
-inert. Updating them would create a *third* copy of every schema to maintain. The
-recommendation is deletion plus a `.gitignore` rule, pending owner sign-off.
+Special case, now closed: there were **112 committed declaration files** (57 `.d.ts` + 55
+`.d.ts.map`) - not the two originally recorded, and not the 31 + 31 recorded at the first
+re-verification, which had searched only `database/` and missed 26 files under `lib/`. All
+were stale **orphaned build output**: each carried a `sourceMappingURL`, `tsconfig.json` is
+`noEmit` so nothing regenerated them, and TypeScript resolves the sibling `.ts` first, so
+they were inert. **All 112 were deleted on 1 September 2026** with owner approval, plus a
+`.gitignore` rule. Typecheck was identical before and after (16 errors main, 225 admin).
+
+Two were kept, and the rule is the reusable part: delete a `.d.ts` only if a sibling `.ts`
+exists and it is not under `dist/`. The sibling `.ts` is what proves the file is a redundant
+copy rather than a declaration in its own right. That kept `types/global.d.ts` (hand-written)
+and `websocket-server/dist/index.d.ts` (separate build).
+
+**Do not treat declaration files as a third copy of the models to maintain.** Updating them
+by hand was explicitly rejected - it would have created exactly the disease this chapter is
+about.
 
 Out of scope but worth recording: 19 action files and 51 service files are duplicated the
 same way, and the money-critical ones have diverged badly (`competition-end.actions.ts` is

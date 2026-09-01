@@ -31,6 +31,9 @@ defects, all recorded below.
 | 1 Sep 2026 | **New, live in production:** the main app writes `failedAt` and `failedReason` on every failed withdrawal into a schema declaring neither, and `failedReason` was in **neither** app's copy. Every failed withdrawal has been stored with no failure time and no processor reason |
 | 1 Sep 2026 | **New:** the `hero-settings` drift is 42 fields, not 26, and made the Game Master, competition-types, marketplace, journey-badges, trust-badge and enterprise landing sections **un-administrable** rather than merely invisible |
 | 1 Sep 2026 | **Correction:** there are **31** stale `.d.ts` files plus 31 `.d.ts.map`, not two. All are orphaned build output from February and provably inert. Plan changed from "update" to "delete", pending owner sign-off |
+| 1 Sep 2026 | **Correction to that correction, and the count that is right:** the 31 figure counted only `database/`. Repo-wide there were **57 `.d.ts` + 55 `.d.ts.map` = 112 files**, the rest under `lib/services/` and `lib/actions/`. **Owner approved deletion and all 112 are gone**, with a `.gitignore` rule and two deliberate exceptions. Typecheck identical before and after: 16 errors main, 225 admin |
+| 1 Sep 2026 | **Owner decision:** joining a competition is **allowed outside market hours**; only trading itself is gated. Unifying the gates would otherwise have adopted Gate B's behaviour and blocked weekend sign-ups for Monday contests - a revenue regression introduced by a bug fix. Now locked in by test 12 |
+| 1 Sep 2026 | **Proven, was previously an inference:** competition entry-fee ledger rows carry **no competition reference at all**. `referenceId` is not in the schema and `competitionId` is never set. Measured against a real MongoDB in `__tests__/services/entry-fee-ledger.test.ts`. Harm is a broken audit trail, not a wrong balance - checked, not assumed |
 
 ---
 
@@ -266,6 +269,37 @@ shape, and it is the only one of the set with a live security consequence for re
    (`competitionId` / `challengeId`), backfill nothing (there is nothing to backfill - the
    old value was never stored), and align the `currency` value between paths.
 
+### The market-hours question - DECIDED by the owner, 1 September 2026
+
+Unifying the two gates forces a product decision, because Gate B blocks joining outside
+market hours and Gate A does not. Taking the union blindly would have adopted Gate B's
+behaviour and **stopped players signing up at the weekend for a contest starting Monday** -
+a revenue loss introduced by a bug fix, which is exactly the kind of regression a "just
+apply every check from both sides" instruction produces.
+
+**Decision: joining is allowed at any time. Only trading itself is gated by market hours.**
+
+The reasoning, recorded so it is not quietly reversed:
+
+- **Joining is a commercial act, not a trading act.** It moves credits into a prize pool. No
+  position is opened and no price is needed, so there is nothing for a closed market to make
+  unsafe.
+- **The contest may not have started yet.** `upcoming` competitions are the common case for
+  weekend sign-ups, and the start time already governs when trading may begin.
+- **The existing market-hours check stays exactly where it is** - on order placement in
+  `order.actions.ts`. That is the guard that matters and it is untouched by this work.
+
+**Implementation consequence:** the unified `contest-entry.service.ts` performs the union of
+the *security* checks from both gates - email verification, account restrictions, the fraud
+gate and the level requirement - and **does not** carry Gate B's market-hours check at all.
+The `source` parameter therefore no longer needs a market-hours exemption for the simulator,
+which removes the one differing behaviour it existed to express. Keep the parameter for
+audit and rate-limiting purposes, but it should no longer gate a check.
+
+**What must be true after the fix:** a player can join an `upcoming` competition on a
+Saturday, and attempting to place an order in that competition on the Saturday is still
+refused. That pair is now a required test - number 12 below.
+
 ## Tests that must pass
 
 | # | Test | Asserts |
@@ -281,6 +315,7 @@ shape, and it is the only one of the set with a live security consequence for re
 | 9 | Entry fee ledger row | Carries a resolvable competition reference in a field the schema defines. **Written 1 Sep 2026** - `__tests__/services/entry-fee-ledger.test.ts`, 4 tests, passing. Pins the current defect, proves the corrected write survives, proves the audit query works, and guards against "fixing" it by loosening the schema |
 | 10 | Retries exhausted under sustained write conflict | Returns 409, no participant created, no debit |
 | 11 | Accept a challenge while restricted / fraud-flagged | Refused (sub-defect 1b) |
+| 12 | Join an `upcoming` competition outside market hours, then try to place an order in it | Join **succeeds**, order **refused**. Locks in the owner's decision above, in both directions - a fix that blocked the join would fail this, and so would one that let the order through |
 
 Test 8 matters because there is an existing recovery process that resets a stuck
 competition back to `active` after 5 minutes - so a slow finalization really can be run
@@ -293,7 +328,7 @@ Ordered by how much they should worry you.
 | Risk | Why | Mitigation |
 |---|---|---|
 | **Double debit via the retry loop** | The unified service wraps a wallet debit in a retry loop. A wrong re-read double-charges | Copy Gate B's structure verbatim; assert zero wallet drift across 20 concurrent joins (test 1) |
-| **The union of checks is stricter than either gate** | Applying market hours to Gate A would stop players joining an *upcoming* competition at the weekend | Product decision, made deliberately before coding. Recommendation: allow joining upcoming contests outside market hours |
+| **The union of checks is stricter than either gate** | Applying market hours to Gate A would stop players joining an *upcoming* competition at the weekend | **DECIDED by the owner, 1 Sep 2026: joining is allowed at any time; only trading itself is gated by market hours.** See below |
 | **Entry is revenue-critical and instantly visible** | If it breaks, nobody can join anything | Deploy at low traffic; be ready to revert; Stage 0 reverts independently |
 | **No existing test coverage** | Five tests exist in the repo and none touch entry or settlement | Tests-first is not a formality here |
 | **The admin mirror must change too** | Otherwise drift worsens | Do Defect 2 first so the guard is in place |
@@ -451,29 +486,57 @@ Mongoose defines getters only for declared paths. So a debug dump of the documen
 the value while the line of code beside it reads nothing and takes the wrong branch. Both
 behaviours are pinned in `mirror-drift-behaviour.test.ts`.
 
-## The stale type declarations - larger than recorded, and the plan changed
+## The stale type declarations - DELETED 1 September 2026 (owner approved)
 
-The plan said "two stale `.d.ts` files, update them". What is actually there is **31
-`.d.ts` files and 31 matching `.d.ts.map` files**, all under `database/`, all committed in
-February 2026, and every one of them stale.
+The plan said "two stale `.d.ts` files, update them". Two counts in this document have now
+been superseded, and the second correction is the one to trust:
 
-They are **orphaned build output**, not hand-maintained declarations:
+| Count | Where it came from | Status |
+|---|---|---|
+| 2 | The original 17 Aug write-up | Stale |
+| 31 `.d.ts` + 31 `.d.ts.map` | First re-verification, which searched only `database/` | **Also stale** - it missed everything under `lib/` |
+| **57 `.d.ts` + 55 `.d.ts.map` = 112 files** | Repo-wide `git ls-files "*.d.ts"` | **Correct. All deleted** |
 
-- Each ends with a `sourceMappingURL` comment, and the `.map` files are committed beside
-  them.
-- `tsconfig.json` sets `noEmit: true`, so nothing regenerates them. They are frozen at
-  whatever the schemas looked like in February.
-- They are **inert**: TypeScript resolves `./competition.model` to the `.ts` file, which
-  wins over a sibling `.d.ts`. Verified by measurement - moving all 62 files out of the
-  repository produced a **byte-identical set of 16 pre-existing type errors** and a
-  **clean production build**.
+The lesson is the same one the mirror guard taught: **do not scope a count to the directory
+you happen to be looking at.** The first re-verification was checking model mirrors, so it
+searched the models directory and reported a models-shaped answer. Twenty-six more files
+sat under `lib/services/` and `lib/actions/` the whole time.
+
+They were **orphaned build output**, not hand-maintained declarations:
+
+- Each ends with a `sourceMappingURL` comment, with the `.map` committed beside it.
+- `tsconfig.json` sets `noEmit: true`, so nothing regenerates them. They were frozen at
+  whatever the code looked like on 1 February 2026 - all 112 came from a single commit.
+- They were **inert**: TypeScript resolves `./competition.model` to the `.ts` file, which
+  wins over a sibling `.d.ts`.
+
+**Proof of inertness, measured twice.** Before deletion: main app 16 type errors, admin app
+225. After deleting all 112: **16 and 225, identical**. 182 tests still pass and the mirror
+guard still reports 75 pairs in agreement.
+
+**Two files were deliberately kept**, and the classification rule is worth recording
+because "delete every `.d.ts`" would have broken the build:
+
+| Kept | Why |
+|---|---|
+| `types/global.d.ts` | **Hand-written.** It has no sibling `.ts`, so it is the sole source of its types, not a copy of anything |
+| `websocket-server/dist/index.d.ts` | Build output of a **separate** build with its own lifecycle, under `dist/` |
+
+The rule applied was: delete a `.d.ts` only if a sibling `.ts` exists and it is not under
+`dist/`. A sibling `.ts` is what proves the file is a redundant copy rather than a
+declaration in its own right. Two files - `lib/actions/trading/contest-utils.d.ts` and
+`lib/actions/trading/position.actions.d.ts` - had no `.map` and needed a manual look; both
+are full of `export declare const`, which is emitted output rather than anything a person
+writes, and both came from the same February commit.
+
+A `.gitignore` rule now ignores `*.d.ts` and `*.d.ts.map`, with negations for
+`types/global.d.ts`, `next-env.d.ts` and the websocket server's `dist` output, so a stray
+`tsc -d` cannot reintroduce them. Verified both ways: a probe file under
+`database/models/` is correctly ignored, and neither kept file is.
 
 **Deviation from the plan, recorded deliberately:** updating them by hand was rejected.
-Doing so would create a third copy of every schema to keep in step - the very disease this
-defect is about - for files that nothing reads. The recommendation is to **delete all 62
-and add a `.gitignore` rule** so a stray `tsc` run cannot commit them again. This is a
-deletion of tracked files and therefore an owner decision; it is listed in the sign-off
-gate below rather than done silently.
+Doing so would have created a third copy of every schema to keep in step - the very disease
+this defect is about - for files that nothing reads.
 
 ## Beyond models - noted, not in scope
 
@@ -526,8 +589,9 @@ starts.
    enum values, never remove them.** Removing an enum value to make two sides agree
    orphans every document already storing it.
 
-3. **Handle the `.d.ts` files** - see the deviation recorded above. Delete rather than
-   update, pending owner sign-off.
+3. **Handle the `.d.ts` files** - **DONE.** All 112 deleted on owner approval, with a
+   `.gitignore` rule. See the section above for the classification rule and the two
+   exceptions.
 
 4. **Add a PR checklist item**: "model changed - mirror updated?"
 
@@ -616,31 +680,40 @@ carefully - `hero-settings` alone is 42 fields across a schema and two interface
 
 ---
 
-# BLOCKER - the test database (resolve before writing any code)
+# The test database - RESOLVED AND BUILT, 1 September 2026
+
+**This was the blocker on all of Defect 1. It is cleared.**
 
 MongoDB transactions require a replica set, and every money path in Defect 1 runs inside a
-transaction. There is currently **no way to run a transaction in a test**:
+transaction. When this document was written there was no way to run a transaction in a test:
+`mongodb-memory-server` was not installed - referenced only in a comment in
+`__tests__/helpers/db-mock.ts`, which **mocks** the database rather than running one - and
+every existing test was a pure function.
 
-- `mongodb-memory-server` is **not installed**. It is referenced only in a comment in
-  `__tests__/helpers/db-mock.ts`, which **mocks** the database rather than running one.
-- All existing tests are pure functions. Vitest is configured (`vitest.config.ts`,
-  `npm test`), CI runs `npx vitest run` on push to `main`, and `apps/admin` has no test
-  setup at all.
+**Owner decision: `mongodb-memory-server` as a single-node replica set**, chosen over a
+local replica-set Mongo (does not work in CI) and a throwaway Atlas cluster (costs money and
+needs credentials in CI).
 
-The eight-to-eleven money tests Defect 1 depends on cannot be written until this is
-decided. The options:
+Delivered as `__tests__/helpers/mongo-test-server.ts`, with `startTestMongo`,
+`stopTestMongo` and `clearTestMongo`. Proven rather than assumed: its own test suite writes
+across two collections in one transaction and asserts the commit is atomic and the rollback
+leaves nothing behind.
 
-| Option | Notes |
-|---|---|
-| `mongodb-memory-server` as a single-node replica set | Self-contained, no external dependency, works in CI. Adds a dev dependency and some start-up time |
-| A separate database on a local replica-set Mongo | Fast, but does not work in CI without the same setup |
-| A throwaway Atlas cluster | Closest to production; costs money and needs credentials in CI |
+Three practical notes for anyone extending it:
 
-**Recommendation:** `mongodb-memory-server` configured as a single-node replica set, since
-it is the only option that also works in GitHub Actions.
+- **CI caches the MongoDB binary** (`~/.cache/mongodb-binaries`). Without that it is a fresh
+  ~100 MB download every run, which is slow and makes the suite depend on an external host.
+- **Allow ~120 s for `beforeAll`** on a cold machine, since the first run downloads the
+  binary. Subsequent runs start in a second or two.
+- **`clearTestMongo` in `afterEach`, not `afterAll`.** Money tests assert exact balances, so
+  leakage between tests produces failures that look like logic bugs.
 
 The local `chatvolt` database is **not** production - confirmed by the owner - so local
 iteration is safe.
+
+**Still outstanding for Defect 1's remaining tests:** the entry paths are server actions
+that read the logged-in user, so they need a session/auth mocking harness on top of this.
+That is the next piece of work, and it changes no production code.
 
 ---
 
@@ -698,9 +771,15 @@ running system.
 - [ ] Mute challenge, social or messaging notifications as a player. Confirm the admin app now honours it.
 - [ ] Record an admin balance addition and a custom expense. Confirm both still work (their enum values were added to the main app's copy).
 
-**Decide the outstanding question**
+**Decisions taken 1 September 2026 - no longer outstanding**
 
-- [ ] Decide whether to **delete the 31 `.d.ts` and 31 `.d.ts.map` files** under `database/`. They are orphaned February build output, provably inert, and every one is stale. Recommendation: delete and add a `.gitignore` rule. Left in place pending this decision.
+- [x] **Delete the orphaned `.d.ts` files.** Approved and done. The count was 112 repo-wide, not 62 - the earlier figure had only counted `database/`. `types/global.d.ts` and the websocket server's `dist` output were deliberately kept. A `.gitignore` rule prevents recurrence. Typecheck identical before and after.
+- [x] **Market hours must not block joining.** Approved. Only trading itself is gated. Locked in by test 12.
+- [x] **`mongodb-memory-server` as a single-node replica set** for the test database. Built and proven.
+
+Nothing here needs your input again. The only thing left for you on Defect 2 is the test checklist above.
+
+**One thing to be aware of, not a decision:** the mirror guard cannot statically check one enum, `hero-settings.model.ts:featuresColumns`, because its values are built at runtime. It reports this on every run rather than passing quietly. 74 of 75 pairs are fully compared; that one is compared by field name only.
 
 ## Owner test checklist - Prerequisite A (already shipped)
 

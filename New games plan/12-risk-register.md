@@ -90,7 +90,7 @@ The practical consequence: a read is worthless as evidence that two copies agree
 
 **Why it becomes critical when games are added:** `gameType` is exactly this kind of field. If the admin's copy lacks it, the admin app **cannot set it** - so a Trivia contest created or edited through a path that must write the label ends up unlabelled. An unlabelled contest is treated as trading, so the finalizer attempts to close forex positions that do not exist, scores everyone zero, ranks them equal, and pays prizes to the wrong players - **silently** (see R3).
 
-**Why very likely to recur:** 75 duplicated model files (plus 19 action and 51 service files), and 31 committed `.d.ts` files acting as stale third copies. **11** model pairs were drifted.
+**Why very likely to recur:** 75 duplicated model files, plus 19 action and 51 service files. **11** model pairs were drifted. There were also 112 committed declaration files that *looked* like stale third copies but were inert, since TypeScript resolves the sibling `.ts` first - all deleted 1 Sep 2026 with a `.gitignore` rule, so they are no longer a maintenance surface or a source of confusion.
 
 **Mitigation (Stage 0) - BUILT 1 September 2026:**
 - `tools/model-mirror/` - a **CI check plus pre-push hook** comparing field paths **and enum values** across every mirrored pair, extracted from the TypeScript AST rather than by regex. Fails the build with a message naming each file, field and side. Cheapest fix in the whole programme; permanently eliminates the class of bug.

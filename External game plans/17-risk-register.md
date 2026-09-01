@@ -101,8 +101,11 @@ and 51 service files** are duplicated the same way.
 | `withdrawal-request.model.ts` | **Main** missing `failedAt`, `withdrawalMethod`, `originalCardDetails.userPaymentOptionId` |
 | `trading/competition-participant.model.ts` | Fields match; admin lacks 4 compound indexes |
 
-There are also **31 committed `.d.ts` files** under `database/`, all stale, acting as third
-copies. They turned out to be orphaned build output from February 2026 and provably inert.
+There were also **112 committed declaration files** (57 `.d.ts` + 55 `.d.ts.map`) that
+looked like stale third copies. They turned out to be orphaned build output from February
+2026 and provably inert - TypeScript resolves the sibling `.ts` first. **All deleted on
+1 September 2026**, with a `.gitignore` rule. They are not a third copy to keep in step, and
+provider-related models must not acquire one.
 
 #### What drift actually does - measured, and not what these documents used to say
 

@@ -592,9 +592,16 @@
         <p style="margin-bottom:0">Worth understanding, because it explains why a guard was needed rather than more careful review. When a field is missing from one blueprint, that side <b>still reads the value correctly</b> in most contexts &mdash; it shows up in logs and debug output exactly as expected. But the ordinary way code reads a field returns <b>nothing at all</b>, so the program quietly takes the wrong branch. The evidence and the code disagree, and the evidence looks fine. That is the whole reason this survived unnoticed for months, and why the check has to be automatic.</p>
       </div>
 
-      <div class="cal plain">
-        <div class="t">One decision still needed from you</div>
-        <p style="margin-bottom:0">There are <b>62 leftover files</b> in the codebase from a one-off command run in February. They are automatically generated copies of the blueprints, they are all out of date, and nothing reads them &mdash; proven by removing them all and confirming the code still compiles identically. Keeping them would mean maintaining a <i>third</i> copy of every blueprint, which is the very problem this defect is about. <b>The recommendation is to delete them</b> and add a rule so they cannot come back. They have been left in place because deleting files is your call, not ours.</p>
+      <div class="cal good">
+        <div class="t">Leftover files &mdash; you approved deletion, and they are gone</div>
+        <p>There were <b>112 leftover files</b> in the codebase from a one-off command run in February. They were automatically generated copies of the blueprints, all out of date, and nothing read them &mdash; proven by removing them and confirming the code compiles <i>identically</i>, error for error. Keeping them would have meant maintaining a <i>third</i> copy of every blueprint, which is the very problem this defect is about. All deleted, with a rule added so they cannot come back.</p>
+        <p style="margin-bottom:0"><b>Worth flagging, because it is the same mistake twice:</b> we first reported this as 62 files. That count only looked in the folder we happened to be working in. Searching the whole project found 112 &mdash; the rest were sitting in a different folder the whole time. It is the identical error the blueprint audit made when it reported &ldquo;21 files&rdquo; and the truth was 75. <b>Counts scoped to where you are standing are not totals</b>, and that is now a standing rule for this project. Two files were kept deliberately, because they are genuine hand-written definitions rather than generated copies.</p>
+      </div>
+
+      <div class="cal info">
+        <div class="t">Your decision on market hours, and why it mattered</div>
+        <p>Fixing the two entry doors forced a question we could not answer for you. One door blocks people from joining a competition when the financial markets are closed; the other does not. Merging them by simply applying every check from both sides would have adopted the stricter behaviour &mdash; and <b>stopped players signing up on a Saturday for a contest starting Monday.</b></p>
+        <p style="margin-bottom:0">That would have been lost revenue caused by a bug fix, which is the sort of thing that goes unnoticed for months. <b>Your decision: joining is allowed at any time; only the trading itself waits for the markets to open.</b> That is the right call &mdash; joining just moves credits into a prize pot, so a closed market makes nothing unsafe. It is now locked down by a test that fails if anyone ever blocks the join <i>or</i> lets trading through early.</p>
       </div>
 
       <!-- ---------- OPTIONAL ---------- -->

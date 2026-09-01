@@ -53,8 +53,15 @@ reading before anything else, because they contradict what the plan said:
    for exactly that purpose. The third was found by the typecheck, not the guard - syncing
    `whitelabel.model.ts` removed four standing TypeScript errors (229 to 225).
 
-**One decision is outstanding:** whether to delete the 31 `.d.ts` and 31 `.d.ts.map` files
-under `database/`. See the work log entry below.
+**No decisions are outstanding.** Three were taken on 1 September 2026:
+
+| Decision | Outcome |
+|---|---|
+| Test database | `mongodb-memory-server` as a single-node replica set. Built and proven with a real two-collection transaction |
+| The orphaned `.d.ts` files | **Delete.** All 112 removed, plus a `.gitignore` rule. The count was 112 repo-wide, not the 62 previously recorded - the earlier figure counted only `database/` and missed 26 files under `lib/` |
+| Market hours vs joining | **Joining is allowed at any time; only trading is gated.** Taking the union of the two gates blindly would have blocked weekend sign-ups for Monday contests - a revenue regression introduced by a bug fix. Locked in by Defect 1 test 12 |
+
+The only thing left for the owner is the **Defect 2 test checklist** in `00a`.
 
 ---
 
@@ -178,7 +185,7 @@ the owner confirms each item, with the date.
 - [ ] A **landing-page section that was previously unwritable** (Game Master, competition types, marketplace, journey and badges, or trust badges) saves and persists
 - [ ] A player muting challenge / social / messaging notifications is honoured by the admin app
 - [ ] Admin balance addition and custom expense still record correctly
-- [ ] **Decision given** on deleting the 31 `.d.ts` and 31 `.d.ts.map` files under `database/`
+- [x] **Decision given** on deleting the orphaned declaration files. Approved, and done: **112 files** repo-wide (57 `.d.ts` + 55 `.d.ts.map`), not the 62 previously recorded, plus a `.gitignore` rule. `types/global.d.ts` and the websocket server's `dist` output kept deliberately
 
 ### Automated gate
 
@@ -316,6 +323,53 @@ Template:
 
 ---
 
+### 1 Sep 2026 - Orphaned `.d.ts` files deleted, and two decisions recorded
+
+**112 files deleted** (57 `.d.ts` + 55 `.d.ts.map`), on owner approval. No production code
+changed.
+
+**The count in this document was wrong twice, and the second correction is the lesson.**
+The original write-up said two files. The first re-verification said 31 + 31, because it was
+investigating model mirrors and therefore searched `database/`. A repo-wide
+`git ls-files "*.d.ts"` found **57**, the rest under `lib/services/` and `lib/actions/`.
+The same mistake the mirror audit made: *scoping a count to the directory you happen to be
+looking at, then reporting it as a total.*
+
+**Two files were kept, and the rule matters more than the list.** Delete a `.d.ts` only if
+a sibling `.ts` exists and it is not under `dist/` - a sibling `.ts` is what proves the file
+is a redundant copy rather than a declaration in its own right. That rule kept
+`types/global.d.ts` (hand-written, no sibling, sole source of its types) and
+`websocket-server/dist/index.d.ts` (separate build, own lifecycle) automatically. Two files
+had no `.map` and needed a manual look; both are `export declare const` throughout, which is
+emitted output, and both came from the same 1 February commit as the rest.
+
+**Proof of inertness, measured before and after:** main app 16 type errors, admin app 225 -
+identical. 182 tests still pass, mirror guard still reports 75 pairs in agreement.
+
+A `.gitignore` rule now ignores `*.d.ts` / `*.d.ts.map` with negations for the two keepers
+and `next-env.d.ts`. Verified in both directions: a probe file under `database/models/` is
+ignored, and neither keeper is.
+
+**Owner decision on market hours, recorded because it changes the Defect 1 design.**
+Unifying the two entry gates forced a product question, since Gate B blocks joining outside
+market hours and Gate A does not. Taking the union blindly would have adopted Gate B's
+behaviour and **blocked weekend sign-ups for Monday contests** - a revenue regression
+introduced by a bug fix, which is the sort of thing "apply every check from both sides"
+quietly produces.
+
+Decision: **joining is allowed at any time; only trading itself is gated by market hours.**
+Joining moves credits into a prize pool - no position is opened and no price is needed, so a
+closed market makes nothing unsafe. The existing check stays exactly where it is, on order
+placement in `order.actions.ts`.
+
+Consequence for the build: the unified `contest-entry.service.ts` takes the union of the
+*security* checks only and does **not** carry the market-hours check. That removes the one
+differing behaviour the `source` parameter existed to express, so `source` should be kept
+for audit and rate limiting but should no longer gate a check. Added as **test 12**: join an
+`upcoming` competition outside market hours, then try to place an order in it - the join must
+succeed and the order must be refused. It fails a fix that blocks the join *and* a fix that
+lets the order through.
+
 ### 1 Sep 2026 - Stage 0 Defect 1, test 9 written first (no production change)
 
 Defect 2 is committed as `0798a935` and awaiting the owner test. Rather than idle, the
@@ -427,8 +481,9 @@ allowlist entry**. Nothing is deployed - this is code and tests only.
    all 62 out of the repository, which produced a byte-identical set of 16 pre-existing
    type errors and a clean compile. Updating them by hand would create a *third* copy of
    every schema to keep in step - exactly the disease this defect is about.
-   **They have been left in place**, because deleting tracked files is an owner decision.
-   It is on the Defect 2 checklist in `00a`.
+   *(Superseded the same day: the owner approved deletion, and the count was wrong here
+   too - **112 files repo-wide**, not 62. This entry counted only `database/`. See the
+   `.d.ts` work-log entry above.)*
 3. **The allowlist has one entry, not the several anticipated.** `withdrawal-request.model.ts`
    was expected to need one; it turned out to be a real bug instead. Only `admin.model.ts`
    is genuinely deliberate, and the entry records both why and the condition that would
