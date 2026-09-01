@@ -533,7 +533,7 @@
 
       <h4>What it causes &mdash; measured, not assumed</h4>
 
-      <div class="cal gold">
+      <div class="cal plain">
         <div class="t">This document used to say something different, and it was wrong</div>
         <p style="margin-bottom:0">It previously said the harm was that &ldquo;the admin app cannot see the field&rdquo;, and that saving a record would strip it. Both claims were tested against a real database on 1 September 2026 and <b>both were wrong</b>. Reading works fine. An ordinary save keeps everything. The real harm is on <b>writing</b>, and in one respect it is worse than the old description.</p>
       </div>
@@ -590,6 +590,14 @@
       <div class="cal plain">
         <div class="t">Why nobody spotted these</div>
         <p style="margin-bottom:0">Worth understanding, because it explains why a guard was needed rather than more careful review. When a field is missing from one blueprint, that side <b>still reads the value correctly</b> in most contexts &mdash; it shows up in logs and debug output exactly as expected. But the ordinary way code reads a field returns <b>nothing at all</b>, so the program quietly takes the wrong branch. The evidence and the code disagree, and the evidence looks fine. That is the whole reason this survived unnoticed for months, and why the check has to be automatic.</p>
+      </div>
+
+      <div class="cal plain">
+        <div class="t">The leftover files were two problems, not one &mdash; and the second was real</div>
+        <p>After deleting the first batch, building the test harness failed immediately and pointed at a file nobody had looked for: a <b>second set of 113 leftover files</b> from a <i>different</i> command run, six weeks earlier, in December. Same modules. The first clean-up had removed one half of what that command produces and left the other half sitting there.</p>
+        <p><b>The first batch was harmless. This one was not.</b> The test runner was loading these <i>six-month-old</i> copies instead of the real code. We proved it rather than guessing: one of the stale copies is missing four functions the real file has, so we simply asked the test runner whether one of them existed. It did not.</p>
+        <p>The consequence was serious for this stage: <b>every database blueprint and every money-handling service was impossible to test.</b> The money tests this whole defect exists to enable could not have been written at all &mdash; blocked by files everyone assumed were junk.</p>
+        <p style="margin-bottom:0"><b>The reassuring part:</b> we checked all four toolchains, and the live website, the background worker and the production build all correctly use the real code. Only the test runner was affected, which is exactly why this went unnoticed for seven months. All 113 are now deleted, with verification after the fact: identical type-checking results, all 188 tests passing, the worker builds, and the production build compiles cleanly.</p>
       </div>
 
       <div class="cal good">
@@ -1727,8 +1735,8 @@
 
   <h3>Game Masters &mdash; bigger than this chapter first said</h3>
 
-  <div class="cal warn">
-    <div class="t">An estimate corrected upward, 30 August 2026</div>
+      <div class="cal plain">
+        <div class="t">An estimate corrected upward, 30 August 2026</div>
     <p>This section previously called Game Masters &ldquo;four smaller items, roughly three to four days&rdquo;. Read properly against the code, that was wrong by an order of magnitude. The real system is <b>three dedicated collections, twenty-eight API routes, three subscription tiers, a referral chain, a daily renewal job and two separate earning paths</b>.</p>
     <p style="margin-bottom:0"><b>The real figure is about two and a half weeks</b>, and Game Masters are <b>no longer a deferred item</b> &mdash; one piece of the work is a gate inside Phase 1.</p>
   </div>

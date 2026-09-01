@@ -323,6 +323,80 @@ Template:
 
 ---
 
+### 1 Sep 2026 - The other half of the same emit: 113 stale `.js` files, and they were NOT inert
+
+**This is the most important finding of the day, and it was found by accident.** Building the
+server-action test harness failed with `Cannot find module '@/database/mongoose'`, and the
+stack named `lib/services/xp-level.service.js` - a **compiled JavaScript file** beside the
+TypeScript source.
+
+**57 stale `.js` plus 56 `.js.map`, from 22 December 2025** - a *different and earlier*
+accident than the `.d.ts` files deleted hours before, which were from 1 February 2026. Same
+57 modules. The declaration cleanup had removed one half of a `tsc` emit and left the other.
+
+**The declarations were inert. The JavaScript was not.** That distinction is the whole
+lesson, and "it is only build output" does not settle it - what settles it is which file wins
+in a given resolver.
+
+Measured with a deliberately chosen probe: `xp-level.service.js` lacks four exports the
+current `.ts` has, including `awardXP`, so asking whether `awardXP` is a function reveals
+which file loaded.
+
+| Toolchain | Resolved | Verdict |
+|---|---|---|
+| **vitest** | the stale `.js` | **Broken**, then failed outright - 18 of the 57 use `require("@/...")`, which Vite will not resolve for an externalised CommonJS file |
+| `tsx` (worker, dev) | the `.ts` | Correct |
+| esbuild (`worker:build`) | the `.ts` | Correct |
+| `next build` | the `.ts` | Correct, `✓ Compiled successfully` |
+
+**Production was never running the stale code**, which is why nobody noticed for seven
+months. But **all 57 modules - every model plus the money-critical services - were
+unimportable in any test**, so the Defect 1 money tests could not have been written at all.
+A blocker on the entire defect, sitting in files everyone assumed were harmless junk.
+
+Owner approved deletion. Verified after: typecheck identical (16 main, 225 admin), 188 tests
+passing, worker bundle builds, `next build` compiles. The only build failure is Atlas being
+unreachable from this machine during static generation, which pre-dates all of this work.
+
+The `.gitignore` rule for `.js` is **scoped to `/database/**` and `/lib/**`**, not a blanket
+`*.js`, because `ecosystem.config.js`, `scripts/*.js`, `worker/build.mjs` and the
+`api-server` build are hand-written and a blanket rule would swallow them.
+
+**A mistake of mine, recorded rather than hidden:** the earlier `.d.ts` rule negated
+`next-env.d.ts`, which Next auto-generates and which was already correctly ignored further up
+the file. Later rules win in `.gitignore`, so my negation silently undid a correct earlier
+rule and added two untracked files to every checkout. Removed, and both directions are now
+probe-verified.
+
+**Two rules worth carrying:** when deleting emitted output, **look for the other half of the
+emit** - a `tsc` run that produced `.d.ts` produced `.js` too. And **prove which file a
+resolver picks** rather than reasoning about it; a missing export makes a perfect probe.
+
+### 1 Sep 2026 - Server-action test harness built, and Gate A's guards locked in
+
+`__tests__/helpers/server-action-context.ts` plus
+`__tests__/services/competition-entry-guards.test.ts` (6 tests, passing). Defect 1 tests 3,
+4 and 5 for Gate A. **No production code changed.**
+
+Server actions read the caller from ambient request state that does not exist in a test, so
+the session, headers, restriction service and fraud gate are all replaced. The context is a
+*module* rather than a fixture object because `vi.mock` factories are hoisted above the
+imports and cannot close over local variables - but they can import a module.
+
+**One detail cost real time and would cost it again.** These actions convert errors into
+`{ success: false, error }` and re-throw only errors whose `digest` starts with `NEXT_`.
+A `redirect()` mock without a `digest` gets swallowed into a result object, so the redirect
+appears never to fire and **the production code looks broken when it is correct.** The mock
+now sets a realistic digest, and there is a test asserting the re-throw - because if that
+check is ever "simplified" away, an unauthenticated visitor silently gets an error object
+instead of the sign-in page.
+
+Every refusal test asserts **no participant, no debit, no prize-pool change**, not just the
+error message. A guard that refuses after taking the money is worse than no guard, and
+half-completed entry is precisely what unifying two divergent paths risks. The positive case
+is included deliberately: without it, a guard that refused *everyone* would pass every other
+test in the file.
+
 ### 1 Sep 2026 - Orphaned `.d.ts` files deleted, and two decisions recorded
 
 **112 files deleted** (57 `.d.ts` + 55 `.d.ts.map`), on owner approval. No production code

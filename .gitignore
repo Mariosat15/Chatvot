@@ -107,9 +107,25 @@ eslint-output.txt
 # removal left the typecheck byte-identical (16 errors main, 225 admin, before and after).
 # tsconfig is noEmit, so nothing regenerates them - these rules only stop a stray
 # `tsc -d` run putting them back.
-# Note the negation below: types/global.d.ts is hand-written and must stay tracked.
+# The same applies to the compiled .js beside each .ts, and those were worse than inert:
+# vitest resolved the stale .js in preference to the .ts, which made all 57 modules -
+# every model plus the money-critical services - unimportable in tests.
+#
+# Note the negations: types/global.d.ts is hand-written and must stay tracked, and
+# websocket-server/dist is a separate build's output. next-env.d.ts is deliberately NOT
+# negated - Next regenerates it and it is already ignored above, so un-ignoring it here
+# would just add untracked noise to every checkout.
 *.d.ts
 *.d.ts.map
 !types/global.d.ts
-!next-env.d.ts
 !websocket-server/dist/index.d.ts
+
+# Compiled JavaScript under the TypeScript source trees.
+# Scoped to these two directories on purpose: a blanket *.js would swallow legitimate
+# hand-written files like ecosystem.config.js, scripts/*.js and the api-server build.
+# Nothing under database/ or lib/ is hand-written JavaScript, so anything appearing here
+# is emitted output and must not be committed.
+/database/**/*.js
+/database/**/*.js.map
+/lib/**/*.js
+/lib/**/*.js.map

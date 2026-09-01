@@ -82,6 +82,15 @@ get wrong and are worth stating here:
  Gate B's market-hours check, because doing so would block weekend sign-ups for Monday
  contests. Locked in by Defect 1 test 12, which fails both a fix that blocks the join and
  one that lets the order through.
+- **Testing a server action needs `__tests__/helpers/server-action-context.ts`**, which
+ supplies the session, headers, restriction and fraud outcomes that ambient request state
+ would normally provide. Two things will waste your time otherwise. Server actions
+ **return** `{ success: false, error }` rather than throwing, so assert on the result, not
+ with `rejects.toThrow`. And they re-throw only errors whose **`digest` starts with
+ `NEXT_`** — a `redirect()` mock without a digest is swallowed into a result object, the
+ redirect appears never to fire, and **the production code looks broken when it is
+ correct.** Every guard test must assert the refusal left **no participant, no debit and no
+ prize-pool change**, not merely the right message.
 - **Defect 1's entry-fee ledger defect is proven, not inferred** (1 Sep 2026,
  `__tests__/services/entry-fee-ledger.test.ts`). Gate A writes `referenceId`, which the
  `WalletTransaction` schema does not declare, and never sets `competitionId`, which it
@@ -128,6 +137,7 @@ On every change during implementation:
 | `External game plans/19-game-masters.md`, `New games plan/15` section 5, and the Game Master sections of the internal HTMLs | The Game Master system is the same system in both scenarios. `19` sections 1–4 are the authoritative analysis; `New games plan/15` section 5 restates it. **A fact corrected in one must be corrected in the other** |
 | `ChartVolt-New-Games-Plan.html` and `-Partners.html` | The partner version must **never** mention Stage 0, the duplicate join paths, the admin mirror drift, or any current defect |
 | Any model change | Exists twice: `database/models/` and `apps/admin/database/models/`. Update both in the same commit. **`npm run check:mirrors` now enforces this** in CI and on `git push`, comparing field paths *and* enum values. Do not "fix" a failure by deleting an enum value to make two sides agree — that orphans every document already storing it. Add to the side that lacks it. Deliberate differences go in `tools/model-mirror/allowlist.ts` **with a reason** |
+| Committed compiled `.js` files under `database/` and `lib/` | **All 113 deleted 1 Sep 2026** (57 `.js` + 56 `.js.map`), owner approved. A *separate, earlier* accident from the `.d.ts` one — emitted 22 Dec 2025, same 57 modules, and **six to seven months stale**. Critically, **these were NOT inert**: vitest resolved the stale `.js` in preference to the `.ts`, which made every model and every money-critical service **unimportable in tests** and blocked the whole of Defect 1. `tsx`, esbuild and `next build` all resolve the `.ts` correctly, so production was never affected — which is why it survived unnoticed. Two rules follow: **when deleting emitted output, look for the other half of the emit** (a `tsc` run that produced `.d.ts` produced `.js` too — the first cleanup removed one half and left the harmful one), and **prove which file a resolver picks rather than reasoning about it** — a missing export makes a perfect probe. The `.gitignore` rule is scoped to `/database/**` and `/lib/**`, never a blanket `*.js`, because `ecosystem.config.js`, `scripts/*.js`, `worker/build.mjs` and the `api-server` build are hand-written |
 | Committed `.d.ts` files | **All 112 deleted 1 Sep 2026** (57 `.d.ts` + 55 `.d.ts.map`), owner approved, with a `.gitignore` rule. They were orphaned February 2026 build output, stale, and **inert** — TypeScript resolves the sibling `.ts` first; proven by identical typechecks before and after (16 main, 225 admin). Earlier documents said "two", then "31 + 31" — the 31 counted only `database/` and missed 26 files under `lib/`. **Never treat a `.d.ts` as a third copy of a model to maintain.** Two files are deliberately kept and must stay tracked: `types/global.d.ts` (hand-written, no sibling `.ts`) and `websocket-server/dist/index.d.ts` (separate build). The rule for any future cleanup: delete a `.d.ts` only if a sibling `.ts` exists and it is not under `dist/` |
 
 ## Direction of travel (owner, 30 Aug 2026)
