@@ -191,12 +191,29 @@ more than being alarming:
   correction at all. This is worse than described, not better.
 - **Gate B can admit unverified, restricted or fraud-flagged accounts**, and the admin
   mirror of Gate A can admit unverified and fraud-flagged ones.
-- **Production entry-fee ledger rows have no competition reference.** Gate A writes
-  `referenceId: competitionId`, but `referenceId` **is not in the `WalletTransaction`
-  schema** - the schema defines `competitionId` at line 129. Mongoose strict mode drops
-  unknown fields, so the reference is silently discarded on every write. Nothing queries
-  it today, so nothing is visibly broken, but an entry fee currently cannot be traced back
-  to the contest it paid for.
+- **Production entry-fee ledger rows have no competition reference. PROVEN 1 Sep 2026.**
+  Gate A writes `referenceId: competitionId` (line 548), but `referenceId` **is not in the
+  `WalletTransaction` schema** - the schema defines `competitionId` at line 129, which that
+  call never sets. Mongoose strict mode drops undeclared fields on `create`, so the
+  reference is discarded and the row lands with no link to its competition at all.
+
+  No longer an inference: `__tests__/services/entry-fee-ledger.test.ts` writes the exact
+  row Gate A writes, against a real MongoDB, and reads it back through the driver. The
+  `referenceId` property is absent and `competitionId` is `undefined`. Four tests, written
+  before the fix so the fix has a signal to prove itself against.
+
+  **The scope of harm is narrower than "money is wrong", and it was checked rather than
+  assumed.** Nothing computes money from `WalletTransaction.competitionId`:
+  `withdrawal-validator.service.ts` reads `competitionId` from `CompetitionParticipant`,
+  and `platform-financials.service.ts` uses its own `sourceId`. So this is a **broken
+  audit trail, not a wrong balance** - but every competition entry fee ever collected is
+  unattributable to the competition that charged it, which matters for disputes,
+  reconciliation and refunds, and will matter more when per-game revenue reporting wants
+  exactly this link.
+
+  **Only two places write it**, and they agree: Gate A and its admin mirror at
+  `apps/admin/lib/actions/trading/competition.actions.ts` line 610. This is one bug, not
+  mirror drift - which is why the mirror guard does not catch it and a test must.
 - **Exhausting the retries returns no response.** Gate B's `for` loop is the last
   statement in its `try` block with no `return` after it, so five consecutive write
   conflicts fall through and return `undefined`. Rare, but it should be an explicit 409.
@@ -261,7 +278,7 @@ shape, and it is the only one of the set with a live security consequence for re
 | 6 | Full prize payout on a finished competition | Winner credits + platform fee == prize pool, exact to the cent |
 | 7 | Cancel and refund | Every participant made whole, `prizePool` zeroed |
 | 8 | Finalize the same competition twice | Winners paid **once** (idempotency) |
-| 9 | Entry fee ledger row | Carries a resolvable competition reference in a field the schema defines |
+| 9 | Entry fee ledger row | Carries a resolvable competition reference in a field the schema defines. **Written 1 Sep 2026** - `__tests__/services/entry-fee-ledger.test.ts`, 4 tests, passing. Pins the current defect, proves the corrected write survives, proves the audit query works, and guards against "fixing" it by loosening the schema |
 | 10 | Retries exhausted under sustained write conflict | Returns 409, no participant created, no debit |
 | 11 | Accept a challenge while restricted / fraud-flagged | Refused (sub-defect 1b) |
 
@@ -528,6 +545,25 @@ because the lockout and permission fields that gate admin access would then be s
 discarded. An allowlist entry is a claim that two apps *should* disagree; "we have not got
 round to it" is not that claim, and the guard's tests prove an entry suppresses only the
 fields it names.
+
+### The one thing the guard cannot check
+
+It reports this itself rather than staying quiet about it, which is the important part:
+
+```
+1 enum(s) not statically comparable, so not checked
+    hero-settings.model.ts:featuresColumns
+```
+
+That enum's allowed values are assembled at runtime instead of written out as a literal
+list, so they cannot be read from the source text. **74 of the 75 pairs are compared in
+full; `featuresColumns` is compared by field name only.** A guard that silently skipped it
+would be worse than one that says so, because the silence would be indistinguishable from
+a pass.
+
+Two consequences: if that field ever gains a value on one side only, the write will be
+rejected and the guard will not warn you; and if anyone rewrites the field as a literal
+list, the guard starts checking it automatically with no change needed here.
 
 ## Tests that must pass
 

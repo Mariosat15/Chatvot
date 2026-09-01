@@ -316,6 +316,42 @@ Template:
 
 ---
 
+### 1 Sep 2026 - Stage 0 Defect 1, test 9 written first (no production change)
+
+Defect 2 is committed as `0798a935` and awaiting the owner test. Rather than idle, the
+first of Defect 1's eleven required tests is written. **No production code was touched** -
+this is the "tests-first" step the plan calls for, and it is safe to do before sign-off
+because it adds nothing to the runtime.
+
+`__tests__/services/entry-fee-ledger.test.ts`, 4 tests, passing.
+
+**It converted an inference into a proven defect.** The plan said Gate A writes
+`referenceId` into a schema that does not declare it, and reasoned that the reference must
+therefore be lost. That is now measured against a real MongoDB: write the exact row
+`competition.actions.ts:548` writes, read it back through the driver, and the `referenceId`
+property is absent while `competitionId` is `undefined`. **Every competition entry fee ever
+collected is unattributable to its competition.**
+
+**The scope was checked, not assumed, and it is narrower than it sounds.** Nothing computes
+money from `WalletTransaction.competitionId` - `withdrawal-validator.service.ts` reads that
+field from `CompetitionParticipant`, and `platform-financials.service.ts` uses its own
+`sourceId`. So this is a broken **audit trail**, not a wrong balance. Worth stating plainly
+because "money ledger bug" invites a panic the evidence does not support.
+
+Two further findings worth keeping:
+
+- **Only two places write `referenceId`**, and they agree: Gate A and its admin mirror at
+  `apps/admin/lib/actions/trading/competition.actions.ts:610`. This is one bug duplicated,
+  **not** mirror drift - so the new guard does not catch it, and cannot. A test must.
+- **The guard cannot check one enum**, and says so rather than passing quietly:
+  `hero-settings.model.ts:featuresColumns` builds its allowed values at runtime instead of
+  as a literal list. 74 of 75 pairs are compared in full; that one is compared by field
+  name only. Recorded in `00a` under "The one thing the guard cannot check".
+
+Also included a fourth test that fails if anyone "fixes" this by loosening the schema: a
+typo'd `transactionType` must still be rejected, because every total that groups by that
+field depends on it.
+
 ### 1 Sep 2026 - Stage 0 Defect 2 (model mirrors) - BUILT, AWAITING OWNER TEST
 
 **Shipped:** the mirror guard, the sync of every drifted pair, and the test database the
