@@ -324,8 +324,8 @@ refused. That pair is now a required test - number 12 below.
 | 8 | Finalize the same competition twice | Winners paid **once** (idempotency) |
 | 9 | Entry fee ledger row | Carries a resolvable competition reference in a field the schema defines. **Written 1 Sep 2026** - `__tests__/services/entry-fee-ledger.test.ts`, 4 tests, passing. Pins the current defect, proves the corrected write survives, proves the audit query works, and guards against "fixing" it by loosening the schema |
 | 10 | Retries exhausted under sustained write conflict | Returns 409, no participant created, no debit |
-| 11 | Accept a challenge while restricted / fraud-flagged | Refused (sub-defect 1b) |
-| 12 | Join an `upcoming` competition outside market hours, then try to place an order in it | Join **succeeds**, order **refused**. Locks in the owner's decision above, in both directions - a fix that blocked the join would fail this, and so would one that let the order through. **Join half written 1 Sep 2026** in `competition-join-gate-parity.test.ts`: with the market closed, Gate A admits and Gate B refuses cleanly (no seat, no fee). The order half still to write |
+| 11 | Accept a challenge while restricted / fraud-flagged | Refused (sub-defect 1b). **Written 1 Sep 2026** - `__tests__/services/challenge-accept-guards.test.ts`, 5 tests, passing. Three pin the guards that *are* present so a fix cannot drop them; two record the two that are missing. **Sub-defect 1b is now proven, not inferred** |
+| 12 | Join an `upcoming` competition outside market hours, then try to place an order in it | Join **succeeds**, order **refused**. Locks in the owner's decision above, in both directions - a fix that blocked the join would fail this, and so would one that let the order through. **DONE 1 Sep 2026** in `competition-join-gate-parity.test.ts`, both directions. With the market closed: Gate A admits, Gate B refuses cleanly (no seat, no fee), and `placeOrder` refuses with no order and no position created. The two halves are deliberately in one file - split apart, each reads as an arbitrary rule |
 
 ### Live bug 5 - cancelling a competition twice refunds every player twice
 
@@ -350,6 +350,37 @@ retried cron delivery, an admin cancel racing the cron, a manual re-run - pays t
 `finalizing` in a single `findOneAndUpdate` and bails if it loses the race
 (`competition-end.actions.ts` lines 62-76). The refund path needs the same shape:
 `upcoming|active` -> `cancelling`.
+
+### Sub-defect 1b measured - exactly which guards the challenge accept path is missing
+
+**PROVEN 1 Sep 2026**, `__tests__/services/challenge-accept-guards.test.ts`.
+
+Accepting a challenge debits both players, so it is a money path and should refuse the
+accounts competition entry refuses. `POST /api/challenges/[id]/accept` checks:
+
+| Guard | Present | Where |
+|---|---|---|
+| Authenticated | Yes | line 21 |
+| Email verified | Yes | line 28 |
+| Market hours | Yes | line 43 |
+| Only the challenged user | Yes | line 67 |
+| Status is `pending` | Yes | line 76 |
+| Accept deadline | Yes | line 85 |
+| Wallet balance, both parties | Yes | line 96 |
+| **Account restriction** | **No** | - |
+| **Fraud gate** | **No** | - |
+
+A restricted account - suspended, or under investigation - **can enter a paid 1v1 and be
+debited**, while the same account cannot join a competition. So can a fraud-flagged one.
+
+Worth stating for the fraud case in particular: a challenge is the *easiest* shape for
+coordinated entry, because it is exactly two players and the pot returns to the pair minus
+the platform fee. The gate matters here at least as much as on a competition, and it is the
+one place it is absent.
+
+Note the challenge **create** route (`app/api/challenges/route.ts` lines 175-219) does check
+both. Only accept is missing them, which is why reading one route was never going to find
+this.
 
 ### Correction - the "five finalization entry points" claim is wrong
 

@@ -323,6 +323,37 @@ Template:
 
 ---
 
+### 1 Sep 2026 - Sub-defect 1b measured, and test 12 closed in both directions
+
+`__tests__/services/challenge-accept-guards.test.ts`, 5 tests, plus one more in the gate
+parity file. Suite now **217 tests**, from 211. **No production code changed.**
+
+**Sub-defect 1b is proven, not inferred.** Accepting a challenge debits both players, so it
+is a money path, and it checks seven guards but **not account restriction and not the fraud
+gate**. A suspended account that cannot join a competition **can enter a paid 1v1 and be
+debited**. So can a fraud-flagged one. Three of the five tests pin the guards that *are*
+present, so a fix cannot quietly drop one while adding the missing two.
+
+The fraud case deserves the emphasis: a challenge is the **easiest** shape for coordinated
+entry, being exactly two players with the pot returning to the pair minus the platform fee.
+It is the one paid path where that gate is absent. Note the challenge *create* route does
+check both - only accept is missing them, which is why reading a single route would never
+have found this.
+
+**Test 12 is now complete in both directions.** With the market closed: Gate A admits, Gate B
+refuses cleanly, and `placeOrder` refuses with no order and no position created. Both halves
+live in one file deliberately - split apart, each reads as an arbitrary rule, and the
+decision only means something as a pair. The order half needs almost no fixture because
+`placeOrder` checks the market immediately after the session and before it connects to the
+database.
+
+**Next chat should:** write tests 6, 8 and 10 - the three that remain. 6 and 8 both need a
+fully seeded *finished* competition (participants, closed positions, rankings), which is a
+larger fixture than anything built so far; 10 needs sustained write conflict against Gate B's
+five retries.
+
+---
+
 ### 1 Sep 2026 - Defect 1: the prize-pool gap proven, and a fifth live bug (double refund)
 
 Two new files, 8 tests, all passing. Suite now **211 tests**, from 203. **No production code

@@ -120,6 +120,7 @@ const { enterCompetition } = await import(
 const { POST: joinViaApi } = await import(
   "@/app/api/competitions/[id]/join/route"
 );
+const { placeOrder } = await import("@/lib/actions/trading/order.actions");
 
 const ENTRY_FEE = 25;
 const START_BALANCE = 500;
@@ -321,5 +322,48 @@ describe("competition entry - the two gates compared", () => {
     const comp = await readCompetition(competitionId);
     expect(comp?.currentParticipants).toBe(1);
     expect(await totalCollected([gateBPlayer])).toBe(0);
+  });
+
+  it("refuses the ORDER outside market hours, which is the half that must keep refusing (test 12)", async () => {
+    // Reason: this is the second direction of the owner's decision, and it is the one a
+    // careless fix breaks. Relaxing the market-hours check to let weekend sign-ups through
+    // must not relax it on the trading path - a player who joined on Saturday still cannot
+    // trade until the market opens.
+    //
+    // Asserted here rather than in a trading test file because the two halves only mean
+    // something together. Split apart, each looks like an arbitrary rule.
+    //
+    // Almost no fixture is needed: placeOrder checks the market immediately after the
+    // session and before it even connects to the database (order.actions.ts line 255), so
+    // the refusal happens before any competition state is read.
+    marketState.open = false;
+    marketState.reason = "Market is closed for the weekend";
+
+    const competitionId = await seedCompetition();
+    await seedWallets([DEFAULT_USER_ID]);
+
+    const joined = await enterCompetition(competitionId);
+    expect(joined.success).toBe(true);
+
+    const order = await placeOrder({
+      competitionId,
+      symbol: "EUR/USD",
+      side: "buy",
+      orderType: "market",
+      quantity: 1000,
+    });
+
+    expect(order.success).toBe(false);
+    expect(order.error).toMatch(/market is currently closed/i);
+
+    // No order and no position may exist as a result of the refusal.
+    const orders = await mongoose.connection.db
+      ?.collection("tradingorders")
+      .countDocuments({ competitionId });
+    const positions = await mongoose.connection.db
+      ?.collection("tradingpositions")
+      .countDocuments({ competitionId });
+    expect(orders).toBe(0);
+    expect(positions).toBe(0);
   });
 });
