@@ -52,7 +52,9 @@ Rating scale: Critical = real money moves wrongly or the platform is down; High 
 
 **Mitigation, carried out:** **Stage 0** existed solely for this. The money tests were written first, then all four writers were resolved - two became wrappers over `lib/services/contest-entry.service.ts`, one was fixed in place, one was deleted. The order paid for itself: writing the tests before the fix is what found the double-refund bug, the 500-with-leak, the `brandingFiles` failure and the `SuspicionScore` race, none of which were in this plan.
 
-**Still open, and not to be assumed closed:** the challenge *accept* path still has no restriction or fraud gate (sub-defect 1b, proven by test), and the finalize-time safeguard still has no under-count branch - so a future writer that forgets the `prizePool` increment would still be under-distributed silently.
+**Closed since that was written:** sub-defect 1b is fixed - challenge accept now runs the same restriction and fraud gates via the shared `checkAccountStanding`, asking about `enterChallenge` rather than `enterCompetition`, before any wallet read. The `SuspicionScore` races are fixed too, and a third defect found while documenting the second: `challengeId` was declared on **neither** `WalletTransaction` copy, so nine writers across challenge entry, refunds and payouts had it silently dropped and the whole challenge money trail was unattributable.
+
+**Still open, and not to be assumed closed:** the finalize-time safeguard still has no under-count branch - so a future writer that forgets the `prizePool` increment would still be under-distributed silently. That is the one remaining reason to keep this risk open rather than retire it.
 
 **Detection:** the payout-vs-pool invariant alert in `11` section 7.
 
@@ -304,13 +306,14 @@ Worth recording, because fear of these could distort the plan:
 
 Stage 0 is a separate delivery. **No games work starts until the owner has tested and confirmed:**
 
-1. The money tests pass. **Done** - 236 tests, 18 files, green.
+1. The money tests pass. **Done** - 243 tests, 19 files, green, with the three race-sensitive suites stable across three consecutive runs.
 2. There is exactly **one** contest entry path, and it increments `prizePool` on every route. **Done** - `lib/services/contest-entry.service.ts`. Both gates wrap it; the simulator batch route was fixed in place and keeps its bulk insert.
 3. All four bypassed security checks now apply to both entry routes. **Done**, and coordination detection too, which was avoidable by choosing an entrance.
 4. The mirror fields are synced. **Done** - all **11** drifted pairs of 75, not the five originally recorded.
 5. The mirror-drift CI check is in place **and demonstrably fails** when one side of a pair is changed. **Done**, with tests that prove both the failure and the absence of false positives.
 6. The production build succeeds. **Owner to verify** - currently blocked by this machine's network rather than by Stage 0.
-7. **Sub-defect 1b decided.** The challenge accept path still lacks the restriction and fraud gates. Either fix it inside Stage 0 or record the decision to defer it - do not sign off silently.
+7. **Sub-defect 1b decided - fixed, not deferred.** Challenge accept runs the same restriction and fraud gates via the shared `checkAccountStanding`, before either wallet is touched.
+8. **The challenge ledger is attributable.** `challengeId` is now declared on both `WalletTransaction` copies, so the nine writers spanning challenge entry, refunds and payouts no longer have it silently discarded. Note what cannot be signed off: **rows written before this date stay unattributable**, because the value never reached the database and there is nothing to backfill.
 
 Full owner checklist in `00a-STAGE-0-prerequisite-fixes-DO-FIRST.md`.
 

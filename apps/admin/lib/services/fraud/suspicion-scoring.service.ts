@@ -24,6 +24,15 @@ export interface ScoreUpdate {
   evidence: string;
   linkedUserIds?: string[];
   confidence?: number;
+  /**
+   * The label stored on each linked account, when it differs from `method`.
+   *
+   * Reason: the KYC detector has always written the snake_case `kyc_duplicate` here, and
+   * the admin UI renders the value raw. Defaulting to `method` would silently relabel it
+   * to `kycDuplicate` for new rows only, leaving the same list showing two spellings of
+   * one thing. Callers with existing stored data pass their own label.
+   */
+  matchType?: string;
 }
 
 export class SuspicionScoringService {
@@ -57,27 +66,35 @@ export class SuspicionScoringService {
   };
 
   /**
-   * Get or create suspicion score for a user
+   * Get or create the suspicion score for a user. Atomic.
+   *
+   * Mirrors `lib/services/fraud/suspicion-scoring.service.ts`. See that file for the
+   * measurement behind this; in short, a read-then-create loses the race against the
+   * unique index on `userId` and the losing detector's contribution is silently discarded,
+   * which makes the fraud gate under-report exactly when many accounts arrive together.
    */
   static async getOrCreateScore(userId: string): Promise<ISuspicionScore> {
     await connectToDatabase();
 
-    let score = await SuspicionScore.findOne({ userId });
+    // Reason: `$setOnInsert`, so the zero values are written only on creation and never
+    // over an accumulated score. `scoreBreakdown` is deliberately absent - the schema
+    // defaults every method, and naming the parent here would insert an empty object,
+    // after which `addPercentage` returns silently and every score reads zero forever.
+    const created = await SuspicionScore.findOneAndUpdate(
+      { userId },
+      {
+        $setOnInsert: {
+          userId,
+          totalScore: 0,
+          riskLevel: "low",
+          linkedAccounts: [],
+          scoreHistory: [],
+        },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
 
-    if (!score) {
-      score = await SuspicionScore.create({
-        userId,
-        totalScore: 0,
-        riskLevel: "low",
-        scoreBreakdown: {},
-        linkedAccounts: [],
-        scoreHistory: [],
-      });
-
-      console.log(`✅ Created new suspicion score for user ${userId}`);
-    }
-
-    return score;
+    return created;
   }
 
   /**
@@ -102,7 +119,7 @@ export class SuspicionScoringService {
         if (linkedUserId !== userId) {
           score.addLinkedAccount(
             new mongoose.Types.ObjectId(linkedUserId),
-            update.method,
+            update.matchType ?? update.method,
             update.confidence || 0.85,
           );
         }
@@ -111,28 +128,105 @@ export class SuspicionScoringService {
 
     await score.save();
 
+    // Reason: `save()` writes only this caller's modified paths, so two detectors using
+    // different methods each persist their own breakdown entry while `totalScore` - a
+    // whole-document field both computed from a stale copy - is last-write-wins. The
+    // document then contradicts its own breakdown and `riskLevel`, derived from the total,
+    // lands a band too low, so the account is never auto-restricted. Recomputing
+    // server-side from the persisted breakdown is order-independent.
+    const reconciled = await this.reconcileTotals(userId);
+    const current = reconciled ?? score;
+
     console.log(`📊 Updated suspicion score for user ${userId}:`);
     console.log(`   Method: ${update.method}`);
     console.log(`   Percentage Added: +${update.percentage}%`);
-    console.log(`   Old Score: ${oldScore} → New Score: ${score.totalScore}`);
-    console.log(`   Risk Level: ${oldRiskLevel} → ${score.riskLevel}`);
+    console.log(`   Old Score: ${oldScore} → New Score: ${current.totalScore}`);
+    console.log(`   Risk Level: ${oldRiskLevel} → ${current.riskLevel}`);
 
     // Check if crossed threshold
-    if (oldRiskLevel !== score.riskLevel) {
+    if (oldRiskLevel !== current.riskLevel) {
       console.log(
-        `⚠️ RISK LEVEL CHANGED: ${oldRiskLevel} → ${score.riskLevel}`,
+        `⚠️ RISK LEVEL CHANGED: ${oldRiskLevel} → ${current.riskLevel}`,
       );
 
       // Check if auto-suspend is enabled in fraud settings before auto-restricting
       if (
-        (score.riskLevel === "critical" || score.riskLevel === "high") &&
-        !score.autoRestrictedAt
+        (current.riskLevel === "critical" || current.riskLevel === "high") &&
+        !current.autoRestrictedAt
       ) {
-        await this.checkAndAutoRestrictUser(userId, score);
+        await this.checkAndAutoRestrictUser(userId, current);
       }
     }
 
-    return score;
+    return current;
+  }
+
+  /**
+   * Recompute `totalScore` and `riskLevel` from the breakdown already stored on the
+   * document, in one atomic server-side update. Mirrors the main app's copy.
+   *
+   * A pipeline update rather than a read-modify-write, because the sum must be taken from
+   * what is IN the document at that moment - that is what makes it order-independent and
+   * therefore safe to run concurrently. The thresholds are duplicated from the model's
+   * `calculateRiskLevel` because the comparison happens inside MongoDB, where a JavaScript
+   * method cannot run; they must be kept in step.
+   */
+  private static async reconcileTotals(
+    userId: string,
+  ): Promise<ISuspicionScore | null> {
+    // Derived from the schema so a newly declared detection method is counted without
+    // anyone having to remember this function exists.
+    const methods = Object.keys(SuspicionScore.schema.paths)
+      .map((path) => /^scoreBreakdown\.([^.]+)$/.exec(path)?.[1])
+      .filter((name): name is string => Boolean(name));
+
+    if (methods.length === 0) return null;
+
+    return SuspicionScore.findOneAndUpdate(
+      { userId },
+      [
+        {
+          $set: {
+            totalScore: {
+              $min: [
+                {
+                  $add: methods.map((method) => ({
+                    $ifNull: [`$scoreBreakdown.${method}.percentage`, 0],
+                  })),
+                },
+                100,
+              ],
+            },
+          },
+        },
+        {
+          // A second stage, because it reads the `totalScore` the first one just produced.
+          $set: {
+            riskLevel: {
+              $switch: {
+                branches: [
+                  {
+                    case: { $gte: ["$totalScore", this.THRESHOLDS.critical] },
+                    then: "critical",
+                  },
+                  {
+                    case: { $gte: ["$totalScore", this.THRESHOLDS.high] },
+                    then: "high",
+                  },
+                  {
+                    case: { $gte: ["$totalScore", this.THRESHOLDS.medium] },
+                    then: "medium",
+                  },
+                ],
+                default: "low",
+              },
+            },
+            lastUpdated: "$$NOW",
+          },
+        },
+      ],
+      { new: true },
+    );
   }
 
   /**

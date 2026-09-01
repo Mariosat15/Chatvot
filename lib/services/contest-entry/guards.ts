@@ -10,34 +10,33 @@ import type { ContestEntryActor, ContestEntryFailure } from "./types";
 import { fail } from "./types";
 
 /**
- * The person-level gates. These depend on the account rather than the contest, so they run
- * once before the transaction rather than inside every retry.
+ * The two account-standing gates: is this account restricted, and does the fraud gate
+ * allow it to enter a paid contest right now.
+ *
+ * Separate from `checkActor` so that the challenge accept route can use exactly these two
+ * without inheriting competition wording or a duplicate email check it already performs.
+ * Sub-defect 1b was that the accept route had neither, while competition entry had both -
+ * and a challenge is the easiest shape for coordinated entry, being exactly two players
+ * with the pot returning to the pair minus the platform fee. Proven and then fixed on
+ * 1 September 2026; see `__tests__/services/challenge-accept-guards.test.ts`.
+ *
+ * `action` decides which restriction flag is consulted, and the two are NOT
+ * interchangeable: `enterCompetition` blocks unless `canEnterCompetitions` is truthy,
+ * whereas `enterChallenge` blocks only on an explicit `false`, because restrictions
+ * created before that field existed have it undefined and must stay allowed. Passing the
+ * wrong one would silently change who is admitted.
  */
-export async function checkActor(
+export async function checkAccountStanding(
   actor: ContestEntryActor,
+  action: "enterCompetition" | "enterChallenge",
+  refusalMessage: string,
 ): Promise<ContestEntryFailure | null> {
-  if (actor.trusted) return null;
-
-  // Reason: unverified accounts were occupying seats and skewing matchmaking.
-  if (actor.emailVerified !== true) {
-    return fail(
-      "email_unverified",
-      "Please verify your email address before entering competitions.",
-    );
-  }
-
   const { canUserPerformAction } = await import(
     "@/lib/services/user-restriction.service"
   );
-  const restriction = await canUserPerformAction(
-    actor.userId,
-    "enterCompetition",
-  );
+  const restriction = await canUserPerformAction(actor.userId, action);
   if (!restriction.allowed) {
-    return fail(
-      "restricted",
-      restriction.reason || "You are not allowed to enter competitions",
-    );
+    return fail("restricted", restriction.reason || refusalMessage);
   }
 
   // Enforces the VPN/proxy/Tor/datacenter blocks, device-risk and suspicion-score
@@ -58,6 +57,30 @@ export async function checkActor(
   }
 
   return null;
+}
+
+/**
+ * The person-level gates for competition entry. These depend on the account rather than
+ * the contest, so they run once before the transaction rather than inside every retry.
+ */
+export async function checkActor(
+  actor: ContestEntryActor,
+): Promise<ContestEntryFailure | null> {
+  if (actor.trusted) return null;
+
+  // Reason: unverified accounts were occupying seats and skewing matchmaking.
+  if (actor.emailVerified !== true) {
+    return fail(
+      "email_unverified",
+      "Please verify your email address before entering competitions.",
+    );
+  }
+
+  return checkAccountStanding(
+    actor,
+    "enterCompetition",
+    "You are not allowed to enter competitions",
+  );
 }
 
 /** The level requirement, if the contest sets one. Kept out of the transaction body. */

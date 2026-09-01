@@ -70,10 +70,21 @@ from it change facts stated in this folder:
   not a write conflict**, so it sits outside any retry loop. Provider integration multiplies
   concurrent entries; assume this will be hit.
 
-  **One thing is still open and is NOT closed by the above.** The challenge accept path still
-  has no restriction or fraud gate (sub-defect 1b), and a new finding of the same class -
-  read-then-create races on `SuspicionScore` in three fraud services - is recorded as **R28**.
-  Both are unfixed.
+  **The two items previously open here are now closed**, both on 1 September 2026. Challenge
+  accept has the restriction and fraud gates, sharing `checkAccountStanding` with the entry
+  service so the two paths cannot drift apart again. The `SuspicionScore` races are fixed -
+  and **R28 records two corrections worth reading before writing provider code**: there were
+  five call sites, not three, and fixing the read-then-create exposed a *second* race in the
+  same function, where `totalScore` was read-modify-written and clobbered under concurrency.
+
+  A third defect was found while documenting the first: `challengeId` was declared on
+  **neither** `WalletTransaction` copy, so **nine** writers - challenge entry, the decline
+  refund, and six finalization payouts across both apps - had it silently discarded. **The
+  whole challenge money trail was unattributable.** Fixed add-only in both copies. Two points
+  carry directly into provider work: no balance was wrong, so describe it as an audit-trail
+  fault rather than a financial one; and **the mirror guard could not have caught it**,
+  because both copies were wrong identically. A green `check:mirrors` proves the two apps
+  agree with each other, never that either agrees with the code writing to them.
 
 ### THE OPEN DECISION - which scenario
 

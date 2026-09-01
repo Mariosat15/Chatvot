@@ -130,12 +130,13 @@ get wrong and are worth stating here:
  Use **USD-quoted symbols** or finalization fetches conversion rates over the network, and
  satisfy the **whole** competition schema (`createdBy`, `registrationDeadline`, `description`),
  because finalization saves the document even though those fields play no part in a payout.
-- **The challenge accept route is missing the restriction and fraud guards** (proven 1 Sep
- 2026, `__tests__/services/challenge-accept-guards.test.ts`, sub-defect 1b). It checks seven
- other guards. The challenge **create** route checks both, so only accept is affected — which
- is why reading one route would never have found it. A challenge is the easiest shape for
- coordinated entry, being exactly two players with the pot returning to the pair minus the
- platform fee, so the fraud gap matters here at least as much as on a competition.
+- **The challenge accept route was missing the restriction and fraud guards** (proven and
+ then **fixed** 1 Sep 2026, `__tests__/services/challenge-accept-guards.test.ts`,
+ sub-defect 1b). It checked seven other guards. The challenge **create** route checks both,
+ so only accept was affected — which is why reading one route would never have found it. A
+ challenge is the easiest shape for coordinated entry, being exactly two players with the
+ pot returning to the pair minus the platform fee, so the fraud gap mattered here at least
+ as much as on a competition. See the fix note below.
 - **Classify concurrency failures, never merely count them.** Asserting that the artifact
  and unknown buckets are *empty* is what stops test-server noise inflating a finding. And
  note the trap in the other direction: a genuine write conflict reads `Write conflict during
@@ -182,6 +183,24 @@ get wrong and are worth stating here:
  `referenceId` identically this was **one bug duplicated, not mirror drift**, so the guard
  does not catch it and cannot. The unified service writes `competitionId`; historical rows
  stay unattributable, so **do not describe the audit trail as repaired retroactively.**
+- **The same defect existed on the challenge side, wider, and was fixed 1 Sep 2026.**
+ `challengeId` was declared on **neither** `WalletTransaction` copy while **nine** writers
+ passed it — challenge entry (×2), the decline refund, and six finalization payouts across
+ both apps — so **the entire challenge money trail was unattributable**, not just entry.
+ Same harm statement as its sibling: audit trail, not balance; nothing queries
+ `wallettransactions` by it; nothing to backfill, because the value never reached the
+ database. Declared add-only in both copies with a matching index, proven by
+ `__tests__/services/challenge-accept-guards.test.ts` and probed by un-declaring it again.
+ **This is the third "one bug duplicated, not drift" case**, after `referenceId` and
+ `failedReason`, so carry the general rule rather than the three instances: **the mirror
+ guard proves the two apps agree with each other, never that either agrees with the code
+ writing to them.** A green `check:mirrors` is not evidence that a field is stored.
+- **Verify the throwaway sentence, not just the claim you set out to test.** That bug was
+ found only because a passing remark inside a paragraph about something else — asserting
+ that `challengeId` *was* declared, and that `competitionId` was an ObjectId, both false —
+ was checked before being left on record. Documentation written during implementation is a
+ defect-finding instrument; an unverified aside in it deserves the same suspicion as an
+ unverified claim in code.
 - **Defect 1 is built** (1 Sep 2026, awaiting owner test): `lib/services/contest-entry.service.ts`
  holds the transaction, with the result shapes, the pre-transaction guards and the
  post-commit work in `lib/services/contest-entry/` (`types.ts`, `guards.ts`,
@@ -208,10 +227,37 @@ get wrong and are worth stating here:
  request. It needs handling in **two** places, and missing either leaves the hole open — the
  pre-flight participant check, *and* the **E11000 duplicate-key error** from the unique index
  when two requests pass the check in the same instant. Treat E11000 on that index as success.
-- **A new race is on record and NOT fixed** (`SuspicionScore`, needs an owner decision).
- Three fraud services read-then-create the same score document, so concurrent entries lose
- scores to `E11000`. It surfaced only once the entry path stopped serializing itself — worth
- remembering generally: **removing a bottleneck exposes every race that the bottleneck hid.**
+- **`SuspicionScore` had two independent races, both now fixed** (1 Sep 2026,
+ `__tests__/services/suspicion-score-race.test.ts`). It surfaced only once the entry path
+ stopped serialising itself, which is the general lesson: **removing a bottleneck exposes
+ every race the bottleneck was hiding** — the old path admitted 1 concurrent join in 20, so
+ the losers never reached the fraud services at all. Five call sites, not the three first
+ counted, each read-then-created its own document against a unique index; **17 of 20**
+ concurrent detectors threw `E11000` and their contributions were discarded silently,
+ because every caller is fire-and-forget. Fixed by making `getOrCreateScore` an atomic
+ upsert and routing all five through it.
+ **The second race is the more instructive one, and the upsert did not fix it.** `save()`
+ writes only the paths one caller modified, so two detectors using *different* methods each
+ persisted their own breakdown entry while `totalScore` — a whole-document field both
+ computed from a stale copy — was last-write-wins. The document then **contradicted its own
+ breakdown**: 40 and 25 stored correctly, total 40, so `riskLevel` sat at medium when 65
+ crosses "high" and the account was never auto-restricted. Two rules follow: **a derived
+ total is not safe just because its inputs are on separate paths**, and the fix is to
+ recompute it **server-side from the persisted document** with a `$set` aggregation-pipeline
+ update, which is order-independent and therefore converges no matter how the callers
+ interleave. Two remaining read-then-create sites in `scripts/` are deliberately left —
+ they are hand-run and single-threaded.
+- **Sub-defect 1b is fixed** (1 Sep 2026): challenge accept now calls
+ `checkAccountStanding` from `lib/services/contest-entry/guards.ts`, shared with the
+ unified entry service so the two paid entry paths cannot drift apart again. Two things to
+ keep right. It must pass **`enterChallenge`, never `enterCompetition`** — the flags differ
+ on purpose, since `canEnterChallenges` blocks only on an explicit `false` so that
+ restrictions predating the field stay allowed, and swapping them would quietly refuse every
+ legacy-restricted account. And the guard runs **before any wallet read**, so a refusal
+ cannot leave one of the two debits applied. Pinned by a test that asserts *which* action
+ the route asks about, not merely that it refused — the refusal alone passes either way.
+ Swept the sibling routes: challenge **create** already had both, **decline** and the admin
+ challenge route only ever credit, so there is nothing else to fix.
 
 ## The rule
 

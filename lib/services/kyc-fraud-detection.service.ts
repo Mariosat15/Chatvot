@@ -2,13 +2,11 @@
 /* eslint-disable security/detect-non-literal-regexp -- every RegExp input is escapeRegex()'d before interpolation (see escapeRegex usage below). */
 /* eslint-disable security/detect-object-injection -- object/array access uses trusted loop indices and queried keys, never raw user input. */
 import crypto from "crypto";
-import mongoose from "mongoose";
 import KYCSession from "@/database/models/kyc-session.model";
 import FraudAlert from "@/database/models/fraud/fraud-alert.model";
 import FraudSettings from "@/database/models/fraud/fraud-settings.model";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import UserRestriction from "@/database/models/user-restriction.model";
-import SuspicionScore from "@/database/models/fraud/suspicion-score.model";
 import { connectToDatabase } from "@/database/mongoose";
 import { isValidObjectId } from "@/lib/utils/url-validator";
 
@@ -294,42 +292,34 @@ export async function checkForDuplicateKYC(
       `Duplicate KYC document detected with ${allInvolvedUserIds.length - 1} other account(s). ` +
       `Match type: ${result.duplicateAccounts[0]?.matchType || "unknown"}`;
 
+    // Reason: this used to read-then-create its own score document per user, which loses
+    // the race against the unique index on `userId` and silently discards the
+    // contribution - and a KYC duplicate scan updates several users at once, so the race
+    // is the normal case here rather than an edge one. `updateScore` is the single atomic
+    // path: it upserts, records the linked accounts, and reconciles the total server-side.
+    // See `__tests__/services/suspicion-score-race.test.ts`.
+    const { SuspicionScoringService } = await import(
+      "@/lib/services/fraud/suspicion-scoring.service"
+    );
+
     for (const involvedUserId of allInvolvedUserIds) {
       try {
-        // Find or create suspicion score
-        let suspicionScore = await SuspicionScore.findOne({
-          userId: new mongoose.Types.ObjectId(involvedUserId),
-        });
-
-        if (!suspicionScore) {
-          suspicionScore = new SuspicionScore({
-            userId: new mongoose.Types.ObjectId(involvedUserId),
-            totalScore: 0,
-            riskLevel: "low",
-          });
-        }
-
-        // Add KYC duplicate percentage
-        suspicionScore.addPercentage(
-          "kycDuplicate",
-          kycDuplicatePercentage,
-          evidenceText,
+        const updated = await SuspicionScoringService.updateScore(
+          involvedUserId,
+          {
+            method: "kycDuplicate",
+            percentage: kycDuplicatePercentage,
+            evidence: evidenceText,
+            linkedUserIds: allInvolvedUserIds.filter(
+              (otherId) => otherId !== involvedUserId,
+            ),
+            confidence: 0.95, // High confidence for KYC match
+            // Preserves the label this detector has always stored; see ScoreUpdate.
+            matchType: "kyc_duplicate",
+          },
         );
-
-        // Add linked accounts
-        for (const otherId of allInvolvedUserIds) {
-          if (otherId !== involvedUserId) {
-            suspicionScore.addLinkedAccount(
-              new mongoose.Types.ObjectId(otherId),
-              "kyc_duplicate",
-              0.95, // High confidence for KYC match
-            );
-          }
-        }
-
-        await suspicionScore.save();
         console.log(
-          `  📊 Updated suspicion score for user ${involvedUserId}: ${suspicionScore.totalScore}% (${suspicionScore.riskLevel})`,
+          `  📊 Updated suspicion score for user ${involvedUserId}: ${updated.totalScore}% (${updated.riskLevel})`,
         );
       } catch (scoreError) {
         console.error(

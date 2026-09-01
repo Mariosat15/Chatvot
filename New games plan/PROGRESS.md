@@ -15,8 +15,8 @@
 
 | | |
 |---|---|
-| **Status** | **STAGE 0 IN PROGRESS.** Prerequisite A shipped. **Defects 2 and 1 both built, awaiting owner test.** Sub-defect 1b (challenge accept) not started |
-| **Next action** | Owner runs the two test checklists in `00a`. Two decisions are open: the `SuspicionScore` race, and whether sub-defect 1b ships before Stage 0 signs off |
+| **Status** | **STAGE 0 CODE COMPLETE, awaiting owner test.** Prerequisite A shipped. Defects 2 and 1 built. **Sub-defect 1b, the `SuspicionScore` races and the undeclared `challengeId` ledger field all fixed.** No open engineering items |
+| **Next action** | Owner runs the test checklist in `00a` — 5 manual items, down from 11+ after automation. Nothing else is blocked on a decision |
 | **Owner instruction on record** | "I will need to start today" (1 Sep 2026), superseding "don't start anything" (17 Aug 2026) |
 | **Last updated** | 1 September 2026 |
 
@@ -69,12 +69,13 @@ knowing before reading anything else:
    duplicate-key branch - the seat check won every time. A probe proved it; the branch now has
    a test that forces the condition.
 
-**Two decisions are open** as of the end of 1 September 2026:
+**No engineering decisions are open.** The two that were open at the end of the first
+working session were both decided by the owner and built the same day:
 
-| Open decision | Why it needs the owner |
+| Decision | Outcome |
 |---|---|
-| The `SuspicionScore` read-then-create race (3 call sites) | Same bug class just fixed for seats, but in untested fraud code. Concurrent fraud events silently fail to record a score |
-| Whether sub-defect 1b ships inside Stage 0 | Challenge accept still has no restriction or fraud gate. Proven by test, not fixed |
+| The `SuspicionScore` read-then-create race | **Fix now.** Done, and it turned out to be **five** call sites and **two** distinct races, not the three sites first counted. See the work log |
+| Whether sub-defect 1b ships inside Stage 0 | **Yes, now.** Challenge accept shares `checkAccountStanding` with the unified entry service |
 
 Three earlier decisions were taken on 1 September 2026:
 
@@ -84,7 +85,7 @@ Three earlier decisions were taken on 1 September 2026:
 | The orphaned `.d.ts` files | **Delete.** All 112 removed, plus a `.gitignore` rule. The count was 112 repo-wide, not the 62 previously recorded - the earlier figure counted only `database/` and missed 26 files under `lib/` |
 | Market hours vs joining | **Joining is allowed at any time; only trading is gated.** Taking the union of the two gates blindly would have blocked weekend sign-ups for Monday contests - a revenue regression introduced by a bug fix. Locked in by Defect 1 test 12 |
 
-What is left for the owner: the **two test checklists** in `00a`, and the two decisions above.
+What is left for the owner: the **test checklist** in `00a`, and nothing else.
 
 ---
 
@@ -206,9 +207,11 @@ reader can tell "verified" from "assumed".
       tests, live bug 5*
 - [x] Simulator batch route funds the pool and attributes its ledger rows - *simulator batch
       tests, 7 of them*
-- [ ] **Sub-defect 1b is NOT fixed.** A challenge accepted with a restricted or fraud-flagged
-      account is still allowed. Proven by `challenge-accept-guards.test.ts`; awaiting the
-      decision on whether it ships inside Stage 0
+- [x] Sub-defect 1b fixed - a challenge accepted with a restricted or fraud-flagged account
+      is refused, with neither player debited - *`challenge-accept-guards.test.ts`, 7 tests,
+      the two defect tests inverted and proven to fail without the fix*
+- [x] Concurrent fraud detectors all record their score, and the total agrees with its own
+      breakdown - *`suspicion-score-race.test.ts`, 4 tests*
 
 ### Defect 2 - model mirrors
 
@@ -432,17 +435,10 @@ equivalent at all. **It did no visible harm** - every discarded value happened t
 schema default. A trap waiting for the first non-zero value, not a live data fault. Say it
 that way; overstating it costs credibility on the ones that are real.
 
-**One new finding, not fixed, needs an owner decision.** Three services do read-then-create on
-`SuspicionScore`, which has a unique index on `userId`:
-`lib/services/fraud/suspicion-scoring.service.ts:64-67`,
-`lib/services/registration-security.service.ts:1276-1279`,
-`lib/services/kyc-fraud-detection.service.ts:301-305`. Two concurrent fraud events for one
-user both find nothing and both insert; the loser throws 11000 and **the suspicion score is
-silently not recorded**. It surfaced as duplicate-key noise in the test output once
-coordination detection started running on both paths - exactly the class of bug just fixed for
-seats, in the code that decides whether someone is cheating. `findOneAndUpdate` with `upsert`
-in three places, but it is fraud code with no tests, so it is put to the owner rather than
-folded into this change.
+**One new finding surfaced here and was fixed in the next session** - the `SuspicionScore`
+read-then-create race. It appeared as duplicate-key noise in the test output once coordination
+detection started running on both paths. See the entry below, which also corrects the
+site count recorded here at the time: it was five, not three.
 
 **Files touched:** `lib/services/contest-entry.service.ts` (new),
 `lib/services/simulator/simulator-participant.ts` (new),
@@ -455,12 +451,123 @@ folded into this change.
 `__tests__/services/competition-entry-guards.test.ts`,
 `__tests__/services/entry-fee-ledger.test.ts`.
 
-**Deferred:** the `SuspicionScore` race, above. Also the challenge accept path (sub-defect
-1b) - it still lacks the restriction and fraud gates, and is the obvious next candidate to
-route through a shared guard set.
+**Superseded:** both items deferred by this entry - the `SuspicionScore` race and sub-defect
+1b - were decided by the owner and built the same day. See the entry below.
 
-**Next chat should:** put the `SuspicionScore` race to the owner, then decide whether
-challenge accept joins the unified guard set before Stage 0 signs off.
+---
+
+### 1 Sep 2026 - Sub-defect 1b, the SuspicionScore races and the challenge ledger fixed; Stage 0 code complete
+
+Two findings that this session's work had surfaced but not fixed. The owner chose to close
+both before moving on, which was the right call for a reason worth recording: **both were
+made reachable by the entry-path fix itself.**
+
+**`SuspicionScore` - five call sites and two distinct races, not the three sites and one race
+previously recorded.** `__tests__/services/suspicion-score-race.test.ts`, 4 tests, written
+before the fix.
+
+The first race is the one already described: `findOne` then `create` against a unique index
+on `userId`. Measured, rather than reasoned about: with twenty detectors arriving together for
+a user who had no score yet, **seventeen threw duplicate-key 11000 and their contributions
+were discarded.** Every caller is a fire-and-forget fraud detector that logs and swallows, so
+nothing surfaced. Fixed by making `getOrCreateScore` an atomic upsert and routing all five
+sites through it, which also removed four hand-rolled copies of the same read-then-create.
+
+**The second race is the more instructive one, and the upsert did not fix it.** The test
+caught it, which is the argument for writing the test first in a form that measures rather
+than asserts. `save()` writes only the paths one caller modified, so two detectors using
+*different* methods each persisted their own breakdown entry correctly - but `totalScore` is
+a whole-document field that each had computed from its own stale copy, so it was
+last-write-wins. **The document then contradicted its own breakdown:** 40 and 25 both stored,
+total 40. That is worse than losing a write, because `riskLevel` derives from the total, so
+65 - which crosses the "high" threshold - was filed as medium and the account was never
+auto-restricted. Fixed by recomputing the total and the risk band **server-side from the
+persisted document**, with a `$set` aggregation-pipeline update: it reads what is in the
+document at that moment, so it is order-independent and converges however the callers
+interleave.
+
+Two rules worth carrying forward. **A derived total is not safe just because its inputs sit on
+separate paths.** And **the harm of a silent fraud-scoring failure is asymmetric**: the entry
+fraud gate reads `totalScore` to decide whether to refuse an entry, and coordinated entry -
+many accounts joining one contest in the same second - is both what the detector looks for and
+what provoked the race, so detection was weakest exactly when it was needed.
+
+Two further read-then-create sites in `scripts/` are deliberately left alone: they are
+hand-run and single-threaded, so the race cannot occur.
+
+**Sub-defect 1b fixed.** `checkAccountStanding` was split out of the unified service's
+`checkActor` and is now called by `POST /api/challenges/[id]/accept`, so the two paid entry
+paths share one implementation of the account-standing gates and cannot drift apart again.
+Two details that are easy to get wrong and are pinned by tests:
+
+- It asks about **`enterChallenge`, not `enterCompetition`.** The flags differ on purpose:
+  `canEnterChallenges` blocks only on an explicit `false`, because restrictions created before
+  that field existed have it undefined and must stay allowed. Passing the competition action
+  would have quietly started refusing every legacy-restricted account. The test asserts
+  *which* action the route asks about, because a test that only checked the refusal passes
+  either way - confirmed by swapping the action and watching exactly one test go red.
+- It runs **before any wallet read**, so a refusal cannot leave one of the two debits applied.
+
+The two tests that recorded the defect were **inverted, not deleted**, and both were proven to
+fail without the fix. A third was added asserting that an account in good standing is still
+admitted and both fees still move - otherwise a guard that refuses everything would pass.
+
+**Swept the siblings, and found none.** Challenge **create** already had both gates. Challenge
+**decline** and the admin challenge route touch wallets but only ever *credit* - refunds and
+prize payouts - so an entry gate would be wrong there, not missing.
+
+**Also cleared, because the pre-commit hook requires zero warnings on staged files:** 19
+pre-existing lint warnings in `apps/admin/app/api/kyc-settings/scan-duplicates/route.ts`.
+Most were prototype-pollution sinks - the KYC duplicate scan grouped sessions in plain objects
+keyed by **user-submitted document numbers and names**, so a document number of `__proto__`
+would corrupt the grouping. Replaced with a `Map` and one `groupSessions` helper in place of
+four copies of the same loop.
+
+**One behaviour deliberately preserved rather than tidied:** the KYC detector stores
+`kyc_duplicate` as its linked-account label, and the admin UI renders that value raw. Routing
+it through `updateScore` would have relabelled new rows to `kycDuplicate` and left the same
+list showing two spellings of one thing, so `ScoreUpdate` gained an optional `matchType`.
+
+**A third fix landed in the same session, and how it was found is the point.** While writing
+the paragraph recording sub-defect 1b, this log asserted in passing that the accept route's
+`challengeId` was "a declared field, unlike `referenceId`, so it is not the same defect".
+**Both halves were false**, and checking the sentence before leaving it on record is the only
+reason the bug was found.
+
+`challengeId` was declared on **neither** `WalletTransaction` copy. **Nine** writers pass it -
+two on challenge entry, one on the decline refund, six across the finalization payouts in both
+apps - and strict mode discarded every one. **The entire challenge money trail was
+unattributable to its challenge**, a wider reach than `referenceId`, which cost the competition
+side only its entry rows.
+
+Stated with the same care as its sibling: no query reads `wallettransactions` by `challengeId`,
+so no balance was wrong and no player was mis-paid. It is an audit-trail defect, and nothing can
+be backfilled because the value never reached the database. Fixed add-only in both copies with a
+matching index, and probed by removing the declaration again - the test fails with `expected
+undefined`, the signature of a silent drop.
+
+**This is the third "one bug duplicated, not drift" case in Stage 0**, after `referenceId` and
+`failedReason`. The mirror guard cannot catch any of them and never could: both copies were
+wrong *identically*, so they agreed. Worth stating plainly because the guard is new and its
+reassurance is easy to over-read - **agreement between the two apps says nothing about agreement
+with the code that writes to them.**
+
+**Files touched:** `lib/services/fraud/suspicion-scoring.service.ts`,
+`apps/admin/lib/services/fraud/suspicion-scoring.service.ts`,
+`lib/services/kyc-fraud-detection.service.ts`,
+`lib/services/registration-security.service.ts`,
+`apps/admin/app/api/kyc-settings/scan-duplicates/route.ts`,
+`app/api/challenges/[id]/accept/route.ts`, `lib/services/contest-entry/guards.ts`,
+`database/models/trading/wallet-transaction.model.ts` and its admin mirror,
+`__tests__/services/suspicion-score-race.test.ts` (new, 4 tests),
+`__tests__/services/challenge-accept-guards.test.ts` (5 to 8 tests).
+
+**Verified:** 243 tests across 19 files, mirrors 75 agree / 0 drifted, main-app typecheck at
+its 15-error baseline, admin app at 225, lint clean on all 14 changed files, and the three
+race-sensitive suites stable across three consecutive runs.
+
+**Nothing is deferred.** Stage 0 is code complete and waiting only on the owner's manual
+checklist in `00a`.
 
 ---
 

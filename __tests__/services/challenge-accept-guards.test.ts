@@ -28,26 +28,28 @@ import {
 /**
  * Stage 0, Defect 1, test 11: the guards on accepting a 1v1 challenge (sub-defect 1b).
  *
- * A challenge is the other paid entry point. Accepting one debits the entry fee from both
- * players, so it is a money path and it should refuse the same accounts competition entry
- * refuses. It does not, and these tests measure exactly which guards are missing rather
- * than asserting the intended behaviour and leaving a red test behind.
+ * A challenge is the other paid entry point. Accepting one debits the entry fee from BOTH
+ * players, so it is a money path and it must refuse the accounts competition entry
+ * refuses. It did not. Measured on 1 September 2026 and fixed the same day; the two tests
+ * that recorded the defect are kept and inverted rather than deleted, because the reason
+ * the gap mattered is the most valuable part of them.
  *
- * Guards on POST /api/challenges/[id]/accept, as built:
+ * Guards on POST /api/challenges/[id]/accept:
  *
- *   authenticated            yes    line 21
- *   email verified           yes    line 28
- *   market hours             yes    line 43
- *   only the challenged user yes    line 67
- *   status is pending        yes    line 76
- *   accept deadline          yes    line 85
- *   wallet balance           yes    line 96
- *   account restriction      NO
- *   fraud gate               NO
+ *   authenticated            always
+ *   email verified           always
+ *   market hours             always
+ *   only the challenged user always
+ *   status is pending        always
+ *   accept deadline          always
+ *   wallet balance           always
+ *   account restriction      ADDED 1 Sep 2026
+ *   fraud gate               ADDED 1 Sep 2026
  *
- * The last two are the sub-defect. Competition entry (Gate A) checks both.
- *
- * No production code is changed by this file.
+ * Why it was only reachable here: the challenge CREATE route checks both, so reading one
+ * route would never have found it. The last two now come from `checkAccountStanding` in
+ * `lib/services/contest-entry/guards.ts`, shared with the unified competition entry
+ * service, so the two paths cannot drift apart again.
  */
 
 vi.mock("next/cache", () => ({
@@ -74,13 +76,22 @@ vi.mock("@/database/mongoose", () => ({
   default: async () => mongoose.connection,
 }));
 
-// Reason: mocked even though the accept route never calls them. If the route is later fixed
-// to consult these, the mocks are already wired and the two defect tests below flip to
-// failing - which is the signal the fix landed, and a prompt to rewrite them as guard tests.
+/**
+ * Records which restriction action the route asks about, as well as answering.
+ *
+ * Reason: the answer alone cannot distinguish a route that asks about challenges from one
+ * that asks about competitions, and the two flags behave differently on purpose - so a
+ * test that only checked the refusal would pass either way.
+ */
+const restrictionCalls: string[] = [];
+
 vi.mock("@/lib/services/user-restriction.service", async () => {
   const { ctx: c } = await import("../helpers/server-action-context");
   return {
-    canUserPerformAction: async () => c.restriction,
+    canUserPerformAction: async (_userId: string, action: string) => {
+      restrictionCalls.push(action);
+      return c.restriction;
+    },
     getHiddenUserIds: async () => [] as string[],
   };
 });
@@ -110,6 +121,9 @@ vi.mock("@/lib/services/market-hours.service", () => ({
 
 vi.mock("@/lib/services/notification.service", () => ({
   notificationService: {
+    // `send` is the one the accept route actually calls, after the commit. Stubbed so a
+    // post-commit side effect cannot print a failure that looks like the entry failing.
+    send: async () => {},
     notifyChallengeAccepted: async () => {},
     notifyCompetitionCancelled: async () => {},
   },
@@ -236,6 +250,7 @@ describe("challenge accept - guards (sub-defect 1b)", () => {
     resetActionContext();
     marketState.open = true;
     marketState.reason = "Market is open";
+    restrictionCalls.length = 0;
   });
 
   afterEach(async () => {
@@ -278,41 +293,104 @@ describe("challenge accept - guards (sub-defect 1b)", () => {
     });
   });
 
-  describe("guards that are MISSING - this is sub-defect 1b", () => {
-    it("ACCEPTS a restricted account, which competition entry refuses", async () => {
-      // Reason: this test records a defect, not a fix.
-      //
-      // A restriction is how a suspended or under-investigation account is stopped from
-      // moving money. Gate A calls canUserPerformAction("enterCompetition") and refuses.
-      // The accept route never calls it, so the same account that cannot join a competition
-      // can enter a paid 1v1 and have its wallet debited.
+  describe("the two guards that were missing - sub-defect 1b, now fixed", () => {
+    it("refuses a restricted account, as competition entry does", async () => {
+      // Reason: a restriction is how a suspended or under-investigation account is stopped
+      // from moving money. Gate A always called canUserPerformAction; the accept route
+      // never did, so the same account that could not join a competition could enter a
+      // paid 1v1 and have its wallet debited. Both now share `checkAccountStanding`.
       const challengeId = await seedPendingChallenge();
       withRestriction("Account suspended pending review");
+
+      const { status, body } = await callAccept(challengeId);
+
+      expect(status).toBe(403);
+      expect(body.error).toMatch(/suspended pending review/i);
+
+      // The part that matters: no fee left either wallet and the challenge is untouched.
+      await expectNoEntry(challengeId);
+    });
+
+    it("refuses a fraud-flagged account, as competition entry does", async () => {
+      // Reason: the fraud gate is what stops coordinated entry - two accounts controlled
+      // by one person entering the same contest. A challenge is the EASIEST shape for that
+      // abuse, being exactly two players with the pot returning to the pair minus the
+      // platform fee, so the gate matters here at least as much as on a competition.
+      const challengeId = await seedPendingChallenge();
+      withFraudBlock("Coordinated entry detected from a shared address");
+
+      const { status, body } = await callAccept(challengeId);
+
+      expect(status).toBe(403);
+      expect(body.error).toMatch(/coordinated entry/i);
+      await expectNoEntry(challengeId);
+    });
+
+    it("still admits an account in good standing", async () => {
+      // Reason: asserted so that a guard which refuses everything - the easiest way to make
+      // the two tests above pass - cannot be mistaken for a fix. Both fees must move.
+      const challengeId = await seedPendingChallenge();
 
       const { status } = await callAccept(challengeId);
 
       expect(status).toBe(200);
-
-      // The money moved, which is the part that matters.
       expect(await balanceOf(DEFAULT_USER_ID)).toBe(START_BALANCE - ENTRY_FEE);
+      expect(await balanceOf(CHALLENGER_ID)).toBe(START_BALANCE - ENTRY_FEE);
       expect(await readChallenge(challengeId)).toMatchObject({
         status: "active",
       });
     });
 
-    it("ACCEPTS a fraud-flagged account, which competition entry refuses", async () => {
-      // Reason: as above. The fraud gate is what stops coordinated entries - two accounts
-      // controlled by one person entering the same contest. A challenge is the *easiest*
-      // shape for that abuse, because it is exactly two players and the pot returns to the
-      // pair minus the platform fee, so the gate matters here at least as much as it does
-      // on a competition.
+    it("attributes both entry-fee ledger rows to their challenge", async () => {
+      // Reason: a second instance of the `referenceId` defect, found while documenting this
+      // fix. `challengeId` was NOT declared on the WalletTransaction schema in either app,
+      // yet nine writers already passed it - challenge entry twice, the refund on decline,
+      // and six finalization payout rows - so strict mode discarded every one and the
+      // whole challenge money trail was unattributable to its challenge.
+      //
+      // As with competitions, state the harm accurately: no balance is computed from this
+      // field, so nothing was mis-paid. It is an audit-trail defect. And because BOTH model
+      // copies lacked the field identically, it is one bug duplicated rather than mirror
+      // drift, so `npm run check:mirrors` neither caught it nor could have.
       const challengeId = await seedPendingChallenge();
-      withFraudBlock("Coordinated entry detected from a shared address");
 
       const { status } = await callAccept(challengeId);
-
       expect(status).toBe(200);
-      expect(await balanceOf(DEFAULT_USER_ID)).toBe(START_BALANCE - ENTRY_FEE);
+
+      const rows = await mongoose.connection.db
+        ?.collection("wallettransactions")
+        .find({ transactionType: "challenge_entry" })
+        .toArray();
+
+      expect(rows).toHaveLength(2);
+      for (const row of rows ?? []) {
+        // The assertion that fails when the field is undeclared: strict mode drops it, so
+        // the key is absent entirely rather than holding a wrong value.
+        expect(row.challengeId).toBe(challengeId);
+      }
+
+      // Both players, one row each, and the fee signed as a debit.
+      expect(new Set((rows ?? []).map((r) => r.userId))).toEqual(
+        new Set([CHALLENGER_ID, DEFAULT_USER_ID]),
+      );
+      expect((rows ?? []).map((r) => r.amount)).toEqual([
+        -ENTRY_FEE,
+        -ENTRY_FEE,
+      ]);
+    });
+
+    it("consults the CHALLENGE restriction flag, not the competition one", async () => {
+      // Reason: the two flags are deliberately different. `canEnterCompetitions` blocks
+      // when falsy; `canEnterChallenges` blocks only on an explicit `false`, because
+      // restrictions created before that field existed have it undefined and must stay
+      // allowed. Passing "enterCompetition" here would quietly start refusing every
+      // legacy-restricted account, so pin the action the route asks about.
+      const challengeId = await seedPendingChallenge();
+
+      await callAccept(challengeId);
+
+      expect(restrictionCalls).toContain("enterChallenge");
+      expect(restrictionCalls).not.toContain("enterCompetition");
     });
   });
 });

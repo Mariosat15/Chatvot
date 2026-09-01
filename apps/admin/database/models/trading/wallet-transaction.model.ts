@@ -38,6 +38,11 @@ export interface IWalletTransaction extends Document {
   paymentId?: string; // Stripe payment ID, etc. (deprecated - use providerTransactionId)
   paymentIntentId?: string; // Stripe Payment Intent ID (for fraud detection)
   competitionId?: string; // If related to competition
+  // Reason: mirrors the main app. Nine writers already pass this - challenge entry (x2),
+  // the refund on decline, and six finalization payout rows across both apps - but it was
+  // never declared, so strict mode discarded every one and the whole challenge money trail
+  // was unattributable. Declared 1 Sep 2026; historical rows cannot be recovered.
+  challengeId?: string; // If related to a 1v1 challenge
   description: string; // Transaction description
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- free-form PSP metadata blob
   metadata?: Record<string, any>; // Additional data
@@ -129,6 +134,9 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
     competitionId: {
       type: String,
     },
+    challengeId: {
+      type: String,
+    },
     description: {
       type: String,
       required: true,
@@ -151,6 +159,7 @@ const WalletTransactionSchema = new Schema<IWalletTransaction>(
 // Indexes for fast queries
 WalletTransactionSchema.index({ userId: 1, createdAt: -1 });
 WalletTransactionSchema.index({ competitionId: 1 });
+WalletTransactionSchema.index({ challengeId: 1 });
 WalletTransactionSchema.index({ status: 1, createdAt: -1 });
 WalletTransactionSchema.index({ transactionType: 1, createdAt: -1 });
 WalletTransactionSchema.index({ provider: 1, createdAt: -1 });

@@ -1270,29 +1270,19 @@ export async function recordFailedLogin(data: {
           // Also update suspicion score if userId is available
           if (data.userId) {
             try {
-              const SuspicionScore = (
-                await import("@/database/models/fraud/suspicion-score.model")
-              ).default;
-              let score = await SuspicionScore.findOne({ userId: data.userId });
-
-              if (!score) {
-                score = await SuspicionScore.create({
-                  userId: data.userId,
-                  totalScore: 0,
-                  riskLevel: "low",
-                  scoreBreakdown: {},
-                  linkedAccounts: [],
-                  scoreHistory: [],
-                });
-              }
-
-              // Add brute force percentage to score
-              score.addPercentage(
-                "bruteForce",
-                35,
-                `Brute force: ${entry.count} failed logins from IP ${ip}`,
+              // Reason: this used to read-then-create its own score document, which loses
+              // the race against the unique index on `userId` and silently discards the
+              // contribution. `updateScore` is the single atomic path - it upserts and
+              // reconciles the total server-side. See
+              // `__tests__/services/suspicion-score-race.test.ts`.
+              const { SuspicionScoringService } = await import(
+                "@/lib/services/fraud/suspicion-scoring.service"
               );
-              await score.save();
+              await SuspicionScoringService.updateScore(data.userId, {
+                method: "bruteForce",
+                percentage: 35,
+                evidence: `Brute force: ${entry.count} failed logins from IP ${ip}`,
+              });
               console.log(
                 `📊 Suspicion score updated for ${data.userId}: +35% (brute force)`,
               );

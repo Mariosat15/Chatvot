@@ -449,7 +449,7 @@
 
       <h4>The fix &mdash; built on 1 September 2026</h4>
       <ol>
-        <li><b>Write the money tests first</b>, against today's behaviour, so any unintended change is caught immediately. <b>Done</b>, and it paid for itself: writing the tests before the fix is what found four separate live bugs that were not in this plan.</li>
+        <li><b>Write the money tests first</b>, against today's behaviour, so any unintended change is caught immediately. <b>Done</b>, and it paid for itself several times over: writing the tests before the fix is what found the double refund, the busy-competition outage, the lost fraud scores, the missing challenge checks and the discarded challenge payment stamps &mdash; <b>five live faults, none of which were in this plan.</b></li>
         <li><b>Build one single entrance</b> that does <i>all</i> the checks from both doors and <i>always</i> adds the fee to the prize pool, in the same database transaction as the charge. <b>Done.</b></li>
         <li><b>Point both existing doors at it</b>, so nothing else in the app has to change. <b>Done</b> &mdash; the two doors shrank from 379 and 361 lines to 76 and 141.</li>
         <li><b>Keep the retry logic</b> from the API path &mdash; it exists because simultaneous joins genuinely collide. <b>Done</b>, and see below: this turned out to matter far more than expected.</li>
@@ -473,6 +473,14 @@
         <div class="t">A fault neither door had ever handled</div>
         <p>Both doors checked "is this player already in?" and then added them &mdash; two separate steps. Two simultaneous joins by the <i>same</i> player can both pass that check. What actually stops the second seat is a uniqueness rule in the database, and it reports a <b>different</b> kind of error from the one both doors knew how to retry. So whichever request lost was told the server had failed, with no way to tell whether it had been charged.</p>
         <p style="margin-bottom:0">It is now treated the same way as the check itself: the player is in, and nothing extra was taken. One detail is worth recording because it nearly went unnoticed &mdash; the obvious test, racing two joins against each other, <b>never actually triggered this path</b>; the simple check won every time. It had to be forced deliberately. A test that passes is not proof that the thing it was written for ever ran.</p>
+      </div>
+
+      <div class="cal plain">
+        <div class="t">The other paid door &mdash; head-to-head challenges &mdash; and a bug found by proof-reading</div>
+        <p>A <b>challenge</b> is the two-player version of a contest, and accepting one charges <i>both</i> players. It was checking a player's ticket and balance but <b>not</b> whether the account was suspended or flagged for fraud &mdash; so an account barred from every competition could still be entered into a paid challenge. Reading the challenge <i>creation</i> code would never have shown this, because that one checks properly; only the accept step was missing them. <b>Fixed</b> by giving it the same two checks the single entrance uses, run before either wallet is touched, so a refusal can never leave one of the two players charged.</p>
+        <p>Then, while writing that paragraph down, a sentence in it turned out to be wrong &mdash; and checking it found a further live fault. Every challenge payment record was being stamped with the challenge it belonged to, but the database had <b>never been told that field existed</b>, so it discarded the stamp every time. <b>Nine</b> different places did this: both entry charges, the refund when a challenge is declined, and all six prize payouts. <b>The entire history of challenge money was unattributable to the challenges that generated it.</b></p>
+        <p>Said precisely, because overstating it would be wrong: <b>nobody was paid the wrong amount.</b> No balance is calculated from that stamp, so this is a record-keeping fault, not a financial one &mdash; it matters for disputes, refunds and audits rather than for anyone's wallet. It is <b>fixed</b>, though the records already written cannot be repaired, because the information never reached the database to begin with.</p>
+        <p style="margin-bottom:0">Two things about this are worth more than the bug. First, <b>the automatic blueprint guard could not have caught it</b> &mdash; both applications were wrong in exactly the same way, so they agreed with each other perfectly. The guard proves the two apps match; it cannot prove either one matches the code writing to it. Second, this is now the <b>third</b> fault of that shape found in Stage 0, and the only reason this one surfaced is that a claim written in passing, in a paragraph about something else, was verified instead of assumed.</p>
       </div>
 
       <div class="cal info">
@@ -1904,7 +1912,7 @@
 
 <footer class="foot">
   <span><b>ChartVolt</b> &mdash; New Games Plan &middot; Plan only, no code changed &middot; Based on six audits of the live codebase</span>
-  <span>17 August 2026 &middot; v1.3, revised 1 September 2026 (Stage 0 Defect 2 built; drift severity corrected by measurement; two live defects found and fixed)</span>
+  <span>17 August 2026 &middot; v1.4, revised 1 September 2026 (Stage 0 code complete &mdash; Defects 1 and 2 built, four entry paths resolved, seven live defects found and fixed)</span>
 </footer>
 
 <script>

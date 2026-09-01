@@ -24,7 +24,31 @@ export interface ScoreUpdate {
   evidence: string;
   linkedUserIds?: string[];
   confidence?: number;
+  /**
+   * The label stored on each linked account, when it differs from `method`.
+   *
+   * Reason: the KYC detector has always written the snake_case `kyc_duplicate` here, and
+   * the admin UI renders the value raw. Defaulting to `method` would silently relabel it
+   * to `kycDuplicate` for new rows only, leaving the same list showing two spellings of
+   * one thing. Callers with existing stored data pass their own label.
+   */
+  matchType?: string;
 }
+
+/**
+ * A `.lean()` suspicion score: plain data with the document methods stripped.
+ *
+ * Named so that the three read helpers below can state what they return instead of casting
+ * through `any`, which hid the fact that a lean result has no `addPercentage` on it.
+ */
+export type LeanSuspicionScore = Omit<
+  ISuspicionScore,
+  | "calculateRiskLevel"
+  | "addPercentage"
+  | "addPoints"
+  | "addLinkedAccount"
+  | "resetScore"
+>;
 
 export class SuspicionScoringService {
   /**
@@ -56,27 +80,52 @@ export class SuspicionScoringService {
   };
 
   /**
-   * Get or create suspicion score for a user
+   * Get or create the suspicion score for a user. Atomic.
+   *
+   * This is the ONLY way a score document should be obtained. Four other call sites used
+   * to read-then-create their own, and each one carried the race described below; they now
+   * all come through here.
+   *
+   * Reason: `userId` is uniquely indexed, so a read-then-create loses the race. Measured
+   * on 1 Sep 2026 (`__tests__/services/suspicion-score-race.test.ts`): with twenty
+   * detectors arriving together for a user who has no score yet, seventeen of them threw
+   * E11000 and their contributions were discarded. Every caller is a fire-and-forget fraud
+   * detector that logs and swallows, so nothing surfaced. The harm is that the entry fraud
+   * gate reads `totalScore` to decide whether to refuse an entry, and coordinated entry -
+   * many accounts joining one contest in the same second - is both what the detector looks
+   * for and what provokes the race, so detection was weakest exactly when needed.
+   *
+   * It became reachable at scale only when Defect 1's unified entry service gave both join
+   * gates a retry loop. Before that the entry path admitted about one concurrent join in
+   * twenty, and the losers never reached the fraud services at all.
    */
   static async getOrCreateScore(userId: string): Promise<ISuspicionScore> {
     await connectToDatabase();
 
-    let score = await SuspicionScore.findOne({ userId });
+    // Reason: `$setOnInsert` rather than `$set` is what makes this safe to call on a user
+    // who already has a score - the zero values are written only when the document is
+    // actually created, never over a score that has accumulated.
+    //
+    // `scoreBreakdown` is deliberately absent: the schema declares a default for each of
+    // the fourteen methods, and naming the parent here would insert an empty object
+    // instead. That would be worse than the race it replaced, because `addPercentage`
+    // returns silently when `scoreBreakdown[method]` is missing - every score would then
+    // read zero forever. Pinned by the tests asserting a non-zero total.
+    const created = await SuspicionScore.findOneAndUpdate(
+      { userId },
+      {
+        $setOnInsert: {
+          userId,
+          totalScore: 0,
+          riskLevel: "low",
+          linkedAccounts: [],
+          scoreHistory: [],
+        },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
 
-    if (!score) {
-      score = await SuspicionScore.create({
-        userId,
-        totalScore: 0,
-        riskLevel: "low",
-        scoreBreakdown: {},
-        linkedAccounts: [],
-        scoreHistory: [],
-      });
-
-      // console.log(`✅ Created new suspicion score for user ${userId}`);
-    }
-
-    return score;
+    return created;
   }
 
   /**
@@ -89,7 +138,6 @@ export class SuspicionScoringService {
     await connectToDatabase();
 
     const score = await this.getOrCreateScore(userId);
-    const oldScore = score.totalScore;
     const oldRiskLevel = score.riskLevel;
 
     // Add percentage using model method
@@ -101,7 +149,7 @@ export class SuspicionScoringService {
         if (linkedUserId !== userId) {
           score.addLinkedAccount(
             new mongoose.Types.ObjectId(linkedUserId),
-            update.method,
+            update.matchType ?? update.method,
             update.confidence || 0.85,
           );
         }
@@ -110,28 +158,108 @@ export class SuspicionScoringService {
 
     await score.save();
 
-    // console.log(`📊 Updated suspicion score for user ${userId}:`);
-    // console.log(`   Method: ${update.method}`);
-    // console.log(`   Percentage Added: +${update.percentage}%`);
-    // console.log(`   Old Score: ${oldScore} → New Score: ${score.totalScore}`);
-    // console.log(`   Risk Level: ${oldRiskLevel} → ${score.riskLevel}`);
+    // Reason: `save()` writes only the paths this caller modified, so two detectors using
+    // DIFFERENT methods both persist their own breakdown entry - but `totalScore` is a
+    // whole-document field that each computed from its own stale copy, so it is
+    // last-write-wins. The document then contradicts itself: measured on 1 Sep 2026, a
+    // concurrent 40% and 25% left both breakdown entries correct and `totalScore` at 40.
+    // That is worse than losing the write outright, because `riskLevel` derives from the
+    // total, so 65% - which crosses the "high" threshold - was filed as medium and the
+    // account was never auto-restricted. Recomputing server-side from the document's own
+    // persisted breakdown is order-independent: whichever caller reconciles last sees
+    // every entry, so the pair always converges on the right total.
+    const reconciled = await this.reconcileTotals(userId);
+
+    const current = reconciled ?? score;
 
     // Check if crossed threshold
-    if (oldRiskLevel !== score.riskLevel) {
+    if (oldRiskLevel !== current.riskLevel) {
       // console.log(
-        // `⚠️ RISK LEVEL CHANGED: ${oldRiskLevel} → ${score.riskLevel}`,
+        // `⚠️ RISK LEVEL CHANGED: ${oldRiskLevel} → ${current.riskLevel}`,
       // );
 
       // Check if auto-suspend is enabled in fraud settings before auto-restricting
       if (
-        (score.riskLevel === "critical" || score.riskLevel === "high") &&
-        !score.autoRestrictedAt
+        (current.riskLevel === "critical" || current.riskLevel === "high") &&
+        !current.autoRestrictedAt
       ) {
-        await this.checkAndAutoRestrictUser(userId, score);
+        await this.checkAndAutoRestrictUser(userId, current);
       }
     }
 
-    return score;
+    return current;
+  }
+
+  /**
+   * Recompute `totalScore` and `riskLevel` from the breakdown already stored on the
+   * document, in one atomic server-side update.
+   *
+   * Reason for a pipeline update rather than a read-modify-write: the sum must be taken
+   * from what is IN the document at that moment, not from a copy the caller loaded
+   * earlier. That is the whole point - it is what makes the operation order-independent
+   * and therefore safe to run concurrently.
+   *
+   * The thresholds are duplicated from the model's `calculateRiskLevel` because the
+   * comparison happens inside MongoDB, where a JavaScript method cannot run. They must be
+   * kept in step; the tests assert a specific band either side of a boundary so a
+   * divergence fails rather than quietly mis-classifying accounts.
+   */
+  private static async reconcileTotals(
+    userId: string,
+  ): Promise<ISuspicionScore | null> {
+    // Derived from the schema, not hard-coded, so a newly declared detection method is
+    // counted without anyone having to remember this function exists.
+    const methods = Object.keys(SuspicionScore.schema.paths)
+      .map((path) => /^scoreBreakdown\.([^.]+)$/.exec(path)?.[1])
+      .filter((name): name is string => Boolean(name));
+
+    if (methods.length === 0) return null;
+
+    return SuspicionScore.findOneAndUpdate(
+      { userId },
+      [
+      {
+        $set: {
+          totalScore: {
+            $min: [
+              {
+                $add: methods.map((method) => ({
+                  $ifNull: [`$scoreBreakdown.${method}.percentage`, 0],
+                })),
+              },
+              100,
+            ],
+          },
+        },
+      },
+      {
+        // A second stage, because it reads the `totalScore` the first one just produced.
+        $set: {
+          riskLevel: {
+            $switch: {
+              branches: [
+                {
+                  case: { $gte: ["$totalScore", this.THRESHOLDS.critical] },
+                  then: "critical",
+                },
+                {
+                  case: { $gte: ["$totalScore", this.THRESHOLDS.high] },
+                  then: "high",
+                },
+                {
+                  case: { $gte: ["$totalScore", this.THRESHOLDS.medium] },
+                  then: "medium",
+                },
+              ],
+              default: "low",
+            },
+          },
+          lastUpdated: "$$NOW",
+        },
+      },
+      ],
+      { new: true },
+    );
   }
 
   /**
@@ -375,39 +503,23 @@ export class SuspicionScoringService {
   /**
    * Get suspicion score for a user (plain object, no methods)
    */
-  static async getScore(
-    userId: string,
-  ): Promise<Omit<
-    ISuspicionScore,
-    | "calculateRiskLevel"
-    | "addPercentage"
-    | "addPoints"
-    | "addLinkedAccount"
-    | "resetScore"
-  > | null> {
+  static async getScore(userId: string): Promise<LeanSuspicionScore | null> {
     await connectToDatabase();
-    return (await SuspicionScore.findOne({ userId }).lean()) as any;
+    return (await SuspicionScore.findOne({
+      userId,
+    }).lean()) as unknown as LeanSuspicionScore | null;
   }
 
   /**
    * Get all high-risk users (plain objects, no methods)
    */
-  static async getHighRiskUsers(): Promise<
-    Omit<
-      ISuspicionScore,
-      | "calculateRiskLevel"
-      | "addPercentage"
-      | "addPoints"
-      | "addLinkedAccount"
-      | "resetScore"
-    >[]
-  > {
+  static async getHighRiskUsers(): Promise<LeanSuspicionScore[]> {
     await connectToDatabase();
     return (await SuspicionScore.find({
       riskLevel: { $in: ["high", "critical"] },
     })
       .sort({ totalScore: -1 })
-      .lean()) as any;
+      .lean()) as unknown as LeanSuspicionScore[];
   }
 
   /**
@@ -415,20 +527,11 @@ export class SuspicionScoringService {
    */
   static async getUsersByRiskLevel(
     level: "low" | "medium" | "high" | "critical",
-  ): Promise<
-    Omit<
-      ISuspicionScore,
-      | "calculateRiskLevel"
-      | "addPercentage"
-      | "addPoints"
-      | "addLinkedAccount"
-      | "resetScore"
-    >[]
-  > {
+  ): Promise<LeanSuspicionScore[]> {
     await connectToDatabase();
     return (await SuspicionScore.find({ riskLevel: level })
       .sort({ totalScore: -1 })
-      .lean()) as any;
+      .lean()) as unknown as LeanSuspicionScore[];
   }
 
   /**

@@ -34,6 +34,7 @@ defects, all recorded below.
 | 1 Sep 2026 | **Correction to that correction, and the count that is right:** the 31 figure counted only `database/`. Repo-wide there were **57 `.d.ts` + 55 `.d.ts.map` = 112 files**, the rest under `lib/services/` and `lib/actions/`. **Owner approved deletion and all 112 are gone**, with a `.gitignore` rule and two deliberate exceptions. Typecheck identical before and after: 16 errors main, 225 admin |
 | 1 Sep 2026 | **Owner decision:** joining a competition is **allowed outside market hours**; only trading itself is gated. Unifying the gates would otherwise have adopted Gate B's behaviour and blocked weekend sign-ups for Monday contests - a revenue regression introduced by a bug fix. Now locked in by test 12 |
 | 1 Sep 2026 | **Proven, was previously an inference:** competition entry-fee ledger rows carry **no competition reference at all**. `referenceId` is not in the schema and `competitionId` is never set. Measured against a real MongoDB in `__tests__/services/entry-fee-ledger.test.ts`. Harm is a broken audit trail, not a wrong balance - checked, not assumed |
+| 1 Sep 2026 | **New, live in production, and a correction to a claim this document made:** `challengeId` was declared on **neither** `WalletTransaction` copy, so **nine** writers - challenge entry, the decline refund, and six finalization payouts - had it silently dropped. **The entire challenge money trail was unattributable to its challenge.** This document previously asserted the opposite; the bug was found by checking that sentence. Fixed add-only in both copies |
 
 ---
 
@@ -251,31 +252,81 @@ more than being alarming:
   statement in its `try` block with no `return` after it, so five consecutive write
   conflicts fall through and return `undefined`. Rare, but it should be an explicit 409.
 
-## Sub-defect 1b - the challenge accept path (found 1 Sep 2026)
+## Sub-defect 1b - the challenge accept path (found 1 Sep 2026, FIXED same day)
 
-Challenges have the same asymmetry as competitions, and unlike Gate B **this one is on a
+Challenges had the same asymmetry as competitions, and unlike Gate B **this one is on a
 path real players use.**
 
 | Check | Create (`POST /api/challenges`) | Accept (`POST /api/challenges/[id]/accept`) |
 |---|---|---|
-| Email verified | Yes (135-141) | Yes (28-37) |
-| Account restrictions | Yes (168-187) | **No** |
-| Fraud gate | Yes (196-211) | **No** |
-| Market hours | Yes (217-258) | Yes (43-54) |
-| Both wallets debited | No - create does not debit | Yes (95-125) |
+| Email verified | Yes | Yes |
+| Account restrictions | Yes | **Was: no.** Added 1 Sep 2026 |
+| Fraud gate | Yes | **Was: no.** Added 1 Sep 2026 |
+| Market hours | Yes | Yes |
+| Both wallets debited | No - create does not debit | Yes |
 
 Accept is where the money actually moves and where both `ChallengeParticipant` records are
-created. It is called from three live components: `app/(root)/challenges/page-content.tsx`
-line 95, `components/challenges/ChallengePopup.tsx` line 192, and
-`components/trading/ChallengeEntryActions.tsx` line 40. It also writes `challengeId` on
-the ledger row, which has the same not-in-schema problem as `referenceId`.
+created. It is called from three live components: `app/(root)/challenges/page-content.tsx`,
+`components/challenges/ChallengePopup.tsx` and
+`components/trading/ChallengeEntryActions.tsx`. Because *create* checked both gates and
+*accept* did not, reading either route on its own would never have found this.
 
-**Recommendation:** fold 1b into Defect 1. It is the same class of bug, the same fix
-shape, and it is the only one of the set with a live security consequence for real users.
+**Fixed** by splitting `checkAccountStanding` out of the unified service's `checkActor`, so
+one implementation of the two gates serves both paid entry paths. Two things the tests pin
+because they are easy to get wrong:
+
+- It asks about **`enterChallenge`, never `enterCompetition`.** The flags differ on purpose:
+  `canEnterChallenges` blocks only on an explicit `false`, because restrictions created before
+  that field existed have it undefined and must stay allowed. Passing the competition action
+  would quietly refuse every legacy-restricted account. Verified by swapping the action and
+  confirming exactly one test goes red.
+- It runs **before any wallet read**, so a refusal cannot leave one of the two debits applied.
+
+**Swept for siblings and found none.** Challenge *decline* and the admin challenge route touch
+wallets but only ever *credit* - refunds and prize payouts - so an entry gate would be wrong
+there rather than missing.
+
+### Live bug 7, found while writing the paragraph above and now fixed - the whole challenge money trail was unattributable
+
+The first draft of this section claimed `challengeId` was "a *declared* field, unlike
+`referenceId`, so it is not the same defect". **That was wrong in both halves**, and
+checking it rather than shipping the sentence is what found the bug.
+
+`challengeId` was declared on **neither** copy of `WalletTransaction`, and `competitionId`
+is a `String`, not an ObjectId. So it is not merely the same defect - it is **worse in
+reach**. `referenceId` cost the competition side its *entry* rows; `challengeId` was passed
+by **nine writers spanning the entire challenge money lifecycle** and every one was
+discarded by strict mode:
+
+| Writers | Where |
+|---|---|
+| 2 | Challenge entry, one row per player - `app/api/challenges/[id]/accept/route.ts` |
+| 1 | The refund when a challenge is declined - `app/api/challenges/[id]/decline/route.ts` |
+| 6 | Finalization prize payouts, three per app - `lib/actions/trading/challenge-finalize.actions.ts` and its admin mirror |
+
+**Every challenge entry fee, refund and prize payout ever recorded is unattributable to its
+challenge.** Same harm as the competition case and stated with the same care: nothing
+computes a balance from the field - checked, no query reads `wallettransactions` by
+`challengeId` - so no player was mis-paid. It is an audit-trail defect, and the rows already
+written cannot be recovered, because the value never reached the database.
+
+**Fixed 1 Sep 2026**, add-only, in both copies: declared alongside `competitionId`, with a
+matching index. Proven by `attributes both entry-fee ledger rows to their challenge` in
+`__tests__/services/challenge-accept-guards.test.ts`, and the test was probed by removing
+the declaration again - it fails with `expected undefined`, the signature of a silent drop.
+
+Two rules worth carrying, because both nearly failed here:
+
+- **The mirror guard cannot catch this and never could.** Both copies lacked the field
+  *identically*, so they agreed. This is **one bug duplicated, not drift** - the third such
+  case in Stage 0, after `referenceId` and `failedReason`. Agreement between the two apps
+  says nothing about agreement with the code that writes to them.
+- **Verify the throwaway sentence too.** This was found only because a claim written in
+  passing, in a paragraph about something else, was checked before being left on record.
 
 ## The fix - BUILT 1 September 2026
 
-Steps 1 to 3 and 5 are done. Step 4 is not - see the note at the end.
+All five steps are done.
 
 1. **Write the money tests first, against current behaviour.** Done, and it paid for itself
    three times over: writing the tests *before* the fix is what found live bugs 5 and 6 and
@@ -295,8 +346,11 @@ Steps 1 to 3 and 5 are done. Step 4 is not - see the note at the end.
    | 3 | Simulator batch | **Fixed in place.** It exists to seed thousands of participants in one transaction; a per-user service call would defeat the only reason it exists |
    | 4 | Admin mirror | **Deleted.** 332 lines. Dead code with a weaker guard set is an invitation, not an asset |
 
-4. **Challenge accept - NOT DONE.** Sub-defect 1b is proven by test and still unfixed. It is
-   a separate decision because it is a separate money path with a second player in it.
+4. **Challenge accept - DONE 1 Sep 2026.** Sub-defect 1b was proven by test and then fixed.
+   `checkAccountStanding` was split out of the service's `checkActor` so the challenge path
+   gets the same two gates without inheriting competition wording or a duplicate email check.
+   It asks about **`enterChallenge`**, not `enterCompetition` - the flags differ on purpose -
+   and it runs before any wallet read, so a refusal cannot leave one of the two debits applied.
 5. **Ledger reference unified.** Writes `competitionId`, the field the schema defines.
    Nothing to backfill: the old `referenceId` value was never stored. `currency` is now
    `"EUR"` with `exchangeRate: 1` on every path - Gate A alone wrote `"CREDITS"`, which
@@ -365,7 +419,7 @@ refused. That pair is now a required test - number 12 below.
 | 8 | Finalize the same competition twice | Winners paid **once** (idempotency). **DONE 1 Sep 2026. Passes** - an optimistic `active` -> `finalizing` lock already exists. This is the **control for live bug 5**: it proves the refund path's double-pay is a missing guard, not a property of the money layer |
 | 9 | Entry fee ledger row | Carries a resolvable competition reference in a field the schema defines. **Written 1 Sep 2026** - `__tests__/services/entry-fee-ledger.test.ts`, 4 tests, passing. Pins the current defect, proves the corrected write survives, proves the audit query works, and guards against "fixing" it by loosening the schema |
 | 10 | Retries exhausted under sustained write conflict | Returns 409, no participant created, no debit. **Written 1 Sep 2026** in `competition-join-gate-parity.test.ts`. **Was returning 500 and leaking the driver's message; FIXED 1 Sep 2026** and now returns 409 with a safe message. The clean-refusal half held throughout and is asserted separately |
-| 11 | Accept a challenge while restricted / fraud-flagged | Refused (sub-defect 1b). **Written 1 Sep 2026** - `__tests__/services/challenge-accept-guards.test.ts`, 5 tests, passing. Three pin the guards that *are* present so a fix cannot drop them; two record the two that are missing. **Sub-defect 1b is now proven, not inferred** |
+| 11 | Accept a challenge while restricted / fraud-flagged | Refused, with neither player debited. **Written and then FIXED 1 Sep 2026** - `__tests__/services/challenge-accept-guards.test.ts`, 7 tests. Three pin the guards that were always present so the fix could not drop them; the two that recorded the defect were **inverted, not deleted**, and both were proven to fail without the fix. Two added: one asserts an account in good standing is still admitted and both fees still move (otherwise a guard that refuses everything would pass), and one asserts **which restriction action the route asks about** - `enterChallenge`, since the two flags behave differently and a test checking only the refusal passes either way |
 | 12 | Join an `upcoming` competition outside market hours, then try to place an order in it | Join **succeeds**, order **refused**. Locks in the owner's decision above, in both directions - a fix that blocked the join would fail this, and so would one that let the order through. **DONE 1 Sep 2026** in `competition-join-gate-parity.test.ts`, both directions. With the market closed, **both** gates now admit the join and `placeOrder` still refuses with no order and no position created. Before the unification this test recorded a *disagreement* - Gate A admitted and Gate B refused; it now records agreement. The two halves are deliberately in one file: split apart, each reads as an arbitrary rule |
 | 13 | Two joins by the same player collide on the unique index | Returns the existing seat, charges nothing. **Added 1 Sep 2026** - not in the original list, because nobody had noticed the read-then-insert race. Racing the two gates was tried first and **never entered the branch** (the seat check won every time), so the test forces the condition by stubbing the seat lookup to miss exactly once. A probe confirmed the branch is genuinely reached |
 | 14 | Simulator batch route funds the pool and uses declared field names | **Added 1 Sep 2026** - `simulator-join-batch.test.ts`, 7 tests. Two of them were proven to fail by temporarily reverting the `prizePool` increment. The field-name test had to be rewritten: it passed both before and after, because strict mode had already discarded the bad names by the time the row reached MongoDB, so it now compares the builder's keys against `CompetitionParticipant.schema.paths` |
@@ -1166,7 +1220,7 @@ and should not delay it.
 | Missing refund notification | `competition_refunded` is only sent from the **admin** notification service, not from the main automatic cancel path. Users refunded because a competition failed to meet minimum participants may never be told. | `competition-cancel.actions.ts` |
 | Silent prize-pool correction | The finalization safeguard that caps the pool to `participants x entryFee` hides drift in the one direction it does cover. Once Defect 1 is fixed, turn it into a logged warning plus an admin alert, and add the missing under-count branch. | `competition-end.actions.ts` |
 | ~~`join-batch` has no callers~~ | **Done 1 Sep 2026.** Fixed in place rather than deleted or folded in: it exists to seed thousands of participants in one transaction, and a per-user service call would defeat that. Got the `prizePool` increment and its six misnamed fields corrected. | `app/api/simulator/competitions/join-batch/route.ts` |
-| `SuspicionScore` read-then-create race | **New, 1 Sep 2026, needs an owner decision - arguably not "optional".** Three services do `findOne` then `create` on a model with a unique index on `userId`: `fraud/suspicion-scoring.service.ts:64-67`, `registration-security.service.ts:1276-1279`, `kyc-fraud-detection.service.ts:301-305`. Two concurrent fraud events for one user both find nothing, both insert, and the loser throws 11000 - so **the suspicion score is silently not recorded**. Found because coordination detection started running on both entry paths and filled the test output with duplicate keys. Exactly the bug class just fixed for seats, in the code that decides whether someone is cheating. The fix is `findOneAndUpdate` with `upsert` in three places; it is listed here rather than done because it is fraud code with no test coverage. | three services, above |
+| ~~`SuspicionScore` read-then-create race~~ | **FIXED 1 Sep 2026**, and it was **five** call sites and **two** races, not the three sites and one race first recorded. Race 1: `findOne` then `create` against a unique index - measured at **17 of 20** concurrent detectors losing their contribution to duplicate-key 11000, silently, because every caller is fire-and-forget. Fixed with an atomic upsert in `getOrCreateScore`, with all five sites routed through it. Race 2, which the upsert did **not** fix and the test caught: `save()` writes only one caller's paths, so two detectors using different methods each stored their breakdown entry correctly while `totalScore` - computed from a stale copy - was last-write-wins, leaving the document contradicting its own breakdown and `riskLevel` a band too low. Fixed by recomputing the total server-side from the persisted document with a `$set` pipeline update, which is order-independent. Two sites in `scripts/` are left alone: hand-run and single-threaded | `fraud/suspicion-scoring.service.ts`, its admin mirror, `registration-security.service.ts`, `kyc-fraud-detection.service.ts`, `apps/admin/.../scan-duplicates/route.ts` |
 
 ---
 
@@ -1210,9 +1264,10 @@ the code, which every automated test bypasses by calling the action directly.
 only. The check now lives in the shared service so both gates run it, but no test drives it
 through Gate B specifically - the fixture needs an XP record and was not worth duplicating.
 
-**Sub-defect 1b is NOT fixed.** Accepting a challenge with a restricted or fraud-flagged
-account is still allowed. It is proven by `challenge-accept-guards.test.ts` and awaits a
-decision on whether it ships inside Stage 0. Do not tick a Defect 1 box on its behalf.
+**Sub-defect 1b is fixed.** Accepting a challenge with a restricted or fraud-flagged account
+is refused with neither player debited, through `checkAccountStanding` shared with the unified
+entry service. Proven by `challenge-accept-guards.test.ts`, 7 tests, with both defect tests
+inverted and shown to fail without the fix.
 
 ## Owner test checklist - Defect 2 (model mirrors)
 

@@ -1,24 +1,87 @@
 import { NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/admin/auth";
 import { connectToDatabase } from "@/database/mongoose";
-import mongoose from "mongoose";
 import KYCSession from "@/database/models/kyc-session.model";
 import FraudAlert from "@/database/models/fraud/fraud-alert.model";
 import FraudSettings from "@/database/models/fraud/fraud-settings.model";
 import UserRestriction from "@/database/models/user-restriction.model";
-import SuspicionScore from "@/database/models/fraud/suspicion-score.model";
 import AuditLog from "@/database/models/audit-log.model";
+import { SuspicionScoringService } from "@/lib/services/fraud/suspicion-scoring.service";
+
+type MatchType = "document_number" | "id_number" | "fingerprint" | "name_dob";
+
+/** Only the fields this scan reads, so the grouping below is checked rather than `any`. */
+interface KycSessionRow {
+  userId: string;
+  userEmail?: string;
+  userName?: string;
+  completedAt?: Date;
+  createdAt?: Date;
+  documentFingerprint?: string;
+  documentData?: { type?: string; country?: string; number?: string };
+  personData?: {
+    idNumber?: string;
+    firstName?: string;
+    lastName?: string;
+    dateOfBirth?: string;
+  };
+}
 
 interface DuplicateGroup {
   key: string;
-  matchType: "document_number" | "id_number" | "fingerprint" | "name_dob";
-  sessions: any[];
+  matchType: MatchType;
+  sessions: KycSessionRow[];
+}
+
+interface DuplicateReport {
+  matchType: MatchType;
+  userIds: string[];
+  alertId: string;
+  alertExisted?: boolean;
+  documentInfo?: { type: string; country: string; numberMasked: string };
+  accountCount?: number;
 }
 
 function maskDocNumber(num: string): string {
   if (num.length <= 4) return "****";
   return num.slice(0, 2) + "*".repeat(num.length - 4) + num.slice(-2);
 }
+
+/**
+ * Bucket sessions by a caller-supplied key, skipping any session with no key.
+ *
+ * Reason for a Map rather than a plain object: the keys are document numbers and names
+ * taken from user-submitted KYC data, so `obj[key] = ...` is a prototype-pollution sink -
+ * a document number of `__proto__` or `constructor` would corrupt the grouping. A Map
+ * treats every key as data. This also replaced four hand-rolled copies of the same loop.
+ */
+function groupSessions(
+  sessions: KycSessionRow[],
+  keyOf: (session: KycSessionRow) => string | undefined,
+): Map<string, KycSessionRow[]> {
+  const groups = new Map<string, KycSessionRow[]>();
+  for (const session of sessions) {
+    const key = keyOf(session);
+    if (!key) continue;
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(session);
+    else groups.set(key, [session]);
+  }
+  return groups;
+}
+
+/** True when every user in `sessions` is already covered by an earlier group. */
+function alreadyGrouped(
+  groups: DuplicateGroup[],
+  sessions: KycSessionRow[],
+): boolean {
+  return groups.some((group) => {
+    const seen = new Set(group.sessions.map((s) => s.userId));
+    return sessions.every((s) => seen.has(s.userId));
+  });
+}
+
+const NORMALISE = (value: string) => value.toUpperCase().replace(/\s/g, "");
 
 export async function POST() {
   try {
@@ -52,95 +115,65 @@ export async function POST() {
       });
     }
 
-    // Group by various identifiers to find duplicates
+    // Group by various identifiers to find duplicates.
+    //
+    // Order matters: document number first, because it is the strongest signal, then the
+    // weaker ones - each of which is skipped when an earlier, stronger group already
+    // covers the same set of users, so one identity is not reported four times.
+    const rows = approvedSessions as unknown as KycSessionRow[];
     const duplicateGroups: DuplicateGroup[] = [];
 
-    // Group 1: By document number + country
-    const byDocNumber: Record<string, any[]> = {};
-    for (const sess of approvedSessions) {
-      if (sess.documentData?.number && sess.documentData?.country) {
-        const key = `${sess.documentData.number.toUpperCase().replace(/\s/g, "")}|${sess.documentData.country.toUpperCase()}`;
-        if (!byDocNumber[key]) byDocNumber[key] = [];
-        byDocNumber[key].push(sess);
-      }
-    }
-    for (const [key, sessions] of Object.entries(byDocNumber)) {
-      if (sessions.length > 1) {
-        duplicateGroups.push({ key, matchType: "document_number", sessions });
-      }
-    }
+    const passes: Array<{
+      matchType: MatchType;
+      keyOf: (session: KycSessionRow) => string | undefined;
+      /** The strongest signal reports unconditionally; the rest defer to it. */
+      skipIfCovered: boolean;
+    }> = [
+      {
+        matchType: "document_number",
+        keyOf: (s) =>
+          s.documentData?.number && s.documentData?.country
+            ? `${NORMALISE(s.documentData.number)}|${s.documentData.country.toUpperCase()}`
+            : undefined,
+        skipIfCovered: false,
+      },
+      {
+        matchType: "id_number",
+        keyOf: (s) =>
+          s.personData?.idNumber ? NORMALISE(s.personData.idNumber) : undefined,
+        skipIfCovered: true,
+      },
+      {
+        matchType: "fingerprint",
+        keyOf: (s) => s.documentFingerprint || undefined,
+        skipIfCovered: true,
+      },
+      {
+        matchType: "name_dob",
+        keyOf: (s) =>
+          s.personData?.firstName &&
+          s.personData?.lastName &&
+          s.personData?.dateOfBirth
+            ? `${s.personData.firstName.toUpperCase()}|${s.personData.lastName.toUpperCase()}|${s.personData.dateOfBirth}`
+            : undefined,
+        skipIfCovered: true,
+      },
+    ];
 
-    // Group 2: By ID number
-    const byIdNumber: Record<string, any[]> = {};
-    for (const sess of approvedSessions) {
-      if (sess.personData?.idNumber) {
-        const key = sess.personData.idNumber.toUpperCase().replace(/\s/g, "");
-        if (!byIdNumber[key]) byIdNumber[key] = [];
-        byIdNumber[key].push(sess);
-      }
-    }
-    for (const [key, sessions] of Object.entries(byIdNumber)) {
-      if (sessions.length > 1) {
-        const alreadyGrouped = duplicateGroups.some((g) => {
-          const gUserIds = new Set(g.sessions.map((s) => s.userId));
-          return sessions.every((s) => gUserIds.has(s.userId));
-        });
-        if (!alreadyGrouped) {
-          duplicateGroups.push({ key, matchType: "id_number", sessions });
+    for (const pass of passes) {
+      for (const [key, sessions] of groupSessions(rows, pass.keyOf)) {
+        if (sessions.length < 2) continue;
+        if (pass.skipIfCovered && alreadyGrouped(duplicateGroups, sessions)) {
+          continue;
         }
-      }
-    }
-
-    // Group 3: By document fingerprint
-    const byFingerprint: Record<string, any[]> = {};
-    for (const sess of approvedSessions) {
-      if (sess.documentFingerprint) {
-        const key = sess.documentFingerprint;
-        if (!byFingerprint[key]) byFingerprint[key] = [];
-        byFingerprint[key].push(sess);
-      }
-    }
-    for (const [key, sessions] of Object.entries(byFingerprint)) {
-      if (sessions.length > 1) {
-        const alreadyGrouped = duplicateGroups.some((g) => {
-          const gUserIds = new Set(g.sessions.map((s) => s.userId));
-          return sessions.every((s) => gUserIds.has(s.userId));
-        });
-        if (!alreadyGrouped) {
-          duplicateGroups.push({ key, matchType: "fingerprint", sessions });
-        }
-      }
-    }
-
-    // Group 4: By name + date of birth
-    const byNameDob: Record<string, any[]> = {};
-    for (const sess of approvedSessions) {
-      if (
-        sess.personData?.firstName &&
-        sess.personData?.lastName &&
-        sess.personData?.dateOfBirth
-      ) {
-        const key = `${sess.personData.firstName.toUpperCase()}|${sess.personData.lastName.toUpperCase()}|${sess.personData.dateOfBirth}`;
-        if (!byNameDob[key]) byNameDob[key] = [];
-        byNameDob[key].push(sess);
-      }
-    }
-    for (const [key, sessions] of Object.entries(byNameDob)) {
-      if (sessions.length > 1) {
-        const alreadyGrouped = duplicateGroups.some((g) => {
-          const gUserIds = new Set(g.sessions.map((s) => s.userId));
-          return sessions.every((s) => gUserIds.has(s.userId));
-        });
-        if (!alreadyGrouped) {
-          duplicateGroups.push({ key, matchType: "name_dob", sessions });
-        }
+        duplicateGroups.push({ key, matchType: pass.matchType, sessions });
       }
     }
 
     let alertsCreated = 0;
     let usersSuspended = 0;
     let scoresUpdated = 0;
-    const duplicatesFound: any[] = [];
+    const duplicatesFound: DuplicateReport[] = [];
 
     for (const group of duplicateGroups) {
       const userIds = [...new Set(group.sessions.map((s) => s.userId))];
@@ -219,33 +252,22 @@ export async function POST() {
       // Update suspicion scores
       const evidenceText = `Duplicate KYC document detected with ${userIds.length - 1} other account(s). Match type: ${group.matchType}`;
 
+      // Reason: this used to read-then-create its own score document per user, which loses
+      // the race against the unique index on `userId` and silently discards the
+      // contribution. A duplicate scan updates a whole group at once, so the race is the
+      // normal case here. `updateScore` upserts atomically and reconciles the total
+      // server-side. See `__tests__/services/suspicion-score-race.test.ts`.
       for (const userId of userIds) {
         try {
-          let score = await SuspicionScore.findOne({
-            userId: new mongoose.Types.ObjectId(userId),
+          await SuspicionScoringService.updateScore(userId, {
+            method: "kycDuplicate",
+            percentage: 50,
+            evidence: evidenceText,
+            linkedUserIds: userIds.filter((otherId) => otherId !== userId),
+            confidence: 0.95,
+            // Preserves the label this scan has always stored; see ScoreUpdate.
+            matchType: "kyc_duplicate",
           });
-
-          if (!score) {
-            score = new SuspicionScore({
-              userId: new mongoose.Types.ObjectId(userId),
-              totalScore: 0,
-              riskLevel: "low",
-            });
-          }
-
-          score.addPercentage("kycDuplicate", 50, evidenceText);
-
-          for (const otherId of userIds) {
-            if (otherId !== userId) {
-              score.addLinkedAccount(
-                new mongoose.Types.ObjectId(otherId),
-                "kyc_duplicate",
-                0.95,
-              );
-            }
-          }
-
-          await score.save();
           scoresUpdated++;
         } catch (err) {
           console.error(`Failed to update score for ${userId}:`, err);

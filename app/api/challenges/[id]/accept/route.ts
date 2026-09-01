@@ -8,6 +8,7 @@ import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import mongoose from "mongoose";
 import { canJoinChallenge } from "@/lib/services/market-hours.service";
+import { checkAccountStanding } from "@/lib/services/contest-entry/guards";
 
 // POST - Accept a challenge
 export async function POST(
@@ -38,6 +39,41 @@ export async function POST(
 
     const { id } = await params;
     await connectToDatabase();
+
+    // Reason: sub-defect 1b. Accepting a challenge debits a real entry fee from both
+    // players, so it must refuse the accounts competition entry refuses - but it checked
+    // neither the account restriction nor the fraud gate, so a suspended or
+    // coordination-flagged account could enter a paid 1v1 and be charged. Proven by
+    // `__tests__/services/challenge-accept-guards.test.ts` before being fixed here.
+    //
+    // Placed before every wallet read so a refusal cannot leave a partial debit, and
+    // shares `checkAccountStanding` with the unified contest entry service so the two paths
+    // cannot drift apart again. `enterChallenge`, not `enterCompetition`: the flags differ
+    // deliberately, and the helper documents why.
+    const standing = await checkAccountStanding(
+      {
+        userId: session.user.id,
+        email: session.user.email || "",
+        username: session.user.name || "",
+        emailVerified: true,
+        // Same header order as both competition entry paths, so one fraud gate does not
+        // see a different address depending on which contest type it was asked about.
+        ip:
+          request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+          request.headers.get("x-real-ip") ||
+          request.headers.get("cf-connecting-ip") ||
+          undefined,
+      },
+      "enterChallenge",
+      "You are not allowed to enter challenges",
+    );
+    if (standing) {
+      await dbSession.abortTransaction();
+      return NextResponse.json(
+        { error: standing.error },
+        { status: 403 },
+      );
+    }
 
     // Check if market is open for challenges
     const marketCheck = await canJoinChallenge();

@@ -84,15 +84,20 @@ A related defect on a path real players **do** use: the challenge *accept* route
 and it is where both wallets are debited. **Proven by test on 1 September 2026 and NOT
 fixed.** Sub-defect 1b, awaiting a decision on whether it ships inside X0.
 
-And a **new** finding of the same class, in the fraud layer rather than the money layer:
-three services do `findOne` then `create` on `SuspicionScore`, which has a unique index on
-`userId`. Two concurrent fraud events for one user both find nothing, both insert, and the
-loser throws duplicate-key 11000 - so **the suspicion score is silently not recorded**. It
-surfaced only because coordination detection started running on both entry paths. Recorded as
-R28. It matters to this programme because provider contests will multiply concurrent entries.
+A **new** finding of the same class surfaced in the fraud layer rather than the money layer -
+read-then-create against a unique index on `SuspicionScore`, losing suspicion scores under
+concurrency. It appeared only because coordination detection started running on both entry
+paths. **Found and fixed the same day**; recorded as R28, which also corrects the site count
+(five, not three) and records a second race the first fix exposed. It matters to this
+programme because provider contests will multiply concurrent entries.
 
 Building a new score path on top of the original mess would have meant debugging two problems
-at once with real money involved. **The competition half is done; the challenge half is not.**
+at once with real money involved. **Both halves are now done** - the competition gates were
+unified first, then challenge accept was given the same restriction and fraud guards via the
+shared `checkAccountStanding`. A third defect was found while documenting the second: the
+ledger's `challengeId` was declared on **neither** app's `WalletTransaction`, so **nine**
+writers spanning challenge entry, refunds and payouts had it silently discarded, leaving the
+whole challenge money trail unattributable. Also fixed the same day.
 
 ### R2 - Admin mirror drift (a confirmed defect, not a prediction)
 
@@ -271,31 +276,36 @@ unrelated behaviour off it, which is precisely how the bypass header above came 
 
 ---
 
-### R28 - Read-then-create races on unique-indexed fraud records (found 1 Sep 2026, NOT fixed)
+### R28 - Read-then-create races on unique-indexed fraud records (found and FIXED 1 Sep 2026)
 
-Three services do `findOne` and then `create` on `SuspicionScore`, which carries a unique
-index on `userId`:
+**Closed.** Kept in the register because the defect class recurs and this programme
+multiplies exactly the conditions that trigger it.
 
-| File | Lines |
-|---|---|
-| `lib/services/fraud/suspicion-scoring.service.ts` | 64-67 |
-| `lib/services/registration-security.service.ts` | 1276-1279 |
-| `lib/services/kyc-fraud-detection.service.ts` | 301-305 |
+`SuspicionScore` carries a unique index on `userId`, and the code did `findOne` then `create`
+against it. **Two corrections to the first record of this risk**, both found by measuring
+rather than reading: there were **five** call sites, not three, and **two distinct races**,
+not one.
 
-Two concurrent fraud events for the same user both find no record, both insert, and the loser
-throws duplicate-key 11000. The caller swallows it, so **the suspicion score is silently not
-recorded** - a fraud signal is lost with no log line naming what was lost.
+The first race is the read-then-create. Measured with twenty detectors arriving together for
+a user with no score yet: **seventeen threw duplicate-key 11000 and their contributions were
+lost.** The second was only visible once the first was fixed - `updateScore` did a
+read-modify-write of `totalScore`, so concurrent updates clobbered each other and the total
+disagreed with the breakdown it was supposedly derived from.
 
-**How it was found matters more than the bug.** It appeared as duplicate-key noise in the test
-output only after coordination detection started running on *both* entry paths, which the
-unification did. Before that, Gate B skipped the detector entirely, so the race was invisible
-and so was the fact that a fraud control could be avoided by choosing an entrance.
+**Fixed** with `findOneAndUpdate` + `upsert` + `$setOnInsert` for creation, and an
+aggregation-pipeline update that recomputes `totalScore` and `riskLevel` **server-side** from
+the persisted breakdown, so no read-modify-write window exists. The three ad-hoc call sites
+now route through `SuspicionScoringService.updateScore` instead of reimplementing it. Proven
+by `__tests__/services/suspicion-score-race.test.ts`, written before the fix.
 
-**Why it belongs in this register:** it is the same defect class as the duplicate-seat race
-fixed in the entry service - a read-then-insert with a unique index behind it - and this
-programme multiplies concurrent entries, which is exactly what triggers it. The fix is
-`findOneAndUpdate` with `upsert` in three places. It is not done because the code has no test
-coverage and it sits in the fraud layer, where a careless change is worse than the bug.
+**How it was found still matters more than the bug.** It appeared as duplicate-key noise in
+test output only after coordination detection started running on *both* entry paths, which the
+unification did. Before that, Gate B skipped the detector entirely - so the race was invisible,
+and so was the fact that **a fraud control could be avoided by choosing an entrance.**
+
+**The lesson to carry into provider work:** a read-then-insert behind a unique index is a bug
+wherever it appears, and fixing the first race can expose a second in the same function. Do not
+stop measuring at the first green test.
 
 ---
 
