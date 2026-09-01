@@ -429,9 +429,36 @@ entry was ever stored. The test asserts a **round trip through the real helper**
 hard-coded string, because the writers and readers only work if they agree, and separately
 pins that encoding a dot-free name is a no-op, since the readers encode unconditionally.
 
-**Next chat should:** build Defect 1's unified `contest-entry.service.ts`. Every behaviour it
-must preserve or correct is pinned by a test. The 3-item manual checklist for Defect 2 is
-still with the owner and does not block it.
+---
+
+### 1 Sep 2026 - scope correction before building the unified service: FOUR writers, not two
+
+Verified while mapping the gates. Every description of Defect 1 says "duplicate join paths".
+There are **four** places that create a `CompetitionParticipant` and move entry-fee money, and
+**two were never on record**:
+
+| # | Path | Reachable by | `prizePool` |
+|---|---|---|---|
+| 1 | Gate A, `enterCompetition` | The production UI | Yes |
+| 2 | Gate B, `POST /api/competitions/[id]/join` | Simulator and tests only | **No** |
+| 3 | `app/api/simulator/competitions/join-batch` | Simulator only, guarded | **No** |
+| 4 | `apps/admin/.../competition.actions.ts:452` | **Nothing. Dead code.** | Yes |
+
+Also worth recording: **no React component calls Gate B.** It is reached by the simulator and
+the tests. That does not reduce the defect - it explains why it has never produced a customer
+complaint, and it means the fix can be made without a migration.
+
+**Path 3 repeats Gate B's money defect** and additionally bulk-inserts participants using field
+names the schema does not declare (`pnlPercent`, `tradesCount`, `joinedAt`), which Mongoose
+drops silently - the same class of bug as the entry-fee ledger.
+
+**Path 4 is dead code, which is what makes it dangerous.** It increments `prizePool`, so it is
+not the money defect, but it is missing **email verification and the fraud gate** and it
+**throws instead of returning `{ success: false }`**. Wiring it into a future admin feature
+would silently adopt the weaker guard set and crash the render.
+
+**This needs an owner decision before the service is built**, because "route both gates through
+it" is now four decisions and two of them are policy. Put to the owner; not started.
 
 ---
 

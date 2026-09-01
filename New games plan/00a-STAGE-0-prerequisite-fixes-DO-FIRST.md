@@ -483,6 +483,37 @@ Note the challenge **create** route (`app/api/challenges/route.ts` lines 175-219
 both. Only accept is missing them, which is why reading one route was never going to find
 this.
 
+### Correction - there are FOUR competition-entry writers, not two
+
+**Verified 1 Sep 2026** before starting the unified service. This document, and every summary
+of Defect 1, describes "duplicate join paths". There are **four** places that create a
+`CompetitionParticipant` and move entry-fee money. Two were never on record.
+
+| # | Path | Reachable by | `prizePool` | Notes |
+|---|---|---|---|---|
+| 1 | **Gate A** - `enterCompetition`, `lib/actions/trading/competition.actions.ts:352` | The production UI (`CompetitionEntryButton`, `CompetitionCard`) | **Yes** | The only path a paying customer uses |
+| 2 | **Gate B** - `POST /api/competitions/[id]/join` | Simulator and tests only - **no React component calls it** | **No** | The prize-pool defect |
+| 3 | **Simulator batch** - `app/api/simulator/competitions/join-batch/route.ts` | Simulator only, behind `guardSimulatorRoute` | **No** | New to this document |
+| 4 | **Admin mirror** - `apps/admin/lib/actions/trading/competition.actions.ts:452` | **Nothing. Dead code.** | Yes (line 651) | New to this document |
+
+**Path 3, the simulator batch, has the same money defect as Gate B** - it `$inc`s
+`currentParticipants` at lines 193 and 238 and never touches `prizePool`. It also bulk-inserts
+participants with **field names the schema does not declare** (`pnlPercent`, `tradesCount`,
+`joinedAt` instead of `pnlPercentage`, `totalTrades`, `enteredAt`), which Mongoose drops
+silently - the same class of bug as the entry-fee ledger. It is correctly guarded by
+`guardSimulatorRoute`, so Prerequisite A covered it.
+
+**Path 4 is dead code, and that is the dangerous part.** Nothing in `apps/admin` imports it -
+only the restriction service's action-name union and a comment in the Game Master route
+mention the name. It *does* increment `prizePool`, so it is not the money defect, but it is
+**missing email verification and the fraud gate** and it **throws instead of returning
+`{ success: false }`**. A future admin feature wiring it up would silently get the weaker
+guard set and a server action that crashes the render.
+
+**Why this matters for the fix.** "Route both gates through the unified service" is now four
+decisions, not one, and two of them are policy rather than engineering. Recorded here so the
+scope is explicit before any code is written.
+
 ### Correction - the "five finalization entry points" claim is wrong
 
 `External game plans/11-foundation-and-seams.md` lines 67-74 lists five. Verified against
