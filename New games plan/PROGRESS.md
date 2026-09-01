@@ -361,11 +361,36 @@ lock on the competition document, WiredTiger fails each attempt immediately, and
 budget drains at the speed of its own backoff. Deterministic, where a throughput-based
 version would not be.
 
-**Next chat should:** write tests 6 and 8, the last two. Both need a fully seeded *finished*
-competition - participants, closed positions, rankings - which is a larger fixture than
-anything built so far. Note while doing it that `finalizeCompetition` already has the
-idempotency lock the refund path lacks (`active` -> `finalizing`, lines 62-76), so test 8 is
-expected to pass rather than record a defect.
+**Tests 6 and 8 also landed. All twelve Defect 1 tests are now written.** Suite **223**.
+`competition-finalize-payout.test.ts`, 5 tests, and unlike almost everything else in Stage 0
+this path records **no defect**.
+
+Payout exactness holds in three shapes - ranked, tied, and an uneven 33/33/34 split. The
+assertion is `prizes + platform fee == pool` rather than per-winner, because the distribution
+may legitimately change and what must never change is that the two sides balance. The dust
+case earns its place: prizes are floored to two decimals, and the fee is computed as
+`prizePool - totalDistributed`, so the remainder lands in the fee instead of vanishing. A
+"tidier" fee calculation that multiplied the percentage directly would silently start losing
+it, which is exactly the kind of change the unified service invites.
+
+Double finalize passes, because an optimistic `active` -> `finalizing` lock already exists.
+**That makes it the control for live bug 5**: the refund path's double-pay is a missing guard
+rather than a property of the money layer, and this test shows what shape the fix takes.
+
+**One fixture trap to know before touching finalization**, because it cost an hour and reads
+as a production bug. Finalization **recomputes every participant's stats from positions and
+trade history** before ranking, so seeding `pnl` on the participant document does nothing -
+it is overwritten with zero, all players tie at rank 1, and the resulting equal payout looks
+like a prize-distribution defect. To rank participants you must seed a **closed
+`TradingPosition` and a matching `TradeHistory` row**, since the realized amount is read from
+the history by `positionId`. Use **USD-quoted symbols** or finalization fetches conversion
+rates over the network, and satisfy the **whole** competition schema, because finalization
+saves the document.
+
+**Next chat should:** stop writing tests and get the three owner decisions resolved - the two
+open bug fixes (brandingFiles dotted keys, the double refund) and the 3-item manual
+checklist. After that, Defect 1's actual fix: the unified `contest-entry.service.ts`. Every
+behaviour it must preserve or correct is now pinned by a test.
 
 ---
 

@@ -319,9 +319,9 @@ refused. That pair is now a required test - number 12 below.
 | 3 | Join with unverified email, via **all** entry points | All refuse |
 | 4 | Join while account-restricted, via **all** entry points | All refuse |
 | 5 | Join below the level requirement, via **all** entry points | All refuse |
-| 6 | Full prize payout on a finished competition | Winner credits + platform fee == prize pool, exact to the cent |
+| 6 | Full prize payout on a finished competition | Winner credits + platform fee == prize pool, exact to the cent. **DONE 1 Sep 2026** - `competition-finalize-payout.test.ts`, 5 tests. **Passes, no defect.** Checked ranked, tied and uneven splits; the floor-rounding dust lands in the platform fee rather than vanishing |
 | 7 | Cancel and refund | Every participant made whole, `prizePool` zeroed. **Written 1 Sep 2026** - `__tests__/services/competition-cancel-refund.test.ts`, 4 tests, passing. Also pins that a refund reverses the spend rather than counting as winnings, that a participant with no wallet is skipped instead of stranding everyone else's money, and **records live bug 5 below** |
-| 8 | Finalize the same competition twice | Winners paid **once** (idempotency) |
+| 8 | Finalize the same competition twice | Winners paid **once** (idempotency). **DONE 1 Sep 2026. Passes** - an optimistic `active` -> `finalizing` lock already exists. This is the **control for live bug 5**: it proves the refund path's double-pay is a missing guard, not a property of the money layer |
 | 9 | Entry fee ledger row | Carries a resolvable competition reference in a field the schema defines. **Written 1 Sep 2026** - `__tests__/services/entry-fee-ledger.test.ts`, 4 tests, passing. Pins the current defect, proves the corrected write survives, proves the audit query works, and guards against "fixing" it by loosening the schema |
 | 10 | Retries exhausted under sustained write conflict | Returns 409, no participant created, no debit. **Written 1 Sep 2026** in `competition-join-gate-parity.test.ts`. **The route does not return 409 - it returns 500 and leaks the driver's message.** See below. The clean-refusal half holds and is asserted |
 | 11 | Accept a challenge while restricted / fraud-flagged | Refused (sub-defect 1b). **Written 1 Sep 2026** - `__tests__/services/challenge-accept-guards.test.ts`, 5 tests, passing. Three pin the guards that *are* present so a fix cannot drop them; two record the two that are missing. **Sub-defect 1b is now proven, not inferred** |
@@ -350,6 +350,44 @@ retried cron delivery, an admin cancel racing the cron, a manual re-run - pays t
 `finalizing` in a single `findOneAndUpdate` and bails if it loses the race
 (`competition-end.actions.ts` lines 62-76). The refund path needs the same shape:
 `upcoming|active` -> `cancelling`.
+
+### Finalization holds up - tests 6 and 8 pass, and one fixture trap to know about
+
+**Written 1 Sep 2026**, `__tests__/services/competition-finalize-payout.test.ts`, 5 tests.
+Unlike almost everything else in Stage 0, this path records **no defect**.
+
+**Test 6, payout exactness.** Every credit collected leaves the pool exactly once. Asserted
+as `prizes + platform fee == pool` rather than per-winner, because the distribution may
+legitimately change and what must never change is that the two sides balance. Checked in
+three shapes: a ranked field (60/40 of the 240 net, third gets nothing), a three-way tie, and
+an awkward 33/33/34 split.
+
+The dust case is worth keeping. Prizes are floored to two decimals
+(`competition-ranking.service.ts` line 428), so an awkward percentage rounds each winner
+down. The platform fee is computed as `prizePool - totalDistributed`, so the remainder lands
+in the fee rather than vanishing and the pool still balances. **A "tidier" fee calculation
+that multiplied the percentage directly would silently start losing it** - which is exactly
+the kind of change the unified service invites.
+
+**Test 8, double finalize.** Passes. Finalization takes an optimistic lock, moving `active`
+to `finalizing` in one `findOneAndUpdate` and returning early if it loses the race
+(`competition-end.actions.ts` lines 62-76). The second call pays nothing: no balance change,
+no fee, no extra ledger row. **This is the control for live bug 5** - it proves the refund
+path's double-pay is a missing guard, not an inherent property of the money layer, and it
+shows exactly what shape the fix should take.
+
+**The fixture trap, which cost an hour and will cost the next person the same.**
+Finalization **recomputes every participant's stats from their positions and trade history**
+before ranking. Seeding `pnl` on the participant document does nothing - it is overwritten
+with zero. All three test players then tied at rank 1, and the equal payout looked like a
+prize-distribution bug in production rather than a fixture that had not seeded any trades.
+
+To rank participants you must seed a **closed `TradingPosition` and a matching `TradeHistory`
+row**, because the realized amount is read from the history by `positionId` (lines 161-179),
+not derived from the position. Two more points: **use USD-quoted symbols**, or finalization
+fetches live conversion rates over the network; and the competition fixture must satisfy the
+**whole** schema (`createdBy`, `registrationDeadline`, `description`), because finalization
+saves the document even though those fields play no part in a payout.
 
 ### Live bug 6 - exhausted retries return 500 with the raw driver message
 
