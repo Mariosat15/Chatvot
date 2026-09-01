@@ -100,12 +100,13 @@ The practical consequence: a read is worthless as evidence that two copies agree
 - PR checklist item: "model changed - mirror updated?"
 - Every task in `03` lists both paths explicitly.
 
-**What the fix uncovered:** three live production bugs.
+**What the fix uncovered:** four live production bugs, **all now fixed**.
 1. Failed withdrawals were storing no failure time and no processor reason, because the main app wrote `failedAt` and `failedReason` into a schema declaring neither.
 2. Six landing-page sections - Game Master, competition types, marketplace, journey and badges, trust badges, enterprise case studies - were **not administrable at all**, because 42 fields were missing from the admin copy of `hero-settings.model.ts`.
 3. **Hero and branding images could never be recovered after a redeploy.** `whitelabel.brandingFiles` holds a base64 backup of every uploaded image for exactly that purpose, and the admin schema did not declare it, so the three routes that read it saw `undefined`. Deleting an image also left the database copy behind forever. Found by the typecheck rather than the guard: syncing the model removed four standing TypeScript errors (229 to 225).
+4. **The same images could never be *stored* either.** Syncing the schema was necessary and not sufficient: the upload routes key the map by filename, and **Mongoose refuses map keys containing a dot**, so no entry had ever been written in either app. The sync only changed the failure mode - an undeclared field meant a plain `Map` accepted the key and the write was discarded; a declared one hands the route a `MongooseMap` that validates and throws, which the route catches and logs. Fixed by a shared `branding-file-key.ts` helper that encodes the dot, wired through two writers, four readers and one delete across both apps. Nothing to migrate.
 
-That third one is also the clearest illustration of *why* drift hides so well. `.lean()` and `toObject()` return an undeclared field perfectly, but **ordinary `doc.field` access returns `undefined`**, because Mongoose only defines getters for declared paths. A debug dump shows the value; the code beside it reads nothing.
+The third and fourth together are the clearest illustration of *why* drift hides so well - and of the trap of stopping at the schema. Reads are not uniformly safe: `.lean()` and `toObject()` return an undeclared field perfectly, but **ordinary `doc.field` access returns `undefined`**, because Mongoose only defines getters for declared paths. A debug dump shows the value; the code beside it reads nothing. And a synced schema is not a working feature - the guard proves two copies agree, not that either one works.
 
 **Detection:** the guard runs in CI and blocks pushes. A test asserts the real repository has zero drift, with a lower bound on the number of pairs compared so it cannot pass vacuously.
 

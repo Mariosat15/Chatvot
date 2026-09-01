@@ -323,13 +323,14 @@ refused. That pair is now a required test - number 12 below.
 | 7 | Cancel and refund | Every participant made whole, `prizePool` zeroed. **Written 1 Sep 2026** - `__tests__/services/competition-cancel-refund.test.ts`, 4 tests, passing. Also pins that a refund reverses the spend rather than counting as winnings, that a participant with no wallet is skipped instead of stranding everyone else's money, and **records live bug 5 below** |
 | 8 | Finalize the same competition twice | Winners paid **once** (idempotency). **DONE 1 Sep 2026. Passes** - an optimistic `active` -> `finalizing` lock already exists. This is the **control for live bug 5**: it proves the refund path's double-pay is a missing guard, not a property of the money layer |
 | 9 | Entry fee ledger row | Carries a resolvable competition reference in a field the schema defines. **Written 1 Sep 2026** - `__tests__/services/entry-fee-ledger.test.ts`, 4 tests, passing. Pins the current defect, proves the corrected write survives, proves the audit query works, and guards against "fixing" it by loosening the schema |
-| 10 | Retries exhausted under sustained write conflict | Returns 409, no participant created, no debit. **Written 1 Sep 2026** in `competition-join-gate-parity.test.ts`. **The route does not return 409 - it returns 500 and leaks the driver's message.** See below. The clean-refusal half holds and is asserted |
+| 10 | Retries exhausted under sustained write conflict | Returns 409, no participant created, no debit. **Written 1 Sep 2026** in `competition-join-gate-parity.test.ts`. **Was returning 500 and leaking the driver's message; FIXED 1 Sep 2026** and now returns 409 with a safe message. The clean-refusal half held throughout and is asserted separately |
 | 11 | Accept a challenge while restricted / fraud-flagged | Refused (sub-defect 1b). **Written 1 Sep 2026** - `__tests__/services/challenge-accept-guards.test.ts`, 5 tests, passing. Three pin the guards that *are* present so a fix cannot drop them; two record the two that are missing. **Sub-defect 1b is now proven, not inferred** |
 | 12 | Join an `upcoming` competition outside market hours, then try to place an order in it | Join **succeeds**, order **refused**. Locks in the owner's decision above, in both directions - a fix that blocked the join would fail this, and so would one that let the order through. **DONE 1 Sep 2026** in `competition-join-gate-parity.test.ts`, both directions. With the market closed: Gate A admits, Gate B refuses cleanly (no seat, no fee), and `placeOrder` refuses with no order and no position created. The two halves are deliberately in one file - split apart, each reads as an arbitrary rule |
 
-### Live bug 5 - cancelling a competition twice refunds every player twice
+### Live bug 5, now FIXED - cancelling a competition twice refunded every player twice
 
-**PROVEN 1 Sep 2026**, `__tests__/services/competition-cancel-refund.test.ts`.
+**PROVEN and FIXED 1 Sep 2026**, `__tests__/services/competition-cancel-refund.test.ts`.
+The test now proves the fix rather than the defect.
 
 `cancelCompetitionAndRefund` selects participants with
 `CompetitionParticipant.find({ competitionId })` - **no status filter** - and never checks
@@ -346,10 +347,29 @@ this function, and the lazy check inside `getCompetitionById` cancels and refund
 Because the refund does not verify prior status, anything that invokes it a second time - a
 retried cron delivery, an admin cancel racing the cron, a manual re-run - pays twice.
 
-**The remedy already exists in the same codebase.** Finalization locks `active` ->
+**The remedy already existed in the same codebase.** Finalization locks `active` ->
 `finalizing` in a single `findOneAndUpdate` and bails if it loses the race
-(`competition-end.actions.ts` lines 62-76). The refund path needs the same shape:
-`upcoming|active` -> `cancelling`.
+(`competition-end.actions.ts` lines 62-76).
+
+**The fix, applied to both apps.** The refund now claims the competition in the same
+`findOneAndUpdate` that sets its final status - `{ _id, status: { $ne: "cancelled" } }` ->
+`status: "cancelled", cancellationReason, prizePool: 0` - and a second caller matches nothing
+and returns `{ success: true, refundedCount: 0 }`. Two details worth keeping:
+
+- **No new enum value was needed.** Setting the *final* status up front is the lock, and
+  because it happens inside the transaction an abort rolls it back for a retry. An
+  intermediate `cancelling` state would have meant a schema change in both apps.
+- **A duplicate request returns success, not an error.** A retried cron delivery has not done
+  anything wrong, and handing it a failure would invite a third attempt.
+
+The redundant status update that used to run at the end of the transaction was removed, with
+a comment saying why - left in place it would read as though the lock were advisory.
+
+**One adjacent hazard is measured but deliberately NOT closed.** The guard is
+`status !== "cancelled"`, so a **completed** competition is still refundable - returning every
+entry fee on top of prizes already paid. Pinned by a test that records the current behaviour
+rather than failing. Closing it means deciding which statuses an admin may cancel, which is a
+policy question and belongs with the unified service, not smuggled into a bug fix.
 
 ### Finalization holds up - tests 6 and 8 pass, and one fixture trap to know about
 
@@ -389,10 +409,10 @@ fetches live conversion rates over the network; and the competition fixture must
 **whole** schema (`createdBy`, `registrationDeadline`, `description`), because finalization
 saves the document even though those fields play no part in a payout.
 
-### Live bug 6 - exhausted retries return 500 with the raw driver message
+### Live bug 6, now FIXED - exhausted retries returned 500 with the raw driver message
 
-**PROVEN 1 Sep 2026**, `competition-join-gate-parity.test.ts`. Test 10 expected a 409. The
-route does not produce one.
+**PROVEN and FIXED 1 Sep 2026**, `competition-join-gate-parity.test.ts`. Test 10 expected a
+409; the route did not produce one.
 
 When Gate B's fifth retry fails it re-throws (`join/route.ts` line 308), the outer catch
 returns **500**, and the body carries `error.message` verbatim - so the caller receives a raw
@@ -405,9 +425,24 @@ Two separate problems in one line:
   a race and is worth repeating. The user-visible effect is that a busy competition looks
   like an outage.
 - **Information disclosure.** Returning the driver's own text to an unauthenticated caller
-  names the storage engine and its configuration. Worth checking for the same pattern
-  elsewhere: `error instanceof Error ? error.message : ...` in a route response is the shape
-  to grep for.
+  names the storage engine and its configuration.
+
+**The fix.** The transient branch now answers **409** with a message a player can act on, and
+the driver's text stays in the server log. A compiler check while fixing it also exposed that
+the retry loop had **no return after it at all** - the function could fall through and return
+`undefined`, which Next turns into an opaque 500. That path is now explicit.
+
+**The sweep found the pattern is codebase-wide, and it was deliberately NOT mass-edited.**
+`error instanceof Error ? error.message` appears **166 times across 119 API route files**. A
+166-site change would be unreviewable, and many of those messages are legitimate
+user-facing validation text - the harm is specific to messages that originate in the driver or
+the framework rather than in our own `throw`. Recommended approach when it is tackled: a small
+helper that maps known-safe errors to their message and everything else to a generic string,
+introduced route by route. Recorded here so it is a known debt rather than a discovery.
+
+The join route was the only **HTTP route** with the transient-retry shape; the other three
+sites (`challenge-finalize`, `competition-end`, `retry-db`) are server actions and utilities
+that return result objects, so no status code is involved.
 
 The test forces the conflict rather than racing for it - a second transaction holds a write
 lock on the competition document, so WiredTiger fails each attempt immediately and the retry
@@ -686,6 +721,41 @@ undeclared field perfectly, but **ordinary property access returns `undefined`**
 Mongoose defines getters only for declared paths. So a debug dump of the document shows
 the value while the line of code beside it reads nothing and takes the wrong branch. Both
 behaviours are pinned in `mirror-drift-behaviour.test.ts`.
+
+### Live bug 4, now FIXED - the same images could never be *stored* either
+
+**FOUND and FIXED 1 Sep 2026**, `__tests__/services/mirror-sync-behaviour.test.ts`.
+
+Syncing the schema was necessary and **not sufficient**. The upload routes build
+`${type}-${timestamp}-${random}.${ext}` and use it as the map key, so the key **always**
+contains a dot - and **Mongoose refuses map keys containing a dot**. No `brandingFiles` entry
+had ever been stored, in either app.
+
+The sync changed the failure mode rather than removing it, which is why it needed finding
+twice:
+
+| | What the route got | What happened |
+|---|---|---|
+| **Before the sync** | Field undeclared, so a plain JavaScript `Map` | Accepted the dotted key, then the whole undeclared field was discarded on save |
+| **After the sync** | `default: new Map()`, so a `MongooseMap` | Validated the key and threw; line 108 caught it and logged a warning |
+
+Either way the response reported success, because the file *had* reached the disk. Nothing
+surfaced until a redeploy, by which point the image was gone with no copy to restore.
+
+**The fix.** A shared helper, `lib/utils/branding-file-key.ts` (mirrored into `apps/admin`),
+encodes `.` as `__DOT__` on the way in and back on the way out. Wired through **two writers,
+four readers and one delete** across both apps. `__DOT__` was chosen over base64 so the keys
+stay readable when someone inspects the document - which matters for a field whose entire
+purpose is disaster recovery.
+
+Two things the test does deliberately. It asserts a **round trip through the real helper**
+rather than a hard-coded encoded string, because the writers and the four readers only work if
+they agree and a baked-in format would pass even if a reader forgot to encode. And it pins
+that encoding a **dot-free** name is a no-op, because the readers call the encoder
+unconditionally - if that were not true, adding it would have broken extensionless names while
+fixing dotted ones.
+
+**Nothing to migrate.** No entry was ever stored, in either failure mode.
 
 ## The stale build output - ALL DELETED 1 September 2026 (owner approved)
 
@@ -1068,11 +1138,11 @@ below, because a schema test cannot see whether a form is wired to the field it 
 - [ ] **Open one previously unwritable landing-page section in admin, change it, save, reload.** The schema now stores it - what a test cannot check is whether the form actually sends the value. Any one of: Game Master showcase, competition types, marketplace, journey and badges, trust badges.
 - [ ] **Spot-check two admin screens read what they now store:** a Game-Master-created competition shows its Game Master, and a card deposit shows its payment provider.
 
-**A fourth live bug, found by these tests, NOT fixed by the sync**
+**A fourth live bug, found by these tests, NOT fixed by the sync - now FIXED separately**
 
 `brandingFiles` - the base64 backup that restores hero and branding images after a redeploy
-wipes the filesystem - **has never stored a single entry, and still cannot.** Syncing the
-schema was necessary and is not sufficient.
+wipes the filesystem - **had never stored a single entry.** Syncing the schema was necessary
+and was not sufficient. Fixed 1 Sep 2026; the detail is under "Live bug 4" above.
 
 The upload route builds the key as `${type}-${timestamp}-${random}.${ext}` and
 **Mongoose refuses map keys containing a dot**, which a filename always has. The sync
@@ -1091,18 +1161,24 @@ surfaces until a redeploy, by which point the image is gone and there is no copy
 restore. The four readers look the file up by that same dotted name, so the key format
 cannot be changed on the write side alone.
 
-Recorded by a test that asserts the *current, broken* behaviour, so the day it is fixed the
-test fails and has to be updated deliberately. **There is no data to migrate when it is
-fixed, because no entry has ever been stored.** Awaiting an owner decision: it needs a
-shared key-encoding helper used by one writer and four readers across both apps.
+**Fixed by `lib/utils/branding-file-key.ts`**, mirrored into `apps/admin`, encoding `.` as
+`__DOT__` and wired through **two writers, four readers and one delete** across both apps.
+**There was no data to migrate, because no entry had ever been stored.** The test now proves
+the round trip rather than the defect.
 
 **Decisions taken 1 September 2026 - no longer outstanding**
 
 - [x] **Delete the orphaned `.d.ts` files.** Approved and done. The count was 112 repo-wide, not 62 - the earlier figure had only counted `database/`. `types/global.d.ts` and the websocket server's `dist` output were deliberately kept. A `.gitignore` rule prevents recurrence. Typecheck identical before and after.
 - [x] **Market hours must not block joining.** Approved. Only trading itself is gated. Locked in by test 12.
 - [x] **`mongodb-memory-server` as a single-node replica set** for the test database. Built and proven.
+- [x] **Fix all three live bugs (4, 5 and 6).** Approved and done. Every test that recorded a defect now proves its fix instead of being deleted - the comment explaining why the defect was reachable is the most valuable part, and losing it would lose the reason the guard exists.
 
-Nothing here needs your input again. The only thing left for you on Defect 2 is the test checklist above.
+Two follow-ups were deliberately **left open** rather than folded into the bug fixes, and neither is closed:
+
+- **A completed competition is still refundable**, returning entry fees on top of prizes already paid. The lock is `status !== "cancelled"`. Closing it means deciding which statuses an admin may cancel - policy, not a bug fix. Measured by a test that records the behaviour.
+- **`error instanceof Error ? error.message` appears 166 times across 119 API route files.** Only the proven one was changed. A 166-site diff would be unreviewable and most of those messages are legitimate user-facing text.
+
+The only thing left for you on Defect 2 is the 3-item test checklist above.
 
 **One thing to be aware of, not a decision:** the mirror guard cannot statically check one enum, `hero-settings.model.ts:featuresColumns`, because its values are built at runtime. It reports this on every run rather than passing quietly. 74 of 75 pairs are fully compared; that one is compared by field name only.
 

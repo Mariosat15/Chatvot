@@ -5,6 +5,7 @@ import { constants } from "fs";
 import path from "path";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
+import { encodeBrandingFileKey } from "@/lib/utils/branding-file-key";
 
 export async function POST(request: NextRequest) {
   try {
@@ -124,22 +125,27 @@ export async function POST(request: NextRequest) {
     try {
       await connectToDatabase();
       const ext = fileExtension.toLowerCase();
-      const contentTypes: Record<string, string> = {
-        jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
-        gif: "image/gif", webp: "image/webp", svg: "image/svg+xml", ico: "image/x-icon",
-      };
-      const contentType = contentTypes[ext] || "image/png";
+      // A Map rather than an object literal, so a crafted extension cannot reach
+      // Object.prototype and return something that is not a content type.
+      const contentTypes = new Map<string, string>([
+        ["jpg", "image/jpeg"], ["jpeg", "image/jpeg"], ["png", "image/png"],
+        ["gif", "image/gif"], ["webp", "image/webp"], ["svg", "image/svg+xml"],
+        ["ico", "image/x-icon"],
+      ]);
+      const contentType = contentTypes.get(ext) || "image/png";
       const base64Data = buffer.toString("base64");
 
       let settings = await WhiteLabel.findOne();
       if (!settings) { settings = new WhiteLabel(); }
-      const brandingFiles = (settings as any).brandingFiles || new Map();
-      brandingFiles.set(filename, {
+      // Reason: documents written before the field was declared have no map to set into.
+      if (!settings.brandingFiles) settings.brandingFiles = new Map();
+      // Reason: Mongoose rejects map keys containing a dot, so the raw filename could never
+      // be stored and this backup silently did nothing. See branding-file-key.ts.
+      settings.brandingFiles.set(encodeBrandingFileKey(filename), {
         data: base64Data,
         contentType,
         updatedAt: new Date(),
       });
-      (settings as any).brandingFiles = brandingFiles;
       await settings.save();
       console.log(`💾 [Upload] File backed up to DB: ${filename} (${Math.round(base64Data.length / 1024)}KB base64)`);
     } catch (dbErr) {

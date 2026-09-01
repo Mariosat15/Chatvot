@@ -438,6 +438,14 @@
         <li>The same event is recorded in the ledger under two different field names, which makes financial reconciliation harder.</li>
       </ul>
 
+      <div class="cal plain">
+        <div class="t">Two more money defects found while writing the tests &mdash; both now fixed</div>
+        <p><b>Cancelling a competition twice refunded every player twice.</b> The refund never checked whether the competition had already been cancelled, so it found the same players a second time and paid every entry fee out again. The database transaction did not help: it made each pass atomic, not unique. Measured on three players who each paid a 25-credit fee &mdash; after two cancellations each held 25 credits nobody had ever paid, with a ledger that agreed.</p>
+        <p>This was not theoretical. A scheduled job cancels competitions that never filled, an admin can cancel one on demand, and a third check cancels during page rendering. A retried scheduled delivery, or an admin clicking cancel while the sweep ran, paid twice. <b>Fixed by claiming the competition in the same instruction that marks it cancelled</b>, in both applications, so a second caller finds nothing to do and reports success rather than an error &mdash; a retried job has done nothing wrong, and refusing it would only invite a third attempt.</p>
+        <p><b>A busy competition looked like an outage.</b> When simultaneous joins collided more than five times, the API answered with a server-error code and passed the database's own internal message straight back to the caller. Two things were wrong: the error code tells a browser not to try again and can make the load balancer take the server out of service, and the message itself named the storage engine and its settings to anyone who asked. <b>Both fixed</b> &mdash; it now returns the code that means "you lost a race, please try again" along with a message a player can act on, and the technical detail stays in the server log.</p>
+        <p style="margin-bottom:0">The second one led to a wider finding worth recording. That habit of returning the raw internal message appears <b>166 times across 119 API files</b>. It was deliberately <b>not</b> changed everywhere at once: a change that size could not be reviewed properly, and most of those messages are legitimate text intended for the user. The harm is specific to messages that come from the database or the framework rather than from our own code. It is now a known piece of debt with a recommended approach, rather than something waiting to be rediscovered.</p>
+      </div>
+
       <h4>The fix</h4>
       <ol>
         <li><b>Write the money tests first</b>, against today's behaviour, so any unintended change is caught immediately.</li>
@@ -579,7 +587,7 @@
       </div>
 
       <div class="cal bad">
-        <div class="t">The three live defects it found on the way</div>
+        <div class="t">The three live defects it found on the way &mdash; all now fixed</div>
         <ol style="margin-bottom:0">
           <li><b>Failed withdrawals recorded neither the time nor the reason.</b> The payment provider was reporting why a payout failed and the platform was discarding it, so the admin screen had nothing to show and nobody could tell a customer what had gone wrong.</li>
           <li><b>Six landing-page sections could not be edited at all.</b> Game Master, competition types, the marketplace, journey and badges, trust badges and the enterprise case studies. Saving a change returned a success message and changed nothing.</li>
@@ -588,10 +596,11 @@
       </div>
 
       <div class="cal plain">
-        <div class="t">A fourth defect, and the honest position on the third</div>
-        <p>The image-recovery fault above is <b>not fixed by matching the blueprints.</b> Matching them was necessary and it is not sufficient, and the plan says so rather than claiming a win.</p>
-        <p>The backup copy is filed under the image's filename, and the database <b>refuses a key containing a dot</b> &mdash; which every filename has. So the backup has never been written once, and matching the blueprints only changed how it fails: before, the field did not exist and the write was quietly thrown away; now the field exists and the write is rejected outright. The upload code catches that rejection, writes a line to the log, and still reports success, because the image did reach the disk. Nothing looks wrong until a deployment, by which point the image is gone and there is no copy to restore.</p>
-        <p style="margin-bottom:0">Two practical consequences. <b>There is nothing to migrate when this is fixed</b>, because no backup has ever been stored. And the fix is small but touches five places &mdash; one that writes the key and four that read it &mdash; so it is a decision to take deliberately rather than a line to change in passing.</p>
+        <div class="t">A fourth defect underneath the third &mdash; now fixed</div>
+        <p>The image-recovery fault above was <b>not fixed by matching the blueprints.</b> Matching them was necessary and it was not sufficient, which is worth stating plainly: a matched blueprint proves two copies agree, not that either one works.</p>
+        <p>The backup copy is filed under the image's filename, and the database <b>refuses a key containing a dot</b> &mdash; which every filename has. So the backup had never been written once, and matching the blueprints only changed how it failed: before, the field did not exist and the write was quietly thrown away; afterwards the field existed and the write was rejected outright. The upload code caught that rejection, wrote a line to the log, and still reported success, because the image did reach the disk. Nothing looked wrong until a deployment, by which point the image was gone and there was no copy to restore.</p>
+        <p><b>Fixed 1 September 2026.</b> A single shared helper now encodes the dot on the way in and restores it on the way out, wired through all seven places that touch these keys &mdash; two that write, four that read and one that deletes &mdash; in both applications. The encoding keeps the stored names readable, which matters for a field whose entire purpose is recovering from a disaster: someone inspecting the database during an incident should be able to see which image is which.</p>
+        <p style="margin-bottom:0"><b>There was nothing to migrate</b>, because no backup had ever been stored.</p>
       </div>
 
       <div class="cal plain">

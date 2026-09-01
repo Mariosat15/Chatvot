@@ -5,6 +5,10 @@ import {
   stopTestMongo,
   clearTestMongo,
 } from "../helpers/mongo-test-server";
+import {
+  encodeBrandingFileKey,
+  decodeBrandingFileKey,
+} from "@/lib/utils/branding-file-key";
 
 /**
  * Stage 0, Defect 2: proves the mirror sync fixed real behaviour.
@@ -258,31 +262,49 @@ describe("Defect 2 - the synced fields now actually persist", () => {
       expect(stored?.has("hero-banner-png")).toBe(true);
     });
 
-    it("STILL FAILS for a real filename, because Mongoose maps reject keys containing a dot", async () => {
-      // Reason: this test records a defect, not a fix. Syncing the schema was necessary
-      // and is not sufficient.
+    it("stores and retrieves a real dotted filename (live bug 4, fixed)", async () => {
+      // Reason: this was the proof of live bug 4 and is now the proof of its fix. Syncing
+      // the schema was necessary and was not sufficient.
       //
-      // The upload route builds `${type}-${timestamp}-${random}.${ext}` and uses it as the
-      // Map key, so the key ALWAYS contains a dot, and Mongoose rejects it. The four
-      // readers look the file up by that same dotted name, so the key format cannot simply
-      // be changed on the write side alone.
+      // The upload route builds `${type}-${timestamp}-${random}.${ext}`, so the key ALWAYS
+      // contains a dot - and Mongoose rejects map keys containing one. The sync changed the
+      // failure mode rather than removing it. Before, the field was undeclared, so the route
+      // got a plain JavaScript Map which accepted the key and had the whole field discarded
+      // on save. After, `default: new Map()` gave it a MongooseMap, which validated and
+      // threw; line 108 caught that and logged a warning while the response still reported
+      // success, because the file had reached the disk. Nothing surfaced until a redeploy,
+      // by which point the image was gone with no copy to restore.
       //
-      // The sync changed the failure mode rather than removing it. Before: brandingFiles
-      // was undeclared, so `(settings as any).brandingFiles` gave undefined, the route fell
-      // back to a plain JS Map which accepts any key, and the assignment to an undeclared
-      // path was silently discarded. After: the field is declared with `default: new Map()`,
-      // so the route now gets a MongooseMap, which validates the key and throws.
-      //
-      // Either way the backup has never been written once. Line 108 of the upload route
-      // catches this and logs a warning, and the response still reports success because
-      // the file did reach the disk - so nothing surfaces until a redeploy, by which point
-      // the image is gone and there is no copy to restore.
-      //
-      // One consequence worth stating: there is no data to migrate when this is fixed,
-      // because no brandingFiles entry has ever been stored.
-      await expect(writeBrandingFile("hero-1756713600-a1b2c3.png")).rejects.toThrow(
-        /do not support keys that contain "\."/,
-      );
+      // The fix encodes the dot on both sides via `encodeBrandingFileKey`. Asserted here as
+      // a round trip through the *real* helper rather than a hard-coded encoded string,
+      // because the writers and the four readers only work if they agree - a test that
+      // baked in the format would pass even if a reader forgot to encode.
+      const filename = "hero-1756713600-a1b2c3.png";
+      const doc = await writeBrandingFile(encodeBrandingFileKey(filename));
+
+      const reread = await AdminWhiteLabel.findById(doc._id);
+      const stored = (
+        reread as unknown as { brandingFiles?: Map<string, unknown> }
+      )?.brandingFiles;
+
+      // What a reader route does: encode the requested filename and look it up.
+      expect(stored?.get(encodeBrandingFileKey(filename))).toMatchObject({
+        contentType: "image/png",
+      });
+
+      // And the stored key really does carry no dot, which is the whole constraint.
+      const keys = [...(stored?.keys() ?? [])];
+      expect(keys).toHaveLength(1);
+      expect(keys[0]).not.toContain(".");
+      expect(decodeBrandingFileKey(keys[0])).toBe(filename);
+    });
+
+    it("leaves a dot-free filename untouched, so encoding is safe to apply everywhere", async () => {
+      // Reason: the readers call the encoder unconditionally, including for names that never
+      // had a dot. If encoding were not a no-op for those, adding it would have broken the
+      // extensionless case rather than fixing the dotted one.
+      expect(encodeBrandingFileKey("logo")).toBe("logo");
+      expect(decodeBrandingFileKey("logo")).toBe("logo");
     });
   });
 

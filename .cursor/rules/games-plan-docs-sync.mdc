@@ -91,15 +91,51 @@ get wrong and are worth stating here:
  test.** Both register under the same name via `models.X || model(...)`, so the second
  import silently returns the first and the test examines the wrong schema while looking
  correct.
-- **The `brandingFiles` image-recovery bug is NOT fixed by the model sync** (found 1 Sep
- 2026, `__tests__/services/mirror-sync-behaviour.test.ts`). The upload route uses the
- filename as the map key and **Mongoose refuses map keys containing a dot**. The sync
- changed the failure mode without removing it: before, the undeclared field meant a plain
- JavaScript `Map` accepted the key and the write was silently discarded; after, `default:
- new Map()` hands the route a `MongooseMap` that validates and throws, and line 108 of
- `apps/admin/app/api/hero-settings/upload/route.ts` catches it and warns. **No entry has
- ever been stored, so there is nothing to migrate when it is fixed.** If a document claims
- the sync fixed hero/branding image recovery, that claim is stale.
+- **A synced schema is not a working feature — the `brandingFiles` bug proved it twice.**
+ Found and **fixed** 1 Sep 2026. The upload routes key the map by filename and **Mongoose
+ refuses map keys containing a dot**. The sync changed the failure mode without removing it:
+ before, the undeclared field meant a plain JavaScript `Map` accepted the key and the write
+ was silently discarded; after, `default: new Map()` hands the route a `MongooseMap` that
+ validates and throws, and the route catches it and warns while still reporting success.
+ **No entry had ever been stored, so there was nothing to migrate.** Fixed by
+ `lib/utils/branding-file-key.ts` (mirrored into `apps/admin`), encoding `.` as `__DOT__`,
+ wired through **two writers, four readers and one delete** across both apps. Two rules
+ follow: **the mirror guard proves two copies agree, not that either one works** — follow a
+ drift fix with a test that round-trips real data; and **assert the round trip through the
+ real helper, never a hard-coded encoded string**, or a reader that forgot to encode still
+ passes.
+- **Every test that recorded a defect was flipped to prove its fix, not deleted** (1 Sep
+ 2026, three bugs). Keep doing this. The comment that explained why the defect was reachable
+ is the most valuable part of the test, and deleting it loses the reason the guard exists.
+ Rename the test, invert the assertion, keep the history in the `// Reason:` block.
+- **Two fixes deliberately stopped short, and both are recorded rather than silently
+ scoped.** `cancelCompetitionAndRefund`'s lock is `status !== "cancelled"`, so a **completed**
+ competition is still refundable — entry fees returned on top of prizes already paid. And
+ `error instanceof Error ? error.message` in a route response appears **166 times across 119
+ API route files**; only the proven one was changed. In both cases the wider change is a
+ policy decision or an unreviewable diff, so it belongs with the unified service. **Do not
+ let a summary imply either is closed.**
+- **Setting the final status up front IS the lock.** The double-refund fix needed no new enum
+ value: `findOneAndUpdate({ _id, status: { $ne: "cancelled" } }, { $set: { status:
+ "cancelled", ... } })` claims and completes in one instruction, and a transaction abort rolls
+ it back for a retry. An intermediate `cancelling` state would have meant a schema change in
+ both apps for no gain. Also: **a duplicate money request should return success with a zero
+ count**, not an error — a retried cron delivery has done nothing wrong, and a failure invites
+ a third attempt.
+- **Finalization recomputes participant stats from trades before ranking.** Seeding `pnl` on a
+ `CompetitionParticipant` does nothing; it is overwritten with zero, every player ties at rank
+ 1, and the resulting equal payout **reads as a prize-distribution bug in production**. To
+ rank participants, seed a **closed `TradingPosition` and a matching `TradeHistory` row** —
+ the realized amount is read from the history by `positionId`, not derived from the position.
+ Use **USD-quoted symbols** or finalization fetches conversion rates over the network, and
+ satisfy the **whole** competition schema (`createdBy`, `registrationDeadline`, `description`),
+ because finalization saves the document even though those fields play no part in a payout.
+- **The challenge accept route is missing the restriction and fraud guards** (proven 1 Sep
+ 2026, `__tests__/services/challenge-accept-guards.test.ts`, sub-defect 1b). It checks seven
+ other guards. The challenge **create** route checks both, so only accept is affected — which
+ is why reading one route would never have found it. A challenge is the easiest shape for
+ coordinated entry, being exactly two players with the pot returning to the pair minus the
+ platform fee, so the fraud gap matters here at least as much as on a competition.
 - **Classify concurrency failures, never merely count them.** Asserting that the artifact
  and unknown buckets are *empty* is what stops test-server noise inflating a finding. And
  note the trap in the other direction: a genuine write conflict reads `Write conflict during

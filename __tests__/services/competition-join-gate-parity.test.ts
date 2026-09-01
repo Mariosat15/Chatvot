@@ -324,19 +324,16 @@ describe("competition entry - the two gates compared", () => {
     expect(await totalCollected([gateBPlayer])).toBe(0);
   });
 
-  it("returns 500 and leaks the driver message when Gate B exhausts its retries (test 10)", async () => {
-    // Reason: this test records two defects, and the plan predicted neither precisely.
+  it("returns 409 without leaking the driver message when Gate B exhausts its retries (test 10, live bug 6 fixed)", async () => {
+    // Reason: this was the proof of live bug 6 and is now the proof of its fix. Before it,
+    // the fifth failure re-threw into the outer catch, which returned **500** with
+    // `error.message` verbatim - so a caller received "Write conflict during plan execution
+    // and yielding is disabled".
     //
-    // Test 10 as written expects a 409. The route does not produce one. When the fifth
-    // retry fails it re-throws, the outer catch returns **500**, and the body carries
-    // `error.message` verbatim - so the client receives a raw MongoDB string such as
-    // "Write conflict during plan execution and yielding is disabled".
-    //
-    // Both halves matter. A 500 tells a caller the server is broken, so a browser will not
-    // retry and a load balancer may take the instance out of rotation; a 409 tells it the
-    // request lost a race and is worth repeating. And returning the driver's own text to an
-    // unauthenticated caller is an information leak - it names the storage engine and its
-    // configuration.
+    // Both halves mattered. A 500 tells a browser not to retry and can make a load balancer
+    // pull the instance out of rotation, so a busy competition looked like an outage rather
+    // than a lost race. And the driver's own text names the storage engine and its
+    // configuration to an unauthenticated caller.
     //
     // The conflict is forced rather than raced, so this is deterministic. A second
     // transaction holds a write lock on the competition document; WiredTiger fails the
@@ -359,16 +356,20 @@ describe("competition entry - the two gates compared", () => {
 
       const { status, body } = await callGateB(competitionId);
 
-      expect(status).toBe(500);
+      expect(status).toBe(409);
       expect(body.success).toBe(false);
-      expect(body.error).toMatch(/write conflict/i);
+
+      // Something a player can act on, and nothing about the database.
+      expect(body.error).toMatch(/try again/i);
+      expect(body.error).not.toMatch(/write conflict|yielding|WiredTiger|transaction/i);
     } finally {
       await blocker.abortTransaction();
       await blocker.endSession();
     }
 
-    // Whatever the status code, the refusal must be clean. This is the part that must stay
-    // true after the code is corrected to a 409.
+    // The refusal must also be clean, which was already true before the fix and must stay
+    // true: a conflict that took the fee without seating the player would be far worse than
+    // a wrong status code.
     const comp = await readCompetition(competitionId);
     expect(comp?.currentParticipants).toBe(0);
     expect(comp?.prizePool).toBe(0);

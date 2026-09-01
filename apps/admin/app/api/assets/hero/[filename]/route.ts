@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile, access, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { constants } from "fs";
+import { encodeBrandingFileKey } from "@/lib/utils/branding-file-key";
 
 /**
  * GET /api/assets/hero/[filename]
@@ -49,7 +50,11 @@ export async function GET(
       await connectToDatabase();
 
       const settings = await WhiteLabel.findOne();
-      const fileEntry = settings?.brandingFiles?.get(sanitizedFilename);
+      // Reason: stored with the dots encoded, because Mongoose rejects map keys containing
+      // one. See branding-file-key.ts.
+      const fileEntry = settings?.brandingFiles?.get(
+        encodeBrandingFileKey(sanitizedFilename),
+      );
 
       if (fileEntry?.data) {
         console.log(`🔄 [Hero Serve] Restoring from DB: ${sanitizedFilename}`);

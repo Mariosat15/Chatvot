@@ -203,42 +203,76 @@ describe("competition cancellation and refunds", () => {
     expect(wallet?.totalWonFromCompetitions).toBeUndefined();
   });
 
-  it("DOUBLE-REFUNDS when called twice, because there is no idempotency guard", async () => {
-    // Reason: this test records a defect, not a fix.
+  it("refunds once when called twice (live bug 5, fixed)", async () => {
+    // Reason: this was the proof of live bug 5 and is now the proof of its fix. Before the
+    // fix both calls paid out, so every player ended up a whole entry fee better off than
+    // they started - credits created from nothing, with a ledger that agreed.
     //
-    // `cancelCompetitionAndRefund` selects participants with
-    // `CompetitionParticipant.find({ competitionId })` and no status filter, and it never
-    // checks whether the competition is already cancelled. The first call refunds everyone
-    // and sets each participant to "refunded"; a second call finds those same documents and
-    // pays every entry fee out again. The transaction does not help - it makes each pass
-    // atomic, not unique.
+    // Reachability was never theoretical. The Inngest cron cancels undersubscribed
+    // competitions, the admin cancel route cancels on demand, and the lazy check inside
+    // getCompetitionById cancels during render. A retried cron delivery, or an admin click
+    // racing the sweep, paid twice.
     //
-    // Reachability is not theoretical. The Inngest cron sets `status: "cancelled"` and then
-    // calls this function, and the lazy check inside `getCompetitionById` cancels and
-    // refunds too. Because the refund itself does not verify prior status, anything that
-    // invokes it a second time - a retried cron delivery, an admin cancel racing the cron,
-    // a manual re-run - pays twice.
-    //
-    // Contrast with finalization, which locks `active` -> `finalizing` in a single
-    // findOneAndUpdate and bails if it loses. The remedy here is the same shape.
+    // The fix claims the competition in the same `findOneAndUpdate` that sets its final
+    // status, so a second caller matches nothing and returns a no-op. The transaction alone
+    // never helped: it made each pass atomic, not unique.
     const competitionId = await seedCancelledScenario();
 
-    await cancelCompetitionAndRefund(competitionId, "First cancellation");
+    const first = await cancelCompetitionAndRefund(
+      competitionId,
+      "First cancellation",
+    );
     const afterFirst = await balances();
 
-    await cancelCompetitionAndRefund(competitionId, "Same cancellation again");
+    const second = await cancelCompetitionAndRefund(
+      competitionId,
+      "Same cancellation again",
+    );
     const afterSecond = await balances();
 
+    // Everyone is whole after the first call, and unchanged after the second.
     expect(afterFirst).toEqual(PLAYERS.map(() => START_BALANCE));
+    expect(afterSecond).toEqual(afterFirst);
 
-    // The defect: every player is now up by a second entry fee they never paid.
-    expect(afterSecond).toEqual(
-      PLAYERS.map(() => START_BALANCE + ENTRY_FEE),
+    // The second call reports success with nothing refunded. Asserted because a duplicate
+    // request is not an error - a caller that retried should not be handed a failure.
+    expect(first).toMatchObject({ success: true, refundedCount: PLAYERS.length });
+    expect(second).toEqual({
+      success: true,
+      refundedCount: 0,
+      totalRefunded: 0,
+    });
+
+    // And the ledger is written once, so the audit trail matches the money.
+    expect(await refundRows(competitionId)).toHaveLength(PLAYERS.length);
+  });
+
+  it("refuses to refund a competition that already paid out prizes", async () => {
+    // Reason: the guard is `status !== "cancelled"`, so a *completed* competition is still
+    // eligible - and refunding one would hand back entry fees on top of prizes already paid.
+    // Pinning it here records what the guard does and does not cover, rather than leaving a
+    // reader to assume the narrower condition also protects this case.
+    const competitionId = await seedCancelledScenario();
+    await mongoose.connection.db
+      ?.collection("competitions")
+      .updateOne(
+        { _id: new mongoose.Types.ObjectId(competitionId) },
+        { $set: { status: "completed" } },
+      );
+
+    const result = await cancelCompetitionAndRefund(
+      competitionId,
+      "Cancelling after payout",
     );
 
-    // And the ledger doubles too, so the money and the audit trail agree that credits were
-    // created from nothing.
-    expect(await refundRows(competitionId)).toHaveLength(PLAYERS.length * 2);
+    // Documented behaviour: it DOES refund, returning every entry fee. In production the
+    // winners would keep their prizes as well, so the pool is paid out twice over.
+    //
+    // The narrow guard is deliberate - it fixes the proven double-refund without changing
+    // which statuses an admin may cancel - but this is the adjacent hazard, and the unified
+    // service is where it should be closed. Left as a measurement, not a red test.
+    expect(result.refundedCount).toBe(PLAYERS.length);
+    expect(await balances()).toEqual(PLAYERS.map(() => START_BALANCE));
   });
 
   it("skips a player with no wallet rather than aborting the whole refund", async () => {

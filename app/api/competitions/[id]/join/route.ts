@@ -305,9 +305,49 @@ export async function POST(
           continue;
         }
 
+        if (isTransient) {
+          // Reason: a lost race is not a server fault, and it used to be reported as one.
+          // Re-throwing landed in the outer catch, which returned 500 with `error.message`
+          // verbatim - so the caller received "Write conflict during plan execution and
+          // yielding is disabled".
+          //
+          // Two things were wrong with that. A 500 tells a browser not to retry and can make
+          // a load balancer pull the instance out of rotation, so a busy competition looked
+          // like an outage. And the driver's own text names the storage engine and its
+          // configuration to an unauthenticated caller.
+          //
+          // 409 is the accurate answer: the request conflicted with a concurrent one and is
+          // worth repeating. The detail stays in the server log.
+          console.error(
+            `❌ Competition join exhausted ${MAX_RETRIES} retries for ${competitionId}:`,
+            txError,
+          );
+          return NextResponse.json(
+            {
+              success: false,
+              error:
+                "This competition is receiving a lot of entries right now. Please try again.",
+            },
+            { status: 409 },
+          );
+        }
+
         throw txError;
       }
     }
+
+    // Reason: unreachable - every iteration returns, continues or throws - but the compiler
+    // cannot see that, and without it the function has a path that returns undefined. Next
+    // would turn that into an opaque 500, so answer the same way the exhausted-retry branch
+    // does rather than leaving the behaviour to chance.
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "This competition is receiving a lot of entries right now. Please try again.",
+      },
+      { status: 409 },
+    );
   } catch (error) {
     console.error("Competition join error:", error);
     return NextResponse.json(

@@ -387,10 +387,51 @@ the history by `positionId`. Use **USD-quoted symbols** or finalization fetches 
 rates over the network, and satisfy the **whole** competition schema, because finalization
 saves the document.
 
-**Next chat should:** stop writing tests and get the three owner decisions resolved - the two
-open bug fixes (brandingFiles dotted keys, the double refund) and the 3-item manual
-checklist. After that, Defect 1's actual fix: the unified `contest-entry.service.ts`. Every
-behaviour it must preserve or correct is now pinned by a test.
+---
+
+### 1 Sep 2026 - all three live bugs FIXED (owner approved all three)
+
+Suite **225**, mirror guard clean, main typecheck **15 errors from a 16 baseline**, admin at
+its 225 baseline, no new lint warnings. **Every test that recorded a defect now proves its
+fix**, rather than being deleted - which keeps the reachability argument on record.
+
+**Live bug 5, the double refund.** `cancelCompetitionAndRefund` now claims the competition in
+the same `findOneAndUpdate` that sets its final status, in **both apps**. Two details worth
+keeping: **no new enum value was needed**, because setting the *final* status up front is the
+lock and a transaction abort rolls it back for a retry; and a duplicate request returns
+`{ success: true, refundedCount: 0 }` rather than an error, because a retried cron delivery
+has done nothing wrong and a failure would invite a third attempt.
+
+**One adjacent hazard is measured but deliberately left open.** The guard is
+`status !== "cancelled"`, so a **completed** competition is still refundable - handing back
+entry fees on top of prizes already paid. A test records the current behaviour rather than
+failing. Closing it means deciding which statuses an admin may cancel, which is policy and
+belongs with the unified service, not smuggled into a bug fix.
+
+**Live bug 6, the 500 and the leak.** The join route answers **409** with a message a player
+can act on. Fixing it surfaced a second problem the compiler found: the retry loop had **no
+return after it at all**, so the function could fall through and return `undefined`, which
+Next turns into an opaque 500. Now explicit.
+
+**The sweep result matters more than the fix.** `error instanceof Error ? error.message`
+appears **166 times across 119 API route files**. It was deliberately **not** mass-edited - the
+change would be unreviewable and many of those messages are legitimate user-facing validation
+text. The harm is specific to messages originating in the driver or the framework rather than
+in our own `throw`. Recommended when tackled: a helper mapping known-safe errors to their
+message and everything else to a generic string, introduced route by route. Now known debt
+rather than a future discovery.
+
+**Live bug 4, brandingFiles.** A shared `branding-file-key.ts` helper (mirrored into
+`apps/admin`) encodes `.` as `__DOT__`, wired through **two writers, four readers and one
+delete** across both apps. `__DOT__` over base64 so the keys stay readable in the document,
+which matters for a field whose whole purpose is disaster recovery. Nothing to migrate - no
+entry was ever stored. The test asserts a **round trip through the real helper** rather than a
+hard-coded string, because the writers and readers only work if they agree, and separately
+pins that encoding a dot-free name is a no-op, since the readers encode unconditionally.
+
+**Next chat should:** build Defect 1's unified `contest-entry.service.ts`. Every behaviour it
+must preserve or correct is pinned by a test. The 3-item manual checklist for Defect 2 is
+still with the owner and does not block it.
 
 ---
 

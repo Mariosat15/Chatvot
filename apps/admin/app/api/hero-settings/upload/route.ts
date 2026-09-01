@@ -6,6 +6,7 @@ import { verifyAdminAuth } from "@/lib/admin/auth";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
+import { encodeBrandingFileKey } from "@/lib/utils/branding-file-key";
 
 // POST - Upload hero images
 export async function POST(request: NextRequest) {
@@ -86,23 +87,28 @@ export async function POST(request: NextRequest) {
     // Backup file to MongoDB for persistence across servers/deployments
     try {
       await connectToDatabase();
-      const contentTypes: Record<string, string> = {
-        jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
-        gif: "image/gif", webp: "image/webp", svg: "image/svg+xml",
-        mp4: "video/mp4", webm: "video/webm",
-      };
-      const contentType = contentTypes[(ext || "png").toLowerCase()] || file.type;
+      // A Map rather than an object literal, so a crafted extension cannot reach
+      // Object.prototype and return something that is not a content type.
+      const contentTypes = new Map<string, string>([
+        ["jpg", "image/jpeg"], ["jpeg", "image/jpeg"], ["png", "image/png"],
+        ["gif", "image/gif"], ["webp", "image/webp"], ["svg", "image/svg+xml"],
+        ["mp4", "video/mp4"], ["webm", "video/webm"],
+      ]);
+      const contentType =
+        contentTypes.get((ext || "png").toLowerCase()) || file.type;
       const base64Data = buffer.toString("base64");
 
       let settings = await WhiteLabel.findOne();
       if (!settings) settings = new WhiteLabel();
-      const brandingFiles = (settings as any).brandingFiles || new Map();
-      brandingFiles.set(filename, {
+      // Reason: documents written before the field was declared have no map to set into.
+      if (!settings.brandingFiles) settings.brandingFiles = new Map();
+      // Reason: Mongoose rejects map keys containing a dot, so the raw filename could never
+      // be stored and this backup silently did nothing. See branding-file-key.ts.
+      settings.brandingFiles.set(encodeBrandingFileKey(filename), {
         data: base64Data,
         contentType,
         updatedAt: new Date(),
       });
-      (settings as any).brandingFiles = brandingFiles;
       await settings.save();
       console.log(`💾 [Hero Upload] Backed up to DB: ${filename}`);
     } catch (dbErr) {
@@ -183,8 +189,9 @@ export async function DELETE(request: NextRequest) {
     try {
       await connectToDatabase();
       let settings = await WhiteLabel.findOne();
-      if (settings?.brandingFiles?.has(filename)) {
-        settings.brandingFiles.delete(filename);
+      const brandingKey = encodeBrandingFileKey(filename);
+      if (settings?.brandingFiles?.has(brandingKey)) {
+        settings.brandingFiles.delete(brandingKey);
         await settings.save();
       }
     } catch {}

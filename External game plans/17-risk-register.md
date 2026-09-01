@@ -125,6 +125,13 @@ Drift is a **write-side** defect, in descending order of harm:
    for declared paths. Severe, and the subtlest of the six: the field survives a debug dump
    while the code beside it reads nothing. This is how `whitelabel.brandingFiles` disabled
    branding-image recovery in three admin routes without anyone noticing.
+7. **A synced schema is not a working feature.** `brandingFiles` had a *second*, independent
+   defect underneath the drift: the upload routes key the map by filename, and **Mongoose
+   refuses map keys containing a dot**, so no entry had ever been stored in either app. The
+   sync merely changed the failure mode - an undeclared field let a plain `Map` accept the key
+   and discard the write; a declared one hands the route a `MongooseMap` that validates and
+   throws. Both were silent. The guard proves two copies agree, not that either works, so a
+   drift fix must be followed by a test that actually round-trips the data.
 
 **Why this matters for a provider integration specifically:** the danger to a game label is
 not that "an admin save strips it". It is that **the admin app cannot set it at all**. A

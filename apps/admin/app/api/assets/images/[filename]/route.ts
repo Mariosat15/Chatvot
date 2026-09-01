@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile, access, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { constants } from "fs";
+import { encodeBrandingFileKey } from "@/lib/utils/branding-file-key";
 
 // Reason: Track which missing filenames have already been warned about to avoid
 // spamming server logs on every request for the same missing image.
@@ -93,7 +94,11 @@ export async function GET(
       await connectToDatabase();
 
       const settings = await WhiteLabel.findOne();
-      const fileEntry = settings?.brandingFiles?.get(sanitizedFilename);
+      // Reason: stored with the dots encoded, because Mongoose rejects map keys containing
+      // one. See branding-file-key.ts.
+      const fileEntry = settings?.brandingFiles?.get(
+        encodeBrandingFileKey(sanitizedFilename),
+      );
 
       if (fileEntry?.data) {
         console.log(`🔄 [Serve] Restoring branding image from DB: ${sanitizedFilename}`);

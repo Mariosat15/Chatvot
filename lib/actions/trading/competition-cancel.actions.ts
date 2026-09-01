@@ -31,11 +31,46 @@ export async function cancelCompetitionAndRefund(
     );
     console.log(`   Reason: ${reason}`);
 
-    // Get the competition
-    const competition =
-      await Competition.findById(competitionId).session(session);
+    // Reason: claim the competition atomically before refunding anything, or a second
+    // caller refunds every participant a second time. This is reachable in production, not
+    // theoretical: the scheduled Inngest job cancels undersubscribed competitions, the
+    // admin cancel route cancels on demand, and getCompetitionById cancels as a backup
+    // check during render - so a scheduled sweep and an admin click can overlap.
+    //
+    // The condition is the lock. Setting the final status up front means a second caller
+    // matches nothing and leaves with a no-op, and because it happens inside the
+    // transaction an abort rolls it back for a retry. Same shape as the lock
+    // finalizeCompetition already uses.
+    //
+    // `new: false` returns the pre-update document, which is what the refund loop needs -
+    // the entry fee and the name.
+    const competition = await Competition.findOneAndUpdate(
+      { _id: competitionId, status: { $ne: "cancelled" } },
+      {
+        $set: {
+          status: "cancelled",
+          cancellationReason: reason,
+          prizePool: 0, // Refunded in full below, so the pool is empty.
+        },
+      },
+      { new: false, session },
+    );
+
     if (!competition) {
-      throw new Error("Competition not found");
+      // Either it does not exist or it is already cancelled. Tell the two apart, because
+      // one is a bug in the caller and the other is a duplicate request doing no harm.
+      const exists = await Competition.exists({ _id: competitionId }).session(
+        session,
+      );
+      if (!exists) {
+        throw new Error("Competition not found");
+      }
+
+      console.log(
+        `↩️ Competition ${competitionId} is already cancelled; refunds were already issued`,
+      );
+      await session.abortTransaction();
+      return { success: true, refundedCount: 0, totalRefunded: 0 };
     }
 
     // Get all participants
@@ -139,18 +174,10 @@ export async function cancelCompetitionAndRefund(
       );
     }
 
-    // Update competition status and clear prize pool (it's been refunded)
-    await Competition.findByIdAndUpdate(
-      competitionId,
-      {
-        $set: {
-          status: "cancelled",
-          cancellationReason: reason,
-          prizePool: 0, // Prize pool is now empty (refunded)
-        },
-      },
-      { session },
-    );
+    // Reason: the status, reason and prize pool were already set by the claiming update at
+    // the top of this transaction, which is what makes a second caller a no-op. Setting them
+    // again here would be harmless but misleading - it would read as though the lock were
+    // advisory rather than the thing preventing a double refund.
 
     await session.commitTransaction();
     committed = true;
