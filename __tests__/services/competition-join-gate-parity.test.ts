@@ -20,23 +20,29 @@ import {
   DEFAULT_USER_ID,
   resetActionContext,
   signInAsDistinctPlayers,
+  withFraudBlock,
+  withRestriction,
+  withUnverifiedEmail,
 } from "../helpers/server-action-context";
 
 /**
  * Stage 0, Defect 1: the two join paths compared side by side, in one file.
  *
- * This is the heart of the defect. A player can enter the same competition through either
- * of two independent implementations:
+ * A player can enter the same competition through either of two entrances:
  *
  *   Gate A  `enterCompetition`                     lib/actions/trading/competition.actions.ts
  *   Gate B  POST /api/competitions/[id]/join       app/api/competitions/[id]/join/route.ts
  *
- * Both take the entry fee. The plan's claim is that they disagree about what else happens,
- * and that the disagreement is a money defect rather than an inconsistency. These tests
- * measure the disagreement rather than restating it, so the unified service has a
- * specification to satisfy and cannot quietly drop a behaviour that only one gate had.
+ * They were two independent implementations, and they disagreed about which guards applied
+ * and what money moved. These tests measured every disagreement first, so the unified
+ * service in `lib/services/contest-entry.service.ts` had a specification to satisfy and
+ * could not quietly drop a behaviour that only one gate had.
  *
- * No production code is changed by this file.
+ * Both gates now call that service. The tests are unchanged in what they assert about, but
+ * three have flipped from recording a defect to proving its fix - Gate B funding the prize
+ * pool, a mixed field funding it in full, and the market-hours ruling. Each says so, and
+ * says what the old behaviour was, because a test that only states today's answer does not
+ * tell the next reader why the answer was ever in doubt.
  */
 
 vi.mock("next/cache", () => ({
@@ -91,6 +97,27 @@ vi.mock("@/lib/services/fraud/entry-fraud-gate.service", async () => {
   return { assertEntryFraudGate: async () => c.fraud };
 });
 
+// Reason: the unified service runs badges, notifications and coordination detection as
+// fire-and-forget work after the transaction commits. None of it is what these tests are
+// about, and leaving it real caused two kinds of noise that look like failures: duplicate
+// keys on the fraud collections, and "Client must be connected" when the work outlived the
+// test that started it. Stubbing them keeps the output readable and the assertions honest.
+vi.mock("@/lib/services/badge-evaluation.service", () => ({
+  evaluateUserBadges: async () => ({ newBadges: [] }),
+}));
+
+vi.mock("@/lib/services/notification.service", () => ({
+  notificationService: { notifyCompetitionJoined: async () => {} },
+}));
+
+vi.mock("@/lib/services/fraud/coordination-detection.service", () => ({
+  CoordinationDetectionService: { detectCoordinatedEntry: async () => {} },
+}));
+
+vi.mock("@/lib/services/fraud/behavioral-analysis.service", () => ({
+  BehavioralAnalysisService: { recordCompetitionEntry: async () => {} },
+}));
+
 // Reason: Gate B gates on market hours and Gate A does not. That difference is measured in
 // its own test below by driving this mock, rather than being left to whatever day the suite
 // happens to run on - a test that passes only on a weekday is not a test.
@@ -117,6 +144,9 @@ vi.mock("@/lib/services/market-hours.service", () => ({
 const { enterCompetition } = await import(
   "@/lib/actions/trading/competition.actions"
 );
+const CompetitionParticipant = (
+  await import("@/database/models/trading/competition-participant.model")
+).default;
 const { POST: joinViaApi } = await import(
   "@/app/api/competitions/[id]/join/route"
 );
@@ -231,20 +261,17 @@ describe("competition entry - the two gates compared", () => {
     expect(comp?.prizePool).toBe(ENTRY_FEE);
   });
 
-  it("Gate B TAKES THE FEE AND DOES NOT FUND THE PRIZE POOL", async () => {
-    // Reason: this test records a defect, not a fix. It is the clearest money statement in
-    // the whole of Defect 1.
+  it("Gate B funds the prize pool with the fee it collects", async () => {
+    // Reason: this test used to record the defect and now records its fix. It is the
+    // clearest money statement in the whole of Defect 1, so it is worth stating what was
+    // wrong: the route debited the wallet and incremented only `currentParticipants`. There
+    // was no `prizePool` increment anywhere in it. The platform collected the entry fee and
+    // the pot the players were competing for did not grow by it.
     //
-    // The route debits the wallet (lines 190-199) and increments only
-    // `currentParticipants` (lines 260-264). There is no `prizePool` increment anywhere in
-    // it. So the platform collects the entry fee and the pot the players are competing for
-    // does not grow by it.
-    //
-    // The finalize-time safeguard does not catch this, and it is worth being precise about
-    // why: it compares `prizePool` against `currentParticipants * entryFee` and caps the
-    // pool when it is too HIGH. Here the pool is too LOW, so the check passes and the
-    // shortfall is distributed as though it were the correct amount. Under-payment is
-    // silent; over-payment is not.
+    // The finalize-time safeguard did not catch that, and the reason matters: it compares
+    // `prizePool` against `currentParticipants * entryFee` and caps the pool when it is too
+    // HIGH. The pool was too LOW, so the check passed and the shortfall was distributed as
+    // though it were the correct amount. Under-payment is silent; over-payment is not.
     const competitionId = await seedCompetition();
     await seedWallets([DEFAULT_USER_ID]);
 
@@ -257,19 +284,19 @@ describe("competition entry - the two gates compared", () => {
 
     const comp = await readCompetition(competitionId);
 
-    // The fee was taken, and the seat was given.
     expect(await totalCollected([DEFAULT_USER_ID])).toBe(ENTRY_FEE);
     expect(comp?.currentParticipants).toBe(1);
-
-    // And the prize pool never saw it.
-    expect(comp?.prizePool).toBe(0);
+    expect(comp?.prizePool).toBe(ENTRY_FEE);
   });
 
-  it("under-funds the pool in proportion to how many players used Gate B", async () => {
+  it("funds the pool in full for a mixed field, whichever gate each player used", async () => {
     // Reason: the single-player case above could be read as a rounding curiosity. This is
-    // the shape of the real harm - a mixed field, which is exactly what a live competition
-    // is, since the two gates are reachable from different parts of the product at the same
-    // time. Six players each pay the fee; the pool holds half of what they paid.
+    // the shape of the harm that was there - a mixed field, which is what a live competition
+    // is once both entrances are reachable from different parts of the product. Six players
+    // each pay the fee; before the unification the pool held half of what they paid.
+    //
+    // This is the test that would catch a future entrance being added without the increment,
+    // so it asserts the invariant directly: what was collected is what can be paid out.
     const competitionId = await seedCompetition();
     const players = signInAsDistinctPlayers(6);
     await seedWallets(players);
@@ -290,20 +317,20 @@ describe("competition entry - the two gates compared", () => {
 
     expect(collected).toBe(6 * ENTRY_FEE);
     expect(comp?.currentParticipants).toBe(6);
-
-    // Three players' fees are missing from the pot they are competing for.
-    expect(comp?.prizePool).toBe(3 * ENTRY_FEE);
-    expect(collected - (comp?.prizePool as number)).toBe(3 * ENTRY_FEE);
+    expect(comp?.prizePool).toBe(collected);
+    expect(collected - (comp?.prizePool as number)).toBe(0);
   });
 
-  it("Gate B refuses outside market hours where Gate A allows the join", async () => {
-    // Reason: this is the divergence the owner ruled on 1 September 2026. The unified
-    // service must take Gate A's behaviour here - joining an upcoming competition is
-    // allowed at any time, and only trading itself is gated - because carrying Gate B's
-    // check across would block weekend sign-ups for Monday contests.
+  it("both gates allow a join while the market is closed", async () => {
+    // Reason: this is the divergence the owner ruled on 1 September 2026. Gate B refused a
+    // join while the market was shut and Gate A allowed it. The ruling was that joining an
+    // upcoming competition is allowed at any time and only trading itself is gated, because
+    // carrying Gate B's check into the unified service would block weekend sign-ups for
+    // Monday contests - the most common way a contest fills.
     //
-    // Both halves are asserted in one test on purpose: the point is not that either gate
-    // behaves a particular way, it is that they disagree on the same input.
+    // The mock forces the market closed, so this asserts the decision rather than whatever
+    // day the suite happens to run on. The other half of the ruling - that placing an order
+    // outside market hours is still refused - is asserted further down this file.
     marketState.open = false;
     marketState.reason = "Market is closed for the weekend";
 
@@ -315,13 +342,18 @@ describe("competition entry - the two gates compared", () => {
     expect(gateA.success).toBe(true);
 
     const gateB = await callGateB(competitionId);
-    expect(gateB.body.success).toBe(false);
-    expect(gateB.body.error).toMatch(/closed|market/i);
+    expect({ status: gateB.status, error: gateB.body.error }).toEqual({
+      status: 200,
+      error: undefined,
+    });
 
-    // The refusal must be clean: no seat, and no fee taken.
+    // Both players are seated and both fees are in the pool.
     const comp = await readCompetition(competitionId);
-    expect(comp?.currentParticipants).toBe(1);
-    expect(await totalCollected([gateBPlayer])).toBe(0);
+    expect(comp?.currentParticipants).toBe(2);
+    expect(comp?.prizePool).toBe(2 * ENTRY_FEE);
+    expect(await totalCollected([gateAPlayer, gateBPlayer])).toBe(
+      2 * ENTRY_FEE,
+    );
   });
 
   it("returns 409 without leaking the driver message when Gate B exhausts its retries (test 10, live bug 6 fixed)", async () => {
@@ -422,5 +454,208 @@ describe("competition entry - the two gates compared", () => {
       .countDocuments({ competitionId });
     expect(orders).toBe(0);
     expect(positions).toBe(0);
+  });
+
+  it("attributes the entry-fee ledger row to its competition, through either gate", async () => {
+    // Reason: the end-to-end half of test 9. `entry-fee-ledger.test.ts` proves what the
+    // schema does with the wrong field name; this proves the real entry path uses the right
+    // one, which is the assertion that would have caught the defect in the first place.
+    //
+    // Gate A used to write `referenceId`, which the schema does not declare, so strict mode
+    // discarded it and the row was left unattributable. Gate B already wrote `competitionId`
+    // correctly - so this is also the test that stops the unified service regressing to the
+    // worse of the two behaviours it inherited.
+    const competitionId = await seedCompetition();
+    const [gateAPlayer, gateBPlayer] = signInAsDistinctPlayers(2);
+    await seedWallets([gateAPlayer, gateBPlayer]);
+
+    expect((await enterCompetition(competitionId)).success).toBe(true);
+    expect((await callGateB(competitionId)).body.success).toBe(true);
+
+    const rows =
+      (await mongoose.connection.db
+        ?.collection("wallettransactions")
+        .find({ transactionType: "competition_entry" })
+        .toArray()) ?? [];
+
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => String(r.competitionId)).sort()).toEqual([
+      competitionId,
+      competitionId,
+    ]);
+
+    // The field the old code used must not come back. It looks harmless in a debug dump,
+    // which is precisely the problem.
+    for (const row of rows) {
+      expect(row).not.toHaveProperty("referenceId");
+      expect(row.amount).toBe(-ENTRY_FEE);
+    }
+
+    // And the query the audit trail needs actually answers.
+    const collected = rows.reduce(
+      (sum, r) => sum + Math.abs(r.amount as number),
+      0,
+    );
+    expect(collected).toBe((await readCompetition(competitionId))?.prizePool);
+  });
+
+  it("charges one fee when the same player joins twice at the same instant", async () => {
+    // Reason: the shape of the real hazard - a double-click on the website while a retry
+    // from the app is in flight, hitting two entrances at once. Both gates are raced rather
+    // than tested separately, because that is what a player actually does.
+    //
+    // Measured, not assumed: on this harness the two joins serialize and the second one is
+    // caught by the seat check rather than by the unique index. That is worth stating,
+    // because it means this test does NOT exercise the duplicate-key path - the test below
+    // does that deliberately.
+    const competitionId = await seedCompetition();
+    await seedWallets([DEFAULT_USER_ID]);
+
+    const [viaAction, viaRoute] = await Promise.all([
+      enterCompetition(competitionId),
+      callGateB(competitionId),
+    ]);
+
+    // Reason: both must succeed. One of them found or created the seat and the other was
+    // told the seat exists; neither is an error the player should ever see.
+    expect(viaAction.success).toBe(true);
+    expect(viaRoute.body.success).toBe(true);
+
+    const comp = await readCompetition(competitionId);
+    expect(comp?.currentParticipants).toBe(1);
+    expect(comp?.prizePool).toBe(ENTRY_FEE);
+    expect(await totalCollected([DEFAULT_USER_ID])).toBe(ENTRY_FEE);
+
+    const participants = await mongoose.connection.db
+      ?.collection("competitionparticipants")
+      .countDocuments({ competitionId });
+    expect(participants).toBe(1);
+
+    // Exactly one fee in the ledger. Two rows here would mean the player paid twice for
+    // one seat, which is the outcome the whole test exists to rule out.
+    const rows = await mongoose.connection.db
+      ?.collection("wallettransactions")
+      .countDocuments({ transactionType: "competition_entry" });
+    expect(rows).toBe(1);
+  }, 60_000);
+
+  it("returns the existing seat when the unique index catches a duplicate insert", async () => {
+    // Reason: the seat check is a read followed by an insert, so two joins by one player can
+    // both pass it. The unique index on (competitionId, userId) is what actually prevents
+    // the second seat, and it surfaces as a duplicate-key error (11000) rather than a write
+    // conflict - so it was outside the retry logic either gate had. Neither handled it: the
+    // loser received an opaque 500 and could not tell whether it had been charged.
+    //
+    // The window is too narrow to hit reliably by racing - the test above tried, and the
+    // seat check won every time - so it is forced here instead. `findOne` is stubbed to
+    // report "no seat" exactly once, which is precisely what the losing request sees, and
+    // the insert then collides with the row that really is there. Forcing the condition is
+    // the only way this branch gets covered at all; left to a race it would sit untested
+    // and the 500 would come back the first time it mattered.
+    const competitionId = await seedCompetition();
+    await seedWallets([DEFAULT_USER_ID]);
+
+    const first = await enterCompetition(competitionId);
+    expect(first.success).toBe(true);
+
+    const balanceAfterFirst = await totalCollected([DEFAULT_USER_ID]);
+    expect(balanceAfterFirst).toBe(ENTRY_FEE);
+
+    // Reason: `mockImplementationOnce` on a spy falls back to the real method once consumed,
+    // so the recovery lookup inside the duplicate-key handler runs for real and the test
+    // proves the seat is genuinely found rather than fabricated.
+    const spy = vi
+      .spyOn(CompetitionParticipant, "findOne")
+      .mockImplementationOnce(
+        () =>
+          ({
+            // The service calls `.session(session)` on the query it gets back.
+            session: async () => null,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stands in for a Mongoose Query
+          }) as any,
+      );
+
+    try {
+      const second = await enterCompetition(competitionId);
+
+      // The player is in, and knows it, rather than receiving a server error.
+      expect(second.success).toBe(true);
+      expect(second).toMatchObject({ alreadyEntered: true });
+      if (second.success && first.success) {
+        expect(second.participantId).toBe(first.participantId);
+      }
+    } finally {
+      spy.mockRestore();
+    }
+
+    // The money is the point: the duplicate must cost nothing. A second debit here would
+    // mean the collision path charged for a seat it did not create.
+    expect(await totalCollected([DEFAULT_USER_ID])).toBe(balanceAfterFirst);
+
+    const comp = await readCompetition(competitionId);
+    expect(comp?.currentParticipants).toBe(1);
+    expect(comp?.prizePool).toBe(ENTRY_FEE);
+
+    const participants = await mongoose.connection.db
+      ?.collection("competitionparticipants")
+      .countDocuments({ competitionId });
+    expect(participants).toBe(1);
+
+    const rows = await mongoose.connection.db
+      ?.collection("wallettransactions")
+      .countDocuments({ transactionType: "competition_entry" });
+    expect(rows).toBe(1);
+  });
+
+  it("applies Gate A's guards to Gate B, which used to skip them", async () => {
+    // Reason: the security half of the defect. Gate B checked none of email verification,
+    // account restrictions, the fraud gate or the level requirement, so any of them could
+    // be bypassed simply by using the other entrance. Each is asserted through Gate B
+    // specifically, because that is the side that lacked them.
+    //
+    // The refusal has to be clean in every case: a guard that blocks the seat but keeps the
+    // fee would be worse than no guard.
+    const cases = [
+      {
+        name: "an unverified email",
+        arrange: () => withUnverifiedEmail(),
+        expected: /verify your email/i,
+      },
+      {
+        name: "a restricted account",
+        arrange: () => withRestriction("Account suspended pending review"),
+        expected: /suspended/i,
+      },
+      {
+        name: "a fraud-flagged account",
+        arrange: () =>
+          withFraudBlock("Entry is not allowed at this time."),
+        expected: /not allowed/i,
+      },
+    ];
+
+    for (const testCase of cases) {
+      resetActionContext();
+      const competitionId = await seedCompetition();
+      await seedWallets([DEFAULT_USER_ID]);
+      testCase.arrange();
+
+      const { status, body } = await callGateB(competitionId);
+
+      expect({ case: testCase.name, success: body.success }).toEqual({
+        case: testCase.name,
+        success: false,
+      });
+      expect(body.error).toMatch(testCase.expected);
+      // 403 rather than 400: the request is well formed, the account is not permitted.
+      expect(status).toBe(403);
+
+      const comp = await readCompetition(competitionId);
+      expect(comp?.currentParticipants).toBe(0);
+      expect(comp?.prizePool).toBe(0);
+      expect(await totalCollected([DEFAULT_USER_ID])).toBe(0);
+
+      await clearTestMongo();
+    }
   });
 });

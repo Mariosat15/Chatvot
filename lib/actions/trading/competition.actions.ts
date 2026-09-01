@@ -8,8 +8,9 @@ import { redirect } from "next/navigation";
 import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
-import CreditWallet from "@/database/models/trading/credit-wallet.model";
-import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+// Reason: CreditWallet and WalletTransaction were used only by enterCompetition's inline
+// money movement, which now lives in lib/services/contest-entry.service.ts. Entry money is
+// moved in exactly one place; nothing in this file should touch a wallet again.
 import mongoose from "mongoose";
 // Static imports for better performance (no dynamic import overhead)
 import { calculateRankings } from "@/lib/services/competition-ranking.service";
@@ -348,370 +349,65 @@ export const createCompetition = async (competitionData: {
   }
 };
 
-// Enter competition (deduct credits, create participant)
+/**
+ * Enter a competition. The entrance the production UI uses.
+ *
+ * Stage 0, Defect 1: the guards and the money movement that used to live inline here now
+ * live in `lib/services/contest-entry.service.ts`, shared with the API route so that the two
+ * entrances cannot diverge again. What stays here is the part that is genuinely a server
+ * action's job: reading the session, taking the client IP off the request, and revalidating
+ * the paths whose cached output just went stale.
+ *
+ * Two behaviour changes came out of unifying, both deliberate and both recorded in the
+ * service's header:
+ *
+ *   - Entering a competition you are already in now returns success instead of the error
+ *     "You are already in this competition". No fee is taken either way.
+ *   - The entry-fee ledger row is attributed with `competitionId`. This action used to write
+ *     `referenceId`, which the schema does not declare, so strict mode discarded it.
+ */
 export const enterCompetition = async (competitionId: string) => {
   try {
-    // Validate MongoDB ObjectId format
-    if (!mongoose.Types.ObjectId.isValid(competitionId)) {
-      throw new Error("Invalid competition ID format");
-    }
-
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) redirect("/sign-in");
 
-    await connectToDatabase();
-
-    // Reason: Email verification is required to enter public competitions.
-    // Prevents spam signups from occupying seats and skewing matchmaking.
-    if ((session.user as { emailVerified?: boolean }).emailVerified !== true) {
-      throw new Error(
-        "Please verify your email address before entering competitions.",
-      );
-    }
-
-    // ✅ CHECK USER RESTRICTIONS
-    console.log(
-      `🔐 Checking competition entry restrictions for user ${session.user.id}`,
-    );
-    const { canUserPerformAction } =
-      await import("@/lib/services/user-restriction.service");
-    const restrictionCheck = await canUserPerformAction(
-      session.user.id,
-      "enterCompetition",
-    );
-
-    console.log(`   Restriction check result:`, restrictionCheck);
-
-    if (!restrictionCheck.allowed) {
-      console.log(`   ❌ Entry blocked due to restrictions`);
-      throw new Error(
-        restrictionCheck.reason || "You are not allowed to enter competitions",
-      );
-    }
-
-    console.log(`   ✅ User allowed to enter competition`);
-
-    // 🛡️ FRAUD ENTRY GATE — enforces VPN/Proxy/Tor/Datacenter blocks, the
-    // device-risk & suspicion-score thresholds, and the per-hour entry throttle.
-    // All are admin-configurable and fail OPEN, so legitimate users are never
-    // blocked by a detection error.
-    const entryHeaders = await headers();
-    const entryIp =
-      entryHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-      entryHeaders.get("x-real-ip") ||
-      entryHeaders.get("cf-connecting-ip") ||
+    const requestHeaders = await headers();
+    const ip =
+      requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      requestHeaders.get("x-real-ip") ||
+      requestHeaders.get("cf-connecting-ip") ||
       undefined;
-    const { assertEntryFraudGate } = await import(
-      "@/lib/services/fraud/entry-fraud-gate.service"
-    );
-    const fraudGate = await assertEntryFraudGate({
+
+    const { enterContest } = await import("@/lib/services/contest-entry.service");
+    const result = await enterContest(competitionId, {
       userId: session.user.id,
-      ip: entryIp || undefined,
+      email: session.user.email || "",
+      username: session.user.name || session.user.email || "",
+      emailVerified:
+        (session.user as { emailVerified?: boolean }).emailVerified === true,
+      ip,
     });
-    if (!fraudGate.allowed) {
-      throw new Error(
-        fraudGate.reason || "Entry is not allowed at this time.",
-      );
+
+    if (!result.success) {
+      return { success: false as const, error: result.error };
     }
 
-    // Start MongoDB transaction
-    const mongoSession = await mongoose.startSession();
-    mongoSession.startTransaction();
-    let committed = false;
+    revalidatePath("/competitions");
+    revalidatePath(`/competitions/${competitionId}`);
+    revalidatePath("/wallet");
 
-    try {
-      // Get competition
-      const competition =
-        await Competition.findById(competitionId).session(mongoSession);
-
-      if (!competition) {
-        throw new Error("Competition not found");
-      }
-
-      // Validate competition status
-      if (
-        competition.status !== "upcoming" &&
-        competition.status !== "active"
-      ) {
-        throw new Error(
-          competition.status === "cancelled"
-            ? "This competition has been cancelled"
-            : competition.status === "completed"
-              ? "This competition has already ended"
-              : "Competition is not open for entries"
-        );
-      }
-
-      // Reason: Enforce registrationDeadline — once it has passed, no new entries are allowed.
-      // Legacy guard: deadline is never earlier than startTime (old bug set it to -1hr).
-      const now = new Date();
-      if (competition.registrationDeadline) {
-        const deadline = new Date(competition.registrationDeadline);
-        const start = new Date(competition.startTime);
-        const effectiveDeadline = deadline < start ? start : deadline;
-        if (now > effectiveDeadline) {
-          throw new Error(
-            "Registration for this competition has closed. No new entries are accepted."
-          );
-        }
-      }
-
-      // Check if competition is full
-      if (competition.currentParticipants >= competition.maxParticipants) {
-        throw new Error("Competition is full");
-      }
-
-      // Check if user already entered
-      const existingParticipant = await CompetitionParticipant.findOne({
-        competitionId: competitionId,
-        userId: session.user.id,
-      }).session(mongoSession);
-
-      if (existingParticipant) {
-        throw new Error("You are already in this competition");
-      }
-
-      // Check level requirement
-      if (
-        competition.levelRequirement &&
-        competition.levelRequirement.enabled
-      ) {
-        const { getUserLevel } =
-          await import("@/lib/services/xp-level.service");
-        const { getTitleByXP, TITLE_LEVELS } =
-          await import("@/lib/constants/levels");
-
-        const userLevel = await getUserLevel(session.user.id);
-        const userTitleLevel = getTitleByXP((userLevel as any).currentXP || 0);
-
-        // Check if user meets minimum level
-        if (userTitleLevel.level < competition.levelRequirement.minLevel) {
-          const requiredTitle =
-            TITLE_LEVELS[competition.levelRequirement.minLevel - 1];
-          throw new Error(
-            `This competition requires ${requiredTitle.title} (Level ${requiredTitle.level}) or higher. You are currently ${userTitleLevel.title} (Level ${userTitleLevel.level}).`,
-          );
-        }
-
-        // Check if user is below maximum level (if set)
-        if (
-          competition.levelRequirement.maxLevel &&
-          userTitleLevel.level > competition.levelRequirement.maxLevel
-        ) {
-          const maxTitle =
-            TITLE_LEVELS[competition.levelRequirement.maxLevel - 1];
-          throw new Error(
-            `This competition is only for traders up to ${maxTitle.title} (Level ${maxTitle.level}). You are ${userTitleLevel.title} (Level ${userTitleLevel.level}).`,
-          );
-        }
-      }
-
-      // Get user wallet
-      const wallet = await CreditWallet.findOne({
-        userId: session.user.id,
-      }).session(mongoSession);
-
-      if (!wallet) {
-        throw new Error("Wallet not found");
-      }
-
-      // Check balance
-      if (wallet.creditBalance < competition.entryFee) {
-        throw new Error(
-          `Insufficient balance. Need €${competition.entryFee}, have €${wallet.creditBalance}`,
-        );
-      }
-
-      // Deduct entry fee from wallet
-      await CreditWallet.findOneAndUpdate(
-        { userId: session.user.id },
-        {
-          $inc: {
-            creditBalance: -competition.entryFee,
-            totalSpentOnCompetitions: competition.entryFee,
-          },
-        },
-        { session: mongoSession },
-      );
-
-      // Create transaction record
-      await WalletTransaction.create(
-        [
-          {
-            userId: session.user.id,
-            transactionType: "competition_entry",
-            amount: -competition.entryFee,
-            balanceBefore: wallet.creditBalance,
-            balanceAfter: wallet.creditBalance - competition.entryFee,
-            currency: "CREDITS",
-            status: "completed",
-            referenceId: competitionId,
-            description: `Entry fee for ${competition.name}`,
-          },
-        ],
-        { session: mongoSession },
-      );
-
-      // Create competition participant
-      const participant = await CompetitionParticipant.create(
-        [
-          {
-            competitionId: competitionId,
-            userId: session.user.id,
-            username: session.user.name || session.user.email,
-            email: session.user.email,
-            startingCapital: competition.startingCapital,
-            currentCapital: competition.startingCapital,
-            availableCapital: competition.startingCapital,
-            usedMargin: 0,
-            pnl: 0,
-            pnlPercentage: 0,
-            realizedPnl: 0,
-            unrealizedPnl: 0,
-            totalTrades: 0,
-            winningTrades: 0,
-            losingTrades: 0,
-            winRate: 0,
-            currentOpenPositions: 0,
-            currentRank: 0,
-            status: "active",
-          },
-        ],
-        { session: mongoSession },
-      );
-
-      // Update competition (increment participants and prize pool)
-      await Competition.findByIdAndUpdate(
-        competitionId,
-        {
-          $inc: {
-            currentParticipants: 1,
-            prizePool: competition.entryFee,
-          },
-        },
-        { session: mongoSession },
-      );
-
-      // Commit transaction
-      await mongoSession.commitTransaction();
-      committed = true;
-
-      console.log(
-        `✅ User ${session.user.id} entered competition ${competition.name}`,
-      );
-      console.log(`   Entry fee: €${competition.entryFee}`);
-      console.log(`   Starting capital: $${competition.startingCapital}`);
-
-      // Evaluate badges for the user (fire and forget - don't wait)
-      try {
-        const { evaluateUserBadges } =
-          await import("@/lib/services/badge-evaluation.service");
-        evaluateUserBadges(session.user.id)
-          .then((result) => {
-            if (result.newBadges.length > 0) {
-              console.log(
-                `🏅 User earned ${result.newBadges.length} new badges after entering competition`,
-              );
-            }
-          })
-          .catch((err) => console.error("Error evaluating badges:", err));
-      } catch (error) {
-        console.error("Error importing badge service:", error);
-      }
-
-      // Send notification about competition entry (fire and forget)
-      try {
-        const { notificationService } =
-          await import("@/lib/services/notification.service");
-        await notificationService.notifyCompetitionJoined(
-          session.user.id,
-          competition.name,
-        );
-        console.log(
-          `🔔 Competition joined notification sent to user ${session.user.id}`,
-        );
-      } catch (error) {
-        console.error("Error sending competition joined notification:", error);
-      }
-
-      // Track competition entry for coordination detection (fire and forget)
-      try {
-        const { CoordinationDetectionService } =
-          await import("@/lib/services/fraud/coordination-detection.service");
-        const { BehavioralAnalysisService } =
-          await import("@/lib/services/fraud/behavioral-analysis.service");
-
-        const entryTime = new Date();
-
-        // Track entry in user's profile
-        BehavioralAnalysisService.recordCompetitionEntry(session.user.id)
-          .then(() => console.log("📝 Competition entry recorded in profile"))
-          .catch((err) =>
-            console.error("Error recording competition entry:", err),
-          );
-
-        // Get recent entries for this competition (use createdAt, not joinedAt)
-        CompetitionParticipant.find({
-          competitionId: competitionId,
-          createdAt: { $gte: new Date(Date.now() - 5 * 60 * 1000) }, // Last 5 minutes
-        })
-          .select("userId createdAt")
-          .lean()
-          .then(async (recentEntries) => {
-            console.log(
-              `🎯 Found ${recentEntries.length} entries in last 5 minutes for competition ${competitionId}`,
-            );
-
-            // Include current user in the entries
-            const entries = recentEntries.map((e) => ({
-              userId: e.userId.toString(),
-              entryTime: new Date(e.createdAt),
-            }));
-
-            // Add current entry if not already in list
-            if (!entries.some((e) => e.userId === session.user.id)) {
-              entries.push({ userId: session.user.id, entryTime });
-            }
-
-            console.log(`🎯 Total entries to check: ${entries.length}`);
-
-            // Need at least 2 entries for coordination detection
-            if (entries.length >= 2) {
-              console.log(
-                `🎯 Running coordination detection for ${entries.length} entries`,
-              );
-              await CoordinationDetectionService.detectCoordinatedEntry(
-                competitionId,
-                entries,
-              );
-            }
-          })
-          .catch((err) =>
-            console.error("Error checking coordinated entries:", err),
-          );
-      } catch (error) {
-        console.error("Error in coordination detection:", error);
-      }
-
-      revalidatePath("/competitions");
-      revalidatePath(`/competitions/${competitionId}`);
-      revalidatePath("/wallet");
-
-      return {
-        success: true,
-        message: "Successfully entered competition",
-        // Reason: Mongoose create() returns array; guard for safety
-        participant: JSON.parse(JSON.stringify(participant[0] ?? {})),
-      };
-    } catch (error) {
-      if (!committed) {
-        await mongoSession.abortTransaction();
-      }
-      throw error;
-    } finally {
-      mongoSession.endSession();
-    }
+    return {
+      success: true as const,
+      message: result.alreadyEntered
+        ? "You are already entered in this competition"
+        : "Successfully entered competition",
+      participantId: result.participantId,
+      alreadyEntered: result.alreadyEntered,
+    };
   } catch (error) {
+    // Reason: `redirect()` works by throwing, and Next.js identifies its own control-flow
+    // errors by a `digest` beginning with "NEXT_". Swallowing one turns a redirect into a
+    // silent no-op, so they must be re-thrown before the generic handler runs.
     if (
       typeof error === "object" &&
       error !== null &&
@@ -721,10 +417,11 @@ export const enterCompetition = async (competitionId: string) => {
     ) {
       throw error;
     }
-    const msg =
-      error instanceof Error ? error.message : "Failed to enter competition";
-    console.error("Error entering competition:", msg);
-    return { success: false as const, error: msg };
+    console.error("Error entering competition:", error);
+    return {
+      success: false as const,
+      error: "Something went wrong. Please contact support.",
+    };
   }
 };
 

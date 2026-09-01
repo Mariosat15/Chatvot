@@ -6,6 +6,7 @@ import CompetitionParticipant from "@/database/models/trading/competition-partic
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import { guardSimulatorRoute } from "@/lib/services/simulator/simulator-mode";
+import { buildSimulatorParticipant } from "@/lib/services/simulator/simulator-participant";
 
 /**
  * POST /api/simulator/competitions/join-batch
@@ -151,29 +152,14 @@ export async function POST(request: NextRequest) {
           };
         });
 
-        // Create participants
-        const participants = usersWithBalance.map((userId: string) => ({
-          competitionId,
-          userId,
-          username: `SimUser_${userId.slice(-6)}`,
-          email: `simuser_${userId.slice(-6)}@test.simulator`,
-          startingCapital: competition.startingCapital,
-          currentCapital: competition.startingCapital,
-          availableCapital: competition.startingCapital,
-          pnl: 0,
-          pnlPercent: 0,
-          unrealizedPnl: 0,
-          currentPnl: 0,
-          currentPnlPercent: 0,
-          tradesCount: 0,
-          winningTrades: 0,
-          losingTrades: 0,
-          winRate: 0,
-          maxDrawdown: 0,
-          currentDrawdown: 0,
-          status: "active",
-          joinedAt: now,
-        }));
+        const participants = usersWithBalance.map((userId: string) =>
+          buildSimulatorParticipant(
+            competitionId,
+            userId,
+            competition.startingCapital,
+            now,
+          ),
+        );
 
         // Execute all operations atomically within transaction
         await CreditWallet.bulkWrite(walletOps, {
@@ -188,9 +174,18 @@ export async function POST(request: NextRequest) {
           ordered: false,
           session: mongoSession,
         });
+        // Reason: the prize pool must grow by every fee taken. This route debited
+        // usersWithBalance.length x entryFee above but used to increment only the
+        // participant count, so a simulator-seeded competition finalized with an
+        // under-funded pool and under-paid its winners.
         await Competition.findByIdAndUpdate(
           competitionId,
-          { $inc: { currentParticipants: usersWithBalance.length } },
+          {
+            $inc: {
+              currentParticipants: usersWithBalance.length,
+              prizePool: entryFee * usersWithBalance.length,
+            },
+          },
           { session: mongoSession },
         );
 
@@ -206,28 +201,14 @@ export async function POST(request: NextRequest) {
         });
       } else {
         // No entry fee - just create participants (still use transaction for consistency)
-        const participants = usersToJoin.map((userId: string) => ({
-          competitionId,
-          userId,
-          username: `SimUser_${userId.slice(-6)}`,
-          email: `simuser_${userId.slice(-6)}@test.simulator`,
-          startingCapital: competition.startingCapital,
-          currentCapital: competition.startingCapital,
-          availableCapital: competition.startingCapital,
-          pnl: 0,
-          pnlPercent: 0,
-          unrealizedPnl: 0,
-          currentPnl: 0,
-          currentPnlPercent: 0,
-          tradesCount: 0,
-          winningTrades: 0,
-          losingTrades: 0,
-          winRate: 0,
-          maxDrawdown: 0,
-          currentDrawdown: 0,
-          status: "active",
-          joinedAt: now,
-        }));
+        const participants = usersToJoin.map((userId: string) =>
+          buildSimulatorParticipant(
+            competitionId,
+            userId,
+            competition.startingCapital,
+            now,
+          ),
+        );
 
         await CompetitionParticipant.insertMany(participants, {
           ordered: false,

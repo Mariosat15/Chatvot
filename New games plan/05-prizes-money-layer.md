@@ -26,20 +26,25 @@ The conclusion up front: **the money layer is already game-agnostic and should b
 
 > Fixed and signed off **before** the games work starts. Full spec: `00a-STAGE-0-prerequisite-fixes-DO-FIRST.md`.
 
-There are **two divergent competition join paths**, and they disagree on both security and money.
+> **BUILT 1 September 2026.** `lib/services/contest-entry.service.ts` exists and both gates
+> call it. The remainder of this section is the record of what was wrong and why the shape of
+> the fix is what it is - read it before adding a fifth entry path.
 
-| Behaviour | `enterCompetition` server action | `POST /api/competitions/[id]/join` |
-|---|---|---|
-| Email verified | Yes | **No** |
-| User restrictions | Yes | **No** |
-| Fraud gate | Yes | **No** |
-| Level requirement | Yes | **No** |
-| Market hours | No | Yes |
-| **`$inc prizePool`** | **Yes** | **No** |
-| WriteConflict retry | No | Yes |
-| Contest ref field | `referenceId` | `competitionId` |
+There were **two divergent competition join paths**, and they disagreed on both security and money.
 
-Files: `lib/actions/trading/competition.actions.ts` (approx. 352-729) and `app/api/competitions/[id]/join/route.ts`.
+| Behaviour | `enterCompetition` server action | `POST /api/competitions/[id]/join` | Unified |
+|---|---|---|---|
+| Email verified | Yes | **No** | Yes |
+| User restrictions | Yes | **No** | Yes |
+| Fraud gate | Yes | **No** | Yes |
+| Level requirement | Yes | **No** | Yes |
+| Market hours | No | Yes | **No** - only trading is gated |
+| **`$inc prizePool`** | **Yes** | **No** | **Yes**, always |
+| WriteConflict retry | No | Yes | Yes |
+| Duplicate entry | Throws | Success | Success |
+| Contest ref field | `referenceId` | `competitionId` | `competitionId` |
+
+Files: `lib/actions/trading/competition.actions.ts` and `app/api/competitions/[id]/join/route.ts`. Both are now thin wrappers over the service.
 
 ### Why this blocks the games work
 
@@ -58,14 +63,17 @@ enterContest({
 }) : Promise<{ success: boolean; error?: string; participantId?: string }>
 ```
 
-Requirements:
-- The **union** of all gates from both paths, with `source` controlling only the legitimately different bits (simulator skips market hours; that is the one real difference).
-- `$inc prizePool` **always**, in the same transaction as the debit.
-- One canonical contest-reference field on the ledger row. Pick one, backfill the other, document the decision.
-- Keep the WriteConflict retry from the API path - it exists because concurrent joins genuinely conflict on the counter.
-- Calls `module.onParticipantJoin()` inside the transaction.
+Requirements, and what was actually built against each:
 
-Acceptance test: enter the same contest 20 times concurrently from both entry points and assert `prizePool === successfulJoins x entryFee` and `currentParticipants === successfulJoins`, with no wallet drift.
+- The **union** of all gates from both paths. **Done.** The `source` parameter was **dropped**: it existed to express one legitimately different bit - the simulator skipping market hours - and the owner's market-hours ruling removed that difference entirely. What replaced it is a narrower flag, `trusted`, which skips only the three *person-level* gates a synthetic user cannot satisfy (email verification, restrictions, fraud) and skips no contest or money guard. Named for what it does rather than where the call came from, deliberately: `source === "simulator"` invites future code to hang unrelated behaviour off it, which is how the header bypass that Prerequisite A had to fix came to exist.
+- `$inc prizePool` **always**, in the same transaction as the debit. **Done**, on all paths including the simulator batch route.
+- One canonical contest-reference field on the ledger row. **Done** - `competitionId`. Nothing to backfill: the old `referenceId` value was never stored, because the schema does not declare it.
+- Keep the WriteConflict retry from the API path. **Done**, and it turned out to be worth more than expected: concurrent joins went from **1 in 20 to 20 in 20** once Gate A inherited it.
+- Calls `module.onParticipantJoin()` inside the transaction. **Not yet** - the module registry does not exist until Phase 1. The service is the single place it will hook into, which was the point.
+
+Acceptance test: enter the same contest 20 times concurrently from both entry points and assert `prizePool === successfulJoins x entryFee` and `currentParticipants === successfulJoins`, with no wallet drift. **Written and passing** - `__tests__/services/competition-entry-concurrency.test.ts`.
+
+One requirement that was missing from this list and had to be added during the build: **the read-then-insert seat check is not atomic.** Two joins by one player can both pass it, and the unique index on `(competitionId, userId)` is what actually stops the second seat. It reports **duplicate key 11000, not a write conflict**, so it sits outside the retry logic entirely. Any future entry path must handle it, and must handle it as *success* - the player is in, and charging them again for a seat they already have is the exact failure this whole section exists to prevent.
 
 ### Related items to clean up in the same pass
 

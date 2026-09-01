@@ -53,6 +53,27 @@ from it change facts stated in this folder:
   A copy missing one of them **rejects the result callback** rather than mis-storing it, so
   a finished round is never recorded and the contest never settles. The guard
   (`tools/model-mirror/`) compares enum values for this reason.
+- **Stage 0 Defect 1 (entry paths) is built** as of 1 September 2026. All four competition
+  entry writers are resolved: two became wrappers over `lib/services/contest-entry.service.ts`,
+  the simulator batch route was fixed in place, and the dead admin copy was deleted. R1 in
+  `17-risk-register.md` is updated. Three things from it bear on this programme directly:
+
+  **The single entry service is the seam every provider contest will join through.** That was
+  the point of doing it first, and it now exists: one place that takes a fee, funds the pool,
+  seats the player and runs the fraud controls. A provider adapter adds a caller, not a fifth
+  implementation.
+
+  **Two things it fixed are hazards this programme would have re-created.** The prize pool is
+  now incremented on every path - a provider contest seeded by an internal route would
+  otherwise have repeated the exact defect. And the read-then-insert seat race is handled:
+  two entries for one player collide on the unique index and report **duplicate key 11000,
+  not a write conflict**, so it sits outside any retry loop. Provider integration multiplies
+  concurrent entries; assume this will be hit.
+
+  **One thing is still open and is NOT closed by the above.** The challenge accept path still
+  has no restriction or fraud gate (sub-defect 1b), and a new finding of the same class -
+  read-then-create races on `SuspicionScore` in three fraud services - is recorded as **R28**.
+  Both are unfixed.
 
 ### THE OPEN DECISION - which scenario
 

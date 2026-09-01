@@ -49,36 +49,50 @@ chapter covers risks to the programme and to the application.
 
 ## 2. Critical platform risks
 
-### R1 - Money paths refactored without tests first
+### R1 - Money paths refactored without tests first - LARGELY CLOSED 1 September 2026
 
-**Four** competition-entry writers exist and **they disagree about money**.
-`enterCompetition` in `lib/actions/trading/competition.actions.ts` lines **584-593**
-increments both `currentParticipants` and `prizePool`.
-`app/api/competitions/[id]/join/route.ts` lines **252-256** increments only
-`currentParticipants`. So does `app/api/simulator/competitions/join-batch/route.ts`, which
-has no callers at all. The admin mirror of `enterCompetition` (lines 618-655) does update
-the pool but omits the email check and the fraud gate.
+**Four** competition-entry writers existed and **they disagreed about money**.
+`enterCompetition` in `lib/actions/trading/competition.actions.ts` incremented both
+`currentParticipants` and `prizePool`. `app/api/competitions/[id]/join/route.ts` incremented
+only `currentParticipants`. So did `app/api/simulator/competitions/join-batch/route.ts`. The
+admin mirror of `enterCompetition` did update the pool but omitted the email check and the
+fraud gate.
 
-The API route also skips **four** checks the action performs: email verification, user
+The API route also skipped **four** checks the action performed: email verification, user
 restrictions, the fraud gate, and the level requirement.
 
-Re-verified 1 September 2026, with two corrections worth carrying:
+**All four are now resolved.** `lib/services/contest-entry.service.ts` is the single entry
+path; the two real gates are thin wrappers over it, the simulator batch route was fixed in
+place, and the dead admin copy was deleted. The prize pool grows by every fee taken, in the
+same transaction that takes it, on every path.
+
+Re-verified 1 September 2026, with two corrections still worth carrying:
 
 - The finalize-time safeguard that caps the pool to `currentParticipants x entryFee`
-  **does not mask this**. It only fires when the pool is too *high*
-  (`competition-end.actions.ts` 695-718), so an under-counted pool is under-distributed with
-  no correction and no log line.
-- The API route is currently reached **only by the simulator service**; both real join
-  buttons call `enterCompetition`. So no paying customer is affected *today*. That lowers
-  the urgency and not the priority, because this programme adds new callers to exactly this
-  path.
+  **did not mask this**. It only fires when the pool is too *high*
+  (`competition-end.actions.ts` 695-718), so an under-counted pool was under-distributed with
+  no correction and no log line. **The under-count branch is still missing** - the safeguard
+  has not been changed, so this remains true for any future writer that forgets the increment.
+- The API route was reached **only by the simulator service**; both real join buttons called
+  `enterCompetition`. So no paying customer was affected, which is why the fix needed no
+  migration.
+
+**Two things remain open, and neither should be assumed closed by the above.**
 
 A related defect on a path real players **do** use: the challenge *accept* route
 (`app/api/challenges/[id]/accept/route.ts`) skips account restrictions and the fraud gate,
-and it is where both wallets are debited. Folded into X0 as sub-defect 1b.
+and it is where both wallets are debited. **Proven by test on 1 September 2026 and NOT
+fixed.** Sub-defect 1b, awaiting a decision on whether it ships inside X0.
 
-Building a new score path on top of this means debugging two problems at once with real
-money involved. **Fixed and signed off in X0, before anything else.**
+And a **new** finding of the same class, in the fraud layer rather than the money layer:
+three services do `findOne` then `create` on `SuspicionScore`, which has a unique index on
+`userId`. Two concurrent fraud events for one user both find nothing, both insert, and the
+loser throws duplicate-key 11000 - so **the suspicion score is silently not recorded**. It
+surfaced only because coordination detection started running on both entry paths. Recorded as
+R28. It matters to this programme because provider contests will multiply concurrent entries.
+
+Building a new score path on top of the original mess would have meant debugging two problems
+at once with real money involved. **The competition half is done; the challenge half is not.**
 
 ### R2 - Admin mirror drift (a confirmed defect, not a prediction)
 
@@ -247,6 +261,41 @@ fails open when the secret is unset, a check that is never actually called by th
 a bypass header trusted because it is convenient in development. Two rules follow, and
 X-phase acceptance should hold them: **never let an authentication helper accept a request
 because configuration is missing**, and **test the route, not just the helper.**
+
+A third rule, added 1 September 2026 while unifying the entry paths: **do not name a flag
+after where the call came from.** The original design for the entry service took a
+`source: "web" | "api" | "simulator"` parameter. It was replaced with `trusted`, which says
+what it actually permits - skipping three person-level gates that a synthetic user cannot
+satisfy, and nothing else. A `source` value is an open invitation for the next change to hang
+unrelated behaviour off it, which is precisely how the bypass header above came to exist.
+
+---
+
+### R28 - Read-then-create races on unique-indexed fraud records (found 1 Sep 2026, NOT fixed)
+
+Three services do `findOne` and then `create` on `SuspicionScore`, which carries a unique
+index on `userId`:
+
+| File | Lines |
+|---|---|
+| `lib/services/fraud/suspicion-scoring.service.ts` | 64-67 |
+| `lib/services/registration-security.service.ts` | 1276-1279 |
+| `lib/services/kyc-fraud-detection.service.ts` | 301-305 |
+
+Two concurrent fraud events for the same user both find no record, both insert, and the loser
+throws duplicate-key 11000. The caller swallows it, so **the suspicion score is silently not
+recorded** - a fraud signal is lost with no log line naming what was lost.
+
+**How it was found matters more than the bug.** It appeared as duplicate-key noise in the test
+output only after coordination detection started running on *both* entry paths, which the
+unification did. Before that, Gate B skipped the detector entirely, so the race was invisible
+and so was the fact that a fraud control could be avoided by choosing an entrance.
+
+**Why it belongs in this register:** it is the same defect class as the duplicate-seat race
+fixed in the entry service - a read-then-insert with a unique index behind it - and this
+programme multiplies concurrent entries, which is exactly what triggers it. The fix is
+`findOneAndUpdate` with `upsert` in three places. It is not done because the code has no test
+coverage and it sits in the fraud layer, where a careless change is worse than the bug.
 
 ---
 

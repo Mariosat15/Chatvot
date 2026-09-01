@@ -368,15 +368,16 @@
       </div>
 
       <!-- ---------- DEFECT 1 ---------- -->
-      <h3 id="defect1">Defect 1 &mdash; Two entrance doors that behave differently</h3>
+      <h3 id="defect1">Defect 1 &mdash; Two entrance doors that behave differently <span class="b ok">Built &mdash; awaiting your test</span></h3>
 
       <div class="cal plain">
         <div class="t">In plain words</div>
-        <p>Imagine a stadium with two entrance gates. At <b>Gate A</b> the staff check your ticket, your ID and your eligibility, and they drop your entry fee into the prize money jar. At <b>Gate B</b> they check almost nothing &mdash; and <b>they forget to put your fee in the jar.</b> Both gates take your money. Only one records it in the prize pot.</p>
+        <p>Imagine a stadium with two entrance gates. At <b>Gate A</b> the staff check your ticket, your ID and your eligibility, and they drop your entry fee into the prize money jar. At <b>Gate B</b> they check almost nothing &mdash; and <b>they forget to put your fee in the jar.</b> Both gates took your money. Only one recorded it in the prize pot.</p>
+        <p style="margin-bottom:0"><b>There is now one gate.</b> Built on 1 September 2026: a single entrance that performs every check from both doors and always puts the fee in the jar. The description below is kept in the past tense on purpose &mdash; it is the record of what was wrong and why, which is what the next person adding a game needs to read before adding a new way in.</p>
       </div>
 
       <figure>
-        <div class="fig-t">Diagram 2 &mdash; The two join paths</div>
+        <div class="fig-t">Diagram 2 &mdash; The two join paths, <i>as they were before the fix</i></div>
         <svg viewBox="0 0 900 420" role="img" aria-label="Gate A performs four checks and adds the fee to the prize pool; Gate B skips the checks and does not add to the prize pool">
           <!-- player -->
           <circle cx="60" cy="200" r="26" fill="#143a5c"/>
@@ -428,14 +429,14 @@
 
           <text x="450" y="396" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#6b7d8f" font-style="italic">Both doors take the money. Only Gate A records it in the prize pot &mdash; so the pot ends up smaller than the fees collected.</text>
         </svg>
-        <figcaption><b>Verified in the code.</b> The website path increases both the player count and the prize pool (<code>competition.actions.ts</code> lines 584&ndash;593). The API path increases only the player count (<code>join/route.ts</code> lines 252&ndash;256). Re-checked on 1 September 2026, and one earlier claim in this document was wrong: a safeguard at the end of a competition caps the pool to <code>players &times; entry fee</code>, but <b>only when the pool is too high</b>. An under-counted pool &mdash; which is exactly what Gate B produces &mdash; is not corrected, not capped and not logged. It is simply under-distributed. Worse than previously described, not better. The reason it has never shown up is different: <b>Gate B is currently only reached by the simulator</b>, so no paying customer has used it.</figcaption>
+        <figcaption><b>Verified in the code, and now fixed.</b> The website path increased both the player count and the prize pool; the API path increased only the player count. Re-checked on 1 September 2026, and one earlier claim in this document was wrong: a safeguard at the end of a competition caps the pool to <code>players &times; entry fee</code>, but <b>only when the pool is too high</b>. An under-counted pool &mdash; exactly what Gate B produced &mdash; was not corrected, not capped and not logged. It was simply under-distributed. Worse than previously described, not better. <b>That safeguard has not been changed</b>, so the same blind spot would apply to any future entrance that forgot the prize pool; it is on the list of adjacent items. The reason this never showed up as a complaint is separate: <b>Gate B was only ever reached by the simulator</b>, so no paying customer used it &mdash; which is also why the fix needed no data migration.</figcaption>
       </figure>
 
-      <h4>What it causes today</h4>
+      <h4>What it caused &mdash; all three now fixed</h4>
       <ul>
-        <li>Competitions joined through the API path build up <b>no prize pool</b>, so the pot is smaller than the fees actually taken.</li>
-        <li>Players can enter through that path while <b>unverified, restricted, or flagged by the fraud system</b>.</li>
-        <li>The same event is recorded in the ledger under two different field names, which makes financial reconciliation harder.</li>
+        <li>Competitions joined through the API path built up <b>no prize pool</b>, so the pot was smaller than the fees actually taken.</li>
+        <li>Players could enter through that path while <b>unverified, restricted, or flagged by the fraud system</b>.</li>
+        <li>The same event was recorded in the ledger under two different field names &mdash; and worse, the name the website used <b>does not exist</b> in the database's definition, so it was discarded entirely. Every entry fee taken before this fix cannot be traced to the competition that charged it, and it cannot be repaired after the fact, because the value was never written down.</li>
       </ul>
 
       <div class="cal plain">
@@ -446,18 +447,37 @@
         <p style="margin-bottom:0">The second one led to a wider finding worth recording. That habit of returning the raw internal message appears <b>166 times across 119 API files</b>. It was deliberately <b>not</b> changed everywhere at once: a change that size could not be reviewed properly, and most of those messages are legitimate text intended for the user. The harm is specific to messages that come from the database or the framework rather than from our own code. It is now a known piece of debt with a recommended approach, rather than something waiting to be rediscovered.</p>
       </div>
 
-      <h4>The fix</h4>
+      <h4>The fix &mdash; built on 1 September 2026</h4>
       <ol>
-        <li><b>Write the money tests first</b>, against today's behaviour, so any unintended change is caught immediately.</li>
-        <li><b>Build one single entrance</b> that does <i>all</i> the checks from both doors and <i>always</i> adds the fee to the prize pool, in the same database transaction as the charge.</li>
-        <li><b>Point both existing doors at it</b>, so nothing else in the app has to change.</li>
-        <li><b>Keep the retry logic</b> from the API path &mdash; it exists because simultaneous joins genuinely collide.</li>
-        <li><b>Unify the ledger field</b> so one event is recorded one way.</li>
+        <li><b>Write the money tests first</b>, against today's behaviour, so any unintended change is caught immediately. <b>Done</b>, and it paid for itself: writing the tests before the fix is what found four separate live bugs that were not in this plan.</li>
+        <li><b>Build one single entrance</b> that does <i>all</i> the checks from both doors and <i>always</i> adds the fee to the prize pool, in the same database transaction as the charge. <b>Done.</b></li>
+        <li><b>Point both existing doors at it</b>, so nothing else in the app has to change. <b>Done</b> &mdash; the two doors shrank from 379 and 361 lines to 76 and 141.</li>
+        <li><b>Keep the retry logic</b> from the API path &mdash; it exists because simultaneous joins genuinely collide. <b>Done</b>, and see below: this turned out to matter far more than expected.</li>
+        <li><b>Unify the ledger field</b> so one event is recorded one way. <b>Done.</b></li>
       </ol>
 
+      <div class="cal plain">
+        <div class="t">Two doors were actually four, and they were not all dealt with the same way</div>
+        <p>Mapping the code before building the single entrance found <b>four</b> places that took an entry fee and seated a player, not two. Two had never been written down anywhere.</p>
+        <p>The third was a bulk route used to seed thousands of test players at once. It repeated the prize-pool defect exactly, and it also wrote six player fields under names the database does not recognise &mdash; which the database discards in silence. <b>It was fixed where it stands rather than folded into the single entrance</b>, because its whole purpose is to insert thousands of rows in one operation and routing it through a one-player-at-a-time service would defeat that. Worth being precise about the six fields: they did <b>no visible harm</b>, because every discarded value happened to match the default the database would have used anyway. A trap waiting for the first meaningful value, not a live fault.</p>
+        <p style="margin-bottom:0">The fourth was a copy inside the admin application that <b>nothing called at all</b>. It was <b>deleted</b>, and being unused is exactly why: it was missing two of the security checks and it crashed the page instead of returning an error, so the next admin feature that needed to enter a player would have found it, used it, and inherited both faults. Dead code with weaker rules is a liability, not a spare part.</p>
+      </div>
+
+      <div class="cal plain">
+        <div class="t">An unexpected result: nineteen out of twenty players were being turned away</div>
+        <p>The API door retried when two joins collided; the website door did not. Sharing one implementation gave the website door the retry, and the effect was much larger than anyone was looking for. With twenty players joining at the same instant, the website door previously admitted <b>one</b>. It now admits <b>twenty</b>.</p>
+        <p style="margin-bottom:0">Those nineteen players were being refused entry to a competition that had room for them. Nobody had reported it, because a busy moment looks like bad luck rather than a bug &mdash; which is the general lesson: this was found by <i>measuring</i> the old behaviour before changing it, not by reading the code.</p>
+      </div>
+
+      <div class="cal plain">
+        <div class="t">A fault neither door had ever handled</div>
+        <p>Both doors checked "is this player already in?" and then added them &mdash; two separate steps. Two simultaneous joins by the <i>same</i> player can both pass that check. What actually stops the second seat is a uniqueness rule in the database, and it reports a <b>different</b> kind of error from the one both doors knew how to retry. So whichever request lost was told the server had failed, with no way to tell whether it had been charged.</p>
+        <p style="margin-bottom:0">It is now treated the same way as the check itself: the player is in, and nothing extra was taken. One detail is worth recording because it nearly went unnoticed &mdash; the obvious test, racing two joins against each other, <b>never actually triggered this path</b>; the simple check won every time. It had to be forced deliberately. A test that passes is not proof that the thing it was written for ever ran.</p>
+      </div>
+
       <div class="cal info">
-        <div class="t">Why this must happen before the games work</div>
-        <p>The games project adds <b>more ways to join a contest</b>. Building new doors on top of two existing doors that already disagree about money and security multiplies the bug instead of fixing it. That is the road to double charges and unpaid winners.</p>
+        <div class="t">Why this had to happen before the games work</div>
+        <p>The games project adds <b>more ways to join a contest</b>. Building new doors on top of doors that already disagreed about money and security would have multiplied the bug instead of fixing it. That is the road to double charges and unpaid winners. There is now a single entrance for every future game to join through, which was the whole point of doing this first.</p>
       </div>
 
       <!-- ---------- DEFECT 2 ---------- -->
@@ -654,16 +674,22 @@
       </div>
 
       <h4>Defect 1 &mdash; the two doors</h4>
+      <p style="margin:0 0 10px"><b>This list was nine items and is now three.</b> Six are now covered by automated tests that run on every change, which is a better guarantee than a one-off manual check. The three that remain are the ones a test genuinely cannot do &mdash; all three are about the <i>browser</i> reaching the code, and every automated test skips the browser by calling the code directly.</p>
       <div class="chk">
-        <div><span class="box"></span><span>Join a paid competition <b>through the website</b>. In admin, confirm the prize pool went up by exactly the entry fee.</span></div>
-        <div><span class="box"></span><span>Join a paid competition <b>through the API / simulator</b>. Confirm the prize pool <b>also</b> went up by exactly the entry fee.</span></div>
-        <div><span class="box"></span><span>On a full competition, confirm the prize pool equals <b>number of players &times; entry fee</b>.</span></div>
-        <div><span class="box"></span><span>Try to join with an <b>unverified email</b> through both routes. Both must refuse.</span></div>
-        <div><span class="box"></span><span>Try to join with a <b>restricted account</b> through both routes. Both must refuse.</span></div>
-        <div><span class="box"></span><span><b>Accept a challenge</b> with a restricted account. It must refuse. (This route is used by real players and currently skips the check.)</span></div>
-        <div><span class="box"></span><span>Run a competition to the end. Confirm prizes paid + platform fee equals the prize pool exactly.</span></div>
-        <div><span class="box"></span><span>Cancel a competition that has players. Confirm everyone is fully refunded and the pool is zero.</span></div>
-        <div><span class="box"></span><span>Open an entry-fee transaction in admin. Confirm it <b>names the competition</b> it paid for.</span></div>
+        <div><span class="box"></span><span>Join a paid competition <b>through the website</b>. In admin, confirm the prize pool went up by exactly the entry fee. <b>Worth doing by hand</b> &mdash; nothing yet proves the <i>button</i> still reaches the rewritten code.</span></div>
+        <div><span class="box"></span><span>Open an entry-fee transaction in admin. Confirm it <b>names the competition</b> it paid for. The value is now stored and searchable; what is untested is whether the admin screen displays it.</span></div>
+        <div><span class="box"></span><span>Confirm the <b>full production build succeeds</b>. The entry code moved out of one file into a shared one, which is the kind of change that only fails at build time.</span></div>
+        <div><span class="box done"></span><span>Prize pool rises by the fee through <b>both</b> doors, and on a mixed field of players using both. <i>Automated.</i></span></div>
+        <div><span class="box done"></span><span><b>Unverified email, restricted account and fraud flag</b> all refused through both doors &mdash; with no seat given and no fee taken. <i>Automated.</i></span></div>
+        <div><span class="box done"></span><span>Prizes paid + platform fee equals the prize pool exactly, including tied and uneven splits. <i>Automated.</i></span></div>
+        <div><span class="box done"></span><span>Cancelling a competition refunds everyone, <b>once</b>, even if it is cancelled twice. <i>Automated.</i></span></div>
+        <div><span class="box done"></span><span>The bulk seeding route funds the pool and records which competition each fee belongs to. <i>Automated.</i></span></div>
+        <div><span class="box"></span><span><b>Still not fixed, and not to be ticked here.</b> Accepting a challenge with a restricted or fraud-flagged account is <i>still allowed</i>. It is proven by a test and awaits your decision on whether it is fixed inside this stage or after it.</span></div>
+      </div>
+
+      <div class="cal plain">
+        <div class="t">One new problem found, not fixed, and it needs your decision</div>
+        <p style="margin-bottom:0">Three parts of the fraud system record a player's suspicion score by first looking for an existing record and then creating one. If two suspicious events land at the same moment, both look, both find nothing, both try to create &mdash; and one is rejected, so <b>that fraud signal is silently thrown away</b>. It is the same shape as the seat problem described earlier, in the code that decides whether someone is cheating. It came to light only because a fraud check that previously ran on one door now runs on both. The fix is small, but it is untested code in a sensitive area, so it is being put to you rather than bundled in quietly.</p>
       </div>
 
       <h4>Defect 2 &mdash; the two blueprints</h4>

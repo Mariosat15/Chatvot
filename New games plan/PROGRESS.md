@@ -15,8 +15,8 @@
 
 | | |
 |---|---|
-| **Status** | **STAGE 0 IN PROGRESS.** Prerequisite A shipped. **Defect 2 built, awaiting owner test.** Defect 1 not started |
-| **Next action** | Owner runs the Defect 2 test checklist in `00a`, and decides the `.d.ts` question. Then **Defect 1** |
+| **Status** | **STAGE 0 IN PROGRESS.** Prerequisite A shipped. **Defects 2 and 1 both built, awaiting owner test.** Sub-defect 1b (challenge accept) not started |
+| **Next action** | Owner runs the two test checklists in `00a`. Two decisions are open: the `SuspicionScore` race, and whether sub-defect 1b ships before Stage 0 signs off |
 | **Owner instruction on record** | "I will need to start today" (1 Sep 2026), superseding "don't start anything" (17 Aug 2026) |
 | **Last updated** | 1 September 2026 |
 
@@ -53,7 +53,30 @@ reading before anything else, because they contradict what the plan said:
    for exactly that purpose. The third was found by the typecheck, not the guard - syncing
    `whitelabel.model.ts` removed four standing TypeScript errors (229 to 225).
 
-**No decisions are outstanding.** Three were taken on 1 September 2026:
+**Defect 1 is now built too.** One entry service, `lib/services/contest-entry.service.ts`,
+which both gates call. The prize-pool gap is closed on every path, the dead admin copy is
+deleted, and the simulator batch route is fixed in place. Three things from it are worth
+knowing before reading anything else:
+
+1. **Concurrent joins went from 1 in 20 to 20 in 20.** Not the goal - a side effect of Gate A
+   inheriting the retry Gate B already had. Nineteen of twenty players were previously turned
+   away from a competition with room for them.
+2. **A hazard neither gate handled.** Two joins by one player can both pass the seat check;
+   the unique index stops the second seat and reports **duplicate key 11000, not a write
+   conflict**, so it fell outside both retry loops. The loser got an opaque 500 and could not
+   tell whether it had been charged.
+3. **A race test that passes is not proof the race ran.** Racing both gates never entered the
+   duplicate-key branch - the seat check won every time. A probe proved it; the branch now has
+   a test that forces the condition.
+
+**Two decisions are open** as of the end of 1 September 2026:
+
+| Open decision | Why it needs the owner |
+|---|---|
+| The `SuspicionScore` read-then-create race (3 call sites) | Same bug class just fixed for seats, but in untested fraud code. Concurrent fraud events silently fail to record a score |
+| Whether sub-defect 1b ships inside Stage 0 | Challenge accept still has no restriction or fraud gate. Proven by test, not fixed |
+
+Three earlier decisions were taken on 1 September 2026:
 
 | Decision | Outcome |
 |---|---|
@@ -61,7 +84,7 @@ reading before anything else, because they contradict what the plan said:
 | The orphaned `.d.ts` files | **Delete.** All 112 removed, plus a `.gitignore` rule. The count was 112 repo-wide, not the 62 previously recorded - the earlier figure counted only `database/` and missed 26 files under `lib/` |
 | Market hours vs joining | **Joining is allowed at any time; only trading is gated.** Taking the union of the two gates blindly would have blocked weekend sign-ups for Monday contests - a revenue regression introduced by a bug fix. Locked in by Defect 1 test 12 |
 
-The only thing left for the owner is the **Defect 2 test checklist** in `00a`.
+What is left for the owner: the **two test checklists** in `00a`, and the two decisions above.
 
 ---
 
@@ -121,7 +144,8 @@ Legend: `NOT STARTED` / `IN PROGRESS` / `BUILT - AWAITING OWNER TEST` / `SIGNED 
 |---|---|---|---|---|
 | **Prereq A** | Simulator route authentication (unplanned; live security fix, commit `d5d3a328`) | 1 day | `BUILT - AWAITING OWNER TEST` | - |
 | **Stage 0 / Defect 2** | Model mirror sync (**11** drifted pairs of 75) + CI guard with allowlist + test-database harness | 3-5 days | `BUILT - AWAITING OWNER TEST` | - |
-| **Stage 0 / Defect 1** | Single contest-entry path across all four writers, plus challenge accept (1b) | 3-4 days, +1 for 1b | `NOT STARTED` | - |
+| **Stage 0 / Defect 1** | Single contest-entry path across all four writers | 3-4 days | `BUILT - AWAITING OWNER TEST` | - |
+| **Stage 0 / Defect 1b** | Challenge accept: still missing the restriction and fraud gates | 1 day | `NOT STARTED` | - |
 | **Phase 1** | Foundation: game label, general score, game registry, ranking seam, trading module, **Game Master insert game label (a gate)** | 2.5-3.5 weeks | `NOT STARTED` | - |
 | **Phase 2** | The Trivia game: question bank, gameplay, scoring, settlement, player screens | 2-3 weeks | `NOT STARTED` | - |
 | **Phase 3** | Admin: menu restructure, game picker, dynamic settings, question bank, reporting by game | 1.5-2 weeks | `NOT STARTED` | - |
@@ -162,15 +186,29 @@ the owner confirms each item, with the date.
 
 ### Defect 1 - entry paths
 
-- [ ] Joined a paid competition via the **website**; prize pool rose by exactly the entry fee
-- [ ] Joined a paid competition via the **API / simulator**; prize pool **also** rose by exactly the entry fee
-- [ ] Prize pool on a filled competition equals participants x entry fee
-- [ ] **Unverified email** refused via both routes
-- [ ] **Restricted account** refused via both routes
-- [ ] **Challenge accepted** with a restricted account is refused (sub-defect 1b)
-- [ ] Competition run to completion; prizes paid + platform fee equals the prize pool exactly
-- [ ] Competition cancelled with participants; everyone refunded, pool zeroed
-- [ ] An entry-fee transaction opened in admin **names the competition** it paid for
+Most of this list is now covered by an automated test, so only the items a test cannot reach
+are left for the owner. The ticked lines say which test replaced them, so that a future
+reader can tell "verified" from "assumed".
+
+- [ ] Joined a paid competition **through the website**, end to end, and the prize pool rose
+      by exactly the entry fee. **Worth doing by hand** - every automated test drives the
+      action directly, so nothing yet proves the button reaches it
+- [ ] An entry-fee transaction opened **in the admin UI names the competition** it paid for.
+      The field is now written and queryable; what is unverified is that admin displays it
+- [ ] Full production build succeeds (`next build`), since the entry path is now a shared
+      module rather than inline code in a server action
+- [x] Prize pool rose by the fee via **both** gates, and on a mixed field - *gate parity
+      tests, "funds the prize pool" and "funds the pool in full for a mixed field"*
+- [x] **Unverified email, restricted account and fraud flag** refused via both gates, with no
+      seat and no fee taken - *"applies Gate A's guards to Gate B"*
+- [x] Prizes paid + platform fee equals the pool exactly - *finalize payout test 6*
+- [x] Cancelled competition refunds everyone, once, even if cancelled twice - *cancel refund
+      tests, live bug 5*
+- [x] Simulator batch route funds the pool and attributes its ledger rows - *simulator batch
+      tests, 7 of them*
+- [ ] **Sub-defect 1b is NOT fixed.** A challenge accepted with a restricted or fraud-flagged
+      account is still allowed. Proven by `challenge-accept-guards.test.ts`; awaiting the
+      decision on whether it ships inside Stage 0
 
 ### Defect 2 - model mirrors
 
@@ -189,7 +227,7 @@ the owner confirms each item, with the date.
 
 ### Automated gate
 
-- [ ] All 11 money tests pass
+- [x] All money tests pass - **236 in the suite**, 18 files, green
 - [x] All **20** mirror tests pass (12 guard, 8 drift-behaviour)
 - [x] Mirror check runs in CI and as a `pre-push` hook
 - [ ] The 25 simulator-auth tests from Prerequisite A still pass
@@ -323,6 +361,109 @@ Template:
 
 ---
 
+### 1 Sep 2026 - Defect 1 BUILT: one entry service, all four writers resolved
+
+**The core of Defect 1 is done.** `lib/services/contest-entry.service.ts` is the single path
+into a paid competition, and both gates call it. Suite now **236 tests**, from 225. Main
+typecheck **15 errors, one below the 16 baseline** - a pre-existing error lived in the Gate A
+body that was deleted. Mirrors clean, lint clean.
+
+**What each of the four writers became:**
+
+| # | Path | Resolution |
+|---|---|---|
+| 1 | Gate A, `enterCompetition` | Thin wrapper: session, client IP, `revalidatePath`. 379 lines became 76 |
+| 2 | Gate B, `POST /api/competitions/[id]/join` | Thin wrapper: work out the caller, map the result to a status code. 361 lines became 141 |
+| 3 | Simulator batch | **Fixed in place**, not folded in - it exists to seed thousands of participants in one transaction and a per-user service call would defeat that |
+| 4 | Admin mirror | **Deleted.** 332 lines, plus two imports that became unused |
+
+**The money defect is closed.** The prize pool now grows by every fee taken, in the same
+transaction that takes it, on every path. The parity test that used to be titled "Gate B
+TAKES THE FEE AND DOES NOT FUND THE PRIZE POOL" now asserts the opposite, and the mixed-field
+test asserts the invariant directly: what was collected equals what can be paid out.
+
+**Three behaviour changes, all deliberate, all owner-decided:**
+
+1. **Duplicate entry returns success.** Gate A threw, Gate B returned success. Beyond the
+   owner's ruling there is a correctness argument that settles it: the service retries a lost
+   write race, so a first attempt that committed and then lost its response would be charged
+   a second fee if a repeat were treated as an error.
+2. **Market hours are not checked on join.** Gate B checked, Gate A did not.
+3. **Ledger rows carry `competitionId`.** Gate A wrote `referenceId`, which the schema does
+   not declare, so every entry fee it took is unattributable. Not backfillable - the value
+   was never stored.
+
+**Two measured improvements that were not the point but are worth more than they look:**
+
+- **Concurrent joins went from 1 in 20 to 20 in 20.** Gate A had no retry and Gate B had
+  five; sharing one implementation gave Gate A the retry. Nineteen of twenty players were
+  previously turned away from a competition that had room for them. The test now asserts a
+  floor of 15 rather than the observed 20, so it detects the retry being lost without
+  pretending to measure a production figure.
+- **Coordination detection now runs on both paths.** It is a fraud control and Gate B skipped
+  it entirely, so it was avoidable by using the other entrance. Suppressed for simulator
+  callers, which would otherwise trip it by design.
+
+**A hazard neither gate handled, now closed and tested.** The seat check is a read followed by
+an insert, so two joins by one player can both pass it. The unique index on
+`(competitionId, userId)` is what actually prevents the second seat, and it surfaces as
+**duplicate key 11000, not a write conflict** - outside the retry logic either gate had.
+Whoever lost got an opaque 500 and could not tell whether they had been charged. It is now
+treated exactly like the seat check: the player is in, nothing extra was taken.
+
+**Worth repeating: a race test that passes is not proof the race path ran.** Racing both gates
+was tried first and the seat check won every time, so the duplicate-key branch was never
+entered. A one-line probe proved that, and the branch now has a test that forces the condition
+by stubbing the seat lookup to miss exactly once. Left to the race it would have sat untested
+and the 500 would have returned the first time it mattered.
+
+**Same lesson, second form: prove the test fails without the fix.** The simulator batch tests
+all passed *before* the prize-pool increment was added, until the increment was temporarily
+reverted - two failed, four passed. And the field-name test passed both before and after,
+because strict mode had already discarded the bad names by the time the row reached MongoDB.
+It was rewritten to compare the builder's keys against `CompetitionParticipant.schema.paths`,
+which is the only check that actually fails; the builder was extracted to
+`lib/services/simulator/simulator-participant.ts` so it could be reached at all.
+
+**On the batch route's misnamed fields, more precisely than previously recorded:** six names
+were wrong, not three. `pnlPercent`, `tradesCount` and `joinedAt` were misspellings of
+declared fields; `currentPnl`, `currentPnlPercent` and `currentDrawdown` have no schema
+equivalent at all. **It did no visible harm** - every discarded value happened to equal the
+schema default. A trap waiting for the first non-zero value, not a live data fault. Say it
+that way; overstating it costs credibility on the ones that are real.
+
+**One new finding, not fixed, needs an owner decision.** Three services do read-then-create on
+`SuspicionScore`, which has a unique index on `userId`:
+`lib/services/fraud/suspicion-scoring.service.ts:64-67`,
+`lib/services/registration-security.service.ts:1276-1279`,
+`lib/services/kyc-fraud-detection.service.ts:301-305`. Two concurrent fraud events for one
+user both find nothing and both insert; the loser throws 11000 and **the suspicion score is
+silently not recorded**. It surfaced as duplicate-key noise in the test output once
+coordination detection started running on both paths - exactly the class of bug just fixed for
+seats, in the code that decides whether someone is cheating. `findOneAndUpdate` with `upsert`
+in three places, but it is fraud code with no tests, so it is put to the owner rather than
+folded into this change.
+
+**Files touched:** `lib/services/contest-entry.service.ts` (new),
+`lib/services/simulator/simulator-participant.ts` (new),
+`lib/actions/trading/competition.actions.ts`, `app/api/competitions/[id]/join/route.ts`,
+`app/api/simulator/competitions/join-batch/route.ts`,
+`apps/admin/lib/actions/trading/competition.actions.ts`,
+`__tests__/services/simulator-join-batch.test.ts` (new, 7 tests),
+`__tests__/services/competition-join-gate-parity.test.ts` (4 to 10 tests),
+`__tests__/services/competition-entry-concurrency.test.ts`,
+`__tests__/services/competition-entry-guards.test.ts`,
+`__tests__/services/entry-fee-ledger.test.ts`.
+
+**Deferred:** the `SuspicionScore` race, above. Also the challenge accept path (sub-defect
+1b) - it still lacks the restriction and fraud gates, and is the obvious next candidate to
+route through a shared guard set.
+
+**Next chat should:** put the `SuspicionScore` race to the owner, then decide whether
+challenge accept joins the unified guard set before Stage 0 signs off.
+
+---
+
 ### 1 Sep 2026 - Sub-defect 1b measured, and test 12 closed in both directions
 
 `__tests__/services/challenge-accept-guards.test.ts`, 5 tests, plus one more in the gate
@@ -443,6 +584,10 @@ There are **four** places that create a `CompetitionParticipant` and move entry-
 | 2 | Gate B, `POST /api/competitions/[id]/join` | Simulator and tests only | **No** |
 | 3 | `app/api/simulator/competitions/join-batch` | Simulator only, guarded | **No** |
 | 4 | `apps/admin/.../competition.actions.ts:452` | **Nothing. Dead code.** | Yes |
+
+> **Resolved the same day.** All four are dealt with - see the entry at the top of this log.
+> Paths 1 and 2 became wrappers around one service, 3 was fixed in place, 4 was deleted. The
+> table is kept as the record of what was found, not of what is true now.
 
 Also worth recording: **no React component calls Gate B.** It is reached by the simulator and
 the tests. That does not reduce the defect - it explains why it has never produced a customer

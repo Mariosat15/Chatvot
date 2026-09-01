@@ -98,6 +98,25 @@ vi.mock("@/lib/services/fraud/entry-fraud-gate.service", async () => {
   return { assertEntryFraudGate: async () => c.fraud };
 });
 
+// Reason: the entry service runs these as fire-and-forget work after the transaction
+// commits, so they can outlive the test that started them and log against a torn-down
+// database. Stubbing them keeps a guard test's output about guards.
+vi.mock("@/lib/services/badge-evaluation.service", () => ({
+  evaluateUserBadges: async () => ({ newBadges: [] }),
+}));
+
+vi.mock("@/lib/services/notification.service", () => ({
+  notificationService: { notifyCompetitionJoined: async () => {} },
+}));
+
+vi.mock("@/lib/services/fraud/coordination-detection.service", () => ({
+  CoordinationDetectionService: { detectCoordinatedEntry: async () => {} },
+}));
+
+vi.mock("@/lib/services/fraud/behavioral-analysis.service", () => ({
+  BehavioralAnalysisService: { recordCompetitionEntry: async () => {} },
+}));
+
 // Imported after the mocks are declared. vi.mock is hoisted, so this still gets them.
 const { enterCompetition } = await import(
   "@/lib/actions/trading/competition.actions"

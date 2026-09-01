@@ -125,26 +125,33 @@ Active scheduler is the **Agenda worker** (`worker/index.ts`). The Inngest cron 
 
 ---
 
-## 6. Two divergent competition join paths (must fix first)
+## 6. Two divergent competition join paths - FIXED 1 September 2026
 
-| Behaviour | `enterCompetition` (server action) | `POST /api/competitions/[id]/join` |
-|---|---|---|
-| Email verification | Yes | **No** |
-| User restrictions | Yes | **No** |
-| Fraud gate | Yes | **No** |
-| Level requirement | Yes | **No** |
-| Market hours check | No | Yes |
-| **Increments `prizePool`** | **Yes** | **No** |
-| WriteConflict retry | No | Yes |
-| Wallet tx field used | `referenceId` | `competitionId` |
+> **Resolved.** Both gates now call `lib/services/contest-entry.service.ts`, which performs
+> the union of their guards. The table below is the record of what was found; the last
+> column is what the single implementation now does. Kept rather than deleted because the
+> next person to add an entry path needs to see how far two copies drifted.
 
-`enterCompetition` lives in `lib/actions/trading/competition.actions.ts` (approx. lines 352-729); the route is `app/api/competitions/[id]/join/route.ts`.
+| Behaviour | `enterCompetition` (server action) | `POST /api/competitions/[id]/join` | Unified |
+|---|---|---|---|
+| Email verification | Yes | **No** | Yes |
+| User restrictions | Yes | **No** | Yes |
+| Fraud gate | Yes | **No** | Yes |
+| Level requirement | Yes | **No** | Yes |
+| Market hours check | No | Yes | **No** - owner decision; only trading is gated |
+| **Increments `prizePool`** | **Yes** | **No** | **Yes**, always |
+| WriteConflict retry | No | Yes | Yes - concurrent joins went from 1 in 20 to 20 in 20 |
+| Duplicate entry | Throws | Success | Success - owner decision |
+| Wallet tx field used | `referenceId` | `competitionId` | `competitionId` |
+| Coordination detection | Yes | **No** | Yes - it is a fraud control and was avoidable by using the other entrance |
 
-**The `prizePool` divergence is a live bug**, not just a refactor smell: contests joined via the API route accumulate no prize pool, so at finalization the pool is smaller than entry fees collected.
+`enterCompetition` lives in `lib/actions/trading/competition.actions.ts`; the route is `app/api/competitions/[id]/join/route.ts`. Both are now thin wrappers - 379 lines became 76, and 361 became 141.
 
-Two corrections from the 1 September 2026 re-verification. First, the safeguard at finalize (`competition-end.actions.ts` lines 695-718) **does not mask this** - it only fires when the stored pool is *higher* than `currentParticipants x entryFee`, so an under-counted pool passes straight through and is under-distributed with no correction and no log line. Second, the API route is currently reached **only by the simulator**; both real join buttons call `enterCompetition`. So no paying customer is affected today, but there are four writers of `currentParticipants` in total and two of them omit the pool.
+**The `prizePool` divergence was a live bug**, not just a refactor smell: contests joined via the API route accumulated no prize pool, so at finalization the pool was smaller than the entry fees collected.
 
-**Consequence for this project:** we are about to add a second, third and fourth way to join a contest. Consolidating to one entry service **before** adding game types is mandatory, not optional. This is **Stage 0**, delivered separately from the games plan and signed off by the owner first - see `00a-STAGE-0-prerequisite-fixes-DO-FIRST.md`.
+Two corrections from the 1 September 2026 re-verification, both still worth knowing. First, the safeguard at finalize (`competition-end.actions.ts` lines 695-718) **did not mask this** - it only fires when the stored pool is *higher* than `currentParticipants x entryFee`, so an under-counted pool passed straight through and was under-distributed with no correction and no log line. Second, the API route was reached **only by the simulator**; both real join buttons called `enterCompetition`. So no paying customer was affected, which is why it survived unnoticed - and why the fix needed no migration.
+
+**Consequence for this project:** we are about to add a second, third and fourth way to join a contest. Consolidating to one entry service **before** adding game types was mandatory, not optional, and it is now done. This was **Stage 0**, delivered separately from the games plan and signed off by the owner first - see `00a-STAGE-0-prerequisite-fixes-DO-FIRST.md`.
 
 Related dormant item: `challenge_refund` exists in the `transactionType` enum with **no writer anywhere** in the code.
 

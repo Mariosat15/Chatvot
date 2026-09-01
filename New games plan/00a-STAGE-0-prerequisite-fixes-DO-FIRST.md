@@ -167,14 +167,34 @@ Neither gate is fully correct. Gate A has the right security and money handling 
 the market-hours check and the concurrency retry. Gate B has the retry and market-hours
 check but skips four security checks and the prize-pool update.
 
-## There are four writers, not two
+## There are four writers, not two - ALL FOUR RESOLVED 1 September 2026
 
-| # | Path | Adds to prize pool? | Notes |
-|---|---|---|---|
-| 1 | `enterCompetition` | **Yes** | The **only** path real players use |
-| 2 | `POST /api/competitions/[id]/join` | **No** | Called **only** by `lib/services/simulator/simulator.service.ts` (lines 683, 713) |
-| 3 | `apps/admin/lib/actions/trading/competition.actions.ts` (618-655) | Yes | Admin mirror of Gate A, but **missing** the email check and the fraud gate |
-| 4 | `app/api/simulator/competitions/join-batch/route.ts` | **No** | **No callers anywhere in the repo** |
+| # | Path | Added to prize pool? | Notes | Resolution |
+|---|---|---|---|---|
+| 1 | `enterCompetition` | **Yes** | The **only** path real players use | Wrapper around the shared service |
+| 2 | `POST /api/competitions/[id]/join` | **No** | Called **only** by `lib/services/simulator/simulator.service.ts` (lines 683, 713) | Wrapper around the shared service |
+| 3 | `apps/admin/lib/actions/trading/competition.actions.ts` | Yes | Admin mirror of Gate A, but **missing** the email check and the fraud gate | **Deleted** |
+| 4 | `app/api/simulator/competitions/join-batch/route.ts` | **No** | **No callers anywhere in the repo** | **Fixed in place** |
+
+Two notes on that table, because both were surprises.
+
+**Path 3 was deleted rather than fixed.** Nothing imported it, and the reason to remove it
+rather than repair it is that a weaker duplicate is worse than no duplicate: the next admin
+feature that needs to enter a user would have found it, adopted a guard set missing email
+verification and the fraud gate, and crashed the render by throwing where the codebase
+returns `{ success: false }`. The typecheck confirmed it was genuinely unreferenced - deleting
+332 lines changed the admin error count not at all, and removed one standing error from the
+main app when Gate A's body went the same way.
+
+**Path 4 was fixed rather than folded in.** It exists to seed thousands of participants in one
+transaction, and routing it through a per-user service would remove the only reason it exists.
+It got the `prizePool` increment and its six misnamed participant fields corrected. On those
+fields, more precisely than this document said before: **six were wrong, not three.**
+`pnlPercent`, `tradesCount` and `joinedAt` were misspellings of declared fields;
+`currentPnl`, `currentPnlPercent` and `currentDrawdown` have no schema equivalent at all. And
+it **did no visible harm** - every discarded value happened to equal the schema default, so
+this was a trap waiting for the first non-zero value rather than a live data fault. Worth
+saying that way round; overstating the small ones costs credibility on the real ones.
 
 ## What it causes today - corrected
 
@@ -253,31 +273,52 @@ the ledger row, which has the same not-in-schema problem as `referenceId`.
 **Recommendation:** fold 1b into Defect 1. It is the same class of bug, the same fix
 shape, and it is the only one of the set with a live security consequence for real users.
 
-## The fix
+## The fix - BUILT 1 September 2026
 
-1. **Write the money tests first, against current behaviour.** Before changing anything,
-   lock in what the system does today so any unintended change is caught. (Tests listed
-   below.) This depends on the test-database decision - see the blocker section.
-2. **Create one entry service:** `lib/services/contest-entry.service.ts`
-   - Performs the **union** of all checks from both gates.
-   - Always increments `currentParticipants` **and** `prizePool`, inside the same database
-     transaction as the wallet debit.
-   - Keeps the concurrent-join retry from Gate B (it exists for a real reason - simultaneous
-     joins genuinely conflict). Copy Gate B's structure rather than inventing one: it
-     correctly starts a fresh session and re-reads inside each attempt.
-   - Returns an explicit 409 when retries are exhausted instead of falling through.
-   - Takes a `source` parameter (`web` / `api` / `simulator`) which controls **only** the
-     one legitimate difference: the simulator skips the market-hours check. The simulator
-     identity itself is now authenticated by Prerequisite A - do **not** reintroduce a
-     header-triggered bypass.
-3. **Point all four existing entry points at it.** They become thin wrappers. No caller
-   outside changes. Decide explicitly whether `join-batch` should be deleted instead,
-   since it has no callers.
-4. **Do the same for challenge accept** (sub-defect 1b), adding the restriction and fraud
-   checks it lacks.
-5. **Unify the ledger reference field.** Write the field the schema actually defines
-   (`competitionId` / `challengeId`), backfill nothing (there is nothing to backfill - the
-   old value was never stored), and align the `currency` value between paths.
+Steps 1 to 3 and 5 are done. Step 4 is not - see the note at the end.
+
+1. **Write the money tests first, against current behaviour.** Done, and it paid for itself
+   three times over: writing the tests *before* the fix is what found live bugs 5 and 6 and
+   the `SuspicionScore` race, none of which were in this plan.
+2. **One entry service:** `lib/services/contest-entry.service.ts`. Performs the union of the
+   security checks from both gates, always increments `currentParticipants` **and**
+   `prizePool` in the same transaction as the wallet debit, keeps Gate B's retry structure
+   (fresh session, re-read inside each attempt), and returns an explicit contention result
+   instead of falling through.
+3. **All four entry points resolved**, though not all four the same way, and the reasoning
+   matters more than the outcome:
+
+   | # | Path | Resolution |
+   |---|---|---|
+   | 1 | Gate A, `enterCompetition` | Wrapper. 379 lines to 76 |
+   | 2 | Gate B, the API route | Wrapper. 361 lines to 141 |
+   | 3 | Simulator batch | **Fixed in place.** It exists to seed thousands of participants in one transaction; a per-user service call would defeat the only reason it exists |
+   | 4 | Admin mirror | **Deleted.** 332 lines. Dead code with a weaker guard set is an invitation, not an asset |
+
+4. **Challenge accept - NOT DONE.** Sub-defect 1b is proven by test and still unfixed. It is
+   a separate decision because it is a separate money path with a second player in it.
+5. **Ledger reference unified.** Writes `competitionId`, the field the schema defines.
+   Nothing to backfill: the old `referenceId` value was never stored. `currency` is now
+   `"EUR"` with `exchangeRate: 1` on every path - Gate A alone wrote `"CREDITS"`, which
+   nothing reads, and `"EUR"` matches the schema default and the other three writers.
+
+**Two things the original plan did not anticipate.**
+
+The `source` parameter was dropped. It existed to express one legitimate difference - the
+simulator skipping market hours - and the owner's market-hours ruling removed that
+difference entirely. What replaced it is a narrower flag, `trusted`, which skips **only** the
+three person-level gates (email verification, restrictions, fraud) that a synthetic user
+cannot satisfy. It skips no contest guard and no money guard. Naming it for what it does
+rather than for where the call came from is deliberate: `source === "simulator"` invites
+future code to hang unrelated behaviour off it, which is how the header bypass that
+Prerequisite A fixed came to exist in the first place.
+
+And **a hazard neither gate had handled** turned up while writing the service. The seat check
+is a read followed by an insert, so two joins by one player can both pass it. The unique index
+on `(competitionId, userId)` is what actually prevents the second seat, and it reports
+**duplicate key 11000, not a write conflict** - so it fell outside both retry loops. Whichever
+request lost received an opaque 500 and could not tell whether it had been charged. It is now
+treated exactly as the seat check is: the player is in, nothing extra was taken.
 
 ### The market-hours question - DECIDED by the owner, 1 September 2026
 
@@ -316,16 +357,18 @@ refused. That pair is now a required test - number 12 below.
 |---|---|---|
 | 1 | 20 simultaneous joins through both entry points | `prizePool == successful joins x entryFee`, `currentParticipants` matches, no wallet drift. **Written 1 Sep 2026** - `__tests__/services/competition-entry-concurrency.test.ts`, 5 tests, passing. See the measurement below |
 | 2 | Join with insufficient balance | No partial state - no participant without a debit, no debit without a participant. **Written 1 Sep 2026**, passing |
-| 3 | Join with unverified email, via **all** entry points | All refuse |
-| 4 | Join while account-restricted, via **all** entry points | All refuse |
-| 5 | Join below the level requirement, via **all** entry points | All refuse |
+| 3 | Join with unverified email, via **all** entry points | All refuse. **DONE 1 Sep 2026.** Gate A was covered by `competition-entry-guards.test.ts`; Gate B is covered by "applies Gate A's guards to Gate B" in the parity file, which asserts a **403 with no seat, no fee and no pool change** for each of the three person-level gates |
+| 4 | Join while account-restricted, via **all** entry points | All refuse. **DONE 1 Sep 2026**, same test as row 3 |
+| 5 | Join below the level requirement, via **all** entry points | All refuse. **Gate A covered**; the level check now runs on both gates because it lives in the shared service, but there is **no test driving it through Gate B specifically** - the level fixture needs an XP record and was not worth duplicating. The guard is shared code, so the risk is low; recorded rather than claimed |
 | 6 | Full prize payout on a finished competition | Winner credits + platform fee == prize pool, exact to the cent. **DONE 1 Sep 2026** - `competition-finalize-payout.test.ts`, 5 tests. **Passes, no defect.** Checked ranked, tied and uneven splits; the floor-rounding dust lands in the platform fee rather than vanishing |
 | 7 | Cancel and refund | Every participant made whole, `prizePool` zeroed. **Written 1 Sep 2026** - `__tests__/services/competition-cancel-refund.test.ts`, 4 tests, passing. Also pins that a refund reverses the spend rather than counting as winnings, that a participant with no wallet is skipped instead of stranding everyone else's money, and **records live bug 5 below** |
 | 8 | Finalize the same competition twice | Winners paid **once** (idempotency). **DONE 1 Sep 2026. Passes** - an optimistic `active` -> `finalizing` lock already exists. This is the **control for live bug 5**: it proves the refund path's double-pay is a missing guard, not a property of the money layer |
 | 9 | Entry fee ledger row | Carries a resolvable competition reference in a field the schema defines. **Written 1 Sep 2026** - `__tests__/services/entry-fee-ledger.test.ts`, 4 tests, passing. Pins the current defect, proves the corrected write survives, proves the audit query works, and guards against "fixing" it by loosening the schema |
 | 10 | Retries exhausted under sustained write conflict | Returns 409, no participant created, no debit. **Written 1 Sep 2026** in `competition-join-gate-parity.test.ts`. **Was returning 500 and leaking the driver's message; FIXED 1 Sep 2026** and now returns 409 with a safe message. The clean-refusal half held throughout and is asserted separately |
 | 11 | Accept a challenge while restricted / fraud-flagged | Refused (sub-defect 1b). **Written 1 Sep 2026** - `__tests__/services/challenge-accept-guards.test.ts`, 5 tests, passing. Three pin the guards that *are* present so a fix cannot drop them; two record the two that are missing. **Sub-defect 1b is now proven, not inferred** |
-| 12 | Join an `upcoming` competition outside market hours, then try to place an order in it | Join **succeeds**, order **refused**. Locks in the owner's decision above, in both directions - a fix that blocked the join would fail this, and so would one that let the order through. **DONE 1 Sep 2026** in `competition-join-gate-parity.test.ts`, both directions. With the market closed: Gate A admits, Gate B refuses cleanly (no seat, no fee), and `placeOrder` refuses with no order and no position created. The two halves are deliberately in one file - split apart, each reads as an arbitrary rule |
+| 12 | Join an `upcoming` competition outside market hours, then try to place an order in it | Join **succeeds**, order **refused**. Locks in the owner's decision above, in both directions - a fix that blocked the join would fail this, and so would one that let the order through. **DONE 1 Sep 2026** in `competition-join-gate-parity.test.ts`, both directions. With the market closed, **both** gates now admit the join and `placeOrder` still refuses with no order and no position created. Before the unification this test recorded a *disagreement* - Gate A admitted and Gate B refused; it now records agreement. The two halves are deliberately in one file: split apart, each reads as an arbitrary rule |
+| 13 | Two joins by the same player collide on the unique index | Returns the existing seat, charges nothing. **Added 1 Sep 2026** - not in the original list, because nobody had noticed the read-then-insert race. Racing the two gates was tried first and **never entered the branch** (the seat check won every time), so the test forces the condition by stubbing the seat lookup to miss exactly once. A probe confirmed the branch is genuinely reached |
+| 14 | Simulator batch route funds the pool and uses declared field names | **Added 1 Sep 2026** - `simulator-join-batch.test.ts`, 7 tests. Two of them were proven to fail by temporarily reverting the `prizePool` increment. The field-name test had to be rewritten: it passed both before and after, because strict mode had already discarded the bad names by the time the row reached MongoDB, so it now compares the builder's keys against `CompetitionParticipant.schema.paths` |
 
 ### Live bug 5, now FIXED - cancelling a competition twice refunded every player twice
 
@@ -1122,7 +1165,8 @@ and should not delay it.
 | `challenge_refund` never written | The value exists in the wallet transaction enum with no code that ever writes it. Either implement active-challenge cancellation, or comment it as reserved. | `wallet-transaction.model.ts` |
 | Missing refund notification | `competition_refunded` is only sent from the **admin** notification service, not from the main automatic cancel path. Users refunded because a competition failed to meet minimum participants may never be told. | `competition-cancel.actions.ts` |
 | Silent prize-pool correction | The finalization safeguard that caps the pool to `participants x entryFee` hides drift in the one direction it does cover. Once Defect 1 is fixed, turn it into a logged warning plus an admin alert, and add the missing under-count branch. | `competition-end.actions.ts` |
-| `join-batch` has no callers | Either delete it or point it at the new entry service. Leaving a fourth divergent writer in place defeats the purpose of consolidating. | `app/api/simulator/competitions/join-batch/route.ts` |
+| ~~`join-batch` has no callers~~ | **Done 1 Sep 2026.** Fixed in place rather than deleted or folded in: it exists to seed thousands of participants in one transaction, and a per-user service call would defeat that. Got the `prizePool` increment and its six misnamed fields corrected. | `app/api/simulator/competitions/join-batch/route.ts` |
+| `SuspicionScore` read-then-create race | **New, 1 Sep 2026, needs an owner decision - arguably not "optional".** Three services do `findOne` then `create` on a model with a unique index on `userId`: `fraud/suspicion-scoring.service.ts:64-67`, `registration-security.service.ts:1276-1279`, `kyc-fraud-detection.service.ts:301-305`. Two concurrent fraud events for one user both find nothing, both insert, and the loser throws 11000 - so **the suspicion score is silently not recorded**. Found because coordination detection started running on both entry paths and filled the test output with duplicate keys. Exactly the bug class just fixed for seats, in the code that decides whether someone is cheating. The fix is `findOneAndUpdate` with `upsert` in three places; it is listed here rather than done because it is fraud code with no test coverage. | three services, above |
 
 ---
 
@@ -1132,15 +1176,43 @@ and should not delay it.
 
 ## Owner test checklist - Defect 1 (entry paths)
 
-- [ ] Join a paid competition through the **website UI**. Confirm in admin that the prize pool increased by exactly the entry fee.
-- [ ] Join a paid competition through the **API / simulator path**. Confirm the prize pool **also** increased by exactly the entry fee.
-- [ ] Confirm the prize pool on a filled competition equals `number of participants x entry fee`.
-- [ ] Attempt to join with an **unverified email** through both routes. Both must refuse.
-- [ ] Attempt to join with a **restricted account** through both routes. Both must refuse.
-- [ ] **Accept a challenge** with a restricted account. It must refuse. (sub-defect 1b)
-- [ ] Run a competition to completion. Confirm total prizes paid plus platform fee equals the prize pool exactly.
-- [ ] Cancel a competition with participants. Confirm every player is fully refunded and the pool is zero.
-- [ ] Open an entry-fee transaction in admin and confirm it names the competition.
+**This list was nine items and is now three.** The rest are covered by automated tests, listed
+first so you can see what is already proven rather than take it on trust. The three that
+remain are the ones a test genuinely cannot reach - all three are about the *browser* reaching
+the code, which every automated test bypasses by calling the action directly.
+
+**Automated - no action needed**
+
+| Was a manual check | Now proven by |
+|---|---|
+| Prize pool rises by the fee, through **both** gates | `competition-join-gate-parity.test.ts` - "funds the prize pool", both gates |
+| Prize pool on a filled competition equals participants x entry fee | Same file - the six-player mixed-field test, which asserts collected == pool |
+| Unverified email refused through both routes | Same file - "applies Gate A's guards to Gate B", which also asserts no seat, no fee and no pool change |
+| Restricted account refused through both routes | Same test. A fraud flag is covered too, which was never on the manual list |
+| Prizes paid plus platform fee equals the pool exactly | `competition-finalize-payout.test.ts`, including ranked, tied and uneven splits |
+| Cancel refunds every player, and only once | `competition-cancel-refund.test.ts` - the second call refunds nothing (live bug 5) |
+| Entry-fee row names its competition | `competition-join-gate-parity.test.ts` end to end, plus `entry-fee-ledger.test.ts` at the schema level |
+| Simulator batch route funds the pool | `simulator-join-batch.test.ts`, 7 tests |
+
+**Still needs a human - three checks**
+
+- [ ] **Join a paid competition through the website UI**, and confirm in admin that the prize
+      pool rose by exactly the entry fee. Worth doing by hand: every automated test calls the
+      server action directly, so nothing yet proves the **button** reaches it after the
+      rewrite.
+- [ ] **Open an entry-fee transaction in the admin UI** and confirm it names the competition.
+      The field is now written and queryable - what is unverified is that admin *displays* it.
+- [ ] **Run a full production build** (`next build`). The entry path moved from inline code in
+      a server action into a shared module, which is the kind of change that only fails at
+      build time.
+
+**Not covered, and not claimed:** joining below the level requirement is tested through Gate A
+only. The check now lives in the shared service so both gates run it, but no test drives it
+through Gate B specifically - the fixture needs an XP record and was not worth duplicating.
+
+**Sub-defect 1b is NOT fixed.** Accepting a challenge with a restricted or fraud-flagged
+account is still allowed. It is proven by `challenge-accept-guards.test.ts` and awaits a
+decision on whether it ships inside Stage 0. Do not tick a Defect 1 box on its behalf.
 
 ## Owner test checklist - Defect 2 (model mirrors)
 

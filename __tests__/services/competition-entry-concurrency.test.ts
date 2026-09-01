@@ -122,6 +122,32 @@ vi.mock("@/lib/services/fraud/entry-fraud-gate.service", async () => {
   return { assertEntryFraudGate: async () => c.fraud };
 });
 
+// Reason: the entry service runs badges, notifications and coordination detection as
+// fire-and-forget work after the transaction commits. None of it is what this file measures,
+// and leaving it real produced two kinds of noise that read like failures in a concurrency
+// test - which is the last place a reader should have to distinguish noise from a finding.
+//
+// Both were worth understanding before being silenced. The duplicate keys on
+// `suspicionscores` are a genuine read-then-create race in the fraud scoring services, not a
+// test artifact; it is recorded for the owner separately. The "Client must be connected"
+// errors are work outliving the test that started it, which is inherent to fire-and-forget
+// and was true of the old inline code too.
+vi.mock("@/lib/services/badge-evaluation.service", () => ({
+  evaluateUserBadges: async () => ({ newBadges: [] }),
+}));
+
+vi.mock("@/lib/services/notification.service", () => ({
+  notificationService: { notifyCompetitionJoined: async () => {} },
+}));
+
+vi.mock("@/lib/services/fraud/coordination-detection.service", () => ({
+  CoordinationDetectionService: { detectCoordinatedEntry: async () => {} },
+}));
+
+vi.mock("@/lib/services/fraud/behavioral-analysis.service", () => ({
+  BehavioralAnalysisService: { recordCompetitionEntry: async () => {} },
+}));
+
 const { enterCompetition } = await import(
   "@/lib/actions/trading/competition.actions"
 );
@@ -303,7 +329,7 @@ describe("competition entry - money integrity under concurrency", () => {
     expect(await totalDebited(players)).toBe(20 * ENTRY_FEE);
   }, 60_000);
 
-  it("records how many of 20 simultaneous joins Gate A actually admits", async () => {
+  it("admits nearly every one of 20 simultaneous joins now that the retry is shared", async () => {
     const competitionId = await seedCompetition();
     const players = signInAsDistinctPlayers(20);
     await seedWallets(players, START_BALANCE);
@@ -314,35 +340,54 @@ describe("competition entry - money integrity under concurrency", () => {
     const succeeded = results.filter((r) => r.success).length;
     const failures = results.filter((r) => !r.success);
 
-    // Reason: this is deliberately an observation, not a threshold. The plan records that
-    // Gate A has no retry on write conflict while Gate B retries five times, and predicts
-    // that concurrent joins are therefore lost. Asserting an exact number here would make
-    // the test fail on a faster machine for no useful reason. What it does assert is the
-    // part that must hold either way: a rejected join is *clean*, so successes plus
-    // failures account for every attempt and no failure left a debit behind. When the
-    // unified service adds the retry, this number should rise and the file above still
-    // passes unchanged.
+    // Reason: this test used to be a pure observation, because asserting a number would
+    // have measured throughput rather than correctness. It is now worth asserting, and the
+    // measurement is the reason why.
+    //
+    // Before the unification, Gate A had no retry on write conflict while Gate B retried
+    // five times. Measured on 1 September 2026, Gate A admitted 1 of 20 concurrent joins;
+    // the other 19 players were turned away from a competition that had room for them.
+    // Routing both gates through the one service gave Gate A the retry, and the same
+    // measurement now reads 20 of 20.
+    //
+    // The floor is set at 15 rather than 20 on purpose. Twenty is what a single-node
+    // in-memory replica set gives on this machine, and pinning it exactly would make the
+    // test fail on a loaded CI runner for no useful reason. Fifteen is far above the
+    // pre-fix 1 and far below the observed 20, so it detects the retry being lost without
+    // pretending to measure a production figure.
+    expect(succeeded).toBeGreaterThanOrEqual(15);
+
+    // The part that must hold whatever the number: a refused join is clean, so successes
+    // plus failures account for every attempt and no failure left a debit behind.
     expect(succeeded + failures.length).toBe(20);
     expect(await totalDebited(players)).toBe(succeeded * ENTRY_FEE);
 
-    // Reason: the failures are classified rather than merely counted, and the breakdown is
-    // asserted. Every refusal must be a write conflict - the thing being measured - so if
-    // test-server noise ever creeps back in, this fails loudly instead of inflating the
-    // finding. An unclassified count is how "the entry path collapses under load" nearly
-    // went on record on the strength of a collection-creation artifact.
+    // Reason: failures are classified rather than merely counted. An unclassified count is
+    // how "the entry path collapses under load" nearly went on record on the strength of a
+    // collection-creation artifact. Note the trap in the other direction too: a genuine
+    // conflict reads "Write conflict during plan execution and yielding is disabled", so
+    // matching "yielding is disabled" as an infrastructure marker files every real failure
+    // as noise and makes a defect vanish.
+    //
+    // A refusal now arrives as the service's own generic contention message rather than the
+    // driver's text, so `contended` is the expected wording and the raw driver strings
+    // should no longer appear at all.
+    const contended = failures.filter((f) => /try again/i.test(f.error ?? ""));
     const conflicts = failures.filter((f) => isWriteConflict(f.error));
     const artifacts = failures.filter((f) => isInfrastructureFailure(f.error));
     const other = failures.filter(
-      (f) => !isWriteConflict(f.error) && !isInfrastructureFailure(f.error),
+      (f) =>
+        !/try again/i.test(f.error ?? "") &&
+        !isWriteConflict(f.error) &&
+        !isInfrastructureFailure(f.error),
     );
 
     expect(artifacts.map((f) => f.error)).toEqual([]);
     expect(other.map((f) => f.error)).toEqual([]);
-    expect(conflicts.length).toBe(failures.length);
 
     console.log(
-      `Gate A admitted ${succeeded}/20 concurrent joins; ` +
-        `${conflicts.length} lost a write conflict, 0 test-server artifacts.`,
+      `Concurrent joins admitted ${succeeded}/20 (was 1/20 before the shared retry); ` +
+        `${contended.length} exhausted their retries, ${conflicts.length} raw conflicts, 0 artifacts.`,
     );
   }, 60_000);
 
@@ -367,7 +412,7 @@ describe("competition entry - money integrity under concurrency", () => {
     ).toBe(0);
   });
 
-  it("refuses a second join by the same player, and does not charge twice", async () => {
+  it("returns the existing seat on a second join, and does not charge twice", async () => {
     const competitionId = await seedCompetition();
     await seedWallets([DEFAULT_USER_ID], START_BALANCE);
 
@@ -376,12 +421,20 @@ describe("competition entry - money integrity under concurrency", () => {
 
     const second = await enterCompetition(competitionId);
 
-    // Reason: the plan records that the two gates disagree here - Gate A throws while
-    // Gate B returns success with "Already joined". Whichever the unified service picks,
-    // the money outcome is the part that cannot vary: one debit, one seat, one fee in the
-    // pool. This test pins that and stays silent on the response shape.
-    expect(second.success).toBe(false);
+    // Reason: the two gates disagreed here - Gate A threw "You are already in this
+    // competition" while Gate B returned success with "Already joined". The owner chose
+    // idempotent success on 1 September 2026, and it is not merely a preference: the
+    // service retries a lost write race, so a first attempt that committed and then lost
+    // its response would be charged a second fee if a repeat were treated as an error.
+    expect(second.success).toBe(true);
+    expect(second).toMatchObject({ alreadyEntered: true });
+    if (second.success && first.success) {
+      // The same seat, not a new one.
+      expect(second.participantId).toBe(first.participantId);
+    }
 
+    // The money outcome is the part that cannot vary either way: one debit, one seat,
+    // one fee in the pool.
     const comp = await readCompetition(competitionId);
     expect(comp?.currentParticipants).toBe(1);
     expect(comp?.prizePool).toBe(ENTRY_FEE);

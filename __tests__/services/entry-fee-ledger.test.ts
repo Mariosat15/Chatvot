@@ -11,23 +11,28 @@ import WalletTransaction from "@/database/models/trading/wallet-transaction.mode
  * Stage 0, Defect 1, test 9: "Entry fee ledger row carries a resolvable competition
  * reference in a field the schema defines."
  *
- * This file pins the defect in place BEFORE the entry paths are unified, so the fix has
- * something to prove itself against. It touches no production code.
+ * This file characterises the schema itself, which is why it is worth keeping now that the
+ * defect is fixed: it is what makes the failure mode legible to the next person who writes
+ * a ledger row. The end-to-end proof that the real entry path gets this right lives in
+ * `competition-join-gate-parity.test.ts`.
  *
- * The defect: lib/actions/trading/competition.actions.ts line 548 writes
- * `referenceId: competitionId` on the competition_entry row, and the schema does not
- * declare `referenceId`. It declares `competitionId`, which that call never sets. Because
- * Mongoose strict mode drops undeclared fields on create, the reference is discarded and
- * the row lands with no link to its competition at all.
+ * The defect it pinned: `enterCompetition` wrote `referenceId: competitionId` on the
+ * competition_entry row, and the schema does not declare `referenceId`. It declares
+ * `competitionId`, which that call never set. Mongoose strict mode drops undeclared fields
+ * on create, so the reference was discarded and the row landed with no link to its
+ * competition at all. No error, no warning.
  *
- * The admin mirror has the same line at apps/admin/lib/actions/trading/
- * competition.actions.ts:610, so the two copies agree - this is one bug, not drift.
+ * The admin mirror had the same line, so the two copies agreed - this was one bug
+ * duplicated, not mirror drift, which is why the mirror guard did not catch it and could
+ * not. Both are now gone: the admin copy was deleted and the main one writes
+ * `competitionId` through `lib/services/contest-entry.service.ts`.
  *
  * Scope of harm, checked rather than assumed: nothing computes money from
- * WalletTransaction.competitionId today. withdrawal-validator.service.ts reads
- * competitionId from CompetitionParticipant, and platform-financials.service.ts uses its
- * own sourceId. So this is a broken audit trail, not a wrong balance - every competition
- * entry fee in the ledger is unattributable to the competition that charged it.
+ * WalletTransaction.competitionId. withdrawal-validator.service.ts reads competitionId from
+ * CompetitionParticipant, and platform-financials.service.ts uses its own sourceId. So it
+ * was a broken audit trail, not a wrong balance - but every competition entry fee taken
+ * before the fix is unattributable to the competition that charged it, and no backfill is
+ * possible because the value was never stored.
  */
 
 const ENTRY_ROW = {
@@ -54,10 +59,10 @@ describe("competition entry fee ledger row", () => {
     await clearTestMongo();
   });
 
-  it("loses the competition reference when written as referenceId, as production does today", async () => {
+  it("loses the competition reference when written as referenceId, as the old code did", async () => {
     const competitionId = new mongoose.Types.ObjectId().toString();
 
-    // Exactly what competition.actions.ts:548 writes.
+    // Exactly what enterCompetition used to write.
     await WalletTransaction.create({ ...ENTRY_ROW, referenceId: competitionId });
 
     const raw = await mongoose.connection.db
@@ -68,9 +73,9 @@ describe("competition entry fee ledger row", () => {
     expect(raw?.transactionType).toBe("competition_entry");
     expect(raw?.amount).toBe(-25);
 
-    // Reason: this is the defect, asserted so it cannot be fixed by accident and so the
-    // fix has a failing-to-passing signal. The row exists and the money is right, but
-    // the competition it belongs to is nowhere on it.
+    // Reason: this is the failure mode, kept as a characterisation of the schema rather
+    // than of the old code. The row exists and the money on it is right, which is exactly
+    // why nobody noticed - the only thing missing is the competition it belongs to.
     expect(raw).not.toHaveProperty("referenceId");
     expect(raw?.competitionId).toBeUndefined();
   });
@@ -78,7 +83,7 @@ describe("competition entry fee ledger row", () => {
   it("keeps the reference when written to the field the schema declares", async () => {
     const competitionId = new mongoose.Types.ObjectId().toString();
 
-    // What the unified entry path must write instead.
+    // What the unified entry path writes.
     await WalletTransaction.create({ ...ENTRY_ROW, competitionId });
 
     const raw = await mongoose.connection.db

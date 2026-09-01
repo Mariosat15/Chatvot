@@ -152,10 +152,11 @@ get wrong and are worth stating here:
  MongoDB **cannot create a collection inside a transaction**, so the first test to touch a
  new collection fails with `due to catalog changes` — which is indistinguishable at a glance
  from a contention failure. This nearly put a false finding on record: a 20-way join test
- reported 1 success in 20, and most of the failures were this artifact. **Measured after the
- fix, Gate A really does admit only 1 in 20 concurrent joins** (`Write conflict`, no retry,
- while Gate B retries five times) — but the ratio is not a production prediction, because a
- single-node in-memory replica set has tighter lock timeouts. Assert against the *observed*
+ reported 1 success in 20, and most of the failures were this artifact. Measured after that
+ artifact was removed, Gate A admitted **1 concurrent join in 20** because it had no retry
+ while Gate B retried five times; **since the unified service gave both gates the retry, the
+ same test measures 20 in 20.** The ratio is not a production prediction either way, because
+ a single-node in-memory replica set has tighter lock timeouts. Assert against the *observed*
  success count, never against the attempt count, so the test survives the fix.
 - **Test fixtures must use ObjectId-shaped user ids** (24 hex chars), not readable labels.
  Better Auth uses the MongoDB adapter so real ids are ObjectId strings; most models type
@@ -172,14 +173,45 @@ get wrong and are worth stating here:
  redirect appears never to fire, and **the production code looks broken when it is
  correct.** Every guard test must assert the refusal left **no participant, no debit and no
  prize-pool change**, not merely the right message.
-- **Defect 1's entry-fee ledger defect is proven, not inferred** (1 Sep 2026,
- `__tests__/services/entry-fee-ledger.test.ts`). Gate A writes `referenceId`, which the
- `WalletTransaction` schema does not declare, and never sets `competitionId`, which it
- does — so **every competition entry fee is unattributable to its competition.** Two
- things to state accurately: the harm is a **broken audit trail, not a wrong balance**
- (nothing computes money from that field — checked), and because *both* copies write
- `referenceId` identically this is **one bug duplicated, not mirror drift**, so the guard
- does not catch it and cannot.
+- **Defect 1's entry-fee ledger defect was proven, not inferred, and is now fixed** (1 Sep
+ 2026, `__tests__/services/entry-fee-ledger.test.ts`). Gate A wrote `referenceId`, which the
+ `WalletTransaction` schema does not declare, and never set `competitionId`, which it
+ does — so **every competition entry fee was unattributable to its competition.** Two
+ things to state accurately: the harm was a **broken audit trail, not a wrong balance**
+ (nothing computes money from that field — checked), and because *both* copies wrote
+ `referenceId` identically this was **one bug duplicated, not mirror drift**, so the guard
+ does not catch it and cannot. The unified service writes `competitionId`; historical rows
+ stay unattributable, so **do not describe the audit trail as repaired retroactively.**
+- **Defect 1 is built** (1 Sep 2026, awaiting owner test): `lib/services/contest-entry.service.ts`
+ holds the transaction, with the result shapes, the pre-transaction guards and the
+ post-commit work in `lib/services/contest-entry/` (`types.ts`, `guards.ts`,
+ `side-effects.ts`) to keep every file under the 500-line limit. `enterCompetition` and
+ `POST /api/competitions/[id]/join` are now thin wrappers over it, and the service re-exports
+ the types so importers only ever need the one path.
+ **The first thing to get right is that there were four
+ writers, not the two the plan described** — the two known gates, a simulator batch route,
+ and a dead admin copy. Each was resolved differently and the reasoning matters: the
+ **dead admin copy was deleted** (nothing imported it, and it carried weaker guards that a
+ future feature would have inherited); the **batch route was fixed in place** rather than
+ routed through the service, because its bulk insert is the point of it. **Count the writers
+ before unifying anything** — a plan that says "two paths" is an assumption until grep says so.
+- **The batch route silently dropped six participant fields**, because it built seats with
+ names the `CompetitionParticipant` schema does not declare (`pnlPercent` for
+ `pnlPercentage`, `joinedAt` for `enteredAt`, and four more). Two rules: **extract an
+ inline object builder into a named function before testing it** — the seat shape is now
+ `lib/services/simulator/simulator-participant.ts` and a test compares its keys against
+ `Model.schema.paths`, which no assertion on the saved document could do, since strict mode
+ has already discarded the evidence by then. And **prove a field-name test fails** by
+ injecting a bad name and watching it go red; a test that only ever passes proves nothing.
+- **A duplicate entry is idempotent success, not an error** (owner decision, 1 Sep 2026):
+ return the existing seat and take no second fee. That covers a double-click and a retried
+ request. It needs handling in **two** places, and missing either leaves the hole open — the
+ pre-flight participant check, *and* the **E11000 duplicate-key error** from the unique index
+ when two requests pass the check in the same instant. Treat E11000 on that index as success.
+- **A new race is on record and NOT fixed** (`SuspicionScore`, needs an owner decision).
+ Three fraud services read-then-create the same score document, so concurrent entries lose
+ scores to `E11000`. It surfaced only once the entry path stopped serializing itself — worth
+ remembering generally: **removing a bottleneck exposes every race that the bottleneck hid.**
 
 ## The rule
 
@@ -214,8 +246,9 @@ On every change during implementation:
 | `External game plans/10-external-only-programme.md` section 3, `PROGRESS.md`'s X-phase table, and section 15 of `ChartVolt-External-Games-Plan.html` | The X0–X12 phase list, effort figures and the 18–24 week total appear in all three. Changing one means changing all three |
 | `External game plans/11`–`18` and their `New games plan` sources (`01`, `02`, `07`, `08`, `09`, `11`, `12`, `13`, `15`) | The external chapters restate load-bearing facts — line numbers, the five finalization entry points, the eight missing RBAC IDs — rather than duplicating whole chapters. **If a fact changes in the source, change it in the restatement too**, or the two plans will disagree about the codebase |
 | `14-implementation-phases.md`, `00-README.md`, `PROGRESS.md` and the roadmap sections of both New-Games-Plan HTMLs | Phase list, effort estimates and totals appear in five places. Changing one means changing all five. Currently: Stage 0 (**6–9 days**), P1–P7 (**14–19 weeks**), plus the unscheduled per-game marketplace. The partner HTML's timeline SVG is drawn to scale — rescale the bars, not just the labels. Note the partner HTML must not carry the Stage 0 figure at all |
-| The mirror-drift counts, wherever they appear | `New games plan` `00-README.md`, `12-risk-register.md`, `00a`, `03-data-model-changes.md`; `External game plans` `17-risk-register.md`, `18-migration-testing-rollout.md`; both internal HTMLs. Measured 1 Sep 2026 by the guard itself: **75 mirrored model pairs, 11 drifted** (all now synced), plus 19 action and 51 service files and **31 stale committed `.d.ts` files**. Earlier documents said "~21 files, 3 drifted", or "10 drifted" — both are stale. Do not hand-count these; run `npm run check:mirrors:list` |
+| The mirror-drift counts, wherever they appear | `New games plan` `00-README.md`, `12-risk-register.md`, `00a`, `03-data-model-changes.md`; `External game plans` `17-risk-register.md`, `18-migration-testing-rollout.md`; both internal HTMLs. Measured 1 Sep 2026 by the guard itself: **75 mirrored model pairs, 11 drifted** (all now synced), plus 19 action and 51 service files. Earlier documents said "~21 files, 3 drifted", or "10 drifted" — both are stale, as is any figure of "31" for the stale `.d.ts` files, which was 112 (see the row below). Do not hand-count these; run `npm run check:mirrors:list` |
 | `External game plans/19-game-masters.md`, `New games plan/15` section 5, and the Game Master sections of the internal HTMLs | The Game Master system is the same system in both scenarios. `19` sections 1–4 are the authoritative analysis; `New games plan/15` section 5 restates it. **A fact corrected in one must be corrected in the other** |
+| The competition entry paths, wherever they appear | `New games plan` `00a`, `01-current-state-audit.md`, `05-prizes-money-layer.md`, `12-risk-register.md`, `PROGRESS.md`; `External game plans` `PROGRESS.md` and `17-risk-register.md`; `ChartVolt-New-Games-Plan.html`. There were **four** writers, now **two** — `lib/services/contest-entry.service.ts` behind both gates, plus the batch route fixed in place and the admin copy deleted. Any document still saying "two duplicate join paths" as a *present* fact is stale; as a description of what Stage 0 started from it is correct, so **say which** |
 | `ChartVolt-New-Games-Plan.html` and `-Partners.html` | The partner version must **never** mention Stage 0, the duplicate join paths, the admin mirror drift, or any current defect |
 | Any model change | Exists twice: `database/models/` and `apps/admin/database/models/`. Update both in the same commit. **`npm run check:mirrors` now enforces this** in CI and on `git push`, comparing field paths *and* enum values. Do not "fix" a failure by deleting an enum value to make two sides agree — that orphans every document already storing it. Add to the side that lacks it. Deliberate differences go in `tools/model-mirror/allowlist.ts` **with a reason** |
 | Committed compiled `.js` files under `database/` and `lib/` | **All 113 deleted 1 Sep 2026** (57 `.js` + 56 `.js.map`), owner approved. A *separate, earlier* accident from the `.d.ts` one — emitted 22 Dec 2025, same 57 modules, and **six to seven months stale**. Critically, **these were NOT inert**: vitest resolved the stale `.js` in preference to the `.ts`, which made every model and every money-critical service **unimportable in tests** and blocked the whole of Defect 1. `tsx`, esbuild and `next build` all resolve the `.ts` correctly, so production was never affected — which is why it survived unnoticed. Two rules follow: **when deleting emitted output, look for the other half of the emit** (a `tsc` run that produced `.d.ts` produced `.js` too — the first cleanup removed one half and left the harmful one), and **prove which file a resolver picks rather than reasoning about it** — a missing export makes a perfect probe. The `.gitignore` rule is scoped to `/database/**` and `/lib/**`, never a blanket `*.js`, because `ecosystem.config.js`, `scripts/*.js`, `worker/build.mjs` and the `api-server` build are hand-written |

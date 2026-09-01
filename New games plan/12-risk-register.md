@@ -44,13 +44,15 @@ Rating scale: Critical = real money moves wrongly or the platform is down; High 
 
 ## Critical risks in detail
 
-### R1 - Money paths refactored without tests first
+### R1 - Money paths refactored without tests first - LARGELY CLOSED 1 September 2026
 
 **What breaks:** double charges, unpaid winners, prize pools that do not match entry fees collected.
 
-**Why likely:** there are already **two divergent competition join paths** that disagree on security checks *and* on whether `prizePool` is incremented. Confirmed: `competition.actions.ts` lines 587-590 increments both `currentParticipants` and `prizePool`; `join/route.ts` lines 252-256 increments only `currentParticipants`. We are about to add more callers. Refactoring an already-inconsistent money path with no test coverage is the highest-risk activity in this project.
+**Why it was likely:** there were **four divergent competition entry writers**, not the two originally recorded, and they disagreed on security checks *and* on whether `prizePool` was incremented. `competition.actions.ts` incremented both `currentParticipants` and `prizePool`; `join/route.ts` and the simulator batch route incremented only `currentParticipants`. We were about to add more callers. Refactoring an already-inconsistent money path with no test coverage was the highest-risk activity in this project.
 
-**Mitigation:** **Stage 0** exists solely for this and is delivered separately with owner sign-off. Write the eight money tests **first**, then consolidate to one entry service, then build games on top. Do not reorder these.
+**Mitigation, carried out:** **Stage 0** existed solely for this. The money tests were written first, then all four writers were resolved - two became wrappers over `lib/services/contest-entry.service.ts`, one was fixed in place, one was deleted. The order paid for itself: writing the tests before the fix is what found the double-refund bug, the 500-with-leak, the `brandingFiles` failure and the `SuspicionScore` race, none of which were in this plan.
+
+**Still open, and not to be assumed closed:** the challenge *accept* path still has no restriction or fraud gate (sub-defect 1b, proven by test), and the finalize-time safeguard still has no under-count branch - so a future writer that forgets the `prizePool` increment would still be under-distributed silently.
 
 **Detection:** the payout-vs-pool invariant alert in `11` section 7.
 
@@ -302,12 +304,13 @@ Worth recording, because fear of these could distort the plan:
 
 Stage 0 is a separate delivery. **No games work starts until the owner has tested and confirmed:**
 
-1. The eight money tests pass.
-2. There is exactly **one** contest entry path, and it increments `prizePool` on every route.
-3. All four bypassed security checks now apply to both entry routes.
-4. The five already-missing mirror fields are synced.
-5. The mirror-drift CI check is in place **and demonstrably fails** when one side of a pair is changed.
-6. The production build succeeds.
+1. The money tests pass. **Done** - 236 tests, 18 files, green.
+2. There is exactly **one** contest entry path, and it increments `prizePool` on every route. **Done** - `lib/services/contest-entry.service.ts`. Both gates wrap it; the simulator batch route was fixed in place and keeps its bulk insert.
+3. All four bypassed security checks now apply to both entry routes. **Done**, and coordination detection too, which was avoidable by choosing an entrance.
+4. The mirror fields are synced. **Done** - all **11** drifted pairs of 75, not the five originally recorded.
+5. The mirror-drift CI check is in place **and demonstrably fails** when one side of a pair is changed. **Done**, with tests that prove both the failure and the absence of false positives.
+6. The production build succeeds. **Owner to verify** - currently blocked by this machine's network rather than by Stage 0.
+7. **Sub-defect 1b decided.** The challenge accept path still lacks the restriction and fraud gates. Either fix it inside Stage 0 or record the decision to defer it - do not sign off silently.
 
 Full owner checklist in `00a-STAGE-0-prerequisite-fixes-DO-FIRST.md`.
 
