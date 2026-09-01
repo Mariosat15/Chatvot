@@ -1,0 +1,192 @@
+# 07 - Failure Modes and Edge Cases
+
+The integration depends on a third party we do not control, while real prize money
+waits on their answers. This document covers what happens when they do not answer.
+
+---
+
+## 1. The governing principle
+
+> **A provider failure must degrade the experience. It must never corrupt money.**
+
+Acceptable outcomes: a contest is delayed, paused, extended, or cancelled with full
+refunds. Unacceptable outcomes: prizes paid on incomplete scores, a player charged
+for a round they could not play, a contest that can never settle, or two payouts for
+one contest.
+
+---
+
+## 2. The worst failure - a round that never reports
+
+This is the single most important scenario in the integration. A player played, the
+contest is over, and we do not know their score. Everyone else's prize money is
+blocked behind it.
+
+### 2.1 The four-stage safety net
+
+```
+Stage 1  CALLBACK        Provider posts the result       -> normal path, ~99% of cases
+Stage 2  POLL            Reconciliation job pulls        -> catches lost webhooks
+Stage 3  FINAL SWEEP     Pull once more at grace end     -> last chance before settling
+Stage 4  POLICY          Apply the unresolved policy     -> settle without it, and alert
+```
+
+### 2.2 The reconciliation job
+
+Runs every minute against rounds that are launched but unresolved.
+
+| Round age | Action |
+|---|---|
+| < 2 min past expected finish | Wait - the callback is probably in flight |
+| 2-10 min | Poll `GET /v1/rounds/{roundId}` with backoff |
+| Contest entering grace | Poll every attempt remaining, urgently |
+| Grace expired | Apply the unresolved policy and raise a **critical** alert |
+
+Polling is cheap and the failure it prevents is expensive. Poll generously.
+
+### 2.3 The unresolved policy - an explicit per-contest choice
+
+| Policy | Behaviour | Use when |
+|---|---|---|
+| `score_zero` | Unresolved round scores zero. Contest settles on time | **Default.** Most players finish; one straggler must not block everyone |
+| `exclude` | Player removed from ranking and **refunded their entry fee** | Fairer to the affected player, slightly reduces the pot. Good for small, high-value contests |
+| `hold_and_alert` | Settlement blocked until a human decides | High-value contests only. Requires someone actually watching |
+
+The choice must be made when the contest is created, not improvised during an
+incident. Whichever is chosen, the affected player is **notified explicitly** rather
+than silently scored zero.
+
+---
+
+## 3. Provider outage
+
+### 3.1 Detection
+
+Health checks each minute: a lightweight catalogue call, plus round-creation success
+rate and callback arrival rate. Three consecutive failures marks the provider
+`degraded`; sustained failure marks it `down`.
+
+### 3.2 Response by contest state
+
+| State | Response |
+|---|---|
+| **Not yet open** | Hide the contest. Postpone or cancel with full refunds before anyone pays |
+| **Registration open, play not started** | Stop new entries. If not recovered before play opens, cancel and refund everyone |
+| **Play in progress** | **Pause the contest** and extend the play window by the outage duration. Show players an honest message |
+| **Settling** | Poll until the grace period ends, then apply the unresolved policy |
+| **Completed** | Unaffected |
+
+Pausing and extending is far better than cancelling. Players who already played keep
+their scores, and the contest completes late rather than not at all.
+
+### 3.3 The automatic kill switch
+
+If a provider is `down` for more than 15 minutes, automatically disable **new**
+contest creation and new round creation for that provider, and notify admins. Live
+contests continue under the rules above.
+
+A per-provider manual kill switch must also exist and must be usable without a
+deployment.
+
+---
+
+## 4. Round-level edge cases
+
+| Case | Handling |
+|---|---|
+| Player double-clicks Play | Idempotent round creation returns the same round and launch URL. The unique index on `{contestId, userId, attemptNumber}` is the hard guarantee |
+| Launch URL expires before play | Detect on page load; request a fresh round. Does **not** consume another attempt if the original was never started |
+| Player closes the tab mid-round | Round stays live until `expiresAt`. Returning resumes if the provider supports it, otherwise it resolves as abandoned |
+| Player loses connectivity | Provider's problem to handle gracefully. Our rule: they must not lose a paid attempt to a dropped signal, so `abandoned` results should carry a partial score where possible |
+| Two devices, same round | One live round per player per contest, enforced in the database |
+| Round outlives the contest | `expiresAt` is always set at or before the play window end |
+| Result arrives after settlement | Recorded against the round for audit, **not** applied to the ranking. Alert raised. If it would have changed the outcome, follow the re-settlement path in `06` |
+| Provider reports an impossible score | Rejected against `scoreRange`, round marked unresolved, alert raised |
+| Provider reports the same round twice with different scores | First valid result wins. Second stored and flagged as a **critical** discrepancy |
+| Provider voids a round after settlement | Manual re-settlement. Must be supported deliberately |
+
+---
+
+## 5. Contest-level edge cases
+
+| Case | Handling |
+|---|---|
+| Nobody plays | Cancel, refund everyone in full |
+| Only one player plays | Honour the prize split if minimum participants were met; otherwise cancel and refund. Decided by existing contest rules, not by anything new |
+| Fewer than minimum participants | Existing auto-cancel and refund path, unchanged |
+| Everyone ties | Existing shared-position logic splits the pot |
+| Game withdrawn by the provider mid-contest | Existing rounds honoured; no new rounds; settle on the scores achieved. If nobody played, cancel and refund |
+| Admin edits settings mid-contest | **Blocked.** Game, settings and seed lock the moment the first player joins |
+| Contest cancelled with live rounds | Void the rounds via the provider if supported, refund everyone regardless |
+
+---
+
+## 6. Money-safety invariants
+
+These must hold at all times and be asserted by automated tests, in the same spirit
+as the Stage 0 money tests.
+
+| # | Invariant |
+|---|---|
+| 1 | Prize pool == sum of entry fees collected, minus refunds |
+| 2 | Prizes paid + platform fee == prize pool, to the cent |
+| 3 | No participant is ever debited twice for one entry |
+| 4 | Settling a contest twice pays winners **once** |
+| 5 | A cancelled contest returns every entry fee, and leaves the pool at zero |
+| 6 | No money moves as a result of any provider call, ever |
+| 7 | A voided round never causes a debit or a credit |
+| 8 | Every round reaches a terminal state within grace end + 24h |
+
+Invariant 6 is the one that makes this integration fundamentally safer than a
+provider-hosted wallet, and it should be enforced by a test that fails if any
+provider code path can reach the wallet service.
+
+---
+
+## 7. Degradation matrix
+
+| Failure | Players see | Money impact |
+|---|---|---|
+| Catalogue sync fails | Nothing - cached catalogue is served | None |
+| Round creation fails | "Cannot start right now, try again" | None - no attempt consumed |
+| Launch URL fails to load | Retry, then a fresh round | None |
+| Callback delayed | "Score being confirmed" | None - grace period absorbs it |
+| Callback never arrives | Unresolved policy applies, player notified | Possible refund under `exclude` |
+| Provider down mid-contest | Contest paused, window extended | None |
+| Provider down before start | Contest cancelled | Full refunds |
+| Provider terminates the contract | Games disabled; live contests settle or refund | Full refunds where unsettled |
+
+**In no row does money move incorrectly.** That is the test of the design.
+
+---
+
+## 8. What must be built alongside the feature
+
+Easy to defer, expensive to add after the first incident.
+
+| Item | Why it cannot wait |
+|---|---|
+| Reconciliation job | Without it a single lost webhook blocks a contest indefinitely |
+| Unresolved-round alert | Silence is the failure mode. Nobody discovers it except an angry player |
+| Provider health panel in admin | Otherwise "is it us or them" takes an hour every time |
+| Manual round resolution tool | Support must be able to set a score with a reason and an audit entry |
+| Re-settlement capability | Contests will occasionally need correcting after payout |
+| Pause and extend on a contest | The single most useful outage response |
+| Per-provider kill switch | Must be usable without a deployment |
+
+---
+
+## 9. Rehearsal before launch
+
+Every one of these should be executed deliberately in the sandbox, not hoped about:
+
+- [ ] Withhold a callback entirely, confirm reconciliation resolves it
+- [ ] Withhold it permanently, confirm the unresolved policy fires and alerts
+- [ ] Send a callback with a bad signature, confirm rejection and alert
+- [ ] Send the same callback twice, confirm one score
+- [ ] Send two different scores for one round, confirm the discrepancy alert
+- [ ] Send a result after settlement, confirm it is recorded but not applied
+- [ ] Take the provider offline mid-contest, confirm pause and extend
+- [ ] Cancel a contest with live rounds, confirm full refunds
+- [ ] Settle the same contest twice, confirm winners paid once
+- [ ] Run a contest end to end with real (small) entry fees before going public

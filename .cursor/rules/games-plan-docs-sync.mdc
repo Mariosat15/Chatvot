@@ -1,0 +1,158 @@
+---
+description: Keep the games-platform plan documents in sync with reality once implementation starts
+alwaysApply: true
+---
+
+# Games Plan Documents — Sync Rule
+
+Two planning projects exist as documentation only. When implementation begins, or when
+any new information changes an assumption, **the documents must be updated in the same
+piece of work as the code.**
+
+| Folder | Covers |
+|---|---|
+| `New games plan/` | Stage 0 defect fixes, then the in-house game-module architecture |
+| `External game plans/` | Integrating games from a third-party skill-game provider |
+
+## Two scenarios, and which chapters apply
+
+`External game plans/` covers **two** decisions. Check `External game plans/PROGRESS.md`
+for which one is on record before planning any work.
+
+| Scenario | Meaning | Chapters | Programme |
+|---|---|---|---|
+| **Add-on** | The `New games plan` is delivered too. External games are an addition | `01`-`09` | E1-E9, 7.5-8 weeks engineering on top of the foundation |
+| **External-only** | Provider games are the **only** new games. No in-house game | `01`-`09` **and** `10`-`18` | X0-X12, 20-26 weeks total |
+
+Chapters `10`-`18` exist because `01`-`09` delegated the foundation and every
+platform-wide change (admin, navigation, wording, flags, catalogue, risks, rollout) to the
+`New games plan`. If that plan is not being delivered, the dependency does not disappear -
+it moves into `External game plans/`, and `10`-`18` own it.
+
+**The finding to keep repeating, because the intuition is wrong:** external-only is **not
+cheaper**, it is broader. Dropping an in-house game saves ~3.5 weeks; a correct provider
+integration costs ~7; all the platform work is identical. The prize is a catalogue and no
+content burden, not a saving. Do not let a summary anywhere imply otherwise.
+
+**Stage 0 is a prerequisite in both scenarios.** It fixes live defects under the money
+layer, and nothing changes that.
+
+**Stage 0 started on 1 September 2026** and is tracked in `New games plan/PROGRESS.md`,
+which is the file to read before touching any of this. Three things from it are easy to
+get wrong and are worth stating here:
+
+- **Prerequisite A already shipped** (commit `d5d3a328`): the `/api/simulator/*` routes
+  accepted a plain `X-Simulator-Mode: true` header as authentication in production, so an
+  unauthenticated caller could credit any wallet. Recorded as **R27** in
+  `External game plans/17-risk-register.md` because the provider callback specified in
+  `01`/`06` can repeat the same mistake. Two rules follow: **an authentication helper must
+  never accept a request because configuration is missing**, and **test the route, not just
+  the helper.**
+- **The finalize-time prize-pool safeguard does not mask the join-path defect.** It only
+  fires when the pool is too *high*. An under-counted pool is under-distributed silently.
+  Several documents used to claim the opposite; if you find that claim, it is stale.
+- **The order is Defect 2 before Defect 1**, so the mirror guard exists before Defect 1
+  edits the admin copy of the entry path.
+
+## The rule
+
+**Documentation is part of the deliverable, not a follow-up task.** A phase is not
+finished until the documents match what was actually built.
+
+On every change during implementation:
+
+1. **Update `PROGRESS.md`** in the relevant folder — status table, work log entry,
+   decisions, open questions. This is the file a new chat reads first.
+2. **Update the affected chapter(s).** If the data model changed, `04-data-model.md`
+   changes. If a flow changed, the flow document changes.
+3. **Update the HTML versions**, which are generated from the same content and drift
+   silently otherwise:
+   - `New games plan/ChartVolt-New-Games-Plan.html` — internal
+   - `New games plan/ChartVolt-New-Games-Plan-Partners.html` — partner-facing
+   - `External game plans/ChartVolt-External-Games-Plan.html` — internal
+   - `External game plans/ChartVolt-Game-API-Requirements.html` — sent to providers
+4. **Record deviations explicitly.** If the build differed from the plan, say so in the
+   work log with the reason. Never silently rewrite the plan to match the code.
+5. **Check whether docs outside these folders are affected** — `README.md`,
+   `.cursor/rules/*.mdc`, `deploy/README.md`, the admin wiki
+   (`apps/admin/components/admin/AdminWikiSection.tsx`), and
+   `legal/ChartVolt-Regulatory-Defence-Pack.html` if anything touches the
+   skill-versus-chance argument or the money flow.
+
+## Paired documents that must never drift
+
+| Pair | Constraint |
+|---|---|
+| `01-provider-contract-specification.md` and `ChartVolt-Game-API-Requirements.html` | Same requirements, different audience. A provider building against a stale spec is worse than no spec. The HTML carries a **version number and a document-history table** — bump both whenever `01` changes, since providers may already be building against the issued version |
+| `External game plans/10-external-only-programme.md` section 3, `PROGRESS.md`'s X-phase table, and section 15 of `ChartVolt-External-Games-Plan.html` | The X0–X12 phase list, effort figures and the 18–24 week total appear in all three. Changing one means changing all three |
+| `External game plans/11`–`18` and their `New games plan` sources (`01`, `02`, `07`, `08`, `09`, `11`, `12`, `13`, `15`) | The external chapters restate load-bearing facts — line numbers, the five finalization entry points, the eight missing RBAC IDs — rather than duplicating whole chapters. **If a fact changes in the source, change it in the restatement too**, or the two plans will disagree about the codebase |
+| `14-implementation-phases.md`, `00-README.md`, `PROGRESS.md` and the roadmap sections of both New-Games-Plan HTMLs | Phase list, effort estimates and totals appear in five places. Changing one means changing all five. Currently: Stage 0 (**6–9 days**), P1–P7 (**14–19 weeks**), plus the unscheduled per-game marketplace. The partner HTML's timeline SVG is drawn to scale — rescale the bars, not just the labels. Note the partner HTML must not carry the Stage 0 figure at all |
+| The mirror-drift counts, wherever they appear | `New games plan` `00-README.md`, `12-risk-register.md`, `00a`; `External game plans` `17-risk-register.md`, `18-migration-testing-rollout.md`. Verified 1 Sep 2026: **75 mirrored model pairs, 10 drifted**, plus 19 action and 51 service files. Earlier documents said "~21 files, 3 drifted" — if you find that phrasing anywhere, it is stale |
+| `External game plans/19-game-masters.md`, `New games plan/15` section 5, and the Game Master sections of the internal HTMLs | The Game Master system is the same system in both scenarios. `19` sections 1–4 are the authoritative analysis; `New games plan/15` section 5 restates it. **A fact corrected in one must be corrected in the other** |
+| `ChartVolt-New-Games-Plan.html` and `-Partners.html` | The partner version must **never** mention Stage 0, the duplicate join paths, the admin mirror drift, or any current defect |
+| Any model change | Exists twice: `database/models/` and `apps/admin/database/models/`. Update both in the same commit |
+
+## Direction of travel (owner, 30 Aug 2026)
+
+The platform is becoming **games-first**: players browse games, open a game page with
+its description and rules, and join a competition from there. Trading becomes one game
+among several — **demoted in navigation, not degraded in function.**
+
+Recorded in `New games plan/15-platform-transformation-and-gaps.md`, which also holds
+the three things chapters `01`–`14` did not cover: the games catalogue as admin-managed
+content, the per-game marketplace, and Game Master residuals.
+
+## Hard constraints recorded in the plans
+
+Do not quietly reverse these; they are load-bearing. If one must change, update the
+decision log in the relevant `PROGRESS.md` and say why.
+
+- An external provider **never touches money** — no wallet access, no balances, no payouts.
+- Only **skill-based** games are in scope. Chance-determined outcomes invert the
+  regulatory position in `legal/ChartVolt-Regulatory-Defence-Pack.html`.
+- **Stage 0 first.** `New games plan/00a-STAGE-0-prerequisite-fixes-DO-FIRST.md` is a
+  prerequisite with its own owner sign-off, before any games work starts.
+- `gameKey` is **immutable** once written — it is the join key for all historical stats.
+- Scores enter the system through **exactly one** ingestion function.
+- **Nothing in the marketplace may improve a player's score or ranking in a paid
+  contest.** Cosmetics, titles, entry-fee vouchers and extra *practice* are fine;
+  extra time, retries, hints, skips and easier content are not. Fairness, the
+  regulatory position and chargeback exposure each independently require this.
+- **No random or mystery packs**, even cosmetic ones — paying for a randomised reward
+  introduces the chance element the regulatory defence depends on being absent.
+- The **game module registry (code)** and the **game catalogue entry (content)** are
+  separate concepts. One module may back several catalogue entries.
+- Build the games catalogue and games-first navigation **after** the first real second
+  game exists. An almost-empty catalogue is worse than none. It is **P7**, last.
+- **Page content per game is contractual for external providers** — tagline,
+  description, rules summary, how-to-play, thumbnail and banner, localised into every
+  locale they declare, with no provider branding in the copy. Each provider title gets
+  its own game page; a provider who will not supply content is transferring their
+  content cost to us per title, forever.
+- `/competitions` is **retained** alongside `/games`. Some players browse by game,
+  others by what starts soonest or has the biggest pot. Do not replace one with the other.
+- **No paid format is ever single-player.** A **competition** is two or more players,
+  usually many, with winners sharing the pool. A **challenge** is exactly two. Practice is
+  the only one-player mode and it is free, unranked and prize-less. `minParticipants`
+  defaults to 2 and auto-cancels with full refunds below it — that behaviour already exists
+  and must not be weakened.
+- **"Independent play" describes gameplay, not contest size**, and the earlier name
+  "solo-scored" was replaced because it was read as the latter. Trading is itself an
+  independent-play game: every trader plays their own account and all are ranked together.
+  If a document implies an independent-play game means a solo contest, that is a bug.
+- Use **"challenge"**, never "duel". The codebase has a `Challenge` model, `/challenges`
+  routes, `challengesEnabled`, and `challenge_entry` / `challenge_refund` ledger values.
+  The provider-facing capability flag is `supportsOneVsOne`.
+- **Game Masters must work identically on every game** — create contests, refer players,
+  earn a share of referred players' entry fees. They are **~2.5 weeks of work, not four
+  days**; any document saying otherwise is stale. Two facts that are easy to get wrong:
+  a Game Master earns from **referred players' entry fees in any contest**, not from
+  contests they created; and the Game Master competition route **inserts with the raw
+  MongoDB driver and sets no game label**, which makes stamping it a **gate** in the
+  foundation phase rather than a task.
+- **A Game Master may not create external-provider contests until the revenue share is
+  computed on net platform fee after provider cost.** `limits.allowedGameTypes` defaults
+  to `["trading"]`. They still *earn* from provider contests from day one. Reason: the
+  share is a percentage of the entry fee taken before provider cost exists, and the
+  existing cap is against **gross** platform fee, so a low-fee contest can be net
+  loss-making while still paying out. `External game plans/19-game-masters.md` section 5.

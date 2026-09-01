@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ChartVolt &mdash; External Games Plan</title>
+<style>
+  :root{
+    --navy:#0d2338; --navy2:#143a5c; --navy3:#1d4d75;
+    --gold:#c9a23f; --gold-lt:#f0dda6; --gold-bg:#fdf8ec;
+    --ink:#1b2733; --body:#3a4a5a; --muted:#6b7d8f;
+    --line:#dde4ec; --line2:#eef2f7;
+    --bg:#f6f8fb; --card:#ffffff;
+    --green:#1a6e49; --green-bg:#eaf6ef; --green-line:#b6ddc6;
+    --red:#a02a38; --red-bg:#fdedef; --red-line:#f0c3c9;
+    --amber:#8a6209; --amber-bg:#fdf5e3; --amber-line:#ecd9a6;
+    --blue:#1c5788; --blue-bg:#ecf3fa; --blue-line:#c2d8ec;
+    --radius:10px;
+    --mono:"Cascadia Code",Consolas,"SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--body);
+    font-size:15.5px; line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .hero{
+    background:linear-gradient(150deg,var(--navy) 0%,var(--navy2) 55%,var(--navy3) 100%);
+    color:#fff; padding:54px 32px 46px;
+    border-bottom:4px solid var(--gold);
+  }
+  .hero-in{max-width:1180px;margin:0 auto}
+  .eyebrow{font-size:11.5px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--gold-lt);font-weight:700;margin-bottom:14px}
+  .hero h1{font-size:40px;line-height:1.14;font-weight:700;letter-spacing:-.6px;margin-bottom:14px}
+  .hero .lede{font-size:17.5px;color:#cfdcea;max-width:880px;line-height:1.55}
+  .hero-meta{margin-top:26px;padding-top:20px;border-top:1px solid rgba(255,255,255,.16);
+    display:flex;flex-wrap:wrap;gap:30px;font-size:13px}
+  .hero-meta b{display:block;color:var(--gold-lt);font-size:10.5px;letter-spacing:.14em;
+    text-transform:uppercase;margin-bottom:4px;font-weight:700}
+  .hero-meta span{color:#e4ecf4}
+  .stamp{display:inline-block;margin-top:22px;background:rgba(201,162,63,.16);
+    border:1px solid var(--gold);color:var(--gold-lt);
+    padding:7px 16px;border-radius:100px;font-size:12.5px;font-weight:700;
+    letter-spacing:.08em;text-transform:uppercase}
+
+  .shell{max-width:1180px;margin:0 auto;padding:0 32px;display:grid;
+    grid-template-columns:236px 1fr;gap:44px;align-items:start}
+  nav.toc{position:sticky;top:22px;padding:26px 0;max-height:calc(100vh - 44px);overflow-y:auto}
+  nav.toc h4{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
+    margin:0 0 12px;font-weight:700}
+  nav.toc a{display:block;padding:5px 10px;font-size:13.2px;color:var(--body);
+    text-decoration:none;border-left:2px solid var(--line);line-height:1.4}
+  nav.toc a:hover{color:var(--navy2);background:#eef3f9;border-left-color:var(--gold)}
+  nav.toc .sep{height:1px;background:var(--line);margin:12px 0}
+  main{padding:34px 0 80px;min-width:0}
+
+  section{margin-bottom:46px;scroll-margin-top:20px}
+  .sec-h{display:flex;align-items:baseline;gap:13px;margin-bottom:8px}
+  .sec-n{flex:none;width:31px;height:31px;border-radius:7px;background:var(--navy);color:#fff;
+    font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  h2{font-size:25px;color:var(--navy);font-weight:700;letter-spacing:-.3px;line-height:1.24}
+  .sec-sub{color:var(--muted);font-size:14.5px;margin:0 0 22px 44px}
+  h3{font-size:17.5px;color:var(--navy2);font-weight:700;margin:28px 0 11px}
+  h4{font-size:14.5px;color:var(--navy2);font-weight:700;margin:20px 0 8px}
+  p{margin-bottom:13px}
+  ul,ol{margin:0 0 14px 21px}
+  li{margin-bottom:6px}
+  strong,b{color:var(--ink);font-weight:600}
+  a{color:var(--blue)}
+  code{font-family:var(--mono);font-size:.885em;background:#eef2f7;color:var(--navy2);
+    padding:1.5px 5px;border-radius:4px;border:1px solid var(--line)}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px 22px;margin-bottom:16px}
+  .grid{display:grid;gap:14px;margin-bottom:16px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g4{grid-template-columns:repeat(4,1fr)}
+
+  .cal{border-left:4px solid;border-radius:0 var(--radius) var(--radius) 0;
+    padding:16px 20px;margin:16px 0}
+  .cal .t{font-weight:700;font-size:13px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px}
+  .cal p:last-child{margin-bottom:0}
+  .plain{background:var(--gold-bg);border-color:var(--gold)}
+  .plain .t{color:var(--amber)}
+  .good{background:var(--green-bg);border-color:var(--green)}
+  .good .t{color:var(--green)}
+  .bad{background:var(--red-bg);border-color:var(--red)}
+  .bad .t{color:var(--red)}
+  .info{background:var(--blue-bg);border-color:var(--blue)}
+  .info .t{color:var(--blue)}
+
+  .verdict{background:var(--navy);color:#fff;border-radius:var(--radius);
+    padding:28px 30px;margin-bottom:34px;border-left:5px solid var(--gold)}
+  .verdict .q{font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--gold-lt);font-weight:700;margin-bottom:11px}
+  .verdict .a{font-size:20px;line-height:1.45;color:#fff;font-weight:600}
+  .verdict .n{margin-top:14px;font-size:14px;color:#bccfe0;line-height:1.55}
+  /* the global strong/b colour is dark ink, which is illegible on the navy panel */
+  .verdict .n b{color:#fff}
+  .verdict .a b{color:var(--gold-lt)}
+
+  .tw{overflow-x:auto;margin-bottom:16px;border:1px solid var(--line);border-radius:var(--radius)}
+  table{width:100%;border-collapse:collapse;background:#fff;font-size:13.6px}
+  th{background:var(--navy2);color:#fff;text-align:left;padding:10px 13px;
+    font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;white-space:nowrap}
+  td{padding:9px 13px;border-bottom:1px solid var(--line2);vertical-align:top;line-height:1.5}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:nth-child(even){background:#fafcfe}
+  td code{font-size:.85em}
+
+  .b{display:inline-block;padding:2px 9px;border-radius:100px;font-size:11px;
+    font-weight:700;letter-spacing:.04em;white-space:nowrap;border:1px solid}
+  .b.crit{background:var(--red-bg);color:var(--red);border-color:var(--red-line)}
+  .b.high{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-line)}
+  .b.med{background:var(--blue-bg);color:var(--blue);border-color:var(--blue-line)}
+  .b.low{background:#f1f4f7;color:var(--muted);border-color:var(--line)}
+  .b.ok{background:var(--green-bg);color:var(--green);border-color:var(--green-line)}
+  .b.no{background:var(--red);color:#fff;border-color:var(--red)}
+
+  figure{margin:22px 0;background:#fff;border:1px solid var(--line);
+    border-radius:var(--radius);padding:22px 20px 16px}
+  figure svg{display:block;width:100%;height:auto}
+  figcaption{margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);
+    font-size:13px;color:var(--muted);line-height:1.55}
+  figcaption b{color:var(--navy2)}
+  .fig-t{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);
+    font-weight:700;margin-bottom:14px}
+
+  .chk{background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+    padding:6px 4px;margin-bottom:16px}
+  .chk div{display:flex;gap:11px;padding:9px 15px;border-bottom:1px solid var(--line2);
+    font-size:14px;line-height:1.5}
+  .chk div:last-child{border-bottom:none}
+  .box{flex:none;width:15px;height:15px;border:2px solid var(--navy3);border-radius:3px;margin-top:3px}
+
+  .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;
+    background:var(--line);border:1px solid var(--line);border-radius:var(--radius);
+    overflow:hidden;margin-bottom:18px}
+  .kv > div{background:#fff;padding:14px 16px}
+  .kv b{display:block;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--muted);margin-bottom:5px;font-weight:700}
+  .kv span{font-size:17px;font-weight:700;color:var(--navy)}
+  .kv em{font-style:normal;font-size:12.5px;color:var(--body);display:block;margin-top:2px}
+
+  .ph{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin-bottom:18px}
+  .ph-row{display:grid;grid-template-columns:82px 1fr 116px;gap:0;background:#fff;
+    border-bottom:1px solid var(--line2)}
+  .ph-row:last-child{border-bottom:none}
+  .ph-row.pre{background:var(--amber-bg)}
+  .ph-id{padding:14px 12px;font-weight:700;color:var(--navy);font-size:13.5px;
+    background:#f7f9fc;border-right:1px solid var(--line2);display:flex;align-items:center}
+  .ph-row.pre .ph-id{background:#f6e8c6;color:var(--amber)}
+  .ph-b{padding:13px 16px;font-size:13.8px;line-height:1.52}
+  .ph-b b{display:block;color:var(--navy2);margin-bottom:2px}
+  .ph-e{padding:14px 14px;font-size:13px;font-weight:700;color:var(--navy2);
+    border-left:1px solid var(--line2);display:flex;align-items:center}
+
+  hr.d{border:none;border-top:1px solid var(--line);margin:34px 0}
+  .foot{max-width:1180px;margin:0 auto;padding:26px 32px 46px;border-top:1px solid var(--line);
+    color:var(--muted);font-size:12.8px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+
+  @media (max-width:1000px){
+    .shell{grid-template-columns:1fr;gap:0;padding:0 20px}
+    nav.toc{display:none}
+    .g2,.g3,.g4{grid-template-columns:1fr}
+    .hero h1{font-size:30px}
+    .hero{padding:38px 20px 34px}
+    .ph-row{grid-template-columns:1fr}
+    .ph-id,.ph-e{border:none}
+  }
+  @media print{
+    nav.toc{display:none}
+    .shell{grid-template-columns:1fr;padding:0}
+    body{font-size:10.5pt;background:#fff}
+    section{page-break-inside:avoid}
+    figure{page-break-inside:avoid}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,1 L7,4.5 L0,8 Z" fill="#6b7d8f"/>
+    </marker>
+    <marker id="arg" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,1 L7,4.5 L0,8 Z" fill="#1a6e49"/>
+    </marker>
+    <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,1 L7,4.5 L0,8 Z" fill="#a02a38"/>
+    </marker>
+  </defs>
+</svg>
+
+<header class="hero">
+  <div class="hero-in">
+    <div class="eyebrow">ChartVolt &middot; Platform Strategy &amp; Technical Plan</div>
+    <h1>Games From an External Provider</h1>
+    <p class="lede">How ChartVolt can run paid competitions and one-against-one challenges on games supplied by another company &mdash; chess puzzles, trivia, word games &mdash; while keeping the entry fees, the prize pool, the ranking and the rewards exactly where they are today. The provider runs the game and reports a score. Nothing else changes.</p>
+    <div class="hero-meta">
+      <div><b>Status</b><span>Plan only &mdash; no code changed</span></div>
+      <div><b>Date</b><span>18 Aug 2026 &middot; rev 30 Aug 2026</span></div>
+      <div><b>Provider</b><span>None selected &mdash; plan is provider-neutral</span></div>
+      <div><b>Engineering</b><span>7&ndash;8 weeks after prerequisites</span></div>
+      <div><b>To public launch</b><span>10&ndash;12 weeks</span></div>
+    </div>
+    <div class="stamp">The provider never touches money</div>
+  </div>
+</header>
+
+<div class="shell">
+
+<nav class="toc">
+  <h4>Contents</h4>
+  <a href="#idea">The idea</a>
+  <a href="#boundary">The money boundary</a>
+  <a href="#words">Vocabulary</a>
+  <a href="#families">Two kinds of game</a>
+  <div class="sep"></div>
+  <a href="#flow">How a contest works</a>
+  <a href="#contract">What we require</a>
+  <a href="#arch">Architecture</a>
+  <a href="#round">The round lifecycle</a>
+  <div class="sep"></div>
+  <a href="#fair">Fairness &mdash; the seed</a>
+  <a href="#trust">Trust and verification</a>
+  <a href="#fail">When things fail</a>
+  <div class="sep"></div>
+  <a href="#scoring">Scoring and rewards</a>
+  <a href="#choose">Choosing a provider</a>
+  <div class="sep"></div>
+  <a href="#phases">The plan</a>
+  <a href="#gm">Game Masters</a>
+  <a href="#only">If these are the only games</a>
+  <a href="#honest">Honest assessment</a>
+</nav>
+
+<main>
+
+<!-- ============ 1. THE IDEA ============ -->
+<section id="idea">
+  <div class="verdict">
+    <div class="q">The idea in one paragraph</div>
+    <div class="a">Another company supplies the games and tells us what each player scored. ChartVolt does everything else &mdash; exactly as it does for trading today.</div>
+    <div class="n">A player buys credits, pays an entry fee to join a competition or to challenge someone, plays, and the winners share the pot. Points, ranking, levels, badges and milestones all follow. The only thing that changes is who supplies the gameplay in the middle.</div>
+  </div>
+
+  <div class="sec-h"><div class="sec-n">1</div><h2>Why this is the low-risk way to add games</h2></div>
+  <p class="sec-sub">Building games in-house means designing, building and maintaining each one. Buying them means we get a catalogue on day one.</p>
+
+  <div class="grid g3">
+    <div class="card">
+      <h4>Speed</h4>
+      <p style="margin:0">A provider brings a full catalogue immediately. We add titles by ticking a box, not by writing a game.</p>
+    </div>
+    <div class="card">
+      <h4>Focus</h4>
+      <p style="margin:0">Our advantage is the competition engine, the money handling and the rewards &mdash; not building puzzle games. This plays to it.</p>
+    </div>
+    <div class="card">
+      <h4>Variety</h4>
+      <p style="margin:0">Different players like different games. A catalogue widens the audience far faster than one in-house title ever could.</p>
+    </div>
+  </div>
+
+  <div class="cal info">
+    <div class="t">The concept does not change</div>
+    <p><b>Buy credits &rarr; pay an entry fee &rarr; compete &rarr; winners share the pot.</b> That is what ChartVolt does today with trading, and it is exactly what it will do with an external game. The engine that handles the money, the ranking and the rewards is already built, already live and already reconciled. This project does not touch it.</p>
+  </div>
+</section>
+
+<!-- ============ 2. MONEY BOUNDARY ============ -->
+<section id="boundary">
+  <div class="sec-h"><div class="sec-n">2</div><h2>The single most important design decision</h2></div>
+  <p class="sec-sub">The provider never touches money. They run games and report scores &mdash; that is the whole relationship.</p>
+
+  <figure>
+    <div class="fig-t">Diagram 1 &mdash; the boundary</div>
+    <svg viewBox="0 0 920 300" role="img" aria-label="Money stays on the ChartVolt side of the boundary">
+      <rect x="8" y="46" width="384" height="212" rx="10" fill="#ecf3fa" stroke="#c2d8ec"/>
+      <text x="200" y="72" text-anchor="middle" font-size="14" font-weight="700" fill="#143a5c">CHARTVOLT</text>
+      <text x="200" y="96" text-anchor="middle" font-size="11.5" fill="#6b7d8f">everything that matters</text>
+      <text x="34" y="126" font-size="12.5" fill="#3a4a5a">Credits, entry fees, prize pool</text>
+      <text x="34" y="150" font-size="12.5" fill="#3a4a5a">Prizes, refunds, platform fee, ledger</text>
+      <text x="34" y="174" font-size="12.5" fill="#3a4a5a">Eligibility, fraud checks, KYC</text>
+      <text x="34" y="198" font-size="12.5" fill="#3a4a5a">Ranking, points, badges, levels</text>
+      <text x="34" y="222" font-size="12.5" fill="#3a4a5a">Leaderboards, notifications, support</text>
+
+      <line x1="474" y1="18" x2="474" y2="286" stroke="#c9a23f" stroke-width="2" stroke-dasharray="6 5"/>
+      <text x="474" y="14" text-anchor="middle" font-size="10.5" font-weight="700" fill="#8a6209" letter-spacing="1.5">THE BOUNDARY</text>
+
+      <rect x="556" y="46" width="356" height="212" rx="10" fill="#f1f4f7" stroke="#dde4ec"/>
+      <text x="734" y="72" text-anchor="middle" font-size="14" font-weight="700" fill="#143a5c">GAME PROVIDER</text>
+      <text x="734" y="96" text-anchor="middle" font-size="11.5" fill="#6b7d8f">two jobs, and no others</text>
+      <text x="584" y="132" font-size="12.5" fill="#3a4a5a">1. Run the game for one player</text>
+      <text x="584" y="158" font-size="12.5" fill="#3a4a5a">2. Tell us the score</text>
+      <rect x="580" y="182" width="308" height="56" rx="7" fill="#fdedef" stroke="#f0c3c9"/>
+      <text x="734" y="204" text-anchor="middle" font-size="12" font-weight="700" fill="#a02a38">No balances. No bets. No payouts.</text>
+      <text x="734" y="224" text-anchor="middle" font-size="11.5" fill="#a02a38">No access to any customer wallet.</text>
+
+      <line x1="394" y1="120" x2="552" y2="120" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+      <text x="473" y="112" text-anchor="middle" font-size="10.5" fill="#6b7d8f" font-family="Consolas, monospace">create round</text>
+      <line x1="552" y1="164" x2="396" y2="164" stroke="#1a6e49" stroke-width="1.8" marker-end="url(#arg)"/>
+      <text x="473" y="156" text-anchor="middle" font-size="10.5" fill="#1a6e49" font-family="Consolas, monospace">signed score</text>
+
+      <line x1="398" y1="214" x2="548" y2="214" stroke="#a02a38" stroke-width="1.6" stroke-dasharray="5 4"/>
+      <circle cx="473" cy="214" r="13" fill="#fff" stroke="#a02a38" stroke-width="2"/>
+      <line x1="464" y1="223" x2="482" y2="205" stroke="#a02a38" stroke-width="2"/>
+      <text x="473" y="248" text-anchor="middle" font-size="11" font-weight="700" fill="#a02a38">money never crosses</text>
+    </svg>
+    <figcaption><b>Two things go out, one thing comes back.</b> We ask the provider to start a round for a player, and they send back a signed score. Money stays entirely on our side of the dashed line, in the system that already handles it today.</figcaption>
+  </figure>
+
+  <h3>What this boundary buys us</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Because the provider never touches money&hellip;</th></tr></thead>
+    <tbody>
+      <tr><td>There is no wallet interface to host for them, and no provider-initiated debits or credits</td></tr>
+      <tr><td>No third party can move a customer balance, under any circumstances</td></tr>
+      <tr><td>Our financial reporting, reconciliation and audit trail are completely untouched</td></tr>
+      <tr><td>A provider outage can delay a contest, but it cannot corrupt money</td></tr>
+      <tr><td>Switching provider, or running several at once, has no effect on the money layer</td></tr>
+      <tr><td>The regulatory position is unchanged: entry fee in, ranked by skill, fixed prize by finishing position</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal bad">
+    <div class="t">A hard rule</div>
+    <p>Any provider who requires access to player balances, or who wants to take bets and pay winnings directly, is <b>rejected on that basis alone</b>. It is not a negotiation point. It is the difference between a contained integration and rebuilding our financial controls around a third party.</p>
+  </div>
+</section>
+
+<!-- ============ 3. VOCABULARY ============ -->
+<section id="words">
+  <div class="sec-h"><div class="sec-n">3</div><h2>The words, fixed</h2></div>
+  <p class="sec-sub">Different providers use the same words to mean different things, so these definitions are fixed for the whole project.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:150px">Term</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><b>Provider</b></td><td>The external company supplying games through an API</td></tr>
+      <tr><td><b>Game</b></td><td>One title from that provider, for example "Chess Puzzles" or "Trivia Blitz"</td></tr>
+      <tr><td><b>Round</b></td><td>One player playing once, producing <b>one score</b>. The atomic unit of everything</td></tr>
+      <tr><td><b>Match</b></td><td>A head-to-head round with two players at the same time, as in chess</td></tr>
+      <tr><td><b>Contest</b></td><td>A ChartVolt competition or challenge. Our existing concept, unchanged</td></tr>
+      <tr><td><b>Competition</b></td><td><b>Two or more</b> players ranked against each other, winners sharing the pool. Never one</td></tr>
+      <tr><td><b>Challenge</b></td><td><b>Exactly two</b> players. One challenges the other; the winner takes the pot</td></tr>
+      <tr><td><b>Independent play</b></td><td>A game where each player plays their <b>own round</b> rather than needing a live opponent. Says nothing about contest size &mdash; trading works this way. See section 4</td></tr>
+      <tr><td><b>Raw score</b></td><td>The number the provider reports, in the game's own units</td></tr>
+      <tr><td><b>Points</b></td><td>Our cross-game currency, derived from finishing position, 0 to 1000</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal plain">
+    <div class="t">The one to remember</div>
+    <p><b>A round is one player, one play, one score.</b> Competitions, challenges, leaderboards and prizes are all built by ChartVolt out of rounds. The provider only ever supplies the round.</p>
+  </div>
+</section>
+
+<!-- ============ 4. FAMILIES ============ -->
+<section id="families">
+  <div class="sec-h"><div class="sec-n">4</div><h2>Two kinds of game, and why it decides everything</h2></div>
+  <p class="sec-sub">This distinction determines which games can be used for competitions and which can only be used for challenges. It has nothing to do with how many people are competing.</p>
+
+  <div class="cal warn">
+    <div class="t">Read this before the diagram: &ldquo;independent play&rdquo; does not mean &ldquo;playing alone&rdquo;</div>
+    <p><b>Independent play describes the gameplay, not the contest.</b> It means each player plays their own round and gets their own score, rather than needing a live opponent in the same session. Every one of those players is still ranked against every other player, and they are all still competing for the same pot.</p>
+    <p><b>Trading is itself an independent-play game.</b> Every trader in a ChartVolt competition trades their own account, alone, at their own pace &mdash; and they are all ranked against each other for a share of one prize pool. Nobody would call a trading competition a solo activity, and the same reasoning applies to a trivia or chess-puzzle competition.</p>
+    <p style="margin-bottom:0"><b>There is no single-player paid format anywhere in this plan, and none is proposed.</b></p>
+  </div>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:150px">Format</th><th style="width:230px">Players</th><th>Prize</th><th style="width:210px">Existing equivalent</th></tr></thead>
+    <tbody>
+      <tr><td><b>Competition</b></td><td><b>Two or more.</b> Many is the normal case. <code>minParticipants</code> defaults to&nbsp;2, and below it the contest is auto-cancelled and everyone refunded</td><td>Winners share the pool by finishing position</td><td>A trading competition, exactly</td></tr>
+      <tr><td><b>Challenge</b></td><td><b>Exactly two.</b> One player challenges another</td><td>Winner takes the pot, less the platform fee</td><td>A trading challenge, exactly</td></tr>
+      <tr><td>Practice</td><td>One</td><td><b>None. Free, unranked, no prize</b></td><td>Demo trading</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>The minimum-players rule is <b>reused, not built</b>. <code>Competition.minParticipants</code> is already on the model, and <code>competition.actions.ts</code> already auto-cancels and refunds every entry fee when a competition does not fill. A provider-game competition inherits all of it, because it is the same model and the same code path.</p>
+
+  <figure>
+    <div class="fig-t">Diagram 2 &mdash; the two families</div>
+    <svg viewBox="0 0 920 250" role="img" aria-label="Independent-play games versus head-to-head games">
+      <rect x="8" y="10" width="440" height="230" rx="10" fill="#eaf6ef" stroke="#b6ddc6"/>
+      <text x="30" y="40" font-size="13.5" font-weight="700" fill="#1a6e49">FAMILY A &mdash; INDEPENDENT PLAY</text>
+      <text x="30" y="62" font-size="12" fill="#3a4a5a">Each player plays their own round. All are ranked together.</text>
+      <text x="30" y="82" font-size="12" fill="#6b7d8f">Trivia . puzzles . word games . chess puzzles . time attacks</text>
+
+      <rect x="30" y="98" width="196" height="60" rx="7" fill="#fff" stroke="#b6ddc6"/>
+      <text x="128" y="122" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1a6e49">Competition</text>
+      <text x="128" y="142" text-anchor="middle" font-size="11.5" fill="#3a4a5a">Easy &mdash; works today</text>
+
+      <rect x="238" y="98" width="196" height="60" rx="7" fill="#fff" stroke="#b6ddc6"/>
+      <text x="336" y="122" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1a6e49">Challenge</text>
+      <text x="336" y="142" text-anchor="middle" font-size="11.5" fill="#3a4a5a">Easy &mdash; compare two scores</text>
+
+      <rect x="30" y="172" width="404" height="48" rx="7" fill="#d9efe2" stroke="#b6ddc6"/>
+      <text x="232" y="201" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1a6e49">Launch with these</text>
+
+      <rect x="472" y="10" width="440" height="230" rx="10" fill="#fdf5e3" stroke="#ecd9a6"/>
+      <text x="494" y="40" font-size="13.5" font-weight="700" fill="#8a6209">FAMILY B &mdash; HEAD-TO-HEAD</text>
+      <text x="494" y="62" font-size="12" fill="#3a4a5a">The game needs an opponent to exist at all.</text>
+      <text x="494" y="82" font-size="12" fill="#6b7d8f">Full chess . checkers . backgammon</text>
+
+      <rect x="494" y="98" width="196" height="60" rx="7" fill="#fff" stroke="#ecd9a6"/>
+      <text x="592" y="122" text-anchor="middle" font-size="12.5" font-weight="700" fill="#8a6209">Challenge</text>
+      <text x="592" y="142" text-anchor="middle" font-size="11.5" fill="#3a4a5a">Easy &mdash; it is the game</text>
+
+      <rect x="702" y="98" width="196" height="60" rx="7" fill="#fff" stroke="#f0c3c9"/>
+      <text x="800" y="122" text-anchor="middle" font-size="12.5" font-weight="700" fill="#a02a38">Competition</text>
+      <text x="800" y="142" text-anchor="middle" font-size="11.5" fill="#a02a38">Needs a bracket engine</text>
+
+      <rect x="494" y="172" width="404" height="48" rx="7" fill="#f6e8c6" stroke="#ecd9a6"/>
+      <text x="696" y="201" text-anchor="middle" font-size="12.5" font-weight="700" fill="#8a6209">Add later, challenges first</text>
+    </svg>
+    <figcaption><b>An independent-play game supports both formats with the machinery we already have.</b> A head-to-head game gives us challenges immediately, but competitions would need a tournament bracket &mdash; pairings, byes, drop-outs and abandonments, all with real money in the pot. That is a project of its own.</figcaption>
+  </figure>
+
+  <div class="cal good">
+    <div class="t">The practical answer for chess</div>
+    <p>If chess is wanted at launch, use <b>chess puzzles</b> rather than full chess. Puzzles are independent-play, so they rank cleanly in a competition and need no bracket engine. It is recognisably chess, and it works with what exists. Full head-to-head chess can follow later as challenges.</p>
+  </div>
+</section>
+
+<!-- ============ 5. FLOW ============ -->
+<section id="flow">
+  <div class="sec-h"><div class="sec-n">5</div><h2>How a contest works, start to finish</h2></div>
+  <p class="sec-sub">Only the middle of this is new. The beginning and the end already exist and run live today.</p>
+
+  <figure>
+    <div class="fig-t">Diagram 3 &mdash; the contest journey</div>
+    <svg viewBox="0 0 920 290" role="img" aria-label="The eight steps of a contest">
+      <rect x="8" y="8" width="904" height="80" rx="9" fill="#ecf3fa" stroke="#c2d8ec"/>
+      <text x="24" y="30" font-size="10.5" font-weight="700" fill="#1c5788" letter-spacing="1.4">ALREADY BUILT</text>
+      <rect x="24" y="38" width="208" height="40" rx="6" fill="#fff" stroke="#c2d8ec"/>
+      <text x="128" y="63" text-anchor="middle" font-size="12" fill="#143a5c">1. Admin creates contest</text>
+      <line x1="238" y1="58" x2="256" y2="58" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <rect x="262" y="38" width="208" height="40" rx="6" fill="#fff" stroke="#c2d8ec"/>
+      <text x="366" y="63" text-anchor="middle" font-size="12" fill="#143a5c">2. Player pays entry fee</text>
+      <line x1="476" y1="58" x2="494" y2="58" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <rect x="500" y="38" width="208" height="40" rx="6" fill="#fff" stroke="#c2d8ec"/>
+      <text x="604" y="63" text-anchor="middle" font-size="12" fill="#143a5c">3. Fee joins the prize pool</text>
+      <line x1="714" y1="58" x2="732" y2="58" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <rect x="738" y="38" width="158" height="40" rx="6" fill="#fff" stroke="#c2d8ec"/>
+      <text x="817" y="63" text-anchor="middle" font-size="12" fill="#143a5c">4. Player clicks Play</text>
+
+      <rect x="8" y="100" width="904" height="80" rx="9" fill="#fdf8ec" stroke="#ecd9a6"/>
+      <text x="24" y="122" font-size="10.5" font-weight="700" fill="#8a6209" letter-spacing="1.4">THE NEW WORK</text>
+      <rect x="24" y="130" width="270" height="40" rx="6" fill="#fff" stroke="#ecd9a6"/>
+      <text x="159" y="155" text-anchor="middle" font-size="12" fill="#143a5c">5. We ask the provider for a round</text>
+      <line x1="300" y1="150" x2="318" y2="150" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <rect x="324" y="130" width="270" height="40" rx="6" fill="#fff" stroke="#ecd9a6"/>
+      <text x="459" y="155" text-anchor="middle" font-size="12" fill="#143a5c">6. Player plays inside our page</text>
+      <line x1="600" y1="150" x2="618" y2="150" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <rect x="624" y="130" width="272" height="40" rx="6" fill="#fff" stroke="#ecd9a6"/>
+      <text x="760" y="155" text-anchor="middle" font-size="12" fill="#143a5c">7. Provider sends a signed score</text>
+
+      <rect x="8" y="192" width="904" height="88" rx="9" fill="#eaf6ef" stroke="#b6ddc6"/>
+      <text x="24" y="214" font-size="10.5" font-weight="700" fill="#1a6e49" letter-spacing="1.4">ALREADY BUILT</text>
+      <rect x="24" y="222" width="208" height="46" rx="6" fill="#fff" stroke="#b6ddc6"/>
+      <text x="128" y="242" text-anchor="middle" font-size="12" fill="#143a5c">8. Rank the players</text>
+      <text x="128" y="259" text-anchor="middle" font-size="11" fill="#6b7d8f">by score</text>
+      <line x1="238" y1="245" x2="256" y2="245" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <rect x="262" y="222" width="208" height="46" rx="6" fill="#fff" stroke="#b6ddc6"/>
+      <text x="366" y="242" text-anchor="middle" font-size="12" fill="#143a5c">9. Pay the prizes</text>
+      <text x="366" y="259" text-anchor="middle" font-size="11" fill="#6b7d8f">from the pool</text>
+      <line x1="476" y1="245" x2="494" y2="245" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <rect x="500" y="222" width="396" height="46" rx="6" fill="#fff" stroke="#b6ddc6"/>
+      <text x="698" y="242" text-anchor="middle" font-size="12" fill="#143a5c">10. Points, levels, badges, milestones, notifications</text>
+      <text x="698" y="259" text-anchor="middle" font-size="11" fill="#6b7d8f">exactly as today</text>
+    </svg>
+    <figcaption><b>Seven of the ten steps already exist.</b> The blue and green bands are live code running on chartvolt.com right now. Only the gold band &mdash; asking for a round, hosting the game and receiving the score &mdash; is new.</figcaption>
+  </figure>
+</section>
+
+<!-- ============ 6. CONTRACT ============ -->
+<section id="contract">
+  <div class="sec-h"><div class="sec-n">6</div><h2>What we require from a provider</h2></div>
+  <p class="sec-sub">Three calls out, one call in. The narrowness is deliberate &mdash; it is what makes a second provider cheap to add and any provider cheap to drop.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:44px">Dir</th><th style="width:280px">Call</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><b>out</b></td><td><code>GET /games</code></td><td>List the games, with what each one can and cannot do</td></tr>
+      <tr><td><b>out</b></td><td><code>POST /rounds</code></td><td>Start a round for one player, and get back a link to play it</td></tr>
+      <tr><td><b>out</b></td><td><code>GET /rounds/{id}</code></td><td>Ask what happened, if the result never arrived</td></tr>
+      <tr><td><b>in</b></td><td><code>POST /events</code></td><td>The provider tells us the score, signed, server to server</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>The twelve things that are not negotiable</h3>
+  <p>A provider failing any one of these cannot be used for contests where real money is at stake.</p>
+
+  <div class="chk">
+    <div><span class="box"></span><span>Results arrive <b>server to server</b>, never through the player's browser</span></div>
+    <div><span class="box"></span><span>Results are <b>cryptographically signed</b>, with a timestamp so old ones can be rejected</span></div>
+    <div><span class="box"></span><span>We can <b>ask for a result</b> at any time, in case the message to us is lost</span></div>
+    <div><span class="box"></span><span>Repeated messages are <b>safely ignored</b> &mdash; one round can only ever produce one score</span></div>
+    <div><span class="box"></span><span>Every round <b>always finishes</b> in a known state. A round can never simply hang</span></div>
+    <div><span class="box"></span><span>All players in one competition can be given <b>identical content</b> from a seed we supply</span></div>
+    <div><span class="box"></span><span>There is a <b>test environment</b>, separate from the live one</span></div>
+    <div><span class="box"></span><span>They handle <b>no money</b> of any kind</span></div>
+    <div><span class="box"></span><span>Each game states whether a <b>higher or lower score wins</b></span></div>
+    <div><span class="box"></span><span>Game identifiers are <b>stable and never reused</b></span></div>
+    <div><span class="box"></span><span>There is a written <b>service level agreement</b></span></div>
+    <div><span class="box"></span><span>Each round has a <b>replay or audit link</b>, so disputes can be answered</span></div>
+  </div>
+
+  <div class="cal info">
+    <div class="t">One detail that pays for itself</div>
+    <p>Each game must describe its own settings in a machine-readable form. If it does, the admin panel can <b>build the settings form automatically</b>, which means a new title from the provider goes live by ticking a box rather than by writing and deploying code. This is the difference between an integration that scales and one that needs a developer for every new game.</p>
+  </div>
+</section>
+
+<!-- ============ 7. ARCHITECTURE ============ -->
+<section id="arch">
+  <div class="sec-h"><div class="sec-n">7</div><h2>How it plugs in</h2></div>
+  <p class="sec-sub">The contest engine never learns that a provider exists. It only knows that players have scores.</p>
+
+  <figure>
+    <div class="fig-t">Diagram 4 &mdash; the layers</div>
+    <svg viewBox="0 0 920 400" role="img" aria-label="Layered architecture from user interface down to the provider">
+      <rect x="90" y="8" width="740" height="46" rx="8" fill="#fff" stroke="#dde4ec"/>
+      <text x="460" y="30" text-anchor="middle" font-size="12.5" font-weight="700" fill="#143a5c">USER INTERFACE</text>
+      <text x="460" y="46" text-anchor="middle" font-size="11" fill="#6b7d8f">browse . lobby . play . results</text>
+      <line x1="460" y1="56" x2="460" y2="70" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+
+      <rect x="90" y="74" width="740" height="58" rx="8" fill="#eaf6ef" stroke="#b6ddc6"/>
+      <text x="460" y="98" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1a6e49">SHARED CONTEST ENGINE &mdash; exists today, unchanged</text>
+      <text x="460" y="118" text-anchor="middle" font-size="11.5" fill="#3a4a5a">entry fee . prize pool . lock . rank . pay . fee . refund &nbsp;&mdash;&nbsp; knows only that players have scores</text>
+      <line x1="460" y1="134" x2="460" y2="148" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+
+      <rect x="240" y="152" width="440" height="42" rx="8" fill="#fdf8ec" stroke="#ecd9a6"/>
+      <text x="460" y="178" text-anchor="middle" font-size="12.5" font-weight="700" fill="#8a6209">GAME REGISTRY &mdash; which kind of game is this?</text>
+
+      <line x1="330" y1="196" x2="240" y2="222" stroke="#6b7d8f" stroke-width="1.4" marker-end="url(#ar)"/>
+      <line x1="460" y1="196" x2="460" y2="222" stroke="#6b7d8f" stroke-width="1.4" marker-end="url(#ar)"/>
+      <line x1="590" y1="196" x2="690" y2="222" stroke="#6b7d8f" stroke-width="1.4" marker-end="url(#ar)"/>
+
+      <rect x="120" y="228" width="212" height="52" rx="8" fill="#fff" stroke="#dde4ec"/>
+      <text x="226" y="250" text-anchor="middle" font-size="12" font-weight="700" fill="#143a5c">TRADING</text>
+      <text x="226" y="268" text-anchor="middle" font-size="11" fill="#6b7d8f">exists today</text>
+
+      <rect x="354" y="228" width="212" height="52" rx="8" fill="#fff" stroke="#dde4ec"/>
+      <text x="460" y="250" text-anchor="middle" font-size="12" font-weight="700" fill="#143a5c">IN-HOUSE GAME</text>
+      <text x="460" y="268" text-anchor="middle" font-size="11" fill="#6b7d8f">optional</text>
+
+      <rect x="588" y="228" width="212" height="52" rx="8" fill="#ecf3fa" stroke="#1c5788" stroke-width="1.6"/>
+      <text x="694" y="250" text-anchor="middle" font-size="12" font-weight="700" fill="#1c5788">PROVIDER MODULE</text>
+      <text x="694" y="268" text-anchor="middle" font-size="11" fill="#1c5788">new &mdash; one for all providers</text>
+
+      <line x1="694" y1="282" x2="694" y2="298" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <rect x="560" y="302" width="268" height="38" rx="8" fill="#fdf8ec" stroke="#ecd9a6"/>
+      <text x="694" y="326" text-anchor="middle" font-size="12" font-weight="700" fill="#8a6209">PROVIDER REGISTRY &mdash; which company?</text>
+
+      <line x1="640" y1="342" x2="612" y2="358" stroke="#6b7d8f" stroke-width="1.4" marker-end="url(#ar)"/>
+      <line x1="748" y1="342" x2="776" y2="358" stroke="#6b7d8f" stroke-width="1.4" marker-end="url(#ar)"/>
+      <rect x="520" y="362" width="176" height="34" rx="7" fill="#fff" stroke="#dde4ec"/>
+      <text x="608" y="384" text-anchor="middle" font-size="11.5" fill="#143a5c">Provider A adapter</text>
+      <rect x="708" y="362" width="176" height="34" rx="7" fill="#fff" stroke="#dde4ec"/>
+      <text x="796" y="384" text-anchor="middle" font-size="11.5" fill="#143a5c">Provider B adapter</text>
+    </svg>
+    <figcaption><b>One provider module serves every provider game.</b> Which company and which title are stored as data on the contest, not written into code. Adding a new title from an existing provider needs no release at all &mdash; and adding a second provider means one new adapter and one registry entry, nothing more.</figcaption>
+  </figure>
+
+  <div class="cal plain">
+    <div class="t">The rule that protects the whole design</div>
+    <p><b>Provider concepts must never leak past the adapter.</b> If the provider's identifiers, formats or vocabulary start appearing in the prize logic, the leaderboards or the admin reports, then switching or adding a provider stops being a swap and becomes a rewrite. The test is simple: adding a second provider should touch one folder and one registry entry, and nothing else.</p>
+  </div>
+
+  <h3>Where a provider game appears to players</h3>
+  <p>Since this plan was drafted, the platform direction has firmed up: <b>players will browse a catalogue of games</b>, each with its own page, rather than a single list of competitions. That has a direct and useful consequence for provider games.</p>
+
+  <div class="cal good">
+    <div class="t">A provider title becomes a catalogue entry, and nothing more</div>
+    <p>Each game pulled from the provider's catalogue is published as a <b>catalogue entry</b> &mdash; the same kind of record that an in-house game uses. It gets its own page with a description, rules, artwork and its own league table, and it can be featured, reordered, hidden or marked coming-soon from the admin panel without a release. To a player, a provider game and an in-house game are indistinguishable, which is exactly the intended outcome. The provider is a supplier, not a brand on our site.</p>
+  </div>
+
+  <div class="cal info">
+    <div class="t">What this asks of the provider</div>
+    <p>A game page needs more than a name. The provider must supply <b>page-quality content</b>: a real description, a short rules summary, how-to-play text, and artwork at usable sizes &mdash; not just a thumbnail. This is cheap for them to provide and expensive for us to write on their behalf for every title, so it belongs in the contract from the start. It is listed in the requirements document sent to providers.</p>
+  </div>
+
+  <div class="cal bad">
+    <div class="t">One commercial limit that follows automatically</div>
+    <p>The platform rule is that <b>nothing sold may improve a score or ranking in a paid contest</b>. So no provider mechanic that sells advantage &mdash; extra time, hints, retries, continues, or paid unlocks that affect results &mdash; may be enabled inside a ranked contest, whoever takes the payment. If a provider's game depends on such mechanics for its economics, it is the wrong game for this platform. Ask early.</p>
+  </div>
+</section>
+
+<!-- ============ 8. ROUND ============ -->
+<section id="round">
+  <div class="sec-h"><div class="sec-n">8</div><h2>What happens when a player presses Play</h2></div>
+
+  <figure>
+    <div class="fig-t">Diagram 5 &mdash; the round lifecycle</div>
+    <svg viewBox="0 0 920 400" role="img" aria-label="Sequence of a single round">
+      <text x="110" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#143a5c">PLAYER</text>
+      <text x="440" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#143a5c">CHARTVOLT</text>
+      <text x="800" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#143a5c">PROVIDER</text>
+      <line x1="110" y1="30" x2="110" y2="384" stroke="#dde4ec" stroke-width="1.5"/>
+      <line x1="440" y1="30" x2="440" y2="384" stroke="#dde4ec" stroke-width="1.5"/>
+      <line x1="800" y1="30" x2="800" y2="384" stroke="#dde4ec" stroke-width="1.5"/>
+
+      <line x1="112" y1="52" x2="436" y2="52" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <text x="274" y="46" text-anchor="middle" font-size="11" fill="#3a4a5a">clicks Play</text>
+
+      <rect x="330" y="64" width="290" height="52" rx="6" fill="#fdf8ec" stroke="#ecd9a6"/>
+      <text x="475" y="84" text-anchor="middle" font-size="11" fill="#8a6209">entered? contest live? attempts left?</text>
+      <text x="475" y="102" text-anchor="middle" font-size="11" fill="#8a6209">create the round record</text>
+
+      <line x1="442" y1="136" x2="796" y2="136" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <text x="619" y="130" text-anchor="middle" font-size="11" fill="#3a4a5a">start a round &mdash; player, settings, seed</text>
+      <line x1="796" y1="164" x2="444" y2="164" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <text x="619" y="158" text-anchor="middle" font-size="11" fill="#3a4a5a">link to play, expires in minutes</text>
+
+      <line x1="436" y1="192" x2="114" y2="192" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <text x="274" y="186" text-anchor="middle" font-size="11" fill="#3a4a5a">our page, with the game inside it</text>
+
+      <rect x="150" y="210" width="700" height="42" rx="6" fill="#ecf3fa" stroke="#c2d8ec"/>
+      <text x="500" y="236" text-anchor="middle" font-size="12" font-weight="700" fill="#1c5788">the player plays the game</text>
+
+      <line x1="796" y1="278" x2="444" y2="278" stroke="#1a6e49" stroke-width="2" marker-end="url(#arg)"/>
+      <text x="619" y="272" text-anchor="middle" font-size="11" font-weight="700" fill="#1a6e49">SIGNED SCORE &mdash; server to server</text>
+
+      <rect x="300" y="290" width="290" height="66" rx="6" fill="#eaf6ef" stroke="#b6ddc6"/>
+      <text x="445" y="310" text-anchor="middle" font-size="11" fill="#1a6e49">check the signature</text>
+      <text x="445" y="327" text-anchor="middle" font-size="11" fill="#1a6e49">ignore it if we have seen it before</text>
+      <text x="445" y="344" text-anchor="middle" font-size="11" fill="#1a6e49">record the score, update the board</text>
+
+      <line x1="436" y1="376" x2="114" y2="376" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <text x="274" y="370" text-anchor="middle" font-size="11" fill="#3a4a5a">your score, your position</text>
+    </svg>
+    <figcaption><b>Notice what the score does not do: it never passes through the player's browser.</b> The game may tell our page that it has finished so we can refresh the screen, but that message is only a hint. The score that decides money comes directly from the provider's servers to ours, signed.</figcaption>
+  </figure>
+</section>
+
+<!-- ============ 9. FAIRNESS ============ -->
+<section id="fair">
+  <div class="sec-h"><div class="sec-n">9</div><h2>Fairness &mdash; everyone faces the same challenge</h2></div>
+  <p class="sec-sub">Two players cannot be ranked against each other if they answered different questions of unknown difficulty.</p>
+
+  <figure>
+    <div class="fig-t">Diagram 6 &mdash; identical content from one seed</div>
+    <svg viewBox="0 0 920 230" role="img" aria-label="One seed produces identical content for every player">
+      <rect x="20" y="76" width="200" height="72" rx="9" fill="#143a5c"/>
+      <text x="120" y="104" text-anchor="middle" font-size="12.5" font-weight="700" fill="#f0dda6">ONE SEED</text>
+      <text x="120" y="124" text-anchor="middle" font-size="11" fill="#cfdcea">generated per contest</text>
+      <text x="120" y="140" text-anchor="middle" font-size="11" fill="#cfdcea">never shown to players</text>
+
+      <line x1="226" y1="112" x2="300" y2="52" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <line x1="226" y1="112" x2="300" y2="112" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <line x1="226" y1="112" x2="300" y2="172" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+
+      <rect x="306" y="24" width="286" height="56" rx="8" fill="#fff" stroke="#dde4ec"/>
+      <text x="330" y="48" font-size="12" fill="#143a5c">Player A</text>
+      <text x="330" y="68" font-size="11" fill="#6b7d8f">same 10 questions</text>
+      <rect x="306" y="84" width="286" height="56" rx="8" fill="#fff" stroke="#dde4ec"/>
+      <text x="330" y="108" font-size="12" fill="#143a5c">Player B</text>
+      <text x="330" y="128" font-size="11" fill="#6b7d8f">same 10 questions</text>
+      <rect x="306" y="144" width="286" height="56" rx="8" fill="#fff" stroke="#dde4ec"/>
+      <text x="330" y="168" font-size="12" fill="#143a5c">Player C</text>
+      <text x="330" y="188" font-size="11" fill="#6b7d8f">same 10 questions</text>
+
+      <text x="560" y="48" text-anchor="end" font-size="10.5" fill="#8a6209" font-family="Consolas, monospace">shuffled order</text>
+      <text x="560" y="108" text-anchor="end" font-size="10.5" fill="#8a6209" font-family="Consolas, monospace">shuffled order</text>
+      <text x="560" y="188" text-anchor="end" font-size="10.5" fill="#8a6209" font-family="Consolas, monospace">shuffled order</text>
+
+      <line x1="598" y1="52" x2="672" y2="106" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <line x1="598" y1="112" x2="672" y2="112" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <line x1="598" y1="172" x2="672" y2="118" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+
+      <rect x="678" y="76" width="222" height="72" rx="9" fill="#eaf6ef" stroke="#b6ddc6"/>
+      <text x="789" y="104" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1a6e49">A FAIR RANKING</text>
+      <text x="789" y="126" text-anchor="middle" font-size="11" fill="#3a4a5a">the score difference is skill,</text>
+      <text x="789" y="142" text-anchor="middle" font-size="11" fill="#3a4a5a">not luck of the draw</text>
+    </svg>
+    <figcaption><b>Same content, shuffled presentation.</b> Everyone faces the identical challenge, so the ranking measures skill. Shuffling the order stops players from simply telling each other that the answer is B. The seed itself is never sent to the browser and cannot be guessed.</figcaption>
+  </figure>
+
+  <div class="cal bad">
+    <div class="t">The exploit this closes, and the one it creates</div>
+    <p>Seeding makes the contest fair, but it also means a player who sees the content early has an enormous advantage. So an attempt is <b>used up the moment the round is created</b>, not when it is finished. Without that, a player could open a round, read the questions, quit, look up the answers, and start again. Consuming the attempt at the start removes the value of doing so entirely.</p>
+  </div>
+</section>
+
+<!-- ============ 10. TRUST ============ -->
+<section id="trust">
+  <div class="sec-h"><div class="sec-n">10</div><h2>Trusting a number that decides real money</h2></div>
+  <p class="sec-sub">A score arrives over the internet from a third party and determines who gets paid. Every one goes through the same gate.</p>
+
+  <figure>
+    <div class="fig-t">Diagram 7 &mdash; the verification gate</div>
+    <svg viewBox="0 0 920 320" role="img" aria-label="Eleven checks every incoming score must pass">
+      <rect x="300" y="6" width="320" height="34" rx="7" fill="#143a5c"/>
+      <text x="460" y="28" text-anchor="middle" font-size="12" font-weight="700" fill="#f0dda6">A SCORE ARRIVES</text>
+      <line x1="460" y1="42" x2="460" y2="54" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+
+      <rect x="230" y="58" width="460" height="28" rx="6" fill="#fdf8ec" stroke="#ecd9a6"/>
+      <text x="460" y="77" text-anchor="middle" font-size="11.5" fill="#8a6209">store the raw message first &mdash; evidence before logic</text>
+      <rect x="230" y="90" width="460" height="28" rx="6" fill="#fff" stroke="#dde4ec"/>
+      <text x="460" y="109" text-anchor="middle" font-size="11.5" fill="#3a4a5a">is the provider known and switched on?</text>
+      <rect x="230" y="122" width="460" height="28" rx="6" fill="#fff" stroke="#dde4ec"/>
+      <text x="460" y="141" text-anchor="middle" font-size="11.5" fill="#3a4a5a">is the timestamp fresh &mdash; under five minutes old?</text>
+      <rect x="230" y="154" width="460" height="28" rx="6" fill="#fff" stroke="#dde4ec"/>
+      <text x="460" y="173" text-anchor="middle" font-size="11.5" fill="#3a4a5a">does the signature match, byte for byte?</text>
+      <rect x="230" y="186" width="460" height="28" rx="6" fill="#fff" stroke="#dde4ec"/>
+      <text x="460" y="205" text-anchor="middle" font-size="11.5" fill="#3a4a5a">have we already seen this exact message?</text>
+      <rect x="230" y="218" width="460" height="28" rx="6" fill="#fff" stroke="#dde4ec"/>
+      <text x="460" y="237" text-anchor="middle" font-size="11.5" fill="#3a4a5a">does the round exist, and can it still accept a score?</text>
+      <rect x="230" y="250" width="460" height="28" rx="6" fill="#fff" stroke="#dde4ec"/>
+      <text x="460" y="269" text-anchor="middle" font-size="11.5" fill="#3a4a5a">is the score inside the range this game can produce?</text>
+
+      <line x1="460" y1="282" x2="460" y2="292" stroke="#1a6e49" stroke-width="1.6" marker-end="url(#arg)"/>
+      <rect x="300" y="294" width="320" height="26" rx="6" fill="#eaf6ef" stroke="#b6ddc6"/>
+      <text x="460" y="312" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1a6e49">accepted &mdash; recorded and ranked</text>
+
+      <line x1="694" y1="72" x2="810" y2="72" stroke="#a02a38" stroke-width="1.4" marker-end="url(#arr)"/>
+      <line x1="694" y1="136" x2="810" y2="136" stroke="#a02a38" stroke-width="1.4" marker-end="url(#arr)"/>
+      <line x1="694" y1="200" x2="810" y2="200" stroke="#a02a38" stroke-width="1.4" marker-end="url(#arr)"/>
+      <line x1="694" y1="264" x2="810" y2="264" stroke="#a02a38" stroke-width="1.4" marker-end="url(#arr)"/>
+      <rect x="814" y="120" width="98" height="80" rx="8" fill="#fdedef" stroke="#f0c3c9"/>
+      <text x="863" y="150" text-anchor="middle" font-size="11.5" font-weight="700" fill="#a02a38">REJECTED</text>
+      <text x="863" y="168" text-anchor="middle" font-size="10.5" fill="#a02a38">and an alert</text>
+      <text x="863" y="182" text-anchor="middle" font-size="10.5" fill="#a02a38">is raised</text>
+    </svg>
+    <figcaption><b>The raw message is stored before any of the checks run.</b> That single habit turns a future dispute from an argument into a lookup: we can always show exactly what the provider sent, and prove it was genuinely signed by them.</figcaption>
+  </figure>
+
+  <div class="grid g2">
+    <div class="card">
+      <h4>What we accept from the browser</h4>
+      <ul style="margin-bottom:0">
+        <li>"The game finished, refresh the screen"</li>
+        <li>"Close the window"</li>
+        <li>"Resize to this height"</li>
+      </ul>
+    </div>
+    <div class="card" style="border-color:#f0c3c9;background:#fdedef">
+      <h4 style="color:#a02a38">What we never accept from the browser</h4>
+      <ul style="margin-bottom:0">
+        <li><b>"My score was 9,800"</b></li>
+        <li><b>"I completed the round"</b></li>
+        <li><b>Anything that affects money</b></li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>A lesson from a defect found in our own code</h3>
+
+  <p>On 1 September 2026, while re-reading the contest entry code for the prerequisite fixes, we found a set of internal testing endpoints that could add credits to any wallet &mdash; and the only thing protecting them was a label the caller attached to their own request. No secret, no password. It was fixed and deployed the same day, and it is mentioned here rather than buried because <b>the same three mistakes are available in the callback described above</b>, where the stake is a score that decides prize money.</p>
+
+  <div class="grid g3">
+    <div class="card" style="border-color:#f0c3c9;background:#fdedef">
+      <h4 style="color:#a02a38">A lock that opens when unconfigured</h4>
+      <p style="margin-bottom:0">The check accepted the request whenever the secret had not been set. Missing configuration became permission. <b>A security check must refuse when it does not know what to compare against</b> &mdash; never wave the request through.</p>
+    </div>
+    <div class="card" style="border-color:#f0c3c9;background:#fdedef">
+      <h4 style="color:#a02a38">A lock never fitted to the door</h4>
+      <p style="margin-bottom:0">A correct check already existed. Nineteen of twenty endpoints simply did not call it. <b>Test the endpoint, not the checking function</b> &mdash; a passing test on the helper proves nothing about the routes.</p>
+    </div>
+    <div class="card" style="border-color:#f0c3c9;background:#fdedef">
+      <h4 style="color:#a02a38">A convenient bypass left in</h4>
+      <p style="margin-bottom:0">A shortcut added to make local development easy was still active in production. <b>Any development bypass must be tied to the environment</b> and proved inactive outside it.</p>
+    </div>
+  </div>
+
+  <p style="margin-bottom:0">All three apply directly to the signature verification on the result callback. They are written into the acceptance criteria for the phase that builds it, and recorded as <b>R27</b> in the risk register.</p>
+</section>
+
+<!-- ============ 11. FAILURE ============ -->
+<section id="fail">
+  <div class="sec-h"><div class="sec-n">11</div><h2>When the provider lets us down</h2></div>
+  <p class="sec-sub">The worst case is simple to state: a player played, the contest is over, and we do not know their score. Everyone else's prize money is stuck behind it.</p>
+
+  <figure>
+    <div class="fig-t">Diagram 8 &mdash; the four-stage safety net</div>
+    <svg viewBox="0 0 920 210" role="img" aria-label="Four stages of recovering a missing result">
+      <rect x="8" y="30" width="212" height="96" rx="9" fill="#eaf6ef" stroke="#b6ddc6"/>
+      <text x="114" y="56" text-anchor="middle" font-size="11" font-weight="700" fill="#1a6e49" letter-spacing="1.2">STAGE 1</text>
+      <text x="114" y="80" text-anchor="middle" font-size="12.5" font-weight="700" fill="#143a5c">They tell us</text>
+      <text x="114" y="102" text-anchor="middle" font-size="11" fill="#3a4a5a">the normal path</text>
+      <text x="114" y="146" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1a6e49">about 99% of rounds</text>
+      <line x1="226" y1="78" x2="244" y2="78" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+
+      <rect x="250" y="30" width="212" height="96" rx="9" fill="#ecf3fa" stroke="#c2d8ec"/>
+      <text x="356" y="56" text-anchor="middle" font-size="11" font-weight="700" fill="#1c5788" letter-spacing="1.2">STAGE 2</text>
+      <text x="356" y="80" text-anchor="middle" font-size="12.5" font-weight="700" fill="#143a5c">We ask them</text>
+      <text x="356" y="102" text-anchor="middle" font-size="11" fill="#3a4a5a">a job checks every minute</text>
+      <text x="356" y="146" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1c5788">catches lost messages</text>
+      <line x1="468" y1="78" x2="486" y2="78" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+
+      <rect x="492" y="30" width="212" height="96" rx="9" fill="#fdf8ec" stroke="#ecd9a6"/>
+      <text x="598" y="56" text-anchor="middle" font-size="11" font-weight="700" fill="#8a6209" letter-spacing="1.2">STAGE 3</text>
+      <text x="598" y="80" text-anchor="middle" font-size="12.5" font-weight="700" fill="#143a5c">One last sweep</text>
+      <text x="598" y="102" text-anchor="middle" font-size="11" fill="#3a4a5a">just before settling</text>
+      <text x="598" y="146" text-anchor="middle" font-size="11.5" font-weight="700" fill="#8a6209">the final chance</text>
+      <line x1="710" y1="78" x2="728" y2="78" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+
+      <rect x="734" y="30" width="178" height="96" rx="9" fill="#fdedef" stroke="#f0c3c9"/>
+      <text x="823" y="56" text-anchor="middle" font-size="11" font-weight="700" fill="#a02a38" letter-spacing="1.2">STAGE 4</text>
+      <text x="823" y="80" text-anchor="middle" font-size="12.5" font-weight="700" fill="#143a5c">Settle anyway</text>
+      <text x="823" y="102" text-anchor="middle" font-size="11" fill="#3a4a5a">by the agreed rule</text>
+      <text x="823" y="146" text-anchor="middle" font-size="11.5" font-weight="700" fill="#a02a38">and raise an alarm</text>
+
+      <rect x="8" y="170" width="904" height="34" rx="7" fill="#f7f9fc" stroke="#dde4ec"/>
+      <text x="460" y="192" text-anchor="middle" font-size="12" font-weight="700" fill="#143a5c">At no point does a contest sit stuck forever, and at no point does money move incorrectly</text>
+    </svg>
+    <figcaption><b>One straggler must never block everyone else's prizes.</b> By default an unrecoverable round scores zero and the contest settles on time, with that player told exactly what happened. For high-value contests the rule can instead be to refund that player and remove them from the ranking, or to hold settlement for a human decision.</figcaption>
+  </figure>
+
+  <h3>What players see when things go wrong</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="width:250px">What failed</th><th>What the player sees</th><th style="width:190px">Effect on money</th></tr></thead>
+    <tbody>
+      <tr><td>The game list will not refresh</td><td>Nothing &mdash; we serve the saved copy</td><td><span class="b ok">None</span></td></tr>
+      <tr><td>A round will not start</td><td>"Cannot start right now, try again"</td><td><span class="b ok">None &mdash; no attempt used</span></td></tr>
+      <tr><td>The score is slow to arrive</td><td>"Confirming your score"</td><td><span class="b ok">None</span></td></tr>
+      <tr><td>The score never arrives</td><td>Told directly what happened</td><td><span class="b med">Refund, on some settings</span></td></tr>
+      <tr><td>Provider goes down mid-contest</td><td>Contest paused, time added back</td><td><span class="b ok">None</span></td></tr>
+      <tr><td>Provider down before it starts</td><td>Contest cancelled</td><td><span class="b med">Everyone refunded</span></td></tr>
+      <tr><td>Provider ends the contract</td><td>Games disappear from the list</td><td><span class="b med">Everyone refunded</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal good">
+    <div class="t">The test of the design</div>
+    <p>In every row of that table, <b>money either does not move or moves back to the player</b>. There is no failure of the provider that can pay the wrong person, charge someone twice, or leave a pool unaccounted for. That is what the boundary in Diagram 1 is for.</p>
+  </div>
+</section>
+
+<!-- ============ 12. SCORING ============ -->
+<section id="scoring">
+  <div class="sec-h"><div class="sec-n">12</div><h2>From a score to points, badges and levels</h2></div>
+  <p class="sec-sub">The provider supplies exactly one number. Everything a player experiences as progression is built by us from finishing positions.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:170px">Layer</th><th style="width:170px">Scope</th><th>What it is for</th><th style="width:120px">Who makes it</th></tr></thead>
+    <tbody>
+      <tr><td><b>Raw score</b></td><td>One round of one game</td><td>Deciding who wins <b>this</b> contest</td><td>The provider</td></tr>
+      <tr><td><b>Points</b></td><td>Across every game</td><td>Cross-game leaderboards and progression</td><td>ChartVolt</td></tr>
+      <tr><td><b>Rating</b></td><td>Lifetime, per game</td><td>How good a player actually is</td><td>ChartVolt</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal info">
+    <div class="t">Why points come from position and not from score</div>
+    <p>A trivia score of 8,730 and a chess-puzzle time of 42 seconds cannot be compared. But <b>first place out of forty</b> means the same thing in any game. Because points are calculated from finishing position, field size and stake, a brand new game from the provider works with the points system on day one, with no changes at all.</p>
+  </div>
+
+  <h3>Badges come in three scopes</h3>
+  <div class="grid g3">
+    <div class="card">
+      <h4>Platform-wide</h4>
+      <p style="margin:0">First deposit, verified account, ten contests entered, first win. <b>Available to provider-game players immediately</b>, at no content cost.</p>
+    </div>
+    <div class="card">
+      <h4>Per game</h4>
+      <p style="margin:0">Score over 1,000 in Trivia Blitz, a chess puzzle solved in under thirty seconds. Configured in admin, not written in code.</p>
+    </div>
+    <div class="card">
+      <h4>Across games</h4>
+      <p style="margin:0">Won a contest in three different games. A genuinely new category that rewards breadth and only becomes possible now.</p>
+    </div>
+  </div>
+
+  <div class="cal bad">
+    <div class="t">Two rules that protect player progress</div>
+    <p><b>Never show a player badges for games they do not play</b> &mdash; a list of unreachable achievements discourages rather than motivates. And <b>never rename a badge's internal identifier</b>: those identifiers are the keys to saved progress, and renaming one silently deletes what players have earned. The visible label can change freely at any time.</p>
+  </div>
+</section>
+
+<!-- ============ 13. CHOOSING ============ -->
+<section id="choose">
+  <div class="sec-h"><div class="sec-n">13</div><h2>Choosing a provider</h2></div>
+  <p class="sec-sub">Ten questions eliminate most candidates in a single email, before anyone writes any code.</p>
+
+  <div class="kv">
+    <div><b>Eliminating questions</b><span>10</span><em>any "no" disqualifies</em></div>
+    <div><b>Scored criteria</b><span>7 areas</span><em>weighted, out of 250</em></div>
+    <div><b>Pass mark</b><span>200</span><em>below 120, reject</em></div>
+    <div><b>Pilot before launch</b><span>5 stages</span><em>sandbox to public</em></div>
+  </div>
+
+  <div class="cal plain">
+    <div class="t">Ask this one first</div>
+    <p><b>"Is the outcome determined by the player's decisions, or by a random number generator?"</b> Everything else follows from the answer. A provider can describe chance-based products as "games" throughout their marketing. If the catalogue mentions return-to-player percentages, house edge, volatility or free spins, the answer is chance &mdash; and the regulatory position of the entire platform changes.</p>
+  </div>
+
+  <h3>The commercial question that decides viability</h3>
+  <p>Provider pricing determines whether cheap contests can exist at all, and it is easy to discover this too late. Take a &euro;1 entry fee, twenty players, and a 10% platform fee &mdash; a &euro;20 pool and &euro;2 of revenue.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:200px">Price per round</th><th style="width:200px">One attempt each</th><th style="width:200px">Best of three</th><th>Outcome</th></tr></thead>
+    <tbody>
+      <tr><td>&euro;0.01</td><td>&euro;0.20</td><td>&euro;0.60</td><td><span class="b ok">Fine</span></td></tr>
+      <tr><td>&euro;0.05</td><td>&euro;1.00</td><td>&euro;3.00</td><td><span class="b high">Best of three loses money</span></td></tr>
+      <tr><td>&euro;0.10</td><td>&euro;2.00</td><td>&euro;6.00</td><td><span class="b crit">Break-even at best</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal bad">
+    <div class="t">Two conclusions to carry into the negotiation</div>
+    <p>Pricing per round above roughly two cents makes <b>low-entry contests unviable</b> &mdash; and those are exactly the contests that attract new players. And any per-round pricing must come with a <b>cap on attempts</b>, because unlimited replays at a cost per replay is an open-ended liability. A flat licence or a share of our fee is far preferable to paying per round.</p>
+  </div>
+</section>
+
+<!-- ============ 14. PHASES ============ -->
+<section id="phases">
+  <div class="sec-h"><div class="sec-n">14</div><h2>The plan</h2></div>
+  <p class="sec-sub">Each phase is independently testable, and nothing touching money goes live until everything around it is proven.</p>
+
+  <figure>
+    <div class="fig-t">Diagram 9 &mdash; the route to launch</div>
+    <svg viewBox="0 0 920 190" role="img" aria-label="Roadmap from prerequisites to public launch">
+      <line x1="40" y1="96" x2="880" y2="96" stroke="#dde4ec" stroke-width="3"/>
+
+      <circle cx="110" cy="96" r="11" fill="#8a6209"/>
+      <text x="110" y="101" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">0</text>
+      <text x="110" y="62" text-anchor="middle" font-size="12" font-weight="700" fill="#8a6209">Prerequisites</text>
+      <text x="110" y="132" text-anchor="middle" font-size="11" fill="#6b7d8f">defect fixes +</text>
+      <text x="110" y="147" text-anchor="middle" font-size="11" fill="#6b7d8f">game foundation</text>
+      <text x="110" y="167" text-anchor="middle" font-size="11" font-weight="700" fill="#143a5c">3&ndash;4 weeks</text>
+
+      <circle cx="300" cy="96" r="11" fill="#1c5788"/>
+      <text x="300" y="101" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">1</text>
+      <text x="300" y="62" text-anchor="middle" font-size="12" font-weight="700" fill="#1c5788">Foundations</text>
+      <text x="300" y="132" text-anchor="middle" font-size="11" fill="#6b7d8f">adapter, rounds,</text>
+      <text x="300" y="147" text-anchor="middle" font-size="11" fill="#6b7d8f">score handling</text>
+      <text x="300" y="167" text-anchor="middle" font-size="11" font-weight="700" fill="#143a5c">2 weeks</text>
+
+      <circle cx="490" cy="96" r="11" fill="#1c5788"/>
+      <text x="490" y="101" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">2</text>
+      <text x="490" y="62" text-anchor="middle" font-size="12" font-weight="700" fill="#1c5788">Real contests</text>
+      <text x="490" y="132" text-anchor="middle" font-size="11" fill="#6b7d8f">provider, admin,</text>
+      <text x="490" y="147" text-anchor="middle" font-size="11" fill="#6b7d8f">player screens</text>
+      <text x="490" y="167" text-anchor="middle" font-size="11" font-weight="700" fill="#143a5c">4 weeks</text>
+
+      <circle cx="680" cy="96" r="11" fill="#1c5788"/>
+      <text x="680" y="101" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">3</text>
+      <text x="680" y="62" text-anchor="middle" font-size="12" font-weight="700" fill="#1c5788">Hardening</text>
+      <text x="680" y="132" text-anchor="middle" font-size="11" fill="#6b7d8f">recovery, alerts,</text>
+      <text x="680" y="147" text-anchor="middle" font-size="11" fill="#6b7d8f">challenges</text>
+      <text x="680" y="167" text-anchor="middle" font-size="11" font-weight="700" fill="#143a5c">2 weeks</text>
+
+      <circle cx="860" cy="96" r="11" fill="#1a6e49"/>
+      <text x="860" y="101" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">4</text>
+      <text x="860" y="62" text-anchor="middle" font-size="12" font-weight="700" fill="#1a6e49">Launch</text>
+      <text x="860" y="132" text-anchor="middle" font-size="11" fill="#6b7d8f">staged pilot</text>
+      <text x="860" y="167" text-anchor="middle" font-size="11" font-weight="700" fill="#143a5c">2&ndash;4 weeks</text>
+    </svg>
+    <figcaption><b>Two of the nine engineering phases need no provider at all.</b> The adapter and the score-handling layer are built against a mock, which means the commercial conversation and the engineering can run in parallel rather than one after the other.</figcaption>
+  </figure>
+
+  <div class="ph">
+    <div class="ph-row pre"><div class="ph-id">Pre</div><div class="ph-b"><b>Prerequisites</b>Known defects in the contest layer, then the game-module foundation. Both from the separate games plan &mdash; this project sits directly on top of them. <b>Started 1 September 2026.</b> One item within them, a simulator authentication fix, has already shipped; see section 10 for why it matters to the provider callback specified here.</div><div class="ph-e">3&ndash;4 weeks</div></div>
+    <div class="ph-row"><div class="ph-id">E1</div><div class="ph-b"><b>Provider abstraction and mock</b>The adapter shape, the registry, the game catalogue. A mock provider that can be told to fail in every way a real one can.</div><div class="ph-e">1 week</div></div>
+    <div class="ph-row"><div class="ph-id">E2</div><div class="ph-b"><b>Rounds and score handling</b>The heart of it. Creating rounds, receiving scores, signatures, duplicates, the audit trail. Nothing proceeds until every failure rehearsal passes.</div><div class="ph-e">1 week</div></div>
+    <div class="ph-row"><div class="ph-id">E3</div><div class="ph-b"><b>The real provider</b>The actual adapter, tested against their sandbox end to end.</div><div class="ph-e">1 week</div></div>
+    <div class="ph-row"><div class="ph-id">E4</div><div class="ph-b"><b>Contests and settlement</b>Scores feed the existing engine. Entry fees in, prizes out, balanced to the cent.</div><div class="ph-e">1 week</div></div>
+    <div class="ph-row"><div class="ph-id">E5</div><div class="ph-b"><b>Admin panel</b>Create, monitor, pause, extend, cancel and rescue a contest without a developer.</div><div class="ph-e">1 week</div></div>
+    <div class="ph-row"><div class="ph-id">E6</div><div class="ph-b"><b>Player screens and rewards</b>Browse, join, practise, play, results. Points, badges, levels and milestones wired in.</div><div class="ph-e">1 week</div></div>
+    <div class="ph-row"><div class="ph-id">E7</div><div class="ph-b"><b>Resilience</b>Recovery of missing scores, health checks, alerts, pause and extend, kill switches.</div><div class="ph-e">1 week</div></div>
+    <div class="ph-row"><div class="ph-id">E8</div><div class="ph-b"><b>Challenges</b>One against one, on the same content, with expiry and refunds handled.</div><div class="ph-e">0.5&ndash;1 week</div></div>
+    <div class="ph-row"><div class="ph-id">E9</div><div class="ph-b"><b>Pilot and launch</b>Sandbox, then internal free, then internal paid, then a limited public run, then open.</div><div class="ph-e">2&ndash;4 weeks</div></div>
+  </div>
+
+  <div class="cal info">
+    <div class="t">The gate before going public</div>
+    <p>Across the whole pilot: <b>zero rounds that were never resolved, zero payout discrepancies, zero invalid signatures</b>, fewer than one percent of contests settling late, and disputes under half a percent of rounds. These are not aspirations &mdash; they are the conditions for opening it to the public.</p>
+  </div>
+
+  <div class="cal plain">
+    <div class="t">This plan assumes something &mdash; and it may not hold</div>
+    <p>The nine phases above are an <b>addition</b> to a platform that has already been generalised. They assume a separate project fixes the two contest-layer defects, builds the game foundation, ships an in-house game, and does all the platform-wide work &mdash; the admin panel, the navigation, the wording, the switches, the games catalogue. <b>If provider games are the only new games, none of that happens on its own.</b> Section 16 covers that case.</p>
+  </div>
+</section>
+
+<!-- ============ 15. GAME MASTERS ============ -->
+<section id="gm">
+  <div class="sec-h"><div class="sec-n">15</div><h2>Game Masters on the new games</h2></div>
+  <p class="sec-sub">Game Masters must work on provider games exactly as they work on trading &mdash; create competitions, refer players, earn a share of the fees those players generate. Most of that already works. One part is a gate, and one part is a commercial problem trading never had.</p>
+
+  <div class="cal warn">
+    <div class="t">A correction to an earlier draft</div>
+    <p>An earlier version of this plan described Game Masters as &ldquo;four smaller items, roughly three to four days&rdquo;. Checked against the code, that was wrong by an order of magnitude. The real system is <b>three dedicated collections, twenty-eight API routes, three subscription tiers, a referral attribution chain, a daily renewal worker job, and two separate earning paths</b> at competition and challenge settlement.</p>
+    <p style="margin-bottom:0">The real figure is <b>about two and a half weeks</b>, and it now has its own chapter, <code>19-game-masters.md</code>.</p>
+  </div>
+
+  <h3>How a Game Master actually earns &mdash; not what the name suggests</h3>
+  <p>This is the single fact most likely to be assumed wrongly, and a plan built on the opposite assumption would be wrong throughout.</p>
+
+  <div class="cal info">
+    <div class="t">The mechanism</div>
+    <p style="margin-bottom:0">A Game Master earns from the <b>entry fees of players they referred, in any contest those players enter</b> &mdash; not from contests the Game Master created. Creating competitions is how they attract and keep referred players. It is not itself the revenue event.</p>
+  </div>
+
+  <p>The consequence is convenient: <b>a Game Master earns correctly from a provider contest the moment such a contest can be settled at all</b>, with no Game Master-specific work. The share is a percentage of the entry fee, capped so it can never exceed the platform fee, and neither of those calculations knows what a game is.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:300px">Concern</th><th style="width:150px">Status</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td>Referral earnings on entry fees</td><td><b style="color:#1a6e49">Works unchanged</b></td><td>Keys on the entry fee and participant IDs. Neither is trading-specific</td></tr>
+      <tr><td>The cap against platform fee</td><td><b style="color:#1a6e49">Works unchanged</b></td><td>Fee arithmetic, no game concepts</td></tr>
+      <tr><td>Referral attribution at signup</td><td><b style="color:#1a6e49">Works unchanged</b></td><td>A code prefix. Nothing to do with games</td></tr>
+      <tr><td>Subscriptions, tiers, renewal, pause</td><td><b style="color:#1a6e49">Works unchanged</b></td><td>Entirely game-agnostic</td></tr>
+      <tr><td>Earnings and referrals dashboards</td><td><b style="color:#1a6e49">Works unchanged</b></td><td>Read collections that carry no game fields</td></tr>
+      <tr><td><b>Competition creation</b></td><td><b style="color:#a02a38">Must change &mdash; a gate</b></td><td>Requires trading fields, writes trading defaults, and sets <b>no game label at all</b></td></tr>
+      <tr><td>Which games a Game Master may run</td><td><b style="color:#8a6209">New</b></td><td>A per-tier permission list, defaulting to trading only</td></tr>
+      <tr><td>The creation wizard</td><td><b style="color:#8a6209">Must change</b></td><td>Needs the same game picker and dynamic settings step as the admin wizard, reusing those components</td></tr>
+      <tr><td>Analytics by game</td><td><b style="color:#8a6209">New</b></td><td>So a Game Master can see which games their audience plays, and the platform can see margin per game</td></tr>
+      <tr><td>Tier wording</td><td><b style="color:#1a6e49">Cheap</b></td><td>&ldquo;Trading battles&rdquo;, &ldquo;scalp battles&rdquo;. Database content, editable without a deploy</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>The gate</h3>
+  <div class="cal bad">
+    <div class="t">The Game Master competition route sets no game label</div>
+    <p>It inserts with the <b>raw MongoDB driver</b> rather than through the schema layer, so it will not pick up a default. An unlabelled competition <b>reads as a trading competition and gets settled by trading code</b> &mdash; which means it pays the wrong players.</p>
+    <p style="margin-bottom:0">This is a <b>gate inside the foundation phase, not a task</b>. It applies to both the main-app route and its admin twin. It is also worth replacing the hand-rolled insert with the same creation path the admin wizard uses: two divergent creation paths for the same object is precisely the defect class the prerequisite fixes exist to remove.</p>
+  </div>
+
+  <h3>Two live defects found while writing this chapter</h3>
+  <p>Neither is caused by this project. Both are cheap now and awkward later.</p>
+  <div class="tw"><table>
+    <thead><tr><th style="width:330px">Defect</th><th>Impact</th></tr></thead>
+    <tbody>
+      <tr><td><b>The admin app pays no Game Master earnings</b><br /><span style="color:#6b7d8f">The main app has roughly 500 lines of earnings logic at settlement. The admin mirror has none of it</span></td><td>A competition settled through the admin app pays the Game Master <b>nothing</b>, and records no explanation on the platform ledger either. Silent revenue loss, invisible until a Game Master asks</td></tr>
+      <tr><td><b>A dead admin button</b><br /><span style="color:#6b7d8f">The management screen calls an action the API never implemented; two schema fields have no reader or writer</span></td><td>An admin clicks a control that does nothing. It matters more once disabling a Game Master's creation rights actually protects money</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>The problem trading never had</h3>
+  <p>A trading round costs nothing to run. A provider round has a price. The Game Master's share is a percentage of the <b>entry fee</b>, calculated at settlement <b>before that cost exists</b>, and the safety cap is against the <b>gross</b> platform fee &mdash; so the cap does not save us.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:300px"></th><th style="width:190px">Trading contest</th><th>Provider contest at 2c a round</th></tr></thead>
+    <tbody>
+      <tr><td>Entry fee, twenty players, all referred by one Game Master</td><td>1.00</td><td>1.00</td></tr>
+      <tr><td>Prize pool</td><td>20.00</td><td>20.00</td></tr>
+      <tr><td>Platform fee at 10%</td><td>2.00</td><td>2.00</td></tr>
+      <tr><td>Game Master share, 10% of entry fees</td><td>2.00</td><td>2.00</td></tr>
+      <tr><td>Provider cost</td><td>0.00</td><td>0.40</td></tr>
+      <tr><td><b>Platform result</b></td><td><b style="color:#6b7d8f">0.00 &mdash; break even</b></td><td><b style="color:#a02a38">&minus;0.40 &mdash; a loss</b></td></tr>
+    </tbody>
+  </table></div>
+
+  <p>It gets worse with a best-of-three attempts policy, where the provider cost triples while the entry fee does not move. The platform pays to run the contest, and pays the Game Master for the privilege.</p>
+
+  <div class="verdict">
+    <div class="q">The decision</div>
+    <div class="a">Game Masters earn from provider contests from day one. They cannot create one until the share is calculated on net fee.</div>
+    <div class="n">The permission list defaults to <b>trading only</b>, so no existing Game Master silently gains the ability to create a loss-making contest. Because earning follows <b>referred players</b> rather than created contests, the revenue share works from the first provider competition an admin runs. Only <b>creation</b> is held back &mdash; until the share is computed on <b>net</b> platform fee after provider cost, and a minimum entry fee is in place. That split costs nothing and blocks nothing permanently.</div>
+  </div>
+</section>
+
+<!-- ============ 16. EXTERNAL ONLY ============ -->
+<section id="only">
+  <div class="sec-h"><div class="sec-n">16</div><h2>If these are the only games we add</h2></div>
+  <p class="sec-sub">The decision that changes the size of the project more than any other &mdash; and the one place where the intuitive answer is wrong.</p>
+
+  <div class="verdict">
+    <div class="q">The finding</div>
+    <div class="a">Buying the games instead of building one is not the cheaper route. It is the broader one.</div>
+    <div class="n">Dropping the in-house game saves about three and a half weeks. Integrating a provider properly &mdash; signed results, duplicates, rounds that never report, reconciliation &mdash; costs about seven. And every other piece of work is identical, because it is platform work that has nothing to do with who supplies the gameplay. What the external route actually buys is <b>a catalogue of many games instead of one, and somebody else carrying the content burden forever</b>. That is worth paying for. It is not a saving, and it should not be presented as one.</div>
+  </div>
+
+  <figure>
+    <div class="fig-t">Diagram 10 &mdash; the two routes to the same platform, to scale</div>
+    <svg viewBox="0 0 920 300" role="img" aria-label="Timeline comparison of the in-house-first route at about sixteen and a half weeks against the external-only route at about twenty-two and a half weeks">
+      <!-- axis -->
+      <line x1="150" y1="248" x2="880" y2="248" stroke="#dde4ec" stroke-width="2"/>
+      <g font-size="10.5" fill="#6b7d8f" text-anchor="middle">
+        <text x="150" y="266">0</text>
+        <text x="254" y="266">4</text>
+        <text x="359" y="266">8</text>
+        <text x="463" y="266">12</text>
+        <text x="567" y="266">16</text>
+        <text x="671" y="266">20</text>
+        <text x="776" y="266">24</text>
+        <text x="880" y="266">28</text>
+        <text x="515" y="288" font-size="11" font-weight="700" fill="#143a5c">weeks</text>
+      </g>
+      <g stroke="#eef2f7" stroke-width="1">
+        <line x1="254" y1="60" x2="254" y2="248"/>
+        <line x1="359" y1="60" x2="359" y2="248"/>
+        <line x1="463" y1="60" x2="463" y2="248"/>
+        <line x1="567" y1="60" x2="567" y2="248"/>
+        <line x1="671" y1="60" x2="671" y2="248"/>
+        <line x1="776" y1="60" x2="776" y2="248"/>
+      </g>
+
+      <!-- route A -->
+      <text x="140" y="98" text-anchor="end" font-size="12" font-weight="700" fill="#143a5c">Build one game</text>
+      <text x="140" y="114" text-anchor="end" font-size="10.5" fill="#6b7d8f">in house first</text>
+      <rect x="150" y="82" width="39" height="34" fill="#8a6209"/>
+      <rect x="189" y="82" width="65" height="34" fill="#1c5788"/>
+      <rect x="254" y="82" width="78" height="34" fill="#4a8fc4"/>
+      <rect x="332" y="82" width="196" height="34" fill="#7fa8c9"/>
+      <rect x="528" y="82" width="52" height="34" fill="#1a6e49"/>
+      <text x="594" y="104" font-size="13" font-weight="700" fill="#1a6e49">14&ndash;19 weeks</text>
+
+      <!-- route B -->
+      <text x="140" y="180" text-anchor="end" font-size="12" font-weight="700" fill="#143a5c">Buy the games</text>
+      <text x="140" y="196" text-anchor="end" font-size="10.5" fill="#6b7d8f">external only</text>
+      <rect x="150" y="164" width="39" height="34" fill="#8a6209"/>
+      <rect x="189" y="164" width="65" height="34" fill="#1c5788"/>
+      <rect x="254" y="164" width="182" height="34" fill="#a02a38"/>
+      <rect x="436" y="164" width="196" height="34" fill="#7fa8c9"/>
+      <rect x="632" y="164" width="104" height="34" fill="#1a6e49"/>
+      <text x="750" y="186" font-size="13" font-weight="700" fill="#a02a38">20&ndash;26 weeks</text>
+
+      <!-- legend -->
+      <g font-size="11" fill="#3a4a5a">
+        <rect x="150" y="24" width="12" height="12" fill="#8a6209"/><text x="168" y="34">Defect fixes</text>
+        <rect x="258" y="24" width="12" height="12" fill="#1c5788"/><text x="276" y="34">Foundation</text>
+        <rect x="360" y="24" width="12" height="12" fill="#4a8fc4"/><text x="378" y="34">In-house game</text>
+        <rect x="474" y="24" width="12" height="12" fill="#a02a38"/><text x="492" y="34">Provider integration</text>
+        <rect x="620" y="24" width="12" height="12" fill="#7fa8c9"/><text x="638" y="34">Platform work</text>
+        <rect x="740" y="24" width="12" height="12" fill="#1a6e49"/><text x="758" y="34">Pilot and launch</text>
+      </g>
+    </svg>
+    <figcaption><b>Look at the two pale blue bars &mdash; they are the same length.</b> That is the admin panel, the navigation, the wording, the leaderboards, the catalogue and the Game Master work: identical in both routes. The gold and mid-blue bars are identical too. Only one segment differs, and the bought one is longer than the built one.</figcaption>
+  </figure>
+
+  <div class="sec-h"><div class="sec-n">16.1</div><h2>What has to be added to this plan</h2></div>
+  <p class="sec-sub">Nine further chapters, because the work does not disappear when the other project does &mdash; it moves here.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:210px">Added</th><th>Why it is now ours</th></tr></thead>
+    <tbody>
+      <tr><td><b>The foundation</b></td><td>A provider game plugs into exactly the socket an in-house game would have used. The game label, the general score field, the registry and the four places trading is welded into the shared engine are all still required</td></tr>
+      <tr><td><b>The admin panel</b></td><td>Navigation grouping, permissions, a create wizard that can build a contest with no trading fields, and analytics broken down by game <i>and by provider</i> &mdash; because provider cost is per provider</td></tr>
+      <tr><td><b>The player screens</b></td><td>A dispatcher that sends a player to the right kind of gameplay, a dashboard that shows nothing about trading to someone who has never traded, and leaderboards that rank across games</td></tr>
+      <tr><td><b>The wording</b></td><td>A player who joined for chess should not be called a Trader or awarded the level &ldquo;Trading God&rdquo;. Roughly 150&ndash;250 visible strings, with a great many identifiers that must <i>not</i> be touched</td></tr>
+      <tr><td><b>The switches</b></td><td>A master switch for trading, gating for the always-on price feed, and per-provider and per-game switches. All of them must work without a deployment</td></tr>
+      <tr><td><b>The games catalogue</b></td><td>A page per game that a player reads before paying. This matters <i>more</i> here, not less &mdash; a provider may deliver ten titles at once</td></tr>
+      <tr><td><b>The marketplace rule</b></td><td>Nothing sold may improve a score in a paid contest. This reaches into provider selection: many casual-game providers depend on selling extra time, retries and hints</td></tr>
+      <tr><td><b>The Game Masters</b></td><td>Section 15. They must be able to create contests for the new games and earn from them, which means the creation route needs a game picker &mdash; and, before anything else, needs to stop writing competitions with no game label at all</td></tr>
+      <tr><td><b>The risk register</b></td><td>The ways the existing application can break during generalisation, plus seven risks that exist only because a third party is on the critical path</td></tr>
+      <tr><td><b>Rollout and rollback</b></td><td>Backfills, eight tiers of tests, and a reversal path for every phase. Including a tier unique to this route: <b>recorded provider responses replayed in the build</b>, so a provider changing their API is caught by a failing build rather than by players mid-contest</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="sec-h"><div class="sec-n">16.2</div><h2>Four risks that only exist on this route</h2></div>
+
+  <div class="grid g3">
+    <div class="card">
+      <h4>We cannot prove it without them</h4>
+      <p style="margin:0">With a game we built, the architecture is validated by our own code. Here, everything past the fifth week is blocked on someone else's test environment. A provider slow to grant access stops the project dead, with nothing to show. <b>Get a committed date, not a promise.</b></p>
+    </div>
+    <div class="card">
+      <h4>One supplier, no fallback</h4>
+      <p style="margin:0">If they terminate, raise prices or fail commercially, the platform reverts to trading alone and every week of games work is stranded. There is no in-house game to fall back on. <b>Evaluate a second provider before launch even if only one goes live.</b></p>
+    </div>
+    <div class="card">
+      <h4>No cost floor</h4>
+      <p style="margin:0">A game we built costs nothing per contest, so free entry contests are always viable for attracting players. A fee per round can make exactly those contests loss-making. <b>Settle pricing before the integration, not after.</b></p>
+    </div>
+    <div class="card">
+      <h4>A Game Master contest that loses money</h4>
+      <p style="margin:0">The sharpest version of the cost problem, and the easiest to miss because every part behaves correctly on its own. The Game Master's share is a slice of the entry fee taken <i>before</i> the provider is paid. <b>Gate creation until the share is calculated on the fee that is actually left.</b> Section 15</p>
+    </div>
+  </div>
+
+  <div class="cal good">
+    <div class="t">The hedge worth considering</div>
+    <p>Build the foundation, integrate the provider &mdash; and keep <b>one small in-house game on the backlog as insurance</b>. Not as the launch game, but as a two-to-three week project that can be pulled forward if the provider relationship goes wrong. It turns the single-supplier risk from existential into merely inconvenient, and it gives the architecture the second real implementation that proves the whole design works.</p>
+  </div>
+
+  <div class="cal info">
+    <div class="t">Where to stop and think</div>
+    <p>The first six phases &mdash; defect fixes, foundation, the adapter, score handling, the real provider and settlement, plus a thin slice of admin &mdash; come to <b>nine to eleven weeks of engineering, eleven to fourteen in calendar terms</b> because everything from the real adapter onwards waits on the provider's test environment. They produce a provider contest a player can pay for and play. <b>That is the right place to pause</b> and judge the rest against how players actually behave, rather than committing six months in advance. The per-game marketplace stays unscheduled for the same reason.</p>
+  </div>
+</section>
+
+<!-- ============ 17. HONEST ============ -->
+<section id="honest">
+  <div class="sec-h"><div class="sec-n">17</div><h2>Honest assessment</h2></div>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:230px">Question</th><th>Answer</th></tr></thead>
+    <tbody>
+      <tr><td><b>Can it be done?</b></td><td><b>Yes, and it is the least risky way to add games.</b> No money crosses to the provider, and the thing we ask of them is simple: run a round, tell us the score</td></tr>
+      <tr><td><b>How long?</b></td><td>Seven to eight weeks of engineering after the prerequisites; ten to twelve weeks to a public launch including the pilot. <b>If provider games are the only new games, twenty to twenty-six weeks</b> &mdash; the prerequisites and all the platform work come with it. See section 16</td></tr>
+      <tr><td><b>Is buying cheaper than building?</b></td><td><b>No &mdash; it is broader.</b> Dropping an in-house game saves about three and a half weeks; a correct provider integration costs about seven. The prize is a catalogue and no content burden, not a saving</td></tr>
+      <tr><td><b>Hardest part?</b></td><td>Receiving scores properly &mdash; signatures, duplicates, late arrivals, and rounds that never report at all</td></tr>
+      <tr><td><b>Biggest technical risk?</b></td><td>A round that never returns a score while real prize money waits on it. The four-stage safety net exists specifically for this</td></tr>
+      <tr><td><b>Biggest commercial risk?</b></td><td>Per-round pricing. Settle it before building, or cheap contests will cost more to run than they earn</td></tr>
+      <tr><td><b>Biggest strategic risk?</b></td><td>Depending on one provider. Contained by keeping their concepts behind a single boundary in the code &mdash; but <b>if these are the only games we add, there is no fallback</b>, so evaluate a second provider before launch and consider keeping one small in-house game as insurance</td></tr>
+      <tr><td><b>Regulatory position?</b></td><td><b>Unchanged</b>, as long as the games are genuinely decided by skill. A chance-based game changes the analysis completely</td></tr>
+      <tr><td><b>What could break the app?</b></td><td>Very little, by design. Everything is added alongside what exists. Turning provider games off returns the platform to exactly what it is today</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="verdict" style="margin-top:30px;margin-bottom:0">
+    <div class="q">In one sentence</div>
+    <div class="a">Let another company run the games, keep the money, the ranking and the rewards entirely on our side, and treat the score they send as evidence to be verified rather than a number to be trusted.</div>
+    <div class="n">Everything else in this document follows from those three decisions.</div>
+  </div>
+</section>
+
+</main>
+</div>
+
+<div class="foot">
+  <div>ChartVolt &mdash; External Games Plan &middot; 18 August 2026, revised 1 September 2026 &middot; Planning document, no code changed in this project</div>
+  <div>Provider-neutral &middot; No provider selected</div>
+</div>
+
+</body>
+</html>

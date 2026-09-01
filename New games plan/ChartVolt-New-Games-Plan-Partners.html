@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ChartVolt &mdash; Becoming a Games Platform</title>
+<style>
+  :root{
+    --navy:#0d2338; --navy2:#143a5c; --navy3:#1d4d75;
+    --gold:#c9a23f; --gold-lt:#f0dda6; --gold-bg:#fdf8ec;
+    --ink:#1b2733; --body:#3a4a5a; --muted:#6b7d8f;
+    --line:#dde4ec; --line2:#eef2f7;
+    --bg:#f6f8fb; --card:#ffffff;
+    --green:#1a6e49; --green-bg:#eaf6ef; --green-line:#b6ddc6;
+    --red:#a02a38; --red-bg:#fdedef; --red-line:#f0c3c9;
+    --amber:#8a6209; --amber-bg:#fdf5e3; --amber-line:#ecd9a6;
+    --blue:#1c5788; --blue-bg:#ecf3fa; --blue-line:#c2d8ec;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--body);
+    font-size:15.5px; line-height:1.64;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- hero ---------- */
+  .hero{
+    background:linear-gradient(150deg,var(--navy) 0%,var(--navy2) 55%,var(--navy3) 100%);
+    color:#fff; padding:54px 32px 46px;
+    border-bottom:4px solid var(--gold);
+  }
+  .hero-in{max-width:1180px;margin:0 auto}
+  .eyebrow{
+    font-size:11.5px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--gold-lt);font-weight:700;margin-bottom:14px;
+  }
+  .hero h1{font-size:40px;line-height:1.14;font-weight:700;letter-spacing:-.6px;margin-bottom:14px}
+  .hero .lede{font-size:17.5px;color:#cfdcea;max-width:880px;line-height:1.55}
+  .hero-meta{
+    margin-top:26px;padding-top:20px;border-top:1px solid rgba(255,255,255,.16);
+    display:flex;flex-wrap:wrap;gap:30px;font-size:13px;
+  }
+  .hero-meta b{display:block;color:var(--gold-lt);font-size:10.5px;letter-spacing:.14em;
+    text-transform:uppercase;margin-bottom:4px;font-weight:700}
+  .hero-meta span{color:#e4ecf4}
+  .stamp{
+    display:inline-block;margin-top:22px;background:rgba(201,162,63,.16);
+    border:1px solid var(--gold);color:var(--gold-lt);
+    padding:7px 16px;border-radius:100px;font-size:12.5px;font-weight:700;
+    letter-spacing:.08em;text-transform:uppercase;
+  }
+
+  /* ---------- layout ---------- */
+  .shell{max-width:1180px;margin:0 auto;padding:0 32px;display:grid;
+    grid-template-columns:236px 1fr;gap:44px;align-items:start}
+  nav.toc{position:sticky;top:22px;padding:26px 0;max-height:calc(100vh - 44px);overflow-y:auto}
+  nav.toc h4{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
+    margin:0 0 12px;font-weight:700}
+  nav.toc a{display:block;padding:5px 10px;font-size:13.2px;color:var(--body);
+    text-decoration:none;border-left:2px solid var(--line);line-height:1.4}
+  nav.toc a:hover{color:var(--navy2);background:#eef3f9;border-left-color:var(--gold)}
+  nav.toc a.on{color:var(--navy2);font-weight:700;border-left-color:var(--gold);background:#eef3f9}
+  main{padding:34px 0 80px;min-width:0}
+
+  /* ---------- sections ---------- */
+  section{margin-bottom:46px;scroll-margin-top:20px}
+  .sec-h{display:flex;align-items:baseline;gap:13px;margin-bottom:8px}
+  .sec-n{
+    flex:none;width:31px;height:31px;border-radius:7px;background:var(--navy);color:#fff;
+    font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center
+  }
+  h2{font-size:25px;color:var(--navy);font-weight:700;letter-spacing:-.3px;line-height:1.24}
+  .sec-sub{color:var(--muted);font-size:14.5px;margin:0 0 22px 44px}
+  h3{font-size:17.5px;color:var(--navy2);font-weight:700;margin:28px 0 11px}
+  h4{font-size:14.5px;color:var(--navy2);font-weight:700;margin:20px 0 8px}
+  p{margin-bottom:13px}
+  ul,ol{margin:0 0 14px 21px}
+  li{margin-bottom:6px}
+  strong,b{color:var(--ink);font-weight:600}
+  a{color:var(--blue)}
+
+  /* ---------- cards & callouts ---------- */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px 22px;margin-bottom:16px}
+  .grid{display:grid;gap:14px;margin-bottom:16px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:repeat(3,1fr)}
+
+  .cal{border-left:4px solid;border-radius:0 var(--radius) var(--radius) 0;
+    padding:16px 20px;margin:16px 0}
+  .cal .t{font-weight:700;font-size:13px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px}
+  .cal p:last-child{margin-bottom:0}
+  .plain{background:var(--gold-bg);border-color:var(--gold)}
+  .plain .t{color:var(--amber)}
+  .good{background:var(--green-bg);border-color:var(--green)}
+  .good .t{color:var(--green)}
+  .bad{background:var(--red-bg);border-color:var(--red)}
+  .bad .t{color:var(--red)}
+  .info{background:var(--blue-bg);border-color:var(--blue)}
+  .info .t{color:var(--blue)}
+
+  /* ---------- verdict ---------- */
+  .verdict{background:var(--navy);color:#fff;border-radius:var(--radius);
+    padding:28px 30px;margin-bottom:34px;border-left:5px solid var(--gold)}
+  .verdict .q{font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--gold-lt);font-weight:700;margin-bottom:11px}
+  .verdict .a{font-size:20px;line-height:1.45;color:#fff;font-weight:600}
+  .verdict .n{margin-top:14px;font-size:14px;color:#bccfe0;line-height:1.55}
+
+  /* ---------- tables ---------- */
+  .tw{overflow-x:auto;margin-bottom:16px;border:1px solid var(--line);border-radius:var(--radius)}
+  table{width:100%;border-collapse:collapse;background:#fff;font-size:13.6px}
+  th{background:var(--navy2);color:#fff;text-align:left;padding:10px 13px;
+    font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;
+    white-space:nowrap}
+  td{padding:9px 13px;border-bottom:1px solid var(--line2);vertical-align:top;line-height:1.5}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:nth-child(even){background:#fafcfe}
+
+  /* ---------- badges ---------- */
+  .b{display:inline-block;padding:2px 9px;border-radius:100px;font-size:11px;
+    font-weight:700;letter-spacing:.04em;white-space:nowrap;border:1px solid}
+  .b.high{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-line)}
+  .b.med{background:var(--blue-bg);color:var(--blue);border-color:var(--blue-line)}
+  .b.low{background:#f1f4f7;color:var(--muted);border-color:var(--line)}
+  .b.ok{background:var(--green-bg);color:var(--green);border-color:var(--green-line)}
+  .b.crit{background:var(--red-bg);color:var(--red);border-color:var(--red-line)}
+
+  /* ---------- diagrams ---------- */
+  figure{margin:22px 0;background:#fff;border:1px solid var(--line);
+    border-radius:var(--radius);padding:22px 20px 16px}
+  figure svg{display:block;width:100%;height:auto}
+  figcaption{margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);
+    font-size:13px;color:var(--muted);line-height:1.55}
+  figcaption b{color:var(--navy2)}
+  .fig-t{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);
+    font-weight:700;margin-bottom:14px}
+
+  /* ---------- checklist ---------- */
+  .chk{background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+    padding:6px 4px;margin-bottom:16px}
+  .chk div{display:flex;gap:11px;padding:9px 15px;border-bottom:1px solid var(--line2);
+    font-size:14px;line-height:1.5}
+  .chk div:last-child{border-bottom:none}
+  .box{flex:none;width:15px;height:15px;border:2px solid var(--navy3);border-radius:3px;
+    margin-top:3px}
+
+  /* ---------- key-value strip ---------- */
+  .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;
+    background:var(--line);border:1px solid var(--line);border-radius:var(--radius);
+    overflow:hidden;margin-bottom:18px}
+  .kv > div{background:#fff;padding:14px 16px}
+  .kv b{display:block;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--muted);margin-bottom:5px;font-weight:700}
+  .kv span{font-size:17px;font-weight:700;color:var(--navy)}
+  .kv em{font-style:normal;font-size:12.5px;color:var(--body);display:block;margin-top:2px}
+
+  /* ---------- phase list ---------- */
+  .ph{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin-bottom:18px}
+  .ph-row{display:grid;grid-template-columns:96px 1fr 116px;gap:0;background:#fff;
+    border-bottom:1px solid var(--line2)}
+  .ph-row:last-child{border-bottom:none}
+  .ph-id{padding:14px 12px;font-weight:700;color:var(--navy);font-size:13.5px;
+    background:#f7f9fc;border-right:1px solid var(--line2);display:flex;align-items:center}
+  .ph-b{padding:13px 16px;font-size:13.8px;line-height:1.52}
+  .ph-b b{display:block;color:var(--navy2);margin-bottom:2px}
+  .ph-e{padding:14px 14px;font-size:13px;font-weight:700;color:var(--navy2);
+    border-left:1px solid var(--line2);display:flex;align-items:center}
+
+  hr.d{border:none;border-top:1px solid var(--line);margin:34px 0}
+  .foot{max-width:1180px;margin:0 auto;padding:26px 32px 46px;border-top:1px solid var(--line);
+    color:var(--muted);font-size:12.8px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+
+  @media (max-width:1000px){
+    .shell{grid-template-columns:1fr;gap:0;padding:0 20px}
+    nav.toc{display:none}
+    .g2,.g3{grid-template-columns:1fr}
+    .hero h1{font-size:30px}
+    .hero{padding:38px 20px 34px}
+    .ph-row{grid-template-columns:1fr}
+    .ph-id,.ph-e{border:none}
+  }
+  @media print{
+    nav.toc{display:none}
+    .shell{grid-template-columns:1fr;padding:0}
+    body{font-size:10.5pt;background:#fff}
+    section{page-break-inside:avoid}
+    figure{page-break-inside:avoid}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+</head>
+<body>
+
+<!-- Shared arrowhead, referenced by every diagram below -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,1 L7,4.5 L0,8 Z" fill="#6b7d8f"/>
+    </marker>
+  </defs>
+</svg>
+
+<!-- ================= HERO ================= -->
+<header class="hero">
+  <div class="hero-in">
+    <div class="eyebrow">ChartVolt &middot; Partner Briefing</div>
+    <h1>From a Trading App to a Games Platform</h1>
+    <p class="lede">How ChartVolt becomes a home for many kinds of paid skill competitions &mdash; trivia first, trading as one game among several &mdash; using the competition and payment systems we have already built and proven.</p>
+    <div class="hero-meta">
+      <div><b>Date</b><span>17 Aug 2026 &middot; rev 30 Aug 2026</span></div>
+      <div><b>First new game</b><span>Trivia</span></div>
+      <div><b>Timeline</b><span>14&ndash;19 weeks</span></div>
+      <div><b>First playable paid quiz</b><span>Around week 8</span></div>
+      <div><b>Trading</b><span>Kept and unchanged</span></div>
+    </div>
+    <div class="stamp">One account &middot; one wallet &middot; many games</div>
+  </div>
+</header>
+
+<div class="shell">
+
+<!-- ================= TOC ================= -->
+<nav class="toc">
+  <h4>Contents</h4>
+  <a href="#verdict">The short version</a>
+  <a href="#vision">1 &middot; Where we are going</a>
+  <a href="#today">2 &middot; What we already own</a>
+  <a href="#build">3 &middot; What we reuse, what we build</a>
+  <a href="#target">4 &middot; How it will work</a>
+  <a href="#points">5 &middot; Points &amp; leaderboards</a>
+  <a href="#money">6 &middot; Money &amp; prizes</a>
+  <a href="#gamify">7 &middot; Levels, badges, journey</a>
+  <a href="#admin">8 &middot; Running the platform</a>
+  <a href="#ui">9 &middot; What players see</a>
+  <a href="#words">10 &middot; Brand &amp; language</a>
+  <a href="#trivia">11 &middot; The Trivia game</a>
+  <a href="#switch">12 &middot; Trading becomes optional</a>
+  <a href="#safe">13 &middot; How we keep it safe</a>
+  <a href="#rollout">14 &middot; How we launch</a>
+  <a href="#roadmap">15 &middot; The roadmap</a>
+</nav>
+
+<main>
+
+<!-- ================= VERDICT ================= -->
+<section id="verdict">
+  <div class="verdict">
+    <div class="q">The question: can ChartVolt really run games other than trading?</div>
+    <div class="a">Yes &mdash; because the hard part is already built. Our competition and payment engine has never cared what the players were actually doing.</div>
+    <div class="n">ChartVolt already contains a complete, working machine for &ldquo;take an entry fee, run a contest, rank the players, pay the winners, refund if it is cancelled.&rdquo; That machine works the same way whether the players are trading currencies or answering questions. Only four narrow parts of the product assume the activity is trading, and those are what this plan changes. Nothing has to be torn down and rebuilt.</div>
+  </div>
+
+  <div class="kv">
+    <div><b>Already reusable</b><span>~80%</span><em>Contest engine, wallet, prizes, refunds, fraud checks</em></div>
+    <div><b>Genuinely new work</b><span>~20%</span><em>Four areas, clearly defined</em></div>
+    <div><b>Trading</b><span>Untouched</span><em>Preserved exactly as it is today</em></div>
+    <div><b>Third game after this</b><span>Weeks, not months</span><em>The point of doing it properly once</em></div>
+  </div>
+</section>
+
+<!-- ================= 1 VISION ================= -->
+<section id="vision">
+  <div class="sec-h"><div class="sec-n">1</div><h2>Where we are going</h2></div>
+  <p class="sec-sub">One account, one wallet, one league table &mdash; and as many games as we want behind it.</p>
+
+  <div class="cal plain">
+    <div class="t">In plain words</div>
+    <p>Today ChartVolt is <b>one game with one audience</b>: people who want to compete at trading. That is a real market, but it is a narrow one. After this project, ChartVolt is a <b>place where people pay a small entry fee to compete at something they are good at</b> &mdash; and trading is simply the first of those things. Same account, same wallet, same prizes, same trust.</p>
+  </div>
+
+  <figure>
+    <div class="fig-t">Diagram 1 &mdash; The shift</div>
+    <svg viewBox="0 0 900 320" role="img" aria-label="Today ChartVolt offers one game. Tomorrow one platform hosts trading, trivia and future games sharing one account and wallet.">
+      <text x="30" y="26" font-family="Segoe UI" font-size="11" letter-spacing="1.6" font-weight="700" fill="#6b7d8f">TODAY</text>
+      <rect x="20" y="40" width="228" height="186" rx="9" fill="#fff" stroke="#dde4ec" stroke-width="1.6"/>
+      <rect x="52" y="76" width="164" height="70" rx="8" fill="#ecf3fa" stroke="#1c5788" stroke-width="1.7"/>
+      <text x="134" y="106" text-anchor="middle" font-family="Segoe UI" font-size="13" font-weight="700" fill="#1c5788">TRADING</text>
+      <text x="134" y="127" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">competitions &amp; challenges</text>
+      <text x="134" y="176" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#6b7d8f">One activity.</text>
+      <text x="134" y="194" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#6b7d8f">One kind of customer.</text>
+      <text x="134" y="212" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#6b7d8f">One reason to visit.</text>
+
+      <line x1="258" y1="130" x2="306" y2="130" stroke="#c9a23f" stroke-width="2.4" marker-end="url(#ar)"/>
+      <text x="282" y="118" text-anchor="middle" font-family="Segoe UI" font-size="10.5" font-weight="700" fill="#8a6209">this plan</text>
+
+      <text x="322" y="26" font-family="Segoe UI" font-size="11" letter-spacing="1.6" font-weight="700" fill="#1a6e49">AFTER THIS PLAN</text>
+      <rect x="316" y="40" width="564" height="186" rx="9" fill="#eaf6ef" stroke="#1a6e49" stroke-width="2"/>
+      <text x="598" y="64" text-anchor="middle" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#1a6e49">ONE PLATFORM &mdash; MANY GAMES</text>
+
+      <rect x="336" y="78" width="164" height="64" rx="7" fill="#ecf3fa" stroke="#1c5788" stroke-width="1.6"/>
+      <text x="418" y="103" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#1c5788">TRADING</text>
+      <text x="418" y="123" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#3a4a5a">exactly as today</text>
+
+      <rect x="516" y="78" width="164" height="64" rx="7" fill="#fdf8ec" stroke="#c9a23f" stroke-width="1.6"/>
+      <text x="598" y="103" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#8a6209">TRIVIA</text>
+      <text x="598" y="123" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#3a4a5a">the first new game</text>
+
+      <rect x="696" y="78" width="164" height="64" rx="7" fill="#f7f9fc" stroke="#a9b8c6" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <text x="778" y="103" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#6b7d8f">MORE GAMES</text>
+      <text x="778" y="123" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#6b7d8f">added cheaply</text>
+
+      <rect x="336" y="156" width="524" height="50" rx="7" fill="#0d2338"/>
+      <text x="598" y="177" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#f0dda6">SHARED BY EVERY GAME</text>
+      <text x="598" y="196" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#dbe6f1">one account &middot; one wallet &middot; one leaderboard &middot; one set of levels and badges &middot; one prize system</text>
+
+      <text x="450" y="264" text-anchor="middle" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#0d2338">A trading customer becomes a ChartVolt customer.</text>
+      <text x="450" y="288" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">They keep their balance, their level, their badges and their history when they try a second game.</text>
+      <text x="450" y="308" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#6b7d8f" font-style="italic">That shared layer is the asset. Every new game makes it more valuable rather than starting from zero.</text>
+    </svg>
+    <figcaption><b>Why the shared layer matters commercially.</b> A player who joins for a quiz already has a funded wallet when they get curious about trading &mdash; and a trader who has a slow week has something else to play. Every game we add makes the account more valuable to hold, which is exactly what a platform is.</figcaption>
+  </figure>
+
+  <h3>What this unlocks</h3>
+  <div class="grid g2">
+    <div class="card">
+      <h4 style="margin-top:0">A much wider audience</h4>
+      <p style="margin-bottom:0">Trading competitions only appeal to people already interested in markets. A quiz competition is understandable to anyone in five seconds. The entry fee, the prize and the leaderboard are identical &mdash; only the barrier to understanding drops.</p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">A cheaper second and third game</h4>
+      <p style="margin-bottom:0">The expensive part is the shared machinery, and it is already paid for. Once the design is in place, adding another game is mostly content and rules rather than engineering.</p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">Clear numbers per game</h4>
+      <p style="margin-bottom:0">For the first time we will be able to see entry-fee volume, revenue, average prize pot, how full contests get and payout ratio <b>broken down by game</b> &mdash; so we can tell which games earn and which merely attract.</p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">Less dependence on one market</h4>
+      <p style="margin-bottom:0">Today a quiet period in the currency markets is a quiet period for the whole business. Games that do not depend on market conditions or trading hours smooth that out.</p>
+    </div>
+  </div>
+
+  <div class="cal good">
+    <div class="t">The end state, stated plainly</div>
+    <p>ChartVolt becomes a <b>competition platform where trading is one game among several</b>. A visitor arrives at a catalogue of games, picks one, reads what it is, and enters a competition or challenges someone directly. Their wallet, level, badges, ranking and history follow them across every game they play. <b>Trading is not reduced in any way</b> &mdash; it keeps every feature it has today and remains the most sophisticated thing on the platform. It simply stops being the only door in, and stops being the thing the whole product is named after.</p>
+  </div>
+
+  <p style="margin-bottom:0">One consequence worth stating early, because it shapes the plan: the games catalogue is the <b>last</b> thing built, not the first. A catalogue containing one game other than trading advertises an empty platform, so the machinery and a real second game come first, and the shop window goes up once there is something to put in it. Section 15 sets out the order.</p>
+</section>
+
+<!-- ================= 2 TODAY ================= -->
+<section id="today">
+  <div class="sec-h"><div class="sec-n">2</div><h2>What we already own</h2></div>
+  <p class="sec-sub">The reason this is a 14&ndash;19 week project rather than a rebuild.</p>
+
+  <div class="cal plain">
+    <div class="t">In plain words</div>
+    <p>ChartVolt already runs the full lifecycle of a paid contest: <b>collect the entry fee &rarr; run the event &rarr; rank the players &rarr; pay the winners &rarr; refund everyone if it is cancelled.</b> None of that machinery asks what the players were doing. That is the single most important fact in this document.</p>
+  </div>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:32%">What we have</th><th>Why it works for any game</th></tr></thead>
+    <tbody>
+      <tr><td><b>The contest shell</b></td><td>Name, description, entry fee, minimum and maximum players, start and end times, closing date, prize pot, our fee, how prizes split by position, pausing, cancelling. None of it mentions trading.</td></tr>
+      <tr><td><b>The contest lifecycle</b></td><td>Draft, upcoming, live, finishing, completed, cancelled. Works for a quiz exactly as it does for trading.</td></tr>
+      <tr><td><b>Credits wallet</b></td><td>Adding and taking credits is the same whatever the game.</td></tr>
+      <tr><td><b>Full financial audit trail</b></td><td>Every movement recorded with the balance before and after.</td></tr>
+      <tr><td><b>Prize calculation</b></td><td>Works purely from finishing positions and percentages. Handles ties and unfilled positions. Knows nothing about trading.</td></tr>
+      <tr><td><b>Refunds</b></td><td>Reverses the entry fee per player if a contest is cancelled.</td></tr>
+      <tr><td><b>Entry and fraud checks</b></td><td>Verified email, account standing, device and location checks, suspicious-behaviour scoring &mdash; all independent of the game.</td></tr>
+      <tr><td><b>Game Master revenue share</b></td><td>Partners earn a share of the <b>entry fees</b> from players they bring in. Works for any paid contest.</td></tr>
+      <tr><td><b>Levels, badges and XP</b></td><td>The award machinery is generic. Only the titles and the conditions are trading-flavoured today.</td></tr>
+      <tr><td><b>Wallet, deposits, withdrawals, verification, messaging, notifications</b></td><td>Already game-neutral.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal good">
+    <div class="t">The conclusion</div>
+    <p>The competition engine and the money engine are <b>sound and proven with real money</b>. This project adds a dimension to them rather than replacing them. Nothing that currently works has to be removed.</p>
+  </div>
+</section>
+
+<!-- ================= 3 BUILD ================= -->
+<section id="build">
+  <div class="sec-h"><div class="sec-n">3</div><h2>What we reuse, and what we build</h2></div>
+  <p class="sec-sub">Four clearly-defined areas. That is the whole engineering project.</p>
+
+  <figure>
+    <div class="fig-t">Diagram 2 &mdash; Where the work actually is</div>
+    <svg viewBox="0 0 900 440" role="img" aria-label="Reusable contest shell on top, four build areas in the middle, reusable money layer below, trading infrastructure kept and switched on demand">
+      <rect x="30" y="24" width="840" height="58" rx="8" fill="#eaf6ef" stroke="#1a6e49" stroke-width="1.8"/>
+      <text x="48" y="48" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#1a6e49">REUSE AS-IS &mdash; the contest shell</text>
+      <text x="48" y="68" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">name &middot; entry fee &middot; dates &middot; status &middot; prize pot &middot; prize split &middot; player limits &middot; pause &middot; cancel &middot; refund</text>
+
+      <rect x="30" y="96" width="840" height="182" rx="8" fill="#fff" stroke="#dde4ec" stroke-width="1.5"/>
+      <text x="450" y="118" text-anchor="middle" font-family="Segoe UI" font-size="11" letter-spacing="1.6" font-weight="700" fill="#8a6209">BUILD &mdash; THE FOUR AREAS, AND NOTHING ELSE</text>
+
+      <rect x="48" y="132" width="192" height="130" rx="7" fill="#fdf8ec" stroke="#c9a23f" stroke-width="1.8"/>
+      <circle cx="72" cy="156" r="13" fill="#c9a23f"/>
+      <text x="72" y="161" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#fff">1</text>
+      <text x="94" y="161" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#8a6209">Ranking</text>
+      <text x="62" y="188" font-family="Segoe UI" font-size="11" fill="#3a4a5a">Today it can only rank</text>
+      <text x="62" y="204" font-family="Segoe UI" font-size="11" fill="#3a4a5a">people by trading results.</text>
+      <text x="62" y="228" font-family="Segoe UI" font-size="11" fill="#3a4a5a">It learns to ask the game</text>
+      <text x="62" y="244" font-family="Segoe UI" font-size="11" fill="#3a4a5a">how to rank instead.</text>
+
+      <rect x="252" y="132" width="192" height="130" rx="7" fill="#fdf8ec" stroke="#c9a23f" stroke-width="1.8"/>
+      <circle cx="276" cy="156" r="13" fill="#c9a23f"/>
+      <text x="276" y="161" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#fff">2</text>
+      <text x="298" y="161" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#8a6209">A general score</text>
+      <text x="266" y="188" font-family="Segoe UI" font-size="11" fill="#3a4a5a">A player&rsquo;s record stores</text>
+      <text x="266" y="204" font-family="Segoe UI" font-size="11" fill="#3a4a5a">trading profit, but has no</text>
+      <text x="266" y="220" font-family="Segoe UI" font-size="11" fill="#3a4a5a">general idea of a score.</text>
+      <text x="266" y="244" font-family="Segoe UI" font-size="11" fill="#3a4a5a">We add one.</text>
+
+      <rect x="456" y="132" width="192" height="130" rx="7" fill="#fdf8ec" stroke="#c9a23f" stroke-width="1.8"/>
+      <circle cx="480" cy="156" r="13" fill="#c9a23f"/>
+      <text x="480" y="161" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#fff">3</text>
+      <text x="502" y="161" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#8a6209">Finishing a contest</text>
+      <text x="470" y="188" font-family="Segoe UI" font-size="11" fill="#3a4a5a">Closing out a contest</text>
+      <text x="470" y="204" font-family="Segoe UI" font-size="11" fill="#3a4a5a">currently means closing</text>
+      <text x="470" y="220" font-family="Segoe UI" font-size="11" fill="#3a4a5a">trading positions. Each</text>
+      <text x="470" y="236" font-family="Segoe UI" font-size="11" fill="#3a4a5a">game gets its own way</text>
+      <text x="470" y="252" font-family="Segoe UI" font-size="11" fill="#3a4a5a">of finishing.</text>
+
+      <rect x="660" y="132" width="192" height="130" rx="7" fill="#ecf3fa" stroke="#1c5788" stroke-width="1.8"/>
+      <circle cx="684" cy="156" r="13" fill="#1c5788"/>
+      <text x="684" y="161" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#fff">4</text>
+      <text x="706" y="161" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#1c5788">The gameplay</text>
+      <text x="674" y="188" font-family="Segoe UI" font-size="11" fill="#3a4a5a">Charts, orders and</text>
+      <text x="674" y="204" font-family="Segoe UI" font-size="11" fill="#3a4a5a">positions are trading-only.</text>
+      <text x="674" y="228" font-family="Segoe UI" font-size="11" font-weight="700" fill="#1a6e49">Not changed at all &mdash;</text>
+      <text x="674" y="244" font-family="Segoe UI" font-size="11" font-weight="700" fill="#1a6e49">it simply becomes</text>
+      <text x="674" y="260" font-family="Segoe UI" font-size="11" font-weight="700" fill="#1a6e49">&ldquo;the trading game&rdquo;.</text>
+
+      <rect x="30" y="292" width="840" height="58" rx="8" fill="#eaf6ef" stroke="#1a6e49" stroke-width="1.8"/>
+      <text x="48" y="316" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#1a6e49">REUSE AS-IS &mdash; the money layer</text>
+      <text x="48" y="336" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">wallet &middot; audit trail &middot; entry fees &middot; prize maths &middot; our fee &middot; unclaimed pots &middot; refunds &middot; Game Master share</text>
+
+      <rect x="30" y="364" width="840" height="52" rx="8" fill="#f7f9fc" stroke="#a9b8c6" stroke-width="1.6"/>
+      <text x="48" y="386" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#3a4a5a">KEEP, AND RUN ONLY WHEN NEEDED &mdash; live market prices and trading data</text>
+      <text x="48" y="404" font-family="Segoe UI" font-size="11.5" fill="#6b7d8f">Never removed. It is switched on when trading is in use and idle when it is not.</text>
+    </svg>
+    <figcaption>Green is reused unchanged. Gold is the genuinely new work. Blue stays exactly as it is and becomes the trading game. Grey is infrastructure we keep permanently and simply leave idle when no trading is happening.</figcaption>
+  </figure>
+
+  <div class="cal info">
+    <div class="t">Deliberately not on the list</div>
+    <p>We are <b>not</b> deleting trading, <b>not</b> rewriting the payment system, <b>not</b> splitting the wallet, and <b>not</b> running a second website. Each of those was considered and rejected as more expensive and far riskier than the approach above.</p>
+  </div>
+</section>
+
+<!-- ================= 4 TARGET ================= -->
+<section id="target">
+  <div class="sec-h"><div class="sec-n">4</div><h2>How it will work</h2></div>
+  <p class="sec-sub">One shared engine, many plug-in games.</p>
+
+  <div class="cal plain">
+    <div class="t">In plain words</div>
+    <p>Every contest gets a <b>label</b> saying which game it is. Each game then has its own small <b>plug-in</b> that knows three things: how to set the game up, how to score it, and how to finish it. The shared engine stops caring what the game is &mdash; it only knows that players earn a <b>score</b>, scores produce <b>finishing positions</b>, and positions receive <b>prizes</b>.</p>
+  </div>
+
+  <figure>
+    <div class="fig-t">Diagram 3 &mdash; Before and after</div>
+    <svg viewBox="0 0 900 500" role="img" aria-label="Before, the engine is wired directly to trading. After, the engine asks a game selector which plug-in applies.">
+      <text x="30" y="26" font-family="Segoe UI" font-size="11.5" letter-spacing="1.6" font-weight="700" fill="#6b7d8f">BEFORE &mdash; wired to one game</text>
+      <rect x="30" y="38" width="230" height="52" rx="7" fill="#fff" stroke="#dde4ec" stroke-width="1.5"/>
+      <text x="145" y="60" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#0d2338">A competition</text>
+      <text x="145" y="78" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#6b7d8f">trading settings built in</text>
+      <line x1="145" y1="92" x2="145" y2="116" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+      <rect x="30" y="120" width="230" height="76" rx="7" fill="#ecf3fa" stroke="#1c5788" stroke-width="1.8"/>
+      <text x="145" y="144" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#1c5788">Finishing the contest</text>
+      <text x="145" y="163" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">closes trading positions</text>
+      <text x="145" y="180" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">ranks by trading profit</text>
+      <line x1="145" y1="198" x2="145" y2="222" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+      <rect x="60" y="226" width="170" height="42" rx="7" fill="#f7f9fc" stroke="#a9b8c6" stroke-width="1.5"/>
+      <text x="145" y="252" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">Trading results only</text>
+      <text x="145" y="296" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#6b7d8f" font-style="italic">One game possible. A second</text>
+      <text x="145" y="312" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#6b7d8f" font-style="italic">would mean copying everything.</text>
+
+      <line x1="300" y1="30" x2="300" y2="470" stroke="#dde4ec" stroke-width="1.5" stroke-dasharray="5 5"/>
+
+      <text x="340" y="26" font-family="Segoe UI" font-size="11.5" letter-spacing="1.6" font-weight="700" fill="#1a6e49">AFTER &mdash; games plug in</text>
+      <rect x="340" y="38" width="520" height="52" rx="7" fill="#fff" stroke="#c9a23f" stroke-width="1.8"/>
+      <text x="600" y="62" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#0d2338">A competition &nbsp;+&nbsp; which game it is &nbsp;+&nbsp; that game&rsquo;s settings</text>
+      <text x="600" y="79" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#8a6209">the label is chosen once, when the contest is created</text>
+      <line x1="600" y1="92" x2="600" y2="112" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <rect x="340" y="116" width="520" height="92" rx="7" fill="#eaf6ef" stroke="#1a6e49" stroke-width="2"/>
+      <text x="600" y="140" text-anchor="middle" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#1a6e49">THE SHARED ENGINE &mdash; unchanged</text>
+      <text x="600" y="160" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">lock entries &middot; rank &middot; split the pot &middot; pay winners &middot; take our fee &middot; refund &middot; notify</text>
+      <text x="600" y="182" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">All it knows is: players earn a score, scores make positions,</text>
+      <text x="600" y="198" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">positions receive prizes.</text>
+      <line x1="600" y1="210" x2="600" y2="234" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <rect x="452" y="238" width="296" height="46" rx="7" fill="#fdf8ec" stroke="#c9a23f" stroke-width="1.8"/>
+      <text x="600" y="266" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#8a6209">GAME SELECTOR &mdash; &ldquo;whose rules apply?&rdquo;</text>
+
+      <line x1="520" y1="286" x2="440" y2="322" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <line x1="600" y1="286" x2="600" y2="322" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <line x1="680" y1="286" x2="760" y2="322" stroke="#6b7d8f" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#ar)"/>
+
+      <rect x="352" y="326" width="152" height="104" rx="7" fill="#ecf3fa" stroke="#1c5788" stroke-width="1.8"/>
+      <text x="428" y="348" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#1c5788">TRADING</text>
+      <text x="428" y="368" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#3a4a5a">positions, profit,</text>
+      <text x="428" y="383" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#3a4a5a">live market prices</text>
+      <text x="428" y="406" text-anchor="middle" font-family="Segoe UI" font-size="10.5" font-weight="700" fill="#1a6e49">exactly as today</text>
+      <text x="428" y="421" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#6b7d8f">nothing removed</text>
+
+      <rect x="524" y="326" width="152" height="104" rx="7" fill="#fdf8ec" stroke="#c9a23f" stroke-width="1.8"/>
+      <text x="600" y="348" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#8a6209">TRIVIA</text>
+      <text x="600" y="368" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#3a4a5a">questions, answers,</text>
+      <text x="600" y="383" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#3a4a5a">score, speed bonus</text>
+      <text x="600" y="406" text-anchor="middle" font-family="Segoe UI" font-size="10.5" font-weight="700" fill="#8a6209">the new game</text>
+      <text x="600" y="421" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#6b7d8f">no market data needed</text>
+
+      <rect x="696" y="326" width="152" height="104" rx="7" fill="#f7f9fc" stroke="#a9b8c6" stroke-width="1.6" stroke-dasharray="5 4"/>
+      <text x="772" y="348" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#6b7d8f">FUTURE GAME</text>
+      <text x="772" y="368" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#6b7d8f">chess, puzzles,</text>
+      <text x="772" y="383" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#6b7d8f">esports, sports&hellip;</text>
+      <text x="772" y="406" text-anchor="middle" font-family="Segoe UI" font-size="10.5" font-weight="700" fill="#6b7d8f">plugs into the</text>
+      <text x="772" y="421" text-anchor="middle" font-family="Segoe UI" font-size="10.5" font-weight="700" fill="#6b7d8f">same engine</text>
+
+      <text x="600" y="462" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#6b7d8f" font-style="italic">The test we hold ourselves to: adding game number three must require no change to the shared engine at all.</text>
+    </svg>
+    <figcaption><b>This is the commercial point of the whole plan.</b> The first new game costs the most because it forces us to build the plug-in system. Every game after that is largely rules and content &mdash; which is what turns ChartVolt from a product into a platform.</figcaption>
+  </figure>
+
+  <h3>What each game brings, and what stays shared</h3>
+  <div class="grid g2">
+    <div class="card">
+      <h4 style="margin-top:0">The game provides</h4>
+      <ul style="margin-bottom:0">
+        <li>Its own settings, and a check that an operator&rsquo;s choices make sense</li>
+        <li>What a player starts with</li>
+        <li>How players are scored and ranked</li>
+        <li>How the contest is finished and final scores produced</li>
+        <li>Its own screens and its own language</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">The platform provides</h4>
+      <ul style="margin-bottom:0">
+        <li>Entry fees, wallet and full audit trail</li>
+        <li>The prize pot and how it splits by position</li>
+        <li>Our fee and unclaimed prize handling</li>
+        <li>Refunds and cancellations</li>
+        <li>Fraud and eligibility checks</li>
+        <li>Levels, badges, leaderboards, notifications</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Two things kept separate</h3>
+  <p>It is worth understanding the difference, because it explains the grid of products we can offer:</p>
+  <div class="tw"><table>
+    <thead><tr><th style="width:24%">Idea</th><th style="width:30%">Options</th><th>What it decides</th></tr></thead>
+    <tbody>
+      <tr><td><b>Contest format</b></td><td>Competition (two or more players) or challenge (exactly two)</td><td>How many players and how the prizes split</td></tr>
+      <tr><td><b>Game</b></td><td>Trading, trivia, and more later</td><td>What the players actually do</td></tr>
+    </tbody>
+  </table></div>
+  <p>Today we have two formats and one game. The target is two formats and many games &mdash; so a single new game immediately gives us more than one product, and a game can decline a format that does not suit it.</p>
+</section>
+
+<!-- ================= 5 POINTS ================= -->
+<section id="points">
+  <div class="sec-h"><div class="sec-n">5</div><h2>Points and leaderboards</h2></div>
+  <p class="sec-sub">The most interesting design problem: making different games fairly comparable.</p>
+
+  <div class="cal plain">
+    <div class="t">In plain words &mdash; the problem</div>
+    <p>A trader might finish with a profit of <b>+4,382</b>. A quiz player might finish with a score of <b>87</b>. You cannot put those in one league table &mdash; the trader would always look better, which means nothing. So we need a <b>fair way to convert both into the same currency</b>.</p>
+  </div>
+
+  <figure>
+    <div class="fig-t">Diagram 4 &mdash; Turning different games into one fair currency</div>
+    <svg viewBox="0 0 900 330" role="img" aria-label="Raw scores from different games are converted into shared points using finishing position, number of players and stake">
+      <text x="30" y="24" font-family="Segoe UI" font-size="11" letter-spacing="1.4" font-weight="700" fill="#6b7d8f">RAW RESULTS &mdash; NOT COMPARABLE</text>
+      <rect x="30" y="36" width="188" height="60" rx="7" fill="#ecf3fa" stroke="#1c5788" stroke-width="1.6"/>
+      <text x="124" y="58" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#1c5788">Trading profit</text>
+      <text x="124" y="82" text-anchor="middle" font-family="Segoe UI" font-size="17" font-weight="700" fill="#0d2338">+4,382</text>
+      <rect x="30" y="106" width="188" height="60" rx="7" fill="#fdf8ec" stroke="#c9a23f" stroke-width="1.6"/>
+      <text x="124" y="128" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#8a6209">Quiz score</text>
+      <text x="124" y="152" text-anchor="middle" font-family="Segoe UI" font-size="17" font-weight="700" fill="#0d2338">87</text>
+      <text x="124" y="196" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#6b7d8f" font-style="italic">Different units. Comparing them</text>
+      <text x="124" y="211" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#6b7d8f" font-style="italic">directly would be meaningless.</text>
+
+      <line x1="228" y1="100" x2="272" y2="100" stroke="#6b7d8f" stroke-width="1.8" marker-end="url(#ar)"/>
+
+      <rect x="278" y="30" width="288" height="200" rx="9" fill="#eaf6ef" stroke="#1a6e49" stroke-width="2"/>
+      <text x="422" y="54" text-anchor="middle" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#1a6e49">THE FAIR CONVERSION</text>
+      <text x="422" y="72" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#6b7d8f">based on how you placed, not what you scored</text>
+      <g font-family="Segoe UI" font-size="11.5" fill="#1b2733">
+        <text x="298" y="102">1. Where did you finish?</text>
+        <text x="312" y="118" font-size="10.5" fill="#6b7d8f">1st of 100 beats 1st of 3</text>
+        <text x="298" y="146">2. How many players?</text>
+        <text x="312" y="162" font-size="10.5" fill="#6b7d8f">a bigger field earns more credit</text>
+        <text x="298" y="190">3. How big was the stake?</text>
+        <text x="312" y="206" font-size="10.5" fill="#6b7d8f">it counts, but only mildly</text>
+      </g>
+
+      <line x1="576" y1="130" x2="620" y2="130" stroke="#6b7d8f" stroke-width="1.8" marker-end="url(#ar)"/>
+
+      <rect x="626" y="70" width="244" height="120" rx="9" fill="#0d2338"/>
+      <text x="748" y="98" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#f0dda6">ONE SHARED CURRENCY</text>
+      <text x="748" y="132" text-anchor="middle" font-family="Segoe UI" font-size="26" font-weight="700" fill="#fff">0 &ndash; 1000</text>
+      <text x="748" y="156" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#bccfe0">points per contest</text>
+      <text x="748" y="176" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#8fa8bf">works for every game, present and future</text>
+
+      <text x="450" y="264" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">Because it looks only at <tspan font-weight="700">how you placed</tspan>, this conversion never has to change when a new game is added.</text>
+      <text x="450" y="290" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">It also closes the obvious loophole: you cannot climb the table by running tiny contests against friends.</text>
+      <text x="450" y="314" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#6b7d8f" font-style="italic">No single contest can ever dominate a season, however large the entry fee.</text>
+    </svg>
+    <figcaption><b>Three ideas kept separate:</b> the <b>raw score</b> decides who wins that contest; <b>shared points</b> compare achievement across games; the <b>skill rating</b> measures how good a player really is. Mixing the first two together is what makes most multi-game leaderboards feel unfair.</figcaption>
+  </figure>
+
+  <h3>Points versus rating</h3>
+  <div class="grid g2">
+    <div class="card">
+      <h4 style="margin-top:0">Points reward playing a lot</h4>
+      <p style="margin-bottom:0">They accumulate over a season, drive progression and can decide seasonal prizes. A player who competes often will climb.</p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">Rating rewards playing well</h4>
+      <p style="margin-bottom:0">A per-game skill number, shown as something like &ldquo;Trading 1840 &middot; Trivia 1610&rdquo;. It rises and falls with results rather than volume, so it cannot be farmed by simply entering everything.</p>
+    </div>
+  </div>
+  <p>Showing both tells an honest story and gives players two different reasons to come back. ChartVolt has no rating system today, and it is the single feature that will make several games feel like one product rather than a collection.</p>
+
+  <h3>The league tables players will see</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="width:24%">Table</th><th>Answers the question</th></tr></thead>
+    <tbody>
+      <tr><td><b>Per game</b></td><td>&ldquo;Who are the best quiz players?&rdquo; &ldquo;Who are the best traders?&rdquo;</td></tr>
+      <tr><td><b>Overall</b></td><td>&ldquo;Who are the best players on ChartVolt?&rdquo;</td></tr>
+      <tr><td><b>Per contest</b></td><td>&ldquo;Who is winning this event right now?&rdquo;</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal good">
+    <div class="t">A performance win along the way</div>
+    <p>The global league table is currently worked out from scratch every time someone opens it, which makes it slow and limits how many players it can show. As part of this work we keep a running total per player instead, so the table loads almost instantly and can show everyone rather than a capped list. Players will feel this immediately.</p>
+  </div>
+
+  <h3>Fair play by design</h3>
+  <p>Every new game invites new ways to cheat, so the counter-measures are designed in from the start rather than added after an incident:</p>
+  <div class="tw"><table>
+    <thead><tr><th style="width:40%">The loophole</th><th>How it is closed</th></tr></thead>
+    <tbody>
+      <tr><td>Farming points in tiny private contests</td><td>Points scale with the size of the field, and a minimum number of players is required before points count at all</td></tr>
+      <tr><td>Two friends trading wins back and forth</td><td>Repeated challenges against the same opponent earn steeply reduced points, and our existing collusion detection extends to all games</td></tr>
+      <tr><td>One person using several accounts</td><td>Existing identity, device and location checks, plus entry limits that count every game rather than trading alone</td></tr>
+      <tr><td>Sharing quiz answers between players</td><td>Everyone sees the same questions but in a different order, so telling a friend &ldquo;the answer is B&rdquo; is useless</td></tr>
+      <tr><td>Faking a fast answer</td><td>All timing is measured on our servers and never taken from the player&rsquo;s device</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ================= 6 MONEY ================= -->
+<section id="money">
+  <div class="sec-h"><div class="sec-n">6</div><h2>Money and prizes</h2></div>
+  <p class="sec-sub">The best news in the plan: this barely changes at all.</p>
+
+  <div class="cal good">
+    <div class="t">In plain words</div>
+    <p><b>A quiz contest handles money in exactly the same way a trading contest does.</b> A player pays 10 credits to enter, the pot becomes 10 credits times the number of players, ChartVolt takes its percentage, the top positions receive their shares, and anything left over is redistributed or recorded as unclaimed. No new payment work, no new provider, no new risk.</p>
+  </div>
+
+  <figure>
+    <div class="fig-t">Diagram 5 &mdash; The money path is identical for every game</div>
+    <svg viewBox="0 0 900 220" role="img" aria-label="Entry fees form a pot, the platform fee is deducted, prizes are paid by finishing position, leftovers redistributed">
+      <rect x="14" y="60" width="132" height="66" rx="7" fill="#fff" stroke="#dde4ec" stroke-width="1.5"/>
+      <text x="80" y="86" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">Players pay</text>
+      <text x="80" y="106" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#0d2338">an entry fee</text>
+      <line x1="150" y1="93" x2="184" y2="93" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <rect x="190" y="60" width="132" height="66" rx="7" fill="#fdf8ec" stroke="#c9a23f" stroke-width="1.8"/>
+      <text x="256" y="86" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#8a6209">Prize pot</text>
+      <text x="256" y="106" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#0d2338">fee &times; players</text>
+      <line x1="326" y1="93" x2="360" y2="93" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <rect x="366" y="60" width="132" height="66" rx="7" fill="#ecf3fa" stroke="#1c5788" stroke-width="1.6"/>
+      <text x="432" y="86" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#1c5788">ChartVolt fee</text>
+      <text x="432" y="106" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#0d2338">deducted</text>
+      <line x1="502" y1="93" x2="536" y2="93" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <rect x="542" y="46" width="150" height="94" rx="7" fill="#eaf6ef" stroke="#1a6e49" stroke-width="1.8"/>
+      <text x="617" y="70" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#1a6e49">Paid by position</text>
+      <text x="617" y="92" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">1st &middot; 2nd &middot; 3rd&hellip;</text>
+      <text x="617" y="112" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">fixed percentages</text>
+      <text x="617" y="130" text-anchor="middle" font-family="Segoe UI" font-size="10.5" font-weight="700" fill="#1a6e49">never linked to a market</text>
+      <line x1="696" y1="93" x2="730" y2="93" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <rect x="736" y="60" width="150" height="66" rx="7" fill="#fff" stroke="#dde4ec" stroke-width="1.5"/>
+      <text x="811" y="82" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">Anything left over is</text>
+      <text x="811" y="100" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">redistributed or</text>
+      <text x="811" y="116" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">recorded as unclaimed</text>
+
+      <text x="450" y="176" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">This chain already knows nothing about trading, so it works unchanged for trivia or anything we add later.</text>
+      <text x="450" y="200" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#6b7d8f" font-style="italic">Keeping the shape identical across games also keeps our regulatory position consistent: performance, then placing, then a fixed prize.</text>
+    </svg>
+    <figcaption>Because prizes are calculated purely from finishing positions and percentages, once ranking understands games, <b>prize distribution needs no change whatsoever.</b></figcaption>
+  </figure>
+
+  <h3>Two details specific to quizzes</h3>
+  <div class="grid g2">
+    <div class="card">
+      <h4 style="margin-top:0">Ties will be common</h4>
+      <p style="margin-bottom:0">On a ten-question quiz many players will score the same. Splitting shared positions equally becomes the sensible default, and operators are warned before choosing winner-takes-all for a game where ties are likely.</p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">A minimum-effort rule</h4>
+      <p style="margin-bottom:0">Trading contests already require a minimum number of trades so nobody can enter and do nothing. The quiz equivalent is a minimum number of questions answered before a player qualifies for prizes.</p>
+    </div>
+  </div>
+
+  <h3>What we will be able to report</h3>
+  <p>Once every contest carries a game label, the financial dashboard can break down <b>entry-fee volume, revenue, average pot size, how full contests get and payout ratio &mdash; by game.</b> That answers the question we cannot currently answer: is a given game genuinely profitable, or is it a cheap way of acquiring customers who then do something else?</p>
+
+  <div class="cal info">
+    <div class="t">Regulatory position</div>
+    <p>The money structure stays deliberately identical across every game: a <b>fixed entry fee, a pooled prize, and a fixed prize based on finishing position</b>. Adding more skill games with that same structure <i>strengthens</i> our position, because it shows the business monetises competitive skill in general rather than exposure to financial markets. Each new game is assessed on its own merits for skill before launch, and prizes will never be tied to a continuous measure of performance.</p>
+  </div>
+
+  <h3>A second revenue line, and a limit we are placing on it deliberately</h3>
+  <p>The platform already sells items &mdash; indicators and bots for trading. As the catalogue grows, that store can carry items for every game, with ownership tracked per game. It is worth doing, but it earns very little until several games have a real population playing them, so it is not on the critical path.</p>
+
+  <div class="cal bad">
+    <div class="t">Nothing sold will improve a player&rsquo;s score or ranking in a paid contest</div>
+    <p>This rule gives up some revenue, and we are giving it up on purpose, for three reasons that each stand on their own. <b>Trust:</b> in a contest with real prize money, a player who discovers that a paying rival had an advantage does not complain &mdash; they leave, and they tell others. <b>Regulation:</b> our entire position rests on outcomes being decided by skill; the moment spending measurably changes results, that argument weakens. <b>Payments:</b> &ldquo;I paid for an advantage and still lost&rdquo; produces card disputes, and dispute rates are what put a merchant account at risk. The cost of this rule is a modest amount of forgone revenue. The cost of breaking it is the business.</p>
+  </div>
+
+  <div class="grid g2">
+    <div class="card" style="border-color:#b6ddc6;background:#eaf6ef">
+      <h4 style="color:#1a6e49;margin-top:0">What we will sell</h4>
+      <ul style="margin-bottom:0">
+        <li>Appearance &mdash; avatars, frames, name colours, themes</li>
+        <li>Titles and display badges, cosmetic only</li>
+        <li>Entry-fee vouchers and discounts</li>
+        <li>Extra <b>practice</b> rounds, outside ranked play</li>
+        <li>Richer personal statistics and history</li>
+      </ul>
+    </div>
+    <div class="card" style="border-color:#f0c3c9;background:#fdedef">
+      <h4 style="color:#a02a38;margin-top:0">What we will not sell</h4>
+      <ul style="margin-bottom:0">
+        <li>Anything that adds points or score</li>
+        <li>Extra time, lives, retries, hints or skips</li>
+        <li>Extra attempts in a one-attempt contest</li>
+        <li>Easier content inside a ranked contest</li>
+        <li><b>Random or mystery packs, even cosmetic ones</b></li>
+      </ul>
+    </div>
+  </div>
+
+  <p style="margin-bottom:0">The last one deserves a word of explanation, because loot boxes are a large and proven revenue line elsewhere. Paying real money for a randomised reward introduces exactly the <b>element of chance</b> that our regulatory position depends on being absent, and it makes no difference that the item is only decorative. Where packs are commercially attractive, we will sell <b>known contents at a known price</b>.</p>
+</section>
+
+<!-- ================= 7 GAMIFY ================= -->
+<section id="gamify">
+  <div class="sec-h"><div class="sec-n">7</div><h2>Levels, badges and the player journey</h2></div>
+  <p class="sec-sub">Mostly a content exercise rather than an engineering one.</p>
+
+  <div class="cal plain">
+    <div class="t">In plain words</div>
+    <p>The systems that award experience, hand out badges and guide a player&rsquo;s journey are <b>already built and already editable from the admin panel</b>. Most of the work here is <b>writing new content</b> &mdash; new badge names, new milestones &mdash; not new software.</p>
+  </div>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:24%">System</th><th style="width:26%">Current state</th><th>What changes</th></tr></thead>
+    <tbody>
+      <tr><td><b>Experience and levels</b></td><td>Works well, editable</td><td>The 20 level titles currently run from &ldquo;Novice Trader&rdquo; to &ldquo;Trading God&rdquo;. They become game-neutral.</td></tr>
+      <tr><td><b>Badges</b></td><td>Works well, editable, with rarity tiers</td><td>Existing badges are marked as trading badges; new quiz badges are added.</td></tr>
+      <tr><td><b>Achievements</b></td><td>One long list of trading conditions</td><td>Each game supplies its own achievements instead of one ever-growing list.</td></tr>
+      <tr><td><b>Journey maps</b></td><td>Already editable in admin</td><td>A shared starting journey, then a branch per game.</td></tr>
+      <tr><td><b>Skill rating</b></td><td>Does not exist yet</td><td>New &mdash; see section 5.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal good">
+    <div class="t">A free win on day one</div>
+    <p>Many existing badges are <b>already game-neutral in substance</b> &mdash; contests entered, wins, podium finishes, deposits, account verification, social badges. Simply marking those as applying to all games gives quiz players a full, meaningful badge collection from launch at <b>no content cost at all</b>.</p>
+  </div>
+
+  <h3>The rule that protects the experience</h3>
+  <p>A player who has never traded will <b>never be shown trading badges or trading achievements</b>. A list of goals you can never complete is worse than no list &mdash; it actively puts people off. Every player sees only what is achievable for the games they actually play.</p>
+
+  <h3>New level titles</h3>
+  <p>Because titles are editable from the admin panel, this is a content change we can make and adjust without any software release.</p>
+  <div class="tw"><table>
+    <thead><tr><th style="width:18%">Tier</th><th style="width:14%">Levels</th><th>Titles</th></tr></thead>
+    <tbody>
+      <tr><td>Beginner</td><td>1&ndash;5</td><td>Rookie &middot; Challenger &middot; Contender &middot; Competitor &middot; Rising Star</td></tr>
+      <tr><td>Intermediate</td><td>6&ndash;10</td><td>Skilled Player &middot; Specialist &middot; Veteran &middot; Strategist &middot; Elite Competitor</td></tr>
+      <tr><td>Advanced</td><td>11&ndash;15</td><td>Master &middot; Grandmaster &middot; Champion &middot; Prodigy &middot; Virtuoso</td></tr>
+      <tr><td>Elite</td><td>16&ndash;20</td><td>Legend &middot; Titan &middot; Icon &middot; Immortal &middot; ChartVolt Legend</td></tr>
+    </tbody>
+  </table></div>
+  <p>Per-game flavour is kept alongside &mdash; &ldquo;Trivia Grandmaster&rdquo;, &ldquo;Trading Master&rdquo; &mdash; so we keep the fun of a specialist title while the account itself carries a neutral one.</p>
+</section>
+
+<!-- ================= 8 ADMIN ================= -->
+<section id="admin">
+  <div class="sec-h"><div class="sec-n">8</div><h2>Running the platform</h2></div>
+  <p class="sec-sub">What changes for the team who create and manage contests.</p>
+
+  <div class="cal plain">
+    <div class="t">In plain words</div>
+    <p>Creating a contest today is a step-by-step wizard. We add <b>one new step at the start &mdash; &ldquo;which game?&rdquo; &mdash; and two of the later steps then adapt</b> to the game chosen. Everything else an operator already knows stays the same.</p>
+  </div>
+
+  <h3>A clearer menu</h3>
+  <p>Today competitions live under a menu heading called &ldquo;Trading&rdquo;. Once quizzes exist, that no longer makes sense. The admin panel reorganises into three clear groups:</p>
+  <div class="grid g3">
+    <div class="card">
+      <h4 style="margin-top:0">COMPETITIONS</h4>
+      <p style="margin-bottom:0;font-size:14px">Every contest, whatever the game, with a filter by game. Plus a new screen for switching games on and off.</p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">TRADING</h4>
+      <p style="margin-bottom:0;font-size:14px">Trading-only tools: history, market hours, instruments, market data, risk settings. Hidden entirely if trading is switched off.</p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">TRIVIA</h4>
+      <p style="margin-bottom:0;font-size:14px">Question bank, categories and quiz settings. Appears only when trivia is switched on.</p>
+    </div>
+  </div>
+
+  <h3>Creating a contest</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="width:22%">Step</th><th>What changes</th></tr></thead>
+    <tbody>
+      <tr><td><b>1. Which game</b></td><td><span class="b ok">New</span> Choose the game. Locked once players have joined.</td></tr>
+      <tr><td>2&ndash;4. Basics, entry fee, schedule</td><td>Unchanged</td></tr>
+      <tr><td><b>5. Game settings</b></td><td><span class="b med">Adapts</span> Trading shows today&rsquo;s screen exactly. Trivia shows category, number of questions, seconds per question and difficulty mix.</td></tr>
+      <tr><td>6. Prizes</td><td>Unchanged</td></tr>
+      <tr><td><b>7. Rules</b></td><td><span class="b med">Adapts</span> The ranking options offered come from the chosen game.</td></tr>
+      <tr><td>8. Review and launch</td><td>Unchanged, with the game shown prominently</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>The question bank</h3>
+  <p>This is the largest new admin screen, and it is what determines whether the quiz game feels fair and fresh:</p>
+  <ul>
+    <li><b>Bulk import</b>, so thousands of questions can be loaded rather than typed one at a time.</li>
+    <li><b>Duplicate detection</b>, so the same question never appears twice in one contest.</li>
+    <li><b>Statistics per question.</b> A question nearly everyone gets right tells us nothing about skill and is retired; one nearly everyone gets wrong is probably mistaken. This is the quality loop that keeps the game honest.</li>
+    <li><b>AI-assisted drafting with human approval.</b> The platform already generates other content with AI, so drafting questions is natural reuse &mdash; but every question is approved by a person before it can appear in a paid contest.</li>
+  </ul>
+
+  <div class="cal info">
+    <div class="t">An operating rule worth knowing</div>
+    <p>We keep <b>at least ten times as many questions as any single contest uses.</b> That is what stops regular players seeing the same questions repeatedly, and it is a content commitment rather than a software one.</p>
+  </div>
+</section>
+
+<!-- ================= 9 UI ================= -->
+<section id="ui">
+  <div class="sec-h"><div class="sec-n">9</div><h2>What players see</h2></div>
+  <p class="sec-sub">One familiar journey, with only the middle step differing by game.</p>
+
+  <figure>
+    <div class="fig-t">Diagram 6 &mdash; The player journey</div>
+    <svg viewBox="0 0 900 300" role="img" aria-label="Players browse, enter a lobby, are routed to trading or quiz gameplay, then see shared results">
+      <rect x="20" y="52" width="140" height="60" rx="7" fill="#eaf6ef" stroke="#1a6e49" stroke-width="1.7"/>
+      <text x="90" y="76" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#1a6e49">Browse</text>
+      <text x="90" y="95" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#3a4a5a">filter by game</text>
+      <line x1="164" y1="82" x2="192" y2="82" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <rect x="198" y="52" width="140" height="60" rx="7" fill="#eaf6ef" stroke="#1a6e49" stroke-width="1.7"/>
+      <text x="268" y="76" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#1a6e49">Contest lobby</text>
+      <text x="268" y="95" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#3a4a5a">rules, how to play, join</text>
+      <line x1="342" y1="82" x2="370" y2="82" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <rect x="376" y="44" width="146" height="76" rx="7" fill="#fdf8ec" stroke="#c9a23f" stroke-width="2"/>
+      <text x="449" y="72" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#8a6209">Play</text>
+      <text x="449" y="93" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#3a4a5a">takes you to the right</text>
+      <text x="449" y="108" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#3a4a5a">screen for the game</text>
+
+      <line x1="526" y1="66" x2="566" y2="42" stroke="#1c5788" stroke-width="1.6" marker-end="url(#ar)"/>
+      <line x1="526" y1="98" x2="566" y2="122" stroke="#c9a23f" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <rect x="572" y="14" width="164" height="60" rx="7" fill="#ecf3fa" stroke="#1c5788" stroke-width="1.7"/>
+      <text x="654" y="36" text-anchor="middle" font-family="Segoe UI" font-size="11.5" font-weight="700" fill="#1c5788">Trading terminal</text>
+      <text x="654" y="54" text-anchor="middle" font-family="Segoe UI" font-size="10" fill="#3a4a5a">charts and live prices</text>
+      <text x="654" y="68" text-anchor="middle" font-family="Segoe UI" font-size="9.5" fill="#6b7d8f">exactly as today</text>
+
+      <rect x="572" y="96" width="164" height="60" rx="7" fill="#fdf8ec" stroke="#c9a23f" stroke-width="1.7"/>
+      <text x="654" y="118" text-anchor="middle" font-family="Segoe UI" font-size="11.5" font-weight="700" fill="#8a6209">Quiz screen</text>
+      <text x="654" y="136" text-anchor="middle" font-family="Segoe UI" font-size="10" fill="#3a4a5a">question, timer, options</text>
+      <text x="654" y="150" text-anchor="middle" font-family="Segoe UI" font-size="9.5" fill="#6b7d8f">light and fast on mobile</text>
+
+      <line x1="740" y1="44" x2="770" y2="76" stroke="#6b7d8f" stroke-width="1.5"/>
+      <line x1="740" y1="126" x2="770" y2="96" stroke="#6b7d8f" stroke-width="1.5"/>
+      <rect x="776" y="52" width="110" height="60" rx="7" fill="#eaf6ef" stroke="#1a6e49" stroke-width="1.7"/>
+      <text x="831" y="76" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#1a6e49">Results</text>
+      <text x="831" y="95" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#3a4a5a">and prizes</text>
+
+      <rect x="20" y="196" width="866" height="42" rx="7" fill="#0d2338"/>
+      <text x="453" y="222" text-anchor="middle" font-family="Segoe UI" font-size="12" fill="#f0dda6">Shared the whole way: wallet &middot; credits &middot; leaderboard &middot; profile &middot; levels &middot; badges &middot; journey &middot; messages &middot; notifications</text>
+
+      <text x="453" y="272" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">Green screens are shared by every game. Only the middle step differs.</text>
+      <text x="453" y="292" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#6b7d8f" font-style="italic">A player who knows how to enter a trading competition already knows how to enter a quiz.</text>
+    </svg>
+    <figcaption><b>Why this matters for conversion.</b> Browsing, joining, paying and collecting prizes are learned once and then work for every game. The only thing a returning player has to learn about a new game is the game itself.</figcaption>
+  </figure>
+
+  <h3>How players find a game</h3>
+  <p>This is the change with the biggest commercial consequence, so it is worth being precise about it. Today a player arrives at a list of competitions. In the new design a player arrives at a <b>catalogue of games</b> &mdash; each with its own page, its own artwork, its own description and its own league table &mdash; and picks the one that appeals to them. The competitions for that game are shown on the game's own page.</p>
+
+  <figure>
+    <div class="fig-t">Diagram &mdash; the journey to a paid entry</div>
+    <svg viewBox="0 0 920 172" role="img" aria-label="Games catalogue leads to a game page, then a competition, then joining">
+      <rect x="14" y="18" width="196" height="94" rx="8" fill="#eaf6ef" stroke="#1a6e49" stroke-width="1.8"/>
+      <text x="112" y="46" text-anchor="middle" font-family="Segoe UI" font-size="13" font-weight="700" fill="#1a6e49">Games</text>
+      <text x="112" y="68" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">the whole catalogue,</text>
+      <text x="112" y="84" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">presented like a store</text>
+      <text x="112" y="104" text-anchor="middle" font-family="Segoe UI" font-size="10" fill="#6b7d8f" font-style="italic">new</text>
+      <line x1="216" y1="65" x2="244" y2="65" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+      <rect x="250" y="18" width="216" height="94" rx="8" fill="#eaf6ef" stroke="#1a6e49" stroke-width="1.8"/>
+      <text x="358" y="46" text-anchor="middle" font-family="Segoe UI" font-size="13" font-weight="700" fill="#1a6e49">One game's page</text>
+      <text x="358" y="68" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">what it is, how to play,</text>
+      <text x="358" y="84" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">its contests, its champions</text>
+      <text x="358" y="104" text-anchor="middle" font-family="Segoe UI" font-size="10" fill="#6b7d8f" font-style="italic">new</text>
+      <line x1="472" y1="65" x2="500" y2="65" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+      <rect x="506" y="18" width="186" height="94" rx="8" fill="#fff" stroke="#dde4ec" stroke-width="1.8"/>
+      <text x="599" y="46" text-anchor="middle" font-family="Segoe UI" font-size="13" font-weight="700" fill="#143a5c">A competition</text>
+      <text x="599" y="68" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">entry fee, prize table,</text>
+      <text x="599" y="84" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">who has joined</text>
+      <text x="599" y="104" text-anchor="middle" font-family="Segoe UI" font-size="10" fill="#1a6e49" font-style="italic">already built</text>
+      <line x1="698" y1="65" x2="726" y2="65" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+      <rect x="732" y="18" width="174" height="94" rx="8" fill="#fff" stroke="#dde4ec" stroke-width="1.8"/>
+      <text x="819" y="46" text-anchor="middle" font-family="Segoe UI" font-size="13" font-weight="700" fill="#143a5c">Join and play</text>
+      <text x="819" y="68" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">pay from the wallet</text>
+      <text x="819" y="84" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">that exists today</text>
+      <text x="819" y="104" text-anchor="middle" font-family="Segoe UI" font-size="10" fill="#1a6e49" font-style="italic">already built</text>
+      <text x="460" y="148" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">Only the two green boxes are new work. Everything that takes money and pays prizes already runs in production.</text>
+    </svg>
+    <figcaption><b>The list of all open competitions stays too.</b> Some people shop by game, others by what starts soonest or has the biggest prize pot. Both audiences get served, and neither route is a compromise.</figcaption>
+  </figure>
+
+  <div class="cal good">
+    <div class="t">Why the catalogue matters commercially</div>
+    <p>Three things it buys us. <b>A reason to return</b> &mdash; a catalogue that grows is a reason to check back, in a way a longer list of contests is not. <b>Search traffic</b> &mdash; a page per game is a page that can be found by people searching for that game, rather than for trading. <b>A place to promote</b> &mdash; featuring a game, launching one, or announcing one as coming soon becomes a merchandising decision made in the admin panel in minutes, not a development task.</p>
+  </div>
+
+  <div class="cal info">
+    <div class="t">Each game's page is edited like a product listing</div>
+    <p>Name, tagline, description, rules, how to play, artwork, category and position in the catalogue are all editable in the admin panel while the site is running. Adding a seasonal variant, refreshing artwork or promoting a game to the front row needs no developer and no release. That is deliberate: <b>merchandising should move at marketing speed, not release speed.</b></p>
+  </div>
+
+  <h3>The personal dashboard</h3>
+  <p>The dashboard currently shows six trading figures &mdash; capital, profit, open positions, trades, win rate and so on. A quiz-only player would see six empty boxes.</p>
+  <div class="cal good">
+    <div class="t">The rule we follow</div>
+    <p>A player sees <b>one section for each game they actually play</b>, and nothing for games they do not. No empty boxes, no jargon they did not ask for. A shared header carries the things that matter to everyone: credits, total points, rating and active contests.</p>
+  </div>
+
+  <h3>Help and guidance</h3>
+  <p>Our help centre is substantial and good. Rather than rewriting it, we <b>split</b> it into a shared core &mdash; account, wallet, deposits, withdrawals, verification, levels, badges, fair play, support &mdash; plus one guide per game. The existing trading content is kept word for word as the trading guide, and a new quiz guide is written alongside it.</p>
+</section>
+
+<!-- ================= 10 WORDS ================= -->
+<section id="words">
+  <div class="sec-h"><div class="sec-n">10</div><h2>Brand and language</h2></div>
+  <p class="sec-sub">The platform speaks about competitions; each game keeps its own voice.</p>
+
+  <div class="cal plain">
+    <div class="t">In plain words</div>
+    <p>Today the product calls people &ldquo;traders&rdquo; and calls its section &ldquo;Trading&rdquo;. That has to become neutral in the <b>shared parts</b> of the product, while each game keeps its own natural language inside its own screens. A trader still sees trading words; a quiz player sees quiz words; the shell around both is game-neutral.</p>
+  </div>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:34%">Where</th><th style="width:28%">Today</th><th>Proposed</th></tr></thead>
+    <tbody>
+      <tr><td>Main menu section</td><td>&ldquo;Trading&rdquo;</td><td>&ldquo;Compete&rdquo;</td></tr>
+      <tr><td>Default name for a player</td><td>&ldquo;Trader&rdquo;</td><td>&ldquo;Player&rdquo;</td></tr>
+      <tr><td>The 20 level titles</td><td>&ldquo;Novice Trader&rdquo; &hellip; &ldquo;Trading God&rdquo;</td><td>Neutral ladder (section 7)</td></tr>
+      <tr><td>Homepage statistics</td><td>&ldquo;Active Traders&rdquo;</td><td>&ldquo;Active Players&rdquo;</td></tr>
+      <tr><td>Help centre headings</td><td>&ldquo;Trader&rsquo;s Journey&rdquo;, &ldquo;Trader Levels&rdquo;</td><td>&ldquo;Your Journey&rdquo;, &ldquo;Levels&rdquo;</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal good">
+    <div class="t">Two things worth knowing</div>
+    <p><b>1. The wording lives in the admin panel</b>, so it can be adjusted at any time without a software release. Language attracts opinions, and this means opinions can be acted on the same day.</p>
+    <p style="margin-bottom:0"><b>2. The measure of success is that a trader should not notice this project happened.</b> The trading terminal, its charts, its help guide and its alerts all keep their existing language deliberately.</p>
+  </div>
+
+  <p>The Terms of Service and risk disclosures currently describe a trading competition platform. Those are contractual documents tied to our regulatory position, so they are handled on a legal track running in parallel with the build &mdash; not treated as copywriting.</p>
+</section>
+
+<!-- ================= 11 TRIVIA ================= -->
+<section id="trivia">
+  <div class="sec-h"><div class="sec-n">11</div><h2>The Trivia game</h2></div>
+  <p class="sec-sub">The first new game, chosen deliberately.</p>
+
+  <div class="cal plain">
+    <div class="t">In plain words</div>
+    <p>A timed quiz competition. Players pay to enter, answer a set of multiple-choice questions, and are ranked by score. The top positions share the pot using <b>exactly the same prize structure</b> trading competitions use today. Scoring rewards being <b>right</b>, being <b>fast</b>, and being <b>consistent</b>.</p>
+  </div>
+
+  <h3>Why trivia first</h3>
+  <div class="grid g2">
+    <div class="card">
+      <h4 style="margin-top:0">Instantly understandable</h4>
+      <p style="margin-bottom:0">No financial knowledge required. A new visitor understands the offer within seconds, which is the opposite of a trading competition.</p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">No new infrastructure</h4>
+      <p style="margin-bottom:0">It needs no market data, no live price feed and no new service &mdash; just questions and screens. That keeps the first new game cheap and low-risk.</p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">Defensible as skill</h4>
+      <p style="margin-bottom:0">Knowledge and recall speed are clearly skill rather than chance, which keeps our regulatory position consistent with trading.</p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">It proves the design</h4>
+      <p style="margin-bottom:0">Trivia is about as different from trading as a game can be. If the shared engine handles both cleanly, it will handle almost anything we add later.</p>
+    </div>
+  </div>
+
+  <h3>How scoring works</h3>
+  <div class="card">
+    <p style="margin-bottom:8px"><b>For each question:</b></p>
+    <ul style="margin-bottom:0">
+      <li>Wrong, or out of time &rarr; <b>no points</b></li>
+      <li>Correct &rarr; <b>base points</b>, plus a <b>speed bonus</b> for answering sooner, plus a <b>streak bonus</b> for consecutive correct answers</li>
+    </ul>
+  </div>
+  <p>The total decides the ranking, and total time taken breaks ties &mdash; which matters, because ties on a short quiz are common.</p>
+
+  <h3>Keeping it fair</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="width:36%">The concern</th><th>How it is handled</th></tr></thead>
+    <tbody>
+      <tr><td>&ldquo;People will look up the answers&rdquo;</td><td>A tight timer per question, and a speed bonus that rewards instant recall over searching</td></tr>
+      <tr><td>&ldquo;People will share answers&rdquo;</td><td>Everyone gets the same questions in a different order, so naming an option is useless</td></tr>
+      <tr><td>&ldquo;Automated players&rdquo;</td><td>Device checks, a minimum believable answer time, and review of impossible speed-and-accuracy combinations</td></tr>
+      <tr><td>&ldquo;The same questions keep appearing&rdquo;</td><td>Questions rotate by how often they have been used, backed by the ten-to-one content rule</td></tr>
+      <tr><td>&ldquo;My connection dropped mid-question&rdquo;</td><td>Reloading returns the same question with the correct remaining time, so nobody loses a paid contest to a dropped signal</td></tr>
+      <tr><td>&ldquo;Could a result be disputed?&rdquo;</td><td>The question set is fixed when the contest starts, so any result can be recalculated exactly and shown to be correct</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal info">
+    <div class="t">Deliberately kept for later</div>
+    <p>The first version lets players take the quiz at their own pace within the contest window. A <b>live version</b> &mdash; everyone answering the same question at the same moment, with a visible score race &mdash; is a much better spectacle and a clear future step, but it is significantly harder to build. We ship the simpler version first, learn from real players, then invest in the show.</p>
+  </div>
+</section>
+
+<!-- ================= 12 SWITCH ================= -->
+<section id="switch">
+  <div class="sec-h"><div class="sec-n">12</div><h2>Trading becomes optional</h2></div>
+  <p class="sec-sub">A business capability, not a technical detail.</p>
+
+  <div class="cal plain">
+    <div class="t">In plain words</div>
+    <p>We gain a single setting that turns trading on or off across the whole product. With it off, the platform still works completely &mdash; it simply offers other games. This matters for entering markets where trading competitions are awkward, for launching a games-only brand, and for reducing our dependence on one activity.</p>
+  </div>
+
+  <div class="grid g3">
+    <div class="card">
+      <h4 style="margin-top:0">Market flexibility</h4>
+      <p style="margin-bottom:0;font-size:14px">Some territories are simpler to enter without a trading product. The same platform can serve them with games only.</p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">White-label options</h4>
+      <p style="margin-bottom:0;font-size:14px">A partner brand can be launched as games-only, or trading-only, from the same platform.</p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">Nothing is thrown away</h4>
+      <p style="margin-bottom:0;font-size:14px">Trading is switched off, never deleted. It can be switched back on at any time with no rebuild.</p>
+    </div>
+  </div>
+
+  <div class="cal good">
+    <div class="t">The safeguard that comes with it</div>
+    <p>The switch cannot be used to strand players. If trading contests are still running, the system will <b>decline to switch trading off</b> and instead offer to switch it off once those contests finish. Open positions are always able to be priced and closed properly.</p>
+  </div>
+</section>
+
+<!-- ================= 13 SAFE ================= -->
+<section id="safe">
+  <div class="sec-h"><div class="sec-n">13</div><h2>How we keep it safe</h2></div>
+  <p class="sec-sub">The safeguards that protect trading, protect the money, and protect us from surprises.</p>
+
+  <div class="cal plain">
+    <div class="t">In plain words</div>
+    <p>The two things that must never go wrong are: <b>trading customers noticing a change</b>, and <b>prize money going to the wrong person</b>. Everything below exists to make both impossible rather than merely unlikely.</p>
+  </div>
+
+  <h3>Protecting the trading business</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="width:34%">Safeguard</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><b>Proof, not opinion</b></td><td>We recalculate a batch of <b>past, completed competitions</b> through the new system and confirm the resulting leaderboards are <b>identical</b> to the ones actually recorded at the time. That turns &ldquo;we think trading still works&rdquo; into evidence.</td></tr>
+      <tr><td><b>Move, do not rewrite</b></td><td>The trading game is created by <b>relocating</b> the existing proven code rather than rewriting it, which is what makes the proof above possible.</td></tr>
+      <tr><td><b>Trading keeps its own language</b></td><td>The terminal, its help guide and its alerts are deliberately excluded from the language changes.</td></tr>
+      <tr><td><b>Nothing removed</b></td><td>Trading infrastructure is kept permanently and simply left idle when not in use.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Protecting the money</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="width:34%">Safeguard</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><b>Two independent checks before paying out</b></td><td>Contests are checked for which game they are before any settlement work begins, and the trading settlement itself refuses to run on a non-trading contest. Two barriers on the one path where an error would cost real money.</td></tr>
+      <tr><td><b>Every payout is reconciled</b></td><td>Prizes paid plus our fee must equal the prize pot for every contest, with an alert if they ever differ.</td></tr>
+      <tr><td><b>Paying twice is impossible</b></td><td>Finishing a contest can be safely repeated without paying anyone a second time.</td></tr>
+      <tr><td><b>Real-money rehearsal</b></td><td>Before any public launch we run internal quiz contests with genuine, very small entry fees, so the payment path is proven with real money rather than assumed.</td></tr>
+      <tr><td><b>Nothing is destroyed</b></td><td>Every change to our records <b>adds</b> information rather than altering or removing it, so every step can be reversed cleanly.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>The risks we are actively managing</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="width:38%">Risk</th><th style="width:14%">Severity</th><th>How it is managed</th></tr></thead>
+    <tbody>
+      <tr><td>A quiz contest being settled as if it were a trading contest</td><td><span class="b crit">Critical</span></td><td>Two independent checks, plus monitoring of every settlement by game</td></tr>
+      <tr><td>Fair-play limits not counting the new game</td><td><span class="b high">High</span></td><td>Entry and fraud limits are updated to count all games together</td></tr>
+      <tr><td>Quiz scoring being gamed</td><td><span class="b high">High</span></td><td>Server-side timing, shuffled options, minimum answer times, anomaly review</td></tr>
+      <tr><td>Legal wording changed without review</td><td><span class="b high">High</span></td><td>Terms and disclosures handled on a separate legal track from the start</td></tr>
+      <tr><td>Players unhappy about leaderboard changes</td><td><span class="b med">Medium</span></td><td>The new table is built and compared alongside the old one before switching, and the change is explained clearly in advance</td></tr>
+      <tr><td>Not enough questions at launch</td><td><span class="b med">Medium</span></td><td>Availability is confirmed when a contest is created, and the ten-to-one content rule is an operating commitment</td></tr>
+      <tr><td>Scope creep into further games too early</td><td><span class="b med">Medium</span></td><td>The design is built for exactly two games. The third comes only after trivia is live and learned from</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal info">
+    <div class="t">On scope discipline</div>
+    <p>Our strategy work names several possible games &mdash; chess, esports, fantasy sports, coding contests. The temptation is to design for all of them now. We will not. <b>Two games is the minimum number that forces a genuinely reusable design</b>, and more than two before either is live means designing against guesses. Ship trivia, learn from real players, then add the third.</p>
+  </div>
+</section>
+
+<!-- ================= 14 ROLLOUT ================= -->
+<section id="rollout">
+  <div class="sec-h"><div class="sec-n">14</div><h2>How we launch</h2></div>
+  <p class="sec-sub">Nothing is visible to players until we choose, and every step can be reversed.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:6%">#</th><th>Step</th><th style="width:18%">Players see it?</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Groundwork put in place behind the scenes. Unused for now.</td><td>No</td></tr>
+      <tr><td>2</td><td>The shared engine learns about games, and trading becomes the first game. The identical-results proof must pass.</td><td>No</td></tr>
+      <tr><td>3</td><td>Trivia built, admin screens built &mdash; still switched off.</td><td>No</td></tr>
+      <tr><td>4</td><td>Question bank filled. Trivia enabled for internal accounts only.</td><td>No</td></tr>
+      <tr><td>5</td><td><b>Internal quiz contests with real, very small entry fees.</b> Money proven end to end.</td><td>No</td></tr>
+      <tr><td>6</td><td>Trivia opened to everyone, starting free or very low cost.</td><td><b>Yes</b></td></tr>
+      <tr><td>7</td><td>New leaderboard built and checked against the existing one before any switch.</td><td>No</td></tr>
+      <tr><td>8</td><td>Leaderboard switched over; new points and rating explained to players in advance.</td><td><b>Yes</b></td></tr>
+      <tr><td>9</td><td>Language and interface updates.</td><td><b>Yes</b></td></tr>
+      <tr><td>10</td><td>Trading on/off switch delivered, still switched on. Rehearsed before ever being used.</td><td>No</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal good">
+    <div class="t">Why step 5 is non-negotiable</div>
+    <p>A paid contest that has never been run with real money is an untested payment path. Small internal contests with genuine fees are the cheapest possible way to discover a problem &mdash; before a customer does.</p>
+  </div>
+
+  <h3>What &ldquo;finished&rdquo; means</h3>
+  <div class="chk">
+    <div><span class="box"></span><span>An operator can create, run and complete a quiz competition without touching a single trading setting.</span></div>
+    <div><span class="box"></span><span>A player pays credits, plays, is ranked and is paid through the <b>same</b> money system as trading.</span></div>
+    <div><span class="box"></span><span>A trading customer&rsquo;s experience is <b>demonstrably unchanged</b> &mdash; proven by recalculating past contests, not by opinion.</span></div>
+    <div><span class="box"></span><span>With trading switched off, the platform is complete and coherent: no dead links, no empty panels, no stranded contests.</span></div>
+    <div><span class="box"></span><span>Leaderboards, points, rating, levels, badges and the journey all work for a quiz-only player.</span></div>
+    <div><span class="box"></span><span>We can report revenue and payout ratio <b>by game</b>.</span></div>
+    <div><span class="box"></span><span><b>Adding a third game needs rules and content only &mdash; no change to the shared engine.</b></span></div>
+  </div>
+  <p style="color:var(--muted);font-size:14px">That final point is the real test of whether we built a platform or just another feature.</p>
+</section>
+
+<!-- ================= 15 ROADMAP ================= -->
+<section id="roadmap">
+  <div class="sec-h"><div class="sec-n">15</div><h2>The roadmap</h2></div>
+  <p class="sec-sub">Seven phases, 14&ndash;19 weeks, with something playable and payable around week 8.</p>
+
+  <figure>
+    <div class="fig-t">Diagram 7 &mdash; The timeline</div>
+    <svg viewBox="0 0 900 262" role="img" aria-label="Seven phases across fourteen to nineteen weeks, with the first playable paid quiz around week eight, public launch of the quiz, and the games catalogue last">
+      <rect x="30" y="70" width="158" height="52" rx="6" fill="#143a5c"/>
+      <text x="109" y="92" text-anchor="middle" font-family="Segoe UI" font-size="11.5" font-weight="700" fill="#fff">1 &middot; FOUNDATION</text>
+      <text x="109" y="110" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#c6d5e4">2.5&ndash;3.5 wks</text>
+
+      <rect x="190" y="70" width="131" height="52" rx="6" fill="#1d4d75"/>
+      <text x="256" y="92" text-anchor="middle" font-family="Segoe UI" font-size="11.5" font-weight="700" fill="#fff">2 &middot; TRIVIA GAME</text>
+      <text x="256" y="110" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#c6d5e4">2&ndash;3 weeks</text>
+
+      <rect x="323" y="70" width="92" height="52" rx="6" fill="#143a5c"/>
+      <text x="369" y="92" text-anchor="middle" font-family="Segoe UI" font-size="11.5" font-weight="700" fill="#fff">3 &middot; ADMIN</text>
+      <text x="369" y="110" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#c6d5e4">1.5&ndash;2 wks</text>
+
+      <rect x="417" y="70" width="184" height="52" rx="6" fill="#1d4d75"/>
+      <text x="509" y="92" text-anchor="middle" font-family="Segoe UI" font-size="11.5" font-weight="700" fill="#fff">4 &middot; POINTS &amp; REWARDS</text>
+      <text x="509" y="110" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#c6d5e4">3&ndash;4 weeks</text>
+
+      <rect x="603" y="70" width="118" height="52" rx="6" fill="#143a5c"/>
+      <text x="662" y="92" text-anchor="middle" font-family="Segoe UI" font-size="11.5" font-weight="700" fill="#fff">5 &middot; LANGUAGE</text>
+      <text x="662" y="110" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#c6d5e4">2&ndash;2.5 wks</text>
+
+      <rect x="723" y="70" width="52" height="52" rx="6" fill="#c9a23f"/>
+      <text x="749" y="92" text-anchor="middle" font-family="Segoe UI" font-size="11.5" font-weight="700" fill="#fff">6</text>
+      <text x="749" y="110" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#fff">LIVE</text>
+
+      <rect x="777" y="70" width="104" height="52" rx="6" fill="#1a6e49"/>
+      <text x="829" y="92" text-anchor="middle" font-family="Segoe UI" font-size="11.5" font-weight="700" fill="#fff">7 &middot; GAMES PAGE</text>
+      <text x="829" y="110" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#cfe8db">~2 weeks</text>
+
+      <line x1="30" y1="140" x2="881" y2="140" stroke="#dde4ec" stroke-width="1.5"/>
+      <text x="30" y="160" font-family="Segoe UI" font-size="10.5" fill="#6b7d8f">week 0</text>
+      <text x="881" y="160" text-anchor="end" font-family="Segoe UI" font-size="10.5" fill="#6b7d8f">week 14&ndash;19</text>
+
+      <line x1="415" y1="60" x2="415" y2="34" stroke="#1a6e49" stroke-width="1.6"/>
+      <circle cx="415" cy="60" r="5" fill="#1a6e49"/>
+      <rect x="288" y="10" width="254" height="24" rx="5" fill="#eaf6ef" stroke="#1a6e49" stroke-width="1.5"/>
+      <text x="415" y="26" text-anchor="middle" font-family="Segoe UI" font-size="11" font-weight="700" fill="#1a6e49">First playable, payable quiz &mdash; around week 8</text>
+
+      <line x1="749" y1="132" x2="749" y2="176" stroke="#c9a23f" stroke-width="1.6"/>
+      <circle cx="749" cy="132" r="5" fill="#c9a23f"/>
+      <rect x="661" y="176" width="176" height="24" rx="5" fill="#fdf8ec" stroke="#c9a23f" stroke-width="1.5"/>
+      <text x="749" y="192" text-anchor="middle" font-family="Segoe UI" font-size="11" font-weight="700" fill="#8a6209">Quiz goes public</text>
+
+      <line x1="829" y1="132" x2="829" y2="206" stroke="#1a6e49" stroke-width="1.6"/>
+      <circle cx="829" cy="132" r="5" fill="#1a6e49"/>
+      <rect x="694" y="206" width="187" height="24" rx="5" fill="#eaf6ef" stroke="#1a6e49" stroke-width="1.5"/>
+      <text x="787" y="222" text-anchor="middle" font-family="Segoe UI" font-size="11" font-weight="700" fill="#1a6e49">Games platform relaunch</text>
+
+      <text x="360" y="212" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">Phases 1 to 3 deliver a quiz that can genuinely be played and paid for.</text>
+      <text x="360" y="230" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">Phases 4 to 6 make it feel like one platform and put it live.</text>
+      <text x="450" y="254" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#6b7d8f" font-style="italic">Content writing and legal review run in parallel and do not extend the timeline.</text>
+    </svg>
+    <figcaption><b>Two separate public moments, on purpose.</b> The quiz goes live first, alongside trading, so it can be tested with real players at small stakes. The games catalogue &mdash; the point at which ChartVolt visibly becomes a games platform &mdash; follows once there is genuinely something to put in it. Based on one experienced developer, testing included; content work such as questions, badge names and journey milestones is done alongside by people who are not developers.</figcaption>
+  </figure>
+
+  <div class="ph">
+    <div class="ph-row">
+      <div class="ph-id">PHASE 1</div>
+      <div class="ph-b"><b>Foundation</b>Contests learn which game they are, players gain a general score, the shared engine learns to ask the game how to rank, and trading becomes the first game &mdash; proven to behave identically. Game Master contests are brought into the same system.</div>
+      <div class="ph-e">2.5&ndash;3.5 weeks</div>
+    </div>
+    <div class="ph-row">
+      <div class="ph-id">PHASE 2</div>
+      <div class="ph-b"><b>The Trivia game</b>Question bank, gameplay, scoring, finishing, player screens.</div>
+      <div class="ph-e">2&ndash;3 weeks</div>
+    </div>
+    <div class="ph-row">
+      <div class="ph-id">PHASE 3</div>
+      <div class="ph-b"><b>Admin</b>Menu reorganised, game picker added, game settings step, question bank and categories, reporting by game.</div>
+      <div class="ph-e">1.5&ndash;2 weeks</div>
+    </div>
+    <div class="ph-row">
+      <div class="ph-id">PHASE 4</div>
+      <div class="ph-b"><b>Points, leaderboards and rewards</b>Shared points, per-game skill rating, faster leaderboards with tabs per game, per-game dashboard sections, badges, levels and journeys. Game Masters gain the ability to run the new games and see their earnings per game.</div>
+      <div class="ph-e">3&ndash;4 weeks</div>
+    </div>
+    <div class="ph-row">
+      <div class="ph-id">PHASE 5</div>
+      <div class="ph-b"><b>Language and the trading switch</b>Neutral wording in the shared product, help centre restructured, Game Master pack descriptions updated, and the trading on/off capability delivered.</div>
+      <div class="ph-e">2&ndash;2.5 weeks</div>
+    </div>
+    <div class="ph-row">
+      <div class="ph-id">PHASE 6</div>
+      <div class="ph-b"><b>Hardening and launch</b>Load testing, monitoring, reversal rehearsal, internal paid contests, public launch, documentation and training.</div>
+      <div class="ph-e">1 week</div>
+    </div>
+    <div class="ph-row">
+      <div class="ph-id">PHASE 7</div>
+      <div class="ph-b"><b>The games catalogue</b>The games page, a page per game, and the admin tools to merchandise them &mdash; artwork, descriptions, featuring, ordering. The visible face of the games platform.</div>
+      <div class="ph-e">~2 weeks</div>
+    </div>
+  </div>
+
+  <div class="cal info">
+    <div class="t">Why the most visible part is built last</div>
+    <p>The instinct is to build the shop window first. It is the wrong instinct here, for one blunt reason: <b>a games catalogue containing one game other than trading advertises an empty platform.</b> The catalogue is also the cheapest and lowest-risk piece to add, while the expensive and delicate work sits underneath it. So the order is: build the machinery, get a real second game running and being played, then build the window and fill it.</p>
+  </div>
+
+  <div class="kv">
+    <div><b>Total</b><span>14&ndash;19 weeks</span><em>Seven phases</em></div>
+    <div><b>Playable and payable</b><span>~week 8</span><em>After phases 1 to 3</em></div>
+    <div><b>Assumption</b><span>1 developer</span><em>Experienced with our platform, testing included</em></div>
+    <div><b>Runs in parallel</b><span>Content &amp; legal</span><em>No effect on the timeline</em></div>
+  </div>
+
+  <div class="cal plain">
+    <div class="t">A natural decision point at week 8</div>
+    <p>Phases 1 to 3 end with a quiz that can be created, played and paid for. That is a real product, and it is a sensible place to <b>stop and look at the evidence</b> before funding the rest: are players entering, are they coming back, does the second game hold attention the way trading does? Committing the whole programme up front is not necessary and not recommended. <b>The main risk to this plan is scope, not technical difficulty.</b></p>
+  </div>
+
+  <h3>What we would ask partners to weigh in on</h3>
+  <ul>
+    <li><b>Is trivia the right first game</b>, or is there a better fit for the audiences you reach?</li>
+    <li><b>How visible should the shift be?</b> Do we present ChartVolt as a games platform from launch, or introduce trivia quietly alongside trading first?</li>
+    <li><b>Which territories</b> would benefit most from a games-only version of the platform?</li>
+    <li><b>Should seasonal prizes</b> be attached to the new shared points, and at what scale?</li>
+  </ul>
+</section>
+
+</main>
+</div>
+
+<footer class="foot">
+  <span><b>ChartVolt</b> &mdash; Becoming a Games Platform &middot; Partner briefing</span>
+  <span>17 August 2026 &middot; v1.1, revised 30 August 2026</span>
+</footer>
+
+<script>
+(function(){
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  var targets = links.map(function(a){
+    var id = a.getAttribute('href').slice(1);
+    return document.getElementById(id);
+  });
+  function onScroll(){
+    var best = -1, bestTop = -Infinity, y = window.scrollY + 130;
+    for (var i = 0; i < targets.length; i++){
+      var el = targets[i];
+      if (!el) continue;
+      var top = el.getBoundingClientRect().top + window.scrollY;
+      if (top <= y && top > bestTop){ bestTop = top; best = i; }
+    }
+    links.forEach(function(a){ a.classList.remove('on'); });
+    if (best >= 0) links[best].classList.add('on');
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll);
+  onScroll();
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ChartVolt &mdash; Game API Requirements for Providers</title>
+<style>
+  :root{
+    --navy:#0d2338; --navy2:#143a5c; --navy3:#1d4d75;
+    --gold:#c9a23f; --gold-lt:#f0dda6; --gold-bg:#fdf8ec;
+    --ink:#1b2733; --body:#3a4a5a; --muted:#6b7d8f;
+    --line:#dde4ec; --line2:#eef2f7;
+    --bg:#f6f8fb; --card:#ffffff;
+    --green:#1a6e49; --green-bg:#eaf6ef; --green-line:#b6ddc6;
+    --red:#a02a38; --red-bg:#fdedef; --red-line:#f0c3c9;
+    --amber:#8a6209; --amber-bg:#fdf5e3; --amber-line:#ecd9a6;
+    --blue:#1c5788; --blue-bg:#ecf3fa; --blue-line:#c2d8ec;
+    --radius:10px;
+    --mono:"Cascadia Code",Consolas,"SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--body);
+    font-size:15.5px; line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .hero{
+    background:linear-gradient(150deg,var(--navy) 0%,var(--navy2) 55%,var(--navy3) 100%);
+    color:#fff; padding:52px 32px 44px;
+    border-bottom:4px solid var(--gold);
+  }
+  .hero-in{max-width:1180px;margin:0 auto}
+  .eyebrow{font-size:11.5px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--gold-lt);font-weight:700;margin-bottom:14px}
+  .hero h1{font-size:38px;line-height:1.15;font-weight:700;letter-spacing:-.6px;margin-bottom:14px}
+  .hero .lede{font-size:17px;color:#cfdcea;max-width:900px;line-height:1.56}
+  .hero-meta{margin-top:26px;padding-top:20px;border-top:1px solid rgba(255,255,255,.16);
+    display:flex;flex-wrap:wrap;gap:30px;font-size:13px}
+  .hero-meta b{display:block;color:var(--gold-lt);font-size:10.5px;letter-spacing:.14em;
+    text-transform:uppercase;margin-bottom:4px;font-weight:700}
+  .hero-meta span{color:#e4ecf4}
+  .stamp{display:inline-block;margin-top:22px;background:rgba(201,162,63,.16);
+    border:1px solid var(--gold);color:var(--gold-lt);
+    padding:7px 16px;border-radius:100px;font-size:12.5px;font-weight:700;
+    letter-spacing:.08em;text-transform:uppercase}
+
+  .shell{max-width:1180px;margin:0 auto;padding:0 32px;display:grid;
+    grid-template-columns:244px 1fr;gap:44px;align-items:start}
+  nav.toc{position:sticky;top:22px;padding:26px 0;max-height:calc(100vh - 44px);overflow-y:auto}
+  nav.toc h4{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
+    margin:0 0 12px;font-weight:700}
+  nav.toc a{display:block;padding:5px 10px;font-size:13.2px;color:var(--body);
+    text-decoration:none;border-left:2px solid var(--line);line-height:1.4}
+  nav.toc a:hover{color:var(--navy2);background:#eef3f9;border-left-color:var(--gold)}
+  nav.toc a.must{color:var(--red);font-weight:700}
+  nav.toc .sep{height:1px;background:var(--line);margin:12px 0}
+  main{padding:34px 0 80px;min-width:0}
+
+  section{margin-bottom:46px;scroll-margin-top:20px}
+  .sec-h{display:flex;align-items:baseline;gap:13px;margin-bottom:8px}
+  .sec-n{flex:none;width:31px;height:31px;border-radius:7px;background:var(--navy);color:#fff;
+    font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  h2{font-size:25px;color:var(--navy);font-weight:700;letter-spacing:-.3px;line-height:1.24}
+  .sec-sub{color:var(--muted);font-size:14.5px;margin:0 0 22px 44px}
+  h3{font-size:17.5px;color:var(--navy2);font-weight:700;margin:28px 0 11px}
+  h4{font-size:14.5px;color:var(--navy2);font-weight:700;margin:20px 0 8px}
+  p{margin-bottom:13px}
+  ul,ol{margin:0 0 14px 21px}
+  li{margin-bottom:6px}
+  strong,b{color:var(--ink);font-weight:600}
+  a{color:var(--blue)}
+  code{font-family:var(--mono);font-size:.885em;background:#eef2f7;color:var(--navy2);
+    padding:1.5px 5px;border-radius:4px;border:1px solid var(--line)}
+
+  pre{background:#fbfcfe;border:1px solid var(--line);border-left:4px solid var(--navy3);
+    border-radius:0 8px 8px 0;padding:15px 18px;overflow-x:auto;margin-bottom:16px;
+    font-family:var(--mono);font-size:12.7px;line-height:1.66;color:#22394d}
+  pre b{color:var(--navy);font-weight:700}
+  pre .c{color:#7d8fa0;font-style:italic}
+  pre .r{color:var(--red);font-weight:700}
+
+  .ep{display:flex;align-items:center;gap:12px;background:var(--navy);color:#fff;
+    border-radius:8px;padding:11px 16px;margin:22px 0 14px;font-family:var(--mono);
+    font-size:14px;flex-wrap:wrap}
+  .ep .m{background:var(--gold);color:#2a1f00;font-weight:700;padding:2px 10px;
+    border-radius:4px;font-size:12px;letter-spacing:.06em}
+  .ep .m.get{background:#7fc0f0;color:#062033}
+  .ep .u{color:#e8f0f8}
+  .ep .tag{margin-left:auto;font-family:"Segoe UI",sans-serif;font-size:11px;
+    letter-spacing:.1em;text-transform:uppercase;font-weight:700;
+    background:rgba(255,255,255,.14);padding:3px 10px;border-radius:100px}
+  .ep .tag.req{background:var(--red);color:#fff}
+  .ep .tag.opt{background:rgba(255,255,255,.16);color:#dbe7f2}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px 22px;margin-bottom:16px}
+  .grid{display:grid;gap:14px;margin-bottom:16px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:repeat(3,1fr)}
+
+  .cal{border-left:4px solid;border-radius:0 var(--radius) var(--radius) 0;
+    padding:16px 20px;margin:16px 0}
+  .cal .t{font-weight:700;font-size:13px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px}
+  .cal p:last-child{margin-bottom:0}
+  .plain{background:var(--gold-bg);border-color:var(--gold)}
+  .plain .t{color:var(--amber)}
+  .good{background:var(--green-bg);border-color:var(--green)}
+  .good .t{color:var(--green)}
+  .bad{background:var(--red-bg);border-color:var(--red)}
+  .bad .t{color:var(--red)}
+  .info{background:var(--blue-bg);border-color:var(--blue)}
+  .info .t{color:var(--blue)}
+
+  .verdict{background:var(--navy);color:#fff;border-radius:var(--radius);
+    padding:28px 30px;margin-bottom:34px;border-left:5px solid var(--gold)}
+  .verdict .q{font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--gold-lt);font-weight:700;margin-bottom:11px}
+  .verdict .a{font-size:20px;line-height:1.45;color:#fff;font-weight:600}
+  .verdict .n{margin-top:14px;font-size:14px;color:#bccfe0;line-height:1.55}
+
+  .tw{overflow-x:auto;margin-bottom:16px;border:1px solid var(--line);border-radius:var(--radius)}
+  table{width:100%;border-collapse:collapse;background:#fff;font-size:13.6px}
+  th{background:var(--navy2);color:#fff;text-align:left;padding:10px 13px;
+    font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;white-space:nowrap}
+  td{padding:9px 13px;border-bottom:1px solid var(--line2);vertical-align:top;line-height:1.5}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:nth-child(even){background:#fafcfe}
+  td code{font-size:.85em}
+
+  .b{display:inline-block;padding:2px 9px;border-radius:100px;font-size:11px;
+    font-weight:700;letter-spacing:.04em;white-space:nowrap;border:1px solid}
+  .b.req{background:var(--red);color:#fff;border-color:var(--red)}
+  .b.opt{background:#f1f4f7;color:var(--muted);border-color:var(--line)}
+  .b.rec{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-line)}
+  .b.ok{background:var(--green-bg);color:var(--green);border-color:var(--green-line)}
+  .b.med{background:var(--blue-bg);color:var(--blue);border-color:var(--blue-line)}
+
+  figure{margin:22px 0;background:#fff;border:1px solid var(--line);
+    border-radius:var(--radius);padding:22px 20px 16px}
+  figure svg{display:block;width:100%;height:auto}
+  figcaption{margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);
+    font-size:13px;color:var(--muted);line-height:1.55}
+  figcaption b{color:var(--navy2)}
+  .fig-t{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);
+    font-weight:700;margin-bottom:14px}
+
+  .chk{background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+    padding:6px 4px;margin-bottom:16px}
+  .chk div{display:flex;gap:11px;padding:9px 15px;border-bottom:1px solid var(--line2);
+    font-size:14px;line-height:1.5}
+  .chk div:last-child{border-bottom:none}
+  .box{flex:none;width:15px;height:15px;border:2px solid var(--navy3);border-radius:3px;margin-top:3px}
+
+  .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;
+    background:var(--line);border:1px solid var(--line);border-radius:var(--radius);
+    overflow:hidden;margin-bottom:18px}
+  .kv > div{background:#fff;padding:14px 16px}
+  .kv b{display:block;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--muted);margin-bottom:5px;font-weight:700}
+  .kv span{font-size:17px;font-weight:700;color:var(--navy)}
+  .kv em{font-style:normal;font-size:12.5px;color:var(--body);display:block;margin-top:2px}
+
+  hr.d{border:none;border-top:1px solid var(--line);margin:34px 0}
+  .foot{max-width:1180px;margin:0 auto;padding:26px 32px 46px;border-top:1px solid var(--line);
+    color:var(--muted);font-size:12.8px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+
+  @media (max-width:1000px){
+    .shell{grid-template-columns:1fr;gap:0;padding:0 20px}
+    nav.toc{display:none}
+    .g2,.g3{grid-template-columns:1fr}
+    .hero h1{font-size:29px}
+    .hero{padding:38px 20px 34px}
+  }
+  @media print{
+    nav.toc{display:none}
+    .shell{grid-template-columns:1fr;padding:0}
+    body{font-size:10.5pt;background:#fff}
+    section{page-break-inside:avoid}
+    figure{page-break-inside:avoid}
+    pre{page-break-inside:avoid}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,1 L7,4.5 L0,8 Z" fill="#6b7d8f"/>
+    </marker>
+    <marker id="arg" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,1 L7,4.5 L0,8 Z" fill="#1a6e49"/>
+    </marker>
+    <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,1 L7,4.5 L0,8 Z" fill="#a02a38"/>
+    </marker>
+  </defs>
+</svg>
+
+<header class="hero">
+  <div class="hero-in">
+    <div class="eyebrow">ChartVolt &middot; Integration Requirements for Game Providers</div>
+    <h1>The Game API We Need From You</h1>
+    <p class="lede">ChartVolt runs paid skill competitions. We handle the money, the ranking and the rewards. We are looking for partners who can supply the games and tell us what each player scored. This document specifies exactly what your API must do so that we can operate on top of it &mdash; three calls to you, one call back to us.</p>
+    <div class="hero-meta">
+      <div><b>Document</b><span>Integration requirements</span></div>
+      <div><b>Version</b><span>1.2</span></div>
+      <div><b>Audience</b><span>Your engineering team</span></div>
+      <div><b>Required calls</b><span>3 out, 1 in</span></div>
+      <div><b>Money handled by you</b><span>None, ever</span></div>
+    </div>
+    <div class="stamp">You run the games. We do everything else.</div>
+  </div>
+</header>
+
+<div class="shell">
+
+<nav class="toc">
+  <h4>Contents</h4>
+  <a href="#ask">What we are asking for</a>
+  <a href="#split">Who does what</a>
+  <a href="#words">Terms we use</a>
+  <a href="#families">Declaring your games</a>
+  <div class="sep"></div>
+  <a href="#map">The interface at a glance</a>
+  <a href="#catalogue">1. List your games</a>
+  <a href="#create">2. Create a round</a>
+  <a href="#result">3. Report the result</a>
+  <a href="#fetch">4. Let us fetch a round</a>
+  <div class="sep"></div>
+  <a href="#auth" class="must">Authentication and signing</a>
+  <a href="#idem" class="must">Idempotency and retries</a>
+  <a href="#seed" class="must">Identical content</a>
+  <a href="#states">Round states</a>
+  <a href="#errors">Errors</a>
+  <div class="sep"></div>
+  <a href="#sandbox">Sandbox</a>
+  <a href="#sla">Service levels</a>
+  <a href="#data">Data protection</a>
+  <a href="#optional">Optional extras</a>
+  <div class="sep"></div>
+  <a href="#checklist" class="must">Conformance checklist</a>
+  <a href="#next">What we need from you</a>
+</nav>
+
+<main>
+
+<!-- ===== 1 ===== -->
+<section id="ask">
+  <div class="verdict">
+    <div class="q">In one paragraph</div>
+    <div class="a">We need you to run one game for one player and tell our servers what they scored. That is the entire relationship.</div>
+    <div class="n">We ask you to start a round, you give us a link to play it, and when the player finishes you send us a signed message containing their score. We take care of the entry fees, the prize pool, the ranking, the payouts, the leaderboards and the player accounts. You never touch money and never see a player's personal details.</div>
+  </div>
+
+  <div class="sec-h"><div class="sec-n">1</div><h2>What ChartVolt is, and where you fit</h2></div>
+  <p class="sec-sub">Understanding the model makes the rest of this document obvious rather than arbitrary.</p>
+
+  <p>ChartVolt runs <b>paid skill competitions</b>. A player buys credits, pays an entry fee to join a competition or to challenge another player one against one, competes, and the winners share the prize pool. Players earn points, ratings, levels, badges and milestones across everything they play.</p>
+
+  <p>All of that already exists and runs live. What we want to add is <b>more things to compete at</b> &mdash; chess puzzles, trivia, word games, logic puzzles, time-attack challenges. Rather than build them ourselves, we want to source them from partners like you.</p>
+
+  <div class="cal info">
+    <div class="t">The one thing that must be true of your games</div>
+    <p><b>Outcomes must be determined by player skill, not by chance.</b> A player who is better at the game must reliably score higher. We cannot use games whose result comes from a random number generator, and we cannot use anything with a return-to-player percentage or a house edge. If your catalogue is chance-based, we are not the right partner for you and it is better that we both know now.</p>
+  </div>
+
+  <h3>Two consequences you will like</h3>
+  <div class="grid g2">
+    <div class="card">
+      <h4>You handle no money</h4>
+      <p style="margin:0">No wallet integration, no balance callbacks, no bets, no payouts, no rollbacks, no reconciliation with us. We never ask you to debit or credit a player. This removes an entire category of integration work and compliance exposure from your side.</p>
+    </div>
+    <div class="card">
+      <h4>You see no personal data</h4>
+      <p style="margin:0">We send you an opaque player identifier and, if you need it for the game UI, a display name. No email addresses, no real names, no dates of birth, no payment details, no identity documents.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 2 ===== -->
+<section id="split">
+  <div class="sec-h"><div class="sec-n">2</div><h2>Who does what</h2></div>
+
+  <figure>
+    <div class="fig-t">Diagram 1 &mdash; the division of responsibility</div>
+    <svg viewBox="0 0 920 300" role="img" aria-label="ChartVolt handles money and ranking, the provider runs games and reports scores">
+      <rect x="8" y="46" width="384" height="212" rx="10" fill="#ecf3fa" stroke="#c2d8ec"/>
+      <text x="200" y="72" text-anchor="middle" font-size="14" font-weight="700" fill="#143a5c">CHARTVOLT</text>
+      <text x="200" y="94" text-anchor="middle" font-size="11.5" fill="#6b7d8f">our responsibility</text>
+      <text x="34" y="124" font-size="12.5" fill="#3a4a5a">Player accounts and identity checks</text>
+      <text x="34" y="148" font-size="12.5" fill="#3a4a5a">Credits, entry fees, prize pools</text>
+      <text x="34" y="172" font-size="12.5" fill="#3a4a5a">Prizes, refunds, all accounting</text>
+      <text x="34" y="196" font-size="12.5" fill="#3a4a5a">Contests, ranking, tie-breaks</text>
+      <text x="34" y="220" font-size="12.5" fill="#3a4a5a">Points, badges, leaderboards, support</text>
+
+      <line x1="474" y1="18" x2="474" y2="286" stroke="#c9a23f" stroke-width="2" stroke-dasharray="6 5"/>
+      <text x="474" y="14" text-anchor="middle" font-size="10.5" font-weight="700" fill="#8a6209" letter-spacing="1.5">THE INTERFACE</text>
+
+      <rect x="556" y="46" width="356" height="212" rx="10" fill="#eaf6ef" stroke="#b6ddc6"/>
+      <text x="734" y="72" text-anchor="middle" font-size="14" font-weight="700" fill="#1a6e49">YOU</text>
+      <text x="734" y="94" text-anchor="middle" font-size="11.5" fill="#6b7d8f">your responsibility</text>
+      <text x="584" y="126" font-size="12.5" fill="#3a4a5a">1. Run the game for one player</text>
+      <text x="584" y="152" font-size="12.5" fill="#3a4a5a">2. Score that player fairly</text>
+      <text x="584" y="178" font-size="12.5" fill="#3a4a5a">3. Tell our servers the score</text>
+      <rect x="580" y="196" width="308" height="46" rx="7" fill="#fff" stroke="#b6ddc6"/>
+      <text x="734" y="217" text-anchor="middle" font-size="11.5" font-weight="700" fill="#1a6e49">That is the complete list.</text>
+      <text x="734" y="234" text-anchor="middle" font-size="11" fill="#3a4a5a">No money. No accounts. No prizes.</text>
+
+      <line x1="394" y1="120" x2="552" y2="120" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+      <text x="473" y="112" text-anchor="middle" font-size="10.5" fill="#6b7d8f" font-family="Consolas, monospace">start a round</text>
+      <line x1="552" y1="164" x2="396" y2="164" stroke="#1a6e49" stroke-width="1.8" marker-end="url(#arg)"/>
+      <text x="473" y="156" text-anchor="middle" font-size="10.5" fill="#1a6e49" font-family="Consolas, monospace">signed score</text>
+
+      <line x1="398" y1="212" x2="548" y2="212" stroke="#a02a38" stroke-width="1.6" stroke-dasharray="5 4"/>
+      <circle cx="473" cy="212" r="13" fill="#fff" stroke="#a02a38" stroke-width="2"/>
+      <line x1="464" y1="221" x2="482" y2="203" stroke="#a02a38" stroke-width="2"/>
+      <text x="473" y="246" text-anchor="middle" font-size="11" font-weight="700" fill="#a02a38">no money crosses</text>
+    </svg>
+    <figcaption><b>Everything commercial, financial and competitive stays on our side.</b> You are responsible for the gameplay experience and for producing a score that honestly reflects how well the player did. Nothing else.</figcaption>
+  </figure>
+</section>
+
+<!-- ===== 3 ===== -->
+<section id="words">
+  <div class="sec-h"><div class="sec-n">3</div><h2>Terms used in this document</h2></div>
+  <p class="sec-sub">Fixed here because these words mean different things at different companies.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:170px">Term</th><th>Meaning in this document</th></tr></thead>
+    <tbody>
+      <tr><td><b>Round</b></td><td><b>One player playing once, producing one score.</b> The atomic unit of the whole integration</td></tr>
+      <tr><td><b>Game</b></td><td>One title in your catalogue, identified by a <code>gameCode</code></td></tr>
+      <tr><td><b>Contest</b></td><td>A ChartVolt competition (<b>two or more</b> players, often many) or challenge (<b>exactly two</b>). Built by us out of rounds. <b>You do not need to know this concept exists</b></td></tr>
+      <tr><td><b>Score</b></td><td>The single number you report for a round, in whatever units the game uses</td></tr>
+      <tr><td><b>Content seed</b></td><td>A value we send you so that every player in one contest faces identical content. See section 12</td></tr>
+      <tr><td><b>Match</b></td><td>A round with two players competing directly, as in chess. Only relevant if you offer head-to-head games</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal plain">
+    <div class="t">The mental model</div>
+    <p>You do not need to understand competitions, prize pools, challenges or leaderboards to integrate with us. <b>You only need to run a round and report a score.</b> We assemble everything else. If your API ever needs to know what a "tournament" is, we have designed something wrong.</p>
+  </div>
+</section>
+
+<!-- ===== 4 ===== -->
+<section id="families">
+  <div class="sec-h"><div class="sec-n">4</div><h2>Declaring what your games can do</h2></div>
+  <p class="sec-sub">We support two kinds of game, and each one needs different things from you.</p>
+
+  <div class="cal warn">
+    <div class="t">&ldquo;Independent play&rdquo; is about your gameplay, not about how many people are competing</div>
+    <p>Every contest we run has <b>at least two players</b>, and a competition usually has many. There is no single-player paid format on our platform.</p>
+    <p style="margin-bottom:0">An <b>independent-play</b> game is simply one where each player plays their <b>own round</b> and gets their own score, rather than needing a live opponent in the same session. We then rank all of those players against each other. If your game can be played by one person at a time and produces a score, it is independent-play &mdash; and it will be used in contests of a hundred people.</p>
+  </div>
+
+  <div class="grid g2">
+    <div class="card" style="border-color:#b6ddc6;background:#eaf6ef">
+      <h4 style="color:#1a6e49;margin-top:0">Independent-play &mdash; <code>family: "independent"</code></h4>
+      <p>Each player plays their own round and receives a score. Trivia, puzzles, word games, chess puzzles, time attacks.</p>
+      <p style="margin-bottom:0"><b>This is what we want most.</b> An independent-play game works for both competitions and one-against-one challenges with no extra work from you, because we simply compare scores.</p>
+    </div>
+    <div class="card" style="border-color:#ecd9a6;background:#fdf5e3">
+      <h4 style="color:#8a6209;margin-top:0">Head-to-head &mdash; <code>family: "head_to_head"</code></h4>
+      <p>The game needs an opponent to exist. Full chess, checkers, backgammon.</p>
+      <p style="margin-bottom:0">Useful for challenges, and we will need your optional match endpoint for it (section 18). Large competitions on these games are a later phase for us, so lead with independent-play titles if you have them.</p>
+    </div>
+  </div>
+
+  <div class="cal info">
+    <div class="t">If you have chess</div>
+    <p>A <b>chess puzzle</b> mode &mdash; solve as many as you can, or solve one as fast as you can &mdash; is far more valuable to us than full head-to-head chess, because it is independent-play and therefore works in a hundred-player competition immediately. If you can offer both, offer puzzles first.</p>
+  </div>
+</section>
+
+<!-- ===== 5 ===== -->
+<section id="map">
+  <div class="sec-h"><div class="sec-n">5</div><h2>The interface at a glance</h2></div>
+  <p class="sec-sub">Three endpoints you build, one endpoint we build. Everything else is optional.</p>
+
+  <figure>
+    <div class="fig-t">Diagram 2 &mdash; the four calls</div>
+    <svg viewBox="0 0 920 250" role="img" aria-label="Three calls from ChartVolt to the provider and one callback">
+      <rect x="8" y="70" width="200" height="112" rx="10" fill="#143a5c"/>
+      <text x="108" y="120" text-anchor="middle" font-size="14" font-weight="700" fill="#f0dda6">CHARTVOLT</text>
+      <text x="108" y="142" text-anchor="middle" font-size="11" fill="#cfdcea">our servers</text>
+
+      <rect x="712" y="70" width="200" height="112" rx="10" fill="#1a6e49"/>
+      <text x="812" y="120" text-anchor="middle" font-size="14" font-weight="700" fill="#dff2e7">YOUR API</text>
+      <text x="812" y="142" text-anchor="middle" font-size="11" fill="#dff2e7">what you build</text>
+
+      <line x1="212" y1="34" x2="708" y2="34" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+      <text x="460" y="26" text-anchor="middle" font-size="11.5" fill="#143a5c" font-family="Consolas, monospace">GET /v1/games</text>
+      <text x="460" y="50" text-anchor="middle" font-size="10.5" fill="#6b7d8f">what games do you have, and what can they do</text>
+
+      <line x1="212" y1="86" x2="708" y2="86" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+      <text x="460" y="78" text-anchor="middle" font-size="11.5" fill="#143a5c" font-family="Consolas, monospace">POST /v1/rounds</text>
+      <text x="460" y="102" text-anchor="middle" font-size="10.5" fill="#6b7d8f">start a round, give us a link to play it</text>
+
+      <line x1="212" y1="138" x2="708" y2="138" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+      <text x="460" y="130" text-anchor="middle" font-size="11.5" fill="#143a5c" font-family="Consolas, monospace">GET /v1/rounds/{roundId}</text>
+      <text x="460" y="154" text-anchor="middle" font-size="10.5" fill="#6b7d8f">what happened, if your message never reached us</text>
+
+      <line x1="708" y1="196" x2="216" y2="196" stroke="#1a6e49" stroke-width="2" marker-end="url(#arg)"/>
+      <text x="460" y="188" text-anchor="middle" font-size="11.5" fill="#1a6e49" font-family="Consolas, monospace">POST /api/games/providers/{you}/events</text>
+      <text x="460" y="212" text-anchor="middle" font-size="10.5" font-weight="700" fill="#1a6e49">the signed score &mdash; you call us</text>
+
+      <rect x="8" y="222" width="904" height="24" rx="6" fill="#f7f9fc" stroke="#dde4ec"/>
+      <text x="460" y="239" text-anchor="middle" font-size="11.5" font-weight="700" fill="#143a5c">All four are server to server. None of them involves the player's browser.</text>
+    </svg>
+    <figcaption><b>The interface is deliberately small.</b> A competent team should be able to implement the three required endpoints in days, not weeks. The work that deserves care is not the endpoints themselves but the guarantees behind them: signing, idempotency, seeding and always reaching a terminal state.</figcaption>
+  </figure>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:60px">Who</th><th style="width:300px">Call</th><th>Purpose</th><th style="width:110px">Status</th></tr></thead>
+    <tbody>
+      <tr><td>You build</td><td><code>GET /v1/games</code></td><td>Your catalogue, with capability metadata</td><td><span class="b req">REQUIRED</span></td></tr>
+      <tr><td>You build</td><td><code>POST /v1/rounds</code></td><td>Create a round, return a launch URL</td><td><span class="b req">REQUIRED</span></td></tr>
+      <tr><td>You build</td><td><code>GET /v1/rounds/{roundId}</code></td><td>Current state of a round, on demand</td><td><span class="b req">REQUIRED</span></td></tr>
+      <tr><td>You call</td><td><code>POST&nbsp;/api/games/providers/{key}/events</code></td><td>Report the result, signed</td><td><span class="b req">REQUIRED</span></td></tr>
+      <tr><td>You build</td><td><code>POST /v1/rounds/{roundId}/void</code></td><td>Cancel a live round</td><td><span class="b rec">WANTED</span></td></tr>
+      <tr><td>You build</td><td><code>POST /v1/matches</code></td><td>Two-player head-to-head match</td><td><span class="b opt">IF APPLICABLE</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ===== 6 ===== -->
+<section id="catalogue">
+  <div class="sec-h"><div class="sec-n">6</div><h2>Endpoint 1 &mdash; list your games</h2></div>
+  <p class="sec-sub">Tells us what you offer and, critically, what each game is capable of. We cache this and re-sync periodically.</p>
+
+  <div class="ep"><span class="m get">GET</span><span class="u">{YOUR_BASE_URL}/v1/games</span><span class="tag req">Required</span></div>
+
+  <h4>Response</h4>
+<pre>{
+  "games": [
+    {
+      <span class="c">// ---- identity ----</span>
+      "gameCode":     "trivia-blitz",        <span class="c">// stable forever, never reused</span>
+      "displayName":  "Trivia Blitz",
+
+      <span class="c">// ---- page content: this game gets its own page on our site ----</span>
+      "tagline":      "Ten questions. Fifteen seconds each. No second guesses.",
+      "description":  "A fast general-knowledge quiz. Ten multiple-choice questions,
+                       fifteen seconds each, with a speed bonus for answering quickly.
+                       Every player in a contest gets the same questions in the same order.",
+      "rulesSummary": "Correct answer: 100 points. Speed bonus: up to 50. Wrong or
+                       unanswered: 0. Highest total wins, ties broken by total time.",
+      "howToPlay":    "Read the question, tap an answer before the timer runs out.
+                       You cannot change an answer and you cannot go back.",
+      "category":     "trivia",
+      "tags":         ["quiz", "fast", "mobile-friendly"],
+
+      <span class="c">// ---- artwork: minimum sizes, HTTPS, stable URLs ----</span>
+      "thumbnailUrl":   "https://cdn.you.com/tb-400x300.jpg",   <span class="c">// 4:3, min 400x300</span>
+      "bannerUrl":      "https://cdn.you.com/tb-1600x600.jpg",  <span class="c">// wide, min 1600x600</span>
+      "iconUrl":        "https://cdn.you.com/tb-icon-256.png",  <span class="c">// square, min 256</span>
+      "screenshotUrls": ["https://cdn.you.com/tb-1.jpg",
+                         "https://cdn.you.com/tb-2.jpg"],
+
+      <span class="c">// ---- what this game can do ----</span>
+      "family":              "independent",  <span class="c">// or "head_to_head"</span>
+      "supportsCompetition": true,
+      "supportsOneVsOne":        true,
+      "supportsPractice":    true,
+      "supportsContentSeed": true,           <span class="c">// see section 12</span>
+
+      <span class="c">// ---- how to interpret the score ----</span>
+      "scoreDirection": "higher_is_better",  <span class="c">// or "lower_is_better"</span>
+      "scoreType":      "integer",           <span class="c">// integer | decimal | duration_ms</span>
+      "scoreRange":     { "min": 0, "max": 10000 },
+
+      <span class="c">// ---- timing ----</span>
+      "typicalDurationSeconds": 180,
+      "maxDurationSeconds":     600,
+
+      <span class="c">// ---- settings we may choose per contest (JSON Schema) ----</span>
+      "configSchema": {
+        "type": "object",
+        "properties": {
+          "questionCount":      { "type": "integer", "minimum": 5, "maximum": 30, "default": 10 },
+          "secondsPerQuestion": { "type": "integer", "minimum": 5, "maximum": 60, "default": 15 },
+          "category":           { "type": "string", "enum": ["general","sport","science","film"] },
+          "difficulty":         { "type": "string", "enum": ["easy","mixed","hard"], "default": "mixed" }
+        },
+        "required": ["questionCount", "secondsPerQuestion"]
+      },
+
+      <span class="c">// ---- availability ----</span>
+      "locales":   ["en", "es", "de", "el"],
+      "platforms": ["desktop", "mobile"],
+      "status":    "active"                  <span class="c">// active | deprecated | maintenance</span>
+    }
+  ]
+}</pre>
+
+  <h4>Field requirements</h4>
+  <div class="tw"><table>
+    <thead><tr><th style="width:230px">Field</th><th style="width:100px">Required</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><code>gameCode</code></td><td><span class="b req">Yes</span></td><td><b>Stable and permanent.</b> Never rename it and never reuse it for a different game. It is the identity behind every historical score we hold for that title</td></tr>
+      <tr><td><code>family</code></td><td><span class="b req">Yes</span></td><td><code>independent</code> or <code>head_to_head</code>. Decides which contest formats we can offer</td></tr>
+      <tr><td><code>supportsCompetition</code><br /><code>supportsOneVsOne</code></td><td><span class="b req">Yes</span></td><td>We hide formats a game cannot support, so being accurate here prevents broken contests</td></tr>
+      <tr><td><code>supportsContentSeed</code></td><td><span class="b req">Yes</span></td><td><b>A game with <code>false</code> here cannot be used in a multi-player competition.</b> See section 12</td></tr>
+      <tr><td><code>scoreDirection</code></td><td><span class="b req">Yes</span></td><td>Speedruns and golf-style scoring are <code>lower_is_better</code>. If this is wrong we rank the entire field backwards and pay the worst player first</td></tr>
+      <tr><td><code>scoreType</code></td><td><span class="b req">Yes</span></td><td><code>integer</code>, <code>decimal</code> or <code>duration_ms</code></td></tr>
+      <tr><td><code>scoreRange</code></td><td><span class="b req">Yes</span></td><td>We reject scores outside this range as a safety check against both cheating and bugs</td></tr>
+      <tr><td><code>maxDurationSeconds</code></td><td><span class="b req">Yes</span></td><td>A round must be impossible to extend beyond this. We use it to schedule contests</td></tr>
+      <tr><td><code>configSchema</code></td><td><span class="b req">Yes</span></td><td>Valid JSON Schema describing every setting we may send in <code>config</code></td></tr>
+      <tr><td><code>status</code></td><td><span class="b req">Yes</span></td><td><code>active</code>, <code>deprecated</code> or <code>maintenance</code></td></tr>
+      <tr><td><code>tagline</code></td><td><span class="b req">Yes</span></td><td>One line under 90 characters, for cards and search results</td></tr>
+      <tr><td><code>description</code></td><td><span class="b req">Yes</span></td><td>Two to four sentences. Must say what the player actually <i>does</i> &mdash; this is what someone reads before paying to enter</td></tr>
+      <tr><td><code>rulesSummary</code></td><td><span class="b req">Yes</span></td><td>How the score is produced and how ties break. Players dispute prizes; this is the first text our support team quotes back to them</td></tr>
+      <tr><td><code>howToPlay</code></td><td><span class="b req">Yes</span></td><td>The controls and constraints, in plain language</td></tr>
+      <tr><td><code>thumbnailUrl</code></td><td><span class="b req">Yes</span></td><td>Catalogue card. 4:3, minimum 400x300</td></tr>
+      <tr><td><code>bannerUrl</code></td><td><span class="b req">Yes</span></td><td>Header of the game's own page. Wide, minimum 1600x600</td></tr>
+      <tr><td><code>screenshotUrls</code></td><td><span class="b rec">Wanted</span></td><td>Two or three. They measurably increase entries</td></tr>
+      <tr><td><code>iconUrl</code>, <code>tags</code></td><td><span class="b rec">Wanted</span></td><td>Compact lists, notifications, search and related games</td></tr>
+      <tr><td><code>locales</code>, <code>platforms</code></td><td><span class="b req">Yes</span></td><td>Most of our players are on mobile. Text fields above must exist in every locale you declare</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Why we ask for real page content, not just a name</h3>
+  <p>On ChartVolt, <b>your game gets its own page</b> &mdash; a header image, a description, the rules, a leaderboard of the best players, and the contests currently open on it. Players browse a catalogue of games and choose one before they see any competition. That page is where someone decides whether to pay an entry fee, so a name and a thumbnail are not enough to make it work.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:210px">Constraint</th><th>What it means</th></tr></thead>
+    <tbody>
+      <tr><td><b>Localised</b></td><td>Text fields must be available in every locale the game declares. Either return a locale map, or honour an <code>Accept-Language</code> header on this endpoint. <b>We will not translate your copy</b></td></tr>
+      <tr><td><b>No provider branding</b></td><td>Descriptions must not contain your company name, logo or links. To the player this is a ChartVolt game &mdash; contractual attribution is handled once in our footer and legal pages, not in game copy</td></tr>
+      <tr><td><b>Stable asset URLs</b></td><td>HTTPS, with a cache policy. We cache and may re-host. URLs that rotate leave broken game pages behind</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal info">
+    <div class="t">This is usually the cheapest thing you can give us</div>
+    <p>You already wrote this copy for your own storefront. Producing it per title, in every language, is inexpensive for you and expensive for us &mdash; and we will not launch a title we cannot present properly. Providers who supply good content get their games <b>featured</b> in our catalogue, which is a placement decision we make in minutes, not a development task.</p>
+  </div>
+
+  <div class="cal bad">
+    <div class="t">One thing that will end the conversation early</div>
+    <p>We do not sell, and will not permit anything sold, that <b>improves a score or ranking in a paid contest</b> &mdash; no extra time, hints, retries, continues, or paid unlocks that affect results. This holds whoever takes the payment. Our contests award real prize money, and outcomes must be decided by skill alone. If a game's economics depend on those mechanics, it is the wrong game for us. Please raise it in your first reply rather than after an integration has been scoped.</p>
+  </div>
+
+  <div class="cal good">
+    <div class="t">Why configSchema is worth doing properly</div>
+    <p>We generate our admin settings form <b>directly from your <code>configSchema</code></b>. If it is accurate and complete, you can add a new game to your catalogue and we can start running contests on it <b>without writing or deploying any code</b>. If it is vague, every new title needs developer time on our side, which makes us slow to adopt your releases. This one field largely determines how quickly your catalogue reaches our players.</p>
+  </div>
+</section>
+
+<!-- ===== 7 ===== -->
+<section id="create">
+  <div class="sec-h"><div class="sec-n">7</div><h2>Endpoint 2 &mdash; create a round</h2></div>
+  <p class="sec-sub">Called from our servers when a player presses Play. You return a URL we load in an iframe.</p>
+
+  <div class="ep"><span class="m">POST</span><span class="u">{YOUR_BASE_URL}/v1/rounds</span><span class="tag req">Required</span></div>
+
+  <h4>Our request</h4>
+<pre>{
+  "roundId":  "cv_rnd_01JAV3M7Q2XK8T",   <span class="c">// OUR id. Echo it back everywhere.</span>
+  "gameCode": "trivia-blitz",             <span class="c">// Also your idempotency key.</span>
+  "mode":     "ranked",                   <span class="c">// "ranked" or "practice"</span>
+
+  "player": {
+    "playerId":    "cv_p_8f21c0",         <span class="c">// opaque, stable per player</span>
+    "displayName": "Nikos",               <span class="c">// may be absent</span>
+    "locale":      "en",
+    "country":     "GR"
+  },
+
+  "config": {                             <span class="c">// validated against your configSchema</span>
+    "questionCount":      10,
+    "secondsPerQuestion": 15,
+    "category":           "sport",
+    "difficulty":         "mixed"
+  },
+
+  "contentSeed": "cv_ctst_774219",        <span class="c">// identical content for everyone</span>
+                                          <span class="c">// in this contest - see section 12</span>
+  "expiresAt":         "2026-08-18T14:00:00Z",
+  "resultCallbackUrl": "https://chartvolt.com/api/games/providers/acme/events",
+  "returnUrl":         "https://chartvolt.com/contests/774219"
+}</pre>
+
+  <h4>Your response</h4>
+<pre>{
+  "roundId":            "cv_rnd_01JAV3M7Q2XK8T",   <span class="c">// echo ours back</span>
+  "providerRoundId":    "acme_r_9f2ab41",          <span class="c">// yours, for support</span>
+  "launchUrl":          "https://play.you.com/launch?t=eyJhbGciOi...",
+  "launchUrlExpiresAt": "2026-08-18T11:35:00Z",
+  "status":             "created"
+}</pre>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:220px">Field</th><th>What we need from you</th></tr></thead>
+    <tbody>
+      <tr><td><code>roundId</code></td><td><b>We generate it, you store it.</b> It appears in your result callback and in our fetch call. Keeping identifier ownership on our side is what makes our reconciliation reliable</td></tr>
+      <tr><td><code>launchUrl</code></td><td>A URL we load in an <b>iframe</b>. It must work embedded, on desktop and mobile, and must carry its own single-use authentication so nobody can replay it</td></tr>
+      <tr><td><code>launchUrlExpiresAt</code></td><td>Short-lived is correct and expected. Tell us when it dies so we can request a fresh round rather than showing a dead frame</td></tr>
+      <tr><td><code>expiresAt</code></td><td>After this moment the round must be <b>unplayable</b> and must report <code>expired</code>. This stops a player finishing long after prizes have been paid</td></tr>
+      <tr><td><code>mode</code></td><td><code>ranked</code> counts towards a paid contest and <b>must</b> produce a result callback. <code>practice</code> is free play and is never scored by us</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal plain">
+    <div class="t">Please support practice mode</div>
+    <p>Players will not pay an entry fee for a game they have never seen. A free, unranked practice round is the single most effective thing you can give us for converting a curious visitor into a paying entrant. If practice rounds are billed differently under your commercial model, tell us up front.</p>
+  </div>
+
+  <h3>The iframe</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="width:230px">Requirement</th><th>Detail</th></tr></thead>
+    <tbody>
+      <tr><td>Must work embedded</td><td>No <code>X-Frame-Options: DENY</code>, and a <code>frame-ancestors</code> policy that permits our domain. Tell us the exact play domain so we can allow it in our own security policy</td></tr>
+      <tr><td>Responsive</td><td>Must fill a variable-height container and work on mobile portrait. Most of our traffic is mobile</td></tr>
+      <tr><td>Messages to the parent</td><td>You may post <code>ready</code>, <code>finished</code>, <code>exit</code> and <code>resize</code>. We act on those as UI hints only</td></tr>
+      <tr><td><b>Never send us a score this way</b></td><td>We will ignore any score arriving from the browser. Scores decide real money and are accepted only from your servers, signed</td></tr>
+      <tr><td>Self-contained</td><td>No login screen, no account creation, no external links out. The player is already authenticated by us</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ===== 8 ===== -->
+<section id="result">
+  <div class="sec-h"><div class="sec-n">8</div><h2>Endpoint 3 &mdash; report the result</h2></div>
+  <p class="sec-sub">The most important call in the integration. This is the number that decides who receives prize money.</p>
+
+  <div class="ep"><span class="m">POST</span><span class="u">https://chartvolt.com/api/games/providers/{yourKey}/events</span><span class="tag req">You call us</span></div>
+
+  <p>Send this within <b>60 seconds</b> of the round reaching a terminal state.</p>
+
+<pre>{
+  "eventId":    "acme_ev_01JAV4T8",       <span class="c">// unique per message, forever</span>
+  "eventType":  "round.completed",
+  "occurredAt": "2026-08-18T11:34:02Z",
+
+  "roundId":         "cv_rnd_01JAV3M7Q2XK8T",   <span class="c">// our id</span>
+  "providerRoundId": "acme_r_9f2ab41",
+  "playerId":        "cv_p_8f21c0",
+  "gameCode":        "trivia-blitz",
+
+  "status": "completed",                  <span class="c">// see section 13</span>
+  "score":  8730,                         <span class="c">// THE number we rank on</span>
+
+  "scoreBreakdown": {                     <span class="c">// free-form, shown to the player</span>
+    "correctAnswers":  9,
+    "wrongAnswers":    1,
+    "averageAnswerMs": 2140,
+    "longestStreak":   7,
+    "speedBonus":      730
+  },
+
+  "startedAt":   "2026-08-18T11:31:50Z",
+  "completedAt": "2026-08-18T11:34:02Z",
+  "durationMs":  132400,
+
+  "replayUrl": "https://play.you.com/replay/acme_r_9f2ab41?t=...",
+
+  "integrity": {                          <span class="c">// anything suspicious you noticed</span>
+    "suspicious": false,
+    "flags": []
+  }
+}</pre>
+
+  <h4>Expected response from us</h4>
+<pre>HTTP 200
+{ "received": true, "eventId": "acme_ev_01JAV4T8" }</pre>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:200px">Field</th><th style="width:100px">Required</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><code>eventId</code></td><td><span class="b req">Yes</span></td><td>Unique per message and stable across your retries. <b>This is how we avoid counting one score twice</b></td></tr>
+      <tr><td><code>roundId</code></td><td><span class="b req">Yes</span></td><td>Exactly the value we sent you</td></tr>
+      <tr><td><code>status</code></td><td><span class="b req">Yes</span></td><td>One of the four terminal states in section 13</td></tr>
+      <tr><td><code>score</code></td><td><span class="b req">Yes</span></td><td>A single number, within the declared <code>scoreRange</code>. <b>We rank on this and nothing else</b></td></tr>
+      <tr><td><code>startedAt</code>, <code>completedAt</code>, <code>durationMs</code></td><td><span class="b req">Yes</span></td><td>We use duration as a tie-break, and ties are common</td></tr>
+      <tr><td><code>replayUrl</code></td><td><span class="b req">Yes</span></td><td>How we answer a player who disputes their score. Should stay valid for at least 90 days</td></tr>
+      <tr><td><code>scoreBreakdown</code></td><td><span class="b rec">Wanted</span></td><td>We never rank on it, but we show it to the player. A visible breakdown is what makes a result feel transparent rather than arbitrary</td></tr>
+      <tr><td><code>integrity</code></td><td><span class="b rec">Wanted</span></td><td>You see things we cannot &mdash; impossible reaction times, automation patterns. A flag here holds the payout for review instead of paying blindly</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal bad">
+    <div class="t">Retry until we acknowledge</div>
+    <p>If you do not receive a <code>2xx</code> from us, <b>keep retrying with backoff for at least 24 hours</b> using the same <code>eventId</code>. Deployments, network faults and outages happen on our side too, and a score that is silently dropped means a contest we cannot settle and a player who does not get paid. Duplicate deliveries are completely safe for us; a lost one is not.</p>
+  </div>
+</section>
+
+<!-- ===== 9 ===== -->
+<section id="fetch">
+  <div class="sec-h"><div class="sec-n">9</div><h2>Endpoint 4 &mdash; let us fetch a round</h2></div>
+  <p class="sec-sub">Our safety net. Do not skip this one.</p>
+
+  <div class="ep"><span class="m get">GET</span><span class="u">{YOUR_BASE_URL}/v1/rounds/{roundId}</span><span class="tag req">Required</span></div>
+
+  <p>Return the current state of the round in <b>exactly the same shape</b> as the result callback body. If the round is still in progress, return it with a non-terminal status.</p>
+
+  <div class="cal bad">
+    <div class="t">Why this is not negotiable</div>
+    <p>Webhooks get lost &mdash; to deployments, outages, misconfiguration and plain network faults. Without a way to ask you what happened, one lost message becomes a contest that can never be settled, with real prize money frozen inside it and players waiting. We poll this endpoint for any round still unresolved as a contest approaches settlement. <b>A provider without it cannot be used for paid contests, regardless of how good the games are.</b></p>
+  </div>
+</section>
+
+<!-- ===== 10 ===== -->
+<section id="auth">
+  <div class="sec-h"><div class="sec-n">10</div><h2>Authentication and signing</h2></div>
+  <p class="sec-sub">Both directions are authenticated and signed. We will exchange credentials before integration begins.</p>
+
+  <h3>Calls from us to you</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="width:190px">Item</th><th>Value</th></tr></thead>
+    <tbody>
+      <tr><td>Transport</td><td>HTTPS only, TLS 1.2 minimum</td></tr>
+      <tr><td>Authentication</td><td><code>Authorization: Bearer {API_KEY}</code> &mdash; a key you issue to us</td></tr>
+      <tr><td>Signature</td><td><code>X-Signature: sha256={HMAC_SHA256(rawBody, API_SECRET)}</code></td></tr>
+      <tr><td>Timestamp</td><td><code>X-Timestamp</code> &mdash; Unix seconds. Please reject anything older than 5 minutes</td></tr>
+      <tr><td>Our timeout</td><td>We abort after <b>10 seconds</b> and may retry</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Your calls to us</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="width:190px">Item</th><th>Value</th></tr></thead>
+    <tbody>
+      <tr><td>Authentication</td><td><code>Authorization: Bearer {CALLBACK_TOKEN}</code> &mdash; a token we issue to you</td></tr>
+      <tr><td>Signature</td><td><code>X-Signature: sha256={HMAC_SHA256(rawBody, CALLBACK_SECRET)}</code></td></tr>
+      <tr><td>Timestamp</td><td><code>X-Timestamp</code> &mdash; Unix seconds. <b>We reject anything older than 5 minutes</b></td></tr>
+      <tr><td>Signature basis</td><td>The <b>raw request body bytes</b>, exactly as sent</td></tr>
+    </tbody>
+  </table></div>
+
+  <h4>Signing, in Node.js</h4>
+<pre>const crypto = require("crypto");
+
+const body      = JSON.stringify(payload);   <span class="c">// serialise ONCE</span>
+const timestamp = Math.floor(Date.now() / 1000).toString();
+const signature = crypto
+  .createHmac("sha256", CALLBACK_SECRET)
+  .update(body, "utf8")                      <span class="c">// sign that exact string</span>
+  .digest("hex");
+
+await fetch(url, {
+  method: "POST",
+  headers: {
+    "Content-Type":  "application/json",
+    "Authorization": `Bearer ${CALLBACK_TOKEN}`,
+    "X-Timestamp":   timestamp,
+    "X-Signature":   `sha256=${signature}`
+  },
+  body                                        <span class="c">// send the SAME string</span>
+});</pre>
+
+  <h4>The same in PHP</h4>
+<pre>$body      = json_encode($payload);
+$timestamp = (string) time();
+$signature = hash_hmac('sha256', $body, $CALLBACK_SECRET);
+
+$headers = [
+  'Content-Type: application/json',
+  'Authorization: Bearer ' . $CALLBACK_TOKEN,
+  'X-Timestamp: ' . $timestamp,
+  'X-Signature: sha256=' . $signature,
+];</pre>
+
+  <div class="cal bad">
+    <div class="t">The mistake that costs everyone a day of debugging</div>
+    <p><b>Sign the exact bytes you send, and send the exact bytes you signed.</b> Serialise the payload to a string once, sign that string, and transmit that same string. If any layer re-serialises the object between signing and sending &mdash; a middleware, a logger, an HTTP client that takes an object rather than a string &mdash; key order or number formatting can shift and the signature will fail. The failures look intermittent and random, which is what makes them expensive. We verify against the raw body we receive, and we will do the same on our side.</p>
+  </div>
+
+  <div class="cal info">
+    <div class="t">Secret rotation</div>
+    <p>Please support rotating secrets without downtime, by accepting both the old and the new value during a changeover window. If a secret is ever exposed, rotation should be a configuration change rather than a coordinated release on both sides at once.</p>
+  </div>
+</section>
+
+<!-- ===== 11 ===== -->
+<section id="idem">
+  <div class="sec-h"><div class="sec-n">11</div><h2>Idempotency and retries</h2></div>
+  <p class="sec-sub">Both sides will retry. Neither side should double-count anything.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:250px">Situation</th><th>Required behaviour</th></tr></thead>
+    <tbody>
+      <tr><td>We call <code>POST /v1/rounds</code> twice with the same <code>roundId</code></td><td><b>Return the same round and the same launch URL.</b> Do not create a second round. A player double-tapping Play must not consume two paid attempts</td></tr>
+      <tr><td>We call it with the same <code>roundId</code> but different parameters</td><td>Reject with <code>409</code>. This means something is wrong and we would rather know than guess</td></tr>
+      <tr><td>You send the same <code>eventId</code> twice</td><td>We record one score and reply <code>200</code> both times. Retrying is always safe for you</td></tr>
+      <tr><td>You send two different scores for one <code>roundId</code></td><td>We keep the first valid one and raise an internal alert. Please avoid this &mdash; it indicates a real defect</td></tr>
+      <tr><td>Your API is briefly unavailable</td><td>We retry idempotent calls up to 3 times with backoff, then fail the round <b>without consuming the player's attempt</b></td></tr>
+      <tr><td>We are briefly unavailable</td><td>Retry the result callback with backoff for at least 24 hours, same <code>eventId</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ===== 12 ===== -->
+<section id="seed">
+  <div class="sec-h"><div class="sec-n">12</div><h2>Identical content &mdash; the fairness requirement</h2></div>
+  <p class="sec-sub">The single most important guarantee in this document, and the one most often missing from existing APIs.</p>
+
+  <p>Every player in one competition must face <b>identical content</b>: the same questions, the same puzzles, the same starting position. We send you the same <code>contentSeed</code> for every round in a contest, and you must guarantee that the same seed with the same <code>config</code> produces the same content, every time.</p>
+
+  <figure>
+    <div class="fig-t">Diagram 3 &mdash; one seed, identical content</div>
+    <svg viewBox="0 0 920 230" role="img" aria-label="One content seed produces identical content for every player">
+      <rect x="20" y="76" width="196" height="72" rx="9" fill="#143a5c"/>
+      <text x="118" y="104" text-anchor="middle" font-size="12.5" font-weight="700" fill="#f0dda6">ONE contentSeed</text>
+      <text x="118" y="124" text-anchor="middle" font-size="11" fill="#cfdcea">we send it with</text>
+      <text x="118" y="140" text-anchor="middle" font-size="11" fill="#cfdcea">every round</text>
+
+      <line x1="222" y1="112" x2="298" y2="52" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <line x1="222" y1="112" x2="298" y2="112" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <line x1="222" y1="112" x2="298" y2="172" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+
+      <rect x="304" y="24" width="290" height="56" rx="8" fill="#fff" stroke="#dde4ec"/>
+      <text x="328" y="48" font-size="12" fill="#143a5c">Player A</text>
+      <text x="328" y="68" font-size="11" fill="#6b7d8f">the same 10 questions</text>
+      <rect x="304" y="84" width="290" height="56" rx="8" fill="#fff" stroke="#dde4ec"/>
+      <text x="328" y="108" font-size="12" fill="#143a5c">Player B</text>
+      <text x="328" y="128" font-size="11" fill="#6b7d8f">the same 10 questions</text>
+      <rect x="304" y="144" width="290" height="56" rx="8" fill="#fff" stroke="#dde4ec"/>
+      <text x="328" y="168" font-size="12" fill="#143a5c">Player C</text>
+      <text x="328" y="188" font-size="11" fill="#6b7d8f">the same 10 questions</text>
+
+      <text x="578" y="48" text-anchor="end" font-size="10.5" fill="#8a6209" font-family="Consolas, monospace">order shuffled</text>
+      <text x="578" y="108" text-anchor="end" font-size="10.5" fill="#8a6209" font-family="Consolas, monospace">order shuffled</text>
+      <text x="578" y="188" text-anchor="end" font-size="10.5" fill="#8a6209" font-family="Consolas, monospace">order shuffled</text>
+
+      <line x1="600" y1="52" x2="674" y2="106" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <line x1="600" y1="112" x2="674" y2="112" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <line x1="600" y1="172" x2="674" y2="118" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+
+      <rect x="680" y="76" width="220" height="72" rx="9" fill="#eaf6ef" stroke="#b6ddc6"/>
+      <text x="790" y="104" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1a6e49">A FAIR RANKING</text>
+      <text x="790" y="126" text-anchor="middle" font-size="11" fill="#3a4a5a">score differences are skill,</text>
+      <text x="790" y="142" text-anchor="middle" font-size="11" fill="#3a4a5a">not luck of the draw</text>
+    </svg>
+    <figcaption><b>Same content, shuffled presentation.</b> Shuffling the order per player is not just permitted, it is wanted &mdash; it stops players simply telling each other that the answer is B while keeping the challenge identical.</figcaption>
+  </figure>
+
+  <h3>What we need you to guarantee</h3>
+  <div class="chk">
+    <div><span class="box"></span><span>Same <code>contentSeed</code> + same <code>config</code> &rarr; <b>identical content</b>, every time, indefinitely</span></div>
+    <div><span class="box"></span><span>Different <code>contentSeed</code> &rarr; different content</span></div>
+    <div><span class="box"></span><span>Presentation order <b>may</b> be shuffled per player; the underlying content may not change</span></div>
+    <div><span class="box"></span><span>The seed is <b>never exposed to the player</b>, in the page, the URL or any client-visible response</span></div>
+    <div><span class="box"></span><span>There is <b>no endpoint anywhere</b> that returns the content for a given seed</span></div>
+    <div><span class="box"></span><span>Content generated for a seed remains reproducible even after your content pool is updated</span></div>
+  </div>
+
+  <div class="cal bad">
+    <div class="t">Why we care so much about this</div>
+    <p>Two players cannot be fairly ranked against each other if they answered different questions of unknown relative difficulty &mdash; and we are paying out real prize money on that ranking. Beyond fairness to players, identical conditions are what make <b>relative skill</b> rather than luck of the draw the deciding factor, which matters a great deal to how our product is classified and regulated. A game that cannot support seeding is still usable for free practice, but not for a paid competition.</p>
+  </div>
+</section>
+
+<!-- ===== 13 ===== -->
+<section id="states">
+  <div class="sec-h"><div class="sec-n">13</div><h2>Round states</h2></div>
+  <p class="sec-sub">Every round must reach one of four terminal states. There is no fifth option, and there is no "silence".</p>
+
+  <figure>
+    <div class="fig-t">Diagram 4 &mdash; the round state machine</div>
+    <svg viewBox="0 0 920 260" role="img" aria-label="Round state machine with four terminal states">
+      <rect x="20" y="104" width="150" height="52" rx="8" fill="#143a5c"/>
+      <text x="95" y="128" text-anchor="middle" font-size="12" font-weight="700" fill="#f0dda6">created</text>
+      <text x="95" y="146" text-anchor="middle" font-size="10.5" fill="#cfdcea">we asked for it</text>
+
+      <line x1="176" y1="130" x2="216" y2="130" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <rect x="222" y="104" width="150" height="52" rx="8" fill="#1d4d75"/>
+      <text x="297" y="128" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">in progress</text>
+      <text x="297" y="146" text-anchor="middle" font-size="10.5" fill="#cfdcea">player is playing</text>
+
+      <line x1="378" y1="118" x2="470" y2="42" stroke="#1a6e49" stroke-width="1.6" marker-end="url(#arg)"/>
+      <line x1="378" y1="126" x2="470" y2="100" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+      <line x1="378" y1="140" x2="470" y2="164" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+      <line x1="378" y1="148" x2="470" y2="222" stroke="#a02a38" stroke-width="1.6" marker-end="url(#arr)"/>
+
+      <rect x="476" y="18" width="190" height="46" rx="8" fill="#eaf6ef" stroke="#1a6e49" stroke-width="1.6"/>
+      <text x="571" y="40" text-anchor="middle" font-size="12" font-weight="700" fill="#1a6e49">completed</text>
+      <text x="571" y="56" text-anchor="middle" font-size="10.5" fill="#3a4a5a">played to the end</text>
+      <text x="686" y="46" font-size="11" fill="#3a4a5a">we rank the score</text>
+
+      <rect x="476" y="76" width="190" height="46" rx="8" fill="#fdf5e3" stroke="#ecd9a6"/>
+      <text x="571" y="98" text-anchor="middle" font-size="12" font-weight="700" fill="#8a6209">abandoned</text>
+      <text x="571" y="114" text-anchor="middle" font-size="10.5" fill="#3a4a5a">quit or disconnected</text>
+      <text x="686" y="104" font-size="11" fill="#3a4a5a">partial score, still counts</text>
+
+      <rect x="476" y="134" width="190" height="46" rx="8" fill="#fdf5e3" stroke="#ecd9a6"/>
+      <text x="571" y="156" text-anchor="middle" font-size="12" font-weight="700" fill="#8a6209">expired</text>
+      <text x="571" y="172" text-anchor="middle" font-size="10.5" fill="#3a4a5a">expiresAt passed</text>
+      <text x="686" y="162" font-size="11" fill="#3a4a5a">zero, or partial if you have it</text>
+
+      <rect x="476" y="196" width="190" height="46" rx="8" fill="#fdedef" stroke="#f0c3c9"/>
+      <text x="571" y="218" text-anchor="middle" font-size="12" font-weight="700" fill="#a02a38">voided</text>
+      <text x="571" y="234" text-anchor="middle" font-size="10.5" fill="#3a4a5a">your fault or cheating</text>
+      <text x="686" y="224" font-size="11" fill="#3a4a5a">not scored, attempt returned</text>
+    </svg>
+    <figcaption><b>Every path must end in one of the four boxes on the right</b>, and you must tell us which one. A round that stops reporting is the worst thing that can happen in this integration, because a contest cannot settle and other players' prize money is frozen behind it.</figcaption>
+  </figure>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:150px">status</th><th style="width:300px">When to use it</th><th>What we do</th></tr></thead>
+    <tbody>
+      <tr><td><code>completed</code></td><td>The player finished the game normally</td><td>Score recorded and ranked</td></tr>
+      <tr><td><code>abandoned</code></td><td>The player quit or disconnected and did not return</td><td>Score recorded as reported. Counts as an attempt. <b>Please send a partial score if you can compute one</b> &mdash; a dropped mobile signal should not cost someone a paid entry</td></tr>
+      <tr><td><code>expired</code></td><td><code>expiresAt</code> passed before completion</td><td>Scored zero, or the partial score if you supply one</td></tr>
+      <tr><td><code>voided</code></td><td>You invalidated the round &mdash; your own fault, a bug, or confirmed cheating</td><td>Not scored, and we return the attempt to the player. <b>No money moves</b></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal plain">
+    <div class="t">A late result is better than no result</div>
+    <p>If something goes wrong and you cannot report within 60 seconds, <b>still report</b>. We keep a grace period after a contest closes precisely so that slow results are absorbed rather than lost, and even a result that arrives after settlement is valuable to us for auditing and for answering the player.</p>
+  </div>
+</section>
+
+<!-- ===== 14 ===== -->
+<section id="errors">
+  <div class="sec-h"><div class="sec-n">14</div><h2>Errors</h2></div>
+  <p class="sec-sub">We need to know whether to retry, to fail, or to tell the player something.</p>
+
+<pre>{
+  "error": {
+    "code":      "GAME_UNAVAILABLE",
+    "message":   "Game is in maintenance until 14:00 UTC.",
+    "retryable": false
+  }
+}</pre>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:90px">HTTP</th><th style="width:290px">Meaning</th><th>What we do</th></tr></thead>
+    <tbody>
+      <tr><td><code>400</code></td><td>Invalid request, or config failing your own schema</td><td>Fail immediately, no retry, and alert our team</td></tr>
+      <tr><td><code>401</code> <code>403</code></td><td>Auth or signature rejected</td><td>Fail immediately, critical alert</td></tr>
+      <tr><td><code>404</code></td><td>Unknown <code>roundId</code> or <code>gameCode</code></td><td>Fail immediately</td></tr>
+      <tr><td><code>409</code></td><td>Same <code>roundId</code>, different parameters</td><td>Fail and alert &mdash; an identifier collision</td></tr>
+      <tr><td><code>422</code></td><td>Valid shape, refused by your business rules</td><td>Fail and show the player a message</td></tr>
+      <tr><td><code>429</code></td><td>Rate limited</td><td>Back off. Please send <code>Retry-After</code></td></tr>
+      <tr><td><code>5xx</code></td><td>Your fault</td><td>Retry up to 3 times, then fail the round <b>without consuming the attempt</b></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal info">
+    <div class="t">Two small things that help a lot</div>
+    <p>Always return <b>JSON, never an HTML error page</b> &mdash; an HTML body forces us to guess what went wrong. And use the <code>retryable</code> flag to tell us whether a <code>500</code> is transient or fatal; that single boolean is often the difference between recovering a player's round and wrongly consuming their paid attempt.</p>
+  </div>
+</section>
+
+<!-- ===== 15 ===== -->
+<section id="sandbox">
+  <div class="sec-h"><div class="sec-n">15</div><h2>Sandbox</h2></div>
+  <p class="sec-sub">We will not connect to your production environment until everything below has been proven in a test one.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:280px">We need</th><th style="width:110px">Status</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>A sandbox separate from production, with its own credentials</td><td><span class="b req">Required</span></td><td>We cannot develop against live games</td></tr>
+      <tr><td>The full round lifecycle working, including real callbacks</td><td><span class="b req">Required</span></td><td>The callback is the part that must be flawless</td></tr>
+      <tr><td>A way to <b>force a specific score</b></td><td><span class="b rec">Strongly wanted</span></td><td>Lets us test ranking, tie-breaks and payouts automatically instead of playing games by hand</td></tr>
+      <tr><td>A way to force each terminal state, including <code>voided</code></td><td><span class="b rec">Strongly wanted</span></td><td>We must rehearse every failure before real money is involved</td></tr>
+      <tr><td>A way to <b>suppress the callback deliberately</b></td><td><span class="b rec">Strongly wanted</span></td><td>So we can prove our recovery path works when a message never arrives</td></tr>
+      <tr><td>Stable content for a fixed seed</td><td><span class="b req">Required</span></td><td>To verify the fairness guarantee in section 12</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal good">
+    <div class="t">The three "strongly wanted" rows are worth real effort</div>
+    <p>They are what let us build automated tests around your API instead of manual ones. Providers who offer them get through our integration and pilot phases substantially faster, because we can prove correctness in minutes rather than days of hand-testing.</p>
+  </div>
+</section>
+
+<!-- ===== 16 ===== -->
+<section id="sla">
+  <div class="sec-h"><div class="sec-n">16</div><h2>Service levels we need</h2></div>
+  <p class="sec-sub">Our players have paid to enter. An outage is not a degraded experience for them, it is a financial event for us.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:320px">Metric</th><th>Requirement</th></tr></thead>
+    <tbody>
+      <tr><td>Game availability</td><td>99.5% monthly or better</td></tr>
+      <tr><td>Round creation response time</td><td>p95 under 2s, p99 under 5s</td></tr>
+      <tr><td>Result callback delivery</td><td>Within 60s of terminal state; 99.9% within 24h including retries</td></tr>
+      <tr><td>Fetch-round endpoint</td><td>p95 under 1s</td></tr>
+      <tr><td>Incident notification</td><td>Within 30 minutes of any incident affecting rounds</td></tr>
+      <tr><td>Breaking API changes</td><td>90 days written notice, with versioned endpoints</td></tr>
+      <tr><td>Support response</td><td>Within 4 business hours for anything affecting live contests</td></tr>
+      <tr><td>Data retention</td><td>Round records and replay links kept at least 90 days</td></tr>
+      <tr><td>Named contact</td><td>A person we can reach during a live incident, not a shared inbox</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ===== 17 ===== -->
+<section id="data">
+  <div class="sec-h"><div class="sec-n">17</div><h2>Data protection</h2></div>
+  <p class="sec-sub">Deliberately minimal, which reduces the compliance burden for both of us.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:280px">Item</th><th style="width:120px">Do we send it?</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Opaque player identifier</td><td><span class="b ok">Yes</span></td><td>Stable per player, meaningless outside our system</td></tr>
+      <tr><td>Display name</td><td><span class="b med">Optional</span></td><td>Only because it may appear in your game UI. Can be withheld</td></tr>
+      <tr><td>Locale and country</td><td><span class="b med">Optional</span></td><td>For localisation only</td></tr>
+      <tr><td>IP address</td><td><span class="b med">On request</span></td><td>Only if you need it for your own anti-cheat, and only once documented</td></tr>
+      <tr><td>Email, real name, date of birth</td><td><span class="b req">Never</span></td><td>&mdash;</td></tr>
+      <tr><td>Payment details, identity documents</td><td><span class="b req">Never</span></td><td>&mdash;</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>A <b>data processing agreement</b> is required before production use, covering your role as a processor, disclosure of any sub-processors, hosting locations, and breach notification timelines.</p>
+</section>
+
+<!-- ===== 18 ===== -->
+<section id="optional">
+  <div class="sec-h"><div class="sec-n">18</div><h2>Optional extras, in order of value to us</h2></div>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:300px">Capability</th><th style="width:110px">Value</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td><code>POST /v1/rounds/{roundId}/void</code></td><td><span class="b rec">High</span></td><td>Lets us cancel a live round when a contest is cancelled, so a player is not left playing for a dead contest</td></tr>
+      <tr><td><code>POST /v1/matches</code> &mdash; two-player match</td><td><span class="b rec">High</span></td><td>Required if you offer head-to-head games and we want real-time challenges on them</td></tr>
+      <tr><td>Sandbox score injection</td><td><span class="b rec">High</span></td><td>Turns our testing from manual into automated. See section 15</td></tr>
+      <tr><td>A <code>round.started</code> webhook</td><td><span class="b med">Medium</span></td><td>Distinguishes "never actually played" from "played and scored zero", which matters when we decide whether to refund</td></tr>
+      <tr><td>Visual theming to match our brand</td><td><span class="b med">Medium</span></td><td>The game sits inside our product; a consistent look measurably improves participation</td></tr>
+      <tr><td>Status page and webhook for incidents</td><td><span class="b med">Medium</span></td><td>Lets us pause contests before players notice</td></tr>
+      <tr><td>Your own leaderboard endpoints</td><td><span class="b opt">Low</span></td><td>We keep our own. Useful only for cross-checking</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ===== 19 ===== -->
+<section id="checklist">
+  <div class="sec-h"><div class="sec-n">19</div><h2>Conformance checklist</h2></div>
+  <p class="sec-sub">Work through this before we schedule an integration call. If anything cannot be met, tell us early &mdash; some items are negotiable and some are not.</p>
+
+  <h3>Must be true, or we cannot run paid contests</h3>
+  <div class="chk">
+    <div><span class="box"></span><span>Game outcomes are determined by <b>player skill</b>, not by chance</span></div>
+    <div><span class="box"></span><span>Results are delivered <b>server to server</b>, never through the player's browser</span></div>
+    <div><span class="box"></span><span>Results are <b>HMAC-signed</b> with a timestamp, over the raw body</span></div>
+    <div><span class="box"></span><span><code>GET /v1/rounds/{roundId}</code> exists and returns full state on demand</span></div>
+    <div><span class="box"></span><span>Round creation is <b>idempotent</b> on our <code>roundId</code></span></div>
+    <div><span class="box"></span><span>Result delivery carries a unique, stable <code>eventId</code></span></div>
+    <div><span class="box"></span><span>Every round <b>always</b> reaches one of the four terminal states</span></div>
+    <div><span class="box"></span><span><b>Content seeding</b> guarantees identical content across players</span></div>
+    <div><span class="box"></span><span>A <b>sandbox</b> exists, separate from production</span></div>
+    <div><span class="box"></span><span>You handle <b>no money</b> of any kind</span></div>
+    <div><span class="box"></span><span><code>scoreDirection</code> is declared per game</span></div>
+    <div><span class="box"></span><span><code>gameCode</code> values are stable and never reused</span></div>
+    <div><span class="box"></span><span>A <b>replay or audit URL</b> is provided per round</span></div>
+    <div><span class="box"></span><span>A written <b>SLA</b> is in place</span></div>
+    <div><span class="box"></span><span><b>Page content per game</b> &mdash; tagline, description, rules summary, how to play, thumbnail and banner &mdash; in every locale you declare</span></div>
+    <div><span class="box"></span><span>Nothing you sell inside a game <b>improves a score or ranking</b></span></div>
+  </div>
+
+  <h3>Strongly wanted</h3>
+  <div class="chk">
+    <div><span class="box"></span><span>Free <b>practice mode</b>, unranked</span></div>
+    <div><span class="box"></span><span>Accurate, complete <code>configSchema</code> per game</span></div>
+    <div><span class="box"></span><span>Partial scores reported for <code>abandoned</code> rounds</span></div>
+    <div><span class="box"></span><span><code>scoreBreakdown</code> detail for the player's results screen</span></div>
+    <div><span class="box"></span><span><code>integrity</code> flags when something looks wrong</span></div>
+    <div><span class="box"></span><span>Sandbox controls to force scores, states and suppressed callbacks</span></div>
+    <div><span class="box"></span><span>Round voiding</span></div>
+    <div><span class="box"></span><span>Screenshots and a square icon per game</span></div>
+    <div><span class="box"></span><span>A short promotional video or animated preview per game</span></div>
+  </div>
+</section>
+
+<!-- ===== 20 ===== -->
+<section id="next">
+  <div class="sec-h"><div class="sec-n">20</div><h2>What we need from you to move forward</h2></div>
+  <p class="sec-sub">Answer these and we can tell you quickly whether there is a fit, before either side spends engineering time.</p>
+
+  <h3>Technical</h3>
+  <ol>
+    <li>Are your game outcomes decided by <b>player skill or by a random number generator</b>?</li>
+    <li>Which of your games are <b>independent-play</b>, and which need an opponent?</li>
+    <li>Can you support <b>content seeding</b> as described in section 12? If not today, could you?</li>
+    <li>Do you have a <b>pull endpoint</b> for round state, or would it need building?</li>
+    <li>How do you sign outbound webhooks today?</li>
+    <li>What is your complete list of terminal round states, and <b>can a round ever hang</b>?</li>
+    <li>Do you report <b>partial scores</b> for abandoned rounds?</li>
+    <li>Do you provide <b>replay links</b>, and for how long do they stay valid?</li>
+    <li>Do you provide anti-cheat or integrity signals?</li>
+    <li>Does your sandbox let us force results?</li>
+    <li>How do you version your API, and what notice do you give for breaking changes?</li>
+  </ol>
+
+  <h3>Product</h3>
+  <ol start="12">
+    <li>Full catalogue, with typical and maximum round duration for each game.</li>
+    <li>Is there a <b>practice mode</b>?</li>
+    <li>How large is the content pool per game, and how often is it refreshed?</li>
+    <li>Which languages and platforms are supported?</li>
+    <li>How often do you release new titles?</li>
+    <li>Can games be <b>visually themed</b> to match our product?</li>
+    <li>Do you supply <b>page content per game</b> &mdash; tagline, description, rules summary, how-to-play text &mdash; and in which languages?</li>
+    <li>What <b>artwork sizes</b> do you provide, and are the URLs stable and cacheable?</li>
+    <li>Does any game sell anything to the player <b>during a round</b>, and can that affect their score? If so, can it be disabled entirely?</li>
+  </ol>
+
+  <h3>Commercial and legal</h3>
+  <ol start="21">
+    <li>What is your <b>pricing model</b>, precisely? Per round, per active player, revenue share, or flat licence?</li>
+    <li>Are <b>practice rounds and abandoned rounds billed</b>?</li>
+    <li>Minimum commitment, contract term and notice period?</li>
+    <li>What is your written SLA, and what are the remedies if it is missed?</li>
+    <li>Which jurisdictions do you already operate in?</li>
+    <li>Do you hold any <b>fairness or game-testing certifications</b>?</li>
+    <li>Will you sign a data processing agreement, and where is data hosted?</li>
+    <li><b>Who bears the cost if a scoring defect on your side causes us to pay a prize to the wrong player?</b></li>
+    <li>Are you content for games to appear <b>unbranded</b> to players, with attribution in our footer and legal pages rather than in game copy?</li>
+  </ol>
+
+  <div class="cal plain">
+    <div class="t">On question 21</div>
+    <p>Pricing shapes what we can build together. Our most valuable contests for growth are <b>low entry-fee, high-participation</b> ones, and a per-round charge can make those uneconomic no matter how good the game is. A flat licence or a share of our platform fee lets us push volume aggressively, which is better for both of us. Tell us your model early so we can design contests around it rather than discovering the problem after launch.</p>
+  </div>
+
+  <div class="verdict" style="margin-top:30px;margin-bottom:0">
+    <div class="q">The summary you can give your engineers</div>
+    <div class="a">Build three endpoints &mdash; list games, create a round, fetch a round &mdash; and post us a signed score when a round ends. Make it idempotent, make every round always finish, and make one seed produce identical content for every player.</div>
+    <div class="n">Everything else in this document is detail supporting those four sentences. No money, no player data, no knowledge of our competition mechanics required.</div>
+  </div>
+
+  <h3>Document history</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="width:90px">Version</th><th style="width:130px">Date</th><th>Change</th></tr></thead>
+    <tbody>
+      <tr><td><b>1.2</b></td><td>30 Aug 2026</td><td><b>Two field renames.</b> <code>family: "solo_scored"</code> becomes <code>family: "independent"</code>, and the capability flag <code>supportsDuel</code> becomes <code>supportsOneVsOne</code>. Both were renamed because &ldquo;solo&rdquo; and &ldquo;duel&rdquo; were being misread as statements about contest size. Nothing else about either field changes. Added a note in section 4 making it explicit that every contest we run has at least two players, and that an independent-play game is used in contests of a hundred people</td></tr>
+      <tr><td><b>1.1</b></td><td>30 Aug 2026</td><td>Page content per game promoted to a hard requirement &mdash; <code>tagline</code>, <code>description</code>, <code>rulesSummary</code>, <code>howToPlay</code>, <code>bannerUrl</code> &mdash; because each game now gets its own page on our site. Added artwork size minimums, localisation and unbranded-copy constraints. Added the rule that nothing sold may improve a score in a paid contest. Three product questions and one commercial question added; commercial questions renumbered from 21</td></tr>
+      <tr><td><b>1.0</b></td><td>Initial</td><td>First issue &mdash; the four calls, authentication and signing, idempotency, content seeding, round states, error handling, sandbox, service levels</td></tr>
+    </tbody>
+  </table></div>
+  <p style="margin-bottom:0">If you have already begun work against version 1.0 or 1.1, almost nothing you have built is invalidated. The 1.1 additions are content fields on the catalogue response. The 1.2 changes are <b>two field renames on the same response</b> &mdash; tell us if you have already shipped the old names and we will accept both during your integration.</p>
+</section>
+
+</main>
+</div>
+
+<div class="foot">
+  <div>ChartVolt &mdash; Game API Requirements &middot; Version 1.2 &middot; Requirements document for prospective game providers</div>
+  <div>Questions on this specification: contact your ChartVolt commercial contact</div>
+</div>
+
+</body>
+</html>
