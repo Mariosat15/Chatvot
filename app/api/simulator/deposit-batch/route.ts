@@ -3,21 +3,17 @@ import mongoose from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import { guardSimulatorRoute } from "@/lib/services/simulator/simulator-mode";
 
 /**
  * POST /api/simulator/deposit-batch
  * Batch deposit to multiple users at once (MUCH faster than individual deposits)
  */
 export async function POST(request: NextRequest) {
-  const isSimulatorMode = request.headers.get("X-Simulator-Mode") === "true";
-  const isDev = process.env.NODE_ENV === "development";
-
-  if (!isSimulatorMode && !isDev) {
-    return NextResponse.json(
-      { success: false, error: "Simulator mode not enabled" },
-      { status: 403 },
-    );
-  }
+  // Reason: this route credits arbitrary wallets, so it requires the internal
+  // secret rather than the declaring header alone.
+  const guard = guardSimulatorRoute(request);
+  if (guard) return guard;
 
   try {
     const body = await request.json();
@@ -48,8 +44,12 @@ export async function POST(request: NextRequest) {
       const walletMap = new Map(existingWallets.map((w) => [w.userId, w]));
 
       // Prepare bulk operations
+      // Reason: these are raw driver bulkWrite operations and untyped insert
+      // documents; the precise generic types add no safety at this call site.
+      /* eslint-disable @typescript-eslint/no-explicit-any */
       const walletOps: any[] = [];
       const transactionDocs: any[] = [];
+      /* eslint-enable @typescript-eslint/no-explicit-any */
 
       for (const deposit of deposits) {
         const { userId, amount } = deposit;

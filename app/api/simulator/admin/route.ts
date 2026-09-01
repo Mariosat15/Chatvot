@@ -2,22 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
 import { ObjectId } from "mongodb";
+import { guardSimulatorRoute } from "@/lib/services/simulator/simulator-mode";
 
 /**
  * POST /api/simulator/admin
  * Simulator endpoint for admin actions (ban/suspend/unban users)
  */
 export async function POST(request: NextRequest) {
-  // Only allow in development or with simulator mode header
-  const isSimulatorMode = request.headers.get("X-Simulator-Mode") === "true";
-  const isDev = process.env.NODE_ENV === "development";
-
-  if (!isSimulatorMode && !isDev) {
-    return NextResponse.json(
-      { success: false, error: "Simulator mode not enabled" },
-      { status: 403 },
-    );
-  }
+  // Reason: this route bans and suspends accounts, so it requires the internal
+  // secret rather than the declaring header alone.
+  const guard = guardSimulatorRoute(request);
+  if (guard) return guard;
 
   try {
     const body = await request.json();

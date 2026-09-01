@@ -1,29 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
+import { guardSimulatorRoute } from "@/lib/services/simulator/simulator-mode";
 
 /**
  * POST /api/simulator/competitions
  * Simulator endpoint to create competitions
  */
 export async function POST(request: NextRequest) {
-  // Only allow in development or with simulator mode header
-  const isSimulatorMode = request.headers.get("X-Simulator-Mode") === "true";
-  const isDev = process.env.NODE_ENV === "development";
-
-  if (!isSimulatorMode && !isDev) {
-    return NextResponse.json(
-      { success: false, error: "Simulator mode not enabled" },
-      { status: 403 },
-    );
-  }
+  const guard = guardSimulatorRoute(request);
+  if (guard) return guard;
 
   try {
     const body = await request.json();
     const {
       name,
       description,
-      entryFee = 10,
+      // Accepted for API compatibility but deliberately ignored — simulator
+      // competitions are always created free (see entryFee: 0 below).
+      entryFee: _entryFee = 10,
       prizePool = 1000,
       maxParticipants = 100,
       startDate,

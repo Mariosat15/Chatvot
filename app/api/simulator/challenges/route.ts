@@ -4,6 +4,7 @@ import Challenge from "@/database/models/trading/challenge.model";
 import ChallengeSettings from "@/database/models/trading/challenge-settings.model";
 import TradingRiskSettings from "@/database/models/trading-risk-settings.model";
 import { nanoid } from "nanoid";
+import { guardSimulatorRoute } from "@/lib/services/simulator/simulator-mode";
 
 /**
  * POST /api/simulator/challenges
@@ -11,15 +12,8 @@ import { nanoid } from "nanoid";
  * MUCH faster than creating one at a time (single DB roundtrip)
  */
 export async function POST(request: NextRequest) {
-  const isSimulatorMode = request.headers.get("X-Simulator-Mode") === "true";
-  const isDev = process.env.NODE_ENV === "development";
-
-  if (!isSimulatorMode && !isDev) {
-    return NextResponse.json(
-      { success: false, error: "Simulator mode not enabled" },
-      { status: 403 },
-    );
-  }
+  const guard = guardSimulatorRoute(request);
+  if (guard) return guard;
 
   try {
     const body = await request.json();
@@ -139,15 +133,8 @@ export async function POST(request: NextRequest) {
  * Delete simulator challenges
  */
 export async function DELETE(request: NextRequest) {
-  const isSimulatorMode = request.headers.get("X-Simulator-Mode") === "true";
-  const isDev = process.env.NODE_ENV === "development";
-
-  if (!isSimulatorMode && !isDev) {
-    return NextResponse.json(
-      { success: false, error: "Simulator mode not enabled" },
-      { status: 403 },
-    );
-  }
+  const guard = guardSimulatorRoute(request);
+  if (guard) return guard;
 
   try {
     await connectToDatabase();

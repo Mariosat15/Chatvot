@@ -3,21 +3,17 @@ import mongoose from "mongoose";
 import { connectToDatabase } from "@/database/mongoose";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import { guardSimulatorRoute } from "@/lib/services/simulator/simulator-mode";
 
 /**
  * POST /api/simulator/payments/approve
  * Simulator endpoint to approve pending payments
  */
 export async function POST(request: NextRequest) {
-  const isSimulatorMode = request.headers.get("X-Simulator-Mode") === "true";
-  const isDev = process.env.NODE_ENV === "development";
-
-  if (!isSimulatorMode && !isDev) {
-    return NextResponse.json(
-      { success: false, error: "Simulator mode not enabled" },
-      { status: 403 },
-    );
-  }
+  // Reason: this route approves payments and credits wallets, so it requires
+  // the internal secret rather than the declaring header alone.
+  const guard = guardSimulatorRoute(request);
+  if (guard) return guard;
 
   try {
     const body = await request.json();

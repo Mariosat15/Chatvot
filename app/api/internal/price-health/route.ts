@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { priceHealthMonitor } from "@/lib/services/price-health-monitor.service";
 import { priceSnapshotService } from "@/lib/services/price-snapshot.service";
+import { verifyInternalSecret } from "@/lib/utils/internal-auth";
 
 /**
  * GET /api/internal/price-health
@@ -11,9 +12,14 @@ export async function GET(request: NextRequest) {
   try {
     // Verify internal API key
     const internalKey = request.headers.get("x-internal-key");
-    const expectedKey = process.env.INTERNAL_API_KEY || "internal-key";
 
-    if (internalKey !== expectedKey) {
+    if (
+      !verifyInternalSecret(
+        internalKey,
+        [process.env.INTERNAL_API_KEY, process.env.INTERNAL_API_SECRET],
+        "internal/price-health",
+      )
+    ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -83,9 +89,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const internalKey = request.headers.get("x-internal-key");
-    const expectedKey = process.env.INTERNAL_API_KEY || "internal-key";
 
-    if (internalKey !== expectedKey) {
+    if (
+      !verifyInternalSecret(
+        internalKey,
+        [process.env.INTERNAL_API_KEY, process.env.INTERNAL_API_SECRET],
+        "internal/price-health",
+      )
+    ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

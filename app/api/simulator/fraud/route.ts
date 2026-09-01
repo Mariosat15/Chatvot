@@ -1,22 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import DeviceFingerprint from "@/database/models/fraud/device-fingerprint.model";
+import { guardSimulatorRoute } from "@/lib/services/simulator/simulator-mode";
 
 /**
  * POST /api/simulator/fraud
  * Simulator endpoint to test fraud detection patterns
  */
 export async function POST(request: NextRequest) {
-  // Only allow in development or with simulator mode header
-  const isSimulatorMode = request.headers.get("X-Simulator-Mode") === "true";
-  const isDev = process.env.NODE_ENV === "development";
-
-  if (!isSimulatorMode && !isDev) {
-    return NextResponse.json(
-      { success: false, error: "Simulator mode not enabled" },
-      { status: 403 },
-    );
-  }
+  // Reason: this route writes device-fingerprint state used by the fraud
+  // engine, so it requires the internal secret rather than the header alone.
+  const guard = guardSimulatorRoute(request);
+  if (guard) return guard;
 
   try {
     const body = await request.json();

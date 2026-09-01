@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { clearLeaderboardCache } from "@/lib/actions/leaderboard/global-leaderboard.actions";
+import { verifyInternalSecret } from "@/lib/utils/internal-auth";
 
 /**
  * POST /api/leaderboard/invalidate
@@ -15,9 +16,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const { secret } = body;
 
-    // Simple shared secret — this endpoint is internal (admin → main app)
-    const expectedSecret = process.env.INTERNAL_API_SECRET || "simulator-cleanup";
-    if (secret !== expectedSecret) {
+    // Shared secret — this endpoint is internal (admin → main app)
+    if (
+      !verifyInternalSecret(
+        secret,
+        [process.env.INTERNAL_API_SECRET],
+        "leaderboard/invalidate",
+      )
+    ) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

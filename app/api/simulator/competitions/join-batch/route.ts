@@ -5,23 +5,18 @@ import Competition from "@/database/models/trading/competition.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import { guardSimulatorRoute } from "@/lib/services/simulator/simulator-mode";
 
 /**
  * POST /api/simulator/competitions/join-batch
  * Batch join multiple users to a competition (MUCH faster than individual joins)
- * Available in development OR with simulator mode header (for production simulation tests)
+ * Requires internal simulator credentials outside development.
  */
 export async function POST(request: NextRequest) {
-  const isSimulatorMode = request.headers.get("X-Simulator-Mode") === "true";
-  const isDev = process.env.NODE_ENV === "development";
-
-  // Allow in development OR with simulator mode header
-  if (!isSimulatorMode && !isDev) {
-    return NextResponse.json(
-      { success: false, error: "Only available in simulator mode" },
-      { status: 403 },
-    );
-  }
+  // Reason: this route debits arbitrary wallets, so it requires the internal
+  // secret rather than the declaring header alone.
+  const guard = guardSimulatorRoute(request);
+  if (guard) return guard;
 
   try {
     const body = await request.json();

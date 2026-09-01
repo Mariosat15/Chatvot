@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import TradingPosition from "@/database/models/trading/trading-position.model";
+import {
+  guardSimulatorRoute,
+  getSimulatorUserId,
+} from "@/lib/services/simulator/simulator-mode";
 
 /**
  * POST /api/simulator/positions/tpsl
@@ -8,22 +12,16 @@ import TradingPosition from "@/database/models/trading/trading-position.model";
  * Can modify by positionId or userId (modifies all user's open positions)
  */
 export async function POST(request: NextRequest) {
-  const isSimulatorMode = request.headers.get("X-Simulator-Mode") === "true";
-  const simulatorUserId = request.headers.get("X-Simulator-User-Id");
-  const isDev = process.env.NODE_ENV === "development";
-
-  // Allow in development OR with simulator mode header (for production simulation tests)
-  if (!isSimulatorMode && !simulatorUserId && !isDev) {
-    return NextResponse.json(
-      { success: false, error: "Simulator mode not enabled" },
-      { status: 403 },
-    );
-  }
+  // Reason: this route rewrites take-profit and stop-loss on arbitrary
+  // accounts' positions, so it requires the internal secret. Note the previous
+  // guard also accepted X-Simulator-User-Id on its own.
+  const guard = guardSimulatorRoute(request);
+  if (guard) return guard;
 
   try {
     const body = await request.json();
     const { positionId, userId, takeProfit, stopLoss } = body;
-    const effectiveUserId = userId || simulatorUserId;
+    const effectiveUserId = userId || getSimulatorUserId(request);
 
     await connectToDatabase();
 

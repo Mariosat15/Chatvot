@@ -8,6 +8,10 @@ import WalletTransaction from "@/database/models/trading/wallet-transaction.mode
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { canJoinCompetition } from "@/lib/services/market-hours.service";
+import {
+  isSimulatorRequest,
+  getSimulatorUserId,
+} from "@/lib/services/simulator/simulator-mode";
 
 /**
  * POST /api/competitions/[id]/join
@@ -20,11 +24,15 @@ export async function POST(
   try {
     const { id: competitionId } = await context.params;
 
-    // Check for simulator mode first
-    const isSimulatorMode = request.headers.get("X-Simulator-Mode") === "true";
-    const simulatorUserId = request.headers.get("X-Simulator-User-Id");
-    // Allow simulator mode in development OR with explicit simulator headers in production
-    const allowSimulatorMode = isSimulatorMode || simulatorUserId;
+    // Check for simulator mode first.
+    // Reason: this branch skips authentication and acts as whichever user id the
+    // caller names, debiting that user's wallet. It previously accepted the
+    // X-Simulator-User-Id header on its own, so an unauthenticated caller could
+    // join a competition as any user. It now requires the internal secret.
+    const allowSimulatorMode = isSimulatorRequest(request);
+    const simulatorUserId = allowSimulatorMode
+      ? getSimulatorUserId(request)
+      : null;
 
     let userId: string;
     let userEmail: string;

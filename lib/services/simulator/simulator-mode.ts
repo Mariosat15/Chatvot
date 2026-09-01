@@ -1,48 +1,115 @@
 /**
  * Simulator Mode Utilities
  *
- * Helpers for detecting simulator mode in API requests
+ * Helpers for detecting simulator mode in API requests.
+ *
+ * SECURITY: the simulator routes act on behalf of an arbitrary user id and can
+ * mutate wallets, orders and contests. They are therefore privileged internal
+ * endpoints, not public API. Access requires ALL of the following outside
+ * development:
+ *
+ *   1. X-Simulator-Mode: true          declares intent
+ *   2. ENABLE_SIMULATOR=true           deployment opts in
+ *   3. X-Internal-Secret               matches INTERNAL_API_SECRET (constant-time)
+ *
+ * Reason: a previous version accepted the X-Simulator-Mode header on its own
+ * whenever INTERNAL_API_SECRET happened to be unset, and most routes never
+ * called this helper at all. That allowed an unauthenticated caller to act as
+ * any user. Both holes are closed here: the guard now fails closed on a missing
+ * or weak secret, and `guardSimulatorRoute` gives every route one line to adopt.
  */
 
-import { NextRequest } from "next/server";
+import crypto from "crypto";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+
+/** A shorter secret than this is treated as unset rather than as protection. */
+const MIN_SECRET_LENGTH = 16;
+
+export const SIMULATOR_MODE_HEADER = "X-Simulator-Mode";
+export const SIMULATOR_USER_HEADER = "X-Simulator-User-Id";
+export const INTERNAL_SECRET_HEADER = "X-Internal-Secret";
 
 /**
- * Check if the request is from the simulator.
- * When INTERNAL_API_SECRET is configured, the caller must also send
- * X-Internal-Secret to prove it is a trusted internal service.
+ * Constant-time string comparison. Returns false on length mismatch rather
+ * than letting timingSafeEqual throw, which would leak length.
  */
-export function isSimulatorRequest(request: NextRequest): boolean {
-  const hasSimHeader = request.headers.get("X-Simulator-Mode") === "true";
-  if (!hasSimHeader) return false;
-
-  const requiredSecret = process.env.INTERNAL_API_SECRET;
-  if (requiredSecret) {
-    return request.headers.get("X-Internal-Secret") === requiredSecret;
+function safeCompare(a: string, b: string): boolean {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  const aBuf = Buffer.from(a, "utf8");
+  const bBuf = Buffer.from(b, "utf8");
+  if (aBuf.length !== bBuf.length) return false;
+  try {
+    return crypto.timingSafeEqual(aBuf, bBuf);
+  } catch {
+    return false;
   }
-  // Reason: Backward-compatible — if the secret isn't configured, accept the
-  // header alone so existing deployments without the env var keep working.
-  return true;
+}
+
+function isDevelopment(): boolean {
+  return process.env.NODE_ENV === "development";
 }
 
 /**
- * Get the simulated user ID from request headers
- */
-export function getSimulatorUserId(request: NextRequest): string | null {
-  return request.headers.get("X-Simulator-User-Id");
-}
-
-/**
- * Check if we should allow simulator mode
- * Only enabled in development or when explicitly allowed
+ * Whether simulator endpoints are permitted in this deployment at all.
+ * Always on in development; production must opt in explicitly.
  */
 export function isSimulatorEnabled(): boolean {
-  // Always allow in development
-  if (process.env.NODE_ENV === "development") {
-    return true;
+  if (isDevelopment()) return true;
+  return process.env.ENABLE_SIMULATOR === "true";
+}
+
+/**
+ * Check that a request is a genuine internal simulator call.
+ *
+ * Outside development this requires the declared header, the deployment opt-in,
+ * and a valid internal secret. A missing or too-short INTERNAL_API_SECRET fails
+ * closed, so a misconfigured deployment refuses simulator traffic instead of
+ * accepting anonymous traffic.
+ */
+export function isSimulatorRequest(request: NextRequest | Request): boolean {
+  if (request.headers.get(SIMULATOR_MODE_HEADER) !== "true") return false;
+  if (!isSimulatorEnabled()) return false;
+
+  const requiredSecret = process.env.INTERNAL_API_SECRET;
+  if (!requiredSecret || requiredSecret.length < MIN_SECRET_LENGTH) {
+    return isDevelopment();
   }
 
-  // Allow if explicitly enabled
-  return process.env.ENABLE_SIMULATOR === "true";
+  return safeCompare(
+    request.headers.get(INTERNAL_SECRET_HEADER) ?? "",
+    requiredSecret,
+  );
+}
+
+/**
+ * Get the simulated user ID from request headers.
+ *
+ * Only trust this after `isSimulatorRequest` has returned true — on its own the
+ * header is attacker-controlled and names the account to act as.
+ */
+export function getSimulatorUserId(
+  request: NextRequest | Request,
+): string | null {
+  return request.headers.get(SIMULATOR_USER_HEADER);
+}
+
+/**
+ * Route guard. Returns a 403 response to return immediately, or null to
+ * proceed. Every /api/simulator route should start with this.
+ *
+ * Development keeps its previous ergonomics: local calls need no headers.
+ */
+export function guardSimulatorRoute(
+  request: NextRequest | Request,
+): NextResponse | null {
+  if (isSimulatorRequest(request)) return null;
+  if (isDevelopment()) return null;
+
+  return NextResponse.json(
+    { success: false, error: "Simulator mode not enabled" },
+    { status: 403 },
+  );
 }
 
 /**

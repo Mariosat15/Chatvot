@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/database/mongoose";
 import { auth } from "@/lib/better-auth/auth";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import { guardSimulatorRoute } from "@/lib/services/simulator/simulator-mode";
 
 /**
  * POST /api/simulator/users
@@ -25,17 +26,8 @@ async function getSimulatorPasswordHash(password: string): Promise<string> {
 }
 
 export async function POST(request: NextRequest) {
-  const { isSimulatorRequest } = await import(
-    "@/lib/services/simulator/simulator-mode"
-  );
-  const isDev = process.env.NODE_ENV === "development";
-
-  if (!isSimulatorRequest(request) && !isDev) {
-    return NextResponse.json(
-      { success: false, error: "Simulator mode not enabled" },
-      { status: 403 },
-    );
-  }
+  const guard = guardSimulatorRoute(request);
+  if (guard) return guard;
 
   try {
     const body = await request.json();
@@ -192,7 +184,7 @@ async function createBatchUsersDirect(
 
   try {
     // Bulk insert users (ordered: false = continue on duplicate key errors)
-    const userInsertResult = await userCollection.insertMany(
+    const _userInsertResult = await userCollection.insertMany(
       userDocs.map(({ _simEmail, ...doc }) => doc),
       { ordered: false },
     );
@@ -241,15 +233,10 @@ async function createBatchUsersDirect(
  * Delete simulator test users
  */
 export async function DELETE(request: NextRequest) {
-  const isSimulatorMode = request.headers.get("X-Simulator-Mode") === "true";
-  const isDev = process.env.NODE_ENV === "development";
-
-  if (!isSimulatorMode && !isDev) {
-    return NextResponse.json(
-      { success: false, error: "Simulator mode not enabled" },
-      { status: 403 },
-    );
-  }
+  // Reason: this route deletes user accounts, so it requires the internal
+  // secret rather than the declaring header alone.
+  const guard = guardSimulatorRoute(request);
+  if (guard) return guard;
 
   try {
     const mongoose = await connectToDatabase();

@@ -11,6 +11,10 @@ import { getUserById } from "@/lib/utils/user-lookup";
 import { nanoid } from "nanoid";
 import { trackTiming, errorResponse } from "@/lib/utils/api-utils";
 import { canJoinChallenge } from "@/lib/services/market-hours.service";
+import {
+  isSimulatorRequest,
+  getSimulatorUserId,
+} from "@/lib/services/simulator/simulator-mode";
 
 // Request timeout for this route (5 seconds)
 const _REQUEST_TIMEOUT_MS = 5000;
@@ -80,11 +84,15 @@ export async function POST(request: NextRequest) {
   const timing = trackTiming("POST /api/challenges");
 
   try {
-    // Check for simulator mode
-    const isSimulatorMode = request.headers.get("X-Simulator-Mode") === "true";
-    const simulatorUserId = request.headers.get("X-Simulator-User-Id");
-    // Allow simulator mode in development OR with explicit simulator headers in production
-    const allowSimulatorMode = isSimulatorMode || simulatorUserId;
+    // Check for simulator mode.
+    // Reason: this branch skips authentication and the fraud/restriction gates,
+    // acting as whichever user id the caller names. It previously accepted the
+    // X-Simulator-User-Id header on its own, so an unauthenticated caller could
+    // create a challenge as any user. It now requires the internal secret.
+    const allowSimulatorMode = isSimulatorRequest(request);
+    const simulatorUserId = allowSimulatorMode
+      ? getSimulatorUserId(request)
+      : null;
 
     let challengerId: string;
     let challengerName: string;
