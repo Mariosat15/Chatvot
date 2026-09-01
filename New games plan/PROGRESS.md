@@ -323,6 +323,59 @@ Template:
 
 ---
 
+### 1 Sep 2026 - Defect 1: the prize-pool gap proven, and a fifth live bug (double refund)
+
+Two new files, 8 tests, all passing. Suite now **211 tests**, from 203. **No production code
+changed.**
+
+**`__tests__/services/competition-join-gate-parity.test.ts`** (4 tests) drives both join
+gates side by side in one file, so the disagreement is *measured* rather than restated. This
+is the clearest money statement in Defect 1:
+
+- Gate A takes the fee and the prize pool rises by it.
+- **Gate B takes the fee, gives the seat, and the pool stays at zero.** There is no
+  `prizePool` increment anywhere in the route - it debits the wallet at lines 190-199 and
+  `$inc`s only `currentParticipants` at lines 260-264.
+- A mixed field of six players, three per gate, collects `6 x entryFee` and leaves the pot
+  holding `3 x entryFee`. **Quote the mixed case, not the single-player one** - one player
+  reads like a rounding curiosity, and a live competition is reachable from both gates at
+  the same time.
+- The finalize-time safeguard cannot catch it, and the reason is worth stating precisely: it
+  caps the pool when it is too **high**. Too low passes the check and is distributed as
+  though correct. **Under-payment is silent; over-payment is not.**
+
+Also covers the join half of test 12: with the market closed, Gate A admits and Gate B
+refuses cleanly - no seat, no fee. The order half is still to write.
+
+**`__tests__/services/competition-cancel-refund.test.ts`** (4 tests) covers test 7 and found
+**live bug 5: cancelling a competition twice refunds every player twice.**
+`cancelCompetitionAndRefund` queries participants with **no status filter** and never checks
+whether the competition is already cancelled. Three players starting at 500 who paid a 25 fee
+hold **525** after two calls. **The transaction does not help - it makes each pass atomic,
+not unique.** Reachable: the Inngest cron sets `status: "cancelled"` and *then* calls the
+refund, and the lazy check in `getCompetitionById` cancels and refunds too, so a retried
+delivery or an admin cancel racing the cron pays twice. The remedy already exists in this
+codebase - finalization locks `active` -> `finalizing` in one `findOneAndUpdate` and bails if
+it loses.
+
+**Correction on record:** the "five finalization entry points" claim in
+`External game plans/11-foundation-and-seams.md` lines 67-74 is wrong. Two of the five do not
+finalize at all (`finalize-old-competitions` closes positions; emergency-cancel refunds), and
+three production callers are missing (Inngest `checkAndFinalizeCompetitions`,
+`claim-early-end`, `early-end-check`). Corrected list is in `00a`.
+
+**One testing lesson, cheap this time.** A mocked `canJoinCompetition` returned `allowed`
+where the real signature returns **`canJoin`**, so the route saw `undefined`, refused, and
+returned `error: "Market is open"` - an open-market reason string attached to a 400. Mock the
+real signature, not a plausible one; and note that the tell was only visible because the
+assertion prints the body. `expect(status).toBe(200)` would have said "expected 400 to be
+200" and sent the reader to a debugger.
+
+**Next chat should:** write tests 6 and 8 (payout exactness, double-finalize idempotency),
+which both need a fully seeded finished competition, then 10, 11 and the order half of 12.
+
+---
+
 ### 1 Sep 2026 - Defect 2 owner checklist cut from eleven items to three, and a fourth live bug found
 
 `__tests__/services/mirror-sync-behaviour.test.ts`, 10 tests, passing. Suite now at **203

@@ -192,6 +192,16 @@ more than being alarming:
   the pool is too **high**. An under-counted pool never enters that branch. So a Gate B
   join would simply distribute **less** than was collected, silently and with no
   correction at all. This is worse than described, not better.
+- **All of the above is now PROVEN, not inferred. 1 Sep 2026**,
+  `__tests__/services/competition-join-gate-parity.test.ts`, 4 tests, passing. The two
+  gates are driven side by side in one file so the disagreement is measured rather than
+  restated. Gate A takes the fee and the pool rises by it. Gate B takes the fee (route
+  lines 190-199), gives the seat (`$inc currentParticipants`, lines 260-264) and **the
+  pool stays at zero** - there is no `prizePool` increment anywhere in the route. A mixed
+  field of six players, three through each gate, collects `6 x entryFee` and leaves the
+  pot holding `3 x entryFee`. That mixed case is the one to quote: a single-player example
+  reads like a rounding curiosity, and a live competition is reachable from both gates at
+  once.
 - **Gate B can admit unverified, restricted or fraud-flagged accounts**, and the admin
   mirror of Gate A can admit unverified and fraud-flagged ones.
 - **Production entry-fee ledger rows have no competition reference. PROVEN 1 Sep 2026.**
@@ -310,12 +320,55 @@ refused. That pair is now a required test - number 12 below.
 | 4 | Join while account-restricted, via **all** entry points | All refuse |
 | 5 | Join below the level requirement, via **all** entry points | All refuse |
 | 6 | Full prize payout on a finished competition | Winner credits + platform fee == prize pool, exact to the cent |
-| 7 | Cancel and refund | Every participant made whole, `prizePool` zeroed |
+| 7 | Cancel and refund | Every participant made whole, `prizePool` zeroed. **Written 1 Sep 2026** - `__tests__/services/competition-cancel-refund.test.ts`, 4 tests, passing. Also pins that a refund reverses the spend rather than counting as winnings, that a participant with no wallet is skipped instead of stranding everyone else's money, and **records live bug 5 below** |
 | 8 | Finalize the same competition twice | Winners paid **once** (idempotency) |
 | 9 | Entry fee ledger row | Carries a resolvable competition reference in a field the schema defines. **Written 1 Sep 2026** - `__tests__/services/entry-fee-ledger.test.ts`, 4 tests, passing. Pins the current defect, proves the corrected write survives, proves the audit query works, and guards against "fixing" it by loosening the schema |
 | 10 | Retries exhausted under sustained write conflict | Returns 409, no participant created, no debit |
 | 11 | Accept a challenge while restricted / fraud-flagged | Refused (sub-defect 1b) |
-| 12 | Join an `upcoming` competition outside market hours, then try to place an order in it | Join **succeeds**, order **refused**. Locks in the owner's decision above, in both directions - a fix that blocked the join would fail this, and so would one that let the order through |
+| 12 | Join an `upcoming` competition outside market hours, then try to place an order in it | Join **succeeds**, order **refused**. Locks in the owner's decision above, in both directions - a fix that blocked the join would fail this, and so would one that let the order through. **Join half written 1 Sep 2026** in `competition-join-gate-parity.test.ts`: with the market closed, Gate A admits and Gate B refuses cleanly (no seat, no fee). The order half still to write |
+
+### Live bug 5 - cancelling a competition twice refunds every player twice
+
+**PROVEN 1 Sep 2026**, `__tests__/services/competition-cancel-refund.test.ts`.
+
+`cancelCompetitionAndRefund` selects participants with
+`CompetitionParticipant.find({ competitionId })` - **no status filter** - and never checks
+whether the competition is already cancelled. The first call refunds everyone and sets each
+participant to `"refunded"`; a second call finds those same documents and pays every entry
+fee out again. **The transaction does not help: it makes each pass atomic, not unique.**
+
+Measured: three players each start at 500, pay a 25 entry fee, and after two calls hold
+**525** - a credit each that nobody ever paid. The ledger doubles too, so the money and the
+audit trail agree that credits were created from nothing.
+
+Reachability is not theoretical. The Inngest cron sets `status: "cancelled"` and *then* calls
+this function, and the lazy check inside `getCompetitionById` cancels and refunds as well.
+Because the refund does not verify prior status, anything that invokes it a second time - a
+retried cron delivery, an admin cancel racing the cron, a manual re-run - pays twice.
+
+**The remedy already exists in the same codebase.** Finalization locks `active` ->
+`finalizing` in a single `findOneAndUpdate` and bails if it loses the race
+(`competition-end.actions.ts` lines 62-76). The refund path needs the same shape:
+`upcoming|active` -> `cancelling`.
+
+### Correction - the "five finalization entry points" claim is wrong
+
+`External game plans/11-foundation-and-seams.md` lines 67-74 lists five. Verified against
+the code on 1 Sep 2026: **two of the five do not finalize at all**, and **three production
+callers are missing from the list.**
+
+Not finalization: `POST /api/finalize-old-competitions` closes stray positions on
+already-`completed` competitions, and the admin emergency-cancel route refunds. Neither
+calls `finalizeCompetition`. The `challenge-finalize` job calls `finalizeChallenge`, a
+separate system.
+
+Missing from the list: the Inngest `checkAndFinalizeCompetitions` cron, the
+`claim-early-end` API route, and the `early-end-check` worker job. Note also that
+`early-end-check`'s all-disqualified branch sets `status: "completed"` and writes an
+unclaimed-pool row **without** calling `finalizeCompetition` at all.
+
+So the real count of paths that distribute prizes is **five**, but not the five listed. Any
+work that must cover every finalization path should start from this list, not that one.
 
 Test 8 matters because there is an existing recovery process that resets a stuck
 competition back to `active` after 5 minutes - so a slow finalization really can be run
