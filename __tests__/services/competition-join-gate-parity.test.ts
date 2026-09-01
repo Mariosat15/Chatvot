@@ -324,6 +324,62 @@ describe("competition entry - the two gates compared", () => {
     expect(await totalCollected([gateBPlayer])).toBe(0);
   });
 
+  it("returns 500 and leaks the driver message when Gate B exhausts its retries (test 10)", async () => {
+    // Reason: this test records two defects, and the plan predicted neither precisely.
+    //
+    // Test 10 as written expects a 409. The route does not produce one. When the fifth
+    // retry fails it re-throws, the outer catch returns **500**, and the body carries
+    // `error.message` verbatim - so the client receives a raw MongoDB string such as
+    // "Write conflict during plan execution and yielding is disabled".
+    //
+    // Both halves matter. A 500 tells a caller the server is broken, so a browser will not
+    // retry and a load balancer may take the instance out of rotation; a 409 tells it the
+    // request lost a race and is worth repeating. And returning the driver's own text to an
+    // unauthenticated caller is an information leak - it names the storage engine and its
+    // configuration.
+    //
+    // The conflict is forced rather than raced, so this is deterministic. A second
+    // transaction holds a write lock on the competition document; WiredTiger fails the
+    // join's write immediately instead of blocking, so every attempt loses and the retry
+    // budget drains at the speed of its own backoff.
+    const competitionId = await seedCompetition();
+    await seedWallets([DEFAULT_USER_ID]);
+
+    const blocker = await mongoose.startSession();
+    blocker.startTransaction();
+
+    try {
+      await mongoose.connection
+        .collection("competitions")
+        .updateOne(
+          { _id: new mongoose.Types.ObjectId(competitionId) },
+          { $set: { name: "Locked by the blocking transaction" } },
+          { session: blocker },
+        );
+
+      const { status, body } = await callGateB(competitionId);
+
+      expect(status).toBe(500);
+      expect(body.success).toBe(false);
+      expect(body.error).toMatch(/write conflict/i);
+    } finally {
+      await blocker.abortTransaction();
+      await blocker.endSession();
+    }
+
+    // Whatever the status code, the refusal must be clean. This is the part that must stay
+    // true after the code is corrected to a 409.
+    const comp = await readCompetition(competitionId);
+    expect(comp?.currentParticipants).toBe(0);
+    expect(comp?.prizePool).toBe(0);
+    expect(await totalCollected([DEFAULT_USER_ID])).toBe(0);
+
+    const participants = await mongoose.connection.db
+      ?.collection("competitionparticipants")
+      .countDocuments({ competitionId });
+    expect(participants).toBe(0);
+  }, 60_000);
+
   it("refuses the ORDER outside market hours, which is the half that must keep refusing (test 12)", async () => {
     // Reason: this is the second direction of the owner's decision, and it is the one a
     // careless fix breaks. Relaxing the market-hours check to let weekend sign-ups through

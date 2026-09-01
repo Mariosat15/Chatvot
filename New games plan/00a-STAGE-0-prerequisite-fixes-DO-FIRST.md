@@ -323,7 +323,7 @@ refused. That pair is now a required test - number 12 below.
 | 7 | Cancel and refund | Every participant made whole, `prizePool` zeroed. **Written 1 Sep 2026** - `__tests__/services/competition-cancel-refund.test.ts`, 4 tests, passing. Also pins that a refund reverses the spend rather than counting as winnings, that a participant with no wallet is skipped instead of stranding everyone else's money, and **records live bug 5 below** |
 | 8 | Finalize the same competition twice | Winners paid **once** (idempotency) |
 | 9 | Entry fee ledger row | Carries a resolvable competition reference in a field the schema defines. **Written 1 Sep 2026** - `__tests__/services/entry-fee-ledger.test.ts`, 4 tests, passing. Pins the current defect, proves the corrected write survives, proves the audit query works, and guards against "fixing" it by loosening the schema |
-| 10 | Retries exhausted under sustained write conflict | Returns 409, no participant created, no debit |
+| 10 | Retries exhausted under sustained write conflict | Returns 409, no participant created, no debit. **Written 1 Sep 2026** in `competition-join-gate-parity.test.ts`. **The route does not return 409 - it returns 500 and leaks the driver's message.** See below. The clean-refusal half holds and is asserted |
 | 11 | Accept a challenge while restricted / fraud-flagged | Refused (sub-defect 1b). **Written 1 Sep 2026** - `__tests__/services/challenge-accept-guards.test.ts`, 5 tests, passing. Three pin the guards that *are* present so a fix cannot drop them; two record the two that are missing. **Sub-defect 1b is now proven, not inferred** |
 | 12 | Join an `upcoming` competition outside market hours, then try to place an order in it | Join **succeeds**, order **refused**. Locks in the owner's decision above, in both directions - a fix that blocked the join would fail this, and so would one that let the order through. **DONE 1 Sep 2026** in `competition-join-gate-parity.test.ts`, both directions. With the market closed: Gate A admits, Gate B refuses cleanly (no seat, no fee), and `placeOrder` refuses with no order and no position created. The two halves are deliberately in one file - split apart, each reads as an arbitrary rule |
 
@@ -350,6 +350,34 @@ retried cron delivery, an admin cancel racing the cron, a manual re-run - pays t
 `finalizing` in a single `findOneAndUpdate` and bails if it loses the race
 (`competition-end.actions.ts` lines 62-76). The refund path needs the same shape:
 `upcoming|active` -> `cancelling`.
+
+### Live bug 6 - exhausted retries return 500 with the raw driver message
+
+**PROVEN 1 Sep 2026**, `competition-join-gate-parity.test.ts`. Test 10 expected a 409. The
+route does not produce one.
+
+When Gate B's fifth retry fails it re-throws (`join/route.ts` line 308), the outer catch
+returns **500**, and the body carries `error.message` verbatim - so the caller receives a raw
+MongoDB string such as `Write conflict during plan execution and yielding is disabled`.
+
+Two separate problems in one line:
+
+- **Wrong status.** A 500 tells the caller the server is broken, so a browser will not retry
+  and a load balancer may pull the instance out of rotation. A 409 tells it the request lost
+  a race and is worth repeating. The user-visible effect is that a busy competition looks
+  like an outage.
+- **Information disclosure.** Returning the driver's own text to an unauthenticated caller
+  names the storage engine and its configuration. Worth checking for the same pattern
+  elsewhere: `error instanceof Error ? error.message : ...` in a route response is the shape
+  to grep for.
+
+The test forces the conflict rather than racing for it - a second transaction holds a write
+lock on the competition document, so WiredTiger fails each attempt immediately and the retry
+budget drains at the speed of its own backoff. That makes it deterministic, which a
+throughput-based version would not be.
+
+**The clean-refusal half holds and is asserted:** no participant, no debit, `prizePool`
+unchanged. That is the part that must remain true after the status code is corrected.
 
 ### Sub-defect 1b measured - exactly which guards the challenge accept path is missing
 

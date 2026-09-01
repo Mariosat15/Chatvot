@@ -347,10 +347,25 @@ decision only means something as a pair. The order half needs almost no fixture 
 `placeOrder` checks the market immediately after the session and before it connects to the
 database.
 
-**Next chat should:** write tests 6, 8 and 10 - the three that remain. 6 and 8 both need a
-fully seeded *finished* competition (participants, closed positions, rankings), which is a
-larger fixture than anything built so far; 10 needs sustained write conflict against Gate B's
-five retries.
+**Test 10 also landed, and found live bug 6.** Suite **218**. The plan expected a 409 when
+Gate B exhausts its five retries. The route returns **500** and puts `error.message` in the
+body verbatim, so the caller gets a raw MongoDB string. Two problems: a 500 stops a browser
+retrying and can pull an instance out of a load balancer, so a busy competition looks like an
+outage; and returning driver text to an unauthenticated caller names the storage engine and
+its configuration. Grep for `error instanceof Error ? error.message` in route responses - the
+same shape is likely elsewhere. The clean-refusal half holds and is asserted, so it stays
+pinned once the status is corrected.
+
+The test forces the conflict rather than racing for it: a second transaction holds a write
+lock on the competition document, WiredTiger fails each attempt immediately, and the retry
+budget drains at the speed of its own backoff. Deterministic, where a throughput-based
+version would not be.
+
+**Next chat should:** write tests 6 and 8, the last two. Both need a fully seeded *finished*
+competition - participants, closed positions, rankings - which is a larger fixture than
+anything built so far. Note while doing it that `finalizeCompetition` already has the
+idempotency lock the refund path lacks (`active` -> `finalizing`, lines 62-76), so test 8 is
+expected to pass rather than record a defect.
 
 ---
 
