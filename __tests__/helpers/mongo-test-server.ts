@@ -125,6 +125,26 @@ export async function ensureCollections(names: string[]): Promise<void> {
       .filter((name) => !existing.has(name))
       .map((name) => db.createCollection(name)),
   );
+
+  await settleIndexes();
+}
+
+/**
+ * Waits until every registered model has finished building its indexes.
+ *
+ * Reason: creating the collections is only half of the catalog problem. Mongoose builds a
+ * model's indexes automatically the first time that model is used, and an index build is
+ * itself a catalog change - so it produces the same "due to catalog changes" failure if it
+ * lands while a transaction is open. Pre-creating collections removed the common case and
+ * left this one, which is rarer and therefore worse: it surfaced as a test that passed
+ * alone and failed roughly one run in three in the full suite, where CPU pressure widens
+ * the window.
+ *
+ * `Model.init()` resolves once the build is done, and is non-destructive - unlike
+ * syncIndexes(), which would also drop indexes the schema no longer declares.
+ */
+export async function settleIndexes(): Promise<void> {
+  await Promise.all(Object.values(mongoose.models).map((model) => model.init()));
 }
 
 /**

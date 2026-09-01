@@ -323,6 +323,64 @@ Template:
 
 ---
 
+### 1 Sep 2026 - Defect 2 owner checklist cut from eleven items to three, and a fourth live bug found
+
+`__tests__/services/mirror-sync-behaviour.test.ts`, 10 tests, passing. Suite now at **203
+tests**, from 193. **No production code changed.**
+
+**Shipped:** eight of the eleven manual checks on the Defect 2 owner checklist are now
+automated. Each test writes a field one of the two apps previously could not persist and
+reads it back through the raw driver - which is exactly what drift broke. The three
+remaining manual checks are the ones a schema test genuinely cannot make: whether a `git
+push` is blocked, and whether the admin *forms* are wired to the fields they now store.
+Stated in the document so the distinction is not lost: a passing schema test does not prove
+a form sends the value.
+
+**Live bug 4, and the sync does NOT fix it.** `brandingFiles` - the base64 backup that
+restores hero and branding images after a redeploy - **has never stored a single entry and
+still cannot.** The upload route uses the filename as the map key, and **Mongoose refuses
+map keys containing a dot.** The sync changed the failure mode without removing it: before,
+the undeclared field meant the route fell back to a plain JavaScript `Map` (any key
+accepted) and the write was silently discarded; after, the declared field with `default: new
+Map()` hands the route a `MongooseMap`, which validates the key and throws. Line 108 of
+`apps/admin/app/api/hero-settings/upload/route.ts` catches it and warns, and the upload
+still reports success because the file reached the disk. **Nothing to migrate when fixed -
+no entry has ever been stored.** Needs a shared key-encoding helper across one writer and
+four readers in both apps. **Awaiting owner decision.**
+
+This corrects the claim in the previous entry that the sync fixed image recovery. It made
+recovery *possible*; it did not make it work.
+
+**Two testing findings, both of which cost a wrong conclusion.**
+
+The first: `apps/admin` has **its own `node_modules/mongoose`**, so admin models run on a
+separate Mongoose instance that the test's `mongoose.connect` never touches. The symptom is
+`Operation "x.insertOne()" buffering timed out after 10000ms`, which reads like a slow
+database rather than an unconnected one. Reached via `Model.base` rather than a guessed
+path, because that IS the instance the model registered on and it survives npm hoisting.
+Also: **never import both copies of the same model into one test.** Both register under the
+same name via `models.X || model(...)`, so the second import silently returns the first, and
+the test then examines the wrong schema while looking correct.
+
+The second: **pre-creating collections fixed only half of the catalog-changes artifact.**
+Mongoose builds a model's indexes on first use, and an index build is itself a catalog
+change. The residue was rarer and therefore worse - the sequential control test passed alone
+and failed **about one full-suite run in three**. `settleIndexes()` now awaits `Model.init()`
+for every registered model. The concurrency measurement is now **self-auditing**: it
+classifies each failure and asserts the artifact and unknown buckets are empty, so noise
+fails the test instead of inflating the finding. Six consecutive full runs: `1/20 admitted,
+19 write conflicts, 0 artifacts`.
+
+One near-miss worth keeping, because it would have erased the finding rather than inflating
+it: a genuine write conflict reads `Write conflict during plan execution **and yielding is
+disabled**`. Treating "yielding is disabled" as an infrastructure marker - tempting, since
+the in-memory engine does say it - would have filed all 19 real failures as noise.
+
+**Next chat should:** write Defect 1 tests 6, 7, 8 (payout exactness, cancel and refund,
+double-finalize idempotency), then 10, 11, 12.
+
+---
+
 ### 1 Sep 2026 - Defect 1 tests 1 and 2: Gate A admits one join in twenty under contention
 
 `__tests__/services/competition-entry-concurrency.test.ts`, 5 tests, passing. **No

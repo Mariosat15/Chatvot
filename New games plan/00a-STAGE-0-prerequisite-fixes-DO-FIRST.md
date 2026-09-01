@@ -346,11 +346,31 @@ was refused, and the fix for it already exists in the other gate.
 
 **A false finding was nearly recorded here, and the trap is worth knowing.** The first run
 also reported 1 in 20, but most of those failures were `Unable to write to collection ... due
-to catalog changes`, which is **MongoDB refusing to create a collection inside a
+to catalog changes`, which is **MongoDB refusing to change the catalog inside a
 transaction** - a property of a fresh test database, not of the code. It looks exactly like a
-contention failure. `ensureCollections()` in the Mongo helper now pre-creates every
-collection the entry path writes, and the finding above was re-measured after that. **Any
-future concurrency test must call it before drawing a conclusion.**
+contention failure.
+
+**Pre-creating the collections removed only half of it.** Mongoose builds a model's indexes
+the first time that model is used, and an index build is itself a catalog change. That
+residue was rarer and therefore worse: the sequential control test passed on its own and
+failed **roughly one full-suite run in three**, where CPU pressure widens the window. A test
+that fails only when the suite is busy teaches the team to rerun rather than to read.
+`settleIndexes()` now awaits `Model.init()` for every registered model, and
+`ensureCollections()` calls it.
+
+**The measurement is now self-auditing rather than merely re-measured.** The test classifies
+each failure and asserts that the artifact and unknown buckets are *empty*, so noise cannot
+inflate the finding again - it fails loudly instead. Six consecutive full-suite runs report
+`Gate A admitted 1/20 concurrent joins; 19 lost a write conflict, 0 test-server artifacts`.
+
+One classifier detail that nearly reintroduced the same error from the other direction: a
+genuine write conflict reads `Write conflict during plan execution **and yielding is
+disabled**`. Matching "yielding is disabled" as an infrastructure marker - which is
+tempting, since the in-memory engine does say it - would have filed all 19 real failures as
+noise and made the defect vanish into the filter.
+
+**Two rules for any future concurrency test:** call `ensureCollections()` before drawing a
+conclusion, and **classify failures rather than counting them.**
 
 ## Risks of making this change
 
@@ -873,25 +893,58 @@ and should not delay it.
 
 ## Owner test checklist - Defect 2 (model mirrors)
 
-The guard, the sync and the tests are built. These are the checks that need a human and a
-running system.
+**This list was eleven items and is now three.** The other eight are covered by automated
+tests, listed below so you can see what is already proven rather than take it on trust.
 
-**Prove the guard guards**
+**Automated - no action needed**
 
-- [ ] Run `npm run check:mirrors`. It reports 75 pairs, 0 drifted, 1 allowlist entry.
-- [ ] Ask the developer to add a field to one side of a pair only. Confirm the check **fails** and names the file and field.
-- [ ] Ask the developer to remove one enum value from one side only. Confirm the check **fails** - this is the case that rejects writes.
-- [ ] Confirm `admin.model.ts`, which is intentionally different, does **not** fail.
-- [ ] Confirm a `git push` is blocked while drift exists (the new `.husky/pre-push` hook).
+Run `npm test` to see all of these. They are not a substitute for the three manual checks
+below, because a schema test cannot see whether a form is wired to the field it saves.
 
-**Prove the sync fixed real behaviour**
+| Was a manual check | Now proven by |
+|---|---|
+| Guard reports 75 pairs, 0 drifted | `npm run check:mirrors`, and asserted in `__tests__/services/model-mirror.test.ts` |
+| Guard fails when a field is added to one side only | `model-mirror.test.ts` |
+| Guard fails when an enum value is removed from one side only | `model-mirror.test.ts` |
+| Allowlisted `admin.model.ts` does not fail | `model-mirror.test.ts` |
+| Failed withdrawal stores a time and a reason | `__tests__/services/mirror-sync-behaviour.test.ts` |
+| A previously unwritable landing-page section saves and persists | `mirror-sync-behaviour.test.ts`, including a read-modify-write cycle, which is what the admin form performs |
+| Game Master, payment provider, and muted challenge/social/messaging preferences all persist | `mirror-sync-behaviour.test.ts` |
+| Admin balance addition and custom expense are accepted, and a typo is still rejected | `mirror-sync-behaviour.test.ts` |
 
-- [ ] Open a Game-Master-created competition in the admin panel. Confirm the Game Master is shown correctly.
-- [ ] Open a card deposit in the admin transactions view. Confirm the payment provider is shown.
-- [ ] **Force a withdrawal to fail.** Confirm the record now stores a failure time and the processor's reason - before this fix it stored neither.
-- [ ] **Edit a landing-page section in admin that was previously unwritable** - Game Master showcase, competition types, marketplace, journey and badges, or trust badges. Save, reload, confirm the change persisted. Before this fix the save reported success and changed nothing.
-- [ ] Mute challenge, social or messaging notifications as a player. Confirm the admin app now honours it.
-- [ ] Record an admin balance addition and a custom expense. Confirm both still work (their enum values were added to the main app's copy).
+**Still needs a human - three checks**
+
+- [ ] Confirm a `git push` is blocked while drift exists (the `.husky/pre-push` hook). Needs a real push.
+- [ ] **Open one previously unwritable landing-page section in admin, change it, save, reload.** The schema now stores it - what a test cannot check is whether the form actually sends the value. Any one of: Game Master showcase, competition types, marketplace, journey and badges, trust badges.
+- [ ] **Spot-check two admin screens read what they now store:** a Game-Master-created competition shows its Game Master, and a card deposit shows its payment provider.
+
+**A fourth live bug, found by these tests, NOT fixed by the sync**
+
+`brandingFiles` - the base64 backup that restores hero and branding images after a redeploy
+wipes the filesystem - **has never stored a single entry, and still cannot.** Syncing the
+schema was necessary and is not sufficient.
+
+The upload route builds the key as `${type}-${timestamp}-${random}.${ext}` and
+**Mongoose refuses map keys containing a dot**, which a filename always has. The sync
+changed the failure mode without removing it:
+
+- **Before:** the field was undeclared, so `(settings as any).brandingFiles` gave
+  `undefined`, the route fell back to a plain JavaScript `Map` that accepts any key, and
+  the assignment to an undeclared path was silently discarded.
+- **After:** the field is declared with `default: new Map()`, so the route now receives a
+  `MongooseMap`, which validates the key and throws.
+
+Either way nothing is written. Line 108 of
+`apps/admin/app/api/hero-settings/upload/route.ts` catches the error and logs a warning,
+and the response still reports success because the file did reach the disk - so nothing
+surfaces until a redeploy, by which point the image is gone and there is no copy to
+restore. The four readers look the file up by that same dotted name, so the key format
+cannot be changed on the write side alone.
+
+Recorded by a test that asserts the *current, broken* behaviour, so the day it is fixed the
+test fails and has to be updated deliberately. **There is no data to migrate when it is
+fixed, because no entry has ever been stored.** Awaiting an owner decision: it needs a
+shared key-encoding helper used by one writer and four readers across both apps.
 
 **Decisions taken 1 September 2026 - no longer outstanding**
 

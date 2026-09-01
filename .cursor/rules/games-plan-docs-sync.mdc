@@ -82,6 +82,35 @@ get wrong and are worth stating here:
  Gate B's market-hours check, because doing so would block weekend sign-ups for Monday
  contests. Locked in by Defect 1 test 12, which fails both a fix that blocks the join and
  one that lets the order through.
+- **`apps/admin` has its own `node_modules/mongoose`.** Admin models therefore run on a
+ **separate Mongoose instance** which a test's `mongoose.connect` does not touch. The
+ symptom is `Operation "x.insertOne()" buffering timed out after 10000ms`, which reads like
+ a slow database rather than an unconnected one. Connect it via **`Model.base`**, not a
+ guessed path — that is the instance the model registered on, and it survives npm hoisting.
+ Second rule from the same area: **never import both copies of one model into a single
+ test.** Both register under the same name via `models.X || model(...)`, so the second
+ import silently returns the first and the test examines the wrong schema while looking
+ correct.
+- **The `brandingFiles` image-recovery bug is NOT fixed by the model sync** (found 1 Sep
+ 2026, `__tests__/services/mirror-sync-behaviour.test.ts`). The upload route uses the
+ filename as the map key and **Mongoose refuses map keys containing a dot**. The sync
+ changed the failure mode without removing it: before, the undeclared field meant a plain
+ JavaScript `Map` accepted the key and the write was silently discarded; after, `default:
+ new Map()` hands the route a `MongooseMap` that validates and throws, and line 108 of
+ `apps/admin/app/api/hero-settings/upload/route.ts` catches it and warns. **No entry has
+ ever been stored, so there is nothing to migrate when it is fixed.** If a document claims
+ the sync fixed hero/branding image recovery, that claim is stale.
+- **Classify concurrency failures, never merely count them.** Asserting that the artifact
+ and unknown buckets are *empty* is what stops test-server noise inflating a finding. And
+ note the trap in the other direction: a genuine write conflict reads `Write conflict during
+ plan execution **and yielding is disabled**`, so matching "yielding is disabled" as an
+ infrastructure marker files every real failure as noise and makes the defect vanish.
+- **`ensureCollections()` alone is not enough — indexes are a catalog change too.**
+ Mongoose builds a model's indexes on first use, which produces the same `due to catalog
+ changes` failure inside a transaction. That residue made the sequential control test pass
+ alone and fail about **one full-suite run in three**. `settleIndexes()` awaits
+ `Model.init()` for every registered model and `ensureCollections()` calls it. A test that
+ fails only when the suite is busy teaches the team to rerun rather than to read.
 - **Before writing any concurrency test, call `ensureCollections()`** from
  `__tests__/helpers/mongo-test-server.ts` with every collection the code under test writes.
  MongoDB **cannot create a collection inside a transaction**, so the first test to touch a

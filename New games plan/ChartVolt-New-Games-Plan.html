@@ -588,6 +588,13 @@
       </div>
 
       <div class="cal plain">
+        <div class="t">A fourth defect, and the honest position on the third</div>
+        <p>The image-recovery fault above is <b>not fixed by matching the blueprints.</b> Matching them was necessary and it is not sufficient, and the plan says so rather than claiming a win.</p>
+        <p>The backup copy is filed under the image's filename, and the database <b>refuses a key containing a dot</b> &mdash; which every filename has. So the backup has never been written once, and matching the blueprints only changed how it fails: before, the field did not exist and the write was quietly thrown away; now the field exists and the write is rejected outright. The upload code catches that rejection, writes a line to the log, and still reports success, because the image did reach the disk. Nothing looks wrong until a deployment, by which point the image is gone and there is no copy to restore.</p>
+        <p style="margin-bottom:0">Two practical consequences. <b>There is nothing to migrate when this is fixed</b>, because no backup has ever been stored. And the fix is small but touches five places &mdash; one that writes the key and four that read it &mdash; so it is a decision to take deliberately rather than a line to change in passing.</p>
+      </div>
+
+      <div class="cal plain">
         <div class="t">Why nobody spotted these</div>
         <p style="margin-bottom:0">Worth understanding, because it explains why a guard was needed rather than more careful review. When a field is missing from one blueprint, that side <b>still reads the value correctly</b> in most contexts &mdash; it shows up in logs and debug output exactly as expected. But the ordinary way code reads a field returns <b>nothing at all</b>, so the program quietly takes the wrong branch. The evidence and the code disagree, and the evidence looks fine. That is the whole reason this survived unnoticed for months, and why the check has to be automatic.</p>
       </div>
