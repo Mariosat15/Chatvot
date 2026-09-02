@@ -503,6 +503,10 @@ export default function MarketDataSection() {
 
   const [detectingGaps, setDetectingGaps] = useState(false);
   const detectingGapsRef = React.useRef(false);
+  // Reason: distinguishes "scanned and found nothing" from "never scanned".
+  // Without it an empty gap list renders as "No gaps detected", which would tell
+  // an operator the data is complete when in fact nothing has been checked.
+  const [gapsScanned, setGapsScanned] = useState(false);
 
   const fetchGaps = useCallback(async () => {
     // Prevent multiple simultaneous calls using ref
@@ -513,11 +517,20 @@ export default function MarketDataSection() {
       const res = await fetch("/api/market-data/gap-fill");
       if (res.ok) {
         const data = await res.json();
-        console.log("[Gap Detection] Response:", data);
         setGaps(data.gaps || []);
+        setGapsScanned(true);
+      } else {
+        setMessage({
+          type: "error",
+          text: "Gap detection failed. Please try again or contact support.",
+        });
       }
     } catch (error) {
       console.error("Error fetching gaps:", error);
+      setMessage({
+        type: "error",
+        text: "Something went wrong running gap detection. Please contact support.",
+      });
     } finally {
       detectingGapsRef.current = false;
       setDetectingGaps(false);
@@ -526,8 +539,12 @@ export default function MarketDataSection() {
 
   useEffect(() => {
     fetchData();
-    fetchGaps();
     fetchSymbols();
+    // Reason: gap detection is deliberately NOT run on mount. It scans every
+    // configured symbol against every timeframe collection and loads each
+    // candle's timestamp into memory, so opening the section used to block on a
+    // multi-minute query and render nothing. It runs only when an operator asks
+    // for it via "Detect Gaps Now", or after a fill, where re-scanning is the point.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only once on mount
 
@@ -951,9 +968,12 @@ export default function MarketDataSection() {
           </p>
         </div>
         <button
+          // Reason: refreshes the counts and settings only. The gap scan is not
+          // included, because it is far more expensive than everything else on
+          // this screen combined and an operator pressing "Refresh" is not asking
+          // for it. "Detect Gaps Now" is the deliberate trigger.
           onClick={() => {
             fetchData();
-            fetchGaps();
           }}
           className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors flex items-center gap-2 border border-gray-700"
         >
@@ -1706,9 +1726,20 @@ export default function MarketDataSection() {
                         </div>
                       )}
                     </div>
-                  ) : (
+                  ) : gapsScanned ? (
                     <div className="flex items-center justify-center h-full text-green-400 text-sm gap-2">
                       <span>✓</span> No gaps detected
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-center gap-1 py-2">
+                      <span className="text-gray-400 text-sm">
+                        Not scanned yet
+                      </span>
+                      <span className="text-gray-600 text-xs">
+                        Press &quot;Detect Gaps Now&quot; to check every symbol
+                        and timeframe. This can take a while on a large
+                        database.
+                      </span>
                     </div>
                   )}
                 </div>
@@ -1785,6 +1816,14 @@ export default function MarketDataSection() {
               <button
                 onClick={runGapFill}
                 disabled={gapFillRunning || saving || gaps.length === 0}
+                // Reason: nothing can be filled before a scan has found it, so the
+                // title explains the disabled state rather than leaving the operator
+                // to guess why the button is dead.
+                title={
+                  gaps.length === 0 && !gapsScanned
+                    ? "Run Detect Gaps Now first"
+                    : undefined
+                }
                 className="w-full mt-4 px-4 py-3 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-600/30 text-purple-400 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
               >
                 {gapFillRunning ? "⏳ Filling..." : "🔧 Fill Gaps Now"}
