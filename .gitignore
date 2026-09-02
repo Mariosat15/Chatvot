@@ -129,3 +129,9 @@ eslint-output.txt
 /database/**/*.js.map
 /lib/**/*.js
 /lib/**/*.js.map
+
+# Local setup notes and screenshots. Owner decision, 2 Sep 2026: never commit these.
+# Reason: setup-help screenshots routinely capture credentials, connection strings and
+# dashboard tokens, and an image cannot be reviewed by a diff. Keeping the whole folder
+# out means nobody has to make that judgement per file.
+/Verif_Setup_help/

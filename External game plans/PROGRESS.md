@@ -13,16 +13,35 @@
 
 | | |
 |---|---|
-| **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **First code shipped 2 Sep 2026** - the admin navigation restructure, a slice of X6 taken out of order. No provider selected |
-| **Next action** | **X1 - the foundation** (`11`), now unblocked. In parallel, commercial: find and assess a provider using `08`. Work runs **admin-first** per the owner sequencing decision below |
-| **Blocked by** | **Nothing for X1-X3.** Stage 0 / X0 was the standing gate and it was **signed off 2 Sep 2026**. A signed provider is still needed from X4 onward; X1-X3 and most of the admin work need no provider at all |
-| **Owner instruction on record** | **External games only, no in-house game** (2 Sep 2026). **One step at a time, admin first, do not break the running app** |
+| **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **First code shipped and owner-tested 2 Sep 2026** - the admin navigation restructure, a slice of X6 taken out of order. No provider selected |
+| **Next action** | **Await the owner's go-ahead for X1.** Nothing blocks it; the hold is deliberate. Commercial work can proceed in parallel: find and assess a provider using `08` |
+| **Blocked by** | **Nothing technical.** Stage 0 / X0 was the standing gate and it was **signed off 2 Sep 2026**. X1 waits only on the owner saying to start. A signed provider is still needed from X4 onward; X1-X3 and most of the admin work need no provider at all |
+| **Owner instruction on record** | **External games only, no in-house game** (2 Sep 2026). **One step at a time, admin first, do not break the running app.** **Do not start X1 until told** (2 Sep 2026) |
 | **Last updated** | 2 September 2026 |
 
-**One thing in the application has now been changed by this project** (2 September 2026):
-the admin navigation restructure from `12` section 1, which separates contest
-administration from trading and collapses the six trading screens into one destination
-inside a GAMES group. It is a slice of **X6 taken deliberately out of order** - see the
+### DEFERRED WORK, APPROVED BUT NOT SCHEDULED
+
+Small, self-contained items the owner has agreed to but parked. Kept here so they are not
+rediscovered as new findings later.
+
+| Item | Why it is deferred | Where it is specified |
+|---|---|---|
+| **Eight sections missing from `ADMIN_SECTIONS`** - `journey-map`, `gamification-wizard`, `system-announcements`, `vendors`, `mdb-cluster` and three others | Owner decision 2 Sep 2026: **do later.** It is a pre-existing defect, not caused by any games work, and it is add-only | `12` section 1, "RBAC - do not forget this" |
+| **Sidebar clicks do not write the URL** | Pre-existing across all ~60 admin sections. Deep links work *inbound*; the address bar just does not track the current section. Belongs with the X6.5 admin pass | `12` s1.1a, "One pre-existing limitation" |
+| **The `tradingEnabled` conditional that hides the Trading destination** | Genuinely blocked - the flag does not exist until X1 introduces it. **"Built" does not include it** | `12` s1, target grouping |
+
+**The first is invisible-by-default, which is why it is worth stating rather than listing.**
+`ADMIN_SECTIONS` is what allows a section to be granted to an employee at all, so those
+eight screens are currently reachable only by a super admin. Nothing errors and nothing
+logs; an operator simply never sees them, and an admin trying to delegate the work finds no
+checkbox to tick.
+
+---
+
+**One thing in the application has now been changed by this project** (2 September 2026,
+**owner-tested**): the admin navigation restructure from `12` section 1, which separates
+contest administration from trading and collapses the six trading screens into one
+destination inside a GAMES group. It is a slice of **X6 taken deliberately out of order** - see the
 work log entry below for why that was judged safe and what it does *not* license.
 Everything else remains planning only.
 
@@ -272,7 +291,7 @@ numbers in chapters `01`-`09` remain resolvable. **Plan against the X-phases bel
 | **X3** | Round lifecycle + result ingestion | `09` E2 | 1 week | `NOT STARTED` |
 | **X4** | Real adapter against sandbox | `09` E3 | 1 week | `NOT STARTED` |
 | **X5** | Contest integration + settlement | `09` E4 | 1 week | `NOT STARTED` |
-| **X6** | Admin: nav restructure incl. **the single Trading section**, RBAC, provider registration, game-aware wizard, analytics, **GM creation API + wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | `STARTED OUT OF ORDER` - the nav restructure and single Trading destination are **built** (2 Sep 2026, awaiting owner test). Everything else `NOT STARTED` |
+| **X6** | Admin: nav restructure incl. **the single Trading section**, RBAC, provider registration, game-aware wizard, analytics, **GM creation API + wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | `PARTIALLY DONE` - nav restructure and single Trading destination **built and owner-tested 2 Sep 2026**. Everything else `NOT STARTED` |
 | **X6.5** | **Admin wording pass** - brought forward from X8 so operators never work a games platform labelled "trading" | `14` | 0.5-1 week | `NOT STARTED` |
 | **X7** | Player UI + points, leaderboards, badges, levels, **profile and cross-game stats**, **per-game GM analytics** | `09` E6 + `13` + `05` + `19` | 3-4 weeks | `NOT STARTED` |
 | **X8** | Player wording, `tradingEnabled`, infrastructure gating | `14` + `15` | 1-1.5 weeks | `NOT STARTED` |
@@ -349,6 +368,10 @@ X12 pilot. All three are in `17` section 7.
 | **2 Sep 2026** | **Trading becomes one game among several, and all trading administration collapses into a single Trading section with its own internal tabs** | Owner requirement. Today ~60 admin sections interleave trading-specific and generic ones, so trading cannot be hidden or reasoned about as a unit. `12` section 1 gains the internal tab list |
 | **2 Sep 2026** | **Games are registered by an operator the way payment providers are** - a provider list, credentials, sandbox/production toggle, test-connection, enable per title | Owner requirement, and the pattern already exists in `PaymentProvidersSection.tsx` + `payment-provider.model.ts`. **Copy the UX, not the storage:** that model embeds `credentials[]` in the readable document and has a `saveToEnv` flag that writes secrets to `.env`. `04` section 3.1 deliberately keeps game credentials out of `game_provider` so admin screens can read it freely. `12` section 4 records the split |
 | **2 Sep 2026** | **The engine is a general competition engine, not a trading engine with games bolted on** | Owner framing, and it is a scope statement rather than a slogan: scoring **and its naming**, stat calculation, financial reporting, badges, levels and journeys must all be game-aware, not trading-shaped with special cases. Chapter `05` already designs the scoring layers; what was missing is the explicit statement that **no aggregate may be trading-only**, which is now `05` section 10 and `12` section 5 |
+| **2 Sep 2026** | **Stage 0 / X0 is signed off, and the restructured admin sections are owner-tested** | Two separate owner tests, both passed the same day. X0 was the standing gate on all games engineering, so it is now open |
+| **2 Sep 2026** | **X1 does not start until the owner says so** | Owner instruction. Nothing technical blocks it - Stage 0 is signed off and the admin change is tested - so this is a deliberate hold, not a dependency. **Do not begin the foundation unprompted** |
+| **2 Sep 2026** | **The eight missing `ADMIN_SECTIONS` ids are deferred** | Owner decision: do later. It is a pre-existing defect unrelated to games work and the fix is add-only. Tracked under "Deferred work" in this file so it is not rediscovered as a new finding |
+| **2 Sep 2026** | **`Verif_Setup_help/` is never committed** | Owner decision, now enforced by a `.gitignore` rule rather than a judgement call per file. Setup-help screenshots routinely capture credentials and connection strings, and an image cannot be reviewed by a diff |
 | **2 Sep 2026** | **Smart onboarding and interest-based challenge matchmaking are in scope** | Owner requirement, and **entirely new** - it appears nowhere in `01`-`19`. A player declares which games they want to be challenged in; the system matches players by shared interest plus prerequisites; and for a player who declares nothing, interest is **inferred from what they actually play** so the feature works without onboarding. New chapter `20`, phase X11.5, 2-3 weeks |
 
 ---
@@ -582,10 +605,9 @@ there, and it is a Mongoose enum on stored employee permissions, so it is add-on
 `trading-menu`, the parent, is deliberately **not** a section: a grant that maps to no
 screen is where privilege widening starts.
 
-**Owner tested:** not yet. Please check that the sidebar reads sensibly, that
-`/dashboard?activeTab=trading-risk` and `?activeTab=price-health` still land correctly,
-and - most important - that a **non-super-admin employee** granted only some trading
-sections sees only those tabs.
+**Owner tested: PASSED, 2 September 2026.** The owner tested the restructured admin
+sections and reported them working. This is a separate sign-off from Stage 0's, taken the
+same day.
 
 **Verified by build, not by assertion:** `next build` of the admin app succeeded;
 `tsc --noEmit` returned **225 errors, matching the documented baseline exactly**, with
@@ -601,12 +623,10 @@ the current section. That is pre-existing, affects all ~60 sections, and belongs
 X6.5. The `tradingEnabled` conditional that hides the whole destination also waits for
 X1, which is where the flag is introduced.
 
-**Next chat should:** start **X1**, the foundation in `11` - Stage 0 was signed off on
-2 September 2026, so it is unblocked. The admin navigation change itself is still awaiting
-the owner's test (the sign-off covered Stage 0, not this). Two admin-only items need no
-foundation and can be picked up alongside: the **eight missing `ADMIN_SECTIONS` ids**
-listed in `12`, which are an existing defect, and the `tradingEnabled` conditional that
-hides the Trading destination - though that one waits on X1 introducing the flag.
+**Next chat should: wait for the owner's go-ahead before starting X1.** Owner instruction,
+2 September 2026: they will say when X1 begins. Stage 0 is signed off and this change is
+tested, so nothing is *blocking* X1 - the hold is a deliberate one, not a dependency.
+**Do not begin the foundation unprompted.**
 
 ---
 
