@@ -14,25 +14,108 @@ piece of work as the code.**
 | `New games plan/` | Stage 0 defect fixes, then the in-house game-module architecture |
 | `External game plans/` | Integrating games from a third-party skill-game provider |
 
-## Two scenarios, and which chapters apply
+## THE SCENARIO IS DECIDED - EXTERNAL-ONLY (owner, 2 September 2026)
 
-`External game plans/` covers **two** decisions. Check `External game plans/PROGRESS.md`
-for which one is on record before planning any work.
+**Provider games are the only new games. No in-house game is built.** The active
+programme is `External game plans/` and its **X0-X12** phases. Read
+`External game plans/PROGRESS.md` first.
 
-| Scenario | Meaning | Chapters | Programme |
-|---|---|---|---|
-| **Add-on** | The `New games plan` is delivered too. External games are an addition | `01`-`09` | E1-E9, 7.5-8 weeks engineering on top of the foundation |
-| **External-only** | Provider games are the **only** new games. No in-house game | `01`-`09` **and** `10`-`18` | X0-X12, 20-26 weeks total |
+| Scenario | Meaning | Chapters | Programme | Status |
+|---|---|---|---|---|
+| **External-only** | Provider games are the **only** new games. No in-house game | `01`-`09` **and** `10`-`20` | X0-X12, **23-30 weeks** | **CHOSEN** |
+| **Add-on** | The `New games plan` is delivered too. External games are an addition | `01`-`09` | E1-E9, 7.5-8 weeks on top of the foundation | **Not pursued.** Kept only so E-phase references resolve |
 
-Chapters `10`-`18` exist because `01`-`09` delegated the foundation and every
+Chapters `10`-`20` exist because `01`-`09` delegated the foundation and every
 platform-wide change (admin, navigation, wording, flags, catalogue, risks, rollout) to the
-`New games plan`. If that plan is not being delivered, the dependency does not disappear -
-it moves into `External game plans/`, and `10`-`18` own it.
+`New games plan`. That plan is not being delivered, so the dependency did not disappear -
+it moved into `External game plans/`, and `10`-`20` own it.
+
+**What the decision does to the `New games plan` folder**, because "superseded" is too
+blunt: **Stage 0 / `00a` is fully active and unchanged** - it is X0, a prerequisite in
+every scenario, and the work currently awaiting owner test. **P1 survives as X1**, same
+seams, delivered from `External game plans/11`. **P2, the in-house Trivia game, is not
+being built.** **P3-P7 are delivered as X6-X11.** The chapters remain valuable as analysis
+of the live codebase, and `15-platform-transformation-and-gaps.md` is still the record of
+the games-first direction.
 
 **The finding to keep repeating, because the intuition is wrong:** external-only is **not
 cheaper**, it is broader. Dropping an in-house game saves ~3.5 weeks; a correct provider
 integration costs ~7; all the platform work is identical. The prize is a catalogue and no
 content burden, not a saving. Do not let a summary anywhere imply otherwise.
+
+**The consequence of the decision that must stay visible:** there is now **no in-house
+game to fall back on**. If the provider search or the pricing fails, the platform will
+have funded the whole foundation, admin and player programme and still have one game. That
+is risk **X8**, and it is why open question 10 - a small in-house hedge game - moved
+*forward* to before X4 rather than away.
+
+### Two owner instructions that came with the decision
+
+Both change the order rather than the contents, and both are load-bearing.
+
+- **Admin first.** An operator must be able to register a provider, sync a catalogue and
+  create a non-trading contest before any player screen has something real to render. The
+  admin app is also a separate process with no player traffic, so it is the safe place to
+  be wrong. **It does not mean X6 moves in front of X1-X5** - a contest must exist before
+  it can be administered. In practice it means X6 and X6.5 complete *before* X7 begins.
+- **One step at a time, without breaking the running app.** Every phase additive and
+  flag-gated, trading pinned by the regression test in `11`, and the rule that **no phase
+  may require a simultaneous change to trading in order to be correct.** If one appears
+  to, the seam in `11` is wrong and that is the thing to fix.
+
+### What the owner's 2 September brief added, and what only looked new
+
+Most of the brief was already designed. Four things were not, and the distinction is the
+useful part - a plan that claims to cover everything is the one that surprises you.
+
+| Genuinely new | Already designed - cross-reference, do not rewrite |
+|---|---|
+| **Smart onboarding and interest matchmaking** - nothing at all in `01`-`19`. New chapter `20`, phase **X11.5**, 2-3 weeks | Admin nav grouping with a TRADING group (`12` s1), provider registration and credentials (`04` s3.1, `12` s4), catalogue as editable content (`16` s1), cross-game scoring in three layers (`05`), financials by game and provider (`12` s5), game pages and filtered browsing (`16`, `13` s4), terminology token layer (`14`) |
+| **"Challenge any user"** - `03` designed the challenge *mechanics* then said the opponent was "invited or matched" and stopped. X10 grew 0.5-1 week to 1-1.5 | Picking the *game* for a challenge was fully designed |
+| **A player profile specification** - it existed only as "terminology pass 6, profile tabs", treating a structural change as a labelling one. `13` s7.2 | Dashboard, leaderboard and `UserGameStats` |
+| **The admin wording pass was in the wrong phase** - it sat in X8, *after* the player UI, which would have had operators running a multi-game platform through screens labelled "trading" for two phases. Split into **X6.5** (admin) and X8 (player); `14` total unchanged at ~10 days | The token dictionary, the passes themselves, the never-rename list |
+
+**Net: 23-30 weeks, up from 20-26.** ~3 weeks of real scope, not a re-estimate. Do not let
+a summary present it as the same programme.
+
+### Five findings from that pass that generalise
+
+- **A trading-shaped service does not fail when a second game arrives - it keeps working
+  and keeps being wrong.** `lib/services/matchmaking.service.ts` and
+  `GET /api/matchmaking` already exist and rank opponents by *trading* skill. Add a second
+  game and it returns matches happily, all of them trading matches, with no error, no
+  empty state and no log line. Same shape as the mirror-drift and `canEnterChallenges`
+  defects: **the system reports success while doing the wrong thing.** The rule:
+  **change the service, do not call it from a new place**, and prove it with a test that
+  fails first. Risk **X13**. The same trap sits in
+  `components/dashboard/GettingStartedCard.tsx`, whose steps tell every new player to
+  "place your first trade".
+- **"Like payment providers" was right about the UX and wrong about the storage.** The
+  owner asked for games to be added the way payment providers are, and
+  `PaymentProvidersSection.tsx` is indeed the right interaction model. But
+  `payment-provider.model.ts` embeds `credentials[]` in the document every screen reads and
+  carries a `saveToEnv` flag with a `regenerate-env` route that writes secrets to `.env`.
+  `04` s3.1 deliberately keeps game credentials **out** of `game_provider`. Copying the
+  pattern wholesale would have undone that on consistency grounds. **Copy the UX, not the
+  persistence** - `12` s4.1.
+- **A menu group is not a tab.** `12` s1 already grouped the trading sections, but the
+  owner asked for one destination with tabs inside. Two things must survive the collapse:
+  **deep links** (tab state must be addressable, not `useState`, or every bookmark and
+  wiki screenshot breaks), and **RBAC** (`ADMIN_SECTIONS` grants per *section*, so merging
+  six into one is a silent privilege widening that looks completely correct on review).
+  **Keep the six IDs and gate the tabs.** `12` s1.1.
+- **No aggregate may silently mean "trading only".** Now a binding rule in `05` s10: every
+  performance or money figure is either generalised across games, explicitly scoped and
+  labelled to one game, or removed from the platform-wide view. There is no third option.
+  **"Total PnL" is the clearest casualty** - a chess puzzle has no profit and loss, so it
+  moves inside the trading card or becomes something genuinely cross-game. The failure mode
+  is not a crash: a trading-only total keeps computing and keeps rendering.
+- **Inference is not consent.** Paying to enter a competition says a player will *play* a
+  game; it does not say they want 1v1 invitations from strangers. `20` s3.2 keeps them
+  separate - inferred interest drives **suggestions**, an explicit opt-in drives
+  **invitations**. Conflating them turns matchmaking into spam. Risk **X14**. The same
+  distinction made `canEnterChallenges` a live defect: **a stored value and an absent one
+  are different facts.**
 
 **Stage 0 is a prerequisite in both scenarios.** It fixes live defects under the money
 layer, and nothing changes that.
@@ -312,6 +395,58 @@ get wrong and are worth stating here:
  reintroducing the defect a one-line change that reads like using an existing API. Same
  reasoning as deleting the unprotected route rather than guarding it.
 
+### The first X-phase code shipped 2 September 2026, and four things from it generalise
+
+The admin navigation restructure (`12` s1/s1.1, built and recorded in **s1.1a**) separated
+contest administration from trading and collapsed the six trading screens into one
+collapsible **Trading** destination inside a **GAMES** group. It is a slice of **X6 taken
+deliberately before X1 and before Stage 0 sign-off**, on the grounds that it is the only
+part of X6 with no dependency on the foundation — it reorganises existing screens and adds
+no field, model, service, route or server action — and that the admin app carries no player
+traffic. **That reasoning does not extend to anything which writes data.**
+
+- **A restatement can be wrong while its source is right, and that is the direction nobody
+ checks.** `12` restated `New games plan/07`'s admin grouping and introduced two errors:
+ an **Arsenal** tab that is not an admin section at all (`TradingArsenalContext.tsx` is
+ chart tooling with no `menuGroups` entry and no `ADMIN_SECTIONS` id), and a **missing
+ `market-data`**, which is real. `07` had both right. The paired-document table is written
+ as though drift flows source → restatement; it flows both ways, so **verifying the source
+ is not verifying the chapter you are building from.** Concretely: **a plan's list of
+ screens is a hypothesis until checked against `menuGroups` and `ADMIN_SECTIONS`
+ together** — presence in one but not the other is the interesting case, because the
+ section can then either not be granted or not be reached.
+- **Before building a mechanism a plan demands, check whether the codebase already has
+ it.** Both of `12`'s hard cautions — tab state must be addressable, RBAC must stay
+ per-section — were **already satisfied**. Sections are driven by `?activeTab=<sectionId>`,
+ so reusing section ids as tab ids preserved every deep link with no new code; and
+ `filteredMenuGroups` already reveals a parent only when `children.some(hasAccess)` and
+ filters the children individually, which *is* per-tab gating, already proven by `settings`
+ and `dev-zone-menu`. The `useState` trap the plan warned about is only reachable by adding
+ a **second** state beside the one that exists. **The caution was right and the remedy was
+ to reuse, not to build.**
+- **A menu parent that renders nothing must not be a permission.** `trading-menu` is
+ deliberately absent from `ADMIN_SECTIONS`. A grant that maps to no screen is exactly where
+ privilege widening starts, and it reviews as harmless. Related and load-bearing:
+ `ADMIN_SECTIONS` is a **Mongoose enum** on `allowedSections` and `customPermissions`, so
+ it is **add-only** — removing a value orphans every employee document storing it. Note
+ `admin-employee.model.ts` lives **only** in `apps/admin` and is *not* mirrored, so
+ `check:mirrors` says nothing about it.
+- **Classify a screen by the component it renders, never by the group it is filed under.**
+ `analytics` sat in the "Trading" group and renders `CompetitionAnalytics` — contest
+ analytics, which belongs to every game. When the group's name is the thing being
+ corrected, that name is the least reliable evidence available. Same trap as the
+ trading-shaped services in `matchmaking.service.ts`: **the label agrees with the old world
+ and keeps agreeing after it ends.**
+
+Pinned by `__tests__/admin/trading-section-nav.test.ts` (9 tests), **both halves probed by
+reintroducing the defect** — restoring `trading-risk` under Settings turned exactly 1 red,
+dropping a tab from the shared list turned 2 red. Verified by a full admin `next build` and
+a `tsc --noEmit` matching the **225-error baseline exactly**, with none in the changed files
+and, equally important, **none disappearing**. Still deferred: sidebar clicks do not write
+the URL (pre-existing, affects all ~60 sections, belongs with X6.5), and the
+`tradingEnabled` conditional that hides the destination waits on X1 — **"built" does not
+include it.**
+
 ## The rule
 
 **Documentation is part of the deliverable, not a follow-up task.** A phase is not
@@ -342,11 +477,14 @@ On every change during implementation:
 | Pair | Constraint |
 |---|---|
 | `01-provider-contract-specification.md` and `ChartVolt-Game-API-Requirements.html` | Same requirements, different audience. A provider building against a stale spec is worse than no spec. The HTML carries a **version number and a document-history table** — bump both whenever `01` changes, since providers may already be building against the issued version |
-| `External game plans/10-external-only-programme.md` section 3, `PROGRESS.md`'s X-phase table, and section 15 of `ChartVolt-External-Games-Plan.html` | The X0–X12 phase list, effort figures and the 18–24 week total appear in all three. Changing one means changing all three |
-| `External game plans/11`–`18` and their `New games plan` sources (`01`, `02`, `07`, `08`, `09`, `11`, `12`, `13`, `15`) | The external chapters restate load-bearing facts — line numbers, the five finalization entry points, the eight missing RBAC IDs — rather than duplicating whole chapters. **If a fact changes in the source, change it in the restatement too**, or the two plans will disagree about the codebase |
-| `14-implementation-phases.md`, `00-README.md`, `PROGRESS.md` and the roadmap sections of both New-Games-Plan HTMLs | Phase list, effort estimates and totals appear in five places. Changing one means changing all five. Currently: Stage 0 (**6–9 days**), P1–P7 (**14–19 weeks**), plus the unscheduled per-game marketplace. The partner HTML's timeline SVG is drawn to scale — rescale the bars, not just the labels. Note the partner HTML must not carry the Stage 0 figure at all |
+| `External game plans/10-external-only-programme.md` section 3, `PROGRESS.md`'s X-phase table, and section 16 of `ChartVolt-External-Games-Plan.html` | The X0–X12 phase list, the effort figures and the **23–30 week** total appear in all three, plus `00-README.md`. Changing one means changing all four. Any figure of 20–26 is stale (it predates the owner's 2 Sep 2026 brief), as is 18–24, which was never right. **The internal HTML's diagram 10 is drawn to scale — rescale the bars, not just the labels**, and keep the two pale blue platform-work bars identical, because their being equal is the entire argument of the figure |
+| `External game plans/11`–`20` and their `New games plan` sources (`01`, `02`, `07`, `08`, `09`, `11`, `12`, `13`, `15`) | The external chapters restate load-bearing facts — line numbers, the five finalization entry points, the eight missing RBAC IDs — rather than duplicating whole chapters. **If a fact changes in the source, change it in the restatement too**, or the two plans will disagree about the codebase |
+| The scenario decision, wherever it appears | `External game plans` `PROGRESS.md`, `00-README.md`, `10` s1, `17` (risk X8), `ChartVolt-External-Games-Plan.html` s14 and s16; `New games plan` `PROGRESS.md`, `00-README.md`, `14-implementation-phases.md`, and both New-Games-Plan HTMLs. **Ten places.** Any document still presenting add-on versus external-only as an *open* question is stale; as a description of what the plan started from it is correct, so **say which** |
+| `New games plan/ChartVolt-New-Games-Plan-Partners.html` sections 11 and 15 | **Known stale, deliberately not rewritten.** Section 11 describes Trivia as a game we build; section 15's roadmap is drawn around the in-house build order. The hero facts were corrected on 2 Sep 2026 and an internal HTML comment in the file records exactly what remains. **How much to tell partners about licensing rather than building is a commercial decision — get the owner's answer before rewriting either section** |
+| `14-implementation-phases.md`, `00-README.md`, `PROGRESS.md` and the roadmap sections of both New-Games-Plan HTMLs | Phase list, effort estimates and totals appear in five places. Changing one means changing all five. **P1–P7 and their 14–19 week total are superseded** by the X-phases — all four `.md`/HTML entry points now carry that notice, and the live figure is **23–30 weeks**. **Stage 0 (6–9 days) is unchanged and still active.** The partner HTML's timeline SVG is drawn to scale — rescale the bars, not just the labels. Note the partner HTML must not carry the Stage 0 figure at all |
 | The mirror-drift counts, wherever they appear | `New games plan` `00-README.md`, `12-risk-register.md`, `00a`, `03-data-model-changes.md`; `External game plans` `17-risk-register.md`, `18-migration-testing-rollout.md`; both internal HTMLs. Measured 1 Sep 2026 by the guard itself: **75 mirrored model pairs, 11 drifted** (all now synced), plus 19 action and 51 service files. Earlier documents said "~21 files, 3 drifted", or "10 drifted" — both are stale, as is any figure of "31" for the stale `.d.ts` files, which was 112 (see the row below). Do not hand-count these; run `npm run check:mirrors:list` |
 | `External game plans/19-game-masters.md`, `New games plan/15` section 5, and the Game Master sections of the internal HTMLs | The Game Master system is the same system in both scenarios. `19` sections 1–4 are the authoritative analysis; `New games plan/15` section 5 restates it. **A fact corrected in one must be corrected in the other** |
+| The admin navigation structure, wherever it appears | `External game plans/12` s1 (grouping table), s1.1 (tab list) and s1.1a (what was built); `New games plan/07` "Target structure" and its BUILT notice; `External game plans/PROGRESS.md` X6 row and work log. **The live structure is `apps/admin/components/admin/AdminDashboard.tsx`'s `menuGroups` plus `apps/admin/lib/admin/game-sections.ts`** — read those, not the prose, and remember `07` was the accurate chapter and `12` the drifted one. There is **no top-level TRADING group**; trading is a destination inside GAMES. Any document describing one is stale |
 | The competition entry paths, wherever they appear | `New games plan` `00a`, `01-current-state-audit.md`, `05-prizes-money-layer.md`, `12-risk-register.md`, `PROGRESS.md`; `External game plans` `PROGRESS.md` and `17-risk-register.md`; `ChartVolt-New-Games-Plan.html`. There were **four** writers, now **two** — `lib/services/contest-entry.service.ts` behind both gates, plus the batch route fixed in place and the admin copy deleted. Any document still saying "two duplicate join paths" as a *present* fact is stale; as a description of what Stage 0 started from it is correct, so **say which** |
 | `ChartVolt-New-Games-Plan.html` and `-Partners.html` | The partner version must **never** mention Stage 0, the duplicate join paths, the admin mirror drift, or any current defect |
 | Any model change | Exists twice: `database/models/` and `apps/admin/database/models/`. Update both in the same commit. **`npm run check:mirrors` now enforces this** in CI and on `git push`, comparing field paths *and* enum values. Do not "fix" a failure by deleting an enum value to make two sides agree — that orphans every document already storing it. Add to the side that lacks it. Deliberate differences go in `tools/model-mirror/allowlist.ts` **with a reason** |

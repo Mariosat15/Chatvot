@@ -204,6 +204,39 @@ Challenges need an acceptance window as well as a play window:
 Without an expiry, credits sit locked in unaccepted challenges indefinitely and
 generate support tickets.
 
+### 2.4 Who the opponent is
+
+**Added 2 September 2026.** The flow above says "opponent invited or matched" and stops
+there. That single phrase was carrying the whole of opponent selection, and the owner's
+brief asks for something specific: *"challenges must be able to challenge any user and
+pick a game to create a challenge - now only for trading."*
+
+Two halves, and only one of them was designed.
+
+| Half | Status |
+|---|---|
+| **Pick a game** | Designed. Sections 2.1-2.3 above, plus `04` adding `gameKey` to `Challenge` |
+| **Challenge any user** | **Not designed.** Today `POST /api/challenges` requires a `challengedId` - every challenge is a direct invitation to one named player. There is no open challenge, and `GET /api/landing/challenges` is an anonymised marketing feed that nothing can be joined from |
+
+The full design, including opponent search, open challenges, interest-based matchmaking
+and the abuse controls that letting anyone challenge anyone requires, is **chapter `20`**.
+It is kept there rather than here because it is a player-preferences and matchmaking
+feature that happens to terminate in a challenge, not a change to the challenge flow -
+the money path, the windows and the resolution table above are all unaffected.
+
+**Three things to carry from `20` into any work on this flow**, because they constrain it:
+
+1. **`Challenge.challengedId` should stay required.** An open challenge has no opponent
+   until accepted, which tempts a nullable field on a model that sits on the money path
+   and is mirrored across both apps. `20` section 6 recommends a separate `OpenChallenge`
+   collection that materialises a `Challenge` on acceptance instead.
+2. **Willingness to be challenged is per game, not global.** `UserPresence.acceptingChallenges`
+   exists and is a single platform-wide boolean. It is kept as a master switch; per-game
+   opt-in is new.
+3. **Open question 15 is unanswered:** may anyone challenge anyone, only friends, or only
+   players who opted in for that game? It is an owner decision and it changes this flow's
+   entry conditions.
+
 ---
 
 ## 3. Where the money moves

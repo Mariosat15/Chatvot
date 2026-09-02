@@ -234,13 +234,13 @@
   <div class="hero-in">
     <div class="eyebrow">ChartVolt &middot; Platform Strategy &amp; Technical Plan</div>
     <h1>From a Trading App to a Games Platform</h1>
-    <p class="lede">How ChartVolt can run many kinds of paid skill competitions &mdash; trivia first, trading as one game among several &mdash; using the contest engine and money system that already exist. Written in plain language, with the two pre-existing defects that must be fixed and verified first.</p>
+    <p class="lede">How ChartVolt can run many kinds of paid skill competitions &mdash; trading as one game among several &mdash; using the contest engine and money system that already exist. Written in plain language, with the pre-existing defects that must be fixed and verified first.</p>
     <div class="hero-meta">
-      <div><b>Status</b><span>Plan only &mdash; no code changed</span></div>
-      <div><b>Date</b><span>17 Aug 2026 &middot; rev 1 Sep 2026</span></div>
+      <div><b>Status</b><span>Stage 0 built &middot; games route decided 2 Sep 2026</span></div>
+      <div><b>Date</b><span>17 Aug 2026 &middot; rev 2 Sep 2026</span></div>
       <div><b>Based on</b><span>Six full audits of the live codebase</span></div>
-      <div><b>First new game</b><span>Trivia</span></div>
-      <div><b>Effort</b><span>Stage 0: 6&ndash;9 days &middot; Games: 14&ndash;19 weeks</span></div>
+      <div><b>New games</b><span>Bought in, not built &mdash; see the notice below</span></div>
+      <div><b>Effort</b><span>Stage 0: 6&ndash;9 days &middot; Games: 23&ndash;30 weeks</span></div>
     </div>
     <div class="stamp">Read Stage 0 first &mdash; it is a separate job</div>
   </div>
@@ -281,6 +281,19 @@
 
 <!-- ================= VERDICT ================= -->
 <section id="verdict">
+
+  <div class="cal plain">
+    <div class="t">Notice &mdash; the games route was decided on 2 September 2026</div>
+    <p><b>The new games will be bought in from an external provider, not built in house.</b> That means the answer below, the four weld points, the database changes, the points system, the money flow, the admin work and the wording work are all <b>still exactly right</b> &mdash; they are platform work, and they do not care who supplies the gameplay.</p>
+    <p>Three things in this document are now out of date, and it is worth being precise about which:</p>
+    <ul>
+      <li><b>Section 11, the Trivia game, is not being built.</b> It is the one part of this plan the decision removes. Read it as an illustration of what a game module looks like, not as a commitment.</li>
+      <li><b>Section 15, the roadmap, has been replaced.</b> The live plan is the X0&ndash;X12 programme in the <i>External game plans</i> folder, and it runs <b>admin first</b> at the owner's instruction &mdash; an operator must be able to add a game and run a contest before any player screen is built against it.</li>
+      <li><b>The total is longer, not shorter.</b> 23&ndash;30 weeks rather than 14&ndash;19. Dropping the in-house game saves about three and a half weeks; integrating a provider properly costs about seven, and everything else is identical either way. <b>If anyone tells you buying the games was the cheaper choice, they have it backwards.</b></li>
+    </ul>
+    <p><b>Stage 0 is untouched by all of this.</b> It fixes live defects underneath the money layer, it is a prerequisite whichever route is taken, and it is the work currently waiting on your test.</p>
+  </div>
+
   <div class="verdict">
     <div class="q">The question: can we actually add more games without breaking the app?</div>
     <div class="a">Yes. The contest engine and the money system already do not care what the game is &mdash; the work is adding a game label and four small adapter points, not rebuilding anything.</div>

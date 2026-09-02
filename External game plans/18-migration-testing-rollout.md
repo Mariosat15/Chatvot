@@ -7,7 +7,7 @@ renamed. That is what makes each phase individually reversible.
 
 ## 1. Data migration
 
-Four backfills, all idempotent, all safe to re-run.
+Five backfills, all idempotent, all safe to re-run.
 
 | # | Backfill | Collections | When |
 |---|---|---|---|
@@ -15,10 +15,50 @@ Four backfills, all idempotent, all safe to re-run.
 | 2 | Populate `score` on participants from their contest's ranking method | participants | X1 - **skip completed contests** |
 | 3 | Default `BadgeConfig.gameTypes` to `["trading"]` | `BadgeConfig` | X1 |
 | 4 | Build `UserGameStats` rows, including the `"_overall"` rollup | new | X7 |
+| 5 | Seed **inferred** `UserGamePreference` rows from `UserGameStats` play counts | new | X11.5 |
 
 **Skip the `score` backfill for completed contests.** Their `finalLeaderboard` is already
 stored and authoritative; recomputing historical scores risks changing a published result
 for no benefit.
+
+### Backfill 4 has an unanswered product question in front of it
+
+**Open question 14, and it must be answered before the backfill is written**, because it
+is written once and it is visible to every existing player.
+
+> Does historical **trading** performance enter the new cross-game aggregates, or do they
+> start at zero?
+
+Both answers are defensible and both have a cost:
+
+| Answer | Cost |
+|---|---|
+| Backfill it | Long-standing traders instantly dominate every cross-game rollup and leaderboard on a platform whose point is that trading is one game among several |
+| Start at zero | Existing players appear to lose their history. It will be reported as a bug, it will generate support load, and they will not be wrong to complain |
+
+There is a third option worth putting in front of the owner rather than choosing here:
+**backfill the per-game trading row but not the `"_overall"` rollup**, so history is
+visibly preserved where it belongs and the cross-game ranking starts fair. It costs one
+extra condition in the backfill.
+
+Whichever is chosen, **the parallel leaderboard diff in rollout step 8 is what catches
+getting it wrong**, and R14 - players read rank changes as unfair - is why that step is
+not optional.
+
+### Backfill 5 is a seed, not a declaration
+
+`UserGamePreference` rows written by backfill 5 must carry `interestLevel: "inferred"`.
+Two consequences, and the second is the one that would be a live defect:
+
+- A row written as `declared` would be indistinguishable from a player's own answer, and
+  section 3.2 of `20` says a declaration is never overwritten by an inference. The backfill
+  would permanently pin a guess as a stated preference.
+- **An inferred row must not by itself make a player challengeable by strangers.** Paying
+  to enter a competition is not consent to receive 1v1 invitations. `20` section 3.2.
+
+This is the same distinction that made `canEnterChallenges` a live defect in Stage 0: a
+stored value and an absent one are different facts, and a backfill that erases the
+difference is not recoverable.
 
 ### The rolling-deploy hazard
 
@@ -199,7 +239,20 @@ to the external scenario and is the cheapest insurance in the plan.
 | 9 | Switch the leaderboard; announce the model | **Yes** |
 | 10 | Terminology and UI de-trading | **Yes** |
 | 11 | Games catalogue and `/games` routes | **Yes** |
-| 12 | `tradingEnabled` flag deployed as `true`; rehearse flipping it in staging only | No |
+| 12 | Backfill 5, then **inferred** matchmaking suggestions only - no stranger invitations | **Yes** |
+| 13 | Per-game interest declaration, opponent picker, open challenges | **Yes** |
+| 14 | `tradingEnabled` flag deployed as `true`; rehearse flipping it in staging only | No |
+
+**Two additions on 2 September 2026, and step 5 changed meaning.** Step 5 now includes the
+**admin navigation restructure and the admin wording pass** (X6, X6.5), which is where
+admin-first shows up in the rollout: an operator works a de-trading-ised admin panel from
+the first internal contest, not two phases later.
+
+**Steps 12 and 13 are deliberately in that order.** Suggestions from inferred interest ship
+before declarations and stranger invitations, for two reasons that pull the same way:
+matchmaking that launches with nobody having declared anything returns nothing and gets
+removed (risk **X18**), and shipping invitations first would mean the first thing players
+experience is unsolicited contact from strangers (risk **X14**).
 
 **Step 6 must not be skipped.** Real money in an internal contest surfaces problems that no
 amount of free testing does - fee deduction, pool arithmetic, payout rounding, ledger
@@ -226,7 +279,9 @@ production for the first time.
 | X7 leaderboard | Flag back to the computed path |
 | X8 terminology | Revert, or override via `WhiteLabel.terminologyOverrides` **with no deploy** |
 | X8 `tradingEnabled` | Set back to `true` |
+| X10 open challenges | Stop accepting new ones; existing `Challenge` rows are untouched, because `20` s6 keeps open challenges in a separate collection rather than loosening `Challenge` |
 | X11 catalogue | Hide the entries; `/competitions` is untouched |
+| X11.5 matchmaking | Flag off suggestions. `UserGamePreference` rows are additive and harmless; **do not delete declared rows** on rollback - they are player intent, and re-collecting them is not free |
 
 Every rollback above is either a flag flip or a revert of an additive change. **There is no
 point in this programme where rollback requires a data migration**, and that is a design
@@ -252,3 +307,12 @@ constraint worth protecting in review.
       writing the second adapter's skeleton**, even if unused
 - [ ] Rollback tested: disable provider games and confirm the platform behaves exactly as it
       does today
+- [ ] **No player-visible or operator-visible aggregate is a platform-wide label over a
+      trading-only calculation** - `05` section 10. Checked on the dashboard, the profile,
+      the leaderboard and the admin financial screens, not asserted
+- [ ] An operator can administer a provider contest end to end **without reading the word
+      "trading"** outside the Trading section
+- [ ] Matchmaking returns opponents for a **non-trading** game, proven by a test that
+      fails against the current trading-only `matchmaking.service.ts`
+- [ ] A player who declared nothing still receives useful suggestions, and receives **no**
+      stranger invitation without an explicit opt-in

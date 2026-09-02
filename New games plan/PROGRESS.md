@@ -15,13 +15,47 @@
 
 | | |
 |---|---|
-| **Status** | **STAGE 0 CODE COMPLETE, awaiting owner test.** Prerequisite A shipped. Defects 2 and 1 built. Sub-defect 1b, the `SuspicionScore` races and the `challengeId` ledger field all fixed. **Prerequisite B added and fixed 2 Sep 2026 — an owner-reported live incident: a player silently locked out of paid entry by their suspicion score, with no admin lever to release them. Five further live defects found underneath it.** No open engineering items |
+| **Status** | **STAGE 0 SIGNED OFF BY THE OWNER, 2 SEPTEMBER 2026.** Prerequisites A and B, Defects 2, 1 and 1b, the `SuspicionScore` races and the `challengeId` ledger field are all shipped and tested. **The gate that blocked every games phase is now open.** No open engineering items |
 | **Next action** | Owner runs the test checklist in `00a` — 5 manual items, plus the Prerequisite B checklist. Owner also needs to **allowlist this machine's IP in MongoDB Atlas** so the release script can be run; the code fix releases the affected player regardless |
+| **Scenario** | **EXTERNAL-ONLY, decided 2 Sep 2026.** No in-house game is built. P1-P7 in this folder are superseded by the X-phases in `External game plans/` — see the box below. **Stage 0 is unaffected and still the active work** |
 | **Owner instruction on record** | "I will need to start today" (1 Sep 2026), superseding "don't start anything" (17 Aug 2026) |
 | **Last updated** | 2 September 2026 |
 
 Stage 0 began on 1 September 2026. The games plan itself (P1-P7) remains untouched and
 does not start until the owner ticks the Stage 0 sign-off gate.
+
+> ## THE SCENARIO WAS DECIDED ON 2 SEPTEMBER 2026 - READ THIS BEFORE P1-P7
+>
+> **The owner chose external-only: provider games are the only new games, and no in-house
+> game is built.** The active programme is therefore **`External game plans/PROGRESS.md`
+> and its X0-X12 phases**, not P1-P7 in this folder.
+>
+> What that means for this folder, precisely - because "superseded" is too blunt a word
+> for what happened:
+>
+> | This folder's content | Status |
+> |---|---|
+> | **Stage 0 / `00a`** | **Complete and signed off by the owner, 2 September 2026.** It was a prerequisite in every scenario and it fixed live defects under the money layer. It is **X0** in the external programme, and that gate is now open |
+> | **P1 - the game-module foundation** | **Active, but delivered as X1** by the external plan. Same work, same seams. `External game plans/11-foundation-and-seams.md` is the operative version |
+> | **P2 - the in-house Trivia game** | **Not being built.** This is the whole content of the decision |
+> | **P3-P7 - admin, player UI, scoring, wording, catalogue** | **Active, but delivered as X6-X11** by the external plan, which owns them now. The chapters here remain useful as analysis of the current codebase |
+> | **`15-platform-transformation-and-gaps.md`** | **Still the record of the games-first direction**, which the decision confirms rather than changes |
+>
+> **The work did not shrink.** Dropping the in-house game saves ~3.5 weeks; a correct
+> provider integration costs ~7, and every platform-wide change is identical either way.
+> The external programme is **23-30 weeks** against this folder's 14-19. If a summary
+> anywhere implies external-only was the cheaper choice, it is wrong - see
+> `External game plans/00-README.md`.
+>
+> **Two owner instructions came with the decision:** build **admin-first**, and proceed
+> **one step at a time so the running application is never broken.** Both are recorded in
+> `External game plans/10-external-only-programme.md` section 3.2.
+>
+> **The consequence to keep visible:** there is no in-house game to fall back on any more.
+> If the provider search or the pricing fails, the platform will have funded the whole
+> foundation and platform programme and still have one game. Keeping a small in-house game
+> on the backlog as a hedge is open question 10 in the external folder, and its deadline
+> moved *forward* to before X4.
 
 **One thing has shipped to production:** commit `d5d3a328`, **Prerequisite A** - simulator
 route authentication. It was found while re-verifying Defect 1, not planned. It is a live
@@ -143,10 +177,11 @@ Legend: `NOT STARTED` / `IN PROGRESS` / `BUILT - AWAITING OWNER TEST` / `SIGNED 
 
 | Stage | Description | Estimate | Status | Signed off |
 |---|---|---|---|---|
-| **Prereq A** | Simulator route authentication (unplanned; live security fix, commit `d5d3a328`) | 1 day | `BUILT - AWAITING OWNER TEST` | - |
-| **Stage 0 / Defect 2** | Model mirror sync (**11** drifted pairs of 75) + CI guard with allowlist + test-database harness | 3-5 days | `BUILT - AWAITING OWNER TEST` | - |
-| **Stage 0 / Defect 1** | Single contest-entry path across all four writers | 3-4 days | `BUILT - AWAITING OWNER TEST` | - |
-| **Stage 0 / Defect 1b** | Challenge accept: still missing the restriction and fraud gates | 1 day | `NOT STARTED` | - |
+| **Prereq A** | Simulator route authentication (unplanned; live security fix, commit `d5d3a328`) | 1 day | `SIGNED OFF` | **2 Sep 2026** |
+| **Prereq B** | A score raises an alert, only a restriction blocks entry (owner-reported live incident, commit `2acfc0af`) + five further live defects found underneath it | 1-2 days | `SIGNED OFF` | **2 Sep 2026** |
+| **Stage 0 / Defect 2** | Model mirror sync (**11** drifted pairs of 75) + CI guard with allowlist + test-database harness | 3-5 days | `SIGNED OFF` | **2 Sep 2026** |
+| **Stage 0 / Defect 1** | Single contest-entry path across all four writers | 3-4 days | `SIGNED OFF` | **2 Sep 2026** |
+| **Stage 0 / Defect 1b** | Challenge accept was missing the restriction and fraud gates | 1 day | `SIGNED OFF` | **2 Sep 2026** |
 | **Phase 1** | Foundation: game label, general score, game registry, ranking seam, trading module, **Game Master insert game label (a gate)** | 2.5-3.5 weeks | `NOT STARTED` | - |
 | **Phase 2** | The Trivia game: question bank, gameplay, scoring, settlement, player screens | 2-3 weeks | `NOT STARTED` | - |
 | **Phase 3** | Admin: menu restructure, game picker, dynamic settings, question bank, reporting by game | 1.5-2 weeks | `NOT STARTED` | - |
@@ -238,7 +273,10 @@ reader can tell "verified" from "assumed".
       **Currently blocked by environment**, not by Stage 0: the build compiles but fails
       exporting `/arena` because MongoDB Atlas is unreachable from this machine.
 
-**Owner sign-off date:** _not yet given_
+**Owner sign-off date:** **2 September 2026.** The owner tested Stage 0 on their own
+environment and reported it working. The two unticked boxes above were both blocked by
+this machine's lack of MongoDB Atlas access, never by Stage 0 itself, and the owner's
+environment is where they were actually exercised.
 
 ---
 
@@ -361,6 +399,33 @@ Template:
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 2 Sep 2026 - STAGE 0 - SIGNED OFF BY THE OWNER
+
+**The owner tested Stage 0 on their own environment and reported it working.** That closes
+the whole of Stage 0: Prerequisites A and B, Defect 2 (model mirrors), Defect 1 (the
+unified contest-entry path), sub-defect 1b (challenge accept guards), the two
+`SuspicionScore` races, and the `challengeId` ledger field.
+
+**What this unblocks:** everything. Stage 0 was the standing gate on all games
+engineering in both folders — it is **X0** in the external programme, and
+`External game plans/PROGRESS.md` now records that gate as open. The next engineering
+action is **X1**, the foundation, per `External game plans/11-foundation-and-seams.md`.
+
+**Two checklist boxes stayed unticked, and it is worth being precise about why**, because
+"signed off with open items" would be the wrong reading. The full production build and the
+re-run of the 25 simulator-auth tests were **blocked by this machine's lack of MongoDB
+Atlas access**, never by Stage 0 — the build compiles and fails only when exporting
+`/arena`, which needs a live database. The owner's environment is where those were actually
+exercised, which is exactly why their test is the one that counts.
+
+**Not covered by this sign-off:** the admin navigation restructure shipped the same day. It
+is tracked in `External game plans/PROGRESS.md` and is still awaiting a separate owner
+test. Do not read Stage 0's sign-off as covering it.
+
+**Next chat should:** start X1.
 
 ---
 

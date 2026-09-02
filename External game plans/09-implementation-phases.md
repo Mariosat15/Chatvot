@@ -3,15 +3,22 @@
 Sequenced so that each phase is independently testable and shippable, and so that
 nothing touching money goes live until everything around it has been proven.
 
-> **This chapter assumes the `New games plan` is also being delivered** - Stage 0, the
-> game-module foundation, and all the platform-wide work (admin, navigation, wording,
-> flags, catalogue). External games are an addition to a platform that has already been
-> generalised.
+> ## SUPERSEDED - USE `10` SECTION 3
 >
-> **If provider games are the only new games, use `10-external-only-programme.md`
-> section 3 instead.** That plan absorbs the foundation and the platform-wide work into
-> a self-contained X0-X12 sequence of 20-26 weeks. The E-phases below all survive inside
-> it, so nothing here is wasted - they are re-sequenced, not replaced.
+> **The owner decided external-only on 2 September 2026:** provider games are the only new
+> games, and no in-house game is built. This chapter assumed the opposite - that the
+> `New games plan` would also deliver Stage 0, the game-module foundation and all the
+> platform-wide work, leaving external games as an addition to an already-generalised
+> platform.
+>
+> **The operative plan is `10-external-only-programme.md` section 3** - a self-contained
+> X0-X12 sequence of **23-30 weeks**, running **admin-first** at the owner's instruction.
+>
+> **Nothing below is wasted, and that is why the chapter is kept.** Every E-phase survives
+> inside the X-phases - E1 becomes X2, E2 becomes X3, and so on - so the phase *contents*,
+> the testing approach and the definition of done all still apply. They are re-sequenced,
+> not replaced, and references to E-phase numbers elsewhere in `01`-`09` resolve here.
+> **Do not plan a schedule from this chapter.**
 
 ---
 

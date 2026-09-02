@@ -61,6 +61,36 @@ provider's own catalogue metadata where possible.
 
 ## 3. Migration passes
 
+**Split into two phases on 2 September 2026.** This chapter previously sat entirely in X8,
+after the player UI. That ordering had a consequence nobody would have chosen deliberately:
+operators would spend two whole phases running a multi-game platform through screens
+labelled "trading", making exactly the mistakes the relabelling exists to prevent. The
+admin half is now **X6.5**, immediately after the admin build; the player half stays in
+**X8**.
+
+### 3.1 Admin passes - X6.5
+
+These follow the navigation restructure in `12` section 1, because renaming a screen and
+moving it are cheaper together than apart, and because the operator is the first person
+who has to think in games rather than trades.
+
+| Pass | Scope | ~strings | Who |
+|---|---|---|---|
+| A1 | Admin navigation labels and group headers - `AdminDashboard.tsx` `menuGroups` | ~60 sections reviewed, ~25 renamed | Developer |
+| A2 | Contest create wizard - step titles, field labels, help text | ~40 | Developer |
+| A3 | Contest list and detail column headers | ~25 | Developer |
+| A4 | Analytics and financial screen labels, per `05` section 10 | ~30 | Developer |
+| A5 | **Admin wiki** - `AdminWikiSection.tsx` | Content | Developer or admin |
+| A6 | **AI agent knowledge base** - `apps/admin/app/api/ai-agent/chat/route.ts` | Content | Developer |
+
+**A5 and A6 are the two that get forgotten, and both are worse than a stale label.** The
+wiki is what an operator reads when they are unsure, and the AI agent actively advises
+them - a knowledge base that still describes a trading-only platform will confidently give
+wrong guidance. Prerequisite B had to update both for exactly this reason; treat them as
+part of the pass, not as documentation to catch up later.
+
+### 3.2 Player passes - X8
+
 Ordered by visibility, so the highest-impact strings change first.
 
 | Pass | Scope | ~strings | Who |
@@ -80,6 +110,12 @@ Ordered by visibility, so the highest-impact strings change first.
 Passes 2, 7, 8 and 9 are **database content, editable in admin by someone who is not a
 developer**. That is roughly three days of work that does not consume engineering time,
 and it can happen in parallel with X7.
+
+**One player-side item is deliberately *not* in this chapter.** The getting-started card
+(`components/dashboard/GettingStartedCard.tsx`) has a step "place your first trade". That
+is a **logic** change - which steps exist and when they count as complete - not a string
+change, so it belongs with the onboarding work in `20` section 5. A wording pass that
+merely relabels it leaves a new player on a games platform with a trading task.
 
 ---
 
@@ -155,14 +191,32 @@ provider renames a game, not when a contract moves to a new provider. See `02`.
 
 ## 8. Effort
 
+Split across the two phases, per section 3.
+
+### X6.5 - admin
+
 | Item | Estimate |
 |---|---|
 | Terminology layer - tokens, resolution, hook, database field, admin UI | 3 days |
+| Passes A1-A4 - roughly 120 admin strings, alongside the `12` s1 restructure | 2-3 days |
+| Passes A5-A6 - admin wiki and AI agent knowledge base | 1 day |
+| **X6.5 total** | **~0.5-1 week** |
+
+The terminology layer itself is built here rather than in X8, because the admin overrides
+UI is the thing that lets a non-developer do the X8 data-entry passes at all.
+
+### X8 - player
+
+| Item | Estimate |
+|---|---|
 | Passes 1, 3, 4, 5, 6 - roughly 145 code strings | 5 days |
 | Passes 2, 7, 8, 9 - admin data entry | 3 days, **non-developer** |
 | Per-game overrides populated from provider catalogue metadata | 1 day |
 | Guardrails - lint rule and checklist | 1 day |
-| **Total engineering** | **~10 days** |
+| **X8 engineering** | **~7 days** |
+
+**Total engineering across both phases is unchanged at ~10 days.** The split moves work
+earlier; it does not add any.
 
 ---
 
@@ -176,3 +230,13 @@ provider renames a game, not when a contract moves to a new provider. See `02`.
 - [ ] Nothing in section 6 is changed - verified by diff review, not assertion
 - [ ] Terminology is editable from admin **without a deploy**
 - [ ] Per-game vocabulary reads naturally for at least two different provider titles
+
+### Admin criteria, X6.5
+
+- [ ] An operator can administer a provider contest end to end **without reading the word
+      "trading"** outside the Trading section
+- [ ] The **admin wiki** describes a multi-game platform, not a trading platform
+- [ ] The **AI agent knowledge base** does not describe trading as the only game - it
+      advises operators directly, so a stale entry produces confidently wrong guidance
+- [ ] No analytics or financial figure is labelled as a platform total while covering only
+      trading (`05` section 10)

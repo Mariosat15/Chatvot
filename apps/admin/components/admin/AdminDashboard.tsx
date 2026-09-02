@@ -70,6 +70,7 @@ import {
   Cookie,
   Megaphone,
   Video,
+  Gamepad2,
 } from "lucide-react";
 import { toast } from "sonner";
 import CredentialsSection from "@/components/admin/CredentialsSection";
@@ -129,6 +130,8 @@ import MessagingSettingsSection from "@/components/admin/MessagingSettingsSectio
 import GameMasterDashboardSection from "@/components/admin/GameMasterDashboardSection";
 import GameMasterManagementSection from "@/components/admin/GameMasterManagementSection";
 import PriceHealthWidget from "@/components/admin/PriceHealthWidget";
+import TradingSectionTabs from "@/components/admin/trading/TradingSectionTabs";
+import { isTradingSection } from "@/lib/admin/game-sections";
 import VendorSubscriptionsSection from "@/components/admin/VendorSubscriptionsSection";
 import IncidentsSection from "@/components/admin/IncidentsSection";
 import VisitorAnalyticsSection from "@/components/admin/visitors/VisitorAnalyticsSection";
@@ -234,11 +237,11 @@ const menuGroups: MenuGroup[] = [
       },
     ],
   },
-  // Trading
+  // Contests — competitions and challenges belong to any game, not to trading
   {
-    id: "trading",
-    label: "Trading",
-    icon: <LineChart className="h-4 w-4" />,
+    id: "contests",
+    label: "Competitions",
+    icon: <Trophy className="h-4 w-4" />,
     color: "text-orange-400",
     items: [
       {
@@ -256,39 +259,60 @@ const menuGroups: MenuGroup[] = [
         bgColor: "bg-red-500/10 hover:bg-red-500/20",
       },
       {
-        id: "trading-history",
-        label: "Trading History",
-        icon: <History className="h-5 w-5" />,
-        color: "text-cyan-400",
-        bgColor: "bg-cyan-500/10 hover:bg-cyan-500/20",
-      },
-      {
         id: "analytics",
         label: "Analytics",
         icon: <BarChart3 className="h-5 w-5" />,
         color: "text-blue-400",
         bgColor: "bg-blue-500/10 hover:bg-blue-500/20",
       },
+    ],
+  },
+  // Games — trading is one game among the several that will follow.
+  // Each game owns one collapsible destination holding only its own screens.
+  {
+    id: "games",
+    label: "Games",
+    icon: <Gamepad2 className="h-4 w-4" />,
+    color: "text-violet-400",
+    items: [
       {
-        id: "market",
-        label: "Market Hours",
-        icon: <Calendar className="h-5 w-5" />,
-        color: "text-green-400",
-        bgColor: "bg-green-500/10 hover:bg-green-500/20",
-      },
-      {
-        id: "symbols",
-        label: "Trading Symbols",
-        icon: <TrendingUp className="h-5 w-5" />,
-        color: "text-violet-400",
-        bgColor: "bg-violet-500/10 hover:bg-violet-500/20",
-      },
-      {
-        id: "market-data",
-        label: "Market Data",
-        icon: <Database className="h-5 w-5" />,
-        color: "text-emerald-400",
-        bgColor: "bg-emerald-500/10 hover:bg-emerald-500/20",
+        id: "trading-menu",
+        label: "Trading",
+        icon: <LineChart className="h-5 w-5" />,
+        color: "text-orange-400",
+        bgColor: "bg-orange-500/10 hover:bg-orange-500/20",
+        children: [
+          {
+            id: "symbols",
+            label: "Symbols",
+            icon: <TrendingUp className="h-4 w-4" />,
+          },
+          {
+            id: "market",
+            label: "Market Hours",
+            icon: <Calendar className="h-4 w-4" />,
+          },
+          {
+            id: "market-data",
+            label: "Market Data",
+            icon: <Database className="h-4 w-4" />,
+          },
+          {
+            id: "trading-risk",
+            label: "Risk & Margin",
+            icon: <Gauge className="h-4 w-4" />,
+          },
+          {
+            id: "price-health",
+            label: "Price Health",
+            icon: <HeartPulse className="h-4 w-4" />,
+          },
+          {
+            id: "trading-history",
+            label: "Trading History",
+            icon: <History className="h-4 w-4" />,
+          },
+        ],
       },
     ],
   },
@@ -417,13 +441,8 @@ const menuGroups: MenuGroup[] = [
     icon: <HeartPulse className="h-4 w-4" />,
     color: "text-rose-400",
     items: [
-      {
-        id: "price-health",
-        label: "Price Feed Health",
-        icon: <HeartPulse className="h-5 w-5" />,
-        color: "text-rose-400",
-        bgColor: "bg-rose-500/10 hover:bg-rose-500/20",
-      },
+      // Reason: "price-health" moved to the Trading destination — it monitors the
+      // trading price feed, so it belongs with the game it serves.
       {
         id: "incidents",
         label: "Incident Management",
@@ -584,11 +603,8 @@ const menuGroups: MenuGroup[] = [
             label: "System Announcements",
             icon: <Megaphone className="h-4 w-4" />,
           },
-          {
-            id: "trading-risk",
-            label: "Trading Risk",
-            icon: <Gauge className="h-4 w-4" />,
-          },
+          // Reason: "trading-risk" moved to the Trading destination — it was the
+          // only game-specific screen inside platform Settings.
           {
             id: "currency",
             label: "Currency",
@@ -763,10 +779,13 @@ export default function AdminDashboard({
   };
 
   const [activeSection, setActiveSection] = useState(getInitialSection());
-  const [expandedMenus, setExpandedMenus] = useState<string[]>([
-    "settings",
-    "dev-zone-menu",
-  ]);
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(() =>
+    // Reason: a deep link straight to a trading screen must not land the operator
+    // in a collapsed menu with no visible indication of where they are.
+    isTradingSection(getInitialSection())
+      ? ["settings", "dev-zone-menu", "trading-menu"]
+      : ["settings", "dev-zone-menu"],
+  );
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [serverTime, setServerTime] = useState(new Date());
@@ -779,6 +798,11 @@ export default function AdminDashboard({
       urlActiveTab !== activeSection
     ) {
       setActiveSection(urlActiveTab);
+      if (isTradingSection(urlActiveTab)) {
+        setExpandedMenus((prev) =>
+          prev.includes("trading-menu") ? prev : [...prev, "trading-menu"],
+        );
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlActiveTab]);
@@ -1448,7 +1472,18 @@ export default function AdminDashboard({
 
         {/* Page Content */}
         <main className="flex-1 p-4 lg:p-6 overflow-auto">
-          <div className="max-w-[1600px] mx-auto">{renderContent()}</div>
+          <div className="max-w-[1600px] mx-auto">
+            {/* Reason: rendered here rather than inside each trading case so the
+                six section components stay untouched by the navigation change. */}
+            {isTradingSection(activeSection) && hasAccess(activeSection) && (
+              <TradingSectionTabs
+                activeSection={activeSection}
+                onSelect={setActiveSection}
+                hasAccess={hasAccess}
+              />
+            )}
+            {renderContent()}
+          </div>
         </main>
       </div>
     </div>

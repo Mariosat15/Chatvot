@@ -6,24 +6,38 @@
 
 ---
 
-## Which scenario are you reading for?
+## The scenario is decided: EXTERNAL-ONLY
 
-This folder covers two decisions, and the answer changes what you need to read.
+**Owner decision, 2 September 2026.** Provider games are the only new games; **no
+in-house game is built.**
 
-| Scenario | What it means | Read |
+| Scenario | What it means | Status |
 |---|---|---|
-| **Add-on** | The `New games plan` is also being delivered - Stage 0, the game-module foundation, an in-house game, and all the platform-wide work. External games are an addition | `01`-`09`. The foundation is a prerequisite owned elsewhere |
-| **External-only** | **Provider games are the only new games.** No in-house game is built. This folder must stand on its own | `01`-`09` **and** `10`-`18`. This plan owns the foundation and every platform-wide change |
+| **External-only** | **Provider games are the only new games.** No in-house game. This folder stands on its own and owns the foundation and every platform-wide change | **CHOSEN** |
+| **Add-on** | The `New games plan` is also delivered - Stage 0, the foundation, an in-house game, all the platform-wide work. External games are an addition | **Not being pursued** |
 
-Chapters `01`-`08` are identical in both scenarios: the provider contract, the
-architecture, the flows, the data model, scoring, trust and provider evaluation do not
-change based on whether an in-house game also exists.
+**Read `01`-`09` and `10`-`20`.** Chapters `01`-`08` are unaffected by the decision - the
+provider contract, architecture, flows, data model, scoring, trust and provider evaluation
+were always scenario-neutral. What changes is that **`09` is superseded** by `10` section
+3, and every sentence in `01`-`09` that delegates work to the `New games plan` now
+delegates it to a chapter here instead.
 
-**If external-only is the decision, start at `10-external-only-programme.md`.** It
-defines the scenario, absorbs the foundation work this folder used to delegate, gives a
-self-contained phase plan, and states the cost honestly.
+**Start at `10-external-only-programme.md`.** It defines the scenario, absorbs the
+foundation work this folder used to delegate, gives the self-contained X0-X12 phase plan,
+and states the cost honestly.
 
-### The one number to know before deciding
+Two owner instructions came with the decision, and both shape the plan rather than
+decorate it:
+
+- **Admin first.** An operator must be able to register a provider, sync a catalogue and
+  create a non-trading contest before any player screen has something real to render. The
+  admin app is also a separate process with no player traffic, which makes it the safe
+  place to be wrong. `12` section 1.2.
+- **One step at a time, without breaking the running app.** Every phase is additive and
+  flag-gated, trading behaviour is pinned by the regression test in `11`, and **no phase
+  may require a simultaneous change to trading in order to be correct.** `10` section 3.2.
+
+### The number to keep quoting accurately
 
 **External-only is not the cheaper route. It is the broader one.** Dropping the in-house
 game saves about 3.5 weeks; doing a provider integration properly costs about 7. All the
@@ -31,12 +45,26 @@ platform work is the same either way.
 
 | Route | To a second playable, payable game | To a full games platform |
 |---|---|---|
-| In-house game first | ~8-10 weeks | 12-17 weeks |
-| External-only | ~11-14 weeks, gated on a signed contract | **20-26 weeks** |
+| In-house game first | ~8-10 weeks | 12-17 weeks (not updated - route not pursued) |
+| External-only | ~11-14 weeks, gated on a signed contract | **23-30 weeks** |
 
 What the external route buys is **breadth and no content burden** - potentially a whole
 catalogue rather than one game, with the questions, artwork and refresh cycle as the
 provider's cost, not ours. The full reasoning is in `10` sections 2 and 5.
+
+**23-30 weeks, not the 20-26 previously stated.** The owner's 2 September brief added ~3
+weeks of real scope: a player profile specification, opponent selection for challenges,
+and smart onboarding with matchmaking. `10` section 3.1 itemises it. Do not present the
+new figure as a re-estimate of the old programme.
+
+### The consequence of the decision that must stay visible
+
+There is now **no in-house game to fall back on.** In the add-on scenario, a failed
+provider relationship left a working Trivia game behind. Here, if the provider search or
+the pricing fails, the platform will have funded the whole foundation, admin and player
+programme and still have exactly one game. That is risk **X8**, and it is why the question
+of keeping a small in-house game on the backlog as insurance moved *forward* to before X4
+rather than away. `10` section 5.
 
 ---
 
@@ -261,6 +289,7 @@ Chapters `01`-`09` above still apply in full; these are additions, not replaceme
 | **17** | `17-risk-register.md` | Platform risks (R-series) and scenario risks (X-series), with three gates |
 | **18** | `18-migration-testing-rollout.md` | Backfills, eight tiers of tests, rollout sequence, rollback per phase |
 | **19** | `19-game-masters.md` | Game Masters on provider games: creating contests, referral earnings, tier limits, and the per-round-cost problem that can make a Game Master contest loss-making |
+| **20** | `20-onboarding-and-matchmaking.md` | **New 2 Sep 2026.** Declared and inferred game interests, challenge matchmaking, opponent selection for "challenge any user", and the onboarding steps that must stop being trading steps |
 
 | - | `PROGRESS.md` | Status tracker - read this in any new chat |
 | - | `ChartVolt-External-Games-Plan.html` | Illustrated version for reading and sharing |
@@ -303,7 +332,7 @@ still a prerequisite (it fixes live defects under the money layer, which no plan
 and the game-module foundation is still required, because a provider game plugs into
 exactly the socket an in-house game would have used.
 
-That is what chapters `10`-`18` exist for. `10` restates the programme as X0 to X12 with
+That is what chapters `10`-`20` exist for. `10` restates the programme as X0 to X12 with
 the foundation absorbed, and `11` owns the seam work directly.
 
 ---
@@ -313,9 +342,10 @@ the foundation absorbed, and `11` owns the seam work directly.
 | Aspect | Assessment |
 |---|---|
 | **Technical feasibility** | **High.** No money crosses the boundary, and the primitive is simple: create a round, receive a score |
-| **Effort - add-on scenario** | **7.5-8 weeks** engineering on top of the game-module foundation, 10-12 weeks calendar to launch including the pilot |
-| **Effort - external-only scenario** | **20-26 weeks**, because the foundation and every platform-wide change come with it. See `10` section 3 |
+| **Effort - external-only, the chosen route** | **23-30 weeks**, because the foundation and every platform-wide change come with it, plus the ~3 weeks added by the owner's 2 Sep 2026 brief. See `10` section 3 |
+| **Effort - add-on scenario** | **7.5-8 weeks** engineering on top of the game-module foundation. **Route not pursued** - kept for reference only |
 | **Is it cheaper than an in-house game?** | **No.** It is broader. Dropping the in-house game saves ~3.5 weeks; the integration costs ~7. The prize is a catalogue and no content burden, not a saving |
+| **Is there a fallback if the provider fails?** | **No, not any more.** That is the cost of the decision, and it is why a small in-house hedge game is open question 10 with a deadline of before X4. See `17` risk X8 |
 | **Hardest part** | Result ingestion done properly: signatures, idempotency, late arrivals, and rounds that never report |
 | **Biggest technical risk** | A round that never returns a result while real prize money waits on it. Addressed in `07-failure-modes-and-edge-cases.md` |
 | **Biggest commercial risk** | Per-round cost. If a provider charges per session, cheap or free contests can cost more to run than they earn. Modelled in `08-provider-evaluation-checklist.md` |

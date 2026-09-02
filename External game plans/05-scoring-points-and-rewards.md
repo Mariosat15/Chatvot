@@ -208,3 +208,74 @@ Unchanged from today. Provider games slot in without touching it.
 
 Steps 2 to 12 are existing code. Only step 1 is new, and it is the subject of
 `07-failure-modes-and-edge-cases.md`.
+
+---
+
+## 10. No aggregate may be trading-only
+
+**Owner framing, 2 September 2026:** *"this engine now becomes a general competition
+engine, not only for trading"* - covering the scoring, **its naming**, the calculations,
+the finances, the badges and the journey elements.
+
+Sections 1-9 already design the scoring layers for multiple games. What was never stated
+is the rule that makes them binding, so it is stated here as a reviewable constraint:
+
+> **Every number the platform shows a player, an operator or an accountant about
+> performance must be defined for every game, or be explicitly labelled as belonging to
+> one game.** There is no third option. A figure that silently means "trading only" while
+> being labelled as a total is a defect, not a simplification.
+
+### 10.1 Why this needs saying
+
+The failure mode is not a crash. A trading-only aggregate on a multi-game platform keeps
+computing, keeps rendering, and keeps being wrong - it reports a total that excludes most
+of the player's activity. The player sees a number lower than their experience, the
+operator sees revenue that does not reconcile, and nothing in the logs indicates a
+problem. **This is the same shape as the mirror-drift and `canEnterChallenges` defects
+found in Stage 0: the system reports success while storing or showing the wrong thing.**
+
+### 10.2 The three legitimate outcomes for each existing aggregate
+
+Every performance or money figure gets one of three dispositions, and the disposition is
+recorded rather than assumed:
+
+| Disposition | Meaning | Example |
+|---|---|---|
+| **Generalised** | Redefined to cover all games | Total winnings, contests entered, contests won, level, XP |
+| **Per-game** | Kept, but explicitly scoped and labelled | Win rate in chess puzzles; PnL in trading |
+| **Retired from the headline** | Still exists on the trading surface, no longer presented as a platform-wide figure | Total PnL, average trade size, Sharpe-style metrics |
+
+**"Total PnL" is the clearest case, and it is a naming problem before it is a
+calculation problem.** It is a trading metric. It cannot be generalised, because a chess
+puzzle has no profit and loss. It therefore belongs in the third row - and a headline
+figure that currently reads "Total Profit" has to become either a trading-scoped figure
+or a genuinely cross-game one such as total winnings. Which one is a product decision;
+leaving it ambiguous is not an option.
+
+### 10.3 The surfaces this applies to
+
+| Surface | Requirement | Chapter |
+|---|---|---|
+| Score naming and units | A "score" must state its game and direction. `scoreDirection` and `scoreType` exist per game for this reason | `04` s3.2 |
+| Cross-game points | Normalised points are the only comparable currency across games | s3 |
+| Skill rating | **Per game.** Never a single platform-wide skill number | s4 |
+| Levels and XP | Generalised. XP from any game | s5 |
+| Badges | Generalised where the achievement is generic; per-game where it is not. **A badge keyed on `gameKey` must never be silently re-scoped**, because `gameKey` is immutable and historical awards depend on it | s5 |
+| Journeys and milestones | Content keyed on `gameKey`. A journey with trading-only steps must be gated on `tradingEnabled` | s6, `15` s2 |
+| Leaderboards | Overall, per game, seasonal | s7 |
+| Player profile and stats | Cross-game aggregates plus per-game breakdown | `13` |
+| Financial reporting | Entry-fee volume, fee revenue, payout ratio and average pot **by game and by provider** - provider cost is per-provider | `12` s5 |
+| Fraud thresholds | Entry throttles and detectors must count non-trading entries. Risk **R9** | `17` |
+
+### 10.4 Two open questions this exposes
+
+Neither blocks X1, and both are recorded in `PROGRESS.md` rather than decided here:
+
+- **Is a player's cross-game rank one number or several?** (question 13) A single
+  "overall" rank requires normalised points to carry real comparability; several per-game
+  ranks are more honest but give no headline. Section 3 makes either possible; what the
+  leaderboard *leads with* is a product decision.
+- **Does historical trading performance enter the new cross-game aggregates?**
+  (question 14) Backfilling makes trading players instantly dominant on a games platform.
+  Starting at zero discards real history and will be read as a bug by existing players.
+  The migration in `18` is written once, so the answer is needed before it.

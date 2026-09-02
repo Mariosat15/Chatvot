@@ -1,7 +1,13 @@
 # 10 - The External-Only Programme
 
-> **Read this chapter before `09-implementation-phases.md` if the decision is that
-> external games are the *only* new games.**
+> **THIS IS THE CHOSEN SCENARIO.** Decided by the owner on **2 September 2026**:
+> provider games are the only new games; no in-house game is built. Read this chapter
+> **instead of** `09-implementation-phases.md`, which describes the add-on route that is
+> no longer being pursued.
+>
+> Two owner instructions came with the decision and both are load-bearing:
+> **build admin-first**, and **take one step at a time so the running application is
+> never broken.** Section 3 reflects them.
 
 Chapters `01`-`09` were written on an assumption: that the `New games plan` delivers
 Stage 0 and the game-module foundation, builds Trivia in-house as the proof game, and
@@ -64,7 +70,13 @@ to do with who supplies the gameplay.
 | Route | To a second playable, payable game | To a full games platform |
 |---|---|---|
 | In-house Trivia first | ~8-10 weeks | **12-17 weeks** |
-| External-only | ~11-14 weeks, and gated on a contract | **20-26 weeks** |
+| External-only | ~11-14 weeks, and gated on a contract | **23-30 weeks** |
+
+Both right-hand figures predate the owner's 2 September 2026 brief; the external-only one
+has been updated for it, the in-house one has not, because that route is not being
+pursued. **Comparing them is therefore no longer apples to apples** - the 12-17 week
+figure excludes the profile work, the opponent picker and matchmaking, which are scope
+rather than route. Do not quote the gap as though it were the cost of the decision.
 
 The external route buys **breadth and zero content burden**, at the cost of roughly six
 extra weeks, a per-round or revenue-share cost, and a supplier dependency on the
@@ -87,16 +99,63 @@ so nothing is written twice.
 | **X3** | Round lifecycle and result ingestion | `09` E2 | 1 week | No |
 | **X4** | Real adapter against the sandbox | `09` E3 | 1 week | **Sandbox** |
 | **X5** | Contest integration and settlement | `09` E4 | 1 week | Sandbox |
-| **X6** | Admin: provider screens **plus** navigation, RBAC, game-aware create wizard, analytics, settings, **and the Game Master creation API and wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | Sandbox |
-| **X7** | Player UI **plus** points, leaderboards, badges, levels, journeys, **Game Master and admin per-game analytics** | `09` E6 + `13` + `05` + `19` | 3-4 weeks | Sandbox |
-| **X8** | Terminology layer, wording passes, `tradingEnabled` master switch, infrastructure gating | `14` + `15` | 1.5-2 weeks | No |
+| **X6** | Admin: provider screens **plus** navigation restructure including **the single Trading section**, RBAC, game-aware create wizard, provider registration, analytics, settings, **and the Game Master creation API and wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | Sandbox |
+| **X6.5** | **Admin wording pass** and the terminology layer itself | `14` s3.1 | 0.5-1 week | No |
+| **X7** | Player UI **plus** points, leaderboards, **profile and cross-game stats**, badges, levels, journeys, **Game Master and admin per-game analytics** | `09` E6 + `13` + `05` + `19` | 3-4 weeks | Sandbox |
+| **X8** | Player wording passes, `tradingEnabled` master switch, infrastructure gating | `14` s3.2 + `15` | 1-1.5 weeks | No |
 | **X9** | Resilience, reconciliation, monitoring | `09` E7 | 1 week | Sandbox |
-| **X10** | Challenges | `09` E8 | 0.5-1 week | Sandbox |
+| **X10** | Challenges - any game, **and any opponent** | `09` E8 + `20` s2 | 1-1.5 weeks | Sandbox |
 | **X11** | Games catalogue and games-first navigation | `16` | ~2 weeks | No |
+| **X11.5** | **Smart onboarding, game interests and challenge matchmaking** | `20` | 2-3 weeks | No |
 | **X12** | Hardening, staged pilot, public launch | `09` E9 + `18` | 3-5 weeks | **Production** |
 
-**X1-X12: 20-26 weeks.** Plus X0 at 6-9 days, delivered and signed off separately. X0 started 1 September 2026; its first item, a simulator authentication fix, has already shipped as commit `d5d3a328`.
+**X1-X12: 23-30 weeks.** Plus X0 at 6-9 days, delivered and signed off separately. X0 started 1 September 2026; its first item, a simulator authentication fix, has already shipped as commit `d5d3a328`.
 One experienced developer on this codebase, testing included.
+
+### 3.1 What changed on 2 September 2026, and why
+
+The table was **20-26 weeks** before the owner's brief. The increase is ~3 weeks of
+genuinely new scope, not a re-estimate of the same work, and the distinction matters
+enough to itemise:
+
+| Change | Effect | Why it is real |
+|---|---|---|
+| **X6.5 split out of X8** | Neutral on total | The wording pass sat *after* the player UI, which would have had operators running a multi-game platform through screens labelled "trading" for two phases. The engineering total in `14` is unchanged at ~10 days; only its position moved |
+| **X10: 0.5-1 week → 1-1.5** | +0.5 week | "Challenge any user" was never specified. `03` designed the challenge *mechanics* and described the opponent as "invited or matched". An opponent picker, open challenges and the abuse controls that come with them are new - see `20` s2 |
+| **X11.5 added** | +2-3 weeks | Smart onboarding and interest matchmaking appear nowhere in `01`-`19`. New chapter `20` |
+| **X7 gains the profile** | +3 days, inside the existing 3-4 week range | The profile existed in this plan only as "terminology pass 6 - profile tabs", treating a structural change as a labelling one. `13` s7.2 |
+
+**X11.5 is cheaper than it looks, and that is itself a risk.** A matchmaking service
+already exists - `lib/services/matchmaking.service.ts` with `GET /api/matchmaking` - along
+with friends, a block list, user search and a rate-limit utility. So the phase is mostly
+generalisation. Generalising a service is routinely under-scoped, because the new
+behaviour is small while the existing call sites are many; Stage 0 learned this by
+counting the competition-entry writers and finding four where the plan said two. Count the
+callers before committing to the estimate.
+
+### 3.2 Admin-first, and what it does not mean
+
+The owner's instruction is to start with admin and proceed in steps that cannot break the
+running application. Two reasons, the second operational:
+
+- **Admin is where a game becomes addable at all.** Until an operator can register a
+  provider, sync a catalogue and create a non-trading contest, every player screen has
+  nothing real to render.
+- **The admin app is the safe place to be wrong.** Separate Next.js process, no player
+  traffic. A broken admin screen inconveniences an operator; a broken player screen costs
+  money and trust.
+
+**It does not mean X6 moves in front of X1-X5.** A provider contest must exist before
+there is anything to administer, so the foundation still comes first. Within the ordering
+below, admin-first means: X6 and X6.5 complete before X7 begins, rather than overlapping
+it; and the player UI is built against data produced by real operator actions rather than
+fixtures.
+
+**"One step at a time" has a concrete meaning here**, and it is already how the plan is
+built: every phase is additive and shipped behind a flag, trading behaviour is pinned by
+the regression test in `11`, and `tradingEnabled` defaults to on. The rule to keep is that
+**no phase may require a simultaneous change to trading to be correct.** If one appears to,
+the seam in `11` is wrong and that is the thing to fix.
 
 **Game Master work (~2.5 weeks, chapter `19`) is not a phase of its own.** It is
 distributed through X1, X6, X7 and X8 and is already inside the figures above. One item
@@ -114,8 +173,14 @@ X0 (signed off) -> X1 -> X2 -> X3 -> X5 -> X12
 
 `X3` before `X5` is not negotiable: settlement must never be built on a result path
 that has not been proven against lost callbacks, duplicates, bad signatures and late
-arrivals. `X6`, `X7` and `X8` can overlap each other once `X5` is stable. `X10` and
-`X11` are independent of everything after `X7`.
+arrivals.
+
+**Revised 2 September 2026 for admin-first:** `X6` and `X6.5` **complete before** `X7`
+begins, rather than overlapping it. That is the whole practical content of the admin-first
+instruction, and it costs a little parallelism in exchange for a player UI built against
+real operator-produced data. `X8` can still overlap `X7`. `X10`, `X11` and `X11.5` are
+independent of everything after `X7`, and `X11.5` should follow `X11` because matchmaking
+across one game is pointless.
 
 ### The shortest useful path
 
@@ -178,6 +243,12 @@ modest cost, and it gives the registry the second real implementation it needs.
 This is a recommendation, not a decision. Record whichever way it goes in
 `PROGRESS.md`, with the reason.
 
+**Status after 2 September 2026: still open, and now more urgent rather than less.** The
+external-only decision is made, which removes the fallback that made this recommendation
+comfortable to defer. It is open question 10 in `PROGRESS.md`, and its deadline was moved
+forward to **before X4** - the last point at which the answer is still cheap, because X4
+is where the programme starts spending against a specific provider's sandbox.
+
 ---
 
 ## 6. What must be true before X1 starts
@@ -204,8 +275,10 @@ This is a recommendation, not a decision. Record whichever way it goes in
 | Chapters | Role in the external-only scenario |
 |---|---|
 | `01`-`08` | **Unchanged and fully applicable.** The provider contract, architecture, flows, data model, scoring, trust, failure modes and evaluation are identical either way |
-| `09` | The add-on phase plan, still valid if the `New games plan` is also being delivered. Superseded by section 3 above when external games are the only games |
+| `09` | The add-on phase plan. **Superseded by section 3** - the add-on route is not being pursued. Kept so that E-phase references in `01`-`09` remain resolvable |
 | `10` | **This chapter.** Scenario, absorbed foundation, programme plan, scenario-specific risks |
 | `11`-`16` | The platform-wide work this folder previously delegated to the `New games plan` |
-| `17` | Risk register, including the six risks in section 4 |
+| `17` | Risk register, including the six risks in section 4 and the six in `20` section 8 |
 | `18` | Migration, testing, rollout and rollback |
+| `19` | Game Masters on provider games |
+| `20` | **New 2 Sep 2026.** Game interests, challenge matchmaking, opponent selection, onboarding - X10 and X11.5 |

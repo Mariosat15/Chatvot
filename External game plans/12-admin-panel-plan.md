@@ -21,14 +21,146 @@ generic sections are interleaved, so there is no way to hide trading.
 | Group | Contents | Visibility |
 |---|---|---|
 | **CONTESTS** | Competitions, challenges, participants, results, refunds | Always |
-| **GAMES** | Game catalogue (`16`), game types registry, providers, provider health, round inspector | Always |
-| **TRADING** | Symbols, market hours, trading risk, price health, trading history, arsenal | Hidden when `tradingEnabled === false` |
+| **GAMES** | Game catalogue (`16`), game types registry, providers, provider health, round inspector, **and one destination per game — trading is the first** | Always |
 | **PLAYERS** | Users, KYC, restrictions, fraud, messaging | Always |
 | **MONEY** | Wallet, transactions, financials, payouts, Game Masters | Always |
 | **PLATFORM** | Settings, environment, content, wiki, employees | Always |
 
 Use the same conditional-visibility pattern `components/UserSidebar.tsx` already uses
 for `arenaEnabled`. Do not invent a second mechanism.
+
+**Deviation, built 2 September 2026: there is no separate TRADING group.** The table used
+to carry one, and building it showed that a top-level TRADING group beside a GAMES group
+re-states the thing the restructure exists to remove — it keeps trading a category of the
+admin panel rather than an entry in one. Trading is now a collapsible destination *inside*
+GAMES, so the second game arrives as its **sibling** rather than as a new group, and the
+diff that adds it touches one array element. Everything section 1.1 requires is unchanged;
+only the container moved.
+
+### 1.1 TRADING becomes one destination with internal tabs
+
+**Owner requirement, 2 September 2026:** *"all trading aspects must be in a separate tab
+with all the tabs inside, so the admin can navigate all the related trading from there."*
+
+The grouping above is necessary but not sufficient. A menu **group** still presents six
+top-level entries; the requirement is a single **destination** whose internals are tabs.
+That distinction matters for the reason the whole restructure exists: trading has to stop
+being the shape of the admin panel and become one item in it.
+
+| | Before | After |
+|---|---|---|
+| Top-level entries for trading | ~6, interleaved with generic sections | **1** - "Trading" |
+| Navigating between trading screens | Back out to the sidebar each time | Tabs within the section |
+| Hiding trading entirely | Impossible | One conditional on `tradingEnabled` |
+
+**Internal tabs, as built:** Symbols · Market Hours · Market Data · Risk & Margin ·
+Price Health · Trading History.
+
+**Two corrections to the list this chapter used to carry, and the direction they came from
+is the lesson.** It named an **Arsenal** tab, which is not an admin section at all —
+`apps/admin/contexts/TradingArsenalContext.tsx` is chart tooling with no entry in
+`menuGroups` and no `ADMIN_SECTIONS` id, so a tab for it could not have been built as
+described. And it **omitted `market-data`**, which is a real trading screen
+(`MarketDataSection`).
+
+**`New games plan/07` section "Target structure" had both right.** It listed Market Data,
+never mentioned Arsenal, and correctly put Contest Analytics under COMPETITIONS. The error
+entered *here*, in the restatement, and survived because it read plausibly. That is the
+exact failure the paired-document rule exists to catch, running in the direction people do
+not check: **a restatement can be wrong while its source is right, so verifying the source
+is not the same as verifying the chapter you are building from.** The practical rule:
+**a plan's list of screens is a hypothesis until checked against `menuGroups` and
+`ADMIN_SECTIONS` together** — presence in one but not the other is the interesting case,
+because the section can then either not be granted or not be reached.
+
+**One section that looked like trading and is not.** `analytics` sat in the old Trading
+group and renders `CompetitionAnalytics` — contest analytics, not trading analytics. It
+moved to CONTESTS along with `competitions` and `challenges`. Classify by the component a
+section renders, never by the group it was filed under; when the group's name is the thing
+being corrected, that name is the least reliable evidence available.
+
+Three things to get right, each of which is a way this goes wrong quietly:
+
+1. **Deep links must keep working.** Existing admin URLs and any bookmark or wiki link
+   pointing at a trading section must resolve, which means the tab state has to be
+   addressable rather than local component state. Collapsing six routes into one
+   component with `useState` silently breaks every existing link and every screenshot in
+   the admin wiki.
+2. **RBAC is per-section, not per-tab.** `ADMIN_SECTIONS` grants access to a *section*.
+   Merging six sections into one either widens permissions for everyone who had access to
+   any of them, or has to keep the six IDs and gate the tabs individually. **Keep the six
+   IDs and gate the tabs** - collapsing them is a silent privilege escalation, and it
+   would be invisible on review because the screen still looks correct.
+3. **This is a navigation change, not a rewrite.** The six screens keep their existing
+   components. Anything more is scope creep into the one part of the admin panel that
+   currently works.
+
+### 1.1a How it was built, and why both hard requirements needed no new code
+
+**Built and verified 2 September 2026.** All three cautions above survived, and the first
+two turned out to be **already satisfied by mechanisms the admin panel had**, which is the
+most useful finding in this section: the risk was real, but the fix was to *reuse*, not to
+build.
+
+- **Deep links were already addressable, so nothing had to be invented.** Section state is
+  driven by `?activeTab=<sectionId>` — read in `getInitialSection()` and re-applied by an
+  effect on `urlActiveTab`. Because each tab **is** an existing section id, `?activeTab=symbols`
+  still resolves exactly as before. The `useState` trap in caution 1 is only reachable by
+  introducing a *second*, tab-local state; the correct move was to reuse the parameter that
+  already existed. The four hard-coded admin deep links (`competitions` ×4, `challenges`,
+  `gamemaster-management`, `users`) were checked and all point at ids that did not change.
+- **Per-tab RBAC gating already existed as a pattern.** `filteredMenuGroups` shows a parent
+  with `children` only when `children.some(hasAccess)` and filters the children
+  individually — the exact behaviour caution 2 demands, already used by `settings` and
+  `dev-zone-menu`. Trading reuses it, so the six ids stay six independent grants.
+- **`ADMIN_SECTIONS` is add-only, and needed no change at all.** It is a **Mongoose enum**
+  on `allowedSections` and `customPermissions`, so removing a value orphans every employee
+  document already storing it. All six trading ids were already present, so this file was
+  not touched. Worth recording: `admin-employee.model.ts` exists **only** in `apps/admin`
+  and is *not* a mirrored model, so `check:mirrors` has nothing to say about it.
+- **The trading parent grants nothing.** `trading-menu` is deliberately **absent** from
+  `ADMIN_SECTIONS`, because it opens a submenu and renders no screen. A permission that
+  maps to no screen is the seed of the privilege widening caution 2 warns about.
+
+**One pre-existing limitation, unchanged and worth knowing.** `handleMenuClick` calls
+`setActiveSection` without writing the URL, so deep links work *inbound* but the address
+bar does not track the current section. The in-page tab bar deliberately behaves the same
+way rather than adding history entries only trading screens would produce. Making
+navigation write the URL is a whole-panel change and belongs with X6.5, not here.
+
+**What was added:** `apps/admin/lib/admin/game-sections.ts` as the single list of which
+sections belong to trading — the sidebar and the tab bar both read it, so they cannot
+drift — and `apps/admin/components/admin/trading/TradingSectionTabs.tsx`. The tab bar is
+rendered **once**, beside `renderContent()`, so none of the six section components were
+edited. It hides itself when fewer than two tabs are permitted, so an employee granted one
+trading section does not learn the names of the five they cannot open.
+
+**Pinned by `__tests__/admin/trading-section-nav.test.ts`, 9 tests**, which assert the
+six ids are real `ADMIN_SECTIONS` values, that the sidebar still gates each separately,
+that the parent grants nothing, that contest sections are not filed under trading, and
+that `trading-risk` and `price-health` left their old homes. **Both halves were probed by
+reintroducing the defect** — putting `trading-risk` back under Settings turned exactly 1
+test red, and dropping a tab from the shared list turned 2 red — because a test that only
+ever passes proves nothing. Verified further by a full `next build` of the admin app and a
+`tsc --noEmit` that matched the **225-error baseline exactly**, with no error appearing in
+the changed files and none disappearing.
+
+### 1.2 Why the admin side goes first
+
+**Owner sequencing decision, 2 September 2026:** admin first, one step at a time, without
+breaking the running application. Two reasons, and the second is the operational one:
+
+- **Admin is where a game becomes addable at all.** Until an operator can register a
+  provider, sync a catalogue and create a non-trading contest, every player-facing screen
+  has nothing real to render.
+- **The admin app is the safe place to be wrong.** It is a separate Next.js process with
+  no player traffic. A broken admin screen costs an operator an inconvenience; a broken
+  player screen costs money and trust.
+
+**This does not move X6 in front of X1.** A second game must be *representable* before it
+can be administered, so the foundation still comes first. What admin-first buys is that
+when the player UI is built in X7, it is built against data produced by real operator
+actions rather than fixtures.
 
 ### RBAC - do not forget this
 
@@ -118,6 +250,62 @@ Cross-reference only; the detail is in `09` E5 and `07`.
 Every model touched here exists twice. Update `apps/admin/database/models/` in the same
 commit - see risk **R2**.
 
+### 4.1 Adding a game must feel like adding a payment provider
+
+**Owner requirement, 2 September 2026:** *"like we have payment providers, that also needs
+to be with the games"* - an operator adds a game by entering rules, credentials and API
+details, without a developer and without a release.
+
+That pattern already exists in the admin app and should be followed rather than
+reinvented:
+
+| Reference | File |
+|---|---|
+| The screen | `apps/admin/components/admin/PaymentProvidersSection.tsx` |
+| The model | `apps/admin/database/models/payment-provider.model.ts` |
+| The routes | `apps/admin/app/api/payment-providers/route.ts`, `.../[id]/route.ts` |
+
+**Copy the interaction model.** It is already the right shape: a list of providers, a
+built-in versus custom distinction (`isBuiltIn`), an active toggle (`isActive`), a
+sandbox/production switch (`testMode`), an ordering field (`priority`), a generic
+credential bag rather than a fixed set of columns, and a per-credential secret flag so
+values can be masked in the UI.
+
+**Do not copy the storage.** This is the part to get right, and it is easy to get wrong
+by being consistent:
+
+| `PaymentProvider` does this | Game providers must not, because |
+|---|---|
+| Embeds `credentials[]` **inside the provider document** | `04` section 3.1 deliberately keeps credentials **out of** `game_provider`, so admin screens, the contest lobby and the catalogue picker can all read that document freely without a secret ever entering scope. Embedding them would undo that on consistency grounds |
+| Carries `saveToEnv`, with a `regenerate-env` route that **writes credentials into `.env`** | A file write to reconfigure a running service is a deployment mechanism, not a settings mechanism. Game credentials are read at request time from settings - see `06` section 8 |
+
+So: **the UX is the payment-providers screen; the persistence is `04` section 3.1 plus
+settings.** Say so in the implementation, because a reviewer comparing the two features
+will otherwise reasonably ask why they differ.
+
+### 4.2 The rules an operator enters, and the limit of "no developer needed"
+
+Two different things get called "rules", and conflating them causes a promise that cannot
+be kept:
+
+1. **Contest rules** - entry fee, schedule, prize split, ranking method, attempts. These
+   are ChartVolt's, live on the contest, and are set in the create wizard (section 2).
+2. **Game settings** - a title's own parameters, such as question count or difficulty.
+   These are the **provider's**, and are declared by the provider as JSON Schema in
+   `configSchema` (`01` section 3). The admin form is generated from it, which is what
+   makes a new title from a contracted provider bookable **by ticking a box, with no
+   release**.
+
+**Where the promise stops, stated plainly:** a new title from an **existing** provider
+needs no code. A **new provider** needs an adapter, because it has a different API. The
+adapter boundary in `02` is what keeps that cost to one bounded piece of work, but it is
+not zero, and no admin screen can make it zero. A summary that says "admins can add any
+game from the panel" is wrong in a way that will be discovered at the worst moment.
+
+Trading keeps a **hand-written** config component registered in
+`apps/admin/lib/games/registry.tsx`. Its settings are too specific to schematise and
+there is exactly one of them.
+
 ---
 
 ## 5. Stats and analytics
@@ -142,6 +330,14 @@ provider outage and a cheating pattern, all before players complain.
 Per-round provider cost against entry-fee revenue, per game. Without it there is no way
 to tell whether a title is profitable or merely popular. Model it against `08` section 3
 before launch, then measure it here.
+
+### The binding rule for every figure on these screens
+
+**No operator-facing aggregate may silently mean "trading only".** Each figure is either
+generalised across games, explicitly scoped and labelled to one game, or removed from the
+platform-wide view. `05` section 10 states the rule and lists the dispositions; this
+screen set is where an operator would first notice it being broken - and the failure is
+silent, because a trading-only total keeps computing and keeps rendering.
 
 ---
 

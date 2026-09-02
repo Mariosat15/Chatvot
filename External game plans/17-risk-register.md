@@ -24,6 +24,9 @@ chapter covers risks to the programme and to the application.
 | **X2** | Single supplier on the critical path | **High** | Medium | All |
 | **X3** | No cost floor - per-round fee kills cheap contests | **High** | Medium | Before X4 |
 | **X7** | Game Master provider contest is net loss-making | **High** | **High** if ungated | Before X6 |
+| **X8** | **No fallback game** now external-only is decided - X2 with its mitigation removed | **High** | Medium | Before X4 |
+| **X13** | Trading-only matchmaker silently returns trading matches on a games platform | **High** | **High** | X11.5 |
+| **X14** | Inferred game interest read as consent to stranger invitations | **High** | Medium | X11.5 |
 | R6 | Price infrastructure broken by gating | High | Medium | X8 |
 | R7 | Game Master raw insert misses the game label | High | High | X1 |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
@@ -44,6 +47,10 @@ chapter covers risks to the programme and to the application.
 | R23 | Notification links point to `/trade` | Medium | High | X6 |
 | R24 | Scope creep before anything ships | Medium | **High** | All |
 | R25 | Round write contention under load | Medium | Medium | X12 |
+| X15 | "Challenge any user" harassment surface - no report-user feature exists | Medium | Medium | X10 |
+| X16 | Overall rank used instead of per-game rating when matching | Medium | Medium | X11.5 |
+| X17 | Matchmaking creeps into a recommendation engine | Medium | Medium | X11.5 |
+| X18 | Empty matchmaking at launch - nobody has declared interests | Medium | High | X11.5 |
 
 ---
 
@@ -400,6 +407,41 @@ one, because earning follows referred players rather than created contests. Add 
 entry fee for Game Master provider contests, and assert non-negative platform margin by
 test. Full analysis in `19` section 5.
 
+### X8 - No fallback game now that external-only is decided
+
+**Raised 2 September 2026**, when the scenario was decided. Not a new risk - it is X2 with
+its mitigation removed. While the scenario was open, "build a small in-house game as
+insurance" was a live option that could be taken at any point. The decision closes the
+add-on route, and if the provider search or the pricing fails, the platform will have
+funded the entire foundation, admin and player programme and still have exactly one game.
+
+**Mitigation:** open question 10 in `PROGRESS.md` was moved forward to **before X4** -
+the last point at which the answer is still cheap, since X4 is where spend starts going
+against a specific provider's sandbox. Keeping a two-to-three week in-house game on the
+backlog converts X2 and X8 from existential to inconvenient. `10` section 5.
+
+### X13-X18 - onboarding and matchmaking
+
+**Added 2 September 2026** with chapter `20`. Listed in full in `20` section 8; summarised
+here because this is the file a reviewer reads.
+
+| # | Risk | Severity |
+|---|---|---|
+| **X13** | The **existing trading-only matchmaker keeps working** after a second game arrives, silently returning trading matches on a games platform. No error, no empty state, no log line | **High** |
+| **X14** | **Inferred interest read as consent** - a player who paid to enter a competition starts receiving stranger challenge invitations they never asked for | **High** |
+| **X15** | **"Challenge any user" becomes a harassment surface.** Blocking exists; there is **no player-facing report-user feature** anywhere in the codebase | Medium |
+| **X16** | **Overall rank used instead of per-game rating**, pairing mismatched opponents while appearing to work correctly | Medium |
+| **X17** | **Scope creep into a recommendation engine.** R24 is already rated High likelihood | Medium |
+| **X18** | **Empty matchmaking at launch**, because nobody has declared any interests yet | Medium |
+
+**X13 is the one to read twice.** `lib/services/matchmaking.service.ts` already exists and
+ranks opponents by *trading* skill. It will not fail when a second game arrives - it will
+keep returning matches, and they will keep being trading matches. This is the same failure
+shape as the mirror-drift and `canEnterChallenges` defects found in Stage 0: **the system
+reports success while doing the wrong thing.** The only defence is to change the service
+rather than call it from a new place, proven by a test that asserts a match in a
+non-trading game and fails before the change.
+
 ---
 
 ## 4. High platform risks
@@ -481,14 +523,22 @@ trading contests exist**, naming them.
 
 ### R24 - Scope creep, and why it is rated High likelihood
 
-This programme is **20-26 weeks** in the external-only scenario, and every chapter
-contains something reasonable to want. The failure mode is not a technical one: it is
-reaching week 20 with a broad, half-finished platform and no provider contest that has
-ever taken a real entry fee.
+This programme is **23-30 weeks**, and every chapter contains something reasonable to
+want. The failure mode is not a technical one: it is reaching week 20 with a broad,
+half-finished platform and no provider contest that has ever taken a real entry fee.
+
+**The rating went up on 2 September 2026, and the reason is instructive rather than
+alarming.** The owner's brief added ~3 weeks of real scope - a profile specification, an
+opponent picker, onboarding and matchmaking - and every item was individually well
+justified. That is exactly what scope creep looks like from the inside: not a bad
+decision, but a series of good ones with no stopping rule. The register's job here is to
+hold the stopping rule, not to argue against the additions.
 
 **Mitigation:** treat `X0-X5 plus a minimal slice of X6` - roughly 11-14 weeks - as the
-first commitment, and review against real player behaviour before funding X6 to X12. The
-catalogue, marketplace and Game Master items are explicitly unscheduled for this reason.
+first commitment, and review against real player behaviour before funding the rest. The
+catalogue, marketplace and Game Master items are explicitly unscheduled for this reason,
+and **X11.5 sits deliberately late** - matchmaking across one game is pointless, so it
+cannot honestly be pulled forward.
 
 ---
 

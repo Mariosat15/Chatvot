@@ -35,6 +35,22 @@ TRIVIA                            <- NEW group, appears only when trivia is enab
 
 The whole `TRADING` group should be **hidden when `tradingEnabled === false`**, and each game group hidden when that game is not in `enabledGameTypes`. This is the same conditional-visibility pattern `UserSidebar.tsx` already uses for `arenaEnabled`.
 
+> **BUILT 2 SEPTEMBER 2026 — with one deviation, and this chapter's list was the accurate one.**
+> The restructure above shipped as a slice of X6 (`External game plans/12` section 1.1a
+> records the detail and the verification). **The deviation:** `TRADING` did not become a
+> top-level group. It is a collapsible **Trading** destination inside a **GAMES** group, so
+> the second game arrives as its sibling rather than as another group — the `TRIVIA` group
+> sketched above would have become `GAMES → Trivia`. Everything else matches: COMPETITIONS
+> holds Competitions, 1v1 Challenges and Analytics; Trading Risk moved out of Settings and
+> Price Feed Health out of Operations.
+>
+> **The `tradingEnabled` conditional is not built yet** — the flag is introduced in X1, so
+> the destination is currently always visible. Do not read "built" as including it.
+>
+> Worth recording for the credit: `External game plans/12` restated this list and
+> introduced two errors doing so — an "Arsenal" tab that does not exist and a missing
+> Market Data. **This chapter was right and the restatement drifted.**
+
 ### RBAC - do not forget this
 
 `ADMIN_SECTIONS` in `apps/admin/database/models/admin-employee.model.ts` is the permission registry. The audit found several existing menu IDs are **missing** from it (`journey-map`, `gamification-wizard`, `system-announcements`, `vendors`, `mdb-cluster`, `server-fleet`, `data-cleanup`, `data-maintenance`), meaning employees cannot be granted them - only super admins see them.

@@ -238,7 +238,7 @@
   <div class="sep"></div>
   <a href="#phases">The plan</a>
   <a href="#gm">Game Masters</a>
-  <a href="#only">If these are the only games</a>
+  <a href="#only">The decision, and what it commits us to</a>
   <a href="#honest">Honest assessment</a>
 </nav>
 
@@ -922,6 +922,12 @@
   <div class="sec-h"><div class="sec-n">14</div><h2>The plan</h2></div>
   <p class="sec-sub">Each phase is independently testable, and nothing touching money goes live until everything around it is proven.</p>
 
+  <div class="cal plain">
+    <div class="t">Read section 16 first &mdash; this roadmap describes the route we are not taking</div>
+    <p>This section was written for the scenario where a game is <i>also</i> built in house and the provider games are an addition to it. <b>On 2 September 2026 the owner decided the other way: the provider games are the only new games.</b> The phases below are still accurate about the provider integration itself, and the ordering logic in them still holds &mdash; but the full programme, its length and its sequence are in <b>section 16</b>, and that is the one to plan against.</p>
+    <p>Two things from the decision change how this reads. The programme is <b>longer</b>, not shorter, because everything the other project would have done moves here. And it now runs <b>admin first</b>, so that an operator can add a game and run a contest before any player screen is built against it.</p>
+  </div>
+
   <figure>
     <div class="fig-t">Diagram 9 &mdash; the route to launch</div>
     <svg viewBox="0 0 920 190" role="img" aria-label="Roadmap from prerequisites to public launch">
@@ -1068,18 +1074,23 @@
 
 <!-- ============ 16. EXTERNAL ONLY ============ -->
 <section id="only">
-  <div class="sec-h"><div class="sec-n">16</div><h2>If these are the only games we add</h2></div>
-  <p class="sec-sub">The decision that changes the size of the project more than any other &mdash; and the one place where the intuitive answer is wrong.</p>
+  <div class="sec-h"><div class="sec-n">16</div><h2>These are the only games we add &mdash; decided</h2></div>
+  <p class="sec-sub">Settled by the owner on 2 September 2026. Provider games are the only new games; no in-house game is built. This section records what that commits us to, and the one place where the intuitive answer is wrong.</p>
 
   <div class="verdict">
-    <div class="q">The finding</div>
+    <div class="q">The finding, and it survives the decision</div>
     <div class="a">Buying the games instead of building one is not the cheaper route. It is the broader one.</div>
-    <div class="n">Dropping the in-house game saves about three and a half weeks. Integrating a provider properly &mdash; signed results, duplicates, rounds that never report, reconciliation &mdash; costs about seven. And every other piece of work is identical, because it is platform work that has nothing to do with who supplies the gameplay. What the external route actually buys is <b>a catalogue of many games instead of one, and somebody else carrying the content burden forever</b>. That is worth paying for. It is not a saving, and it should not be presented as one.</div>
+    <div class="n">Dropping the in-house game saves about three and a half weeks. Integrating a provider properly &mdash; signed results, duplicates, rounds that never report, reconciliation &mdash; costs about seven. And every other piece of work is identical, because it is platform work that has nothing to do with who supplies the gameplay. What the external route actually buys is <b>a catalogue of many games instead of one, and somebody else carrying the content burden forever</b>. That is worth paying for. It is not a saving, and it must not be described internally as one now that it is the plan of record.</div>
+  </div>
+
+  <div class="cal plain">
+    <div class="t">What the decision costs us, stated once and plainly</div>
+    <p>There is now <b>no in-house game to fall back on</b>. While the question was open, &ldquo;build one small game as insurance&rdquo; was an option available at any moment. It is now a decision that has to be taken deliberately, and the honest position is this: <b>if the provider search or the pricing fails, we will have funded the entire foundation, admin and player programme and still have exactly one game.</b> That is why the question of a small hedge game did not go away with the decision &mdash; it moved <i>forward</i>, to before we start spending against a specific provider's test environment.</p>
   </div>
 
   <figure>
     <div class="fig-t">Diagram 10 &mdash; the two routes to the same platform, to scale</div>
-    <svg viewBox="0 0 920 300" role="img" aria-label="Timeline comparison of the in-house-first route at about sixteen and a half weeks against the external-only route at about twenty-two and a half weeks">
+    <svg viewBox="0 0 920 300" role="img" aria-label="Timeline comparison of the in-house-first route at about sixteen and a half weeks against the external-only route at about twenty-five and a half weeks, including three weeks of scope added on 2 September 2026">
       <!-- axis -->
       <line x1="150" y1="248" x2="880" y2="248" stroke="#dde4ec" stroke-width="2"/>
       <g font-size="10.5" fill="#6b7d8f" text-anchor="middle">
@@ -1119,8 +1130,9 @@
       <rect x="189" y="164" width="65" height="34" fill="#1c5788"/>
       <rect x="254" y="164" width="182" height="34" fill="#a02a38"/>
       <rect x="436" y="164" width="196" height="34" fill="#7fa8c9"/>
-      <rect x="632" y="164" width="104" height="34" fill="#1a6e49"/>
-      <text x="750" y="186" font-size="13" font-weight="700" fill="#a02a38">20&ndash;26 weeks</text>
+      <rect x="632" y="164" width="78" height="34" fill="#6b4fa0"/>
+      <rect x="710" y="164" width="104" height="34" fill="#1a6e49"/>
+      <text x="822" y="186" font-size="12.5" font-weight="700" fill="#a02a38">23&ndash;30 weeks</text>
 
       <!-- legend -->
       <g font-size="11" fill="#3a4a5a">
@@ -1130,13 +1142,14 @@
         <rect x="474" y="24" width="12" height="12" fill="#a02a38"/><text x="492" y="34">Provider integration</text>
         <rect x="620" y="24" width="12" height="12" fill="#7fa8c9"/><text x="638" y="34">Platform work</text>
         <rect x="740" y="24" width="12" height="12" fill="#1a6e49"/><text x="758" y="34">Pilot and launch</text>
+        <rect x="150" y="42" width="12" height="12" fill="#6b4fa0"/><text x="168" y="52">Scope added 2 Sep 2026 &mdash; player profile, opponent selection, onboarding and matchmaking</text>
       </g>
     </svg>
-    <figcaption><b>Look at the two pale blue bars &mdash; they are the same length.</b> That is the admin panel, the navigation, the wording, the leaderboards, the catalogue and the Game Master work: identical in both routes. The gold and mid-blue bars are identical too. Only one segment differs, and the bought one is longer than the built one.</figcaption>
+    <figcaption><b>Look at the two pale blue bars &mdash; they are the same length.</b> That is the admin panel, the navigation, the wording, the leaderboards, the catalogue and the Game Master work: identical in both routes. The gold and mid-blue bars are identical too. Only one segment differs between the routes, and the bought one is longer than the built one. <b>The purple segment is not part of that comparison</b> &mdash; it is scope added after the decision, and it would have been added to either route. The in-house bar has not been redrawn for it, because that route is not being taken, so <b>do not read the gap between the two bars as the price of the decision</b>.</figcaption>
   </figure>
 
   <div class="sec-h"><div class="sec-n">16.1</div><h2>What has to be added to this plan</h2></div>
-  <p class="sec-sub">Nine further chapters, because the work does not disappear when the other project does &mdash; it moves here.</p>
+  <p class="sec-sub">Eleven further chapters, because the work does not disappear when the other project does &mdash; it moves here.</p>
 
   <div class="tw"><table>
     <thead><tr><th style="width:210px">Added</th><th>Why it is now ours</th></tr></thead>
@@ -1151,6 +1164,8 @@
       <tr><td><b>The Game Masters</b></td><td>Section 15. They must be able to create contests for the new games and earn from them, which means the creation route needs a game picker &mdash; and, before anything else, needs to stop writing competitions with no game label at all</td></tr>
       <tr><td><b>The risk register</b></td><td>The ways the existing application can break during generalisation, plus seven risks that exist only because a third party is on the critical path</td></tr>
       <tr><td><b>Rollout and rollback</b></td><td>Backfills, eight tiers of tests, and a reversal path for every phase. Including a tier unique to this route: <b>recorded provider responses replayed in the build</b>, so a provider changing their API is caught by a failing build rather than by players mid-contest</td></tr>
+      <tr><td><b>The player's own page</b></td><td>Added 2 September 2026. The profile had appeared in this plan only as &ldquo;rename the tabs&rdquo;, which treats a structural change as a labelling one. It needs a genuine cross-game summary with trading as <i>one card inside it</i> rather than the page itself</td></tr>
+      <tr><td><b>Onboarding and matchmaking</b></td><td>Added 2 September 2026, and entirely new &mdash; nothing in the earlier chapters covered it. A player says which games they want to be challenged in, and we match players by shared interest. Crucially, for a player who says nothing we work it out from what they actually play, so the feature is useful on its first day</td></tr>
     </tbody>
   </table></div>
 
@@ -1163,7 +1178,7 @@
     </div>
     <div class="card">
       <h4>One supplier, no fallback</h4>
-      <p style="margin:0">If they terminate, raise prices or fail commercially, the platform reverts to trading alone and every week of games work is stranded. There is no in-house game to fall back on. <b>Evaluate a second provider before launch even if only one goes live.</b></p>
+      <p style="margin:0">If they terminate, raise prices or fail commercially, the platform reverts to trading alone and every week of games work is stranded. There is no in-house game to fall back on. <b>Evaluate a second provider before launch even if only one goes live.</b> This is the risk the 2 September decision made real rather than hypothetical &mdash; it is the same risk as before, with its escape route closed.</p>
     </div>
     <div class="card">
       <h4>No cost floor</h4>
@@ -1176,8 +1191,39 @@
   </div>
 
   <div class="cal good">
-    <div class="t">The hedge worth considering</div>
+    <div class="t">The hedge worth considering &mdash; now with a deadline</div>
     <p>Build the foundation, integrate the provider &mdash; and keep <b>one small in-house game on the backlog as insurance</b>. Not as the launch game, but as a two-to-three week project that can be pulled forward if the provider relationship goes wrong. It turns the single-supplier risk from existential into merely inconvenient, and it gives the architecture the second real implementation that proves the whole design works.</p>
+    <p><b>The decision on 2 September gave this a date.</b> The answer is needed before we start building against a specific provider's test environment, because that is the point at which the programme becomes committed to one supplier. After it, the hedge is still possible but no longer cheap.</p>
+  </div>
+
+  <div class="sec-h"><div class="sec-n">16.3</div><h2>What the owner asked for on 2 September, and what was actually missing</h2></div>
+  <p class="sec-sub">Most of the brief was already designed. Separating the four things that genuinely were not is the whole value of this section &mdash; because a plan that claims to cover everything is the plan that surprises you.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:230px">Asked for</th><th>Already designed?</th></tr></thead>
+    <tbody>
+      <tr><td>A place in admin where games are added easily, with their rules and their credentials</td><td><b>Yes.</b> The provider registration screens and the credential handling. One correction was needed: it should <i>work</i> like our payment-provider screens, but it must not <i>store</i> credentials the way they do &mdash; that model keeps secrets inside the document every screen reads, and writes them into a configuration file. Game credentials are deliberately kept apart from the record that admin screens read freely</td></tr>
+      <tr><td>Trading becomes one game, with all its administration in one place</td><td><b>Mostly.</b> The grouping was designed; what was missing is that a <i>group</i> of six menu entries is not the same as <i>one</i> destination with tabs inside it. Two things must not be lost in the collapse: existing links have to keep working, and the six separate permissions must stay separate &mdash; merging them would quietly widen who can see what, and the screen would look perfectly correct afterwards</td></tr>
+      <tr><td>Reword admin so it is not all about trading</td><td><b>Yes</b>, but in the wrong order. The wording pass sat <i>after</i> the player screens, which would have left operators running a multi-game platform through screens labelled &ldquo;trading&rdquo; for two phases. It has been split, and the admin half now follows the admin build immediately</td></tr>
+      <tr><td>Scoring, its naming, the calculations, the finances, the badges and the journey must cover every game</td><td><b>Designed, but never stated as a rule.</b> It is now one: every number we show about performance is either defined for every game, or is explicitly labelled as belonging to one game. There is no third option. <b>&ldquo;Total profit&rdquo; is the clearest casualty</b> &mdash; a chess puzzle has no profit, so that figure either moves inside the trading card or becomes something genuinely cross-game, such as total winnings</td></tr>
+      <tr><td>Games on the dashboard, a full page per game, competitions filtered per game</td><td><b>Yes.</b> The catalogue, the game pages and the filters were all designed</td></tr>
+      <tr><td>The player's stats, leaderboard and profile adjusted for winning at different games</td><td><b>Leaderboard yes, profile no.</b> The profile was in the plan only as a renaming task</td></tr>
+      <tr><td>Challenge <i>any</i> user, and pick a game for it</td><td><b>Half.</b> Picking the game was fully designed. Choosing the opponent was one phrase &mdash; &ldquo;invited or matched&rdquo; &mdash; carrying the entire feature. Today a challenge is always a direct invitation to one named person; there is no such thing as an open challenge</td></tr>
+      <tr><td>Smart onboarding that matches players by the games they want to play</td><td><b>No. Nothing at all.</b> Now its own chapter</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal plain">
+    <div class="t">The trap inside the last one, and it is the kind that never announces itself</div>
+    <p>A matchmaking service <b>already exists</b> in the application, along with friends, blocking, player search and rate limiting. That makes this cheaper to build than it sounds. It also makes it far more dangerous, because the existing matchmaker ranks opponents by <b>trading</b> skill.</p>
+    <p>When a second game arrives, that service will not fail. It will keep running, keep returning matches, and keep returning <i>trading</i> matches &mdash; on a platform where most players may never trade. No error, no empty screen, nothing in the logs. <b>This is exactly the shape of the defects found under the money layer in the preparatory work: the system reports success while doing the wrong thing.</b> The only defence is to change the service itself rather than call it from somewhere new, and to prove it with a test that fails before the change is made.</p>
+    <p>The same applies to the getting-started checklist a new player sees, which currently instructs everyone to <b>place their first trade</b>. It will go on rendering that cheerfully.</p>
+  </div>
+
+  <div class="cal info">
+    <div class="t">Two questions the owner still needs to answer, and one worth asking</div>
+    <p><b>Who may be challenged?</b> Anyone, only friends, or only players who opted in for that game. &ldquo;Any user&rdquo; needs a decline path, a block list and a limit on invitations sent, or it becomes a way to harass people. Blocking already exists; <b>there is no way for a player to report anyone</b>, and letting strangers start paid contests against each other without one is a policy choice rather than an oversight.</p>
+    <p><b>Does existing trading history count towards the new cross-game totals?</b> If it does, long-standing traders instantly top every combined table on a platform whose whole point is that trading is one game among several. If it does not, those players appear to lose their history, and they will report it as a bug &mdash; and they will not be wrong. There is a third option worth putting on the table: <b>keep their trading record where it belongs, and start the combined ranking fresh</b>.</p>
   </div>
 
   <div class="cal info">

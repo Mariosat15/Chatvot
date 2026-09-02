@@ -127,7 +127,9 @@ external-only scenario this is the majority of new players, not an edge case.
 
 ---
 
-## 7. Leaderboard
+## 7. Leaderboard, profile and cross-game stats
+
+### 7.1 Leaderboard
 
 `app/(root)/leaderboard/page.tsx` with `LeaderboardClient.tsx` and
 `LeaderboardContent.tsx`. Today the global leaderboard is computed by
@@ -143,6 +145,54 @@ external-only scenario this is the majority of new players, not an edge case.
 
 **Run the new and old leaderboards in parallel and diff the top 100 before switching.**
 Players notice rank changes immediately and read them as unfair - risk **R14**.
+
+### 7.2 The profile page
+
+**Added 2 September 2026.** Until now the profile appeared in this plan only as
+"terminology pass 6 - profile tabs and headings", which treats a structural change as a
+labelling one. The owner's brief lists the profile alongside stats and the leaderboard,
+and it is the screen where a player checks whether the platform has understood what they
+did.
+
+| Change | Note |
+|---|---|
+| A **cross-game summary** at the top | Contests entered, contests won, total winnings, level, XP. All defined for every game per `05` section 10 |
+| A **per-game breakdown** below it | One row or card per game the player has actually played, with that game's own metrics and skill rating |
+| Trading becomes **one entry** in that breakdown | Not the page. Its own metrics - PnL, win rate, trade count - live inside its card, where they are correctly scoped |
+| Hide games the player has never played | An external-only platform may carry twenty titles. Twenty empty cards is not a profile |
+| Badges and journey progress stay | Generalised per `05` section 10; a trading-only journey is gated on `tradingEnabled` |
+
+**The naming problem is on this page more than anywhere else.** A profile header that reads
+"Total Profit" is a trading metric presented as a life-time total. It has to become either
+an explicitly trading-scoped figure inside the trading card, or a genuinely cross-game one
+such as total winnings. Which of the two is open question 13; what is *not* open is that it
+cannot stay ambiguous, because the number will be wrong for every player who plays anything
+else - and it will be wrong silently, since the calculation keeps working.
+
+**Two things to check before building it**, both of which decide the layout rather than
+following from it:
+
+1. **Open question 14 - does historical trading performance enter the cross-game
+   aggregates?** If it does, long-standing traders dominate every rollup on a games
+   platform. If it does not, their profile appears to lose history, which reads as a bug
+   and generates support load. The answer belongs in `18`'s backfill, and this page is
+   where players will see whichever answer was chosen.
+2. **The public profile is a different surface.** `GET /api/user/profile/public` already
+   exists and exposes a limited field set. Whatever is added to the private profile must
+   be decided separately for the public one, or a per-game statistic leaks by default -
+   which matters more once matchmaking (`20`) makes other players' profiles worth looking
+   at.
+
+### 7.3 Where the stats come from
+
+`UserGameStats` is the single source for both surfaces - per-game rows plus an `"_overall"`
+rollup (`04`). Two rules follow, and both exist because the alternative fails quietly:
+
+- **The profile must not compute aggregates of its own.** If the profile derives a total
+  its own way, it will disagree with the leaderboard, and the disagreement will be reported
+  as a prize bug rather than a display bug.
+- **Never present a rollup that only some games contribute to.** Either the rollup covers
+  every game or it is labelled as covering one. `05` section 10 is the binding rule.
 
 ---
 
@@ -214,11 +264,12 @@ push channel adds infrastructure for very little perceived gain.
 | Lobby game-awareness - windows, attempts, rules | 3 days |
 | Dashboard restructure and mega-action split | 5 days |
 | Leaderboard tabs on `UserGameStats`, parallel diff | 4 days |
+| **Profile: cross-game summary, per-game breakdown, trading demoted to one card** | **3 days** |
 | Results page dispatch, replay link, unresolved handling | 3 days |
 | Navigation and conditional visibility | 2 days |
 | Help restructure and the round-failure article | 4 days |
 | Landing and marketing copy | 2 days |
-| **Total** | **~30 days (~6 weeks)** |
+| **Total** | **~33 days (~6.5 weeks)** |
 
 Split across **X7** and **X8**; the provider-specific play and result screens from
 `09` E6 are counted separately.
@@ -238,3 +289,10 @@ Split across **X7** and **X8**; the provider-specific play and result screens fr
 - [ ] The leaderboard top 100 is unchanged on the day of the switch
 - [ ] Help explains play windows, attempts and unresolved rounds before a player meets
       them
+- [ ] The profile shows a **cross-game** summary plus a per-game breakdown, with trading
+      as one card rather than the page
+- [ ] **No figure on the profile is a platform-wide label over a trading-only
+      calculation** - `05` section 10
+- [ ] The profile and the leaderboard agree, because both read `UserGameStats` and neither
+      computes its own aggregate
+- [ ] The **public** profile's field set was decided deliberately, not inherited

@@ -8,14 +8,36 @@
 
 ---
 
+> ## SCENARIO DECIDED 2 SEPTEMBER 2026 - EXTERNAL GAMES ONLY
+>
+> The owner chose **external-only**: provider games are the only new games, and **no
+> in-house game is built.** The active programme is `External game plans/` and its
+> **X0-X12** phases. Start at `External game plans/PROGRESS.md`.
+>
+> **Stage 0 is unaffected** - it is a prerequisite in every scenario, it is the work
+> currently in flight, and it is **X0** in the external programme. Keep using `00a`.
+>
+> **P1, the game-module foundation, is also unaffected in substance** - it is delivered as
+> **X1**, from `External game plans/11-foundation-and-seams.md`.
+>
+> **P2, the in-house Trivia game, is not being built.** P3-P7 are delivered by
+> `External game plans/12`-`16` instead. The chapters here remain valuable as analysis of
+> the current codebase, and `15-platform-transformation-and-gaps.md` is still the record of
+> the games-first direction.
+>
+> **The decision did not make the work smaller.** External-only is **23-30 weeks** against
+> this folder's 14-19, because every platform-wide change is identical either way and the
+> provider integration costs more than the in-house game it replaces. If any summary
+> implies it was the cheaper option, it is wrong.
+
 ## IMPORTANT: two separate pieces of work
 
 This folder describes **two deliveries, not one.**
 
 | | Delivery | Status |
 |---|---|---|
-| **STAGE 0** | `00a-STAGE-0-prerequisite-fixes-DO-FIRST.md` - two **pre-existing defects** fixed on their own | **Do first. Owner tests and signs off.** |
-| **NEW GAMES PLAN** | Everything else in this folder (Phases P1-P6) | **Starts only after Stage 0 sign-off.** |
+| **STAGE 0** | `00a-STAGE-0-prerequisite-fixes-DO-FIRST.md` - two **pre-existing defects** fixed on their own | **Do first. Owner tests and signs off.** Still fully active |
+| **NEW GAMES PLAN** | Everything else in this folder (Phases P1-P6) | **Superseded 2 Sep 2026** by the X-phases in `External game plans/`. P1 survives as X1; P2 is not being built |
 
 Stage 0 is not games work. It fixes defects that exist in the application today and would be worth fixing even if no new game were ever added: competition entry paths that disagree about security and prize money, and admin/player model blueprints that have already drifted apart. They are separated out so they can be reviewed, deployed, tested and rolled back on their own.
 

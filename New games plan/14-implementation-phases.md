@@ -2,6 +2,28 @@
 
 The build order for the **New Games Plan**. Each phase is independently shippable and reversible.
 
+> ## SUPERSEDED 2 SEPTEMBER 2026 - PLAN AGAINST THE X-PHASES INSTEAD
+>
+> The owner chose **external-only**: provider games are the only new games, and **no
+> in-house game is built.** The operative phase plan is
+> **`External game plans/10-external-only-programme.md` section 3** (X0-X12), mirrored in
+> `External game plans/PROGRESS.md`.
+>
+> Read this chapter for its **analysis of what each phase involves** - it is still accurate
+> about the codebase - but not for the sequence or the totals.
+>
+> | This chapter | Where it went |
+> |---|---|
+> | **Stage 0** | **Unchanged and active.** It is **X0**, a prerequisite in every scenario, and it is the work currently awaiting owner test |
+> | **P1** foundation | **X1**, from `External game plans/11` |
+> | **P2** in-house Trivia | **Not being built** |
+> | **P3**-**P7** | **X6**-**X11**, from `External game plans/12`-`16` |
+> | The 14-19 week total | Replaced by **23-30 weeks** for X1-X12. Longer, not shorter: the provider integration costs more than the in-house game it replaces, every platform-wide change is identical either way, and the owner's 2 September brief added ~3 weeks of new scope |
+>
+> Two owner instructions came with the decision and both change the order rather than the
+> contents: **admin-first**, and **one step at a time so the running app is never broken.**
+> `External game plans/10` section 3.2.
+
 ---
 
 ## STAGE 0 - Prerequisite fixes (SEPARATE DELIVERY - NOT PART OF THIS PLAN)
