@@ -4436,6 +4436,245 @@ export default function AdminWikiSection() {
       ),
     },
 
+    // ==================== REFUNDS & CLAWBACKS ====================
+    {
+      id: "refunds",
+      title: "Refunds & Clawbacks",
+      icon: RefreshCw,
+      category: "Financial",
+      tags: [
+        "refunds",
+        "refund",
+        "clawback",
+        "atlas",
+        "deposits",
+        "chargeback",
+        "reversal",
+      ],
+      content: (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold text-amber-400 mb-3 flex items-center gap-2">
+              <RefreshCw className="h-6 w-6" />
+              Refunds &amp; Clawbacks
+            </h2>
+            <p className="text-gray-300 mb-4">
+              A refund returns a customer&apos;s <strong>deposit money</strong>{" "}
+              back to their card. This is separate from the customer withdrawing
+              credits. Refunds are a <strong>two-step</strong> process: (1)
+              return the money, then (2) claw back the granted credits so the
+              books stay balanced.
+            </p>
+          </div>
+
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+            <div className="flex items-center gap-2 text-amber-400 font-semibold mb-2">
+              <AlertTriangle className="h-5 w-5" />
+              Atlas deposits only
+            </div>
+            <p className="text-sm text-gray-300">
+              The in-app refund tools work for{" "}
+              <strong>completed Atlas deposits</strong> only. Deposits made via
+              Nuvei, Stripe, or Paddle have <strong>no refund button</strong> in
+              the admin panel — those must be handled on the provider&apos;s own
+              dashboard, and any credit adjustment done manually.
+            </p>
+          </div>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-amber-400">
+                Who starts a refund?
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300 text-sm">
+              <div className="bg-gray-900 p-3 rounded">
+                <div className="font-medium text-white mb-1">
+                  1. Admin-initiated (normal)
+                </div>
+                <p className="text-xs text-gray-400">
+                  You click <strong>&quot;Refund to card&quot;</strong> in the
+                  admin panel. ChartVolt calls Atlas to return the money.
+                </p>
+              </div>
+              <div className="bg-gray-900 p-3 rounded">
+                <div className="font-medium text-white mb-1">
+                  2. Atlas / provider-side
+                </div>
+                <p className="text-xs text-gray-400">
+                  A refund created directly on the Atlas side (outside
+                  ChartVolt). You did not press anything — the system detects it
+                  automatically.
+                </p>
+              </div>
+              <div className="bg-blue-500/10 border border-blue-500/30 p-3 rounded">
+                <p className="text-xs">
+                  <strong>Either way, the outcome always comes FROM Atlas.</strong>{" "}
+                  The refund confirmation arrives via the Atlas callback webhook
+                  in real time, or is caught by the scheduled reconciler if the
+                  callback was missed. When it completes you get a{" "}
+                  <strong>Security Alert</strong>, the customer is emailed, and
+                  the deposit shows a <strong>↩ Refunded</strong> marker.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-amber-400">
+                Where to find &quot;Refund to card&quot;
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300 text-sm">
+              <p>
+                The button lives inside the{" "}
+                <strong>transaction detail popup</strong>, not on its own page.
+              </p>
+              <div className="bg-gray-900 p-3 rounded space-y-1">
+                <div className="font-medium text-white">
+                  Path 1 — Financial Dashboard
+                </div>
+                <p className="text-xs text-gray-400">
+                  Finance → <strong>Financial Dashboard</strong> →{" "}
+                  <strong>All Transactions</strong> tab → click the deposit row →
+                  scroll to the amber <strong>&quot;Atlas Refund&quot;</strong>{" "}
+                  panel → <strong>Refund to card</strong>.
+                </p>
+              </div>
+              <div className="bg-gray-900 p-3 rounded space-y-1">
+                <div className="font-medium text-white">
+                  Path 2 — User detail panel
+                </div>
+                <p className="text-xs text-gray-400">
+                  Open the user → their <strong>Transactions</strong> tab → click
+                  a completed Atlas deposit → same{" "}
+                  <strong>&quot;Refund to card&quot;</strong> button.
+                </p>
+              </div>
+              <div className="bg-gray-900 p-3 rounded space-y-1">
+                <div className="font-medium text-white">
+                  Refunds tab = clawback queue
+                </div>
+                <p className="text-xs text-gray-400">
+                  The Financial Dashboard&apos;s <strong>Refunds</strong> tab is
+                  the queue for the <em>second</em> step — deposits already
+                  refunded that still need their credits clawed back. Its badge
+                  shows how many are waiting.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-amber-400">
+                The two steps
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-gray-300 text-sm">
+              <div className="bg-gray-900 p-3 rounded">
+                <div className="font-medium text-white mb-1">
+                  Step 1 — Refund to card
+                </div>
+                <p className="text-xs text-gray-400">
+                  Returns the money to the customer&apos;s card via Atlas.
+                  Defaults to the full original charge. Status becomes{" "}
+                  <strong>processing</strong>, then <strong>completed</strong>{" "}
+                  once Atlas confirms. This does <strong>NOT</strong> remove the
+                  user&apos;s credits.
+                </p>
+              </div>
+              <div className="bg-gray-900 p-3 rounded">
+                <div className="font-medium text-white mb-1">
+                  Step 2 — Claw back credits
+                </div>
+                <p className="text-xs text-gray-400">
+                  Enabled only <strong>after</strong> the refund is completed.
+                  Removes the credits that deposit granted (recorded as an admin
+                  adjustment). Rejected if the user no longer has enough credits.
+                </p>
+              </div>
+              <div className="bg-red-500/10 border border-red-500/30 p-3 rounded">
+                <p className="text-xs">
+                  <strong>Why two steps?</strong> The money return and the credit
+                  removal are deliberately separate. If a user already traded the
+                  credits, clawing them back is a balance/risk decision left to an
+                  admin — the system never auto-deducts and never forces a
+                  negative balance.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-amber-400">
+                Button greyed out?
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-gray-300 text-sm">
+              <p>The Atlas Refund panel only shows / is active when:</p>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-400" />
+                  <span>The deposit&apos;s provider is Atlas</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-400" />
+                  <span>The deposit status is &quot;completed&quot;</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-400" />
+                  <span>
+                    No refund is already processing or completed on it
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <XCircle className="h-4 w-4 text-red-400" />
+                  <span>
+                    &quot;Claw back credits&quot; stays disabled until the refund
+                    is completed (and hides once credits are already clawed back)
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-lg text-amber-400">
+                What the customer sees
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-gray-300 text-sm">
+              <p>
+                Customers <strong>cannot request a deposit refund</strong> from
+                inside the app — there is no self-serve refund button. They can
+                only:
+              </p>
+              <div className="space-y-1 text-xs text-gray-400">
+                <p>
+                  • See a <strong>↩ Refunded</strong> badge on the deposit once
+                  you complete the refund, plus a confirmation email.
+                </p>
+                <p>
+                  • Use <strong>&quot;Card refund&quot; withdrawal</strong> —
+                  this sends their wallet credits back to their card as a
+                  withdrawal. It is <em>not</em> a reversal of a specific
+                  deposit.
+                </p>
+                <p>
+                  • Chargebacks are started at their bank, not in the app, and
+                  are handled separately in the Chargebacks tab.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ),
+    },
+
     // ==================== PAYMENTS ====================
     {
       id: "payments",
