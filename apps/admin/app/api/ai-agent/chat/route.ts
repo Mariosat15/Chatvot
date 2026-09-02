@@ -3796,9 +3796,11 @@ The platform has 8 automated detection methods that work together to catch multi
 Admin Panel → Fraud Tab → Settings
 
 **Key Settings**:
-- Entry Block Threshold: Block competition entry if suspicion score > threshold (default: 70)
+- Review Threshold: Escalate the account for investigation if suspicion score > threshold (default: 70). **This does not block anything.** It was called "Entry Block Threshold" and did block paid entry until 2 September 2026; that was removed because the block created no restriction, so it was invisible to admins, unexplained to the player, and impossible to lift.
 - Alert Threshold: Create admin alert if score > threshold (default: 40)
-- Auto-Suspend: Automatically suspend accounts above threshold (default: 90)
+- Auto-Suspend: Automatically suspend accounts above threshold (default: 90) for 7 days. This is the ONLY setting that blocks an account automatically, and it does so by creating a normal UserRestriction, so the player is notified and an admin can lift it.
+
+**A suspicion score never blocks entry on its own.** Only a suspension or ban blocks entry. If an admin reports a player who seems blocked with no restriction on record, check Restricted Users; a score-only block is no longer possible.
 - VPN/Proxy: Toggle blocking per type (VPN, Proxy, Tor)
 - Max accounts per device
 - Rate Limiting: Max signups/hour, max login attempts

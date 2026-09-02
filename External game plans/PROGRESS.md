@@ -63,6 +63,19 @@ from it change facts stated in this folder:
   seats the player and runs the fraud controls. A provider adapter adds a caller, not a fifth
   implementation.
 
+  **A constraint on how that seam may refuse anyone, added 2 September 2026.** Prerequisite B
+  in `New games plan/00a` fixed an owner-reported live incident: the fraud gate was refusing
+  paid entry on a player's **suspicion score alone**, creating no restriction - so the block
+  showed on no admin screen, notified nobody, could not be lifted, and happened while
+  automatic suspension was switched off. **Scores raise alerts; restrictions block.** When X5
+  extends the fraud controls to provider entries, automatic enforcement goes through
+  `UserRestriction` and never through a bare refusal inside the gate. This matters more here
+  than anywhere it has been tested: a provider contest is cheaper and faster to enter than a
+  trading contest, so it will trip a throttle far more often, and the false-positive rate this
+  rule protects against is correspondingly higher. R9 and R27 in `17-risk-register.md` are
+  updated - R27 because that investigation found a **third** route asserting an authorization
+  check it never performed, this time letting any signed-in player raise a rival's fraud score.
+
   **Two things it fixed are hazards this programme would have re-created.** The prize pool is
   now incremented on every path - a provider contest seeded by an internal route would
   otherwise have repeated the exact defect. And the read-then-insert seat race is handled:

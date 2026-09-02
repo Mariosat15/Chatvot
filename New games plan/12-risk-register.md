@@ -177,6 +177,8 @@ Related: `CoordinationDetectionService` and `BehavioralAnalysisService.recordCom
 
 **Mitigation:** keep Trivia in the same participant collections (which the `03` design does), and extend the throttle to count across contest kinds. Wire coordination/behavioural analysis into the consolidated entry service so **every** game gets it automatically - a structural fix rather than a per-game one.
 
+**Rule added 2 September 2026 on how that gate may refuse anyone.** This same gate used to refuse entry on the suspicion score alone. That refusal created no `UserRestriction`, so it showed on no admin screen, notified nobody, could not be lifted, and **ignored `autoSuspendEnabled`** - automatic lockouts happened while the admin had automatic suspension switched off. It locked a real player out and the owner reported it as a live incident; fixed as Prerequisite B in `00a`. When P2 extends the gate to new game types: **scores raise alerts, restrictions block.** Any automatic enforcement goes through `UserRestriction`, which is visible, notified and reversible. Never add a bare refusal inside the gate - a block the player cannot see and the admin cannot lift loses the account with no explanation, and a new game with a cheap fast entry will trip a throttle far more often than a trading contest does.
+
 ---
 
 ### R10 - Market-hours settings block non-trading games

@@ -82,7 +82,7 @@ export interface ISuspicionScore extends Document {
     matchType: string,
     confidence: number,
   ): void;
-  resetScore(): void;
+  resetScore(reason?: string): void;
 }
 
 const ScoreBreakdownSchema = new Schema(
@@ -368,7 +368,13 @@ SuspicionScoreSchema.methods.addLinkedAccount = function (
   }
 };
 
-SuspicionScoreSchema.methods.resetScore = function (): void {
+SuspicionScoreSchema.methods.resetScore = function (reason?: string): void {
+  // Reason: capture the total BEFORE zeroing. This used to read
+  // `delta: -this.totalScore` after the assignment below, so every reset in the
+  // history recorded a delta of -0 and the record of how much was cleared was
+  // lost. The history entry is the only trace a reset leaves, so it mattered.
+  const previousTotal = this.totalScore;
+
   this.totalScore = 0;
   this.riskLevel = "low";
   this.lastUpdated = new Date();
@@ -391,8 +397,12 @@ SuspicionScoreSchema.methods.resetScore = function (): void {
   this.scoreHistory.push({
     timestamp: new Date(),
     score: 0,
-    reason: "Manual reset by admin",
-    delta: -this.totalScore,
+    // Reason: `reason` became a parameter on 2 Sep 2026 so the trail says which
+    // lever was pulled - a dismissed investigation, the one-off release script,
+    // or an admin clearing a score by hand. All three previously wrote the same
+    // "Manual reset by admin", making them indistinguishable after the fact.
+    reason: reason || "Manual reset by admin",
+    delta: -previousTotal,
     triggeredBy: "admin_reset",
   });
 };

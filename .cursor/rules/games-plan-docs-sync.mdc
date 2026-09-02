@@ -258,6 +258,59 @@ get wrong and are worth stating here:
  the route asks about, not merely that it refused — the refusal alone passes either way.
  Swept the sibling routes: challenge **create** already had both, **decline** and the admin
  challenge route only ever credit, so there is nothing else to fix.
+- **Prerequisite B is fixed** (2 Sep 2026, awaiting owner test), and it exists because the
+ owner reported a live incident rather than because anything in the plan predicted it: a
+ player was locked out of paid entry by their **suspicion score alone**. The rule that comes
+ out of it is short and load-bearing — **scores raise alerts, restrictions block.** The entry
+ gate used to return `RISK_SCORE_BLOCKED` above `entryBlockThreshold`, which created no
+ `UserRestriction`, so it appeared on no admin screen, notified nobody, could not be lifted,
+ and **read `entryBlockThreshold` while never looking at `autoSuspendEnabled`** — automatic
+ lockouts while the admin had automatic suspension switched off. The subtlest part is why it
+ was unreportable: the dashboard's account-status card renders only while an alert is
+ *pending or investigating*, so **dismissing the alert deleted the last explanation while
+ the block stayed.** `entryBlockThreshold` is now a **Review** threshold (name kept in the
+ schema, documented as historical — renaming it is a mirrored migration for a cosmetic gain),
+ the dead `shouldBlockEntry` helper is deleted in both apps, and elevate-to-investigation now
+ offers the full suspension options with the player notified either way. **Do not reintroduce
+ a refusal inside the gate.** If automatic action is wanted, raise a restriction, so it stays
+ reversible.
+- **Five more live defects were found under Prerequisite B, and two generalise.** The
+ first: `app/api/fraud/suspicion-score/route.ts` in the **player** app let any signed-in user
+ read the high-risk list, **raise a rival's score to lock them out of a paid competition**,
+ or clear their own — all three handlers commented "admin only", none checking anything but
+ that a session existed. Deleted, since nothing called it and the admin app's copy is
+ guarded. **That is the third time a comment has claimed an authorization check the code
+ never performed**, after Prerequisite A and the internal-secret fallbacks, so carry it as a
+ class: **a comment asserting authorization is not evidence one runs, and a route nothing
+ calls is still reachable over HTTP.** The second generalisable one: auto-suspension set
+ `suspensionEndsAt`, which `UserRestriction` does not declare, so strict mode discarded it
+ and an unset `expiresAt` means **permanent** on this model — every auto-suspension was
+ permanent while its reason text and history entry both promised seven days. **Same failure
+ mode as mirror drift, from a different direction — one writer disagreeing with the schema
+ rather than two copies disagreeing with each other — and `check:mirrors` cannot catch it.**
+ The other three: **Auto-Suspend was near-unreachable at its default**, because it ran only
+ on a risk-*band* change (bands 30/50/70) while `autoSuspendThreshold` defaults to 90, so a
+ score entering critical at 72 was correctly refused for being under 90 and never examined
+ again however high it climbed; **suspended and banned accounts could still accept paid 1v1
+ challenges**, since `canEnterChallenges` was the only permission flag defaulting to
+ *allowed* and 10 of 11 restriction writers never set it; and **`resetScore()` recorded every
+ delta as `-0`**, computing `-this.totalScore` after zeroing the total.
+- **Fix a wrong default at the schema, not across the call sites — but check for the one
+ caller that meant it.** `canEnterChallenges` was wrong in 10 of 11 writers, so flipping the
+ default fixed ten places with one line. The eleventh, the duplicate-KYC path driven by
+ `duplicateKYCBlockChallenges`, sets the flag deliberately, and it is the reason the
+ migration in `tools/fraud/fix-entry-blocked-users.ts --close-challenge-hole` filters on
+ `reason: { $ne: "kyc_fraud" }`. Two rules follow. **A schema default fixes future rows
+ only** — Mongoose already persisted the old value, so existing documents hold a real stored
+ `true` indistinguishable from intent; the migration is not optional. And **a test that pins
+ the new default must be accompanied by one pinning the explicit override**, or the two
+ behaviours collapse into one assertion: probing this turned exactly 1 test red while the
+ explicit-intent test stayed green, which is what proved they were independent.
+- **A dead helper is an invitation, so delete it with the defect.** `shouldBlockEntry()`
+ existed in both `fraud-settings.service.ts` copies, was called by nothing after the gate fix,
+ and did exactly the thing that had just been removed. Leaving it would have made
+ reintroducing the defect a one-line change that reads like using an existing API. Same
+ reasoning as deleting the unprotected route rather than guarding it.
 
 ## The rule
 

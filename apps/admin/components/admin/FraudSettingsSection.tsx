@@ -148,7 +148,7 @@ export default function FraudSettingsSection() {
 
     // Validate thresholds
     if (settings.alertThreshold >= settings.entryBlockThreshold) {
-      toast.error("Alert threshold must be lower than Entry Block threshold");
+      toast.error("Alert threshold must be lower than Review threshold");
       return;
     }
 
@@ -244,9 +244,7 @@ export default function FraudSettingsSection() {
   // Check for configuration conflicts
   const conflicts = [];
   if (settings.alertThreshold >= settings.entryBlockThreshold) {
-    conflicts.push(
-      "Alert threshold should be lower than Entry Block threshold",
-    );
+    conflicts.push("Alert threshold should be lower than Review threshold");
   }
   if (settings.blockVPN && settings.vpnRiskScore < 50) {
     conflicts.push(
@@ -258,7 +256,7 @@ export default function FraudSettingsSection() {
     settings.autoSuspendThreshold <= settings.entryBlockThreshold
   ) {
     conflicts.push(
-      "Auto-suspend threshold should be higher than entry block threshold",
+      "Auto-suspend threshold should be higher than the Review threshold",
     );
   }
 
@@ -1193,7 +1191,8 @@ export default function FraudSettingsSection() {
                 Risk Thresholds
               </CardTitle>
               <CardDescription className="text-gray-500 text-xs">
-                Alert threshold must be lower than Block threshold
+                Alert threshold must be lower than Review threshold. Neither one
+                blocks an account — only a suspension does.
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-0 space-y-6">
@@ -1223,9 +1222,9 @@ export default function FraudSettingsSection() {
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <Label className="text-gray-300">
-                    Entry Block Threshold (block action)
+                    Review Threshold (escalate for investigation)
                   </Label>
-                  <span className="text-2xl font-bold text-red-500">
+                  <span className="text-2xl font-bold text-amber-500">
                     {settings.entryBlockThreshold}
                   </span>
                 </div>
@@ -1240,8 +1239,18 @@ export default function FraudSettingsSection() {
                       updateSetting("entryBlockThreshold", val);
                     }
                   }}
-                  className="w-full accent-red-500"
+                  className="w-full accent-amber-500"
                 />
+                <p className="text-xs text-gray-400 mt-2">
+                  Accounts scoring above this are escalated for review.{" "}
+                  <strong className="text-gray-300">
+                    This does not block anyone.
+                  </strong>{" "}
+                  To block an account, suspend it from the investigation — or
+                  turn on Auto-Suspend below to have the system do it
+                  automatically. Either way the block stays visible here and can
+                  be lifted.
+                </p>
               </div>
 
               <div>

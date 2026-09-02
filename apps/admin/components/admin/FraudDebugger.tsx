@@ -157,10 +157,13 @@ export default function FraudDebugger() {
                 </div>
                 <div className="bg-gray-900 p-3 rounded">
                   <div className="text-sm text-gray-400">
-                    Entry Block Threshold
+                    Review Threshold
                   </div>
-                  <div className="text-2xl font-bold text-red-400 mt-1">
+                  <div className="text-2xl font-bold text-amber-400 mt-1">
                     {debugData.settings.thresholds.entryBlockThreshold}
+                  </div>
+                  <div className="text-[10px] text-gray-500 mt-1">
+                    Escalates for review. Does not block.
                   </div>
                 </div>
               </div>

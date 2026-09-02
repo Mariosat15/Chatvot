@@ -148,14 +148,21 @@ export class SuspicionScoringService {
       console.log(
         `⚠️ RISK LEVEL CHANGED: ${oldRiskLevel} → ${current.riskLevel}`,
       );
+    }
 
-      // Check if auto-suspend is enabled in fraud settings before auto-restricting
-      if (
-        (current.riskLevel === "critical" || current.riskLevel === "high") &&
-        !current.autoRestrictedAt
-      ) {
-        await this.checkAndAutoRestrictUser(userId, current);
-      }
+    // Reason: this used to sit inside the risk-level-change branch above, which made
+    // auto-suspend almost unreachable at its default setting. The bands are medium 30,
+    // high 50, critical 70, while `autoSuspendThreshold` defaults to 90. A score entering
+    // "critical" at, say, 72 called the check once and was correctly turned away for being
+    // under 90 - and then never called again however high it climbed, because the band no
+    // longer changed. So the toggle an admin switched on quietly did nothing unless a
+    // single detection jumped the score from below 70 to 90+ in one step.
+    //
+    // Checking on every change is safe: `checkAndAutoRestrictUser` re-reads the settings,
+    // re-tests the threshold and bails if a restriction already exists, and
+    // `autoRestrictedAt` stops us reconsidering an account already actioned.
+    if (!current.autoRestrictedAt) {
+      await this.checkAndAutoRestrictUser(userId, current);
     }
 
     return current;
@@ -564,11 +571,19 @@ export class SuspicionScoringService {
   /**
    * Reset score for a user
    */
-  static async resetScore(userId: string): Promise<ISuspicionScore> {
+  /**
+   * `reason` is recorded in the document's scoreHistory. Pass one - it is the
+   * only trace a reset leaves, and it distinguishes a dismissed investigation
+   * from an admin clearing a score by hand.
+   */
+  static async resetScore(
+    userId: string,
+    reason?: string,
+  ): Promise<ISuspicionScore> {
     await connectToDatabase();
 
     const score = await this.getOrCreateScore(userId);
-    score.resetScore();
+    score.resetScore(reason);
     await score.save();
 
     console.log(`🔄 Reset suspicion score for user ${userId}`);
@@ -651,13 +666,24 @@ export class SuspicionScoringService {
         customReason: `Automatically suspended: Suspicion score (${score.totalScore}%) exceeded auto-suspend threshold (${settings.autoSuspendThreshold}%). Admin has enabled auto-suspension in fraud settings.`,
         canTrade: false,
         canEnterCompetitions: false,
+        // Reason: added explicitly 2 Sep 2026, mirroring the main app. The schema
+        // default now blocks challenges too, but stating it here keeps the intent
+        // readable next to its four siblings - an auto-suspension that left paid
+        // 1v1 challenges open was the exact hole this closes.
+        canEnterChallenges: false,
         canDeposit: false,
         canWithdraw: false,
         restrictedBy: "SYSTEM", // System restriction
         relatedFraudAlertId: null,
         relatedUserIds: score.linkedAccounts.map((acc) => acc.userId),
         isActive: true,
-        suspensionEndsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        // Reason: this said `suspensionEndsAt` until 2 Sep 2026 - a field
+        // `UserRestriction` does not declare. Mongoose strict mode discarded it
+        // silently, leaving `expiresAt` unset, and an unset `expiresAt` means a
+        // PERMANENT ban by this model's own definition. So every automatic
+        // suspension was permanent while the customReason above, and the fraud
+        // history entry below, both told the admin it would lift after 7 days.
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       });
 
       // Update score

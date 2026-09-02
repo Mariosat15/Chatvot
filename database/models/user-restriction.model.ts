@@ -95,7 +95,18 @@ const UserRestrictionSchema = new Schema<IUserRestriction>(
     // Reason: default true so pre-existing restrictions (created before this
     // field existed) never accidentally block challenges. Only an explicit
     // `false` blocks — see canUserPerformAction("enterChallenge").
-    canEnterChallenges: { type: Boolean, default: true },
+    // Reason: default flipped true → false on 2 Sep 2026. It was the only one of
+    // these five flags defaulting to "allowed", and 10 of the 11 writers that
+    // create a restriction never set it - so every suspended and banned account
+    // could still accept paid 1v1 challenges. A challenge is the easier shape to
+    // abuse, being exactly two players with the pot returning to the pair minus
+    // the fee, so this was the wrong flag to fail open. `canEnterChallenges` is
+    // read as "blocked only on an explicit false", which keeps deliberate
+    // configuration working (see `duplicateKYCBlockChallenges`) while making
+    // silence mean blocked, as it already does for deposits and withdrawals.
+    // NOTE: rows created before this date have `true` stored, not defaulted, so
+    // they need the migration in `tools/fraud/fix-entry-blocked-users.ts`.
+    canEnterChallenges: { type: Boolean, default: false },
     canDeposit: { type: Boolean, default: false },
     canWithdraw: { type: Boolean, default: false },
 

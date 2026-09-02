@@ -274,6 +274,19 @@ what it actually permits - skipping three person-level gates that a synthetic us
 satisfy, and nothing else. A `source` value is an open invitation for the next change to hang
 unrelated behaviour off it, which is precisely how the bypass header above came to exist.
 
+**Third occurrence, 2 September 2026, and it promotes this from an incident to a class.**
+`app/api/fraud/suspicion-score/route.ts` in the **player** app carried `// Admin only` on
+its GET, POST and DELETE handlers while every one of them checked only that *some* session
+existed. Any signed-in player could read the entire high-risk list, **raise a rival's fraud
+score to lock them out of a paid competition**, or clear their own. It was deleted rather
+than guarded: nothing called it, and the admin app holds a `verifyAdminAuth`-protected copy.
+
+The rule to carry into the X phases is therefore stronger than "test the route": **a comment
+asserting an authorization check is not evidence that one runs, and a route nothing calls is
+still reachable over HTTP.** Both provider-facing endpoints in `01` and `06` and every new
+admin route must be tested by calling them as an ordinary player and asserting 403. Dead
+routes get deleted, not left for a future reviewer to assume are guarded.
+
 ---
 
 ### R28 - Read-then-create races on unique-indexed fraud records (found and FIXED 1 Sep 2026)
@@ -416,6 +429,22 @@ wired only into the competition entry action.
 Provider contests will be **cheaper and faster to enter than trading contests**, which
 makes them the more attractive target for multi-accounting. Extend the fraud gate to
 provider entries in X5, not later.
+
+**Constraint added 2 September 2026, and it governs how that extension may refuse anyone.**
+The same gate used to refuse entry on the suspicion score alone, above
+`entryBlockThreshold`. That refusal created no `UserRestriction`, so it appeared on no admin
+screen, notified nobody, could not be lifted, and **ignored `autoSuspendEnabled` entirely** -
+an admin who had deliberately left automatic suspension off still got automatic, permanent
+lockouts. It locked a real player out and was reported by the owner as a live incident. See
+Prerequisite B in `New games plan/00a-STAGE-0-prerequisite-fixes-DO-FIRST.md`.
+
+So when X5 widens the gate: **automatic enforcement must go through `UserRestriction`, never
+through a bare refusal inside the gate.** A refusal a player cannot see and an admin cannot
+reverse is worse than no enforcement, because the account is lost and nobody knows why.
+Scores raise alerts; restrictions block. Provider entries make this sharper, not softer - a
+cheap, fast contest will trip a throttle far more often than a trading contest does, so the
+false-positive rate this rule protects against is higher there than anywhere it has been
+tested.
 
 ### R11 - Legal wording changed without review
 

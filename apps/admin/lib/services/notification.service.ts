@@ -839,6 +839,63 @@ class NotificationService {
     }
   }
 
+  /**
+   * Tell a player an investigation has been opened on their account.
+   *
+   * Reason: before 2 Sep 2026 opening an investigation notified nobody. The only
+   * signal was a dashboard card rendered while the alert was open, which
+   * disappeared the moment the alert was closed - so a player could be affected,
+   * see a card, then see nothing, with no record either way.
+   *
+   * `restricted` controls the one sentence that changes: an investigation on its
+   * own no longer limits the account, so saying "your access is unaffected" is
+   * both true and the thing the player most wants to know. Only pass true when a
+   * restriction was actually created alongside.
+   */
+  async notifyAccountUnderReview(userId: string, restricted: boolean) {
+    console.log(`🔔 Sending account_under_review notification to ${userId}`);
+    try {
+      const result = await this.send({
+        userId,
+        templateId: "account_under_review",
+        variables: {
+          accessNote: restricted
+            ? "Some features are limited while we do this."
+            : "Your account remains fully active in the meantime.",
+        },
+      });
+      if (result) {
+        console.log(`✅ Under-review notification CREATED: ${result._id}`);
+      } else {
+        console.log(`⚠️ Under-review notification NOT created`);
+      }
+      return result;
+    } catch (error) {
+      console.error("❌ Error in notifyAccountUnderReview:", error);
+      return null;
+    }
+  }
+
+  /** Tell a player a review closed with no action taken. */
+  async notifyAccountReviewClosed(userId: string) {
+    console.log(`🔔 Sending account_review_closed notification to ${userId}`);
+    try {
+      const result = await this.send({
+        userId,
+        templateId: "account_review_closed",
+      });
+      if (result) {
+        console.log(`✅ Review-closed notification CREATED: ${result._id}`);
+      } else {
+        console.log(`⚠️ Review-closed notification NOT created`);
+      }
+      return result;
+    } catch (error) {
+      console.error("❌ Error in notifyAccountReviewClosed:", error);
+      return null;
+    }
+  }
+
   async notifyAccountRestored(userId: string) {
     console.log(`🔔 Sending account_restored notification to ${userId}`);
     try {

@@ -77,20 +77,26 @@ export async function isVPNDetectionEnabled(): Promise<boolean> {
 }
 
 /**
- * Get entry block threshold
+ * Get the score at which an account is escalated for review.
+ *
+ * Reason: named `entryBlockThreshold` in the schema for backward compatibility,
+ * but it no longer blocks anything. See the note on the model field.
  */
 export async function getEntryBlockThreshold(): Promise<number> {
   const settings = await getFraudSettings();
   return settings.entryBlockThreshold;
 }
 
-/**
- * Check if entry should be blocked based on risk score
- */
-export async function shouldBlockEntry(riskScore: number): Promise<boolean> {
-  const settings = await getFraudSettings();
-  return riskScore > settings.entryBlockThreshold;
-}
+// Reason: `shouldBlockEntry(riskScore)` was removed on 2 September 2026. It
+// returned `riskScore > entryBlockThreshold`, encoding the silent, unliftable
+// entry block that locked a real player out of the platform - see the long note
+// in `fraud/entry-fraud-gate.service.ts` section 4. It was already dead code in
+// both apps when removed, which is precisely why it was worth deleting rather
+// than leaving: the next feature needing a risk check would have found a
+// plausibly-named helper and reintroduced the defect.
+//
+// A suspicion score escalates for human review. It does not block. To block an
+// account, create a `UserRestriction`, which is visible and can be lifted.
 
 /**
  * Check if alert should be created based on risk score

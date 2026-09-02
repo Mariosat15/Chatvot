@@ -73,6 +73,8 @@ export type NotificationType =
   | "email_changed"
   | "account_suspended"
   | "account_restored"
+  | "account_under_review"
+  | "account_review_closed"
   // KYC
   | "kyc_started"
   | "kyc_approved"
@@ -952,6 +954,45 @@ function getDefaultTemplates(): Partial<INotificationTemplate>[] {
         "Your account has been restored and is now fully active. Welcome back!",
       icon: "✅",
       priority: "high",
+      color: "#10B981",
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: true, push: false },
+    },
+    // Reason: added 2 Sep 2026. Opening an investigation previously told the
+    // player nothing at all - the only signal was a card that appeared on the
+    // dashboard while the alert was open and vanished the moment it was closed.
+    // The wording deliberately says the account stays usable, because an
+    // investigation on its own no longer restricts anything.
+    {
+      templateId: "account_under_review",
+      name: "Account Under Review",
+      description: "Sent when an admin opens an investigation on the account",
+      category: "security",
+      type: "account_under_review",
+      title: "🔍 Account Under Review",
+      message:
+        "We're reviewing some recent activity on your account as part of our routine security checks. {{accessNote}} We'll contact you if we need anything from you.",
+      icon: "🔍",
+      priority: "high",
+      color: "#F59E0B",
+      isEnabled: true,
+      isDefault: true,
+      isCustom: false,
+      channels: { inApp: true, email: true, push: false },
+    },
+    {
+      templateId: "account_review_closed",
+      name: "Account Review Closed",
+      description: "Sent when an investigation is dismissed with no action",
+      category: "security",
+      type: "account_review_closed",
+      title: "✅ Review Complete",
+      message:
+        "We've finished reviewing your account and found no issues. No action has been taken and your account is fully active. Thanks for your patience.",
+      icon: "✅",
+      priority: "normal",
       color: "#10B981",
       isEnabled: true,
       isDefault: true,

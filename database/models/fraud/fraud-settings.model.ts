@@ -19,7 +19,13 @@ export interface IFraudSettings extends Document {
   maxAccountsPerDevice: number; // Alert if more than this
 
   // Risk Scoring
-  entryBlockThreshold: number; // Default: 70 - Block competition entry if risk > this
+  // Reason: the name is historical and kept to avoid a migration. Since
+  // 2 Sep 2026 this BLOCKS NOTHING - it is the score at which an account is
+  // escalated for human review. The silent entry block it used to drive locked
+  // a real player out with no admin lever; see `entry-fraud-gate.service.ts`
+  // section 4. Only `autoSuspendThreshold`, with `autoSuspendEnabled` on,
+  // causes an automatic block, and that one creates a liftable restriction.
+  entryBlockThreshold: number; // Default: 70 - escalate for review above this
   alertThreshold: number; // Default: 40 - Create alert if risk > this
 
   // Auto-Actions

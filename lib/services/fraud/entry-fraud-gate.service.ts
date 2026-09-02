@@ -1,16 +1,24 @@
 /**
  * Entry Fraud Gate
  *
- * Central risk gate for competition / challenge ENTRY. Wires up several fraud
- * settings that previously existed but were enforced nowhere:
- *   - entryBlockThreshold          → block entry when the user's risk score is high
- *   - deviceFingerprintBlockThreshold → block entry from a high-risk device
- *   - maxEntriesPerHour            → throttle rapid competition entries
+ * Central risk gate for competition / challenge ENTRY:
  *   - blockVPN / blockProxy / blockTor / blockDatacenterIPs → block entry by IP
+ *   - maxEntriesPerHour            → throttle rapid competition entries
+ *   - deviceFingerprintBlockThreshold → block entry from a high-risk device
  *
  * Design: capability/threshold-driven, backward-compatible (does nothing until
  * an admin raises a threshold below 100 or turns a block on), and FAILS OPEN on
  * any internal error so a detection hiccup never blocks a legitimate player.
+ *
+ * What this gate deliberately does NOT do: refuse entry on the strength of a
+ * user's suspicion score. `entryBlockThreshold` is an alert/review threshold,
+ * not a block. Section 4 below explains why at length - it is the one thing
+ * about this file most likely to get "helpfully" put back.
+ *
+ * Every refusal here is transient and self-clearing: a different network, an
+ * hour's wait, or a device whose risk an admin resets. Nothing in this gate can
+ * lock an account out indefinitely. Indefinite blocks belong to
+ * `UserRestriction`, where they are visible to admins and can be lifted.
  */
 
 import { getFraudSettings } from "@/lib/services/fraud-settings.service";
@@ -101,30 +109,34 @@ export async function assertEntryFraudGate(params: {
       }
     }
 
-    // 4. Overall suspicion-score block (entryBlockThreshold).
-    const entryThreshold = settings.entryBlockThreshold ?? 100;
-    if (entryThreshold < 100) {
-      try {
-        const SuspicionScore = (
-          await import("@/database/models/fraud/suspicion-score.model")
-        ).default;
-        const score = await SuspicionScore.findOne({ userId })
-          .select({ totalScore: 1 })
-          .lean();
-        const totalScore =
-          (score as { totalScore?: number } | null)?.totalScore ?? 0;
-        if (totalScore > entryThreshold) {
-          return {
-            allowed: false,
-            reason:
-              "Entry is temporarily blocked while your account is under review. Please contact support.",
-            code: "RISK_SCORE_BLOCKED",
-          };
-        }
-      } catch (err) {
-        console.warn("⚠️ Entry gate: suspicion-score check failed (skipping):", err);
-      }
-    }
+    // 4. Suspicion score: DELIBERATELY DOES NOT BLOCK. See below.
+    //
+    // Reason: until 2 September 2026 this returned RISK_SCORE_BLOCKED whenever
+    // `SuspicionScore.totalScore` exceeded `entryBlockThreshold` (default 70).
+    // That was removed because it was an *invisible, irreversible* block, and it
+    // locked a real player out of the platform with no way for an admin to
+    // release them:
+    //
+    //   - it created no UserRestriction, so the account appeared nowhere on the
+    //     admin's Restricted Users screen and the "Lift" action did not apply;
+    //   - it sent the player no notification - the refusal existed only as a
+    //     toast at the moment they tried to enter;
+    //   - the dashboard's account-status card only renders while a fraud alert
+    //     is pending or investigating, so dismissing the alert made the last
+    //     remaining explanation disappear while the block stayed;
+    //   - nothing in the admin UI could lower a score. The only score endpoint
+    //     the UI calls is a recalculate, which can only raise it;
+    //   - and it ignored `autoSuspendEnabled`, so an admin who had deliberately
+    //     left automatic suspension OFF still got automatic lockouts.
+    //
+    // Blocking entry is now the sole job of `UserRestriction`, which is
+    // visible, notifies the player, and can be lifted. A high score raises an
+    // alert for a human to judge, and - only when the admin has turned
+    // `autoSuspendEnabled` on - creates a real restriction via
+    // `SuspicionScoringService.checkAndAutoRestrictUser`.
+    //
+    // Do not reintroduce a score-based refusal here. If automatic action is
+    // wanted, raise the restriction instead, so it stays reversible.
 
     return { allowed: true };
   } catch (error) {

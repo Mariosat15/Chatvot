@@ -228,7 +228,7 @@ export default function FraudMonitoringSection() {
   const [selectedInvestigationAlert, setSelectedInvestigationAlert] =
     useState<FraudAlert | null>(null);
   const [investigationActionType, setInvestigationActionType] = useState<
-    "suspend" | "dismiss" | "ban" | null
+    "suspend" | "dismiss" | "ban" | "investigate" | null
   >(null);
   const [showInvestigationDialog, setShowInvestigationDialog] = useState(false);
   const [suspendDuration, setSuspendDuration] = useState<number>(7);
@@ -242,8 +242,17 @@ export default function FraudMonitoringSection() {
     useState<string>("");
   const [blockTrading, setBlockTrading] = useState<boolean>(true);
   const [blockCompetitions, setBlockCompetitions] = useState<boolean>(true);
+  // Reason: added 2 Sep 2026. This checkbox did not exist, so no admin had ever
+  // been able to block challenges — and because `canEnterChallenges` was the one
+  // permission flag defaulting to "allowed", suspended and banned accounts could
+  // still accept paid 1v1 challenges.
+  const [blockChallenges, setBlockChallenges] = useState<boolean>(true);
   const [blockDeposit, setBlockDeposit] = useState<boolean>(true);
   const [blockWithdraw, setBlockWithdraw] = useState<boolean>(true);
+  // Reason: whether opening an investigation should also restrict the accounts.
+  // Defaults to false - see handleInvestigationAction.
+  const [restrictDuringInvestigation, setRestrictDuringInvestigation] =
+    useState<boolean>(false);
   const [hideFromPublic, setHideFromPublic] = useState<boolean>(false);
   // Review packet — mirrors the per-user restriction form so both admin
   // entry points write the same fields to UserRestriction and the user
@@ -625,19 +634,30 @@ export default function FraudMonitoringSection() {
   // Investigation action handlers
   const handleInvestigationAction = (
     alert: FraudAlert,
-    action: "suspend" | "dismiss" | "ban",
+    action: "suspend" | "dismiss" | "ban" | "investigate",
   ) => {
     setSelectedInvestigationAlert(alert);
     setInvestigationActionType(action);
     // By default, select all suspicious accounts
     setSelectedUserIds(alert.suspiciousUserIds);
     // Reset restriction settings
-    setRestrictionReason("multi_accounting");
+    // Reason: `suspicious_activity` rather than a new "under_investigation"
+    // value. The `reason` field is an enum on UserRestriction in both apps, so a
+    // new value would mean a mirrored schema change for no gain - this is
+    // precisely what suspicious_activity already means.
+    setRestrictionReason(
+      action === "investigate" ? "suspicious_activity" : "multi_accounting",
+    );
     setCustomRestrictionReason("");
     setBlockTrading(true);
     setBlockCompetitions(true);
+    setBlockChallenges(true);
     setBlockDeposit(true);
     setBlockWithdraw(true);
+    // Reason: opening an investigation defaults to NOT restricting. An
+    // investigation is a decision to look, not a decision to punish, and the
+    // admin must opt in to limiting an account they have not yet judged.
+    setRestrictDuringInvestigation(false);
     setInvestigationReviewEtaDays("3");
     setInvestigationDocumentsRequested("");
     setShowInvestigationDialog(true);
@@ -649,10 +669,15 @@ export default function FraudMonitoringSection() {
     // Validate selection
     if (
       (investigationActionType === "ban" ||
-        investigationActionType === "suspend") &&
+        investigationActionType === "suspend" ||
+        investigationActionType === "investigate") &&
       selectedUserIds.length === 0
     ) {
-      toast.error("Please select at least one account to restrict");
+      toast.error(
+        investigationActionType === "investigate"
+          ? "Please select at least one account to investigate"
+          : "Please select at least one account to restrict",
+      );
       return;
     }
 
@@ -685,6 +710,7 @@ export default function FraudMonitoringSection() {
         restrictions: {
           canTrade: !blockTrading,
           canEnterCompetitions: !blockCompetitions,
+          canEnterChallenges: !blockChallenges,
           canDeposit: !blockDeposit,
           canWithdraw: !blockWithdraw,
         },
@@ -694,15 +720,22 @@ export default function FraudMonitoringSection() {
           documentsList.length > 0 ? documentsList : undefined,
       };
 
-      if (investigationActionType === "suspend") {
-        // Calculate suspension duration in milliseconds
-        const durationMs =
-          suspendDuration *
-          (suspendUnit === "hours"
-            ? 3600000
-            : suspendUnit === "days"
-              ? 86400000
-              : 604800000); // weeks
+      // Reason: hours / days / weeks, matching the dialog's unit selector.
+      const durationMs =
+        suspendDuration *
+        (suspendUnit === "hours"
+          ? 3600000
+          : suspendUnit === "days"
+            ? 86400000
+            : 604800000);
+
+      if (investigationActionType === "investigate") {
+        body.restrict = restrictDuringInvestigation;
+        // Only meaningful when restricting, but harmless to always send - the
+        // route ignores it unless `restrict` is true.
+        body.suspendUntil = new Date(Date.now() + durationMs).toISOString();
+        endpoint = "/api/fraud/investigation/open";
+      } else if (investigationActionType === "suspend") {
         body.suspendUntil = new Date(Date.now() + durationMs).toISOString();
         endpoint = "/api/fraud/investigation/suspend";
       } else if (investigationActionType === "ban") {
@@ -731,7 +764,10 @@ export default function FraudMonitoringSection() {
         // Refresh alerts
         await fetchAlerts();
       } else {
-        toast.error(data.message || "Failed to perform action");
+        // Reason: these routes are inconsistent about the failure field - the
+        // older ones return `message`, the newer `error`. Read both so a real
+        // reason reaches the admin instead of the generic fallback.
+        toast.error(data.error || data.message || "Failed to perform action");
       }
     } catch (error) {
       console.error("Error performing investigation action:", error);
@@ -739,20 +775,19 @@ export default function FraudMonitoringSection() {
     }
   };
 
-  const handleElevateToInvestigation = async (alertId: string) => {
-    try {
-      await handleUpdateAlertStatus(
-        alertId,
-        "investigating",
-        "none",
-        "Elevated to Investigation Center for detailed review",
-      );
-      toast.success("Alert elevated to Investigation Center");
-      await fetchAlerts();
-    } catch (error) {
-      console.error("Error elevating alert:", error);
-      toast.error("Failed to elevate alert");
-    }
+  /**
+   * Open the investigation dialog rather than silently flipping the status.
+   *
+   * Reason: this used to PUT `status: "investigating"` and nothing else. The
+   * player was never told, no restriction was created, and the admin was offered
+   * no choice - yet an admin who elevated an alert reasonably believed they had
+   * put the account under review. Meanwhile the account really was locked out of
+   * contest entry, by a suspicion-score check the admin could neither see nor
+   * undo. That check is gone, so elevating now has to state its consequence:
+   * notify the player, and let the admin decide whether to restrict.
+   */
+  const handleElevateToInvestigation = (alert: FraudAlert) => {
+    handleInvestigationAction(alert, "investigate");
   };
 
   const handleUpdateAlertStatus = async (
@@ -1170,9 +1205,7 @@ export default function FraudMonitoringSection() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() =>
-                              handleElevateToInvestigation(alert._id)
-                            }
+                            onClick={() => handleElevateToInvestigation(alert)}
                             className="bg-blue-600/20 border-blue-500/50 text-blue-400 hover:bg-blue-600/30"
                           >
                             <Activity className="h-4 w-4 mr-1" />
@@ -1864,9 +1897,7 @@ export default function FraudMonitoringSection() {
                   Dismiss
                 </Button>
                 <Button
-                  onClick={() =>
-                    handleElevateToInvestigation(selectedAlert._id)
-                  }
+                  onClick={() => handleElevateToInvestigation(selectedAlert)}
                   className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
                 >
                   <Activity className="h-4 w-4 mr-2" />
@@ -1980,11 +2011,16 @@ export default function FraudMonitoringSection() {
               {investigationActionType === "ban" && (
                 <Ban className="h-6 w-6 text-red-500" />
               )}
+              {investigationActionType === "investigate" && (
+                <Activity className="h-6 w-6 text-blue-500" />
+              )}
               {investigationActionType === "dismiss"
                 ? "Dismiss Investigation"
                 : investigationActionType === "suspend"
                   ? "Suspend Accounts"
-                  : "Ban Accounts"}
+                  : investigationActionType === "investigate"
+                    ? "Open Investigation"
+                    : "Ban Accounts"}
             </DialogTitle>
             <DialogDescription className="text-gray-400">
               {investigationActionType === "dismiss" &&
@@ -1993,6 +2029,8 @@ export default function FraudMonitoringSection() {
                 "Temporarily suspend all suspicious accounts for a specified duration."}
               {investigationActionType === "ban" &&
                 "Permanently ban all suspicious accounts from the platform."}
+              {investigationActionType === "investigate" &&
+                "Put these accounts under review. They stay fully active unless you choose to restrict them below."}
             </DialogDescription>
           </DialogHeader>
 
@@ -2000,11 +2038,14 @@ export default function FraudMonitoringSection() {
             <div className="space-y-4 py-4">
               {/* Account Selection */}
               {(investigationActionType === "ban" ||
-                investigationActionType === "suspend") && (
+                investigationActionType === "suspend" ||
+                investigationActionType === "investigate") && (
                 <div className="p-4 bg-gray-800 rounded border border-gray-700">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-sm text-gray-300 font-semibold">
-                      Select Accounts to Restrict
+                      {investigationActionType === "investigate"
+                        ? "Select Accounts to Investigate"
+                        : "Select Accounts to Restrict"}
                     </p>
                     <div className="flex gap-2">
                       <Button
@@ -2068,9 +2109,43 @@ export default function FraudMonitoringSection() {
                 </div>
               )}
 
+              {/* Opening an investigation: restrict, or leave active? */}
+              {investigationActionType === "investigate" && (
+                <div
+                  className={`p-4 rounded border transition-colors ${
+                    restrictDuringInvestigation
+                      ? "bg-yellow-900/20 border-yellow-700/40"
+                      : "bg-gray-800 border-gray-700"
+                  }`}
+                >
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={restrictDuringInvestigation}
+                      onChange={(e) =>
+                        setRestrictDuringInvestigation(e.target.checked)
+                      }
+                      className="w-4 h-4 mt-0.5"
+                    />
+                    <span>
+                      <span className="text-sm text-gray-200 font-semibold">
+                        Also restrict these accounts while I investigate
+                      </span>
+                      <span className="block text-xs text-gray-400 mt-1">
+                        {restrictDuringInvestigation
+                          ? "A suspension will be created for each account. It appears under Restricted Users and you can lift it at any time."
+                          : "Leave unchecked to investigate without limiting anyone. The accounts and their linked accounts stay fully active, and the players are told their account is under review."}
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              )}
+
               {/* Restriction Settings */}
               {(investigationActionType === "ban" ||
-                investigationActionType === "suspend") && (
+                investigationActionType === "suspend" ||
+                (investigationActionType === "investigate" &&
+                  restrictDuringInvestigation)) && (
                 <>
                   <div className="space-y-3">
                     <Label className="text-gray-300 text-sm font-semibold">
@@ -2145,6 +2220,19 @@ export default function FraudMonitoringSection() {
                         />
                         <span className="text-sm text-gray-300">
                           Enter Competitions
+                        </span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={blockChallenges}
+                          onChange={(e) =>
+                            setBlockChallenges(e.target.checked)
+                          }
+                          className="w-4 h-4"
+                        />
+                        <span className="text-sm text-gray-300">
+                          Enter 1v1 Challenges
                         </span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
@@ -2235,7 +2323,9 @@ export default function FraudMonitoringSection() {
                 </>
               )}
 
-              {investigationActionType === "suspend" && (
+              {(investigationActionType === "suspend" ||
+                (investigationActionType === "investigate" &&
+                  restrictDuringInvestigation)) && (
                 <div className="p-4 bg-yellow-900/20 border border-yellow-700/30 rounded">
                   <Label className="text-gray-300 text-sm font-semibold mb-3 block">
                     Suspension Duration
@@ -2323,15 +2413,22 @@ export default function FraudMonitoringSection() {
                   ? "bg-green-600 hover:bg-green-700"
                   : investigationActionType === "suspend"
                     ? "bg-yellow-600 hover:bg-yellow-700"
-                    : "bg-red-600 hover:bg-red-700"
+                    : investigationActionType === "investigate"
+                      ? restrictDuringInvestigation
+                        ? "bg-yellow-600 hover:bg-yellow-700"
+                        : "bg-blue-600 hover:bg-blue-700"
+                      : "bg-red-600 hover:bg-red-700"
               }
             >
-              Confirm{" "}
               {investigationActionType === "dismiss"
-                ? "Dismissal"
+                ? "Confirm Dismissal"
                 : investigationActionType === "suspend"
-                  ? "Suspension"
-                  : "Ban"}
+                  ? "Confirm Suspension"
+                  : investigationActionType === "investigate"
+                    ? restrictDuringInvestigation
+                      ? "Open Investigation & Restrict"
+                      : "Open Investigation"
+                    : "Confirm Ban"}
             </Button>
           </DialogFooter>
         </DialogContent>

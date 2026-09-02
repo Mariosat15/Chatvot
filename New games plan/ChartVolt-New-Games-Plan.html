@@ -483,9 +483,19 @@
         <p style="margin-bottom:0">Two things about this are worth more than the bug. First, <b>the automatic blueprint guard could not have caught it</b> &mdash; both applications were wrong in exactly the same way, so they agreed with each other perfectly. The guard proves the two apps match; it cannot prove either one matches the code writing to it. Second, this is now the <b>third</b> fault of that shape found in Stage 0, and the only reason this one surfaced is that a claim written in passing, in a paragraph about something else, was verified instead of assumed.</p>
       </div>
 
+      <div class="cal plain">
+        <div class="t">A player locked out by a number nobody could see &mdash; reported, not predicted</div>
+        <p>This one came from you, from a real player, and none of the audit work would have found it. A player was refused entry to a paid head-to-head challenge. Nobody had suspended them &mdash; an alert had been raised to "investigation" and nothing more. The player was told nothing. Dismissing the investigation released nothing. And there was <b>no unblock button anywhere</b>, because the account was not on the restricted list; there was no suspension to lift. Automatic suspension was switched <b>off</b> the entire time.</p>
+        <p>The cause was that <b>two different things could block a player, and only one of them was visible.</b> A suspension is deliberate: it shows on the restricted list, the player is told, and you can lift it. The other is a fraud <i>score</i>, raised automatically by the detection system &mdash; and the entrance was refusing anyone whose score passed a threshold. That refusal appeared on no screen, sent no message, and <b>could not be undone by anything in the admin area</b>: the only score control that existed was a recalculate, which can only push a score up. Worse, it read its own threshold and <b>never once checked whether you had turned automatic suspension on</b>. Your decision to leave it off was being overruled by a mechanism you could not see.</p>
+        <p>The cruellest detail is the sequence you actually hit. The player's dashboard explains an account problem only while an alert is <i>open</i>. So <b>dismissing the alert deleted the last remaining explanation while the block stayed put</b> &mdash; the one action that should have released them made the situation less explicable instead.</p>
+        <p>The rule now is one line: <b>scores raise alerts; only suspensions block.</b> A score can no longer refuse anyone by itself. The threshold has been renamed to what it now does &mdash; escalate an account for a human to look at. Raising an alert to investigation now <b>asks you whether to restrict the accounts</b>, with the same options a suspension has; decline, and the player stays fully active. Either way <b>the player is told their account is under review</b>, and told again when a review closes with no action. And dismissing now genuinely clears the score &mdash; it always claimed to, in its own history entry, while only ever clearing a different one.</p>
+        <p style="margin-bottom:0">Digging into it turned up <b>five more live faults</b>, none of them what was being looked for. The two worth your attention: a page in the player app let <b>any logged-in player raise another player's fraud score</b> &mdash; enough to lock a rival out of a competition they were about to lose &mdash; or wipe their own; all three of its functions were labelled "admin only" in the code and none of them checked. And automatic suspension, when switched on, was <b>permanent</b> while telling everyone it was seven days, because it wrote the end date into a field the database had never been told about. The other three: automatic suspension almost never fired at its default setting; suspended and banned accounts <b>could still accept paid head-to-head challenges</b>; and clearing a score never recorded how much it had removed. All five are fixed.</p>
+      </div>
+
       <div class="cal info">
         <div class="t">Why this had to happen before the games work</div>
         <p>The games project adds <b>more ways to join a contest</b>. Building new doors on top of doors that already disagreed about money and security would have multiplied the bug instead of fixing it. That is the road to double charges and unpaid winners. There is now a single entrance for every future game to join through, which was the whole point of doing this first.</p>
+        <p style="margin-bottom:0">The fraud fault above matters here for a different reason. A new game will be <b>cheaper and quicker to enter than a trading contest</b>, so it will trip the fraud detection far more often &mdash; which means the difference between a block you can see and lift and one you cannot is about to matter a great deal more than it did.</p>
       </div>
 
       <!-- ---------- DEFECT 2 ---------- -->
@@ -1828,7 +1838,7 @@
   <div class="ph">
     <div class="ph-row s0">
       <div class="ph-id">STAGE 0</div>
-      <div class="ph-b"><b>Prerequisite fixes &mdash; SEPARATE JOB, YOUR SIGN-OFF</b>One entrance instead of four, prize-pool defect fixed, missing checks added to challenge entry, blueprints synced, permanent automatic guard added, money tests written. No visible change. The simulator security fix is already done.</div>
+      <div class="ph-b"><b>Prerequisite fixes &mdash; SEPARATE JOB, YOUR SIGN-OFF</b>One entrance instead of four, prize-pool defect fixed, missing checks added to challenge entry, blueprints synced, permanent automatic guard added, money tests written. The invisible fraud block removed, so only a real suspension stops a player. Almost no visible change, except that raising an alert to investigation now asks you whether to restrict. The simulator security fix is already done.</div>
       <div class="ph-e">6&ndash;9 days</div>
     </div>
     <div class="ph-row">
@@ -1912,7 +1922,7 @@
 
 <footer class="foot">
   <span><b>ChartVolt</b> &mdash; New Games Plan &middot; Plan only, no code changed &middot; Based on six audits of the live codebase</span>
-  <span>17 August 2026 &middot; v1.4, revised 1 September 2026 (Stage 0 code complete &mdash; Defects 1 and 2 built, four entry paths resolved, seven live defects found and fixed)</span>
+      <span>17 August 2026 &middot; v1.5, revised 2 September 2026 (Stage 0 code complete &mdash; Defects 1 and 2 built, four entry paths resolved, and the invisible fraud block removed; twelve live defects found and fixed)</span>
 </footer>
 
 <script>

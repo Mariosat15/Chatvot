@@ -15,10 +15,10 @@
 
 | | |
 |---|---|
-| **Status** | **STAGE 0 CODE COMPLETE, awaiting owner test.** Prerequisite A shipped. Defects 2 and 1 built. **Sub-defect 1b, the `SuspicionScore` races and the undeclared `challengeId` ledger field all fixed.** No open engineering items |
-| **Next action** | Owner runs the test checklist in `00a` — 5 manual items, down from 11+ after automation. Nothing else is blocked on a decision |
+| **Status** | **STAGE 0 CODE COMPLETE, awaiting owner test.** Prerequisite A shipped. Defects 2 and 1 built. Sub-defect 1b, the `SuspicionScore` races and the `challengeId` ledger field all fixed. **Prerequisite B added and fixed 2 Sep 2026 — an owner-reported live incident: a player silently locked out of paid entry by their suspicion score, with no admin lever to release them. Five further live defects found underneath it.** No open engineering items |
+| **Next action** | Owner runs the test checklist in `00a` — 5 manual items, plus the Prerequisite B checklist. Owner also needs to **allowlist this machine's IP in MongoDB Atlas** so the release script can be run; the code fix releases the affected player regardless |
 | **Owner instruction on record** | "I will need to start today" (1 Sep 2026), superseding "don't start anything" (17 Aug 2026) |
-| **Last updated** | 1 September 2026 |
+| **Last updated** | 2 September 2026 |
 
 Stage 0 began on 1 September 2026. The games plan itself (P1-P7) remains untouched and
 does not start until the owner ticks the Stage 0 sign-off gate.
@@ -361,6 +361,103 @@ Template:
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 2 Sep 2026 - Prerequisite B: an invisible entry block, and five defects under it
+
+**Reported by the owner, not found by planning.** A player was refused entry to a paid
+1v1 challenge with "Entry is temporarily blocked while your account is under review". The
+owner had **not** suspended anyone - they had only elevated a fraud alert to
+"investigation". The player received no notification. Dismissing the investigation changed
+nothing. There was no unblock control anywhere in the admin app. **Auto-Suspend was OFF the
+whole time.**
+
+**Root cause: two independent blocking systems, only one of them visible.**
+`UserRestriction` is visible on the Restricted Users screen, notifies the player and has a
+Lift button. `SuspicionScore` is raised automatically by detectors, and
+`entry-fraud-gate.service.ts` refused entry above `entryBlockThreshold` (default 70) on the
+strength of it alone - invisible to the admin, silent to the player, and with no reset
+anywhere in the admin UI, permanent. It read `entryBlockThreshold` and **never looked at
+`autoSuspendEnabled`**, so the owner's decision to leave automatic suspension off was
+bypassed by a mechanism they could not see.
+
+**Owner decisions (2 Sep 2026):** the score never blocks on its own - only a real
+restriction does; `entryBlockThreshold` is relabelled a **Review threshold**; the
+unprotected route is deleted; and a one-off release script is written and run.
+
+**Five further live defects were found while fixing it.** Each is worth stating because
+none was the thing being looked for:
+
+1. **A player-app route let any logged-in user rewrite anyone's fraud score.**
+   `app/api/fraud/suspicion-score/route.ts` had GET, POST and DELETE all commented "admin
+   only" while checking only that *someone* was signed in. A player could read the whole
+   high-risk list, **raise a rival's score to block them out of a competition**, or clear
+   their own. Nothing called it - the admin UI hits the admin app's properly guarded copy -
+   so it was deleted. **Same shape as Prerequisite A**, and that is now three times a
+   comment has claimed authorization the code never performed.
+2. **Suspended and banned accounts could still accept paid 1v1 challenges.**
+   `canEnterChallenges` was the only one of five permission flags defaulting to *allowed*,
+   and **10 of the 11 writers that create a restriction never set it**. Fixed at the schema
+   default rather than across ten call sites, which also preserves the one writer with
+   genuine intent (`duplicateKYCBlockChallenges`). Existing rows store a real `true` and
+   need the migration in the script.
+3. **Auto-suspend was close to unreachable at its default setting.** It ran only when the
+   risk *band* changed. Bands are 30/50/70; `autoSuspendThreshold` defaults to 90. A score
+   entering "critical" at 72 was correctly turned away for being under 90 and **never
+   checked again however high it climbed**. So the toggle did nothing unless one detection
+   jumped a score from below 70 to 90+ in a single step.
+4. **Auto-suspensions were permanent, while reporting seven days.** The branch set
+   `suspensionEndsAt`, which `UserRestriction` does not declare. Strict mode discarded it,
+   leaving `expiresAt` unset - which this model defines as a permanent ban - while the
+   reason text and the fraud-history entry both promised 7 days.
+5. **`resetScore()` always recorded a delta of `-0`.** It computed `delta: -this.totalScore`
+   *after* zeroing the total, so the one trace a reset leaves never said how much it
+   removed. It also hardcoded "Manual reset by admin", making a dismissed investigation
+   indistinguishable from a hand reset. Now takes a reason.
+
+**Shipped:** score-based entry refusal removed; `Review Threshold` relabel across both
+models, both settings services and the admin UI; dead `shouldBlockEntry` helper deleted in
+both apps; unprotected route deleted; new `POST /api/fraud/investigation/open` which opens
+an investigation, notifies the player and offers the full suspension options; two new
+notification templates (`account_under_review`, `account_review_closed`); Dismiss now
+clears the suspicion score it had always *claimed* to clear and tells the player the review
+closed; `canEnterChallenges` default flipped and set explicitly in the suspend, ban and
+auto-suspend paths; a challenges checkbox added to the investigation dialog, which had
+never existed.
+
+**Files touched:** `lib/services/fraud/entry-fraud-gate.service.ts`,
+`lib/services/fraud/suspicion-scoring.service.ts` (+ admin mirror),
+`lib/services/fraud-settings.service.ts` (+ admin mirror),
+`database/models/user-restriction.model.ts`, `database/models/fraud/suspicion-score.model.ts`,
+`database/models/fraud/fraud-settings.model.ts`, `database/models/notification-template.model.ts`
+(all + admin mirrors), `apps/admin/app/api/fraud/investigation/{open,dismiss,suspend,ban}/route.ts`,
+`apps/admin/lib/services/fraud/review-packet.ts` (new),
+`apps/admin/lib/services/notification.service.ts`,
+`apps/admin/components/admin/{FraudMonitoringSection,FraudSettingsSection}.tsx`,
+`tools/fraud/fix-entry-blocked-users.ts` (new),
+`__tests__/services/fraud-entry-block.test.ts` (new, 9 tests).
+
+**Deviated from plan:** Prerequisite B was not in the plan at all - it came from a live
+incident report. The `entryBlockThreshold` field keeps its name in the schema despite
+meaning something else now; renaming it would be a mirrored migration for a cosmetic gain,
+so the name is documented as historical in both model copies instead.
+
+**Verified:** suite **252 tests, all passing** (was 243). Mirrors 75/75, zero drift. Main
+typecheck 15, admin 225 - both exactly at baseline. Lint clean on every changed file.
+**Each fix was probed** by reintroducing the defect and confirming the tests go red: the
+score block turned 4 tests red, the challenge default exactly 1.
+
+**Owner tested:** not yet.
+
+**Deferred:** the release script **could not be run** - Atlas refuses this machine's IP
+(`TCP 27017 unreachable`), the same blocker that stops `npm run build`. The code fix
+releases the affected player without it. The script still needs running for the legacy
+`canEnterChallenges` rows, which the code fix does *not* repair.
+
+**Next chat should:** ask the owner to allowlist the IP, then run
+`npx tsx tools/fraud/fix-entry-blocked-users.ts` (report first, it changes nothing) followed
+by `--close-challenge-hole`.
 
 ---
 

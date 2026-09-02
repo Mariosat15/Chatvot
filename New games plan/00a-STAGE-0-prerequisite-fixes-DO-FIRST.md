@@ -35,6 +35,12 @@ defects, all recorded below.
 | 1 Sep 2026 | **Owner decision:** joining a competition is **allowed outside market hours**; only trading itself is gated. Unifying the gates would otherwise have adopted Gate B's behaviour and blocked weekend sign-ups for Monday contests - a revenue regression introduced by a bug fix. Now locked in by test 12 |
 | 1 Sep 2026 | **Proven, was previously an inference:** competition entry-fee ledger rows carry **no competition reference at all**. `referenceId` is not in the schema and `competitionId` is never set. Measured against a real MongoDB in `__tests__/services/entry-fee-ledger.test.ts`. Harm is a broken audit trail, not a wrong balance - checked, not assumed |
 | 1 Sep 2026 | **New, live in production, and a correction to a claim this document made:** `challengeId` was declared on **neither** `WalletTransaction` copy, so **nine** writers - challenge entry, the decline refund, and six finalization payouts - had it silently dropped. **The entire challenge money trail was unattributable to its challenge.** This document previously asserted the opposite; the bug was found by checking that sentence. Fixed add-only in both copies |
+| 2 Sep 2026 | **New, reported by the owner from a live incident:** a player was locked out of paid entry by their **suspicion score alone**. Invisible to the admin, unnotified to the player, unaffected by dismissing the investigation, and with **no release control anywhere in the admin app**. Recorded as **Prerequisite B** below |
+| 2 Sep 2026 | **New, live in production:** `app/api/fraud/suspicion-score/route.ts` in the **player** app let any signed-in user read the high-risk list, **raise another player's fraud score**, or clear their own. All three handlers were commented "admin only". Deleted - the admin app has a properly guarded copy and nothing called this one. **Third instance of a comment claiming authorization the code never performed** |
+| 2 Sep 2026 | **New, live in production:** suspended and banned accounts **could still accept paid 1v1 challenges**. `canEnterChallenges` was the only permission flag defaulting to *allowed*, and 10 of 11 restriction writers never set it |
+| 2 Sep 2026 | **New, live in production:** **Auto-Suspend did almost nothing at its default setting.** It ran only on a risk-*band* change (30/50/70) while its threshold defaults to **90**, so a score entering "critical" at 72 was never re-checked however high it climbed |
+| 2 Sep 2026 | **New, live in production:** auto-suspensions were **permanent while reporting seven days**. The branch set `suspensionEndsAt`, which `UserRestriction` does not declare, so strict mode discarded it and left `expiresAt` unset - which this model treats as a permanent ban |
+| 2 Sep 2026 | **New:** `resetScore()` computed `delta: -this.totalScore` **after** zeroing the total, so every reset recorded `-0` and the audit trail never said how much was removed |
 
 ---
 
@@ -110,6 +116,139 @@ process.
       `description: "Simulator deposit"` or `metadata.simulatorMode: true`, and reconcile
       `totalDeposited` against Nuvei and Atlas records. A real exploit leaves an inflated
       wallet with no matching payment-provider record.
+
+---
+
+# PREREQUISITE B - The invisible fraud block (FIXED 2 Sep 2026, awaiting owner test)
+
+**Reported by the owner from a live incident, not found by planning.** It is recorded as a
+prerequisite rather than a defect of its own because it locks real players out of paid
+entry today, and because two of the defects underneath it sit directly on the money layer
+the games work will build on.
+
+## What the owner saw
+
+A player was refused entry to a paid 1v1 challenge. The owner had **not** suspended
+anybody - they had elevated a fraud alert to "investigation" and nothing more. From there:
+
+- the player got **no notification**, and nothing on their dashboard explained the refusal;
+- **dismissing** the investigation released nothing;
+- the admin app offered **no way to unblock**, because the account appeared nowhere on the
+  Restricted Users screen - there was no restriction to lift;
+- and **Auto-Suspend was switched off** for the whole episode.
+
+## Root cause - two blocking systems, one of them invisible
+
+| | `UserRestriction` | `SuspicionScore` |
+|---|---|---|
+| Created by | An admin, deliberately | Fraud detectors, automatically |
+| Visible to the admin | Yes - Restricted Users screen | **No screen shows it** |
+| Player told | Yes - notification + `/account/review` | **No** |
+| Reversible | Yes - Lift button | **Nothing in the admin UI could lower it.** The one score endpoint the UI calls is a *recalculate*, which can only raise it |
+| Blocked paid entry | Yes | **Yes** - and this is the defect |
+
+`lib/services/fraud/entry-fraud-gate.service.ts` returned `RISK_SCORE_BLOCKED` whenever
+`totalScore` exceeded `entryBlockThreshold` (default **70**). Two consequences made it
+worse than a hidden block:
+
+1. It read `entryBlockThreshold` and **never looked at `autoSuspendEnabled`**. The owner's
+   deliberate decision to leave automatic suspension off was bypassed by a mechanism they
+   could not see, which is exactly the complaint.
+2. The dashboard's account-status card renders only while an alert is **pending or
+   investigating**. Dismissing the alert therefore removed the last remaining hint that
+   anything was wrong, **while the block stayed** - the sequence the owner hit.
+
+## The fix
+
+**Blocking entry is now solely the job of `UserRestriction`**, which is visible, notifies
+the player and can be lifted. A high score raises an alert for a human to judge. It creates
+a restriction only when the admin has turned `autoSuspendEnabled` on - and that restriction
+is a normal, liftable one.
+
+| Change | Where |
+|---|---|
+| Score-based refusal removed, with the reasoning kept in place as a comment so it is not reintroduced | `lib/services/fraud/entry-fraud-gate.service.ts` |
+| `entryBlockThreshold` relabelled **Review Threshold**, amber not red, with copy telling the admin it no longer blocks and how to block | both `fraud-settings` models, both services, `FraudSettingsSection.tsx` |
+| Dead `shouldBlockEntry()` helper deleted - it invited the defect straight back | both `fraud-settings.service.ts` copies |
+| **Elevate to investigation now opens a dialog** offering the full suspension options, plus an explicit "restrict during investigation" choice. Decline it and the player stays active | `FraudMonitoringSection.tsx`, new `POST /api/fraud/investigation/open` |
+| Player is notified when a review opens **and** when it closes with no action | two new templates, `notification.service.ts` |
+| **Dismiss now clears the suspicion score it always claimed to clear.** It had only ever reset `DeviceFingerprint.riskScore` while its own history entry said otherwise | `investigation/dismiss/route.ts` |
+
+**Do not reintroduce a score-based refusal in the entry gate.** If automatic action is
+wanted, raise a restriction, so it stays reversible.
+
+## Five further live defects found underneath it
+
+Stated separately because none was the thing being looked for, and each stands alone.
+
+1. **A player-app route let any signed-in user rewrite anyone's fraud score.** GET, POST
+   and DELETE on `app/api/fraud/suspicion-score/route.ts`, all three commented "admin
+   only", all three checking only that a session existed. A player could enumerate the
+   high-risk list, **raise a rival's score to lock them out of a competition**, or clear
+   their own. Deleted: nothing called it, and the admin app's copy is properly guarded.
+   **This is the same shape as Prerequisite A** - the third time a comment has asserted an
+   authorization check the code never performed. Treat that pattern as a class of bug now,
+   not three incidents.
+2. **Suspended and banned accounts could still accept paid 1v1 challenges.**
+   `canEnterChallenges` defaulted to `true` while its four siblings defaulted to `false`,
+   and **10 of the 11 restriction writers never set it**. Fixed at the schema default, not
+   across ten call sites - which also leaves intact the single writer with real intent, the
+   duplicate-KYC path driven by `duplicateKYCBlockChallenges`. The investigation dialog had
+   no challenges checkbox at all; it now does.
+3. **Auto-Suspend was near-unreachable at its default setting.** The check ran only when the
+   risk *band* changed - bands are 30/50/70, and `autoSuspendThreshold` defaults to **90**.
+   A score crossing into "critical" at 72 was correctly turned away for being under 90 and
+   **never examined again, however high it climbed**. The toggle only ever worked if a
+   single detection jumped a score from below 70 to 90+ in one step. Now checked on every
+   update, guarded by `autoRestrictedAt` so it still fires once.
+4. **Auto-suspensions were permanent while promising seven days.** The branch set
+   `suspensionEndsAt`; `UserRestriction` declares `expiresAt`. Strict mode dropped the
+   undeclared field, and an unset `expiresAt` is this model's definition of a permanent ban -
+   while the reason text and the fraud-history entry both said 7 days. **Note this is the
+   same failure mode as Defect 2's mirror drift**, arriving from a different direction: not
+   two copies disagreeing, but one writer disagreeing with the schema. The mirror guard
+   cannot catch it.
+5. **`resetScore()` always recorded a delta of `-0`.** It computed `delta: -this.totalScore`
+   *after* setting the total to zero, so the single trace a reset leaves never recorded how
+   much it removed. It also hardcoded "Manual reset by admin", so a dismissed investigation
+   was indistinguishable from a hand reset. It now takes a reason and captures the previous
+   total first.
+
+## Tests
+
+`__tests__/services/fraud-entry-block.test.ts` - **9 tests, all passing**, against a real
+MongoDB:
+
+| # | What it pins |
+|---|---|
+| 1-3 | The score alone never blocks - at the maximum score, and just above the review threshold - and `RISK_SCORE_BLOCKED` is never returned |
+| 4-5 | A restriction **does** block competitions and challenges, **including when the creator never set `canEnterChallenges`** |
+| 6 | An explicit `canEnterChallenges: true` is still honoured, so the KYC path keeps working |
+| 7 | Auto-Suspend **off** creates no restriction even at a very high score |
+| 8 | Auto-Suspend **on** creates a liftable restriction that blocks challenges **and carries a real `expiresAt`** |
+| 9 | Clearing a score zeroes the total, records the true delta and stores the reason |
+
+**Each fix was probed by reintroducing the defect**: the score block turns 4 red, the
+`canEnterChallenges` default turns exactly 1 red - and test 6 stays green through it, which
+is what proves the two behaviours are independent rather than one assertion covering both.
+
+## Owner checklist
+
+- [ ] **Allowlist this machine's IP in MongoDB Atlas.** Blocks the release script and
+      `npm run build` alike. Same blocker recorded under Environment below.
+- [ ] Run `npx tsx tools/fraud/fix-entry-blocked-users.ts` - **reports only, changes
+      nothing** - to see every player the old block was holding.
+- [ ] Run it again with `--user <id>` to clear the affected player's score. The code fix
+      already releases them; this clears the number so the admin screens read correctly.
+- [ ] Run `npx tsx tools/fraud/fix-entry-blocked-users.ts --close-challenge-hole`. **The
+      code fix does not repair existing rows** - Mongoose persisted the old `true`, so
+      already-restricted accounts can still accept challenges until this is run.
+- [ ] Elevate a test alert to investigation, **decline** the restriction, and confirm the
+      player can still enter and has a notification saying their account is under review.
+- [ ] Elevate another, **accept** the restriction, and confirm the player is refused, is
+      listed on Restricted Users, and can be lifted.
+- [ ] Dismiss an investigation and confirm the score returns to zero and the player is told
+      the review closed.
 
 ---
 

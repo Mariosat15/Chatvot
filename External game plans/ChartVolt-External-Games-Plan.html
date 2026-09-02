@@ -756,9 +756,9 @@
 
   <h3>A lesson from a defect found in our own code</h3>
 
-  <p>On 1 September 2026, while re-reading the contest entry code for the prerequisite fixes, we found a set of internal testing endpoints that could add credits to any wallet &mdash; and the only thing protecting them was a label the caller attached to their own request. No secret, no password. It was fixed and deployed the same day, and it is mentioned here rather than buried because <b>the same three mistakes are available in the callback described above</b>, where the stake is a score that decides prize money.</p>
+  <p>On 1 September 2026, while re-reading the contest entry code for the prerequisite fixes, we found a set of internal testing endpoints that could add credits to any wallet &mdash; and the only thing protecting them was a label the caller attached to their own request. No secret, no password. It was fixed and deployed the same day, and it is mentioned here rather than buried because <b>the same mistakes are available in the callback described above</b>, where the stake is a score that decides prize money. A fourth was added on 2 September 2026, from a second endpoint of the same shape found in the player app.</p>
 
-  <div class="grid g3">
+  <div class="grid g4">
     <div class="card" style="border-color:#f0c3c9;background:#fdedef">
       <h4 style="color:#a02a38">A lock that opens when unconfigured</h4>
       <p style="margin-bottom:0">The check accepted the request whenever the secret had not been set. Missing configuration became permission. <b>A security check must refuse when it does not know what to compare against</b> &mdash; never wave the request through.</p>
@@ -771,9 +771,13 @@
       <h4 style="color:#a02a38">A convenient bypass left in</h4>
       <p style="margin-bottom:0">A shortcut added to make local development easy was still active in production. <b>Any development bypass must be tied to the environment</b> and proved inactive outside it.</p>
     </div>
+    <div class="card" style="border-color:#f0c3c9;background:#fdedef">
+      <h4 style="color:#a02a38">A label instead of a lock</h4>
+      <p style="margin-bottom:0">Found 2 September 2026, and the <b>third</b> of this shape. A page in the player app was marked "admin only" on all three of its functions and checked only that <i>somebody</i> was logged in &mdash; letting any player raise a rival's fraud score, or wipe their own. Nothing called it, which is exactly why nobody looked. <b>A comment is not a check, and an endpoint nothing calls is still reachable.</b> Delete dead endpoints rather than leaving them to be assumed safe.</p>
+    </div>
   </div>
 
-  <p style="margin-bottom:0">All three apply directly to the signature verification on the result callback. They are written into the acceptance criteria for the phase that builds it, and recorded as <b>R27</b> in the risk register.</p>
+  <p style="margin-bottom:0">All four apply directly to the signature verification on the result callback. They are written into the acceptance criteria for the phase that builds it, and recorded as <b>R27</b> in the risk register.</p>
 </section>
 
 <!-- ============ 11. FAILURE ============ -->

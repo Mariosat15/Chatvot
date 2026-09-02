@@ -72,6 +72,13 @@ export async function POST(request: NextRequest) {
           restrictions.canEnterCompetitions !== undefined
             ? restrictions.canEnterCompetitions
             : false,
+        // Reason: added 2 Sep 2026. This route never set the flag, and the schema
+        // defaulted it to "allowed", so a permanently banned account could still
+        // accept paid 1v1 challenges.
+        canEnterChallenges:
+          restrictions.canEnterChallenges !== undefined
+            ? restrictions.canEnterChallenges
+            : false,
         canDeposit:
           restrictions.canDeposit !== undefined
             ? restrictions.canDeposit

@@ -687,11 +687,15 @@ export default function AdminWikiSection() {
               <div className="space-y-2 mt-3">
                 <div className="bg-gray-900 p-2 rounded">
                   <strong className="text-yellow-400">Investigate:</strong>{" "}
-                  Mark alert for review, gather more evidence, use AI report
+                  Marks the alert for review and asks you whether to restrict the accounts
+                  while you look into it. <strong className="text-white">Declining leaves
+                  them fully active</strong> — investigating on its own blocks nothing.
+                  Either way the player is notified that their account is under review.
                 </div>
                 <div className="bg-gray-900 p-2 rounded">
                   <strong className="text-orange-400">Suspend / Restrict:</strong>{" "}
-                  Block user from competitions or specific features
+                  Blocks the user from competitions, 1v1 challenges or specific features,
+                  for a period you choose. Appears on Restricted Users and can be lifted.
                 </div>
                 <div className="bg-gray-900 p-2 rounded">
                   <strong className="text-red-400">Ban / Deactivate:</strong>{" "}
@@ -699,8 +703,23 @@ export default function AdminWikiSection() {
                 </div>
                 <div className="bg-gray-900 p-2 rounded">
                   <strong className="text-green-400">Dismiss / Clear:</strong>{" "}
-                  Mark as false positive. Cleared users won&apos;t be re-flagged for the same evidence.
+                  Mark as false positive. Resets both the device risk score and the
+                  suspicion score to zero, and tells the player the review closed with no
+                  action. Cleared users won&apos;t be re-flagged for the same evidence.
                 </div>
+              </div>
+              <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded mt-3">
+                <strong className="text-amber-400">
+                  A suspicion score never blocks anyone on its own.
+                </strong>{" "}
+                <span className="text-gray-300">
+                  Only a suspension or ban blocks entry, and only Auto-Suspend does that
+                  automatically. Before 2 September 2026 a score above the (then-named)
+                  Entry Block Threshold silently refused paid entry with no restriction
+                  created, so the account showed nowhere and there was nothing to lift. If
+                  a player reports being blocked and you find no restriction for them, that
+                  is no longer possible — but check Restricted Users first.
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -1087,15 +1106,23 @@ export default function AdminWikiSection() {
             <CardContent className="space-y-4 text-gray-300">
               <div>
                 <h4 className="font-semibold text-white mb-2">
-                  Entry Block Threshold
+                  Review Threshold
+                  <span className="ml-2 text-[10px] font-normal text-amber-400/80">
+                    (was &ldquo;Entry Block Threshold&rdquo; before 2 Sep 2026)
+                  </span>
                 </h4>
                 <p className="text-xs text-gray-400 mb-2">
-                  Users with a suspicion score above this value are blocked from entering competitions.
+                  Scores above this value escalate the account for investigation.
+                  <strong className="text-amber-400"> It does not block anything by itself.</strong>{" "}
+                  Until 2 September 2026 it did, and that block was invisible: it created no
+                  restriction, so the account appeared nowhere on Restricted Users and there was
+                  nothing to lift. To actually stop someone entering, suspend or ban them, or
+                  turn on Auto-Suspend below.
                 </p>
                 <div className="bg-gray-900 p-3 rounded space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Lenient (85):</span>
-                    <span className="text-green-400">Few blocks, some fraud may pass</span>
+                    <span className="text-green-400">Few reviews, some fraud unexamined</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Balanced (70):</span>
@@ -1103,7 +1130,7 @@ export default function AdminWikiSection() {
                   </div>
                   <div className="flex justify-between">
                     <span>Strict (50):</span>
-                    <span className="text-red-400">Catches most fraud, some false positives</span>
+                    <span className="text-red-400">Catches most fraud, more to review</span>
                   </div>
                 </div>
               </div>
@@ -1118,9 +1145,12 @@ export default function AdminWikiSection() {
               <div>
                 <h4 className="font-semibold text-white mb-2">Auto-Suspend</h4>
                 <p className="text-xs text-gray-400">
-                  If enabled, accounts with suspicion score above the threshold (default: 90)
-                  are automatically suspended. Toggle this carefully — high risk of false positives
-                  on strict thresholds.
+                  If enabled, accounts with a suspicion score above the threshold (default: 90)
+                  are automatically suspended for 7 days. This is the{" "}
+                  <strong className="text-white">only</strong> setting that blocks an account
+                  automatically. It creates a normal restriction, so the player is notified and
+                  you can lift it from Restricted Users. Toggle it carefully — high risk of false
+                  positives on strict thresholds.
                 </p>
               </div>
             </CardContent>
