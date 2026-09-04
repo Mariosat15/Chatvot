@@ -27,6 +27,15 @@
  * The number that matters is the BEFORE/AFTER delta, not the absolute pass rate.
  */
 
+import dotenv from "dotenv";
+import path from "path";
+
+// Reason: loaded BEFORE any other import, because a module that reads process.env at load
+// time would otherwise see nothing. This matches backfill-game-labels.ts, and its absence
+// here was a real gap - the script read process.env.MONGODB_URI directly and refused to
+// run from a normal shell, which is the only way anyone was ever going to invoke it.
+dotenv.config({ path: path.resolve(process.cwd(), ".env") });
+
 import mongoose from "mongoose";
 
 import {
@@ -70,7 +79,15 @@ async function main() {
   const uri = process.env.MONGODB_URI;
 
   if (!uri) {
-    console.error("❌ MONGODB_URI is not set. Refusing to guess a connection string.");
+    // Reason: name the file it looked in. The usual cause is being run from a directory
+    // other than the project root, and a bare "not set" sends the reader hunting through
+    // their shell profile for a variable that was never the problem.
+    console.error(
+      "❌ MONGODB_URI is not set. Refusing to guess a connection string.\n" +
+        `   Looked for a .env in: ${path.resolve(process.cwd(), ".env")}\n` +
+        "   Run this from the project root, or pass it inline:\n" +
+        "     MONGODB_URI='...' npx tsx tools/games/replay-historical-rankings.ts",
+    );
     process.exit(1);
   }
 
