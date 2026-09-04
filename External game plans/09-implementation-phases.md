@@ -206,6 +206,57 @@ lands in `game_round`.
 **Done when:** a sandbox contest runs end to end - entry fees in, scores collected,
 ranked, prizes paid, ledger balanced to the cent.
 
+#### E4 build notes - PARTIALLY BUILT, 4 September 2026
+
+**Built: publish, entry and ranking. Not built: play, settlement and the refund.** A
+provider contest can now be published, entered and correctly ordered. Nobody can play one
+and nobody is paid. Do not read "entry works" as "the contest works".
+
+`ProviderGameModule` exists at `lib/games/provider/`, mirrored into the admin app, and is
+registered in both registries. One module serves every title from every provider - a new
+title is a catalogue row, a new provider is an adapter, and neither is a new module. The
+registry tripwire test was updated deliberately, and now asserts the list is exactly
+`["trading", "provider"]` with a note that a third entry means the engine has learned
+something game-specific.
+
+**Two P0 defects sat between a created contest and an entered one**, and neither was
+visible in the plan:
+
+- **A provider participant could not be SAVED.** `startingCapital`, `currentCapital` and
+  `availableCapital` were `required: true` with no default on `CompetitionParticipant`, and
+  a provider contest has no starting capital to copy. Now conditional on
+  `(this.gameKey || "trading") === "trading"`, mirrored, with the same load-bearing `||` as
+  `Competition.startingCapital`.
+- **A provider participant that did save was stamped `gameKey: "trading"`**, because the
+  entry service left the field to its schema default. R7-class, and worse than R7 was: the
+  row saves, nothing crashes, and `gameKey` is immutable so it cannot be corrected. The
+  seat is now built by `buildParticipantSeat()`, extracted so a test can compare its keys
+  against `schema.paths`.
+
+Publishing re-runs the whole pre-flight checklist against the **stored** contest rather
+than trusting creation-day validity, because a draft can outlive the switches that made it
+valid. It also runs `contestRoundConfig` against the saved document, which asks a question
+creation could not: whether the settings actually persisted.
+
+**Deliberately not built, and each for a reason rather than for time:**
+
+| Not built | Why |
+|---|---|
+| Round launch for players | Needs a player-facing surface; the round service itself is done (X3) |
+| Provider settlement | `routeToTradingSettlement` correctly returns `no_settle_path`. Paying out needs the trading finalize path's ranking, prize and Game Master stages reachable without its position-closing stage - an extraction, not a wiring job |
+| The `exclude` refund | Still `refundOwed: true`. Removing a player changes the prize pool, so the refund and the re-split are one transaction, and that transaction belongs with settlement |
+| Unpublish | There is deliberately no unpublish. A visible contest can be paid into; hiding it would strand paid entrants. Cancel is the reversible operation, and it refunds |
+
+Tests: `__tests__/services/provider-entry-and-ranking.test.ts` (23), all guards probed by
+`tools/probe-provider-entry.ps1` (10 red on the expected test). Full suite 636 green,
+including the golden ranking regression that pins trading.
+
+**One probe stayed green and the claim was corrected rather than the test strengthened.**
+The `isAtRisk` guard against dividing by absent capital changes no answer today, because
+`NaN < 60` is false exactly as the guard's explicit `false` is. It is kept for readability
+and because the accident holds only for `<`, and the code comment now says so instead of
+claiming a fix.
+
 ### E5 - Admin panel
 
 **`PARTIALLY BUILT` 4 September 2026** - provider registration, credentials, the per-title

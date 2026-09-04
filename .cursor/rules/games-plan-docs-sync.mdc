@@ -839,6 +839,62 @@ look exactly like a broken test. Fixes are in `tools/probe-contest-wizard.ps1`: 
 all whitespace in captured output before matching**, and **assert the file actually changed
 before believing any outcome**. **A probe harness needs its own probe.**
 
+### Five things from X5's first half - publish, entry and ranking (4 September 2026)
+
+A provider contest can now be published, entered and ranked. **Nobody can play one and
+nobody is paid**; settlement and the `exclude` refund remain.
+
+- **"Additive only" does not make a model general - it only stops it breaking.** X1 added
+  `score` and `gameKey` to `CompetitionParticipant` and removed nothing, which was right.
+  But three trading-capital fields were still `required: true` **with no default**, so a
+  provider participant **could not be saved at all**. The generalisation was purely
+  additive and the model stayed trading-only. **When you add a field for a new case, check
+  what the old fields still DEMAND** - the interesting requirement is the one nobody
+  touched. Same shape as the R7 correction: the absent thing, not the changed thing.
+- **A schema default fires before validation, so the obvious test of a `|| "trading"`
+  fallback proves nothing.** Deleting `gameKey` and expecting the predicate to see
+  `undefined` fails: Mongoose fills the default first. The test passed with and without the
+  `||`. An **empty string** does reach the predicate, because defaults fill `undefined`
+  only - and "" is a genuine missing-value shape, the same one the label backfill exists
+  for. **When a probe stays green, decide whether the test is weak or the CLAIM is wrong
+  before assuming the first** - here it was the test; one probe later it was the claim.
+- **A guard that changes no answer should say so rather than claim a fix.** The `isAtRisk`
+  NaN guard could not be probed red, because `NaN < 60` is false exactly as the guard's
+  explicit `false` is. It was kept - the accident holds only for `<`, and an "is healthy"
+  check written with `>` would silently be wrong - but the comment now records that it is
+  clarity, not a bug fix. **An overstated comment is a wrong fact**, the same duty as
+  correcting R7 downward.
+- **One module per GAME CATEGORY, never one per title or per provider - and the thing that
+  varies must travel on the data.** Direction is a property of the title (a puzzle scores
+  upward, a time trial downward), so a module-level constant would force one module per
+  title. It rides on `RankableParticipant.scoreDirection` instead, threaded in at
+  finalization. Two rules fall out: **store the RAW score** (a persisted `-92.4` shows a
+  race time as negative on every screen and poisons cross-game totals), and **negate only
+  at comparison**, so the engine keeps performing exactly one descending sort for every
+  game and no game reaches in to change how sorting works. The registry tripwire now
+  asserts `["trading", "provider"]` and says that a third entry means the engine has
+  learned something game-specific.
+- **A setting that a game cannot honour must not be offered.** The provider module ignores
+  `rankingMethod` completely, pinned by a test asserting all six methods return the same
+  value. Trading's six methods are six questions you can ask of a trading account; a
+  provider game reports one number. Six labels for one behaviour is a control that appears
+  to work and does nothing - the same failure as enabling a provider with no adapter, and
+  as the trading-shaped services in `matchmaking.service.ts`.
+
+**And two rules for anything that publishes.** Re-run the checklist against the **stored**
+record, not the caller's input and not the validation done on creation day - a draft can
+outlive the switches that made it valid, and reading the saved document also asks the
+question creation could not, which is whether the settings actually persisted. And
+**there is deliberately no unpublish**: a visible contest can be paid into, so hiding it
+strands paid entrants. Cancel-with-refund is the reversible operation, the same reasoning
+that gives providers a disable switch and no delete.
+
+**One more invented field caught by the schema, the fifth instance.** `publishedAt` was
+written into the publish update and removed: `Competition` does not declare it, so strict
+mode would have discarded it while the function reported success. It was dropped rather
+than declared, because `updatedAt` already carries the timestamp and the audit log already
+carries who did it - **add a mirrored field only when something will read it.**
+
 ## The rule
 
 **Documentation is part of the deliverable, not a follow-up task.** A phase is not
@@ -880,7 +936,8 @@ On every change during implementation:
 | The competition entry paths, wherever they appear | `New games plan` `00a`, `01-current-state-audit.md`, `05-prizes-money-layer.md`, `12-risk-register.md`, `PROGRESS.md`; `External game plans` `PROGRESS.md` and `17-risk-register.md`; `ChartVolt-New-Games-Plan.html`. There were **four** writers, now **two** — `lib/services/contest-entry.service.ts` behind both gates, plus the batch route fixed in place and the admin copy deleted. Any document still saying "two duplicate join paths" as a *present* fact is stale; as a description of what Stage 0 started from it is correct, so **say which** |
 | The game-provider admin surface, wherever it appears | `External game plans/12` s4 (the five destinations), s4.1 (copy the UX not the persistence) and s4.1a (what was built); `09` E5 checklist; `PROGRESS.md` X6 row and work log; `ChartVolt-External-Games-Plan.html` E5 row. **Two of the five destinations exist** — Providers and the per-title Games list. Any document implying E5 is finished is stale, and any implying the whole of X6 is done is more so: X6 also carries the contest wizard, analytics by provider and the Game Master creation API. **Credentials live only in `WhiteLabel.gameProviderCredentials` behind `select: false`** — a document describing them on `game_provider` is describing the payment-provider pattern that was deliberately not copied |
 | `ChartVolt-New-Games-Plan.html` and `-Partners.html` | The partner version must **never** mention Stage 0, the duplicate join paths, the admin mirror drift, or any current defect |
-| Any model change | Exists twice: `database/models/` and `apps/admin/database/models/`. Update both in the same commit. **`npm run check:mirrors` now enforces this** in CI and on `git push`, comparing field paths *and* enum values. Do not "fix" a failure by deleting an enum value to make two sides agree — that orphans every document already storing it. Add to the side that lacks it. Deliberate differences go in `tools/model-mirror/allowlist.ts` **with a reason** |
+| The contest-entry participant row, wherever it appears | `External game plans/11` seam 2 (and its build note), `09` E4, `PROGRESS.md` X5 row and work log. The row is built by **`lib/services/contest-entry/participant-seat.ts`**, not inline in the service - read that, not the prose. Two facts are load-bearing: the three virtual-capital fields are **conditional on `(this.gameKey \|\| "trading") === "trading"`** in both model copies, and `gameKey` is **copied from the contest, never defaulted**. Any document saying a participant always carries `startingCapital` is stale |
+| Any model change | Exists twice: `database/models/` and `apps/admin/database/models/`. Update both in the same commit. **`npm run check:mirrors` now enforces this** in CI and on `git push`, comparing field paths *and* enum values. It does **not** compare `required` predicate bodies, so a conditional requirement that differs between the apps is a validation rule whose outcome depends on which process saved the document, and the guard stays green. Do not "fix" a failure by deleting an enum value to make two sides agree — that orphans every document already storing it. Add to the side that lacks it. Deliberate differences go in `tools/model-mirror/allowlist.ts` **with a reason** |
 | Committed compiled `.js` files under `database/` and `lib/` | **All 113 deleted 1 Sep 2026** (57 `.js` + 56 `.js.map`), owner approved. A *separate, earlier* accident from the `.d.ts` one — emitted 22 Dec 2025, same 57 modules, and **six to seven months stale**. Critically, **these were NOT inert**: vitest resolved the stale `.js` in preference to the `.ts`, which made every model and every money-critical service **unimportable in tests** and blocked the whole of Defect 1. `tsx`, esbuild and `next build` all resolve the `.ts` correctly, so production was never affected — which is why it survived unnoticed. Two rules follow: **when deleting emitted output, look for the other half of the emit** (a `tsc` run that produced `.d.ts` produced `.js` too — the first cleanup removed one half and left the harmful one), and **prove which file a resolver picks rather than reasoning about it** — a missing export makes a perfect probe. The `.gitignore` rule is scoped to `/database/**` and `/lib/**`, never a blanket `*.js`, because `ecosystem.config.js`, `scripts/*.js`, `worker/build.mjs` and the `api-server` build are hand-written |
 | Committed `.d.ts` files | **All 112 deleted 1 Sep 2026** (57 `.d.ts` + 55 `.d.ts.map`), owner approved, with a `.gitignore` rule. They were orphaned February 2026 build output, stale, and **inert** — TypeScript resolves the sibling `.ts` first; proven by identical typechecks before and after (16 main, 225 admin). Earlier documents said "two", then "31 + 31" — the 31 counted only `database/` and missed 26 files under `lib/`. **Never treat a `.d.ts` as a third copy of a model to maintain.** Two files are deliberately kept and must stay tracked: `types/global.d.ts` (hand-written, no sibling `.ts`) and `websocket-server/dist/index.d.ts` (separate build). The rule for any future cleanup: delete a `.d.ts` only if a sibling `.ts` exists and it is not under `dist/` |
 

@@ -66,10 +66,19 @@ describe("resolving a module by game type", () => {
   });
 
   it("registers exactly the modules that exist today", () => {
-    // Reason: this is a tripwire, not a specification. The provider module arrives in X4
-    // and this test should then be updated deliberately - which is the point, because
-    // registering a module is the moment a whole game becomes reachable.
-    expect(listGameModules().map((m) => m.type)).toEqual(["trading"]);
+    // Reason: this is a tripwire, not a specification. It fired exactly as intended when
+    // X5 registered the provider module, and is updated here deliberately - which is the
+    // point, because registering a module is the moment a whole class of game becomes
+    // reachable and that should never happen as a side effect of something else.
+    //
+    // THE LIST MUST NOT GROW PER PROVIDER OR PER TITLE. One provider module serves every
+    // external game from every company; a new title is a catalogue row and a new company is
+    // an adapter. If a third entry ever appears here, the engine has learned something
+    // game-specific and that is the defect to investigate, not this assertion.
+    expect(listGameModules().map((m) => m.type)).toEqual([
+      "trading",
+      "provider",
+    ]);
   });
 });
 

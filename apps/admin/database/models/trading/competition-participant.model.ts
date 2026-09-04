@@ -16,9 +16,9 @@ export interface ICompetitionParticipant extends Document {
   gameKey: string; // Denormalised from the contest for cross-game statistics queries
 
   // Capital & Performance
-  startingCapital: number; // Initial trading points
-  currentCapital: number; // Updated real-time
-  availableCapital: number; // Not tied up in positions
+  startingCapital?: number; // Absent on a provider participant
+  currentCapital?: number; // Absent on a provider participant
+  availableCapital?: number; // Absent on a provider participant
   usedMargin: number; // Capital tied in open positions
 
   // P&L Metrics
@@ -95,19 +95,45 @@ const CompetitionParticipantSchema = new Schema<ICompetitionParticipant>(
       default: "trading",
       index: true,
     },
+    // The three virtual-capital fields, required only for a trading participant.
+    //
+    // Reason: a provider-game player has no starting capital - `Competition.startingCapital`
+    // is not even set on a provider contest - so an unconditional requirement made a
+    // provider participant unsaveable. It failed as a Mongoose validation error naming a
+    // concept the player was never shown.
+    //
+    // The `|| "trading"` is load-bearing, exactly as on `Competition.startingCapital`:
+    // `gameKey` defaults to "trading", but a row written before that default existed has
+    // none, and such a row IS a trading participant. Written as `this.gameKey === "trading"`
+    // an unlabelled trading participant would save with no capital and every downstream
+    // calculation would divide by it.
+    //
+    // Narrowing this is a change to TRADING's contract, not only an allowance for provider
+    // games - the guarantee moved out of the schema and into a predicate, and the predicate
+    // is now the only thing standing between a trading participant and a missing balance.
+    //
+    // MUST MATCH THE MAIN APP EXACTLY. `check:mirrors` compares field paths and enum values,
+    // NOT predicate bodies - so a difference here is a validation rule whose outcome depends
+    // on which process saved the document, and the guard would stay green.
     startingCapital: {
       type: Number,
-      required: true,
+      required: function (this: { gameKey?: string }) {
+        return (this.gameKey || "trading") === "trading";
+      },
       min: 0,
     },
     currentCapital: {
       type: Number,
-      required: true,
+      required: function (this: { gameKey?: string }) {
+        return (this.gameKey || "trading") === "trading";
+      },
       min: 0,
     },
     availableCapital: {
       type: Number,
-      required: true,
+      required: function (this: { gameKey?: string }) {
+        return (this.gameKey || "trading") === "trading";
+      },
       min: 0,
     },
     usedMargin: {
@@ -263,6 +289,17 @@ CompetitionParticipantSchema.virtual("profitFactor").get(function () {
 
 // Virtual for is at risk (close to margin call)
 CompetitionParticipantSchema.virtual("isAtRisk").get(function () {
+  // Reason: a provider-game participant has no capital, so the division below would be
+  // `undefined / undefined` = NaN, and `NaN < 60` is false.
+  //
+  // BE HONEST ABOUT WHAT THIS GUARD IS: today it changes no answer, because the accidental
+  // NaN result is the same `false` this returns deliberately. It is clarity and future
+  // safety, not a bug fix - a probe that removed it could not turn any test red, which is
+  // how that was established rather than assumed. It earns its place because the accident
+  // only holds for `<`: flip this to `>` for an "is healthy" check and NaN silently answers
+  // false to that too, which would then be wrong.
+  if (!this.startingCapital || this.currentCapital === undefined) return false;
+
   const capitalPercentage = (this.currentCapital / this.startingCapital) * 100;
   return capitalPercentage < 60; // Below 60% of starting capital
 });

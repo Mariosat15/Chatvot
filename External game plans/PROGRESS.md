@@ -263,23 +263,31 @@ path below is kept for reference only; do not plan against it.
    are done**: the navigation restructure (owner-tested), provider registration,
    credentials and the per-title switch, and the contest wizard with pre-flight validation.
 
-**Where the next engineer should actually start, and why it is not the next X6 slice.**
-The wizard can create a provider contest, but it saves a **draft** and nothing publishes,
-runs or settles one. So the remaining X6 screens - health, the round inspector, manual
-resolution, live-contest controls - would all be built against fixtures rather than real
-rounds, which is the same argument that held them back in the first place.
+6. **X5** - contest integration and settlement. **PARTIALLY BUILT, 4 September 2026.**
+   Publish, entry and ranking are done; play, settlement and the refund are not.
 
-That leaves two candidates, and they are not equivalent:
+**Where the next engineer should actually start.** X5's first half landed on 4 September:
+a provider contest can be published, entered and ranked. **It still cannot be played and
+nobody is paid**, so the remaining X6 screens - health, the round inspector, manual
+resolution - would still be built against fixtures, which is the argument that held them
+back originally.
 
-- **X4** (a real adapter against a provider sandbox) is blocked on a signed provider. If
-  one exists, this is first: everything after it is guesswork until a real provider has
-  answered a real call.
-- **X5** (contest integration and settlement) needs no provider and is the larger
-  unblocker. It is what makes a draft publishable, and it owns the entry-fee refund that
-  `03`'s `exclude` policy currently only *names* (`refundOwed: true`). Until X5, the
-  wizard produces contests nobody can play.
+The three pieces of X5 that remain, in dependency order:
 
-**If no provider is signed, go to X5.**
+- **Round launch for players.** The round service is finished (X3) and the contest bridge
+  reads its settings off the stored contest. What is missing is the player-facing surface
+  that calls it, which is the first thing that needs a player screen at all.
+- **Settlement.** `routeToTradingSettlement` correctly refuses a provider contest with
+  `no_settle_path`, which is the right answer and a dead end until there is a settle path.
+  The work is an extraction, not a wiring job: the trading finalize function's ranking,
+  prize-distribution, Game Master and leaderboard-write stages need to be reachable
+  **without** its position-closing and P&L-recalculation stages.
+- **The `exclude` refund.** Still `refundOwed: true`. Removing a player changes the prize
+  pool, so the refund and the re-split must be one transaction, which means it belongs with
+  settlement rather than before it.
+
+**X4 still jumps ahead if a provider is signed**, for the unchanged reason: everything
+built after that point is guesswork until a real provider has answered a real call.
 
 **Reference only - the add-on path, not being pursued:** Stage 0, then `New games plan`
 Phase 1, then **E1** of `09-implementation-phases.md`.
@@ -313,7 +321,7 @@ numbers in chapters `01`-`09` remain resolvable. **Plan against the X-phases bel
 | **X2** | Provider abstraction + mock adapter | `09` E1 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026. Nothing player-visible - `externalGamesEnabled` defaults false |
 | **X3** | Round lifecycle + result ingestion | `09` E2 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026. **Rehearsals 1-6 of `07` s9 green** against the mock (49 tests, 6 guards probed). 7-10 need X5/X8 |
 | **X4** | Real adapter against sandbox | `09` E3 | 1 week | `NOT STARTED` |
-| **X5** | Contest integration + settlement | `09` E4 | 1 week | `NOT STARTED` |
+| **X5** | Contest integration + settlement | `09` E4 | 1 week | `PARTIALLY BUILT` - publish, entry and ranking done 4 Sep 2026. Play, settlement and the `exclude` refund remain |
 | **X6** | Admin: nav restructure incl. **the single Trading section**, RBAC, provider registration, game-aware wizard, analytics, **GM creation API + wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | `PARTIALLY DONE` - nav restructure and single Trading destination **built and owner-tested 2 Sep 2026**. **Provider registration, credentials and the per-title catalogue switch code-complete 4 Sep 2026** (`12` s4.1a). **Contest wizard from `configSchema` + pre-flight validation code-complete 4 Sep 2026** (`12` s2.1) - creates a **draft only**; nothing publishes or settles it. Still `NOT STARTED`: provider health panel, round inspector, manual resolution, live-contest controls, provider contest **editing**, analytics by provider, GM creation API |
 | **X6.5** | **Admin wording pass** - brought forward from X8 so operators never work a games platform labelled "trading" | `14` | 0.5-1 week | `NOT STARTED` |
 | **X7** | Player UI + points, leaderboards, badges, levels, **profile and cross-game stats**, **per-game GM analytics** | `09` E6 + `13` + `05` + `19` | 3-4 weeks | `NOT STARTED` |
@@ -574,6 +582,65 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 4 Sep 2026 - X5 FIRST HALF - PUBLISH, ENTRY AND RANKING - PARTIALLY BUILT
+
+**Shipped:** a provider contest can be published, entered and correctly ranked.
+
+- `lib/games/provider/` - the provider game module (`config.ts`, `scoring.ts`,
+  `index.ts`), mirrored into the admin app and registered in both registries.
+- `lib/services/contest-entry/participant-seat.ts` - the participant row, extracted from
+  the inline object it used to be so a test can compare its keys against `schema.paths`.
+- `CompetitionParticipant`: the three virtual-capital fields are now conditional on the
+  game label. Mirrored.
+- `apps/admin/lib/services/game-providers/provider-contest-publish.service.ts` plus
+  `POST /api/games/contests/[competitionId]/publish`.
+- `RankableParticipant.scoreDirection`, so one provider module can serve titles that rank
+  in opposite directions.
+
+**Files touched:** the two participant models, `lib/games/{types,registry}.ts` and both
+mirrors, `contest-entry.service.ts` and `contest-entry/types.ts`, the new module and
+publish service, `__tests__/services/provider-entry-and-ranking.test.ts` (23 tests),
+`tools/probe-provider-entry.ps1` (10 probes), plus two existing tests updated deliberately.
+
+**Two P0 defects found by the audit, neither predicted by the plan:**
+
+1. **A provider participant could not be saved at all.** Three capital fields were
+   `required: true` with no default, and a provider contest has no capital to copy. The
+   symptom would have been a Mongoose validation error naming a concept the player has
+   never heard of.
+2. **A provider participant that did save was labelled `trading`**, because entry left
+   `gameKey` to its schema default. Nothing crashes, the row looks correct, and `gameKey`
+   is immutable - so every provider player would have been filed under trading forever.
+
+**Deviated from plan:** `09` E4 lists `ProviderGameModule` and settlement as one phase.
+Only the module shipped. Settlement is an extraction of the trading finalize function's
+back half rather than a wiring job, and doing it badly is the one change in this programme
+that can pay the wrong people, so it is its own piece of work.
+
+**Owner tested:** not yet. Nothing is player-visible - `externalGamesEnabled` is still
+false and no player screen exists for a provider contest.
+
+**Deferred:** round launch for players, provider settlement, and the `exclude` policy's
+entry-fee refund (still `refundOwed: true`). No unpublish, deliberately: a visible contest
+can be paid into, so cancel-with-refund is the reversible operation.
+
+**Two corrections worth carrying, both from probing rather than from review:**
+
+- A probe of the `|| "trading"` in the new requirement predicate stayed green, because
+  **Mongoose applies a schema default before validation** - so an absent `gameKey` never
+  reaches the predicate as `undefined`. The test was passing for a reason other than the one
+  it claimed. Rewritten to use an empty string, which does reach it, and which is a real
+  missing-value shape rather than a contrivance.
+- A probe of the `isAtRisk` NaN guard also stayed green, and here **the claim was wrong
+  rather than the test weak**: `NaN < 60` is false, exactly as the guard's explicit `false`
+  is, so it changes no answer today. Kept for readability, with the comment corrected to say
+  so rather than claim a fix.
+
+**Next chat should:** build the player round-launch surface, then settlement. Trading is
+pinned by the golden ranking regression - keep it green through both.
 
 ---
 

@@ -30,7 +30,13 @@ export interface ContestEntrySuccess {
   /** True when the seat already existed. No fee is taken and no counter moves. */
   alreadyEntered: boolean;
   feeCharged: number;
-  competition: { name: string; startingCapital: number };
+  /**
+   * `startingCapital` is optional because a provider-game contest has none - the field is
+   * required on the `Competition` schema only when the contest is trading. Typed as
+   * possibly-absent so a caller has to decide what to show rather than rendering
+   * `undefined`; every existing consumer already falls back with `|| 10000` or `|| 0`.
+   */
+  competition: { name: string; startingCapital?: number };
 }
 
 export interface ContestEntryFailure {

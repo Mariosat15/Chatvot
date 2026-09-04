@@ -48,6 +48,44 @@ Rules:
 The counted round is recorded as `bestRoundId` so a player can always be shown
 exactly which attempt earned their position.
 
+### 2.2 How `scoreDirection` actually reaches ranking - BUILT 4 September 2026
+
+"Honour `scoreDirection`" above is a rule with an awkward implementation, and the awkward
+part is worth stating because the tidy-looking alternatives are all wrong.
+
+**Direction is a property of the TITLE, not of the module.** One `providerGameModule` serves
+every title from every provider - that is the plug-and-play claim - but a puzzle game scores
+upward and a time trial scores downward. A module-level direction constant would force one
+module per title, which is the opposite of what the architecture is for.
+
+**`participant.score` stores the RAW value, unnegated.** A leaderboard, a profile and a
+cross-game aggregate all read that field, and a stored `-92.4` would show a race time as a
+negative number in every one of them - and poison any cross-game total that sums it.
+
+So the negation happens **at the moment of comparison, inside the module**, and the
+direction reaches it on the participant:
+
+```
+provider result -> rawScore -> participant.score          (raw, displayable, stored)
+title.scoreDirection -> RankableParticipant.scoreDirection (threaded in at settlement)
+getRankingValue() -> lower_is_better ? -score : score      (never persisted)
+```
+
+**The engine performs exactly one sort, descending, for every game.** Returning `-92` for a
+92-second run is what makes ascending order fall out of that same descending pass, with no
+branch added to the engine and no game reaching in to change how sorting works.
+
+Two consequences to keep:
+
+- **`scoreDirection` is threaded in at finalization from the catalogue, not stored on every
+  participant row.** It is a ranking input, identical for every player in a contest, and
+  duplicating it per row would create a second place for it to be wrong.
+- **The provider module ignores `rankingMethod` entirely.** Trading's six methods are six
+  different questions you can ask of a trading account; a provider game reports one number.
+  Offering an operator a choice here would be six labels for one behaviour - a setting that
+  appears to work and changes nothing. Pinned by a test that asserts every method returns
+  the same value.
+
 ---
 
 ## 3. Normalised points - the cross-game currency

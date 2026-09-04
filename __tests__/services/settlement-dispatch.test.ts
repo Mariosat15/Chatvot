@@ -73,11 +73,21 @@ describe("a non-trading contest is refused, not mis-settled", () => {
     expect(unknown.ok).toBe(false);
     if (!unknown.ok) expect(unknown.reason).toBe("unknown_game");
 
-    // "provider" has no module registered until X4, so today it is also unknown. When the
-    // provider module lands, this must flip to no_settle_path - and that change is the
-    // signal that X4 actually registered it.
+    // X5 registered the provider module, so this flipped from unknown_game to
+    // no_settle_path exactly as the earlier version of this test predicted it would. That
+    // flip IS the assertion that the module is registered - it cannot pass by accident,
+    // because the only way to reach no_settle_path is for the registry to return a module
+    // whose type is not trading.
+    //
+    // The refusal itself is still correct and must stay. A provider contest must never run
+    // down the trading settlement path; it gets its own, and until that exists refusing is
+    // the safe answer. Do not "fix" this to ok: true.
     const provider = routeToTradingSettlement("provider", "c");
     expect(provider.ok).toBe(false);
+    if (!provider.ok) {
+      expect(provider.reason).toBe("no_settle_path");
+      expect(provider.error).toContain("Provider game");
+    }
   });
 
   it("returns a result object and never throws", () => {

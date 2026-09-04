@@ -1,5 +1,6 @@
 import type { GameModule, GameType } from "./types";
 import { tradingGameModule } from "./trading";
+import { providerGameModule } from "./provider";
 
 /**
  * The module registry (X1, chapter 11 section 3).
@@ -10,11 +11,17 @@ import { tradingGameModule } from "./trading";
  *
  * Invariant 1: the contest engine never imports a specific game folder. It imports this.
  *
- * The provider module is registered here in X4. One provider module serves every game
+ * The provider module was registered here in X5. One provider module serves every game
  * from every provider - which company and which title are data on the contest, not code -
- * so this list does NOT grow per game or per provider.
+ * so this list does NOT grow per game or per provider. If it ever starts to, the engine
+ * has learned something game-specific and that is the bug, not the list.
+ *
+ * Registering a module does NOT make its games available to players. Three switches sit
+ * above this - the platform master switch, the per-provider switch and the per-title
+ * switch - and `getEnabledGameTypes()` in `./index.ts` is what consults them. A module in
+ * this list is a capability the code has, not a decision an operator has made.
  */
-const MODULES: readonly GameModule[] = [tradingGameModule];
+const MODULES: readonly GameModule[] = [tradingGameModule, providerGameModule];
 
 /** Every registered module. Order is registration order and carries no meaning. */
 export function listGameModules(): readonly GameModule[] {

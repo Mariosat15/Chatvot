@@ -73,8 +73,29 @@ export interface RankableParticipant {
   userId: string;
   status: string;
   enteredAt: Date;
-  /** The general, cross-game result. Populated at settlement for every game. */
+  /**
+   * The general, cross-game result, stored RAW as the game reports it.
+   *
+   * Raw rather than pre-negated so that a leaderboard, a profile and a cross-game
+   * aggregate can all read this field and show a race time as 92.4 seconds rather than
+   * as -92.4. Ranking does the negating, at the moment of comparison, and nothing
+   * persists the negated value.
+   */
   score?: number;
+
+  /**
+   * Which way is better for THIS participant's game.
+   *
+   * On the participant rather than on the module because one provider module serves every
+   * one of that provider's titles, and direction is a property of the title - a puzzle
+   * game scores upward while a time trial scores downward. A module-level constant would
+   * force one module per title, which is the opposite of plug-and-play.
+   *
+   * Absent means `higher_is_better`, which is correct for trading and for the large
+   * majority of games. It is a display-independent ranking input, so it is threaded in at
+   * finalization from the catalogue rather than stored on every participant row.
+   */
+  scoreDirection?: ScoreDirection;
 
   // Trading metrics. Present only for trading participants.
   currentCapital?: number;

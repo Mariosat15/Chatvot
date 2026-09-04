@@ -57,6 +57,40 @@ function" understated it.
 | **Today** | Trading fields only - capital, PnL, margin. **No general `score` field** |
 | **Change** | Add `score: number`, plus the provider fields in `04-data-model.md`. **Additive only** - no trading field is removed |
 | **Mirror** | Both files exist twice. `apps/admin/database/models/` must change in the same commit |
+| **Status** | `score` and `gameKey` added in X1. **Capital narrowed in X5** - see below |
+
+#### Seam 2 build note - "additive only" was not sufficient, 4 September 2026
+
+**Additive was the right instinct and it did not go far enough.** Adding `score` and
+`gameKey` without removing a trading field left the model still *demanding* the trading
+fields: `startingCapital`, `currentCapital` and `availableCapital` were `required: true`
+with **no default**, and a provider contest has no capital to copy into them. The result
+was that a provider participant **could not be saved at all** - the generalisation was
+purely additive and the model was still trading-only.
+
+The fix is the same shape as `Competition.startingCapital`: required only when
+`(this.gameKey || "trading") === "trading"`, in **both** copies. Three things about it are
+easy to get wrong.
+
+- **The `||` is load-bearing and its obvious test is not.** A test that DELETES `gameKey`
+  passes with or without the `||`, because Mongoose applies the schema default before
+  validation, so an absent label never reaches the predicate. An **empty string** does
+  reach it - defaults fill `undefined` only - and that is also a real missing-value shape,
+  the same one the game-label backfill exists to handle.
+- **`check:mirrors` compares field paths and enum values, not predicate bodies.** Two
+  copies whose requirement predicates differ is a validation rule whose outcome depends on
+  which process saved the document, and the guard stays green throughout.
+- **Narrowing a requirement is a change to TRADING's contract.** The guarantee moved out of
+  the schema and into a predicate, and that predicate is now the only thing between a
+  trading participant and a missing balance.
+
+**The second half of the seam is who WRITES the row.** The entry service left `gameKey` to
+its schema default, which is `"trading"` - so every provider participant would have been
+mis-filed, permanently, since `gameKey` is immutable. Nothing crashed and the row looked
+correct. The seat is now built by `lib/services/contest-entry/participant-seat.ts`,
+extracted for the reason the simulator's equivalent was: **a test can compare a named
+function's keys against `schema.paths`, and no assertion on a saved document can**, because
+strict mode has already discarded the evidence.
 
 ### Seam 3 - Settlement and finalization
 
@@ -126,6 +160,28 @@ Four things learned building it:
   all four `calculateRankings` call sites.
 - **Distinguish `unknown_game` from `no_settle_path`.** The first means the data or registry
   is wrong; the second is the normal state for a provider contest until X5 exists.
+
+#### Seam 3 status after X5's first half, 4 September 2026
+
+**A provider contest now returns `no_settle_path` rather than `unknown_game`, and that flip
+is the whole progress report.** X5 registered `providerGameModule`, so the registry resolves
+`"provider"` to a real module whose type is not trading - which is the only way to reach the
+second refusal. It was pinned in advance: the earlier test asserted only that the route
+refused, with a note that the flip would be the signal the module had landed. It now asserts
+the reason.
+
+**The refusal is still correct and must not be "fixed" to `ok: true`.** A provider contest
+must never run down the trading settlement path. What remains is to give it its own path,
+and the shape of that work is now clear enough to record:
+
+`finalizeCompetition` is one transaction covering position closing, per-participant stat
+recalculation from trade history, ranking, prize-pool capping, `distributePrizesWithTies`,
+wallet credits, platform fee, Game Master referral fees, the leaderboard write and the
+participant rank persist. A provider contest needs **everything from ranking onwards** and
+**nothing before it**. So settlement is an *extraction* - making the back half callable
+without the front half - not a second implementation and not a wiring job. Writing a
+parallel payout routine is the one change in this programme that can pay the wrong people,
+and R3 already rates it the highest-risk change here.
 
 ### Seam 4 - In-progress gameplay writes
 

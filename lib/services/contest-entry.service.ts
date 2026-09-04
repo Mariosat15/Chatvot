@@ -53,6 +53,7 @@ import CompetitionParticipant from "@/database/models/trading/competition-partic
 import CreditWallet from "@/database/models/trading/credit-wallet.model";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import { checkActor, checkLevelRequirement } from "./contest-entry/guards";
+import { buildParticipantSeat } from "./contest-entry/participant-seat";
 import { runPostEntrySideEffects } from "./contest-entry/side-effects";
 import { fail } from "./contest-entry/types";
 
@@ -245,36 +246,16 @@ export async function enterContest(
 
       const [participant] = await CompetitionParticipant.create(
         [
-          {
+          buildParticipantSeat({
             competitionId,
             userId: actor.userId,
             username: actor.username || actor.email,
             email: actor.email,
+            gameKey: competition.gameKey,
+            gameType: competition.gameType,
             startingCapital: competition.startingCapital,
-            currentCapital: competition.startingCapital,
-            availableCapital: competition.startingCapital,
-            usedMargin: 0,
-            pnl: 0,
-            pnlPercentage: 0,
-            realizedPnl: 0,
-            unrealizedPnl: 0,
-            totalTrades: 0,
-            winningTrades: 0,
-            losingTrades: 0,
-            winRate: 0,
-            averageWin: 0,
-            averageLoss: 0,
-            largestWin: 0,
-            largestLoss: 0,
-            currentOpenPositions: 0,
-            maxDrawdown: 0,
-            maxDrawdownPercentage: 0,
-            currentRank: 0,
-            highestRank: 0,
-            status: "active",
-            marginCallWarnings: 0,
             enteredAt: new Date(),
-          },
+          }),
         ],
         { session },
       );
