@@ -395,6 +395,48 @@ get wrong and are worth stating here:
  reintroducing the defect a one-line change that reads like using an existing API. Same
  reasoning as deleting the unprotected route rather than guarding it.
 
+### Plug and play runs in both directions, and only one direction was designed
+
+The owner's requirement, restated 2 September 2026 before X1: a new game must enter every
+stat, ranking and calculation **with no additional coding**, and **the same must be true
+when a game is removed.** The adding half was already designed. The removing half was
+described nowhere — a search for it returned one unrelated hit about retiring a *metric*.
+Design in `05` section 11, risk **R29**, invariants 8 and 9 in `11` section 5. Note it is
+an **R-series** risk, not X-series — it applies whoever supplies the games, including
+trading itself, so nothing about it depends on a third party. **Check the next free number
+before adding a risk**: this one was written as X19, then R28, before landing on R29 —
+R1–R28 were all taken, and `rg -o "R\d+"` over the register is the check.
+
+- **Auto-inclusion and auto-exclusion are the same mechanism, and the second one corrupts
+  earned data.** If cross-game totals are summed over *currently-enabled* games, then
+  disabling a game **retroactively subtracts everything earned in it** — a player who
+  reached level 12 partly through a provider game drops to level 9 because an operator
+  switched it off. No error, no log, no notification. **Rate this High likelihood, not
+  Medium:** summing the enabled set is the *natural* implementation, it reads correctly,
+  it passes review, and it is only wrong on the day someone toggles a flag — months after
+  the code ships and far from the author. The rule: **totals accumulate on settlement,
+  never recompute on read**, and `getEnabledGameTypes()` gates creation, discovery and
+  entry but **never a stats or leaderboard read path.** Disable affects discoverability
+  and new entry, never history; a disabled game's rows are **retired, not deleted**, which
+  is the second and stronger reason `gameKey` is immutable.
+- **"No additional coding" is three different claims, and only one of them is free.** A
+  new **title** from an existing provider is data-only — already an acceptance criterion in
+  `12` s4. A new **provider** needs an adapter. A new in-house **game type** needs a
+  module. `12` s4.2 already carries this as "the limit of no developer needed", so do not
+  let a summary promise more than the architecture delivers.
+- **Auto-inclusion is a property to preserve, not a feature to build.** There is exactly
+  one way to lose it: **an aggregate that enumerates game types.** Any `switch` on game
+  type, `if (gameType === "trading")`, or hard-coded game list is a place the next game
+  silently fails to appear while the query runs and the page renders. Same failure shape as
+  the trading-shaped services in `matchmaking.service.ts`.
+- **Check the issued provider spec before assuming a restatement needs it changed.** The
+  owner's description of the split — provider reports results, engine owns fees, winners,
+  payouts, credits, stats and levelling — already matches section 1 of
+  `ChartVolt-Game-API-Requirements.html` **verbatim**, which also already names
+  one-against-one challenges and cross-game progression. **No re-issue, no version bump.**
+  Verifying that cost one search and prevented a pointless version bump on a document
+  providers may already be building against.
+
 ### The first X-phase code shipped 2 September 2026, and four things from it generalise
 
 The admin navigation restructure (`12` s1/s1.1, built and recorded in **s1.1a**) separated

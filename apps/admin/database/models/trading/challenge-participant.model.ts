@@ -8,6 +8,12 @@ export interface IChallengeParticipant extends Document {
   email: string;
   role: "challenger" | "challenged";
 
+  // Game-agnostic result (X1 foundation)
+  // Reason: see the matching block on CompetitionParticipant. `score` is the one number
+  // the ranking engine reads whatever the game.
+  score: number;
+  gameKey: string; // Denormalised from the challenge for cross-game statistics queries
+
   // Capital & Performance
   startingCapital: number;
   currentCapital: number;
@@ -80,6 +86,18 @@ const ChallengeParticipantSchema = new Schema<IChallengeParticipant>(
       type: String,
       required: true,
       enum: ["challenger", "challenged"],
+    },
+    // Reason: defaults to 0 so existing rows and every current writer stay valid.
+    score: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    gameKey: {
+      type: String,
+      required: true,
+      default: "trading",
+      index: true,
     },
     startingCapital: {
       type: Number,
@@ -235,6 +253,8 @@ ChallengeParticipantSchema.index(
 );
 ChallengeParticipantSchema.index({ userId: 1, status: 1 });
 ChallengeParticipantSchema.index({ challengeId: 1, pnl: -1 });
+ChallengeParticipantSchema.index({ challengeId: 1, score: -1 }); // Game-agnostic ranking
+ChallengeParticipantSchema.index({ userId: 1, gameKey: 1 }); // Cross-game player statistics
 
 const ChallengeParticipant =
   models?.ChallengeParticipant ||

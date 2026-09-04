@@ -443,8 +443,12 @@ export const getCompetitionLeaderboard = async (
 
     // Get competition to access rules
     const competition = (await Competition.findById(competitionId)
-      .select("rules status")
-      .lean()) as { rules?: Record<string, unknown>; status: string } | null;
+      .select("rules status gameType")
+      .lean()) as {
+      rules?: Record<string, unknown>;
+      status: string;
+      gameType?: string;
+    } | null;
     if (!competition) {
       throw new Error("Competition not found");
     }
@@ -498,6 +502,12 @@ export const getCompetitionLeaderboard = async (
           | "active"
           | "completed"
           | "cancelled",
+        // Reason: this is a READ path and is deliberately not gated on game type - a
+        // leaderboard must render for any contest. But it must rank by the right metric.
+        // Without the label it would rank a provider contest by trading PnL, which every
+        // participant has as zero: no error, no empty state, just a leaderboard that is
+        // quietly wrong. Same failure shape as the trading-shaped services in R/X13.
+        gameType: competition.gameType as string | undefined,
       },
     );
 

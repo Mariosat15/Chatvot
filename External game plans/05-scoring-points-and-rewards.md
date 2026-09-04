@@ -279,3 +279,87 @@ Neither blocks X1, and both are recorded in `PROGRESS.md` rather than decided he
   (question 14) Backfilling makes trading players instantly dominant on a games platform.
   Starting at zero discards real history and will be read as a bug by existing players.
   The migration in `18` is written once, so the answer is needed before it.
+
+---
+
+## 11. Plug and play, in both directions
+
+**Owner requirement, 2 September 2026:** *"when we add a new game it must automatically
+be included in the calculation of stats, rankings etc with no additional coding. The
+games must be plug and play - when we add one, all functions must work; same when we
+remove a game."*
+
+The adding half is already designed. **The removing half was not, and it is the half
+that can corrupt data a player has already earned.**
+
+### 11.1 What "no additional coding" actually guarantees, and where it stops
+
+Being precise here matters, because the phrase can be read as a promise the architecture
+does not make. Three different things get confused:
+
+| What is being added | Code needed? | Why |
+|---|---|---|
+| **A new title from a provider we already integrate** | **None.** Data only | One module serves all provider games, with the title held as data - the 18 Aug decision. Proven by `12` s4's acceptance criterion: a new title becomes bookable with no release |
+| **A new provider** | **An adapter** | Their API differs. `02` s3 isolates this to `lib/games/provider/adapters/` so nothing else changes |
+| **A new in-house game type** | **A module** | Not in scope under the external-only decision, but the seam exists |
+
+So the honest statement is: **adding a game is a data operation; adding a supplier is a
+small, isolated code operation.** `12` s4.2 already carries this as "the limit of no
+developer needed". Do not let a summary promise more.
+
+### 11.2 The rule that makes auto-inclusion true
+
+Auto-inclusion is not a feature to build, it is a property to preserve, and there is
+exactly one way to lose it:
+
+> **No aggregate, leaderboard, stat, ranking, badge rule or report may enumerate game
+> types in code.** Anything containing a `switch` on game type, an `if (gameType ===
+> "trading")`, or a hard-coded list of games is a place where the next game silently
+> fails to appear.
+
+The failure is invisible: the query runs, the page renders, and the new game is simply
+absent. This is why invariant 1 in `11` s5 - the contest engine never imports a specific
+game folder - is enforced with ESLint rather than left to review, and why every aggregate
+must be keyed on `gameKey` (s7) rather than branched on.
+
+### 11.3 Removing a game - "automatically included" implies "automatically excluded"
+
+**This is the dangerous consequence of the requirement above, and it needs stating before
+X1 rather than discovered in X7.** If overall points, ranks and levels are computed as
+sums across enabled games, then disabling a game *retroactively reduces every affected
+player's totals*. A player who reached level 12 partly through Trivia is demoted to
+level 9 because an operator switched Trivia off. **No error, no log, no notification -
+just a player whose progress went backwards and a support ticket nobody can explain.**
+
+Three rules follow, and they are cheap to honour if adopted now:
+
+1. **Disabling a game affects discoverability and new entry, never history.** It hides
+   the game page, stops new contests being created and stops matchmaking suggesting it
+   (`20` s4 already checks `assertGameEnabled`). It must not touch a single earned row.
+2. **Earned progression is a ledger fact, not a recomputed sum.** Points, XP, levels and
+   badges already awarded are immutable once granted. A total that is re-derived from
+   currently-enabled games on every read is the defect; a running total that only ever
+   moves forward is the fix. `05` s7 already prefers running totals for performance
+   reasons - **this is the second, stronger reason for the same design.**
+3. **A disabled game's history is retired, not deleted.** Its per-game leaderboard is
+   hidden or labelled retired; the rows stay. This is precisely why `gameKey` is
+   immutable - it is the join key for historical stats, so removing the key removes the
+   ability to explain a player's own past.
+
+**In-flight contests finish normally.** That behaviour already exists for
+`tradingEnabled` (`New games plan/07`) and for `externalGamesEnabled` (`18` s6), so
+disabling a game follows the established pattern rather than inventing one: let running
+contests settle, or cancel with full refunds - never strand paid entries.
+
+### 11.4 What this adds to X1
+
+Nothing structural, which is the point of raising it early. It constrains two decisions
+X1 makes anyway:
+
+- Cross-game totals on `UserGameStats` are **accumulated on settlement**, not computed
+  on read from the set of enabled games.
+- `getEnabledGameTypes()` gates **creation, discovery and entry**. It must not appear in
+  any stats or leaderboard read path.
+
+If either is built the other way, the fix later is a migration over every player's
+progression - which is exactly the class of change this programme is trying to avoid.

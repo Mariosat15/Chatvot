@@ -15,14 +15,39 @@ import {
   getConversionPairSymbols,
 } from "@/lib/services/pnl-calculator.service";
 import { Types } from "mongoose";
+import { routeToTradingSettlement } from "@/lib/games/settlement";
 
 /**
  * End a competition and distribute prizes
  * This is called automatically by Inngest when endTime is reached
  * Retries up to 3 times on transient transaction errors (WriteConflict)
+ *
+ * X1 seam 3: the game dispatch lives HERE rather than at the call sites, because there
+ * are ten of them in this app and the list keeps growing - one is even a page component.
+ * Every caller is therefore correct by construction, including future ones.
  */
 export async function finalizeCompetition(competitionId: string) {
   const MAX_RETRIES = 3;
+
+  // Gate before the retry loop and before any lock is taken. Reason: refusing here
+  // leaves the competition completely untouched, whereas a check after the optimistic
+  // lock would strand it in "finalizing" with no one able to claim it again.
+  await connectToDatabase();
+  const label = await Competition.findById(competitionId)
+    .select("gameType")
+    .lean<{ gameType?: string } | null>();
+
+  if (label) {
+    const route = routeToTradingSettlement(
+      label.gameType,
+      `competition ${competitionId}`,
+    );
+
+    if (!route.ok) {
+      console.error(`❌ [COMPETITION] ${route.error}`);
+      return { success: false, error: route.error };
+    }
+  }
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -73,6 +98,26 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
       `⚠️ Competition ${competitionId} is not active (status: ${existing?.status ?? "not found"}), skipping`,
     );
     return { success: false, message: "Competition is not active" };
+  }
+
+  // Defence in depth behind the gate in finalizeCompetition. This function is private
+  // and has one caller today, so this should be unreachable - it is here because the
+  // next exported finalize variant might call it directly, and trading settlement
+  // running on a provider contest pays the wrong players without erroring.
+  // Reason: the lock must be RELEASED on refusal, or the competition is stranded in
+  // "finalizing" and no later attempt can claim it.
+  const settlementRoute = routeToTradingSettlement(
+    lockResult.gameType,
+    `competition ${competitionId}`,
+  );
+
+  if (!settlementRoute.ok) {
+    await Competition.findOneAndUpdate(
+      { _id: competitionId, status: "finalizing" },
+      { $set: { status: "active" } },
+    );
+    console.error(`❌ [COMPETITION] ${settlementRoute.error}`);
+    return { success: false, error: settlementRoute.error };
   }
 
   console.log(`🏁 Starting competition finalization for: ${competitionId}`);
@@ -665,6 +710,10 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
     // IMPORTANT: Pass 'completed' status to check minimum trades for final ranking
     const rankedParticipants = calculateRankings(participantData, rules, {
       competitionStatus: "completed",
+      // Reason: passed explicitly even though the gate above guarantees trading here.
+      // It states the intent at the point of use, so this line stays correct if the
+      // gate is ever relaxed to let another game reuse the shared ranking step.
+      gameType: competition.gameType,
     });
 
     console.log(`📊 Rankings calculated with rules:`, {
@@ -718,7 +767,11 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
       });
     }
 
-    const platformFeePercentage = competition.platformFeePercentage / 100;
+    // Reason: named a fraction, not a percentage. The stored field is a percentage
+    // (0-50); distributePrizesWithTies needs it divided by 100 and rejects anything
+    // above 1. Keeping the old name here was half of risk R30 - a local variable called
+    // `platformFeePercentage` that holds 0.2 invites the next reader to "fix" it.
+    const platformFeeFraction = competition.platformFeePercentage / 100;
 
     console.log(`  Gross Prize Pool: ${prizePool} credits`);
     console.log(`  Actual Collected: ${actualCollectedFees} credits`);
@@ -731,7 +784,7 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
       competition.prizeDistribution || [],
       prizePool, // Pass GROSS prize pool, not net
       rules,
-      platformFeePercentage, // Pass platform fee to deduct from each prize
+      platformFeeFraction, // Pass platform fee to deduct from each prize
     );
 
     console.log(
@@ -869,7 +922,7 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
     } else {
       // No winners case: fee is still only the fee percentage, NOT the entire pool
       // The remaining goes to unclaimed pools, not to platform fee
-      actualPlatformFee = prizePool * platformFeePercentage;
+      actualPlatformFee = prizePool * platformFeeFraction;
     }
 
     console.log(
@@ -887,7 +940,7 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
     // When actualWinners > 0, all funds are distributed/redistributed - nothing is unclaimed
     if (actualWinners === 0 && prizePool > 0) {
       // All funds (minus platform fee) are unclaimed because no one got any prizes
-      const unclaimedNet = prizePool * (1 - platformFeePercentage); // Pool minus the fee portion
+      const unclaimedNet = prizePool * (1 - platformFeeFraction); // Pool minus the fee portion
 
       // Determine reason for unclaimed
       let unclaimedReason:

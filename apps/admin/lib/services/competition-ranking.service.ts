@@ -1,7 +1,18 @@
 /**
  * Competition Ranking Service
  * Handles all ranking calculations, tie-breaking, and qualification logic
+ *
+ * X1 seam 1: this file owns qualification, sorting, tie detection, rank assignment and
+ * prize distribution - the parts that are the same whatever the game. What a score MEANS
+ * is the game's business, so the two metric switches that used to live here now live in
+ * the game modules and are reached through the registry.
+ *
+ * Invariant 1: this file must never import a specific game folder. It imports the
+ * registry, which is what makes a game replaceable.
  */
+
+import { getGameModuleOrTrading } from "@/lib/games/registry";
+import type { GameModule } from "@/lib/games/types";
 
 export interface ParticipantData {
   userId: string;
@@ -56,55 +67,47 @@ export interface CompetitionRules {
 
 export interface RankingOptions {
   competitionStatus?: "upcoming" | "active" | "completed" | "cancelled";
+  /**
+   * Which game module interprets the ranking metrics.
+   *
+   * Optional and absent means trading, so every pre-X1 caller keeps its exact behaviour
+   * without being touched. Invariant 5: an absent label reads as trading.
+   */
+  gameType?: string;
 }
 
 /**
- * Calculate ranking value based on ranking method
+ * The scoring half of a game module - the only part ranking needs.
+ *
+ * Reason for narrowing it rather than passing the whole module: it documents that ranking
+ * reads no capabilities and consults no flags, so nobody later adds an
+ * "is this game enabled" check into a sort comparator.
  */
-function getRankingValue(participant: ParticipantData, method: string): number {
-  switch (method) {
-    case "pnl":
-      return participant.pnl;
-    case "roi":
-      return participant.pnlPercentage;
-    case "total_capital":
-      return participant.currentCapital;
-    case "win_rate":
-      return participant.winRate;
-    case "total_wins":
-      return participant.winningTrades;
-    case "profit_factor":
-      // Profit Factor = Total Wins / Total Losses
-      const totalWins = participant.winningTrades;
-      const totalLosses = participant.losingTrades;
-      if (totalLosses === 0) return totalWins > 0 ? 9999 : 0; // Infinity if all wins
-      return totalWins / totalLosses;
-    default:
-      return participant.pnl;
-  }
-}
+type ScoringModule = Pick<
+  GameModule,
+  "getRankingValue" | "getTieBreakerValue"
+>;
 
 /**
- * Get tiebreaker value
+ * Resolve which module interprets this contest's metrics.
+ *
+ * THROWS on an unknown game type, and that is deliberate in a function which otherwise
+ * has no error channel. The alternative is to fall back to trading, which would read
+ * every provider score as zero, tie the whole field at rank 1 and split the pool between
+ * players who did not win it - silently, with the page still rendering. Aborting
+ * finalization is recoverable; paying the wrong people is not. Callers are server actions
+ * that already catch and return `{ success: false }`.
  */
-function getTieBreakerValue(
-  participant: ParticipantData,
-  tieBreaker: string,
-): number {
-  switch (tieBreaker) {
-    case "trades_count":
-      return -participant.totalTrades; // Negative because fewer is better (more efficient)
-    case "win_rate":
-      return participant.winRate;
-    case "total_capital":
-      return participant.currentCapital;
-    case "roi":
-      return participant.pnlPercentage;
-    case "join_time":
-      return -new Date(participant.enteredAt).getTime(); // Negative because earlier is better
-    default:
-      return 0;
+function resolveScoringModule(gameType?: string): ScoringModule {
+  const gameModule = getGameModuleOrTrading(gameType);
+
+  if (!gameModule) {
+    throw new Error(
+      `Cannot rank a contest for unknown game type "${gameType}". No module is registered for it, and ranking it as trading would pay the wrong players.`,
+    );
   }
+
+  return gameModule;
 }
 
 /**
@@ -115,25 +118,26 @@ function areParticipantsTied(
   a: ParticipantData,
   b: ParticipantData,
   rules: CompetitionRules,
+  gameModule: ScoringModule,
 ): boolean {
   const epsilon = 0.0001;
 
   // Compare primary ranking value
-  const aValue = getRankingValue(a, rules.rankingMethod);
-  const bValue = getRankingValue(b, rules.rankingMethod);
+  const aValue = gameModule.getRankingValue(a, rules.rankingMethod);
+  const bValue = gameModule.getRankingValue(b, rules.rankingMethod);
   if (Math.abs(aValue - bValue) >= epsilon) return false;
 
   // Compare tiebreaker 1 (if not split_prize)
   if (rules.tieBreaker1 && rules.tieBreaker1 !== "split_prize") {
-    const aTie1 = getTieBreakerValue(a, rules.tieBreaker1);
-    const bTie1 = getTieBreakerValue(b, rules.tieBreaker1);
+    const aTie1 = gameModule.getTieBreakerValue(a, rules.tieBreaker1);
+    const bTie1 = gameModule.getTieBreakerValue(b, rules.tieBreaker1);
     if (Math.abs(aTie1 - bTie1) >= epsilon) return false;
   }
 
   // Compare tiebreaker 2 (if exists and not split_prize)
   if (rules.tieBreaker2 && rules.tieBreaker2 !== "split_prize") {
-    const aTie2 = getTieBreakerValue(a, rules.tieBreaker2);
-    const bTie2 = getTieBreakerValue(b, rules.tieBreaker2);
+    const aTie2 = gameModule.getTieBreakerValue(a, rules.tieBreaker2);
+    const bTie2 = gameModule.getTieBreakerValue(b, rules.tieBreaker2);
     if (Math.abs(aTie2 - bTie2) >= epsilon) return false;
   }
 
@@ -191,6 +195,9 @@ export function calculateRankings(
   rules: CompetitionRules,
   options?: RankingOptions,
 ): RankedParticipant[] {
+  // Resolved once, not per comparison: the sort comparator runs O(n log n) times.
+  const gameModule = resolveScoringModule(options?.gameType);
+
   // Step 1: Check qualifications (min trades only checked when competition is completed)
   const qualifiedParticipants = participants.map((p) => {
     const qualification = checkQualification(p, rules, options);
@@ -220,8 +227,8 @@ export function calculateRankings(
 
   qualified.sort((a, b) => {
     // Primary ranking method
-    const aValue = getRankingValue(a, rules.rankingMethod);
-    const bValue = getRankingValue(b, rules.rankingMethod);
+    const aValue = gameModule.getRankingValue(a, rules.rankingMethod);
+    const bValue = gameModule.getRankingValue(b, rules.rankingMethod);
 
     // Use epsilon comparison for floating-point values (PNL, ROI, etc.)
     if (Math.abs(aValue - bValue) >= sortEpsilon) {
@@ -230,8 +237,8 @@ export function calculateRankings(
 
     // Tie on primary! Apply tiebreaker 1
     if (rules.tieBreaker1 !== "split_prize") {
-      const aTie1 = getTieBreakerValue(a, rules.tieBreaker1);
-      const bTie1 = getTieBreakerValue(b, rules.tieBreaker1);
+      const aTie1 = gameModule.getTieBreakerValue(a, rules.tieBreaker1);
+      const bTie1 = gameModule.getTieBreakerValue(b, rules.tieBreaker1);
 
       // Use epsilon for floating-point tiebreakers (win_rate, roi)
       // Use 0.5 threshold for integer-like values (trades_count)
@@ -247,8 +254,8 @@ export function calculateRankings(
 
     // Still tied! Apply tiebreaker 2
     if (rules.tieBreaker2 && rules.tieBreaker2 !== "split_prize") {
-      const aTie2 = getTieBreakerValue(a, rules.tieBreaker2);
-      const bTie2 = getTieBreakerValue(b, rules.tieBreaker2);
+      const aTie2 = gameModule.getTieBreakerValue(a, rules.tieBreaker2);
+      const bTie2 = gameModule.getTieBreakerValue(b, rules.tieBreaker2);
 
       const tie2Epsilon = ["win_rate", "roi", "total_capital"].includes(
         rules.tieBreaker2,
@@ -268,9 +275,14 @@ export function calculateRankings(
   let currentRank = 1;
   let skipCount = 0; // Track how many positions to skip after ties
 
+  // Reason: every index in this loop is a counter bounded by `qualified.length` on a
+  // local array, so no caller-supplied key can reach these lookups. Suppressed as a
+  // block rather than refactored to `.at()` because the walk-back below relies on its
+  // `break` to stop at a differing rank, and rank decides the prize split.
+  /* eslint-disable security/detect-object-injection */
   for (let i = 0; i < qualified.length; i++) {
     const current = qualified[i];
-    const currentValue = getRankingValue(current, rules.rankingMethod);
+    const currentValue = gameModule.getRankingValue(current, rules.rankingMethod);
 
     console.log(
       `  Ranking ${i + 1}: ${current.username} - ${rules.rankingMethod}=${currentValue.toFixed(4)}`,
@@ -281,7 +293,7 @@ export function calculateRankings(
       const previous = qualified[i - 1];
 
       // Use the comprehensive tie detection that checks ALL criteria
-      const isTied = areParticipantsTied(current, previous, rules);
+      const isTied = areParticipantsTied(current, previous, rules, gameModule);
 
       if (isTied) {
         // Truly tied! Use same rank as previous
@@ -335,6 +347,7 @@ export function calculateRankings(
       console.log(`    🥇 First place`);
     }
   }
+  /* eslint-enable security/detect-object-injection */
 
   // Step 4: Assign disqualified ranks (after all qualified)
   disqualified.forEach((p, index) => {
@@ -349,14 +362,35 @@ export function calculateRankings(
  * Calculate prize distribution with tie handling
  * FIXED: Now calculates from GROSS prize pool and deducts platform fee from each winner
  * FIXED: Redistributes unclaimed prize positions equally among actual winners
+ *
+ * @param platformFeeFraction A FRACTION, not a percentage: pass 0.1 for a 10% fee.
+ *   Renamed from `platformFeePercentage` on 4 Sep 2026 (risk R30). The old name was
+ *   wrong and dangerous: the maths below is `grossPrize * (1 - fee)`, so a caller who
+ *   trusted the name and passed 10 for "10%" got a multiplier of -9 and paid every
+ *   winner a NEGATIVE prize. Both callers were already correct; the name was not.
  */
 export function distributePrizesWithTies(
   rankedParticipants: RankedParticipant[],
   prizeDistribution: { rank: number; percentage: number }[],
   grossPrizePool: number, // CHANGED: Now receives GROSS prize pool
   rules: CompetitionRules,
-  platformFeePercentage: number = 0, // NEW: Platform fee to deduct from each prize
+  platformFeeFraction: number = 0, // A fraction: 0.1 means 10%. See R30 above.
 ): { userId: string; prizeAmount: number; rank: number; isTied: boolean }[] {
+  // Reason: a percentage passed here silently inverts every payout, so the unit is
+  // checked rather than trusted. This can never reject valid data - both competition and
+  // challenge schemas cap platformFeePercentage at `max: 50`, so a correctly converted
+  // fraction is at most 0.5. Anything above 1 is a unit error by construction.
+  // Throwing aborts finalization, which is retryable; paying negative prizes is not.
+  if (
+    !Number.isFinite(platformFeeFraction) ||
+    platformFeeFraction < 0 ||
+    platformFeeFraction > 1
+  ) {
+    throw new Error(
+      `Platform fee must be a fraction between 0 and 1, received ${platformFeeFraction}. Pass 0.1 for a 10% fee, not 10 - a percentage here would pay negative prizes.`,
+    );
+  }
+
   const distributions: {
     userId: string;
     prizeAmount: number;
@@ -447,11 +481,11 @@ export function distributePrizesWithTies(
       // Single winner at this rank
       const grossPrize =
         (grossPrizePool * (basePercentage + bonusPercentagePerWinner)) / 100;
-      const netPrize = grossPrize * (1 - platformFeePercentage);
+      const netPrize = grossPrize * (1 - platformFeeFraction);
       const prizeAmount = Math.floor(netPrize * 100) / 100;
 
       console.log(
-        `  🏆 Rank ${pos.rank}: ${winnersAtRank[0].username} gets ${basePercentage}% + ${bonusPercentagePerWinner.toFixed(2)}% bonus = ${(basePercentage + bonusPercentagePerWinner).toFixed(2)}% (${prizeAmount} credits after ${(platformFeePercentage * 100).toFixed(1)}% fee)`,
+        `  🏆 Rank ${pos.rank}: ${winnersAtRank[0].username} gets ${basePercentage}% + ${bonusPercentagePerWinner.toFixed(2)}% bonus = ${(basePercentage + bonusPercentagePerWinner).toFixed(2)}% (${prizeAmount} credits after ${(platformFeeFraction * 100).toFixed(1)}% fee)`,
       );
 
       distributions.push({
@@ -470,7 +504,7 @@ export function distributePrizesWithTies(
         // Split base percentage equally, plus each gets bonus
         winnersAtRank.forEach((winner) => {
           const grossPrize = (grossPrizePool * totalPercentagePerWinner) / 100;
-          const netPrize = grossPrize * (1 - platformFeePercentage);
+          const netPrize = grossPrize * (1 - platformFeeFraction);
           const prizeAmount = Math.floor(netPrize * 100) / 100;
 
           distributions.push({
@@ -489,7 +523,7 @@ export function distributePrizesWithTies(
         const totalGroupPercentage =
           basePercentage + bonusPercentagePerWinner * winnersCount;
         const grossPrize = (grossPrizePool * totalGroupPercentage) / 100;
-        const netPrize = grossPrize * (1 - platformFeePercentage);
+        const netPrize = grossPrize * (1 - platformFeeFraction);
         const prizeAmount = Math.floor(netPrize * 100) / 100;
 
         distributions.push({
@@ -512,7 +546,7 @@ export function distributePrizesWithTies(
           const weight = winner.currentCapital / totalWeight;
           const grossPrize =
             (grossPrizePool * totalGroupPercentage * weight) / 100;
-          const netPrize = grossPrize * (1 - platformFeePercentage);
+          const netPrize = grossPrize * (1 - platformFeeFraction);
           const prizeAmount = Math.floor(netPrize * 100) / 100;
 
           distributions.push({

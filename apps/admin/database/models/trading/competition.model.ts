@@ -6,6 +6,13 @@ export interface ICompetition extends Document {
   description: string;
   slug: string; // URL-friendly name
 
+  // Game identity (X1 foundation)
+  // Reason: the contest engine is game-agnostic; these two fields are how it knows which
+  // game module settles, ranks and scores a contest. Defaulted to trading so every
+  // existing document and every writer that predates the games work stays correct.
+  gameType: string; // "trading" | "provider" - selects the game MODULE
+  gameKey: string; // e.g. "trading" or "provider:acme:trivia-blitz" - IMMUTABLE once written
+
   // Entry & Capital
   entryFee: number; // Credits required to enter
   startingCapital: number; // Trading points (virtual capital)
@@ -192,6 +199,21 @@ const CompetitionSchema = new Schema<ICompetition>(
       unique: true,
       lowercase: true,
       trim: true,
+    },
+    // Reason: default rather than required. A rolling deploy has old code writing
+    // contests with no game label, and an unlabelled contest would later be settled by
+    // whichever module the reader guessed - invariant 5 in "External game plans/11".
+    gameType: {
+      type: String,
+      required: true,
+      default: "trading",
+      index: true,
+    },
+    gameKey: {
+      type: String,
+      required: true,
+      default: "trading",
+      index: true,
     },
     entryFee: {
       type: Number,
@@ -535,6 +557,9 @@ CompetitionSchema.index({ status: 1, startTime: -1 });
 // Note: slug already has unique index from schema definition (unique: true)
 CompetitionSchema.index({ createdBy: 1 });
 CompetitionSchema.index({ status: 1, registrationDeadline: 1 });
+// Game-scoped queries: contest lists filtered by game, and the finalization sweeps
+CompetitionSchema.index({ gameType: 1, status: 1 });
+CompetitionSchema.index({ gameKey: 1, status: 1 });
 
 // Virtual for days until start
 CompetitionSchema.virtual("daysUntilStart").get(function () {

@@ -577,6 +577,27 @@
     <p><b>Provider concepts must never leak past the adapter.</b> If the provider's identifiers, formats or vocabulary start appearing in the prize logic, the leaderboards or the admin reports, then switching or adding a provider stops being a swap and becomes a rewrite. The test is simple: adding a second provider should touch one folder and one registry entry, and nothing else.</p>
   </div>
 
+  <h3>Plugging out again &mdash; the half nobody asks about</h3>
+  <p>Games have to be plug and play <b>in both directions</b>. A new game must appear in every statistic, ranking and league table with no extra code &mdash; and turning a game off must break nothing. The first half is designed above. The second half is where the real danger sits, because it is the one that can damage figures a player has already earned.</p>
+
+  <div class="cal bad">
+    <div class="t">Automatically included means automatically excluded</div>
+    <p>If a player's overall points are worked out by <b>adding up the games that are currently switched on</b>, then switching a game off quietly takes away everything earned in it. A player who reached level 12 partly through a provider game <b>drops to level 9</b> the moment an operator disables that game for a commercial reason. Their rank falls, badges may stop qualifying, and nothing reports a problem &mdash; the pages still load, the numbers are simply smaller. The player experiences it as their progress being taken away, and support has no way to explain it.</p>
+  </div>
+
+  <p>The uncomfortable part is that adding up the enabled games is the <b>obvious</b> way to build this. It reads correctly, it survives review, and it is only wrong on the day somebody changes a setting &mdash; months after the code was written and far from whoever wrote it. That is why the decision is taken in the foundation phase rather than left to the phase where the symptom would appear.</p>
+
+  <div class="cal good">
+    <div class="t">Three rules, free if adopted now, expensive later</div>
+    <ul style="margin:0">
+      <li><b>Points, levels and badges are banked, not recalculated.</b> Once earned, they are a permanent record that only ever moves forward &mdash; never a sum re-derived from today's list of games.</li>
+      <li><b>Disabling a game hides it and stops new entries. It never touches history.</b> The game page disappears, no new contests can be created, matchmaking stops suggesting it &mdash; and not one earned record changes.</li>
+      <li><b>A withdrawn game's history is retired, not deleted.</b> Its league table is hidden or marked retired and the records stay, so a player can always see and explain their own past.</li>
+    </ul>
+  </div>
+
+  <p>Contests already under way finish normally, or are cancelled with full refunds &mdash; the same behaviour the platform already uses when trading is switched off. A paid entry is never left stranded. Getting this wrong is not a code fix later; it is a migration across every player's progression, which is exactly the kind of work this programme exists to avoid.</p>
+
   <h3>Where a provider game appears to players</h3>
   <p>Since this plan was drafted, the platform direction has firmed up: <b>players will browse a catalogue of games</b>, each with its own page, rather than a single list of competitions. That has a direct and useful consequence for provider games.</p>
 

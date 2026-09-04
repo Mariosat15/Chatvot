@@ -18,6 +18,7 @@ import {
 } from "@/lib/services/pnl-calculator.service";
 import { getMultipleSymbolConfigs } from "@/lib/services/symbol-config.service";
 import mongoose from "mongoose";
+import { routeToTradingSettlement } from "@/lib/games/settlement";
 
 /**
  * End a competition and distribute prizes
@@ -45,6 +46,21 @@ export async function finalizeCompetition(competitionId: string) {
       );
       await session.abortTransaction();
       return { success: false, message: "Competition is not active" };
+    }
+
+    // X1 seam 3: the game dispatch lives HERE rather than at the call sites, so every
+    // caller - including ones nobody has written yet - is correct by construction.
+    // Placed before any position is closed, and aborts the transaction on refusal so
+    // the competition is left exactly as it was found.
+    const settlementRoute = routeToTradingSettlement(
+      competition.gameType,
+      `competition ${competitionId}`,
+    );
+
+    if (!settlementRoute.ok) {
+      console.error(`❌ [COMPETITION] ${settlementRoute.error}`);
+      await session.abortTransaction();
+      return { success: false, error: settlementRoute.error };
     }
 
     // STEP 1: Close all open positions AND calculate P&L in memory
@@ -449,6 +465,10 @@ export async function finalizeCompetition(competitionId: string) {
     // IMPORTANT: Pass 'completed' status to check minimum trades for final ranking
     const rankedParticipants = calculateRankings(participantData, rules, {
       competitionStatus: "completed",
+      // Reason: passed explicitly even though the gate above guarantees trading here.
+      // It states the intent at the point of use, so this line stays correct if the
+      // gate is ever relaxed to let another game reuse the shared ranking step.
+      gameType: competition.gameType,
     });
 
     console.log(`📊 Rankings calculated with rules:`, {
@@ -502,7 +522,11 @@ export async function finalizeCompetition(competitionId: string) {
       });
     }
 
-    const platformFeePercentage = competition.platformFeePercentage / 100;
+    // Reason: named a fraction, not a percentage. The stored field is a percentage
+    // (0-50); distributePrizesWithTies needs it divided by 100 and rejects anything
+    // above 1. Keeping the old name here was half of risk R30 - a local variable called
+    // `platformFeePercentage` that holds 0.2 invites the next reader to "fix" it.
+    const platformFeeFraction = competition.platformFeePercentage / 100;
 
     console.log(`  Gross Prize Pool: ${prizePool} credits`);
     console.log(`  Actual Collected: ${actualCollectedFees} credits`);
@@ -515,7 +539,7 @@ export async function finalizeCompetition(competitionId: string) {
       competition.prizeDistribution || [],
       prizePool, // Pass GROSS prize pool, not net
       rules,
-      platformFeePercentage, // Pass platform fee to deduct from each prize
+      platformFeeFraction, // Pass platform fee to deduct from each prize
     );
 
     console.log(
@@ -637,7 +661,7 @@ export async function finalizeCompetition(competitionId: string) {
     } else {
       // No winners case: fee is still only the fee percentage, NOT the entire pool
       // The remaining goes to unclaimed pools, not to platform fee
-      actualPlatformFee = prizePool * platformFeePercentage;
+      actualPlatformFee = prizePool * platformFeeFraction;
     }
 
     console.log(
@@ -655,7 +679,7 @@ export async function finalizeCompetition(competitionId: string) {
     // When actualWinners > 0, all funds are distributed/redistributed - nothing is unclaimed
     if (actualWinners === 0 && prizePool > 0) {
       // All funds (minus platform fee) are unclaimed because no one got any prizes
-      const unclaimedNet = prizePool * (1 - platformFeePercentage); // Pool minus the fee portion
+      const unclaimedNet = prizePool * (1 - platformFeeFraction); // Pool minus the fee portion
 
       // Determine reason for unclaimed
       let unclaimedReason:

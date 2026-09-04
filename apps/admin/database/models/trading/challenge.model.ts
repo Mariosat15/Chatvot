@@ -5,6 +5,12 @@ export interface IChallenge extends Document {
   // Challenge ID for URL
   slug: string;
 
+  // Game identity (X1 foundation)
+  // Reason: a challenge is a contest kind, not a game. Which game the two players
+  // compete in is data, so the same 1v1 shell works for trading and provider games.
+  gameType: string; // "trading" | "provider" - selects the game MODULE
+  gameKey: string; // e.g. "trading" or "provider:acme:trivia-blitz" - IMMUTABLE once written
+
   // Participants
   challengerId: string; // User who created the challenge
   challengerName: string;
@@ -134,6 +140,20 @@ const ChallengeSchema = new Schema<IChallenge>(
       unique: true,
       lowercase: true,
       trim: true,
+    },
+    // Reason: default rather than required - see the matching note on Competition.
+    // An unlabelled contest must never reach settlement without a known game.
+    gameType: {
+      type: String,
+      required: true,
+      default: "trading",
+      index: true,
+    },
+    gameKey: {
+      type: String,
+      required: true,
+      default: "trading",
+      index: true,
     },
     challengerId: {
       type: String,
@@ -366,6 +386,9 @@ ChallengeSchema.index({ challengerId: 1, status: 1 });
 ChallengeSchema.index({ challengedId: 1, status: 1 });
 ChallengeSchema.index({ status: 1, acceptDeadline: 1 });
 ChallengeSchema.index({ status: 1, endTime: 1 });
+// Game-scoped queries: challenge lists filtered by game, and the finalization sweeps
+ChallengeSchema.index({ gameType: 1, status: 1 });
+ChallengeSchema.index({ gameKey: 1, status: 1 });
 
 const Challenge =
   models?.Challenge || model<IChallenge>("Challenge", ChallengeSchema);
@@ -376,9 +399,8 @@ const Challenge =
   try {
     if (Challenge.collection) {
       const indexes = await Challenge.collection.indexes();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const hasStaleIndex = indexes.some(
-        (idx: any) => idx.name === "challengeCode_1",
+        (idx: { name?: string }) => idx.name === "challengeCode_1",
       );
       if (hasStaleIndex) {
         await Challenge.collection.dropIndex("challengeCode_1");

@@ -7,6 +7,14 @@ export interface ICompetitionParticipant extends Document {
   username: string; // For leaderboard display
   email: string; // For notifications
 
+  // Game-agnostic result (X1 foundation)
+  // Reason: every field below this block is trading-shaped. `score` is the ONE number
+  // the ranking engine reads whatever the game - for trading it is derived from the
+  // configured ranking metric, for a provider game it is the reported round score.
+  // Invariant 4 in "External game plans/11": every participant gets a score.
+  score: number;
+  gameKey: string; // Denormalised from the contest for cross-game statistics queries
+
   // Capital & Performance
   startingCapital: number; // Initial trading points
   currentCapital: number; // Updated real-time
@@ -72,6 +80,20 @@ const CompetitionParticipantSchema = new Schema<ICompetitionParticipant>(
     email: {
       type: String,
       required: true,
+    },
+    // Reason: defaults to 0 so existing rows and every current writer stay valid.
+    // Trading's score is populated at settlement from the ranking metric; nothing
+    // reads it until the ranking seam is switched over.
+    score: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    gameKey: {
+      type: String,
+      required: true,
+      default: "trading",
+      index: true,
     },
     startingCapital: {
       type: Number,
@@ -229,6 +251,8 @@ CompetitionParticipantSchema.index(
 );
 CompetitionParticipantSchema.index({ competitionId: 1, currentRank: 1 });
 CompetitionParticipantSchema.index({ competitionId: 1, pnl: -1 }); // For leaderboard
+CompetitionParticipantSchema.index({ competitionId: 1, score: -1 }); // Game-agnostic leaderboard
+CompetitionParticipantSchema.index({ userId: 1, gameKey: 1 }); // Cross-game player statistics
 CompetitionParticipantSchema.index({ userId: 1, status: 1 });
 
 // Virtual for profit factor (average win / average loss)

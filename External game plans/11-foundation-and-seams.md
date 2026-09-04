@@ -39,12 +39,15 @@ dispatch point so a provider game can plug in.
 | | |
 |---|---|
 | **File** | `lib/services/competition-ranking.service.ts` |
-| **Function** | `getRankingValue` at **line 64**, with a duplicate switch around **line 99** |
+| **Function** | `getRankingValue` at **line 64**. Verified 4 Sep 2026 |
+| **Correction** | The switch near line 95 is **not a duplicate** - it is `getTieBreakerValue`, a second trading-specific switch over `trades_count`, `win_rate`, `total_capital`, `roi`, `join_time`. It needs generalising too |
+| **Bigger than one function** | The `ParticipantData` interface itself is entirely trading-shaped - `currentCapital`, `pnl`, `totalTrades`, `winningTrades`, `winRate`. The seam is the interface plus two switches, not a single function |
 | **Also** | `lib/actions/trading/challenge-finalize.actions.ts` lines ~**491-628** duplicate the winner logic |
 | **Today** | A `switch` over six trading metrics: `pnl`, `roi`, `total_capital`, `win_rate`, `total_wins`, `profit_factor` |
 | **Change** | Dispatch to the game module. For a provider game the ranking value is the stored `score`, ordered by the game's declared `scoreDirection` |
 
-This is the cheapest seam in the codebase - a single function - and the most valuable.
+Still among the cheapest seams in the codebase, and the most valuable - but "a single
+function" understated it.
 
 ### Seam 2 - Participant performance record
 
@@ -64,16 +67,65 @@ This is the cheapest seam in the codebase - a single function - and the most val
 | **Change** | Extract the position-closing block to a trading game module, and dispatch on the game label before it runs |
 | **Danger** | This is the highest-risk change in the whole programme. See risk **R3** in `17` |
 
-**Five entry points reach finalization, and every one must dispatch:**
+**The entry-point count in this chapter was wrong. Re-measured 4 September 2026** at the
+start of X1, by grepping for calls rather than trusting the list:
 
-1. The `competition-end` worker job - `worker/jobs/competition-end.job.ts`
-2. The `challenge-finalize` worker job - `worker/jobs/challenge-finalize.job.ts`
-3. Lazy auto-finalize inside `getCompetitionById`
-4. `POST /api/finalize-old-competitions`
-5. The admin emergency-cancel route
+| Caller | Function |
+|---|---|
+| `worker/jobs/competition-end.job.ts:80` | `finalizeCompetition` |
+| `worker/jobs/early-end-check.job.ts:182` **and `:664`** | `finalizeCompetition` |
+| `app/api/competitions/[id]/claim-early-end/route.ts:100` | `finalizeCompetition` |
+| `lib/actions/trading/competition.actions.ts:158` - the lazy auto-finalize | `finalizeCompetition` |
+| `checkAndFinalizeCompetitions()` sweep, `competition-end.actions.ts:1807` | `finalizeCompetition` |
+| `worker/jobs/challenge-finalize.job.ts:153` | `finalizeChallenge` |
+| `app/api/challenges/[id]/route.ts:50` | `finalizeChallenge` |
+| **`app/(root)/challenges/[id]/page.tsx:109`** - a page render | `finalizeChallenge` |
+| `finalizeEndedChallenges()` sweep, `challenge-finalize.actions.ts:1653` | `finalizeChallenge` |
+| `apps/admin` copies of both sweeps, plus 3 calls in `end-logic-tests/run` | both |
 
-Missing one of these means a provider contest is settled by trading code: every score
-read as zero, every rank equal, and prizes paid to the wrong players. **Silently.**
+That is **ten call sites in the main app alone**, not five. Three were missing from the
+list entirely - both `early-end-check` calls, the `claim-early-end` route, and a
+**finalize invoked from a page component**. `POST /api/finalize-old-competitions` **does
+not exist**; the sweep is the two in-file functions above.
+
+**This is the Stage 0 lesson repeating:** Defect 1's plan said two entry paths and grep
+found four. *Count the writers before unifying anything.*
+
+**The design consequence, and it is the important part.** The original instruction -
+"every one must dispatch" - puts a dispatch at each call site, which is only correct
+while the list is complete and stays complete. It will not: this codebase adds finalize
+callers, and a page component was already one of them. **Dispatch goes *inside*
+`finalizeCompetition` and `finalizeChallenge` instead**, which makes every caller correct
+by construction, including the ones nobody has written yet. That is four dispatch points
+- two functions across two apps - rather than ten-plus and counting.
+
+Missing one means a provider contest is settled by trading code: every score read as
+zero, every rank equal, and prizes paid to the wrong players. **Silently.**
+
+#### Seam 3 BUILT 4 September 2026
+
+`lib/games/settlement.ts` holds `routeToTradingSettlement`, mirrored into the admin app and
+called from all four finalize functions. The golden baseline stayed **byte-identical**, so
+no trading payout moved. Pinned by `__tests__/services/settlement-dispatch.test.ts`
+(19 tests), including a structural check that all four functions call it and that each
+gates *before* closing positions.
+
+Four things learned building it:
+
+- **A gate reached after the optimistic lock must release it.** Three of the four paths set
+  status to `finalizing` first. Refusing without restoring `active` strands the contest
+  permanently and it never pays out - worse than the bug being guarded against. The
+  wrappers therefore gate before the retry loop; the private attempt functions carry a
+  second check that restores `active`.
+- **The admin `finalizeCompetition` has no retry wrapper and no lock**, loading the
+  competition inside a transaction instead. **The four functions are not four copies of
+  one function** - read each before editing it.
+- **`getCompetitionLeaderboard` was ranking without the game label** in both apps. It is
+  correctly *not* gated, being a read path, but without the label it would rank a provider
+  contest by trading PnL - zero for every participant, no error, no empty state. Fixed at
+  all four `calculateRankings` call sites.
+- **Distinguish `unknown_game` from `no_settle_path`.** The first means the data or registry
+  is wrong; the second is the normal state for a provider contest until X5 exists.
 
 ### Seam 4 - In-progress gameplay writes
 
@@ -144,6 +196,82 @@ Recompute a sample of **historical completed competitions** through the new modu
 and compare against the stored `finalLeaderboard`. Identical order, identical values.
 If they differ, the extraction is wrong. **Do not proceed to X2 until this is green.**
 
+#### Seam 1 EXTRACTED 4 September 2026, and the gate held
+
+The two metric switches now live in `lib/games/trading/scoring.ts` and are reached through
+the registry. The engine retains qualification, sorting, tie detection, rank assignment and
+prize distribution - the game-independent parts.
+
+**The baseline did its job.** It stayed green with no regeneration, and regenerating after
+the extraction produced a **byte-identical** golden file. That is the difference between
+believing an extraction was safe and knowing it.
+
+`RankableParticipant` in `lib/games/types.ts` replaces the trading-shaped interface by
+making every game metric **optional**, so a provider participant can be ranked with a
+`score` alone. `ParticipantData` remains structurally assignable to it, which is why no
+trading code had to change.
+
+`calculateRankings` takes an optional `options.gameType`; absent means trading, so every
+pre-X1 caller is untouched. It **throws** on an unknown game type rather than falling back
+to trading - see the work log for why that is the safe direction.
+
+**One deliberate drift:** the admin app's copy of the ranking service still has the old
+inline switches. Behaviourally identical while trading is the only game, but `check:mirrors`
+does not cover `lib/`, so **seam 3 must mirror `lib/games/` and this service together.**
+
+#### BUILT 4 September 2026, in two halves
+
+Historical replay cannot run in CI - it needs the production database - so the gate was
+built as two complementary pieces, and the **ordering is the load-bearing part**. Both
+were captured **before** any extraction. A baseline recorded afterwards would freeze
+whatever the new code does, bugs included, and then pass for ever while proving nothing.
+
+| Piece | What it is | Runs |
+|---|---|---|
+| `__tests__/services/ranking-regression.test.ts` (22 tests) | Golden file: the frozen output of `calculateRankings` and `distributePrizesWithTies` over an 18-scenario matrix | **CI** |
+| `tools/games/replay-historical-rankings.ts` | Read-only replay of completed competitions against their stored `finalLeaderboard` | **Owner, on the server**. Run before and after; compare the two reports |
+
+The matrix covers every branch that decides money: all six ranking methods, both tiebreak
+paths, a true tie, each disqualification reason, the profit-factor divide-by-zero, the
+sub-epsilon boundary, unclaimed-position redistribution, an all-disqualified field and an
+empty one. It is **append-only** - editing a scenario rewrites the history the golden file
+exists to protect.
+
+Two properties are asserted about the matrix itself, not just the outcomes, because a
+baseline can be broad and still prove nothing: the six ranking methods must produce
+**different orderings** (otherwise the scenarios would pass with the ranking metric
+ignored entirely), and no scenario may pay out more than its pool or pay a negative prize.
+
+**Probed:** changing `case "roi"` to return `pnl` turned exactly one scenario red, naming
+the competition and the cause. Reverted.
+
+**Read the replay report as a delta, not a pass rate.** Participant rows are read as they
+are now, competitions settled under older rules will not reproduce, and `emergency_ended`
+contests took a different path. What matters is a competition that reproduced *before*
+the extraction and does not after.
+
+#### The trap this work walked into - FIXED 4 September 2026
+
+**Now closed.** The parameter is `platformFeeFraction`, it rejects anything outside 0-1
+naming the value it received, and 19 tests in
+`__tests__/services/platform-fee-unit.test.ts` pin both the valid range and the refusals.
+The golden baseline regenerated byte-identical, so no payout changed. Full detail, and the
+second bug the rename uncovered, in risk **R30**. The description below is kept as the
+record of what was found and why it mattered.
+
+
+
+`distributePrizesWithTies` took a parameter named **`platformFeePercentage`** and then
+computed `grossPrize * (1 - platformFeePercentage)`. It therefore required a **fraction**:
+`0.1`, not `10`. Both production callers divided by 100 first, so live payouts were correct
+and **this was a naming defect, not a money defect** - state it that way. But building the
+matrix passed `10` and every fee-bearing scenario produced a **negative prize**, silently,
+with the parameter's own name inviting the mistake. It defaults to `0`, so an omitted
+argument was safe and only a *plausible* argument was dangerous.
+
+It mattered because **X5 adds a third caller** - the provider settle path - written by
+someone reading the signature rather than the two existing call sites. Risk **R30**.
+
 ---
 
 ## 5. Architectural invariants
@@ -157,6 +285,21 @@ Enforce these in review, and the first two with ESLint `no-restricted-imports`.
 5. The game label is **required on write**; a missing label on read means `"trading"`.
 6. Money paths stay single - one entry path, one payout path.
 7. **Provider concepts never leak past the adapter.**
+8. **No aggregate, leaderboard, stat, ranking, badge rule or report enumerates game
+   types.** No `switch` on game type, no `if (gameType === "trading")`, no hard-coded
+   list of games. Key on `gameKey` instead.
+9. **Cross-game totals accumulate on settlement; they are never recomputed on read from
+   the set of enabled games.** `getEnabledGameTypes()` gates creation, discovery and
+   entry - it must never appear in a stats or leaderboard read path.
+
+Invariants 8 and 9 are the two halves of the owner's plug-and-play requirement, and both
+fail silently. **Invariant 8 is how a new game gets included automatically** - anything
+that enumerates game types is a place the next game simply does not appear, with no error
+and a page that still renders. **Invariant 9 is the inverse, and it is the one that
+damages stored data:** if a player's total points are summed over currently-enabled games,
+disabling a game retroactively demotes everyone who earned levels in it. That is risk
+**R29**, the design is `05` section 11, and the cost of getting it wrong is a migration
+over every player's progression rather than a code fix.
 
 Invariant 5 matters during a rolling deploy: old code writing a contest without a game
 label must not produce an unlabelled contest that later settles as the wrong game type.
@@ -188,8 +331,12 @@ in `17`, and it is the reason Mongoose discriminators were rejected as an approa
       object and never throws
 - [ ] Trading wrapped as a module with **no behaviour change**, proven by the historical
       regression test in section 4
-- [ ] All **five** finalization entry points dispatch on game type
+- [ ] Dispatch lives **inside** `finalizeCompetition` and `finalizeChallenge` in both
+      apps, so all ten-plus callers are correct by construction (see seam 3)
 - [ ] The trading settle path **asserts** the game type and aborts if it is not trading
+- [ ] Cross-game totals **accumulate on settlement**, proven by a test that awards
+      progression in a game, disables that game, and asserts the player's level, XP and
+      total points are **unchanged** (risk **R29**, `05` s11.3)
 - [ ] Market-hours gating scoped to `needsMarketHours`, so it cannot block a provider
       contest - `MarketSettings.blockCompetitionsOnHolidays` /
       `blockChallengesOnHolidays`

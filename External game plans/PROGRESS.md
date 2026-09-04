@@ -368,6 +368,8 @@ X12 pilot. All three are in `17` section 7.
 | **2 Sep 2026** | **Trading becomes one game among several, and all trading administration collapses into a single Trading section with its own internal tabs** | Owner requirement. Today ~60 admin sections interleave trading-specific and generic ones, so trading cannot be hidden or reasoned about as a unit. `12` section 1 gains the internal tab list |
 | **2 Sep 2026** | **Games are registered by an operator the way payment providers are** - a provider list, credentials, sandbox/production toggle, test-connection, enable per title | Owner requirement, and the pattern already exists in `PaymentProvidersSection.tsx` + `payment-provider.model.ts`. **Copy the UX, not the storage:** that model embeds `credentials[]` in the readable document and has a `saveToEnv` flag that writes secrets to `.env`. `04` section 3.1 deliberately keeps game credentials out of `game_provider` so admin screens can read it freely. `12` section 4 records the split |
 | **2 Sep 2026** | **The engine is a general competition engine, not a trading engine with games bolted on** | Owner framing, and it is a scope statement rather than a slogan: scoring **and its naming**, stat calculation, financial reporting, badges, levels and journeys must all be game-aware, not trading-shaped with special cases. Chapter `05` already designs the scoring layers; what was missing is the explicit statement that **no aggregate may be trading-only**, which is now `05` section 10 and `12` section 5 |
+| **2 Sep 2026** | **Games are plug and play in both directions: adding a game must need no new code in any stat, ranking or aggregate, and removing one must break nothing** | Owner requirement, restated. The adding half was already designed - one module, title as data, every aggregate keyed on `gameKey`. **The removing half was not, and it is the half that can corrupt earned progression:** if totals are summed across *enabled* games, disabling a game silently demotes players who earned levels in it. New `05` section 11 makes cross-game totals accumulate on settlement rather than recompute on read, and confines `getEnabledGameTypes()` to creation, discovery and entry. Risk **R29** |
+| **2 Sep 2026** | **The engine owns the outcome; the provider only reports it** | Owner restatement, and it already matches the issued provider document verbatim - section 1 of `ChartVolt-Game-API-Requirements.html` tells providers "you send us a signed message containing their score. We take care of the entry fees, the prize pool, the ranking, the payouts, the leaderboards and the player accounts." No re-issue needed |
 | **2 Sep 2026** | **Stage 0 / X0 is signed off, and the restructured admin sections are owner-tested** | Two separate owner tests, both passed the same day. X0 was the standing gate on all games engineering, so it is now open |
 | **2 Sep 2026** | **X1 does not start until the owner says so** | Owner instruction. Nothing technical blocks it - Stage 0 is signed off and the admin change is tested - so this is a deliberate hold, not a dependency. **Do not begin the foundation unprompted** |
 | **2 Sep 2026** | **The eight missing `ADMIN_SECTIONS` ids are deferred** | Owner decision: do later. It is a pre-existing defect unrelated to games work and the fix is add-only. Tracked under "Deferred work" in this file so it is not rediscovered as a new finding |
@@ -549,6 +551,504 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 4 Sep 2026 - THE PRE-EXISTING LINT WARNINGS ON THE X1 FILES - CLEARED, LINT-ONLY
+
+**Shipped:** the pending X1 commit now passes `lint-staged` without `--no-verify`. All 23
+pending `.ts` files lint at **0 problems**, down from 18 warnings, with **no behaviour
+change** - the golden baseline is byte-identical and the suite is 357/357.
+
+**Files touched:** `lib/services/competition-ranking.service.ts` and its admin mirror (a
+block `eslint-disable security/detect-object-injection` around the rank-assignment loop,
+with a `// Reason:` note); `database/models/trading/challenge.model.ts` and its admin
+mirror (a misplaced disable directive removed and `(idx: any)` typed as
+`{ name?: string }`).
+
+**Three things worth carrying:**
+
+- **The count was 18, not the 14 first reported.** The first count covered only the two
+  ranking services and missed the two `challenge.model.ts` copies. **Count warnings over
+  the whole pending changeset, not over the files you happen to be thinking about** -
+  `lint-staged` runs on everything staged, so a partial count gives false confidence that
+  the hook will pass.
+- **All 18 were pre-existing, proven rather than assumed.** `git stash push -- <the four
+  files>` then re-linting produced the same 18 warnings with the same rules and only
+  shifted line numbers, so X1 introduced none. A surgical path-scoped stash is the safe
+  way to take a lint baseline mid-change; a bare `git stash` would have swept 23 files and
+  9 untracked directories.
+- **`security/detect-object-injection` measures syntax, not safety.** `qualified[i]` warns
+  while `qualified[i - 1]` two lines below does not - same local array, same provenance,
+  different expression shape. There are **28,227** instances of this one rule repo-wide,
+  so a zero-warning repo is not a reachable state and the hook is only ever met a dozen at
+  a time. All 14 in the ranking services were false positives: local array, loop counters
+  bounded by `.length`, no caller-supplied key.
+
+**Deviated from plan:** suppressed rather than refactored, deliberately. Rewriting the
+indexing to `.at()` forces a `T | undefined` guard on every access, and the walk-back loop
+depends on a **load-bearing `break`** that stops at the first differing rank. A guard that
+`continue`d where the original breaks would silently merge tie groups across ranks - no
+exception, no log, **the wrong players sharing a pot** - and it would have to be done
+identically in two mirrored files. No security content was being removed in exchange.
+
+**One assumption corrected by probing.** The walk-back loop was assumed uncovered, because
+the golden fixture's largest tie group is only two players and the loop body cannot run
+below three. A `throw` inside it turned `competition-finalize-payout.test.ts` red (2
+tests), so it **is** covered - by the real-MongoDB finalization test, not the golden file.
+The general rule: **coverage of a specific branch is a claim to probe, not to infer from
+the fixture you happen to have in mind.**
+
+**A misplaced disable directive produces two warnings, not zero.** In `challenge.model.ts`
+the `eslint-disable-next-line` sat one line above `const hasStaleIndex = indexes.some(`,
+which contains no `any`, while the real `(idx: any)` two lines down went unsuppressed - so
+it reported both a **stale directive** and an **unsuppressed `any`**. Worth knowing because
+the repo has **74 more** unused-directive warnings of the same family.
+
+**Verified:** 0 lint problems across all 23 pending TS files, and critically **no
+"unused eslint-disable directive" warning**, which is what proves the new suppressions are
+load-bearing rather than decorative. Golden baseline byte-identical (22/22). Suite 357/357
+in 27 files. Main typecheck 18, admin 225 - both exactly at baseline. `check:mirrors` 75
+agree, 0 drifted.
+
+**Deferred:** the other ~28,200 instances of the rule, and the repo-wide
+`no-unused-vars`/`no-explicit-any` debt. Whether `security/detect-object-injection` should
+stay enabled at all is a lint-policy decision for the owner, not something to change
+quietly inside a games phase.
+
+**A separate lint-only commit was attempted and abandoned, for a reason worth keeping.**
+`lint-staged` lints the **staged content**, not the working tree. Staging the X1 seam
+changes to the two ranking services without their suppression comments produces a staged
+file carrying all 14 warnings, so the hook fails and the split forces the very
+`--no-verify` it was meant to avoid. **A lint fix cannot be split from the change it is
+unblocking when both touch the same file.** Landed as one commit instead, called out in
+the message.
+
+**Next chat should:** start X1 step 6 - the Game Master raw-driver insert stamping the game
+label (R7), the ESLint `no-restricted-imports` rule enforcing invariant 1, and scoping the
+market-hours gate to `capabilities.needsMarketHours`.
+
+---
+
+### 4 Sep 2026 - X1 STEP 5 - SEAM 3, SETTLEMENT DISPATCH - BUILT AND PROBED
+
+**Shipped:** `lib/games/settlement.ts` (`routeToTradingSettlement`), mirrored into the
+admin app, and called from **all four** finalize functions. Plus the deferred step-4 drift
+closed and the game label threaded into every ranking call.
+
+**Dispatch is inside the four functions, not at the twelve call sites.** Re-confirmed by
+grep: 7 callers of `finalizeCompetition` and 5 of `finalizeChallenge` in the main app
+alone, one of them a page component. Four dispatch points make every caller correct by
+construction, including ones nobody has written yet.
+
+**Three things the implementation had to get right:**
+1. **Gate before the lock, and release it if the gate is reached after.** Three of the four
+   paths claim the contest by setting status to `finalizing`. Refusing without restoring
+   `active` **strands the contest permanently** - no later attempt can claim it and it
+   never pays out at all, which is worse than the bug being guarded against. The main-app
+   wrappers gate *before* the retry loop so a refusal touches nothing; the private attempt
+   functions carry a second check that restores `active`.
+2. **The two refusals are distinct.** `unknown_game` means the data or registry is wrong
+   and somebody must look. `no_settle_path` is the **normal** state for a provider contest
+   until X5, and must not read as corruption.
+3. **The router consults no flags and touches no database.** A contest players paid to
+   enter must finish even if an operator disables the game mid-run - chapter 18 s6. A test
+   asserts the file never imports `getEnabledGameTypes` or `assertGameEnabled`.
+
+**The admin `finalizeCompetition` is structurally different** and it would have been easy
+to paste the wrong shape: it has **no retry wrapper and no optimistic lock**, loading the
+competition inside a transaction instead. Its gate therefore sits after the status check
+and aborts the transaction. **Read each of the four before editing them** - they are not
+four copies of one function.
+
+**A read path was quietly wrong and is now fixed.** `getCompetitionLeaderboard` in both
+apps called `calculateRankings` **without** the game label. Being a read path it is
+correctly *not* gated - a leaderboard must render for any contest - but without the label
+it would rank a provider contest by trading PnL, which every participant has as zero: no
+error, no empty state, just a leaderboard that is quietly wrong. **Exactly the
+trading-shaped-service failure from X13.** Fixed at all four `calculateRankings` call
+sites; the main app's needed `gameType` adding to its `.select()` projection, which `tsc`
+caught.
+
+**Money paths swept:** `distributePrizesWithTies` has only the two settlement callers, both
+now gated. No fifth settlement path exists.
+
+**Also closed:** the deliberate drift from step 4. `apps/admin/lib/services/competition-ranking.service.ts`
+now dispatches through the registry too. Diffing the two copies showed a **66/97-line
+difference** that turned out to be **console logging only**, including one extra
+`getRankingValue` call that exists purely to log the value - not different ranking logic.
+Worth knowing before assuming the copies are interchangeable.
+
+**Files touched:** `lib/games/settlement.ts` (new) and its admin mirror, all four
+finalize action files, both `competition.actions.ts` copies, both ranking service copies,
+`apps/admin/lib/games/**` (6 files, byte-identical mirror),
+`__tests__/services/settlement-dispatch.test.ts` (19 tests).
+
+**Verified:**
+- Golden baseline **byte-identical** - seam 3 changed no trading payout
+- Full suite **357 tests in 27 files**, up from 338 in 26
+- Main typecheck **18**, admin **225** - both exactly the baselines
+- Lint **0 problems** on every touched file
+- `check:mirrors` green, 75 models
+- **Probed:** deleting the admin competition dispatch turned the gate test red. **The
+  probe also improved a test** - the "dispatches on the game label" assertion matched the
+  bare name, so the leftover *import* satisfied it with no gate present. Now matches
+  `routeToTradingSettlement(` with the paren, so only a real call passes
+- A test asserts `lib/games` is **byte-identical** in both apps, since `check:mirrors`
+  covers models only and would never notice these two copies diverging
+
+**Next chat should:** step 6 - the Game Master raw-driver insert must stamp the game label
+(R7), ESLint `no-restricted-imports` to enforce invariant 1, and scope the market-hours
+gate to `capabilities.needsMarketHours`.
+
+---
+
+### 4 Sep 2026 - R30 CLOSED - THE PLATFORM FEE UNIT
+
+**Shipped:** `distributePrizesWithTies` takes `platformFeeFraction`, not
+`platformFeePercentage`, and range-checks it. Done in both apps, as a standalone change
+rather than folded into a test commit, because it is a money path. Owner asked for it
+before seam 3.
+
+**What the bug was:** the function computes `grossPrize * (1 - fee)`, so it needs `0.1` for
+a 10% fee. Passing `10` made the multiplier `-9` and assigned every winner a **negative
+prize** - silently, because a negative payout reads as a credit adjustment in the
+platform's favour rather than a crash. **Live payouts were never wrong**; both callers
+divided by 100 first. State it as a naming defect that produced a real bug the moment
+anyone trusted the name - which is what happened while building the step 2 baseline.
+
+**Why the guard is safe to add at all:** both the competition and challenge schemas cap
+`platformFeePercentage` at `max: 50`, so a correctly converted fraction is at most 0.5.
+**The guard cannot reject valid data** - anything above 1 is a unit error by construction.
+It throws rather than clamps: aborting finalization is retryable, paying negative prizes
+is not.
+
+**THE RENAME FOUND A SECOND BUG, and this is the part worth carrying.** The local variable
+in both `competition-end.actions.ts` copies was *also* named `platformFeePercentage` while
+holding a fraction, and it was read in **two more places** beyond the call -
+`actualPlatformFee = prizePool * fee` and `unclaimedNet = prizePool * (1 - fee)`. Both were
+correct code wearing the wrong name. Renaming only the declaration left two references
+pointing at a name that no longer existed, and `tsc` reported
+`TS2304: Cannot find name`. **Sweep for the old name after any rename and read every hit** -
+the compiler catches the references that break and says nothing about the ones that still
+compile and now mean something different.
+
+**Swept and confirmed unaffected:** challenge finalization uses
+`challenge.platformFeeAmount`, an absolute amount, and only renders `platformFeePercentage`
+into display strings beside a `%`. No confusion there.
+
+**Files touched:** both `competition-ranking.service.ts` copies (rename + guard), both
+`competition-end.actions.ts` copies (local variable and its two other readers),
+`__tests__/services/platform-fee-unit.test.ts` (new, 19 tests),
+`__tests__/fixtures/ranking-scenarios.ts` and `tools/games/*` (comments and the harness
+type).
+
+**Verified:**
+- Golden baseline regenerated **byte-identical** - the rename and the guard changed no
+  ranking and no payout
+- Full suite **338 tests in 26 files**, up from 319 in 25
+- Main typecheck **18**, admin typecheck **225** - both exactly the baselines
+- Lint 0 errors. The 14 warnings across the two ranking services are **pre-existing**,
+  7 identical in each copy, all in the tie-tracking loop that was not touched
+- **Probed:** deleting the guard turned 8 of the 19 new tests red
+
+**Still open, deliberately:** the parameter is fixed but the *stored field* is still
+`platformFeePercentage` on both contest models, which is correct - it genuinely holds a
+percentage. The two names now differ by design, and the conversion sits at the call site
+with a comment saying so.
+
+---
+
+### 4 Sep 2026 - X1 STEP 4 - SEAM 1, THE RANKING SWITCH - EXTRACTED
+
+**Shipped:** the two metric switches moved out of
+`lib/services/competition-ranking.service.ts` into `lib/games/trading/scoring.ts`, reached
+through the registry. The engine keeps everything that is the same whatever the game -
+qualification, sorting, tie detection, rank assignment, prize distribution - and no longer
+knows what a score means.
+
+**Moved, not rewritten.** Same cases, same order, same `9999` profit-factor sentinel, same
+negations for "fewer trades" and "earlier join". Verified against the original line by line
+rather than from memory.
+
+**Proof it changed nothing, which is the entire point of step 2 existing:** the golden
+baseline stayed green **without regeneration**, and regenerating it after the extraction
+produced a **byte-identical file** (SHA-256 `826EE2D9...`). Ranking and payouts are
+provably unchanged.
+
+**Three design points:**
+1. **`RankableParticipant` makes every game-specific metric optional.** The old
+   `ParticipantData` was entirely trading-shaped, so a second game could not be ranked
+   without faking trading fields or branching on game type. `ParticipantData` is
+   structurally assignable to the new interface, so **nothing on the trading path changed
+   to adopt it**. The trading module reads `?? 0`, which cannot alter behaviour because all
+   six fields are `required` with numeric defaults on both participant models.
+2. **`options.gameType` is optional and absent means trading**, so all pre-X1 callers keep
+   their exact behaviour untouched. Invariant 5.
+3. **`calculateRankings` THROWS on an unknown game type.** Deliberate, in a function with
+   no error channel: the alternative is falling back to trading, which reads every provider
+   score as zero, ties the field at rank 1 and splits the pool between players who did not
+   win it - silently, with the page still rendering. **Aborting finalization is
+   recoverable; paying the wrong people is not.** Callers are server actions that already
+   catch and return `{ success: false }`. Note this is not in tension with
+   `assertGameEnabled()` never throwing - that one answers a *question*, this one is asked
+   to *rank* and cannot decline.
+
+**Files touched:** `lib/games/types.ts` (added `RankableParticipant` and the two scoring
+functions to the contract), `lib/games/trading/scoring.ts` (new),
+`lib/games/trading/index.ts`, `lib/games/registry.ts` (`getGameModuleOrTrading` moved here
+from `index.ts`), `lib/games/index.ts`, `lib/services/competition-ranking.service.ts`.
+
+**Why `getGameModuleOrTrading` sits in `registry.ts` and not `index.ts`:** `index.ts`
+reaches for the database to read `enabledGameTypes`, and this is called from inside a sort
+comparator. A pure ranking function must not drag a database import in behind it. The
+second reason is stronger: **ranking and settlement must never check whether a game is
+enabled**, or disabling a game mid-contest would strand entries players had paid for.
+
+**DELIBERATE DRIFT, recorded rather than left silent:** `apps/admin/lib/services/competition-ranking.service.ts`
+**still carries the old inline switches.** The two apps are behaviourally identical today
+because trading is the only game, so nothing is broken - but they are no longer the same
+code, and `check:mirrors` covers models only and will not say so. **Step 5 must mirror
+`lib/games/` and this service together**, and until it does, a change to one ranking path
+must be made to both.
+
+**Verified:** full suite **319 tests in 25 files**, main typecheck **18** and admin
+typecheck **225** - both exactly the baselines. Lint clean on `lib/games`; the 7 warnings
+on the ranking service are **pre-existing** in the tie-tracking loop, confirmed by diff
+line ranges - my edits stop at line 286.
+
+**Next chat should:** seam 3 - dispatch inside `finalizeCompetition` and `finalizeChallenge`
+in both apps, and mirror `lib/games/` into the admin app as part of it.
+
+---
+
+### 4 Sep 2026 - X1 STEP 3 - THE GAME MODULE REGISTRY - BUILT AND PROBED
+
+**Shipped:** `lib/games/` - `types.ts` (the contract), `registry.ts`, `index.ts` (the
+public entry point), and `trading/` declaring trading as a module. Plus `enabledGameTypes`
+on `WhiteLabel` in **both apps**, which `assertGameEnabled()` needs a real source for.
+**Nothing calls any of it yet**, so it remains additive.
+
+**Files touched:** `lib/games/{types,registry,index}.ts`,
+`lib/games/trading/{index,config}.ts`, both `whitelabel.model.ts` copies,
+`__tests__/services/game-registry.test.ts` (18 tests).
+
+**Three design decisions worth not reversing:**
+1. **`getGameModule()` returns `undefined` for an unknown game type and does NOT fall back
+   to trading.** A fallback would read as defensive programming and be the opposite:
+   settling a provider contest with trading code reads every score as zero, ties the whole
+   field at rank 1 and splits the pool between people who did not win it, silently.
+   **Absent and unknown are different facts** - `resolveGameType()` maps absent to trading
+   (invariant 5, covering pre-X1 documents and the R7 raw-driver insert) while unknown
+   stops the caller.
+2. **`assertGameEnabled()` returns a result object and never throws**, matching both the
+   chapter and the codebase convention. A throw reaches the player as "An error occurred
+   in Server Components render" because Next.js strips thrown messages in production.
+3. **`getEnabledGameTypes()` treats an empty array as unconfigured, not as "all games
+   off"**, and falls back to trading if the settings read fails. A misconfiguration that
+   silently disables every contest is worse than one that leaves the platform as it was.
+   Its docblock also states where it may **not** be used - any stats or leaderboard read
+   path - because that is risk **R29**.
+
+**Deviated from plan:** the chapter says `lib/games/` is mirrored at `apps/admin/lib/games/`.
+**Deliberately not done yet.** The admin app needs it when its own `finalizeCompetition`
+dispatches, which is step 5; creating an unused second copy now means two copies drifting
+through steps 4 and 5 with nothing exercising the second. `check:mirrors` covers models,
+not `lib/`, so the mirror would be unguarded in the meantime.
+
+**Verified:**
+- 18 new tests; full suite **319 tests in 25 files**, up from 301 in 24
+- Main typecheck **18**, admin typecheck **225** - both exactly the measured baselines,
+  with nothing new and nothing vanished
+- Lint clean on `lib/games`, which caught two real problems: an unused import, and
+  **Next.js forbidding a variable named `module`** (`no-assign-module-variable`). The
+  result field is therefore `gameModule`, not `module` - worth knowing before writing the
+  provider module, since the obvious name is the banned one
+- `check:mirrors` green, 75 models, 0 drifted
+- **Probed:** making `getGameModule()` fall back to trading turned exactly 2 tests red,
+  at both the registry and the gate. Reverted
+
+**Next chat should:** seam 1 - move the ranking switch into `lib/games/trading/scoring.ts`
+and generalise `ParticipantData`. The golden baseline from step 2 is the gate; it must
+stay green with no regeneration.
+
+---
+
+### 4 Sep 2026 - X1 STEP 2 - THE REGRESSION BASELINE - BUILT AND PROBED
+
+**Shipped:** the acceptance gate from `11` section 4, in two halves, both captured
+**before** any extraction. That ordering is the entire value: a baseline recorded after
+the move would freeze whatever the new code does, bugs included, and pass for ever.
+
+| Piece | Runs | Size |
+|---|---|---|
+| `__tests__/services/ranking-regression.test.ts` + `__tests__/fixtures/ranking-golden.json` | CI | 22 tests, 18 scenarios |
+| `tools/games/replay-historical-rankings.ts` | Owner, on the server. **Read-only** | Before and after, compared |
+
+The matrix exercises every branch that decides money - six ranking methods, both tiebreak
+paths, a true tie, each disqualification reason, the profit-factor divide-by-zero, the
+sub-epsilon boundary, unclaimed-position redistribution, all-disqualified, and empty.
+
+**Two assertions are about the matrix rather than the code**, because a broad baseline can
+still prove nothing: the six ranking methods must produce **different** orderings, and no
+scenario may overpay its pool or pay a negative prize.
+
+**Files touched:** `__tests__/fixtures/ranking-scenarios.ts`,
+`__tests__/fixtures/ranking-golden.json`, `__tests__/services/ranking-regression.test.ts`,
+`tools/games/generate-ranking-golden.ts`, `tools/games/ranking-golden-shared.ts`,
+`tools/games/replay-historical-rankings.ts`.
+
+**Deviated from plan:** the chapter specifies replaying historical competitions. That
+cannot run in CI, so it became the owner-run half and a synthetic matrix became the CI
+half. The generator is a **script, not part of the test run** - if the tests regenerated
+their own baseline they would agree with themselves for ever, and regenerating should show
+up in review as a changed golden file, since it means award behaviour is being altered.
+
+**Verified:**
+- 22 new tests green; full suite **301 tests in 24 files**, up from 279 in 23
+- Typecheck back to exactly **18**, the measured baseline
+- Lint **0 errors, 0 warnings** on all new files, including the two
+  `security/detect-object-injection` warnings fixed rather than bypassed, because the
+  pre-commit hook allows none
+- **Probed:** changing `case "roi"` to return `pnl` turned exactly one scenario red,
+  naming the scenario and the cause. Reverted, and the service confirmed byte-identical
+  to HEAD afterwards
+
+**One real finding, and it came from walking into it rather than from reading the code.**
+`distributePrizesWithTies` names its parameter `platformFeePercentage` and then computes
+`1 - platformFeePercentage`, so it needs a **fraction**. The first draft of the matrix
+passed `10` and every fee-bearing scenario produced **negative prizes** - visible only
+because the totals were printed and read. **Live payouts are correct**: both callers
+divide by 100 first, so this is a naming defect, not a money defect, and nothing needs
+backfilling. It matters because **X5 adds a third caller** written from the signature.
+Recorded as **R30**, with the rename deliberately deferred - a money-path rename deserves
+its own review rather than riding along in a test commit.
+
+**The general lesson worth carrying:** the harness found this, not the audit. Building a
+matrix that must produce *plausible numbers* forces you to read outputs you would
+otherwise only assert equality on. **Print the totals in a money baseline and look at
+them** - equality against a wrong baseline is silent.
+
+**Next chat should:** create `lib/games/` - `types.ts`, `registry.ts`, `index.ts` with
+`getGameModule()`, `assertGameEnabled()` returning a result object and never throwing.
+Nothing calls it yet, so it stays additive.
+
+---
+
+### 4 Sep 2026 - X1 STEP 1 - GAME LABEL AND SCORE ON ALL FOUR MODELS - BUILT
+
+**Shipped:** the additive half of seams 1 and 2. `gameType` and `gameKey` on
+`Competition` and `Challenge`; `score` and `gameKey` on `CompetitionParticipant` and
+`ChallengeParticipant` - **eight files, both apps, one commit.** All default to
+`"trading"` / `0`, so every existing document and every current writer stays valid and
+**nothing reads the new fields yet.** Zero behaviour change by construction.
+
+**Files touched:** the four models under `database/models/trading/` and their four
+mirrors under `apps/admin/database/models/trading/`, plus
+`__tests__/services/game-label-and-score.test.ts` (14 tests).
+
+**Deviated from plan:** defaults rather than `required`. Invariant 5 wants a missing
+label to mean trading, and during a rolling deploy old code writes contests with no label
+at all - `required: true` alone would have rejected those writes outright.
+
+**Verified:**
+- `npm run check:mirrors` - 75 mirrored models, **0 drifted**
+- Typecheck **18 errors before and 18 after**, measured by stashing the change rather
+  than by reasoning about it. None in the touched files, and **none disappeared** - a
+  vanishing error marks code that was already reaching for a field its schema denied it
+- Full suite **279 tests in 23 files, all green**
+- **Both halves probed:** renaming `score` to `scoreTYPO` turned exactly 3 tests red with
+  a message naming the cause, then reverted
+
+**Two plan corrections found, and the second changes the design:**
+1. **Seam 1 is bigger than "a single function".** The switch near line 95 is not a
+   duplicate of the ranking switch - it is `getTieBreakerValue`, a second trading-specific
+   switch. And `ParticipantData` is *entirely* trading-shaped, so the seam is the
+   interface plus two switches.
+2. **Finalization has ten call sites in the main app, not five.** Three were missing from
+   the chapter - both `early-end-check` calls, `claim-early-end`, and a **finalize invoked
+   from a page component**. `POST /api/finalize-old-competitions` **does not exist.** This
+   is Defect 1 repeating: the plan said two entry paths and grep found four. **Count the
+   writers.** The consequence: dispatch goes **inside** the two finalize functions rather
+   than at each call site, so every caller - including ones not yet written - is correct
+   by construction. Four dispatch points instead of ten and rising.
+
+**Deferred:** the backfill of `gameType`/`gameKey` on existing contests. Not needed yet,
+because the defaults make a missing value read as trading; it is wanted before any query
+filters on game.
+
+**Next chat should:** build the historical regression harness **before touching ranking
+or settlement**. It recomputes completed competitions through the new path and compares
+against the stored `finalLeaderboard`, and it can only prove the extraction changed
+nothing if the baseline is captured while the old code is still in place.
+
+---
+
+### 2 Sep 2026 - PLUG AND PLAY IN BOTH DIRECTIONS - DOCUMENTED, ONE REAL GAP FOUND
+
+**Shipped:** the owner restated the engine vision before X1 starts - provider supplies
+games and results, the engine owns entry fees, winner determination, payouts, credits,
+stats, status and levelling; trading is one game; players challenge each other; the
+leaderboard spans all games; **and a new game must enter every stat and ranking with no
+extra code, with the same true in reverse when a game is removed.** Checked every claim
+against the documents and the issued provider spec rather than assuming they were covered.
+
+**What was already covered, and verified rather than restated:**
+- **The provider's role matches the issued document verbatim.** Section 1 of
+  `ChartVolt-Game-API-Requirements.html` already tells providers: *"you send us a signed
+  message containing their score. We take care of the entry fees, the prize pool, the
+  ranking, the payouts, the leaderboards and the player accounts. You never touch money
+  and never see a player's personal details."* It also already names one-against-one
+  challenges and cross-game points, ratings, levels, badges and milestones. **No re-issue
+  and no version bump needed** - the spec we would hand a provider today is correct.
+- **Zero-code addition** - `12` s4 already carries it as an acceptance criterion, `05` s7
+  already gives a new `gameKey` its own leaderboard automatically, and the 18 Aug decision
+  already holds the title as data behind one module.
+- **Enable/disable already exists as a concept** - `enabledGameTypes` on `WhiteLabel`,
+  `assertGameEnabled()` in the registry, `chartvoltEnabled` on `provider_game`.
+
+**The gap, and it is the load-bearing part of this entry:** every document described
+*adding* a game. **Nothing described removing one**, and the search for it returned a
+single unrelated hit about retiring a *metric*. That matters because auto-inclusion and
+auto-exclusion are the same mechanism: **if cross-game totals are summed over
+currently-enabled games, disabling a game silently subtracts everything earned in it** -
+a player who reached level 12 partly through a provider game is demoted to level 9 when an
+operator switches it off, with no error, no log and no notification. Its likelihood is
+High precisely because summing the enabled set is the *natural* implementation: it reads
+correctly, passes review, and is only wrong on the day someone toggles a flag, months
+later and far from the author.
+
+**Files touched:**
+- `05-scoring-points-and-rewards.md` - new section 11. s11.1 states the boundary of "no
+  additional coding" honestly (a new **title** is data-only; a new **provider** needs an
+  adapter; a new in-house **game type** needs a module), s11.2 gives the single rule that
+  preserves auto-inclusion - **no aggregate may enumerate game types in code** - and s11.3
+  gives the three removal rules.
+- `17-risk-register.md` - risk **R29** under high *platform* risks, owned by **X1** rather
+  than X7, because the decision that prevents it is made when the totals are first
+  written. **Filed as R-series after initially writing it as X19** - the X-series is
+  defined as risks that exist *only* because a third party is on the critical path, and
+  this one applies whoever supplies the games, trading included. R28 was then also wrong,
+  being taken by the fraud read-then-create races; **R1-R28 are all in use.**
+- `11-foundation-and-seams.md` - **invariants 8 and 9** in section 5, plus a
+  done-when criterion. This is the chapter X1 is built from, so it is the placement that
+  actually changes what gets written.
+- `PROGRESS.md` - two decisions on record.
+
+**Deviated from plan:** nothing built. This was deliberately a documentation pass, because
+the owner has not said start and the correction belongs in the plan X1 will be built from.
+
+**Deferred:** the two open questions this touches are unchanged and still not blocking -
+whether cross-game rank is one number or several (13), and whether historical trading
+performance is backfilled into cross-game aggregates (14). Question 14 now matters
+slightly more, since s11.3 makes earned progression an append-only ledger and a backfill
+is therefore a one-time write rather than a recomputation.
+
+**Next chat should:** wait for the owner's go-ahead on **X1**, then build it with the two
+constraints from `05` s11.4 held from the first commit - totals **accumulate on
+settlement**, and `getEnabledGameTypes()` never appears in a stats or leaderboard read
+path. Building either the other way turns the fix into a migration over every player's
+progression.
 
 ---
 

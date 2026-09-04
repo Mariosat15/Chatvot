@@ -83,6 +83,12 @@ export interface WhiteLabelDocument extends Document {
 
   arenaEnabled: boolean;
 
+  // Which game modules are live (X1 foundation).
+  // Reason: gates CREATION, DISCOVERY and ENTRY only. It must never reach a stats or
+  // leaderboard read path - summing totals over the enabled set retroactively demotes
+  // players when a game is switched off. Risk R29, "External game plans/05" s11.3.
+  enabledGameTypes: string[];
+
   updatedAt: Date;
   createdAt: Date;
 }
@@ -317,6 +323,10 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
     arenaEnabled: {
       type: Boolean,
       default: true,
+    },
+    enabledGameTypes: {
+      type: [String],
+      default: ["trading"],
     },
   },
   {

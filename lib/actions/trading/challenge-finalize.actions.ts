@@ -17,13 +17,37 @@ import {
   getConversionPairSymbols,
 } from "@/lib/services/pnl-calculator.service";
 import { Types } from "mongoose";
+import { routeToTradingSettlement } from "@/lib/games/settlement";
 
 /**
  * Finalize a single challenge - close positions, determine winner and distribute prizes
  * Retries up to 3 times on transient transaction errors (WriteConflict)
+ *
+ * X1 seam 3: the game dispatch lives HERE rather than at the call sites. One of this
+ * function's five callers is a page component, which is the clearest evidence that a
+ * per-call-site dispatch would eventually be missed.
  */
 export async function finalizeChallenge(challengeId: string) {
   const MAX_RETRIES = 3;
+
+  // Gate before the retry loop and before any lock is taken, so a refusal leaves the
+  // challenge untouched rather than stranded in "finalizing".
+  await connectToDatabase();
+  const label = await Challenge.findById(challengeId)
+    .select("gameType")
+    .lean<{ gameType?: string } | null>();
+
+  if (label) {
+    const route = routeToTradingSettlement(
+      label.gameType,
+      `challenge ${challengeId}`,
+    );
+
+    if (!route.ok) {
+      console.error(`❌ [CHALLENGE] ${route.error}`);
+      return { success: false, error: route.error };
+    }
+  }
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -82,6 +106,25 @@ async function _finalizeChallengeAttempt(challengeId: string) {
     // Another process already claimed it, or it's not active
     console.log(`Challenge ${challengeId} not active (already claimed or completed), skipping`);
     return null;
+  }
+
+  // Defence in depth behind the gate in finalizeChallenge. Private with one caller today,
+  // so this should be unreachable - it exists because trading settlement running on a
+  // provider contest pays the wrong players without erroring.
+  // Reason: the lock must be RELEASED on refusal, or the challenge is stranded in
+  // "finalizing" and no later attempt can claim it.
+  const settlementRoute = routeToTradingSettlement(
+    lockResult.gameType,
+    `challenge ${challengeId}`,
+  );
+
+  if (!settlementRoute.ok) {
+    await Challenge.findOneAndUpdate(
+      { _id: challengeId, status: "finalizing" },
+      { $set: { status: "active" } },
+    );
+    console.error(`❌ [CHALLENGE] ${settlementRoute.error}`);
+    return { success: false, error: settlementRoute.error };
   }
 
   // Reason: Use the model's own connection for session creation to avoid

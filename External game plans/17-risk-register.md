@@ -27,6 +27,8 @@ chapter covers risks to the programme and to the application.
 | **X8** | **No fallback game** now external-only is decided - X2 with its mitigation removed | **High** | Medium | Before X4 |
 | **X13** | Trading-only matchmaker silently returns trading matches on a games platform | **High** | **High** | X11.5 |
 | **X14** | Inferred game interest read as consent to stranger invitations | **High** | Medium | X11.5 |
+| **R29** | **Disabling a game retroactively demotes players** who earned levels, points or ranks in it | **High** | **High** | **X1** - the design decision is made there |
+| **R30** | `distributePrizesWithTies` took a **fraction** from a parameter named `platformFeePercentage`; a caller passing `10` paid **negative prizes** | **High** | Medium | **CLOSED 4 Sep 2026** - renamed to `platformFeeFraction` and range-checked in both apps |
 | R6 | Price infrastructure broken by gating | High | Medium | X8 |
 | R7 | Game Master raw insert misses the game label | High | High | X1 |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
@@ -445,6 +447,101 @@ non-trading game and fails before the change.
 ---
 
 ## 4. High platform risks
+
+### R29 - Disabling a game retroactively demotes players
+
+**Severity High, likelihood High, and the decision that prevents it is made in X1** - not
+in X7 where the symptom would appear. Recorded 2 September 2026 from the owner's
+plug-and-play requirement; the full design is `05` section 11.3.
+
+**It is an R-series risk, not an X-series one**, and the distinction is worth stating
+because it was initially filed wrongly: this failure applies **whoever supplies the
+games**, including an in-house game or trading itself. Nothing about it depends on a third
+party being on the critical path.
+
+The requirement is that a new game is included in stats and rankings with no extra code.
+The consequence nobody asks about is the inverse: **if cross-game totals are computed as
+sums over currently-*enabled* games, then turning a game off subtracts everything earned
+in it.** A player who reached level 12 partly through a provider game drops to level 9
+because an operator disabled that game for a commercial reason. Their rank falls, badges
+tied to thresholds may stop qualifying, and nothing anywhere reports an error - the
+queries run, the pages render, the numbers are simply smaller.
+
+**Why the likelihood is High rather than Medium:** computing a total by summing the
+enabled set is the *natural* implementation. It reads correctly, it passes review, and it
+is only wrong on a day when someone toggles a flag - which is months after the code ships
+and far from the person who wrote it.
+
+| Mitigation | Where |
+|---|---|
+| Cross-game totals **accumulate on settlement**, never recompute from the enabled set on read | `05` s11.3 rule 2, `11` s5 invariant 9 |
+| `getEnabledGameTypes()` gates **creation, discovery and entry only** - it must not appear in a stats or leaderboard read path | `05` s11.4 |
+| A disabled game's history is **retired, not deleted**; `gameKey` is immutable precisely so a player's past stays explicable | `05` s11.3 rule 3 |
+| In-flight contests finish normally, or cancel with full refunds - never strand a paid entry | `18` s6, matching existing `tradingEnabled` behaviour |
+
+**The test that proves it:** award progression in a game, disable that game, and assert
+the player's level, XP and total points are **unchanged**. It must fail before the fix.
+
+### R30 - The platform fee parameter takes a fraction but is named a percentage
+
+Found 4 September 2026 while building the X1 regression baseline - by walking into it.
+
+`distributePrizesWithTies` in `lib/services/competition-ranking.service.ts` declares
+`platformFeePercentage: number = 0` and computes `grossPrize * (1 - platformFeePercentage)`.
+That requires a **fraction**. Pass `10` meaning 10% and the multiplier becomes `-9`, so
+every winner is assigned a **negative prize**.
+
+**This is a naming defect, not a live money defect, and the distinction should not be
+blurred.** Both production callers - `lib/actions/trading/competition-end.actions.ts` and
+its admin mirror - compute `competition.platformFeePercentage / 100` before calling, so
+payouts today are correct. Nothing needs backfilling.
+
+Why it is rated Medium likelihood rather than Low:
+
+- The parameter's **own name instructs the mistake**. A caller reading the signature has
+  every reason to pass a percentage.
+- It **defaults to `0`**, so forgetting the argument is harmless. Only supplying a
+  plausible-looking value is dangerous, which removes the usual prompt to check.
+- **X5 introduces a third caller** - the provider settle path - and provider fee handling
+  is being written fresh by someone who has not read the two existing call sites.
+- The failure is loud in a test and silent in production: a negative credit adjustment on
+  a payout is an increase in the platform's favour, not a crash.
+
+| Mitigation | Status |
+|---|---|
+| An assertion in the regression suite that no scenario ever pays a negative prize | **Done** - `ranking-regression.test.ts` |
+| Rename the parameter to `platformFeeFraction` in both apps | **Done 4 Sep 2026** |
+| Range-check the unit rather than trusting it | **Done 4 Sep 2026** - rejects anything outside 0-1, naming the received value |
+| 19 tests covering valid fractions, refused percentages, and the boundaries | **Done** - `__tests__/services/platform-fee-unit.test.ts` |
+
+#### CLOSED 4 September 2026, and the rename found a second bug on its way
+
+Done as a standalone change, not folded into a test commit, because it is a money path.
+
+**The guard cannot reject valid data**, which is what made it safe to add. Both the
+competition and challenge schemas cap `platformFeePercentage` at `max: 50`, so a correctly
+converted fraction never exceeds 0.5. Anything above 1 is a unit error by construction. It
+throws rather than clamping: aborting finalization is retryable, paying negative prizes is
+not.
+
+**The rename was not a find-and-replace, and assuming it was would have broken the build.**
+The local variable in both `competition-end.actions.ts` copies was *also* called
+`platformFeePercentage` while holding a fraction, and it was read in **two further places**
+beyond the `distributePrizesWithTies` call - `actualPlatformFee = prizePool * fee` and
+`unclaimedNet = prizePool * (1 - fee)`. Both were correct code wearing the wrong name.
+Renaming only the declaration left two references pointing at a name that no longer
+existed; `tsc` caught it as `TS2304: Cannot find name`. **The lesson is to sweep for the
+old name after a rename and read every hit**, because the compiler catches the ones that
+break and says nothing about the ones that still compile and now mean something else.
+
+**Swept and confirmed unaffected:** the challenge finalization path uses
+`challenge.platformFeeAmount`, an absolute amount, and only ever renders
+`platformFeePercentage` into a display string beside a `%` sign. No fraction confusion
+exists there.
+
+**Proof the fix changed no payout:** the golden baseline regenerated **byte-identical**
+after both the rename and the guard. **Probed:** deleting the guard turned 8 of the 19 new
+tests red.
 
 ### R7 - Game Master route bypasses Mongoose defaults
 
