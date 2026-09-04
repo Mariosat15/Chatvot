@@ -662,10 +662,192 @@ Suite now **396**. Probed by importing four contest models and the connection he
 inside `lib/games/trading/` - all four flagged, including the relative form - while
 `lib/games/index.ts` and its mirror stayed clean.
 
-**Next chat should:** X1 step 7, the idempotent backfill of `gameType`/`gameKey` on existing
-contests. That is the **last step of X1**. Worth stating plainly for anyone reading this
-cold: finishing X1 does not mean external games work - X1 is the foundation phase, and a
-provider game does not plug in until **X4** (the adapter) and **X5**.
+---
+
+### 4 Sep 2026 - X1 STEP 7 - THE BACKFILL - BUILT, NOT YET RUN. X1 IS CODE-COMPLETE
+
+**Shipped:** `tools/games/backfill-game-labels.ts` (backfills 1 and 3 from `18` s1),
+`BadgeConfig.gameTypes` added to both app copies, and the structural half of the invariant 9
+guard. Suite **445 in 29 files**, up from 396.
+
+**The backfill has NOT been run against production.** It is report-only by default and needs
+a deliberate `--apply`.
+
+**Backfill 2 was deferred rather than written, and the reasoning is the deliverable.**
+Chapter 18 already said to skip completed contests, because their `finalLeaderboard` is
+stored and authoritative. The same reasoning extends to *active* ones once you check what
+actually reads the field: **trading ranks on its own six metrics and never reads `score`,
+and seam 2 - the thing that would keep it current during play - is not built.** Writing it
+now produces a number nothing maintains and nothing reads, which goes stale immediately
+while looking authoritative. The schema default of `0` means nothing crashes meanwhile.
+Recorded in `18` s1, not silently skipped.
+
+**Four things from building it that generalise:**
+
+- **The most important property of a backfill is what it refuses to touch.** `gameKey` is
+  immutable because it is the join key for every historical stat, so a script that *can*
+  rewrite it can destroy history silently. "It only sets missing fields" is an assertion
+  about a query filter, and query filters are exactly what people get wrong - so it is
+  pinned by a test seeding a `provider` / `chess-blitz` contest and asserting it survives
+  untouched. Widening the filter turned 3 red.
+- **"Missing" has three shapes and only one is obvious.** Absent is the pre-X1 document,
+  `null` is what some older writers stored, `""` is what an empty form field produces. A
+  filter matching only `$exists: false` leaves the other two behind - **and those are the
+  two that look correct in a document dump.** Each clause probed separately; dropping either
+  turns 1 red.
+- **A schema default is not a stored value, and `.lean()` is where the difference shows.**
+  Mongoose applies defaults when it *hydrates*, so an ordinary read of an old contest
+  returns "trading" with nothing stored. `.lean()` skips hydration and returns the raw
+  document, missing key and all - and much of this codebase reads with `.lean()` for speed.
+  This is why the backfill is needed at all despite invariant 5.
+- **Do not let a migration carry its own copy of a constant.** The script imports
+  `TRADING_GAME_TYPE`, and a test asserts the value it writes equals what
+  `contestGameLabel()` produces. With its own literal, a future change to the app's default
+  would relabel history to a value nothing else uses - and **every row would look correctly
+  labelled.**
+
+**Invariant 9 (R29) is now guarded structurally.** 34 assertions that no stats, leaderboard,
+ranking, progression or badge read path calls `getEnabledGameTypes()` **or**
+`assertGameEnabled()` - the second matters because it calls the first internally, and it is
+the more likely route since it reads as a validity check. Plus a test that the ranking
+services import `@/lib/games/registry` and **not** `@/lib/games`, which is the whole reason
+those live in separate files. The behavioural half - award progression, disable the game,
+assert the level is unchanged - **cannot be written until `UserGameStats` exists at X7**, and
+saying so is more useful than a checkbox implying otherwise.
+
+**`BadgeConfig.gameTypes`** defaults to `["trading"]`, and an **empty array means every
+game**, not none - a misconfiguration that silently makes a badge unearnable is worse than
+one that makes it broad. The backfill therefore leaves an empty array alone. Note this is
+**not** the enumeration invariant 8 forbids: invariant 8 bans the *engine* branching on game
+type, while scoping one badge to the games it makes sense in is operator content. "100
+trades" genuinely cannot be earned at chess.
+
+**Deviation from plan:** the tool is split into `backfill-game-labels.ts` (CLI) and
+`backfill-game-labels-core.ts` (logic), because the script calls `main()` at module level
+and a test importing it would otherwise try to connect to production.
+
+**Verified:** 445/445 in 29 files, main typecheck 18 and admin 225 exactly at baseline,
+`check:mirrors` 75 agree 0 drifted, lint clean on every changed file. Seven probes, all red.
+One probe initially reported a false pass - a multi-line PowerShell pattern with CRLF against
+an LF file simply did not match, so nothing was modified and the test stayed green
+*correctly*. **A probe that does not apply is indistinguishable from a test that does not
+work; check the replacement happened before believing either result.**
+
+**X1 IS CODE-COMPLETE.** Two things remain, and both need a real database rather than more
+code: `replay-historical-rankings.ts` has still never been run, and the backfill has not been
+applied. Both are read-only or report-only by default.
+
+**Next chat should:** run those two against production data with the owner, then start
+**X2**. Worth stating plainly for anyone reading this cold: **code-complete on X1 does not
+mean external games work.** X1 is the foundation - the engine no longer assumes every contest
+is trading. A provider game does not plug in until **X4** (the adapter) and **X5**.
+
+---
+
+### 4 Sep 2026 - X2 - PROVIDER ABSTRACTION AND MOCK ADAPTER - CODE-COMPLETE
+
+**Shipped:** `game_provider` and `provider_game` in both apps, three `WhiteLabel` settings
+fields in both apps, `lib/services/game-providers/` (contract, registry, mock adapter,
+catalogue sync) mirrored into the admin app. Suite **489 in 30 files**, up from 445.
+Mirror guard now **77 pairs**, up from 75. Both typechecks exactly at baseline, lint clean.
+
+**Done-when from `09` E1 is met:** the mock catalogue syncs, appears in the database, and the
+registry resolves an adapter by key. **Nothing is player-visible** - `externalGamesEnabled`
+defaults to false.
+
+**The X2 gate was noted, not cleared.** `11` s4 says do not proceed to X2 until the
+historical ranking replay is green. What is green is the *golden-fixture* test; the replay
+against real stored `finalLeaderboard` data has still never run. X2 touches no ranking or
+settlement code, so it was built anyway - **but the replay must happen before X5**, which is
+where settlement actually integrates. Recorded rather than quietly skipped.
+
+**The plan gave two locations and invariant 2 decided between them.** `11` s3 sketched the
+provider code at `lib/games/provider/adapters/`; `02` s9 put it at
+`lib/services/game-providers/`. The ESLint rule from X1 step 6 bans anything inside a game
+module folder from importing a model - and the registry reads settings while the catalogue
+service writes `provider_game`. So the second location is the only one that does not require
+weakening the invariant, and the split it forces is the right one anyway:
+**`lib/services/game-providers/` does I/O, `lib/games/provider/` (X5) is pure scoring.**
+A general rule falls out of this: **when a guard and a plan disagree about where code goes,
+the guard is usually describing a real constraint the plan had not met yet.**
+
+**Five findings, and two are defects in work from the previous phase:**
+
+- **My own invariant 1 ESLint rule had a latent false positive, and X2 triggered it.** The
+  pattern `**/games/*` matches **any** path with a `games/` segment, so it began rejecting
+  `@/database/models/games/provider-game.model` the moment that folder existed. Fixed with
+  `!**/models/games/**`. The general lesson: **a blocked-by-default wildcard will eventually
+  collide with a directory that merely shares a name, and the collision is indistinguishable
+  from a real violation.** Models are already governed by invariant 2, which bans them
+  *inside* game modules; importing one from the engine is ordinary.
+- **A glob inside a JSDoc comment silently truncated a source file.** `lib/games/*/**`
+  written in prose contains `*/`, which **closes the comment**, so the rest of `contract.ts`
+  parsed as garbage. What makes this worth recording is the symptom: the main typecheck
+  **dropped from 18 errors to 16**, which read as an improvement. **A file that fails to
+  parse reports fewer errors, not more** - so treat a typecheck count going *down*
+  unexpectedly with the same suspicion as one going up. ESLint caught it; `tsc` did not.
+- **A `readonly` field initialised from a `const` infers the literal type and blocks
+  subclassing.** `readonly providerKey = MOCK_PROVIDER_KEY` inferred `"mock"`, so the
+  second-adapter test failed with TS2416. Annotate `: string` to match the interface. This
+  matters beyond neatness: **chapter 09 s7 requires a second adapter skeleton in X9 because
+  with one provider the "a second game costs one file" claim is never tested** (risk X6), and
+  the type error would have surfaced then instead.
+- **"Like payment providers" was right about the UX and wrong about the storage, and the
+  model now says so in a comment.** `game_provider` deliberately holds **no secrets** so
+  every admin screen, the lobby and the catalogue picker can read it freely; credentials live
+  in `WhiteLabel.gameProviderCredentials` with **`select: false`**, so a bare
+  `WhiteLabel.findOne()` - which dozens of call sites already do, several returning the result
+  to a client - **cannot leak one**. A caller that needs them must write
+  `.select("+gameProviderCredentials")`, which is greppable.
+- **Two switches, not one, on every title.** `providerStatus` is what the provider says;
+  `chartvoltEnabled` is what we say, and it defaults to **false**. Collapsing them would hand
+  a third party the ability to put an untested game in front of paying players by changing a
+  value in their own database.
+
+**The catalogue sync's three rules are each pinned by a test**, and the reasoning for the
+allow-list is the transferable part: it writes a **named list** of provider-owned fields
+rather than spreading the payload, because a spread means any field the provider adds - or
+any field an operator later edits - is silently overwritten on the next sync, **and that
+failure is invisible until someone notices their wording reverted**. It also never enables a
+title, and it **reports** titles the provider dropped rather than deleting them, since a
+title with historical rounds cannot be removed without orphaning the stats joined to its
+`gameKey`, and a provider omitting a game from one response is as likely to be a partial
+failure on their side as a withdrawal.
+
+**The mock's job is to be a good liar.** A provider that always works proves nothing, so it
+simulates nine named failure modes from `07` - outage, catalogue unavailable, round-create
+failure, rate limit, bad credentials, callback never arrives, impossible score, bad
+signature, stale timestamp. Two details worth keeping: it is **idempotent on `roundId`**
+exactly as the contract requires, because a mock that is not would let a double-click bug
+through every test that uses it; and its default catalogue deliberately includes a
+**`lower_is_better` / `duration_ms`** title, because **a catalogue of only higher-is-better
+games lets a ranking sign error pass every test - and that error pays the slowest player
+first.**
+
+**Invariant 6 is guarded structurally**: 11 assertions that no file in the provider layer
+imports anything wallet-, prize-, payout- or Stripe-related, that the adapter imports no
+model at all, and that the contract declares no money-bearing field. Named explicitly rather
+than matched with a loose regex, so a money model added later is a deliberate addition to
+that list.
+
+**Verified:** 489/489 in 30 files, main typecheck 18 and admin 225 exactly at baseline,
+`check:mirrors` 77 agree 0 drifted, all four mirrored provider files byte-identical, lint
+clean. **Seven probes, all red** - provider-enables-a-title, sync-deletes-dropped-titles,
+sync-writes-on-failure, allow-list-leaks-presentation, signature-length-guard-removed,
+registry-fails-open, `chartvoltEnabled`-defaults-true.
+
+**Two probes initially reported false passes and both are the same lesson as X1 step 7.** One
+targeted the create path when the assertion was about the update path - **a probe aimed at
+the wrong code path is indistinguishable from a test that does not work.** Two more failed to
+match at all because a multi-line PowerShell pattern with CRLF met an LF file, and one
+because an emoji in the anchor did not survive the shell. The fix is a probe helper that
+escapes the pattern and then relaxes every newline to `\r?\n`, and anchors that avoid
+non-ASCII.
+
+**Next chat should:** X3 - round lifecycle and result ingestion (`09` E2). That is the phase
+`09` marks "the heart of the integration, and the part that must be flawless", with an
+explicit instruction not to move past it until every rehearsal in `07` s9 is green. The mock
+built here is what those rehearsals drive.
 
 ---
 

@@ -89,6 +89,43 @@ export interface WhiteLabelDocument extends Document {
   // players when a game is switched off. Risk R29, "External game plans/05" s11.3.
   enabledGameTypes: string[];
 
+  // ── External game providers (X2, chapter 04 section 2.3) ──────────────────────────────
+  //
+  // Master kill switch for the whole external-games feature, independent of any single
+  // provider's `enabled` flag. Reason: chapter 09 section 5 needs one switch that turns
+  // the feature off without editing provider rows, so a rollout can be reversed in one
+  // action rather than N.
+  externalGamesEnabled: boolean;
+
+  // Non-secret, freely readable provider configuration. Mirrors `game_provider` for the
+  // settings screen; the collection remains the source of truth.
+  gameProviders: {
+    providerKey: string;
+    enabled: boolean;
+    baseUrl?: string;
+    displayName?: string;
+  }[];
+
+  // SECRETS. Never returned to a client, never logged, never rendered.
+  //
+  // Reason: these are here rather than on `game_provider` precisely so that document stays
+  // safe for any screen to read (chapter 04 section 3.1, chapter 12 section 4.1). Anything
+  // that reads this array must strip it before the value crosses a network boundary.
+  //
+  // `callbackSecret` is separate from `apiSecret` and both are per-environment, because
+  // chapter 06 section 8 requires the callback secret to be rotatable with no downtime -
+  // which means accepting the old and the new value at once during a rotation.
+  gameProviderCredentials: {
+    providerKey: string;
+    environment: "sandbox" | "production";
+    apiKey?: string;
+    apiSecret?: string;
+    callbackSecret?: string;
+    /** Kept during a rotation so in-flight callbacks signed with the old value verify. */
+    previousCallbackSecret?: string;
+    rotatedAt?: Date;
+  }[];
+
   updatedAt: Date;
   createdAt: Date;
 }
@@ -327,6 +364,51 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
     enabledGameTypes: {
       type: [String],
       default: ["trading"],
+    },
+
+    // ── External game providers (X2, chapter 04 section 2.3) ────────────────────────────
+    //
+    // Reason: defaults to false so that merely deploying X2 changes nothing a player can
+    // see. Every rollout step in chapter 18 assumes the feature stays dark until an
+    // operator turns it on, and a default of true would launch it on deploy.
+    externalGamesEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    gameProviders: {
+      type: [
+        {
+          providerKey: { type: String, required: true },
+          enabled: { type: Boolean, default: false },
+          baseUrl: { type: String },
+          displayName: { type: String },
+        },
+      ],
+      default: [],
+    },
+    // SECRETS - see the interface comment. Must be stripped before any client response.
+    gameProviderCredentials: {
+      type: [
+        {
+          providerKey: { type: String, required: true },
+          environment: {
+            type: String,
+            enum: ["sandbox", "production"],
+            default: "sandbox",
+          },
+          apiKey: { type: String },
+          apiSecret: { type: String },
+          callbackSecret: { type: String },
+          previousCallbackSecret: { type: String },
+          rotatedAt: { type: Date },
+        },
+      ],
+      default: [],
+      // Reason: excluded from every query by default, so a plain `WhiteLabel.findOne()` -
+      // which dozens of call sites already do, several of which return the result to a
+      // client - cannot leak provider secrets. A caller that genuinely needs them must ask
+      // with `.select("+gameProviderCredentials")`, which is greppable and reviewable.
+      select: false,
     },
   },
   {

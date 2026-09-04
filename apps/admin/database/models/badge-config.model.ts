@@ -17,6 +17,8 @@ export interface IBadgeConfig extends Document {
     minCompletedCompetitions?: number;
   };
   minLevel: number;
+  /** Which games this badge can be earned in. Backfill 3, chapter 18 section 1. */
+  gameTypes: string[];
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -81,6 +83,20 @@ const BadgeConfigSchema = new Schema<IBadgeConfig>(
       default: 0,
       min: 0,
       max: 20,
+    },
+    // Which games this badge can be earned in (X1 backfill 3, chapter 18 section 1).
+    //
+    // Reason: this is NOT the game-type enumeration invariant 8 forbids. Invariant 8 bans
+    // the ENGINE from branching on game type; scoping an individual badge to the games it
+    // makes sense in is content, set per badge by an operator. "100 trades" genuinely
+    // cannot be earned at chess.
+    //
+    // Defaults to trading so every badge that exists today keeps its current meaning, and
+    // an empty array is read as "every game" rather than "no game" - a misconfiguration
+    // that silently makes a badge unearnable is worse than one that makes it broad.
+    gameTypes: {
+      type: [String],
+      default: ["trading"],
     },
     isActive: {
       type: Boolean,

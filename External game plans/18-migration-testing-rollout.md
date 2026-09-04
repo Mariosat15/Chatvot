@@ -11,15 +11,59 @@ Five backfills, all idempotent, all safe to re-run.
 
 | # | Backfill | Collections | When |
 |---|---|---|---|
-| 1 | Set the game label to `"trading"` on every existing contest and participant | `Competition`, `Challenge`, `CompetitionParticipant`, `ChallengeParticipant` | X1 |
-| 2 | Populate `score` on participants from their contest's ranking method | participants | X1 - **skip completed contests** |
-| 3 | Default `BadgeConfig.gameTypes` to `["trading"]` | `BadgeConfig` | X1 |
+| 1 | Set the game label to `"trading"` on every existing contest and participant | `Competition`, `Challenge`, `CompetitionParticipant`, `ChallengeParticipant` | **BUILT 4 Sep 2026** |
+| 2 | Populate `score` on participants from their contest's ranking method | participants | **DEFERRED to seam 2** - see below |
+| 3 | Default `BadgeConfig.gameTypes` to `["trading"]` | `BadgeConfig` | **BUILT 4 Sep 2026** |
 | 4 | Build `UserGameStats` rows, including the `"_overall"` rollup | new | X7 |
 | 5 | Seed **inferred** `UserGamePreference` rows from `UserGameStats` play counts | new | X11.5 |
 
 **Skip the `score` backfill for completed contests.** Their `finalLeaderboard` is already
 stored and authoritative; recomputing historical scores risks changing a published result
 for no benefit.
+
+### Backfills 1 and 3 are built - `tools/games/backfill-game-labels.ts`
+
+Report-only by default; `--apply` writes. Proven by 13 tests against a real MongoDB in
+`__tests__/services/backfill-game-labels.test.ts`. **Not yet run against production.**
+
+Four things about it are worth knowing before running it.
+
+**It never overwrites a label that exists**, and that is the single most important property
+rather than a nicety. `gameKey` is immutable because it is the join key for every
+historical stat, so a backfill that *can* rewrite it is a script that can destroy history
+silently. Pinned by a test that seeds a `provider` / `chess-blitz` contest and asserts it
+comes out untouched; probed by widening the filter, which turned 3 red.
+
+**"Unlabelled" has three shapes, not one.** Absent is the pre-X1 document, `null` is what
+some older writers stored, and `""` is what an empty form field produces. A filter matching
+only `$exists: false` leaves the other two behind - and those are the two that look correct
+in a document dump. Each clause is probed separately; dropping either turns 1 red.
+
+**Each field is filtered independently, not as one `$or` over both.** A row with `gameType`
+set and `gameKey` missing is exactly what an interrupted earlier run leaves behind, and a
+combined filter would either skip it or rewrite the field that was already correct.
+
+**An empty `gameTypes` array counts as configured and is left alone.** On `BadgeConfig` an
+empty array means "every game", which is a legitimate operator choice; overwriting it with
+`["trading"]` would silently narrow a badge somebody deliberately made universal.
+
+One thing the script does *not* carry its own copy of: the string `"trading"`. It imports
+`TRADING_GAME_TYPE`, and a test asserts the value it writes equals what `contestGameLabel()`
+produces. Two sources for that string is one too many - if the app's default ever changed, a
+backfill with its own literal would relabel history to a value nothing else uses, and every
+row would look correctly labelled.
+
+### Why backfill 2 was deferred rather than written
+
+Chapter 18 already said to skip completed contests, because their `finalLeaderboard` is
+stored and authoritative. **The same reasoning extends to active contests, which is what
+changed the decision.** Trading ranks on its own six metrics and never reads `score`, and
+**seam 2 - the thing that would keep `score` current during play - is not built.** Writing
+it now produces a number nothing maintains and nothing reads, which goes stale immediately
+while looking authoritative.
+
+The schema default of `0` means nothing crashes in the meantime. It belongs with seam 2, and
+`04`'s participant model is where the field is already declared.
 
 ### Backfill 4 has an unanswered product question in front of it
 

@@ -71,20 +71,37 @@ if [ ! -L "apps/admin/.env" ]; then
 fi
 
 # Install dependencies
+#
+# Reason: --no-audit --no-fund is worth ~13 minutes of a deploy. Even when every package
+# is already up to date, `npm install` still calls the registry for advisory and funding
+# metadata, and npmjs has begun retiring the endpoint npm uses for it - the tell in the
+# log is "npm notice This endpoint is being retired". When that call is throttled it
+# stalls for minutes per project and reports nothing useful. Measured 4 Sep 2026 on a
+# tree with no dependency changes at all: root 15s (bulk endpoint, succeeded), apps/admin
+# 6m and api-server 7m (old endpoint, stalled).
+#
+# This does not reduce security cover. Auditing during a production deploy is the wrong
+# place for it anyway - the answer arrives after the code is already live and nobody
+# reads it. Run `npm audit` deliberately instead, or in CI where it can block a merge.
+#
+# --prefer-offline uses the local cache for anything already downloaded and only hits the
+# network for genuinely missing packages, which is the common case on a redeploy.
+NPM_FLAGS="--no-audit --no-fund --prefer-offline"
+
 echo "📦 Installing main app dependencies..."
-npm install
+npm install $NPM_FLAGS
 
 # Install admin dependencies
 echo "📦 Installing admin dependencies..."
-cd apps/admin && npm install && cd ../..
+cd apps/admin && npm install $NPM_FLAGS && cd ../..
 
 # Install API server dependencies
 echo "📦 Installing API server dependencies..."
-cd api-server && npm install && cd ..
+cd api-server && npm install $NPM_FLAGS && cd ..
 
 # Install WebSocket server dependencies
 echo "📦 Installing WebSocket server dependencies..."
-cd websocket-server && npm install && cd ..
+cd websocket-server && npm install $NPM_FLAGS && cd ..
 
 # Build all apps
 echo "🔨 Building main app..."

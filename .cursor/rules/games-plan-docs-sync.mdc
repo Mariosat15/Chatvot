@@ -557,6 +557,99 @@ was deleted with it, on the `shouldBlockEntry` precedent. Related and worth noti
 main app never had the check**, so the apps now agree rather than differing by accident - an
 asymmetry a reviewer could otherwise "fix" in the wrong direction.
 
+### Four things from X1 step 7, the backfill (4 September 2026)
+
+`tools/games/backfill-game-labels.ts` covers backfills 1 and 3. **It has not been run
+against production**; it is report-only until `--apply`.
+
+- **The most important property of a backfill is what it refuses to touch.** `gameKey` is
+ immutable because it is the join key for every historical stat, so a script that *can*
+ rewrite it can destroy history silently. **"It only sets missing fields" is an assertion
+ about a query filter**, and query filters are exactly the thing people get wrong. Pin it
+ with a test that seeds a row already correctly labelled and asserts it survives untouched.
+- **"Missing" has three shapes and only one is obvious**: absent, `null`, and `""`. A filter
+ matching only `$exists: false` leaves the other two behind, **and those are the two that
+ look correct in a document dump.** Probe each clause separately. Related: filter each
+ field independently rather than as one `$or` over several - a half-labelled row is exactly
+ what an interrupted earlier run leaves behind, and a combined filter either skips it or
+ rewrites the field that was already right.
+- **A schema default is not a stored value, and `.lean()` is where the difference shows.**
+ Mongoose applies defaults when it *hydrates*, so an ordinary read of a pre-migration
+ document returns the default with nothing stored - but `.lean()` skips hydration and
+ returns the raw document, missing key and all. Much of this codebase reads with `.lean()`.
+ **Never cite an ordinary read as evidence that a field is populated.**
+- **Never let a migration carry its own copy of a constant.** Import it, and assert in a
+ test that what the migration writes equals what the application writes. With its own
+ literal, a later change to the app's default relabels history to a value nothing else
+ uses - and **every row looks correctly labelled.**
+
+**And a lesson about probing itself, which cost a false result here.** A multi-line
+PowerShell replacement pattern with CRLF line endings did not match an LF file, so nothing
+was modified and the test stayed green - reported as "the test is not doing its job" when
+the test was fine. **A probe that fails to apply is indistinguishable from a test that does
+not work.** Confirm the replacement actually changed the file before believing either
+outcome; prefer single-line patterns.
+
+**Deferring a planned migration is a documentation duty, not a silent omission.** Backfill 2
+(`score` on participants) was **not** written, because trading ranks on its own metrics and
+never reads `score`, and seam 2 - which would keep it current - is not built. Writing it
+would produce a number nothing maintains and nothing reads, stale immediately and
+authoritative-looking. Recorded in `18` section 1 with the reasoning, so the next reader does
+not "fix" the gap.
+
+**Say "code-complete", never "done", and say what it excludes.** X1 is code-complete; the
+replay script has never been run and the backfill has not been applied. And the sentence that
+must accompany any X1 completion claim: **finishing X1 does not mean external games work** -
+a provider game does not plug in until **X4** and **X5**.
+
+### Five things from X2, the provider abstraction (4 September 2026)
+
+X2 is code-complete: `game_provider` and `provider_game` in both apps, three `WhiteLabel`
+settings fields, and `lib/services/game-providers/` (contract, registry, mock adapter,
+catalogue sync) mirrored into the admin app. **Nothing is player-visible** -
+`externalGamesEnabled` defaults to false.
+
+- **When a guard and a plan disagree about where code belongs, the guard usually wins.**
+ `11` s3 put the provider code in a game module folder; invariant 2 bans model imports
+ there, and the registry reads settings while the catalogue service writes `provider_game`.
+ The rule is not the problem - the plan had not noticed the constraint. Result:
+ **`lib/services/game-providers/` does I/O, `lib/games/provider/` stays pure.**
+- **A blocked-by-default wildcard will eventually collide with a directory that merely
+ shares a name.** `**/games/*` from invariant 1 began rejecting
+ `@/database/models/games/provider-game.model` the moment X2 created that folder, and the
+ rejection is indistinguishable from a real violation. Negate the specific collision
+ (`!**/models/games/**`) rather than narrowing the rule, and expect this class of failure
+ again whenever a new `games/` directory appears.
+- **A glob written inside a JSDoc comment can truncate the file.** `lib/games/*/**` in prose
+ contains `*/`, which closes the comment; the rest of the file then parses as garbage. The
+ symptom is the trap: the typecheck **fell from 18 errors to 16**, reading as an
+ improvement. **A file that fails to parse reports FEWER errors** - so treat an unexplained
+ *drop* with the same suspicion as a rise, and note ESLint caught this where `tsc` did not.
+- **`readonly field = SOME_CONST` infers the literal type and silently blocks subclassing.**
+ It fails with TS2416 only when someone writes the second implementation - which for an
+ adapter interface is the moment the whole abstraction is first tested. Annotate `: string`
+ to match the interface.
+- **Two switches per title, never one.** `providerStatus` is what the provider says;
+ `chartvoltEnabled` is what we say, defaulting to false. One flag would let a third party
+ put an untested game in front of paying players by editing their own database. The same
+ shape as `enabled` on the provider and `externalGamesEnabled` globally: **a supplier's
+ opinion is an input, never a decision.**
+
+**Two rules for any catalogue or import sync**, both learned here and both about invisible
+failure. Write a **named allow-list of the fields the remote system owns**, never a spread
+of its payload - a spread overwrites operator edits on the next run and nobody notices until
+someone's wording reverts. And **report missing rows, never delete them**: a row with
+history cannot be removed without orphaning the stats joined to its key, and an item absent
+from one response is as likely to be a partial failure upstream as a genuine withdrawal.
+
+**Probing lesson, third instance, now with a fix.** Two X2 probes reported false passes: one
+was aimed at the create path when the assertion covered the update path, and others failed
+to match because a multi-line PowerShell pattern with CRLF met an LF file, or because an
+emoji in the anchor did not survive the shell. **A probe aimed at the wrong code path is
+indistinguishable from a test that does not work.** Use a helper that escapes the pattern
+then relaxes every newline to `\r?\n`, keep anchors ASCII, and confirm the file actually
+changed before believing either outcome.
+
 ## The rule
 
 **Documentation is part of the deliverable, not a follow-up task.** A phase is not

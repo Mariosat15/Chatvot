@@ -97,6 +97,13 @@ export default [
           // Reason: matched against the literal import STRING, not the resolved path, so
           // the relative form needs its own coverage - "**/lib/games/*" does not match
           // "../games/trading". Probed: without the lib-less patterns that import passes.
+          // Reason for the models exception: "**/games/*" matches ANY path with a
+          // "games/" segment, not just the games code layer - so it caught
+          // "@/database/models/games/provider-game.model" the moment X2 added that folder.
+          // A blocked-by-default wildcard will eventually collide with a directory that
+          // merely shares a name, and the collision looks exactly like a real violation.
+          // Models are already governed by invariant 2, which bans them INSIDE game
+          // modules; importing one from the engine is ordinary and correct.
           group: [
             "**/games/*",
             "**/games/*/**",
@@ -105,6 +112,7 @@ export default [
             "!**/games/types",
             "!**/games/settlement",
             "!**/tools/games/**",
+            "!**/models/games/**",
           ],
           message:
             "Invariant 1: the contest engine must not import a game folder directly. Import from '@/lib/games' and resolve the module through the registry.",

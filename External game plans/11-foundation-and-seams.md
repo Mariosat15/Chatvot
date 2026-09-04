@@ -401,18 +401,27 @@ and `gameKey` being immutable means it cannot be corrected in place afterwards.
 
 ## 7. Done when
 
-- [ ] `score` present on both participant models, in **both** apps, same commit
-- [ ] Game label on both contest models, in **both** apps, same commit
-- [ ] Registry resolves a module by game type; `assertGameEnabled()` returns a result
+- [x] `score` present on both participant models, in **both** apps, same commit
+- [x] Game label on both contest models, in **both** apps, same commit
+- [x] Registry resolves a module by game type; `assertGameEnabled()` returns a result
       object and never throws
-- [ ] Trading wrapped as a module with **no behaviour change**, proven by the historical
+- [x] Trading wrapped as a module with **no behaviour change**, proven by the historical
       regression test in section 4
-- [ ] Dispatch lives **inside** `finalizeCompetition` and `finalizeChallenge` in both
+- [x] Dispatch lives **inside** `finalizeCompetition` and `finalizeChallenge` in both
       apps, so all ten-plus callers are correct by construction (see seam 3)
-- [ ] The trading settle path **asserts** the game type and aborts if it is not trading
-- [ ] Cross-game totals **accumulate on settlement**, proven by a test that awards
-      progression in a game, disables that game, and asserts the player's level, XP and
-      total points are **unchanged** (risk **R29**, `05` s11.3)
+- [x] The trading settle path **asserts** the game type and aborts if it is not trading
+- [x] Cross-game totals **accumulate on settlement** - **partially done 4 Sep 2026.** The
+      *structural* half is proven: 34 assertions that no stats, leaderboard, ranking,
+      progression or badge read path calls `getEnabledGameTypes()` **or**
+      `assertGameEnabled()`, and that ranking imports the synchronous registry rather than
+      the database-backed entry point. The *behavioural* half - award progression, disable
+      the game, assert level, XP and points unchanged - **cannot be written yet**, because
+      `UserGameStats` does not exist until X7. The structural test is what prevents the
+      defect being introduced in the meantime (risk **R29**, `05` s11.3)
+- [x] Existing contests and participants backfilled with the trading label -
+      **`tools/games/backfill-game-labels.ts`, 4 Sep 2026.** Report-only by default, 13
+      tests against a real MongoDB. **Not yet run against production.** Backfill 2
+      (`score`) deliberately deferred to seam 2 - see `18` section 1
 - [x] Market-hours gating scoped to `needsMarketHours`, so it cannot block a provider
       contest - **done 4 Sep 2026** at challenge create, challenge accept and admin
       competition create, failing **closed** on an unknown game type
@@ -422,7 +431,17 @@ and `gameKey` being immutable means it cannot be corrected in place afterwards.
       Invariant 1 is blocked by default with the public surface negated; invariant 2 is
       scoped to `lib/games/*/**`, one level below the layer, so it catches module folders
       without banning `lib/games/index.ts` from reading `WhiteLabel`
-- [ ] Mirror CI check from X0 passing
+- [x] Mirror CI check from X0 passing - 75 agree, 0 drifted
 
 **Effort: 2-3 weeks.** Roughly a third of it is the regression test in section 4, and
 that third is the part that makes the rest safe.
+
+> **X1 is code-complete as of 4 September 2026.** Two things remain before it can be called
+> closed, and both need a real database rather than more code:
+> `tools/games/replay-historical-rankings.ts` has never been run against production data,
+> and the backfill has not been applied. Both are read-only or report-only by default.
+>
+> **Code-complete is not the same as external games working.** X1 is the foundation: the
+> engine no longer assumes every contest is trading. A provider game does not plug in until
+> **X4** (the adapter) and **X5**. Anyone reading this as "external games are nearly done"
+> has misread it by about ten phases.

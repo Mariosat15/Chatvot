@@ -181,6 +181,80 @@ describe("invariant 1 is enforced by config, not by good intentions", () => {
   });
 });
 
+/**
+ * Invariant 9 (R29). Cross-game totals accumulate on settlement; they are NEVER recomputed
+ * on read from the set of currently-enabled games.
+ *
+ * Rate this High likelihood, not Medium, because summing the enabled set is the *natural*
+ * implementation. It reads correctly, it passes review, and it is only wrong on the day
+ * somebody toggles a flag - months after the code ships and far from its author. What
+ * happens then is that disabling a game retroactively subtracts everything earned in it: a
+ * player who reached level 12 partly through a provider game drops to level 9. No error,
+ * no log line, no notification.
+ *
+ * `getEnabledGameTypes()` gates creation, discovery and entry. It must never appear in a
+ * stats, leaderboard, ranking or progression READ path.
+ */
+const STATS_AND_PROGRESSION_READ_PATHS = [
+  "lib/actions/leaderboard/global-leaderboard.actions.ts",
+  "apps/admin/lib/actions/leaderboard/global-leaderboard.actions.ts",
+  "lib/services/user-stats.service.ts",
+  "apps/admin/lib/services/user-stats.service.ts",
+  "lib/services/unified-user-stats.service.ts",
+  "lib/services/xp-level.service.ts",
+  "apps/admin/lib/services/xp-level.service.ts",
+  "lib/actions/user/level.actions.ts",
+  "apps/admin/lib/actions/user/level.actions.ts",
+  "lib/services/badge-evaluation.service.ts",
+  "apps/admin/lib/services/badge-evaluation.service.ts",
+  "lib/actions/badges/user-badges.actions.ts",
+  "apps/admin/lib/actions/badges/user-badges.actions.ts",
+  "lib/services/competition-ranking.service.ts",
+  "apps/admin/lib/services/competition-ranking.service.ts",
+  "lib/caches/ranking-cache.ts",
+  "worker/jobs/evaluate-badges.job.ts",
+];
+
+describe("invariant 9: no stats or progression read consults the enabled-game set", () => {
+  it.each(STATS_AND_PROGRESSION_READ_PATHS)(
+    "%s does not call getEnabledGameTypes",
+    (file) => {
+      expect(sourceOf(file)).not.toContain("getEnabledGameTypes");
+    },
+  );
+
+  it.each(STATS_AND_PROGRESSION_READ_PATHS)(
+    "%s does not call assertGameEnabled either",
+    (file) => {
+      // Reason: assertGameEnabled calls getEnabledGameTypes internally, so checking only
+      // the direct name would miss the indirect route - which is the one a well-meaning
+      // contributor is more likely to take, since it reads as a validity check.
+      expect(sourceOf(file)).not.toContain("assertGameEnabled");
+    },
+  );
+
+  it("ranking resolves modules through the SYNCHRONOUS registry, not the gated entry point", () => {
+    // Reason: the two live in different files for exactly this reason. `lib/games/index`
+    // reaches for the database to read enabledGameTypes; the ranking engine is a pure
+    // function called inside a sort comparator and must not drag that in behind it. A
+    // contest players paid to enter has to finish and pay out even if an operator
+    // disables the game mid-flight.
+    for (const file of [
+      "lib/services/competition-ranking.service.ts",
+      "apps/admin/lib/services/competition-ranking.service.ts",
+    ]) {
+      const source = sourceOf(file);
+      expect(source).toMatch(/from ["']@\/lib\/games\/registry["']/);
+      expect(source).not.toMatch(/from ["']@\/lib\/games["']/);
+    }
+  });
+
+  it("the settlement router does not consult it either", () => {
+    // A paid entry must never be stranded by a flag flipped while the contest ran.
+    expect(sourceOf("lib/games/settlement.ts")).not.toContain("getEnabledGameTypes");
+  });
+});
+
 describe("the market-hours gate is scoped to the game, and fails closed", () => {
   it("applies to trading", () => {
     expect(gameNeedsMarketHours("trading")).toBe(true);

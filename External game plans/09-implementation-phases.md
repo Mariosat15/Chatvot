@@ -65,14 +65,61 @@ Build the shape before the specifics. The mock adapter is not throwaway work: it
 remains the basis of every automated test, and it lets seven of nine phases proceed
 without waiting on a provider.
 
-- `GameProviderAdapter` interface and `ProviderRegistry`
-- `MockProviderAdapter` - configurable score, latency, and every failure mode from `07`
-- `game_provider` and `provider_game` collections, in **both** apps
-- Catalogue sync service and caching
-- Credentials wired through settings, in **both** apps
+- [x] `GameProviderAdapter` interface and `ProviderRegistry`
+- [x] `MockProviderAdapter` - configurable score, latency, and every failure mode from `07`
+- [x] `game_provider` and `provider_game` collections, in **both** apps
+- [x] Catalogue sync service and caching
+- [x] Credentials wired through settings, in **both** apps
 
 **Done when:** the mock catalogue syncs, appears in the database, and the registry
 resolves an adapter by key.
+
+#### BUILT 4 September 2026 - code-complete
+
+`lib/services/game-providers/` - `contract.ts`, `registry.ts`,
+`adapters/mock.adapter.ts`, `catalogue.service.ts` - mirrored into `apps/admin/lib/`.
+44 tests in `__tests__/services/game-providers.test.ts`, seven probes all red. Nothing is
+player-visible: `externalGamesEnabled` defaults to false.
+
+**The location question is settled, and not where `11` s3 guessed.** That chapter sketched
+the provider code at `lib/games/provider/adapters/`; section 9 of `02` put it at
+`lib/services/game-providers/`. **Invariant 2 decides it** - the ESLint rule added in X1
+step 6 bans anything inside a game module folder from importing a model, and the registry
+reads settings while the catalogue service writes `provider_game`. The split that results
+is the right one regardless:
+
+| Location | Role | Touches the database |
+|---|---|---|
+| `lib/services/game-providers/` | Talks to the provider, caches the catalogue, resolves adapters | Yes |
+| `lib/games/provider/` (**X5**) | Pure scoring and settlement for a provider contest | **No** |
+
+**Three rules the catalogue sync enforces, each pinned by a test.** A sync never enables a
+title (`chartvoltEnabled` is ours and defaults false); never rewrites `gameKey`, `gameCode`
+or `providerKey`; and never overwrites operator-edited presentation copy. The third is
+implemented as a **named allow-list of provider-owned fields rather than a spread of the
+payload** - a spread means any field the provider adds, or any field an operator later
+edits, is silently overwritten on the next sync, and that failure is invisible until
+somebody notices their wording reverted.
+
+Titles the provider stops listing are **reported, never deleted**. A title with historical
+rounds cannot be removed without orphaning the stats joined to its `gameKey`, and a provider
+omitting a game from one response is as likely to be a partial failure on their side as a
+withdrawal.
+
+**Credentials are out of `game_provider` and behind `select: false`.** They live in
+`WhiteLabel.gameProviderCredentials`, excluded from queries by default, so a bare
+`WhiteLabel.findOne()` - which dozens of call sites already do, several returning the result
+to a client - cannot leak one. Copy the payment-provider **UX**, never its persistence
+(`12` s4.1).
+
+**The mock's default catalogue includes a `lower_is_better` / `duration_ms` title on
+purpose.** A catalogue of only higher-is-better games lets a ranking sign error pass every
+test, and that error pays the slowest player first.
+
+> **The X2 gate in `11` section 4 was noted, not cleared.** The golden-fixture regression
+> test is green; the replay against real stored `finalLeaderboard` data has never been run.
+> X2 touches no ranking or settlement code, so it was built regardless - **but the replay
+> must happen before X5.**
 
 ### E2 - Round lifecycle and result ingestion
 
