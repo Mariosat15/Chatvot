@@ -229,6 +229,45 @@ Recompute a sample of **historical completed competitions** through the new modu
 and compare against the stored `finalLeaderboard`. Identical order, identical values.
 If they differ, the extraction is wrong. **Do not proceed to X2 until this is green.**
 
+#### GATE CLEARED 4 September 2026 - the replay ran against real history
+
+`tools/games/replay-historical-rankings.ts`, run on the server:
+
+```
+competitions read        4
+examined                 4
+reproduced exactly       4
+mismatched               0
+```
+
+**No before/after comparison was needed.** The script is written to run twice, because a
+mismatch is not automatically a regression - participants edited after settlement, older
+ranking rules and `emergency_ended` snapshots all diverge for their own reasons, so the
+number that normally matters is the delta. At **100% the delta cannot be anything but
+zero**, which is why one run settled it.
+
+**State the sample honestly: four competitions is thin.** It proves the extracted path runs
+against real stored data and reproduces it exactly, which is the specific thing the gate
+asks. It does **not** carry the distributions, tie patterns and awkward edge cases the
+chapter hoped real history would supply - the platform simply has not run enough contests
+yet. **The golden matrix in `__tests__/services/ranking-regression.test.ts` is what covers
+those**, and with a sample this small it is the stronger of the two pieces of evidence, not
+the weaker one. Do not let a summary present four-for-four as comprehensive.
+
+**Two incidental findings:**
+
+- **The script had never been run, and could not have been.** It read
+  `process.env.MONGODB_URI` directly and never loaded dotenv, unlike its sibling backfill,
+  so it refused to start from a normal shell with a perfectly good `.env` present. Fixed in
+  `d35544d4`. The general point: **a tool written as an acceptance gate but never executed
+  is not evidence of anything**, and the first attempt to use it is when you find out.
+- **The owner confirmed these contests genuinely settled through the app** rather than being
+  seeded, which is the fact that makes the replay meaningful at all. The stored
+  `finalLeaderboard` was written by the pre-extraction ranking code, so the comparison is a
+  real before/after even though the users and money were test data. **Whether the data is
+  "real" is the wrong question; the question is which code wrote the value being compared
+  against.**
+
 #### Seam 1 EXTRACTED 4 September 2026, and the gate held
 
 The two metric switches now live in `lib/games/trading/scoring.ts` and are reached through

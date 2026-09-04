@@ -755,11 +755,9 @@ Mirror guard now **77 pairs**, up from 75. Both typechecks exactly at baseline, 
 registry resolves an adapter by key. **Nothing is player-visible** - `externalGamesEnabled`
 defaults to false.
 
-**The X2 gate was noted, not cleared.** `11` s4 says do not proceed to X2 until the
-historical ranking replay is green. What is green is the *golden-fixture* test; the replay
-against real stored `finalLeaderboard` data has still never run. X2 touches no ranking or
-settlement code, so it was built anyway - **but the replay must happen before X5**, which is
-where settlement actually integrates. Recorded rather than quietly skipped.
+**The X2 gate is now CLEARED** (later the same day - see the entry below). It was built
+while the gate was still open, on the grounds that X2 touches no ranking or settlement code,
+and that judgement turned out to be safe.
 
 **The plan gave two locations and invariant 2 decided between them.** `11` s3 sketched the
 provider code at `lib/games/provider/adapters/`; `02` s9 put it at
@@ -844,10 +842,57 @@ because an emoji in the anchor did not survive the shell. The fix is a probe hel
 escapes the pattern and then relaxes every newline to `\r?\n`, and anchors that avoid
 non-ASCII.
 
+---
+
+### 4 Sep 2026 - THE X1 RANKING GATE IS CLEARED
+
+`tools/games/replay-historical-rankings.ts` ran on the server against real history:
+**4 competitions read, 4 examined, 4 reproduced exactly, 0 mismatched.** The extraction of
+the two trading metric switches into `lib/games/trading/scoring.ts` changed no historical
+outcome. Recorded in `11` s4 under "GATE CLEARED".
+
+**No before/after run was needed, and that is worth explaining** so nobody repeats the work.
+The script is written to run twice because a mismatch is normally ambiguous - participants
+edited after settlement, competitions settled under older ranking rules, and
+`emergency_ended` snapshots each diverge for reasons unrelated to the extraction, so the
+meaningful figure is the delta between the two runs. **At 100% the delta cannot be anything
+but zero.** A perfect score is the one result that needs no baseline.
+
+**Four competitions is a thin sample and the documents now say so.** The gate asked for real
+history because real history carries distributions, tie patterns and edge cases nobody would
+invent - and four contests carry almost none of that. What the replay proves is narrower but
+still exactly what was asked: the extracted path runs against genuinely stored data and
+reproduces it identically. **The golden matrix remains the stronger evidence of the two**,
+not the weaker, and any summary implying four-for-four is comprehensive is wrong.
+
+**Two findings, and the second one generalises further than this script:**
+
+- **The gate script had never been run, and in fact could not be run.** It read
+  `process.env.MONGODB_URI` directly and never loaded dotenv - unlike its sibling
+  `backfill-game-labels.ts` - so it refused to start from an ordinary shell even with a
+  correct `.env` in the project root. Fixed in `d35544d4`, with `dotenv.config()` placed
+  before the other imports because a module reading `process.env` at load time would
+  otherwise see nothing, and with the refusal message now naming the path it searched.
+  **A tool written as an acceptance gate but never executed is not evidence of anything.**
+- **"Is the data real?" was the wrong question.** The owner's first instinct was that the
+  replay was pointless because the server holds test data. But the script compares against
+  the `finalLeaderboard` **written when each contest settled**, so what matters is not
+  whether the users and money were real - it is **which code wrote the value being compared
+  against**. These contests settled through the app, so the stored leaderboards came from
+  the pre-extraction ranking code and the comparison is a genuine before/after. Had they
+  been seeded directly by a script, the same run would have proved nothing while looking
+  identical. **Before dismissing a regression check as meaningless on test data, ask what
+  produced the expected values.**
+
+**What this unblocks:** X5. The gate was the one hard prerequisite standing in front of
+contest integration and settlement. The **backfill** is still unrun (`--apply` never
+invoked), and that one genuinely can wait - it only labels historical rows, and with four
+contests there is very little to label.
+
 **Next chat should:** X3 - round lifecycle and result ingestion (`09` E2). That is the phase
 `09` marks "the heart of the integration, and the part that must be flawless", with an
 explicit instruction not to move past it until every rehearsal in `07` s9 is green. The mock
-built here is what those rehearsals drive.
+built in X2 is what those rehearsals drive.
 
 ---
 
