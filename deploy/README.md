@@ -208,6 +208,13 @@ cd api-server && npm install && cd ..
 cd websocket-server && npm install && cd ..
 ```
 
+> **Do not add `--legacy-peer-deps` by hand.** The root `.npmrc` sets it, because
+> `better-auth` declares a peerOptional on `vitest@^4` while the test suite is pinned to
+> `vitest@3.2.4`, and npm treats that as a hard `ERESOLVE` failure. Only the root project
+> is affected; the three sub-projects resolve cleanly. Passing the flag manually was what
+> kept `deploy/deploy.sh` from being usable — it runs a bare `npm install` and, with
+> `set -e`, aborted the whole deploy on the first step.
+
 ### Step 5: Build All Apps
 
 ```bash
