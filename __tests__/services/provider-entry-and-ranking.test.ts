@@ -282,7 +282,21 @@ describe("the provider game module", () => {
   });
 
   it("declares no tie-breaks, so identical scores are a genuine tie", () => {
-    expect(providerGameModule.getTieBreakerValue()).toBe(0);
+    // Called through the interface, with arguments, precisely because the implementation
+    // ignores them: the contract is that ANY participant and ANY tie-breaker yield the same
+    // constant. Calling it with none would test the implementation's shape instead.
+    const participant = {
+      userId: "u",
+      status: "active",
+      enteredAt: new Date(),
+      score: 70,
+    };
+
+    for (const tieBreaker of ["join_time", "trades_count", "win_rate"]) {
+      expect(
+        providerGameModule.getTieBreakerValue(participant, tieBreaker),
+      ).toBe(0);
+    }
   });
 
   it("does not need market hours, which is why weekends work", () => {

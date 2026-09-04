@@ -128,8 +128,8 @@ Probe -Name 'tie-breaking on join time is reintroduced' `
   -File 'lib/games/provider/scoring.ts' `
   -Find 'export function getProviderTieBreakerValue(): number {
   return 0;' `
-  -Replace 'export function getProviderTieBreakerValue(): number {
-  return 1;' `
+  -Replace 'export function getProviderTieBreakerValue(p?: { enteredAt?: Date }): number {
+  return p?.enteredAt ? -p.enteredAt.getTime() : 0;' `
   -ExpectRed 'declares no tie-breaks, so identical scores are a genuine tie'
 
 Write-Host "`n=== the registry and settlement routing ===" -ForegroundColor Cyan
@@ -145,5 +145,68 @@ Probe -Name 'settlement starts allowing a provider contest down the trading path
   -Find '  if (gameModule.type !== TRADING_GAME_TYPE) {' `
   -Replace '  if (false) {' `
   -ExpectRed 'refuses a provider contest with no_settle_path, not unknown_game'
+
+Write-Host "`n=== the round-launch guards ===" -ForegroundColor Cyan
+
+$Suite = '__tests__/services/provider-round-launch.test.ts'
+
+Probe -Name 'THE SEAT CHECK IS REMOVED - anyone signed in can play a paid contest' `
+  -File 'lib/services/games/round-launch.service.ts' `
+  -Find '    if (!participant) {' `
+  -Replace '    if (false) {' `
+  -ExpectRed 'REFUSES a signed-in user who never joined the competition'
+
+Probe -Name 'the base URL falls back to localhost instead of refusing' `
+  -File 'lib/services/games/round-launch.service.ts' `
+  -Find '  const raw = process.env.NEXT_PUBLIC_BASE_URL?.trim();
+  if (!raw) return null;' `
+  -Replace '  const raw = process.env.NEXT_PUBLIC_BASE_URL?.trim() || "http://localhost:3000";
+  if (!raw) return null;' `
+  -ExpectRed 'refuses when the public base URL is not configured'
+
+Probe -Name 'a non-http base URL is accepted' `
+  -File 'lib/services/games/round-launch.service.ts' `
+  -Find '  if (!/^https?:\/\//i.test(raw)) return null;' `
+  -Replace '  if (false) return null;' `
+  -ExpectRed 'refuses a relative or non-http base URL'
+
+Probe -Name 'finalizing becomes a playable status' `
+  -File 'lib/services/games/round-launch.service.ts' `
+  -Find 'const PLAYABLE_STATUSES = new Set(["active"]);' `
+  -Replace 'const PLAYABLE_STATUSES = new Set(["active", "finalizing"]);' `
+  -ExpectRed 'refuses while the contest is FINALIZING'
+
+Probe -Name 'the play-window START check is dropped' `
+  -File 'lib/services/games/round-launch.service.ts' `
+  -Find '    if (contest.playWindowStart && new Date() < new Date(contest.playWindowStart)) {' `
+  -Replace '    if (false) {' `
+  -ExpectRed 'refuses before the play window opens'
+
+Probe -Name 'the per-title switch is not re-checked at play time' `
+  -File 'lib/services/games/round-launch.service.ts' `
+  -Find '    if (!title.chartvoltEnabled || title.providerStatus !== "active") {' `
+  -Replace '    if (false) {' `
+  -ExpectRed 'refuses a title an operator has switched off mid-contest'
+
+Probe -Name 'a trading contest is allowed down the provider launch path' `
+  -File 'lib/services/games/round-launch.service.ts' `
+  -Find '    if (!isProviderContest(contest)) {' `
+  -Replace '    if (false) {' `
+  -ExpectRed 'refuses a trading competition rather than half-launching it'
+
+Probe -Name 'our own misconfiguration is leaked to the player' `
+  -File 'lib/services/games/round-launch.service.ts' `
+  -Find '      return refuse(
+        "misconfigured",
+        "This game is temporarily unavailable. Please try again later.",
+      );
+    }
+
+    // `maxDurationSeconds` lives on the catalogue row' `
+  -Replace '      return refuse("misconfigured", config.error);
+    }
+
+    // `maxDurationSeconds` lives on the catalogue row' `
+  -ExpectRed 'gives a neutral message when OUR configuration is the problem'
 
 Write-Host "`n=== done ===`n" -ForegroundColor Cyan
