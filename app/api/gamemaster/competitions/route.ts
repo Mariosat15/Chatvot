@@ -6,6 +6,7 @@ import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
 import { MarketplaceItem } from "@/database/models/marketplace/marketplace-item.model";
+import { contestGameLabel } from "@/lib/games";
 
 /**
  * GET /api/gamemaster/competitions
@@ -459,6 +460,11 @@ export async function POST(request: NextRequest) {
       maxOpenPositions: 10,
       allowShortSelling: false,
       marginCallThreshold: 100,
+      // Reason: same bypass, for the game label (risk R7). A Game Master creates trading
+      // contests only - `limits.allowedGameTypes` defaults to `["trading"]` and provider
+      // contests are blocked until the revenue share is computed on net platform fee
+      // (chapter 19 section 5) - so the label is trading rather than caller-supplied.
+      ...contestGameLabel(),
       createdAt: new Date(),
       updatedAt: new Date(),
     };

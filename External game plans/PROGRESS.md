@@ -554,6 +554,121 @@ Newest at the top.
 
 ---
 
+### 4 Sep 2026 - X1 STEP 6 - THE THREE GUARDS - BUILT AND PROBED
+
+**Shipped:** the three things that stop the engine quietly assuming trading. `contestGameLabel()`
+and `gameNeedsMarketHours()` added to the registry and mirrored; **six** raw-driver contest
+inserts now stamp the label; an ESLint `no-restricted-imports` rule enforcing invariant 1;
+and the market-hours gate scoped to `capabilities.needsMarketHours` at all three cross-game
+call sites. 34 new tests in `__tests__/services/game-guards.test.ts`, suite now **391 in 28
+files**.
+
+**Files touched:** `lib/games/registry.ts` + `index.ts` (and mirrors); `eslint.config.mjs`;
+`app/api/gamemaster/competitions/route.ts` and its admin twin;
+`apps/admin/app/api/admin/trading-tests/run/route.ts`;
+`apps/admin/app/api/admin/end-logic-tests/run/route.ts`; `app/api/challenges/route.ts`;
+`app/api/challenges/[id]/accept/route.ts`;
+`apps/admin/lib/actions/trading/competition.actions.ts`.
+
+**Four findings worth carrying:**
+
+- **There were SIX raw contest inserts, not the one R7 named.** Two Game Master routes,
+  two in the admin trading-test harness and two in the end-logic harness. The harness ones
+  matter more than they look: **the end-logic harness drives finalization**, which now
+  dispatches on `gameType`, so seeding contests unlabelled would have exercised the
+  absent-label fallback rather than the path production takes - a harness quietly testing
+  something adjacent to the real thing. Same lesson as Defect 1's "four writers, not two":
+  **count the writers before fixing the one the plan names.**
+- **Nothing was broken in production, and it is worth being precise about why.**
+  `resolveGameType` treats an absent label as trading (invariant 5), so every unlabelled
+  Game Master contest still settles correctly today. R7 is not a live payout bug; it bites
+  the day something **groups by `gameKey`** and the row silently drops out of a total -
+  long after the commit that caused it, and **unfixable in place, because `gameKey` is
+  immutable once written.**
+- **`no-restricted-imports` matches the import STRING, not the resolved path**, and the
+  first version of the rule was wrong because of it. `**/lib/games/*` caught
+  `@/lib/games/trading`, `@/lib/games/trading/scoring` and `@root/lib/games/trading/config`
+  but **missed `../games/trading`**, which has no `lib/` segment. Found by writing a probe
+  file with four violations and four legal imports and checking which fired - 3 of 4. The
+  rule is also **blocked-by-default with the public surface negated**, so adding a game
+  needs no config change while adding a public engine file needs one line; the safe
+  default is refusal.
+- **The market gate on challenge accept had to MOVE, not just gain a condition.** It ran
+  *before* the challenge was loaded, so it could not know the game - there is no way to
+  scope a gate to a capability without first reading the document that carries the label.
+  It now runs after the lookup and the cheap validations but **before any wallet read**,
+  the same ordering rule as `checkAccountStanding` in sub-defect 1b, so a refusal cannot
+  leave one of the two debits applied. Side effect and an improvement: a request for a
+  challenge that does not exist now returns **404 rather than a market-closed 400**.
+
+**The gate fails CLOSED on an unknown game type**, deliberately. The two mistakes are not
+symmetric: wrongly applying it refuses a contest visibly and someone complains, while
+wrongly skipping it lets real money trade against a closed market on stale prices. Also,
+**neither create path takes the game type from caller input** - a client- or
+operator-supplied value would be a way to skip the market gate on a trading contest by
+claiming to be a different game. Pinned by its own test.
+
+**Deviated from plan:** the admin competition-create gate was **extracted into
+`assertForexMarketOpenForCreate()`** rather than wrapped in place. Sixty lines of live
+money code re-indented is an unreviewable diff for a one-line semantic change, and the file
+was already **753 lines**, over the 500 guidance. The body is unchanged.
+
+**Verified:** all seven guards probed by reintroducing the defect - dropping the label from
+two different raw inserts (2 red each), naming `trading` instead of a wildcard in the
+ESLint pattern (1 red), removing the games-layer exemption (1 red), flipping the gate to
+fail open (1 red), and making the gate unconditional at two call sites (3 and 1 red).
+**Every probe went red; none was a test that only ever passes.** Suite 391/391 in 28 files,
+golden baseline byte-identical, main typecheck 18 and admin 225 both exactly at baseline,
+`check:mirrors` 75 agree 0 drifted.
+
+**OWNER DECISION, 4 Sep 2026 - the weekend competition-create block is REMOVED.** The admin
+action used to refuse an operator creating a **trading** competition while the forex market
+was closed. That was a live usability defect on its own terms, and it extends the 1 Sep
+decision that **joining** a contest outside market hours is allowed and only trading itself
+is gated: setting up Monday's competition on a Sunday is the same kind of legitimate.
+
+Three things make the removal safe rather than merely convenient. **The gate that matters
+is untouched** - order placement in `order.actions.ts` still refuses trades against a closed
+market, so a competition created at the weekend simply cannot be traded in until it opens.
+**The main app never had this check**, so the two apps now agree rather than differing by
+accident. And **the market-holiday overlap warning stays** - it informs the operator without
+refusing them.
+
+Note this is *not* the capability-scoping treatment the other two gates got. Scoping it to
+`needsMarketHours` would have left it refusing trading competitions at the weekend - correct
+for games, still wrong for operators. `assertForexMarketOpenForCreate()` was **deleted with
+it**, on the `shouldBlockEntry` precedent: a dead guard makes reintroducing the defect look
+like using an existing API. Pinned by three tests asserting the refusal is absent from
+**both** apps and that the holiday warning survived; probed by reintroducing the throw,
+which turned 2 red.
+
+**Invariant 2 was added the same day** (game modules never importing contest models), on the
+grounds that it cost five minutes and the alternative was remembering at X4. Nothing violated
+it. Two things about it generalise beyond this rule:
+
+- **The scope is one level below the obvious one.** `lib/games/*/**` matches a module folder
+  but not the layer's own public files, because **`lib/games/index.ts` legitimately reads
+  `WhiteLabel`** for `getEnabledGameTypes()`. Written as `lib/games/**` the rule would ban
+  that and look completely correct doing it. It bans **every** model rather than an
+  allow-list of contest models - a module needing any document is already the design going
+  wrong, and a list silently permits the next model somebody adds.
+- **Flat config is last-one-wins per rule, so block order is load-bearing.** The invariant 1
+  exemption switches `no-restricted-imports` **off** for all of `lib/games/**`, so the
+  invariant 2 block must sit after it or it is **silently dead** - and a dead config block
+  still parses and still reads correctly. Pinned by a test asserting the index of one
+  against the other; probed by widening invariant 2's scope, which turned 2 red.
+
+Suite now **396**. Probed by importing four contest models and the connection helper from
+inside `lib/games/trading/` - all four flagged, including the relative form - while
+`lib/games/index.ts` and its mirror stayed clean.
+
+**Next chat should:** X1 step 7, the idempotent backfill of `gameType`/`gameKey` on existing
+contests. That is the **last step of X1**. Worth stating plainly for anyone reading this
+cold: finishing X1 does not mean external games work - X1 is the foundation phase, and a
+provider game does not plug in until **X4** (the adapter) and **X5**.
+
+---
+
 ### 4 Sep 2026 - THE PRE-EXISTING LINT WARNINGS ON THE X1 FILES - CLEARED, LINT-ONLY
 
 **Shipped:** the pending X1 commit now passes `lint-staged` without `--no-verify`. All 23

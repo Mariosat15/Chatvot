@@ -9,6 +9,7 @@ import WalletTransaction from "@/database/models/trading/wallet-transaction.mode
 import mongoose from "mongoose";
 import { canJoinChallenge } from "@/lib/services/market-hours.service";
 import { checkAccountStanding } from "@/lib/services/contest-entry/guards";
+import { gameNeedsMarketHours } from "@/lib/games";
 
 // POST - Accept a challenge
 export async function POST(
@@ -75,20 +76,6 @@ export async function POST(
       );
     }
 
-    // Check if market is open for challenges
-    const marketCheck = await canJoinChallenge();
-    if (!marketCheck.canJoin) {
-      await dbSession.abortTransaction();
-      return NextResponse.json(
-        {
-          error:
-            marketCheck.reason ||
-            "Cannot accept challenge: Market is currently closed.",
-        },
-        { status: 400 },
-      );
-    }
-
     const challenge = await Challenge.findById(id).session(dbSession);
 
     if (!challenge) {
@@ -126,6 +113,32 @@ export async function POST(
         { error: "Challenge has expired" },
         { status: 400 },
       );
+    }
+
+    // ⏰ Market hours, but only for games that trade against a live market. A provider
+    // challenge has no reason to be refused on a Saturday.
+    //
+    // Reason: this MOVED here from before the challenge lookup. It has to run after the
+    // document is loaded, because the game type is on the document - there is no way to
+    // scope the gate to a capability without first knowing which game it is. It still
+    // runs before any wallet read, so a refusal cannot leave one of the two debits
+    // applied - the same ordering rule as `checkAccountStanding` above.
+    //
+    // Side effect of the move, and an improvement: a request for a challenge that does
+    // not exist now returns 404 rather than a market-closed 400.
+    if (gameNeedsMarketHours(challenge.gameType)) {
+      const marketCheck = await canJoinChallenge();
+      if (!marketCheck.canJoin) {
+        await dbSession.abortTransaction();
+        return NextResponse.json(
+          {
+            error:
+              marketCheck.reason ||
+              "Cannot accept challenge: Market is currently closed.",
+          },
+          { status: 400 },
+        );
+      }
     }
 
     // Check challenged user's wallet balance

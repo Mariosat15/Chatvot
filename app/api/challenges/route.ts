@@ -11,6 +11,7 @@ import { getUserById } from "@/lib/utils/user-lookup";
 import { nanoid } from "nanoid";
 import { trackTiming, errorResponse } from "@/lib/utils/api-utils";
 import { canJoinChallenge } from "@/lib/services/market-hours.service";
+import { contestGameLabel, gameNeedsMarketHours } from "@/lib/games";
 import {
   isSimulatorRequest,
   getSimulatorUserId,
@@ -219,9 +220,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ⏰ CHECK MARKET STATUS - Challenges require open market
+    // The game this challenge will be stamped with. Trading today, because this route
+    // sets no gameType and the schema defaults to it; X5 takes it from the request once
+    // provider challenges exist. Deriving the gate from the SAME value that gets stored
+    // means the two can never disagree.
+    //
+    // Reason: deliberately not read from the request body. A client-supplied game type
+    // would let anyone skip the market-hours gate on a trading challenge by claiming to
+    // be a different game.
+    const gameLabel = contestGameLabel();
+
+    // ⏰ CHECK MARKET STATUS - only for games that trade against a live market.
     // Skip check in simulator mode for testing
-    if (!isInSimulatorMode) {
+    if (!isInSimulatorMode && gameNeedsMarketHours(gameLabel.gameType)) {
       try {
         const marketCheck = await canJoinChallenge();
         if (!marketCheck.canJoin) {
@@ -444,6 +455,7 @@ export async function POST(request: NextRequest) {
     });
 
     const challenge = await Challenge.create({
+      ...gameLabel,
       slug,
       challengerId,
       challengerName,

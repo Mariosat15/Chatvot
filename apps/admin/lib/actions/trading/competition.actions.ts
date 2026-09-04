@@ -214,65 +214,19 @@ export const createCompetition = async (competitionData: {
 
     await connectToDatabase();
 
-    // ⏰ CHECK MARKET STATUS - Block creation when market is closed
-    try {
-      const MASSIVE_API_KEY = process.env.MASSIVE_API_KEY;
-      if (MASSIVE_API_KEY) {
-        const statusRes = await fetch(
-          `https://api.massive.com/v1/marketstatus/now?apiKey=${encodeURIComponent(MASSIVE_API_KEY)}`,
-          { headers: { Accept: "application/json" } },
-        );
-
-        if (statusRes.ok) {
-          const statusData = await statusRes.json();
-          const fxStatus = statusData?.currencies?.fx || "unknown";
-          const isOpen = fxStatus.toLowerCase() === "open";
-
-          if (!isOpen) {
-            throw new Error(
-              `Cannot create competition: Forex market is currently ${fxStatus}. Please wait until market opens (Sunday 10pm - Friday 10pm UTC).`,
-            );
-          }
-        }
-      } else {
-        // Fallback: time-based check
-        const now = new Date();
-        const utcDay = now.getUTCDay();
-        const utcHour = now.getUTCHours();
-        const isClosed =
-          utcDay === 6 ||
-          (utcDay === 0 && utcHour < 22) ||
-          (utcDay === 5 && utcHour >= 22);
-
-        if (isClosed) {
-          throw new Error(
-            "Cannot create competition: Forex market is currently closed (Weekend). Please wait until market opens (Sunday 10pm UTC).",
-          );
-        }
-      }
-    } catch (marketError) {
-      if (
-        marketError instanceof Error &&
-        marketError.message.includes("Cannot create competition")
-      ) {
-        throw marketError; // Re-throw our custom error
-      }
-      console.warn("⚠️ Market status check failed:", marketError);
-      // Use fallback time-based check
-      const now = new Date();
-      const utcDay = now.getUTCDay();
-      const utcHour = now.getUTCHours();
-      const isClosed =
-        utcDay === 6 ||
-        (utcDay === 0 && utcHour < 22) ||
-        (utcDay === 5 && utcHour >= 22);
-
-      if (isClosed) {
-        throw new Error(
-          "Cannot create competition: Forex market is currently closed (Weekend). Please wait until market opens (Sunday 10pm UTC).",
-        );
-      }
-    }
+    // Reason: there is deliberately NO market-hours check here. Creating a competition is
+    // scheduling one, not playing it - an operator setting up Monday's contest on a Sunday
+    // is doing something entirely legitimate, and this action used to refuse it. Removed
+    // by owner decision, 4 September 2026, extending the 1 September decision that joining
+    // a contest outside market hours is allowed and only trading itself is gated.
+    //
+    // Nothing is weakened by removing it. The gate that matters is on order placement in
+    // `order.actions.ts`, which is untouched: a competition created at the weekend simply
+    // cannot be traded in until the market opens. The main app's equivalent action never
+    // had this check, so the two apps now agree rather than differing by accident.
+    //
+    // The market-HOLIDAY overlap warning further down is a different thing and stays. It
+    // informs the operator; it does not refuse them.
 
     // Validate prize distribution totals 100%
     const totalPrizePercentage = competitionData.prizeDistribution.reduce(

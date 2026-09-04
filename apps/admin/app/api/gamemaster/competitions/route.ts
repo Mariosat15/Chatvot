@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/database/mongoose";
 import { verifyGameMasterAuth } from "@/lib/admin/auth";
 import mongoose from "mongoose";
 import { ObjectId } from "mongodb";
+import { contestGameLabel } from "@/lib/games";
 
 /**
  * GET /api/gamemaster/competitions
@@ -278,6 +279,12 @@ export async function POST(request: NextRequest) {
       gameMasterId: auth.userId,
       gameMasterName,
       createdBy: auth.userId,
+      // Reason: this route inserts with the raw MongoDB driver, so Mongoose schema
+      // defaults never run and the game label would be absent (risk R7). A Game Master
+      // creates trading contests only - `limits.allowedGameTypes` defaults to
+      // `["trading"]` and provider contests are blocked until the revenue share is
+      // computed on net platform fee (chapter 19 section 5).
+      ...contestGameLabel(),
       createdAt: new Date(),
       updatedAt: new Date(),
     };

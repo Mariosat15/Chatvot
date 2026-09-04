@@ -489,6 +489,74 @@ the URL (pre-existing, affects all ~60 sections, belongs with X6.5), and the
 `tradingEnabled` conditional that hides the destination waits on X1 — **"built" does not
 include it.**
 
+### Four things from X1 step 6 (4 September 2026) that generalise
+
+The three guards - the game label on raw inserts (R7), the ESLint import boundary
+(invariant 1), and the market-hours capability scope - are built, probed and closed.
+
+- **"Count the writers" is now a rule with three instances, not an anecdote.** Defect 1's
+ plan said two competition entry paths and there were **four**. Seam 3's plan said five
+ finalization entry points and there were **ten**. R7 named **one** raw-driver insert and
+ there were **six**. Every time, the plan's number was an assumption nobody had run `rg`
+ against. **Before fixing the writer a document names, count them.** The two extra R7
+ writers were admin **test harnesses**, which is the part that would have been shrugged
+ off: the end-logic harness drives finalization, so seeding contests unlabelled meant it
+ exercised the absent-label fallback rather than the path production takes - **a harness
+ quietly testing something adjacent to the real thing.**
+- **A risk entry can overstate its own severity, and an overstated risk is still a wrong
+ fact.** `17` and `11` both claimed an unlabelled contest "gets settled by trading code and
+ pays the wrong players". It does not: invariant 5 resolves an absent label to trading,
+ which is correct for all six writers. R7 was never a live payout bug. The real harm is
+ later and quieter - an aggregate that **groups by `gameKey`** silently drops the row, long
+ after the commit, and **`gameKey` is immutable so it cannot be corrected in place.** Both
+ documents and the internal HTML now say so. **Correcting a risk downward is as much a
+ documentation duty as raising one**, because a risk register nobody believes is worse than
+ a short one.
+- **`no-restricted-imports` matches the import STRING, not the resolved path** - and write
+ the probe before trusting the pattern. `**/lib/games/*` caught three violation forms and
+ **missed `../games/trading`**, which has no `lib/` segment. A probe file with four
+ violations and four legal imports showed 3 of 4 firing; reasoning about the glob would not
+ have. Write the rule **blocked-by-default with the public surface negated**, never as a
+ list of game folders: the list version leaves every future game unprotected until somebody
+ remembers, and forgetting is silent.
+- **Two more traps from adding invariant 2 the same day, and both produce a rule that looks
+ right and does nothing.** First, **scope one level below the obvious one**:
+ `lib/games/*/**` matches a module folder but not the layer's own public files, because
+ `lib/games/index.ts` legitimately reads `WhiteLabel` for `getEnabledGameTypes()` - written
+ as `lib/games/**` the rule bans that and reviews as correct. Second, **flat config is
+ last-one-wins per rule**, so a block placed before an exemption that switches the same rule
+ off is **silently dead**, and a dead config block still parses and still reads correctly.
+ Pin the ordering with a test comparing the two blocks' indices. Related: ban **every**
+ model rather than an allow-list of contest models - a module needing any document is
+ already the design going wrong, and a list silently permits the next model added.
+- **Scoping a gate to a property of the thing it guards can force the gate to MOVE.** The
+ challenge-accept market check ran *before* the challenge was loaded, so it could not know
+ the game - there is no way to make it conditional without first reading the document that
+ carries the label. Two rules from placing it again: it must sit **before any wallet read**,
+ the same ordering as `checkAccountStanding` in sub-defect 1b, so a refusal cannot leave one
+ of two debits applied; and moving a guard **changes which error a bad request gets** - a
+ missing challenge now returns 404 rather than a market-closed 400, which is an improvement
+ but is a behaviour change and belongs in the work log either way.
+
+**Two related rules for any capability gate.** It must **fail closed** on an unknown
+value - wrongly applying a gate refuses something visibly and someone complains, wrongly
+skipping it lets real money trade against a closed market. And it must **never take the
+deciding value from caller input**: a client- or operator-supplied game type is a way to
+skip the market gate on a trading contest by claiming to be a different game. Derive it from
+the same helper that stamps the stored label, so the gate and the label cannot disagree.
+
+**Owner decision, 4 September 2026: the weekend competition-create block is removed**, and
+the reasoning generalises. **Capability-scoping is not always the right tool for a gate that
+is wrongly applied.** The admin action refused an operator creating a *trading* competition
+while the forex market was closed; scoping it to `needsMarketHours` would have fixed it for
+provider games and **left it wrong for trading**. The question to ask first is not "which
+games does this gate apply to" but **"is this gate about playing, or about scheduling?"** -
+creating a contest is scheduling it, and order placement still refuses trades against a
+closed market, so nothing was weakened. Do not reintroduce it. `assertForexMarketOpenForCreate()`
+was deleted with it, on the `shouldBlockEntry` precedent. Related and worth noticing: **the
+main app never had the check**, so the apps now agree rather than differing by accident - an
+asymmetry a reviewer could otherwise "fix" in the wrong direction.
+
 ## The rule
 
 **Documentation is part of the deliverable, not a follow-up task.** A phase is not

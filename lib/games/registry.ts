@@ -48,6 +48,30 @@ export function resolveGameType(
 }
 
 /**
+ * The two label fields every contest document must carry (risk R7).
+ *
+ * For writers that bypass Mongoose and therefore get no schema defaults - today the two
+ * Game Master routes, which insert with the raw MongoDB driver.
+ *
+ * A helper rather than two literals at each call site, because the failure mode of
+ * setting `gameType` and forgetting `gameKey` is invisible: the contest settles fine,
+ * every current query still matches it, and the row only disappears later when something
+ * groups by `gameKey` - long after the commit that caused it. `gameKey` is immutable once
+ * written, so a wrong or absent value cannot be corrected in place afterwards.
+ */
+export function contestGameLabel(
+  gameType?: string | null,
+  gameKey?: string | null,
+): { gameType: GameType; gameKey: string } {
+  const resolvedType = resolveGameType(gameType);
+  const trimmedKey = gameKey?.trim();
+  return {
+    gameType: resolvedType,
+    gameKey: trimmedKey?.length ? trimmedKey : resolvedType,
+  };
+}
+
+/**
  * Resolve a module for a contest that is already under way, treating an absent label as
  * trading. Returns `undefined` only for a genuinely unknown game type.
  *
@@ -66,4 +90,23 @@ export function getGameModuleOrTrading(
   gameType: GameType | null | undefined,
 ): GameModule | undefined {
   return getGameModule(resolveGameType(gameType));
+}
+
+/**
+ * Whether the market-hours gate applies to this game (X1 step 6, chapter 11 section 7).
+ *
+ * The gate is unconditional today, which is correct for trading and wrong for everything
+ * else: a chess contest has no reason to be refused on a Saturday. Scoping it to a
+ * capability is what stops the first provider game being unplayable at weekends.
+ *
+ * FAILS CLOSED. An unknown game type keeps the gate rather than dropping it, because the
+ * two mistakes are not symmetric - wrongly applying it refuses a contest visibly and
+ * someone complains, while wrongly skipping it lets real money trade against a closed
+ * market on stale prices.
+ */
+export function gameNeedsMarketHours(
+  gameType: GameType | null | undefined,
+): boolean {
+  const gameModule = getGameModuleOrTrading(gameType);
+  return gameModule ? gameModule.capabilities.needsMarketHours : true;
 }

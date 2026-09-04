@@ -1052,11 +1052,12 @@
     </tbody>
   </table></div>
 
-  <h3>The gate</h3>
-  <div class="cal bad">
-    <div class="t">The Game Master competition route sets no game label</div>
-    <p>It inserts with the <b>raw MongoDB driver</b> rather than through the schema layer, so it will not pick up a default. An unlabelled competition <b>reads as a trading competition and gets settled by trading code</b> &mdash; which means it pays the wrong players.</p>
-    <p style="margin-bottom:0">This is a <b>gate inside the foundation phase, not a task</b>. It applies to both the main-app route and its admin twin. It is also worth replacing the hand-rolled insert with the same creation path the admin wizard uses: two divergent creation paths for the same object is precisely the defect class the prerequisite fixes exist to remove.</p>
+  <h3>The gate &mdash; closed 4 September 2026</h3>
+  <div class="cal good">
+    <div class="t">Every raw-driver contest insert now sets the game label</div>
+    <p>These routes insert with the <b>raw MongoDB driver</b> rather than through the schema layer, so they pick up no default. All of them now stamp the label through one shared helper &mdash; a helper rather than two literals, because setting the game type and forgetting the game key is invisible: the contest settles, every current query still matches it, and the row only disappears once something groups by key.</p>
+    <p><b>There were six such inserts, not the one this risk named.</b> Two Game Master routes and four in the admin test harnesses. The harness ones were not cosmetic: one of them drives the settlement path, so seeding contests without a label meant the harness was testing something adjacent to what production actually does. This is the third time a count in the plan has been low &mdash; after the competition entry paths and the settlement call sites &mdash; so the rule to carry is simply <b>count the writers before fixing the one the plan names</b>.</p>
+    <p style="margin-bottom:0"><b>One correction to what this section used to claim.</b> It said an unlabelled competition &ldquo;gets settled by trading code and pays the wrong players&rdquo;. That was wrong: a missing label deliberately resolves to trading, which is correct for all six of these writers, so there was never a live payout bug here. The real harm arrives later and far more quietly &mdash; the day a cross-game total groups by game key, an unlabelled contest silently drops out of it, and because the key is immutable once written it cannot be corrected in place afterwards. Still worth doing separately: replacing the hand-rolled inserts with the same creation path the admin wizard uses, since two divergent creation paths for one object is precisely the defect class the prerequisite fixes exist to remove.</p>
   </div>
 
   <h3>Two live defects found while writing this chapter</h3>

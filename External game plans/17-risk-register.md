@@ -30,7 +30,7 @@ chapter covers risks to the programme and to the application.
 | **R29** | **Disabling a game retroactively demotes players** who earned levels, points or ranks in it | **High** | **High** | **X1** - the design decision is made there |
 | **R30** | `distributePrizesWithTies` took a **fraction** from a parameter named `platformFeePercentage`; a caller passing `10` paid **negative prizes** | **High** | Medium | **CLOSED 4 Sep 2026** - renamed to `platformFeeFraction` and range-checked in both apps |
 | R6 | Price infrastructure broken by gating | High | Medium | X8 |
-| R7 | Game Master raw insert misses the game label | High | High | X1 |
+| **R7** | Raw-driver contest inserts miss the game label | High | High | **CLOSED 4 Sep 2026** - **six** writers found, not one; all stamp `contestGameLabel()`, pinned by a test that counts labels against inserts |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -543,21 +543,40 @@ exists there.
 after both the rename and the guard. **Probed:** deleting the guard turned 8 of the 19 new
 tests red.
 
-### R7 - Game Master route bypasses Mongoose defaults
+### R7 - Raw-driver contest inserts bypass Mongoose defaults - CLOSED 4 September 2026
 
-`app/api/gamemaster/competitions/route.ts` inserts with the **raw MongoDB driver** at line
-466, so it will not receive a default game label. Set it explicitly. This is also why
-Mongoose discriminators were rejected in `11` section 6.
+Fixed in X1 step 6. All raw-driver contest inserts now spread `contestGameLabel()` from
+`lib/games/registry.ts`. This is also why Mongoose discriminators were rejected in `11`
+section 6.
 
-Combined with R3, this is the sharpest money bug in the programme: an unlabelled
-competition reads as trading, gets settled by trading code, and **pays the wrong players**.
-Setting the label on both this route and its admin twin at
-`apps/admin/app/api/gamemaster/competitions/route.ts` is a **gate inside X1**, not a task -
-see `19` section 3.1.
+**There were six writers, not the one this risk named.** The two Game Master routes, two in
+`apps/admin/app/api/admin/trading-tests/run/route.ts` and two in
+`apps/admin/app/api/admin/end-logic-tests/run/route.ts`. The harness ones are not cosmetic:
+**the end-logic harness drives finalization**, which dispatches on `gameType`, so seeding
+contests unlabelled meant the harness exercised the absent-label fallback instead of the
+path production takes - a test quietly checking something adjacent to the real thing. Carry
+the general rule, which is now the third instance after Defect 1's four entry paths and
+seam 3's ten call sites: **count the writers before fixing the one the plan names.**
 
-Consider also replacing the raw insert with the consolidated creation path used by the admin
-wizard. Two divergent creation paths for the same object is the defect class X0 exists to
-remove from the entry path; leaving it in the creation path invites the same bug again.
+**Correct the severity claim this entry used to make.** It said an unlabelled competition
+"gets settled by trading code and pays the wrong players". That is wrong, and the reason
+matters: `resolveGameType` treats an absent label as **trading** (invariant 5), which is
+exactly right for these six writers because all six create trading contests. R7 was never a
+live payout bug. What it actually breaks is later and quieter - the day an aggregate
+**groups by `gameKey`**, an unlabelled row drops silently out of a total, long after the
+commit that caused it, and **cannot be corrected in place because `gameKey` is immutable
+once written.**
+
+Pinned by `__tests__/services/game-guards.test.ts`, which counts `contestGameLabel()` calls
+against raw `insertOne` calls per file rather than checking a hard-coded list - so a
+**new** raw writer added to any of these files turns it red. Probed by removing the label
+from two different inserts; each turned 2 tests red.
+
+Still open, and deliberately not done here: replacing the raw inserts with the consolidated
+creation path used by the admin wizard. Two divergent creation paths for the same object is
+the defect class X0 exists to remove from the entry path, and leaving it in the creation
+path invites the same bug again - but that is a refactor of Game Master contest creation,
+not a label fix.
 
 ### R9 - Fraud throttle blind to provider entries
 
@@ -671,9 +690,11 @@ cannot honestly be pulled forward.
 - [ ] Finalization dispatches on game type at all **5** entry points
 - [ ] Trading settle path asserts and aborts on a non-trading contest
 - [ ] Dead Inngest crons deleted or fenced
-- [ ] Market-hours gating scoped to `needsMarketHours`
-- [ ] **Both Game Master competition inserts set the game label explicitly** - verified by
-      reading a created document, not by trusting a default (R7)
+- [x] Market-hours gating scoped to `needsMarketHours` - **done 4 Sep 2026**, at all three
+      cross-game call sites (challenge create, challenge accept, admin competition create),
+      failing **closed** on an unknown game type
+- [x] **Every raw-driver contest insert sets the game label explicitly** - **done 4 Sep
+      2026**. Note this was **six** inserts, not the two this line assumed (R7)
 - [ ] **Admin-app finalization pays Game Master earnings identically to the main app** (R26)
 - [ ] `minParticipants` cannot be set below 2 on any creation path, admin or Game Master
 - [ ] Every failure rehearsal in `07` section 9 green **against the mock**

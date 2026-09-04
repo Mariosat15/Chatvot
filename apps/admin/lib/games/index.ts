@@ -18,6 +18,8 @@ export {
   listGameModules,
   resolveGameType,
   getGameModuleOrTrading,
+  contestGameLabel,
+  gameNeedsMarketHours,
 } from "./registry";
 
 /**

@@ -166,6 +166,39 @@ contest format:
 For provider games these are derived from the catalogue response in `01` section 3 -
 `family`, `supportsCompetition`, `supportsOneVsOne`, `supportsContentSeed`.
 
+**`needsMarketHours` is live as of 4 September 2026** (X1 step 6), read through
+`gameNeedsMarketHours()` in the registry at three cross-game call sites: challenge create,
+challenge accept, and admin competition create. Four things about it are worth keeping.
+
+It **fails closed**. An unknown game type keeps the gate rather than dropping it, because
+the mistakes are not symmetric: wrongly applying it refuses a contest visibly and someone
+complains, while wrongly skipping it lets real money trade against a closed market on stale
+prices.
+
+Neither create path takes the game type **from caller input**. A client- or
+operator-supplied value would be a way to skip the market gate on a trading contest by
+claiming to be a different game. Both derive it from `contestGameLabel()`, the same helper
+that stamps the stored label, so the gate and the label cannot disagree.
+
+On **challenge accept the gate had to move, not just gain a condition.** It ran before the
+challenge was loaded, and there is no way to scope a gate to a capability without first
+reading the document carrying the label. It now runs after the lookup and the cheap
+validations but **before any wallet read**, the same ordering rule as `checkAccountStanding`
+in sub-defect 1b, so a refusal cannot leave one of the two debits applied.
+
+**The admin competition-create gate was REMOVED rather than scoped** (owner decision, 4 Sep
+2026). It refused an operator creating a **trading** competition at the weekend, which was a
+live usability defect and inconsistent with the 1 Sep decision that *joining* outside market
+hours is allowed and only trading itself is gated.
+
+The distinction is worth keeping, because it is the one case where capability-scoping was
+the wrong tool: **scoping it to `needsMarketHours` would have left it refusing trading
+competitions at the weekend** - correct for games, still wrong for operators. Creating a
+contest is scheduling it, not playing it. Order placement still refuses trades against a
+closed market, so nothing is weakened; the main app never had the check, so the apps now
+agree; and the market-holiday overlap warning stays, because it informs rather than refuses.
+`assertForexMarketOpenForCreate()` was deleted with it, on the `shouldBlockEntry` precedent.
+
 ### Two independent axes
 
 Do not conflate them:
@@ -278,6 +311,37 @@ someone reading the signature rather than the two existing call sites. Risk **R3
 
 Enforce these in review, and the first two with ESLint `no-restricted-imports`.
 
+> **Invariant 1 is enforced in CI as of 4 September 2026** (X1 step 6), in
+> `eslint.config.mjs`. Two things about how it is written are load-bearing.
+>
+> It is **blocked by default with the public surface negated** - the pattern is
+> `**/games/*` and `**/games/*/**`, with `!**/games/index`, `!**/games/registry`,
+> `!**/games/types` and `!**/games/settlement` allowed back through. Written the other way
+> round, naming each game folder, every future game would be unprotected until somebody
+> remembered to add it, and forgetting is silent. Adding a game now needs no ESLint change;
+> adding a public engine file needs one line, which is the decision that deserves review.
+>
+> And the rule matches the **import string, not the resolved path**. The first version used
+> `**/lib/games/*`, which caught `@/lib/games/trading`, `@/lib/games/trading/scoring` and
+> `@root/lib/games/trading/config` but **missed `../games/trading`** - no `lib/` segment in
+> the string. Found by writing a probe file with four violations and four legal imports and
+> checking which fired: three of four. **Write the probe before trusting the pattern.**
+> `lib/games/**`, `apps/admin/lib/games/**`, `__tests__/**` and `tools/games/**` are exempt.
+>
+> **Invariant 2 is enforced too, as of the same day**, and its scope is the whole trick:
+> `lib/games/*/**`, one level *below* the layer. That matches a module folder
+> (`lib/games/trading/…`) but not the layer's own public files - `lib/games/index.ts`
+> legitimately reads `WhiteLabel` for `getEnabledGameTypes()` and must keep being allowed
+> to. Written as `lib/games/**` it would ban that and look entirely correct doing it. It
+> bans **every** model and the connection helper, not an allow-list of contest models: a
+> module needing any document at all is already the design going wrong, and a list would
+> silently permit the next model somebody adds.
+>
+> One ordering trap, pinned by its own test. Flat config is **last-one-wins per rule**, and
+> the invariant 1 block above switches `no-restricted-imports` **off** for all of
+> `lib/games/**`. The invariant 2 block must come **after** it, or it is silently dead -
+> and a dead config block still parses and still reads correctly.
+
 1. The contest engine **never** imports a specific game folder.
 2. Game modules **never** import contest models directly.
 3. `settleContest()` is **idempotent**. Called twice, it pays once.
@@ -304,11 +368,23 @@ over every player's progression rather than a code fix.
 Invariant 5 matters during a rolling deploy: old code writing a contest without a game
 label must not produce an unlabelled contest that later settles as the wrong game type.
 
-### The trap that has already caused a production defect
+### The trap that has already caused a production defect - CLOSED 4 September 2026
 
 `app/api/gamemaster/competitions/route.ts` inserts with the **raw MongoDB driver**,
-bypassing Mongoose defaults. It will not get a default game label. This is risk **R7**
-in `17`, and it is the reason Mongoose discriminators were rejected as an approach.
+bypassing Mongoose defaults. This is risk **R7** in `17`, and it is the reason Mongoose
+discriminators were rejected as an approach.
+
+**Fixed in X1 step 6, and the count was wrong here too: six raw writers, not one.** The two
+Game Master routes plus two inserts each in the admin trading-test and end-logic-test
+harnesses. All six now spread `contestGameLabel()` from `lib/games/registry.ts`, a helper
+rather than two literals because **setting `gameType` and forgetting `gameKey` is
+invisible** - the contest settles, every current query matches it, and the row only
+disappears once something groups by key.
+
+**Be accurate about the severity, because this chapter overstated it.** An unlabelled
+contest does **not** settle as the wrong game: invariant 5 resolves an absent label to
+trading, which is correct for all six of these writers. The real harm is later and quieter,
+and `gameKey` being immutable means it cannot be corrected in place afterwards.
 
 ---
 
@@ -337,11 +413,15 @@ in `17`, and it is the reason Mongoose discriminators were rejected as an approa
 - [ ] Cross-game totals **accumulate on settlement**, proven by a test that awards
       progression in a game, disables that game, and asserts the player's level, XP and
       total points are **unchanged** (risk **R29**, `05` s11.3)
-- [ ] Market-hours gating scoped to `needsMarketHours`, so it cannot block a provider
-      contest - `MarketSettings.blockCompetitionsOnHolidays` /
-      `blockChallengesOnHolidays`
-- [ ] The Game Master raw-driver insert sets the game label explicitly
-- [ ] ESLint import restrictions in place for invariants 1 and 2
+- [x] Market-hours gating scoped to `needsMarketHours`, so it cannot block a provider
+      contest - **done 4 Sep 2026** at challenge create, challenge accept and admin
+      competition create, failing **closed** on an unknown game type
+- [x] Every raw-driver contest insert sets the game label explicitly - **done 4 Sep 2026**.
+      **Six** writers, not the one R7 named
+- [x] ESLint import restrictions in place for invariants 1 and 2 - **done 4 Sep 2026**.
+      Invariant 1 is blocked by default with the public surface negated; invariant 2 is
+      scoped to `lib/games/*/**`, one level below the layer, so it catches module folders
+      without banning `lib/games/index.ts` from reading `WhiteLabel`
 - [ ] Mirror CI check from X0 passing
 
 **Effort: 2-3 weeks.** Roughly a third of it is the regression test in section 4, and
