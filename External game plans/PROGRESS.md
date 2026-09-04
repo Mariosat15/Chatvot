@@ -253,10 +253,33 @@ engineering plan:
 path below is kept for reference only; do not plan against it.
 
 1. **X0** - Stage 0 defect fixes (`New games plan/00a`). Live defects under the contest
-   and money layer. Built, awaiting owner test.
-2. **X1** - the foundation, owned by this plan. See `11`. No provider needed.
-3. **X2** - provider abstraction and a mock adapter. No provider needed.
-4. Then the admin programme, per the owner's admin-first sequencing.
+   and money layer. **Signed off by the owner 2 September 2026.**
+2. **X1** - the foundation, owned by this plan. See `11`. **Code-complete**, ranking gate
+   cleared by the historical replay.
+3. **X2** - provider abstraction and a mock adapter. **Code-complete.**
+4. **X3** - round lifecycle and result ingestion. **Code-complete**, rehearsals 1-6 green
+   against the mock.
+5. Then the admin programme, per the owner's admin-first sequencing. **Four slices of X6
+   are done**: the navigation restructure (owner-tested), provider registration,
+   credentials and the per-title switch, and the contest wizard with pre-flight validation.
+
+**Where the next engineer should actually start, and why it is not the next X6 slice.**
+The wizard can create a provider contest, but it saves a **draft** and nothing publishes,
+runs or settles one. So the remaining X6 screens - health, the round inspector, manual
+resolution, live-contest controls - would all be built against fixtures rather than real
+rounds, which is the same argument that held them back in the first place.
+
+That leaves two candidates, and they are not equivalent:
+
+- **X4** (a real adapter against a provider sandbox) is blocked on a signed provider. If
+  one exists, this is first: everything after it is guesswork until a real provider has
+  answered a real call.
+- **X5** (contest integration and settlement) needs no provider and is the larger
+  unblocker. It is what makes a draft publishable, and it owns the entry-fee refund that
+  `03`'s `exclude` policy currently only *names* (`refundOwed: true`). Until X5, the
+  wizard produces contests nobody can play.
+
+**If no provider is signed, go to X5.**
 
 **Reference only - the add-on path, not being pursued:** Stage 0, then `New games plan`
 Phase 1, then **E1** of `09-implementation-phases.md`.
@@ -286,12 +309,12 @@ numbers in chapters `01`-`09` remain resolvable. **Plan against the X-phases bel
 | Phase | Description | Source | Estimate | Status |
 |---|---|---|---|---|
 | **X0** | Prerequisite defect fixes, owner sign-off | `New games plan/00a` | 6-9 days | **`SIGNED OFF` 2 Sep 2026** - the gate is open |
-| **X1** | Foundation: game label, score, registry, four seams, **GM insert game label** | `11` + `19` s3.1 | 2.5-3.5 weeks | `NOT STARTED` |
-| **X2** | Provider abstraction + mock adapter | `09` E1 | 1 week | `NOT STARTED` |
-| **X3** | Round lifecycle + result ingestion | `09` E2 | 1 week | `NOT STARTED` |
+| **X1** | Foundation: game label, score, registry, four seams, **GM insert game label** | `11` + `19` s3.1 | 2.5-3.5 weeks | **`CODE-COMPLETE`** 4 Sep 2026. Ranking gate **cleared** (replay: 4/4 reproduced exactly). Backfill written, **not yet `--apply`d** |
+| **X2** | Provider abstraction + mock adapter | `09` E1 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026. Nothing player-visible - `externalGamesEnabled` defaults false |
+| **X3** | Round lifecycle + result ingestion | `09` E2 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026. **Rehearsals 1-6 of `07` s9 green** against the mock (49 tests, 6 guards probed). 7-10 need X5/X8 |
 | **X4** | Real adapter against sandbox | `09` E3 | 1 week | `NOT STARTED` |
 | **X5** | Contest integration + settlement | `09` E4 | 1 week | `NOT STARTED` |
-| **X6** | Admin: nav restructure incl. **the single Trading section**, RBAC, provider registration, game-aware wizard, analytics, **GM creation API + wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | `PARTIALLY DONE` - nav restructure and single Trading destination **built and owner-tested 2 Sep 2026**. Everything else `NOT STARTED` |
+| **X6** | Admin: nav restructure incl. **the single Trading section**, RBAC, provider registration, game-aware wizard, analytics, **GM creation API + wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | `PARTIALLY DONE` - nav restructure and single Trading destination **built and owner-tested 2 Sep 2026**. **Provider registration, credentials and the per-title catalogue switch code-complete 4 Sep 2026** (`12` s4.1a). **Contest wizard from `configSchema` + pre-flight validation code-complete 4 Sep 2026** (`12` s2.1) - creates a **draft only**; nothing publishes or settles it. Still `NOT STARTED`: provider health panel, round inspector, manual resolution, live-contest controls, provider contest **editing**, analytics by provider, GM creation API |
 | **X6.5** | **Admin wording pass** - brought forward from X8 so operators never work a games platform labelled "trading" | `14` | 0.5-1 week | `NOT STARTED` |
 | **X7** | Player UI + points, leaderboards, badges, levels, **profile and cross-game stats**, **per-game GM analytics** | `09` E6 + `13` + `05` + `19` | 3-4 weeks | `NOT STARTED` |
 | **X8** | Player wording, `tradingEnabled`, infrastructure gating | `14` + `15` | 1-1.5 weeks | `NOT STARTED` |
@@ -551,6 +574,128 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 4 Sep 2026 - X6 SLICE - CONTEST WIZARD FROM `configSchema` + PRE-FLIGHT - CODE-COMPLETE
+
+**Shipped:** an operator can now create a competition on a provider game, with the settings
+step generated from that game's own schema, validated by the `03` s4.1 pre-flight checklist.
+This is the half of E5's "an admin can run a contest without a developer" that concerns
+*creating* one. A game picker at `/competitions/new`, a four-step provider wizard, a
+schema parser and validator, the checklist, and the bridge that closes X3's
+`RoundContestConfig` deferral. 49 tests in
+`__tests__/services/provider-contest-create.test.ts`, **all 15 guards probed**. Admin `tsc`
+back to the **225-error baseline exactly**, none in the changed files and none disappearing;
+main app unchanged at 18. `check:mirrors` clean.
+
+**Files touched:** `lib/services/games/{config-schema,contest-preflight,contest-config}.ts`
+(mirrored into `apps/admin`), `apps/admin/lib/services/game-providers/provider-contest.service.ts`,
+`apps/admin/app/api/games/contests/route.ts`, `apps/admin/app/competitions/new/page.tsx`,
+`apps/admin/components/admin/games/{ProviderContestWizard,ConfigSchemaFields,contest-draft,contest-types}`,
+both copies of `competition.model.ts`, `AdminDashboard.tsx` and `CompetitionsListSection.tsx`
+(create buttons now point at the picker).
+
+**Deviated from plan - one structural deviation, stated rather than absorbed.** `12` s2
+describes **one** wizard whose step four becomes dynamic. **Two were built.**
+`/competitions/create` is untouched and a new picker routes to it or to the provider wizard.
+The reason: that section sets two acceptance criteria - *no trading field in a provider
+contest* and *trading creation unchanged* - which one wizard meets only after refactoring
+the 2,892-line form live trading contests depend on. Two paths meet both now, at no risk,
+with both behaviours pinned by tests; merging later is then a UI refactor against a green
+suite. Recorded in `12` s2.1.
+
+**Deferred:** publishing (X5 - a draft is all that can be created), provider **challenges**
+(E8), and **editing** a provider contest, which makes `CompetitionEditorForm.tsx`'s
+pre-existing field gap load-bearing rather than cosmetic - provider game settings are
+currently uneditable once saved.
+
+**Five things worth carrying.**
+
+- **A checklist item gated on a field nobody populates is an item that never runs.** The
+  first draft of the pre-flight read `title.billsPerRound` - **a field that does not exist**
+  on `provider_game`. It type-checked, because the checklist declares its own input
+  interface rather than importing the model, so the compiler had nothing to disagree with.
+  That warning would have been permanently unreachable. Checking the model's real field list
+  before putting it on record also found `lastSuccessfulRoundAt`, which *does* exist and is
+  now what the sandbox-freshness check reads. **A hand-written input interface is a place
+  where an invented field survives a typecheck.**
+- **Verify the throwaway sentence, second instance.** A file-header comment claimed the
+  player lobby "queries exactly four statuses". It filters `status: { $ne: "draft" }` - an
+  explicit exclusion, which is *stronger*, since a status added later is hidden by default
+  rather than accidentally exposed. The claim was corrected before it went on record, and
+  the line is now pinned by a structural test, because the entire safety argument for
+  creating provider contests rests on it.
+- **Narrowing a `required` field is a change to the OTHER game's contract.** Making
+  `startingCapital` conditional reads as "provider games don't need it". What it actually
+  does is move a guarantee trading relies on out of the schema and into a predicate - and
+  the `?? "trading"` in that predicate is load-bearing, not defensive, because invariant 5
+  resolves an absent label to trading. Written as `this.gameType === "trading"`, an
+  unlabelled trading contest saves with no capital and every downstream calculation divides
+  by it. Pinned in **both** copies: a conditional requirement that differs between the apps
+  is a validation rule that depends on which process saved the document.
+- **A schema parser must fail closed, and permissiveness does real harm here.** Unsupported
+  keywords (`allOf`, `pattern`, `oneOf`) refuse the whole schema rather than being skipped.
+  Skipping renders a form missing half the real constraints and then validates against the
+  half it understood - reporting success while accepting settings the provider rejects at
+  play time. Same reasoning as the market-hours gate failing closed on an unknown game.
+- **Probing lesson, fourth instance, and this time the harness was the liar twice over.**
+  One probe reported `PROBE DID NOT APPLY` (4-space indent in the pattern, 2 in the file),
+  and **every** probe reported "OTHER test" because `Out-String` wraps at the console width,
+  so a long test name arrived split across two lines and the literal match silently missed
+  it. Both look exactly like a broken test. Fixes now in `tools/probe-contest-wizard.ps1`:
+  collapse all whitespace in the output before matching, and assert the file actually
+  changed before believing any outcome. **A probe harness needs its own probe.**
+
+**Next chat should:** X4 - the real adapter against a provider sandbox - or, if no provider
+is signed, X5 so a draft contest can actually be published and settled. X5 is the larger
+unblocker: without it the wizard produces contests nobody can play.
+
+---
+
+### 4 Sep 2026 - X6 SLICE - PROVIDER REGISTRATION, CREDENTIALS, PER-TITLE SWITCH - CODE-COMPLETE
+
+**Shipped:** the first operator-facing part of X6, taken next because X4 cannot begin without
+a signed provider and the owner's "admin first" instruction puts these screens before any
+player screen. A `game-providers` admin section under GAMES; five API routes; a
+`provider-admin.service.ts` holding the rules; and three dialogs - register, credentials,
+catalogue. 26 tests in `__tests__/admin/game-providers-admin.test.ts`, suite now **564 in 32
+files**. Admin `tsc` **matches the 225-error baseline exactly**, with none in the changed
+files and, equally important, **none disappearing**.
+
+**Files touched:** `apps/admin/database/models/admin-employee.model.ts` (two add-only section
+ids); `apps/admin/components/admin/AdminDashboard.tsx`;
+`apps/admin/lib/admin/section-route-guard.ts` (new);
+`apps/admin/lib/services/game-providers/provider-admin.service.ts` (new);
+`apps/admin/app/api/games/providers/**` (five routes, new);
+`apps/admin/components/admin/games/**` (four files, new); `eslint.config.mjs`.
+
+**Deviated from plan:** `12` s4 lists five destinations. Only **Providers** and the per-title
+**Games** list are built. Provider health, round inspector and manual resolution are left,
+deliberately: health wants the `provider_health_check` time series from `04` s3.5, and the
+inspector and resolution screens are most useful once X4 has produced real rounds to inspect.
+Building them against the mock now would ship screens whose only content is fixtures.
+
+**Six guards probed** by reintroducing each defect and confirming the suite turned red:
+leaking a secret value into the provider list, ignoring `providerStatus` on the per-title
+switch, enabling a provider with no callback secret, treating a blank secret box as "clear",
+creating a provider already enabled, and swapping the section grant for a bare
+`requireAdminAuth`. All six went red; none was already covered by accident.
+
+**One live defect found and fixed on the way.** The first time a callback secret was stored
+was recorded as a rotation, stamping `rotatedAt` on a provider that had never rotated
+anything. Harmless in effect - `previousCallbackSecret` is undefined either way, so no stale
+secret became acceptable - but a false fact in the database, and an operator reading that date
+would reasonably believe a rotation had happened. Found only because the
+presence-booleans test asserted the *whole* credential object rather than the fields it cared
+about.
+
+**Deferred:** sidebar clicks still do not write `?activeTab=` to the URL. Pre-existing, affects
+all ~60 sections, belongs with X6.5.
+
+**Next chat should:** get the owner to test the screen against the mock provider - register
+`mock`, add any callback secret, enable it, sync the catalogue, toggle a title - then either
+start X4 if a provider is signed, or take the contest wizard next.
 
 ---
 
@@ -892,7 +1037,100 @@ contests there is very little to label.
 **Next chat should:** X3 - round lifecycle and result ingestion (`09` E2). That is the phase
 `09` marks "the heart of the integration, and the part that must be flawless", with an
 explicit instruction not to move past it until every rehearsal in `07` s9 is green. The mock
-built in X2 is what those rehearsals drive.
+built in X2 is what those rehearsals drive. **Done - see the X3 entry below.**
+
+---
+
+### 4 Sep 2026 - X3 - ROUND LIFECYCLE AND RESULT INGESTION - CODE-COMPLETE
+
+**Shipped:** the five E2 deliverables plus the reconciliation net. `game_round` and
+`provider_event` in both apps (**79 mirrored pairs agree**), `RoundService`, the signed
+callback route at `POST /api/games/providers/[providerKey]/events`,
+`ResultIngestionService` with all eleven gates in chapter 06 s2's order, and
+`callback-verification.ts` for raw-body HMAC and constant-time comparison.
+**Rehearsals 1-6 of `07` s9 are green against the mock** -
+`__tests__/services/round-lifecycle.test.ts`, 49 tests, suite **538/538**, both typechecks
+**exactly at baseline** (18 main, 225 admin), lint 0 problems.
+
+**Six guards probed by reintroducing the defect**, each caught by exactly one test: the
+partial unique index, `finalizing` counting as closed, event deduplication, the
+provider-failure rollback, conflict detection, and the absolute timestamp window.
+
+**Nothing is player-visible.** `externalGamesEnabled` still defaults to false and no route
+creates a provider contest.
+
+#### Six findings that generalise
+
+- **"Enforced in the database" is a claim about a specific index, and this one did not
+ enforce what it was credited with.** `07` s4 cited
+ `{ contestId, userId, attemptNumber }` as the guarantee behind "one live round per player
+ per contest". It is not: attempt 1 `launched` beside attempt 2 `launched` satisfies that
+ index perfectly, and that is exactly the abandon-and-peek the rule exists to stop. Closed
+ with a **partial unique index** filtered to the live statuses. The rule to carry:
+ **name the index and work out what it actually excludes** - and note this is the same
+ shape as the R7 correction, where a document asserted a protection that was not there.
+- **The dangerous window for a late result is `finalizing`, not `completed`** - and the
+ obvious check misses it. During `finalizing` ranking is being computed from participant
+ scores, so a score written then may or may not be included **depending purely on
+ timing**. That is worse than a genuinely late result, because a late result is
+ consistently excluded and alerted while this one is a coin flip that leaves no trace.
+ Both contest models carry the state; both are treated as closed.
+- **An attempt is consumed on creation, which forces the provider-failure path to DELETE
+ rather than void.** Consuming on creation is required (`03` s1.3) or a player abandons a
+ bad round and retries free forever. But `01` s6a equally requires a provider 5xx to
+ consume nothing - and because `{ contestId, userId, attemptNumber }` is unique, **a
+ surviving row of any status permanently burns that attempt number.** Marking it `voided`
+ reads like the careful choice and silently costs the player an attempt. Nothing was
+ played, so there is nothing to audit.
+- **A poller with its own scoring path is a second door, and it is the easy mistake here.**
+ Stages 2 and 3 of the reconciliation net produce exactly the same normalised result as a
+ callback, so `applyResult` is shared and `resultSource` records which path delivered it.
+ Writing a separate apply function for polling would look tidier and would be the
+ four-writer competition-entry defect again, in a new place.
+- **A backoff with no cap silently disables the stage it belongs to.** Poll backoff doubles
+ from 30s; uncapped, it eventually exceeds the grace window, so the round sits un-polled
+ until stage 3 and stage 2 has effectively been switched off - with no error and no log
+ line. Capped at 5 minutes, pinned by a test at 30 attempts.
+- **Reaching stage 4 is always critical, even when the contest settles cleanly.** The
+ temptation is to alert only on `hold_and_alert`, since `score_zero` settles on time and
+ looks handled. But stage 4 means the provider never reported and all three earlier stages
+ failed, which is an integration problem regardless of how gracefully it was absorbed.
+ And the player is **always** told: a round silently scored zero is indistinguishable,
+ from the player's seat, from being cheated.
+
+#### Two deferrals, recorded rather than quietly scoped
+
+- **Contest-level round fields are passed in, not read.** `attemptsPolicy`,
+ `unresolvedRoundPolicy`, `resultGracePeriodSeconds` and `playWindowEnd` arrive as
+ `RoundContestConfig`, so X3 adds **no field to either contest model**. Reason: reading
+ `Competition` here would mean six mirrored fields in this phase for a code path nothing
+ calls yet - the same "a number nothing maintains and nothing reads" trap that deferred
+ X1's participant score backfill. X5 wires them without touching this service.
+- **The `exclude` policy names its refund instead of paying it.**
+ `ReconciliationOutcome.refundOwed` is the obligation. Paying it here would put a second
+ money writer beside settlement, and removing a player changes the prize pool - so the
+ refund and the re-split are one transaction belonging to X5. **Do not let a summary imply
+ `exclude` is fully implemented.**
+
+#### Two things about the tooling, both of which cost time
+
+- **The `**/games/*` ESLint wildcard collided for the SECOND time**, now with
+ `lib/services/games`. Negated, as `database/models/games` was in X2. The wildcard is kept
+ deliberately now that the cost is known: anchoring it to `**/lib/games/*` would end the
+ collisions but the rule matches the **import string**, so a nested file writing
+ `../../games/trading` would stop being caught. **That trade is the wrong way round for a
+ guard** - a false positive is noisy and fixed in a minute, a missed violation is silent.
+ Expect a negation each time a new `games/` directory appears.
+- **A fixture trimmed to the fields a test reads failed 34 tests at once for one unrelated
+ reason.** The `Competition` fixture omitted `slug`, `startTime`, `endTime` and
+ `startingCapital` - none of which a round touches - and Mongoose validates the document,
+ not the subset. Same lesson already recorded for the finalization fixtures; it keeps
+ recurring because trimming a fixture always feels like tidying.
+
+**Next chat should:** X4 - the real adapter against a provider sandbox (`09` E3). That is
+the first phase that **cannot proceed without a signed provider**, which is risk X1. If no
+provider is signed, X6 admin work (provider registration, the game-aware wizard) is the
+productive alternative and needs nothing external.
 
 ---
 

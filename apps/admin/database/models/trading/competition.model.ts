@@ -13,6 +13,34 @@ export interface ICompetition extends Document {
   gameType: string; // "trading" | "provider" - selects the game MODULE
   gameKey: string; // e.g. "trading" or "provider:acme:trivia-blitz" - IMMUTABLE once written
 
+  // Provider-game round settings ("External game plans/04" section 2.1).
+  //
+  // X3 deliberately passed these in as a `RoundContestConfig` rather than storing them,
+  // because nothing created a provider contest yet and six unread fields on a mirrored
+  // model would have been dead weight. The admin contest wizard is that caller, so they
+  // land here now.
+  //
+  // ALL OPTIONAL, AND THAT IS NOT LAZINESS. A trading contest has no play window and no
+  // attempts policy; making any of these required would make every existing document
+  // invalid and every trading writer wrong. `gameConfig` being absent IS the statement
+  // "this is not a provider contest".
+  gameConfig?: {
+    providerKey: string;
+    gameCode: string;
+    /** Operator answers, already validated against the title's `configSchema`. */
+    settings?: Record<string, unknown>;
+  };
+  /** Generated once at creation and shared by every round, so all players get the same content. */
+  contentSeed?: string;
+  /** When play may happen. Distinct from registration close and from contest end. */
+  playWindowStart?: Date;
+  playWindowEnd?: Date;
+  /** How long after the play window a late provider result is still accepted. */
+  resultGracePeriodSeconds?: number;
+  attemptsPolicy?: "single" | "best_of_n" | "sum_of_n";
+  attemptsAllowed?: number;
+  unresolvedRoundPolicy?: "score_zero" | "exclude" | "hold_and_alert";
+
   // Entry & Capital
   entryFee: number; // Credits required to enter
   startingCapital: number; // Trading points (virtual capital)
@@ -209,20 +237,57 @@ const CompetitionSchema = new Schema<ICompetition>(
       default: "trading",
       index: true,
     },
-    gameKey: {
-      type: String,
-      required: true,
-      default: "trading",
-      index: true,
-    },
+      gameKey: {
+        type: String,
+        required: true,
+        default: "trading",
+        index: true,
+      },
+      // Provider round settings - see the interface for why every one is optional.
+      gameConfig: {
+        type: {
+          providerKey: { type: String, required: true },
+          gameCode: { type: String, required: true },
+          settings: { type: Schema.Types.Mixed },
+        },
+        required: false,
+        default: undefined,
+        _id: false,
+      },
+      contentSeed: { type: String },
+      playWindowStart: { type: Date },
+      playWindowEnd: { type: Date },
+      resultGracePeriodSeconds: { type: Number, min: 0, default: undefined },
+      attemptsPolicy: {
+        type: String,
+        enum: ["single", "best_of_n", "sum_of_n"],
+        default: undefined,
+      },
+      attemptsAllowed: { type: Number, min: 1, default: undefined },
+      unresolvedRoundPolicy: {
+        type: String,
+        enum: ["score_zero", "exclude", "hold_and_alert"],
+        default: undefined,
+      },
     entryFee: {
       type: Number,
       required: true,
       min: 0,
     },
+    // CONDITIONALLY REQUIRED, so a provider contest can exist at all.
+    //
+    // Virtual trading capital is meaningless for a chess puzzle or a reflex game, but this
+    // was `required: true, min: 100` - so a provider contest could not be saved without
+    // inventing a number, and an invented number is worse than an absent one: it renders in
+    // any summary that has not yet learned about games.
+    //
+    // Trading is unaffected. The predicate is true for every existing document, because
+    // `gameType` defaults to "trading", so nothing already stored becomes invalid.
     startingCapital: {
       type: Number,
-      required: true,
+      required: function (this: { gameType?: string }) {
+        return (this.gameType ?? "trading") === "trading";
+      },
       min: 100,
     },
     minParticipants: {
@@ -560,6 +625,9 @@ CompetitionSchema.index({ status: 1, registrationDeadline: 1 });
 // Game-scoped queries: contest lists filtered by game, and the finalization sweeps
 CompetitionSchema.index({ gameType: 1, status: 1 });
 CompetitionSchema.index({ gameKey: 1, status: 1 });
+// Reason: the reconciliation sweep asks "which contests have a play window closing soon",
+// which without this index is a collection scan on the hot path ("04" section 2.1).
+CompetitionSchema.index({ status: 1, playWindowEnd: 1 });
 
 // Virtual for days until start
 CompetitionSchema.virtual("daysUntilStart").get(function () {

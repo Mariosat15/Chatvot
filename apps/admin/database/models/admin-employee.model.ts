@@ -20,6 +20,12 @@ export const ADMIN_SECTIONS = [
   "market",
   "symbols",
   "market-data",
+  // Games (X6). ADD-ONLY: this array is a Mongoose enum on both `allowedSections` and
+  // `customPermissions`, so removing a value orphans every employee document storing it.
+  // Note "trading-menu" is deliberately absent - it is a collapsible menu parent that
+  // renders no screen, and a grant mapping to no screen is where privilege widening starts.
+  "game-providers",
+  "provider-health",
   // User Management
   "users",
   "badges",

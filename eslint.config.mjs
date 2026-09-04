@@ -97,13 +97,27 @@ export default [
           // Reason: matched against the literal import STRING, not the resolved path, so
           // the relative form needs its own coverage - "**/lib/games/*" does not match
           // "../games/trading". Probed: without the lib-less patterns that import passes.
-          // Reason for the models exception: "**/games/*" matches ANY path with a
-          // "games/" segment, not just the games code layer - so it caught
-          // "@/database/models/games/provider-game.model" the moment X2 added that folder.
-          // A blocked-by-default wildcard will eventually collide with a directory that
-          // merely shares a name, and the collision looks exactly like a real violation.
-          // Models are already governed by invariant 2, which bans them INSIDE game
-          // modules; importing one from the engine is ordinary and correct.
+          // Reason for the models and services exceptions: "**/games/*" matches ANY path
+          // with a "games/" segment, not just the games code layer. It caught
+          // "@/database/models/games/provider-game.model" when X2 added that folder, and
+          // "@/lib/services/games/result-ingestion.service" when X3 added that one, and
+          // "@/components/admin/games/GameProvidersSection" when X6 added that one. All
+          // three read exactly like a real violation.
+          //
+          // THE WILDCARD IS KEPT DELIBERATELY, NOW THAT THE COST IS KNOWN. Anchoring it to
+          // "**/lib/games/*" would end the collisions, but the rule matches the import
+          // STRING and not the resolved path - so a nested file writing
+          // "../../games/trading" would stop being caught. That trade is the wrong way
+          // round for a guard: a false positive is noisy and fixed in a minute, while a
+          // missed violation is silent and is the exact thing this rule exists to prevent.
+          // Expect to add a negation each time a new "games/" directory appears.
+          //
+          // None of the exceptions weakens anything. Models are governed by invariant 2,
+          // which bans them INSIDE game modules; importing one from the engine is ordinary.
+          // lib/services/games IS engine code - the round and ingestion services own
+          // contest-side lifecycle, not any one game's rules. And components/admin/games
+          // is admin UI: a React screen is not a game module and has no scoring rules to
+          // leak, so nothing can bypass the registry through it.
           group: [
             "**/games/*",
             "**/games/*/**",
@@ -113,6 +127,8 @@ export default [
             "!**/games/settlement",
             "!**/tools/games/**",
             "!**/models/games/**",
+            "!**/services/games/**",
+            "!**/components/admin/games/**",
           ],
           message:
             "Invariant 1: the contest engine must not import a game folder directly. Import from '@/lib/games' and resolve the module through the registry.",

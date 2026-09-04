@@ -180,13 +180,38 @@ Easy to defer, expensive to add after the first incident.
 
 Every one of these should be executed deliberately in the sandbox, not hoped about:
 
-- [ ] Withhold a callback entirely, confirm reconciliation resolves it
-- [ ] Withhold it permanently, confirm the unresolved policy fires and alerts
-- [ ] Send a callback with a bad signature, confirm rejection and alert
-- [ ] Send the same callback twice, confirm one score
-- [ ] Send two different scores for one round, confirm the discrepancy alert
-- [ ] Send a result after settlement, confirm it is recorded but not applied
+- [x] Withhold a callback entirely, confirm reconciliation resolves it
+- [x] Withhold it permanently, confirm the unresolved policy fires and alerts
+- [x] Send a callback with a bad signature, confirm rejection and alert
+- [x] Send the same callback twice, confirm one score
+- [x] Send two different scores for one round, confirm the discrepancy alert
+- [x] Send a result after settlement, confirm it is recorded but not applied
 - [ ] Take the provider offline mid-contest, confirm pause and extend
 - [ ] Cancel a contest with live rounds, confirm full refunds
 - [ ] Settle the same contest twice, confirm winners paid once
 - [ ] Run a contest end to end with real (small) entry fees before going public
+
+### Status, 4 September 2026 - and what the ticks do NOT mean
+
+**The first six are green against the mock** (X3, `__tests__/services/round-lifecycle.test.ts`,
+49 tests), which is the gate `09` E2 sets: "do not move past E2 until those tests are green."
+All six central guards were probed by reintroducing the defect, so each tick rests on a test
+proven capable of failing.
+
+**Read the ticks precisely.** They mean the behaviour is correct **against the mock adapter**.
+They do not mean it has been seen against a real provider - that is X4 - and they do not mean
+any money has moved, because nothing in the first six touches a wallet.
+
+**The last four are deliberately not attempted yet**, and each is blocked on a phase rather
+than on effort:
+
+| Rehearsal | Blocked on | Why it cannot be faked now |
+|---|---|---|
+| Provider offline, pause and extend | E7/X8 (section 3.2) | Needs the health monitor and the pause mechanism, neither of which exists |
+| Cancel a contest with live rounds | E4/X5 (section 5) | Needs contest cancellation to know about rounds |
+| Settle the same contest twice | E4/X5 (section 6 #4) | Needs provider settlement to exist before it can be made idempotent |
+| End to end with real entry fees | E9 pilot | Needs a real provider and real money |
+
+All four are **money tests**. Building half of one now against a stub would produce a green
+tick that proves nothing about the path real money takes - which is worse than an empty
+checkbox, because an empty checkbox is honest.

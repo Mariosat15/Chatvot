@@ -71,6 +71,7 @@ import {
   Megaphone,
   Video,
   Gamepad2,
+  Plug,
 } from "lucide-react";
 import { toast } from "sonner";
 import CredentialsSection from "@/components/admin/CredentialsSection";
@@ -86,6 +87,7 @@ import ChallengesAdminSection from "@/components/admin/ChallengesAdminSection";
 import DatabaseSection from "@/components/admin/DatabaseSection";
 import UsersSection from "@/components/admin/UsersSection";
 import PaymentProvidersSection from "@/components/admin/PaymentProvidersSection";
+import GameProvidersSection from "@/components/admin/games/GameProvidersSection";
 import PendingPaymentsSection from "@/components/admin/PendingPaymentsSection";
 import FailedDepositsSection from "@/components/admin/FailedDepositsSection";
 import FraudMonitoringSection from "@/components/admin/FraudMonitoringSection";
@@ -313,6 +315,16 @@ const menuGroups: MenuGroup[] = [
             icon: <History className="h-4 w-4" />,
           },
         ],
+      },
+      // External game providers (X6). Sits beside Trading rather than inside it: a
+      // provider supplies games, it is not a game, and burying it under one game's
+      // destination would imply otherwise.
+      {
+        id: "game-providers",
+        label: "Game Providers",
+        icon: <Plug className="h-5 w-5" />,
+        color: "text-violet-400",
+        bgColor: "bg-violet-500/10 hover:bg-violet-500/20",
       },
     ],
   },
@@ -1119,6 +1131,8 @@ export default function AdminDashboard({
         return <FeeSettingsSection key={currentRefreshKey} />;
       case "payment-providers":
         return <PaymentProvidersSection key={currentRefreshKey} />;
+      case "game-providers":
+        return <GameProvidersSection key={currentRefreshKey} />;
       case "server-monitor":
         return <ServerMonitorSection key={currentRefreshKey} />;
       case "server-fleet":
@@ -1218,7 +1232,9 @@ export default function AdminDashboard({
       {/* Quick Actions */}
       {!sidebarCollapsed && (
         <div className="px-4 py-4 border-b border-gray-700/50">
-          <Link href="/competitions/create">
+          {/* The game picker, which redirects straight here to trading when no provider
+              game is available - so this button behaves exactly as before until one is. */}
+          <Link href="/competitions/new">
             <Button className="w-full bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-gray-900 font-semibold shadow-lg shadow-yellow-500/20">
               <Plus className="h-4 w-4 mr-2" />
               New Competition
@@ -1457,7 +1473,7 @@ export default function AdminDashboard({
               </div>
 
               {/* Quick Create (Desktop) */}
-              <Link href="/competitions/create" className="hidden sm:block">
+              <Link href="/competitions/new" className="hidden sm:block">
                 <Button
                   size="sm"
                   className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold"

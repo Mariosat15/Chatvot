@@ -215,6 +215,84 @@ contest means participants hold scores in units the settlement code will not und
 risk limits, no rules, no ranking method. Close that gap or the game settings will be
 uneditable after creation.
 
+### 2.1 What was built, 4 September 2026
+
+**Code-complete, and it deviates from the target above in one structural way that needs
+stating plainly rather than absorbing.**
+
+**The plan describes one wizard whose step four becomes dynamic. Two wizards were built
+instead.** `/competitions/create` — the 2,892-line trading form — is **untouched**, and a
+new `/competitions/new` game picker routes to either it or a four-step provider wizard.
+
+The reason is that this section sets two acceptance criteria which a single wizard satisfies
+only after a large refactor of the screen live trading contests already depend on: *a
+provider contest is creatable without a single trading field appearing*, and *trading
+contest creation is unchanged*. Two paths satisfy both immediately and at no risk. The
+shared entry point is the picker, which is where the plan's "one way in" actually mattered.
+Merging them later is a UI refactor with both behaviours already pinned by tests; doing it
+first would have meant editing that file with nothing pinning it.
+
+**The picker redirects straight to trading when no provider game is available.** Until a
+provider is live, a "choose your game" screen with one choice is pure friction on the path
+operators use daily, and friction there is how a new screen gets worked around.
+
+| Built | Where |
+|---|---|
+| Game picker, routing to either wizard | `apps/admin/app/competitions/new/page.tsx` |
+| Four-step provider wizard: Game, Settings, Timing & prizes, Review | `components/admin/games/ProviderContestWizard.tsx` |
+| Settings form generated from `configSchema` | `components/admin/games/ConfigSchemaFields.tsx` |
+| Schema parser and validator | `lib/services/games/config-schema.ts` (mirrored) |
+| Pre-flight checklist from `03` s4.1 | `lib/services/games/contest-preflight.ts` (mirrored) |
+| Round settings read off a stored contest | `lib/services/games/contest-config.ts` (mirrored) |
+| Create service and API | `lib/services/game-providers/provider-contest.service.ts`, `app/api/games/contests/route.ts` |
+
+49 tests in `__tests__/services/provider-contest-create.test.ts`, **all 15 guards probed by
+reintroducing the defect.**
+
+**It creates a `draft`, and that is required rather than cautious.** The player lobby
+filters `status: { $ne: "draft" }`, so a draft is invisible. That matters because the
+player-facing side of a provider contest is **X7**: every screen would render trading
+furniture, and the join path still copies trading starting capital onto the participant.
+Publishing belongs to **X5**. Note the exclusion is `$ne`, not an inclusion list — a
+stronger guarantee, because a status added later is hidden by default rather than
+accidentally exposed. A structural test pins that line, since the whole safety argument for
+creating provider contests now rests on it.
+
+**Six findings worth carrying beyond this section.**
+
+- **A "no developer needed" claim has exactly one failure mode: an aggregate or a form that
+  enumerates games.** `ConfigSchemaFields` branches on the declared field *type* and never
+  on a game, provider or game code, and a test asserts the file contains none of those three
+  identifiers. Without it, the first title needing a special case makes the acceptance
+  criterion quietly false while every test still passes.
+- **A schema parser must fail closed, and this is where a permissive one does real harm.**
+  `allOf`, `pattern`, `oneOf` and the rest are *not* ignored — they refuse the whole schema.
+  Silently skipping an unsupported keyword renders a form missing half the real constraints
+  and then validates against the half it understood, which is worse than refusing: it
+  reports success while accepting settings the provider will reject at play time. Same
+  reasoning as the market-hours gate failing closed on an unknown game.
+- **A contest missing round settings is refused, never defaulted.** Falling back to
+  single-attempt with a grace period is the tidy-looking option and it is wrong: the contest
+  runs, players play, and the settings governing their money are ones no operator chose.
+  This is what closes X3's `RoundContestConfig` deferral.
+- **Warnings and refusals must stay separate, or the whole checklist gets bypassed.** Three
+  checklist items are advisory — the platform master switch being off (scheduling ahead of a
+  launch is legitimate), no recent sandbox round, and the per-round cost acknowledgement.
+  Turning any of them into a refusal would push an operator to flip the platform switch on
+  just to draft a contest. Conversely the eleven hard refusals accumulate rather than
+  stopping at the first: an operator fixing one per submission gives up by the fourth.
+- **The per-round cost warning fires for every multi-attempt policy, because nothing records
+  whether a provider bills per round.** `provider_game` has no billing field. A first draft
+  of the checklist read `title.billsPerRound` — a field that does not exist — which
+  type-checked against a hand-written interface and would have made that warning permanently
+  unreachable. **A checklist item gated on a field nobody populates is an item that never
+  runs.** Verified against the model's real field list before it went on record; the same
+  pass found `lastSuccessfulRoundAt`, which *does* exist and is what the sandbox check reads.
+- **The contest API is guarded on `competitions`, not `game-providers`.** Running contests
+  and reaching provider API credentials are different jobs, and the per-section grant is the
+  only thing keeping them apart. Guarding this route on `game-providers` would have made
+  every competition operator a credential holder — and it would have reviewed as consistent.
+
 ---
 
 ## 3. Contest list and detail screens
@@ -282,6 +360,59 @@ by being consistent:
 So: **the UX is the payment-providers screen; the persistence is `04` section 3.1 plus
 settings.** Say so in the implementation, because a reviewer comparing the two features
 will otherwise reasonably ask why they differ.
+
+### 4.1a What was built - 4 September 2026
+
+**`CODE-COMPLETE`, awaiting owner test.** Two of the five destinations in the table above:
+**Providers** and the per-title **Games** list. Health, round inspector and manual
+resolution are not built - see the deviation note in `PROGRESS.md`.
+
+| Piece | File |
+|---|---|
+| RBAC ids (add-only) | `game-providers`, `provider-health` in `apps/admin/database/models/admin-employee.model.ts` |
+| Menu entry + render case | `apps/admin/components/admin/AdminDashboard.tsx`, beside Trading inside GAMES |
+| Rules | `apps/admin/lib/services/game-providers/provider-admin.service.ts` |
+| Routes | `apps/admin/app/api/games/providers/**` - list/register, patch, credentials, sync, games |
+| Shared route guard | `apps/admin/lib/admin/section-route-guard.ts` |
+| UI | `apps/admin/components/admin/games/**` - section plus register, credentials and catalogue dialogs |
+| Tests | `__tests__/admin/game-providers-admin.test.ts`, 26 tests, six guards probed |
+
+**Five findings that generalise, all of them about a correct-looking thing that is wrong.**
+
+- **A structural test that reads source code must strip comments first, and this one had to
+  learn that the hard way.** The assertion "no route mentions `requireAdminAuth`" failed - on
+  a comment in the route explaining why `requireAdminAuth` is the wrong helper. A test that
+  reads prose fails in both directions: it flags a correct file that discusses the
+  anti-pattern, and it passes a broken one whose only mention of the right helper is in a
+  comment. `readCode()` strips block and line comments before matching.
+- **`requireAdminAuth` is not an authorization check, and reaching for it here would have
+  widened access invisibly.** It asks only whether the caller is an admin at all, so an
+  employee granted one unrelated section passes it. These routes reach provider credentials,
+  so the guard is `requireSectionAccess("game-providers")`. Two tests, not one: the first
+  pins the helper, the second **counts the exported handlers and counts the guards**, because
+  a file whose `GET` is guarded and whose `PATCH` is not passes the first check while leaving
+  the mutation open.
+- **"Blank means keep" is the only safe reading of an empty secret box, and the alternative
+  fails silently.** Because the UI can never display a stored secret, an operator editing the
+  environment submits three empty boxes. If empty meant "clear", that harmless edit would
+  break every inbound callback with no error raised anywhere. There is no clear-by-blank path;
+  removal is explicit.
+- **Enabling has to refuse when it cannot work, or the switch lies.** Without an installed
+  adapter, `resolveEnabledProvider` refuses every round with a message no operator can act on -
+  a switch that appears to work and silently does nothing, the same shape as the trading-shaped
+  services in `matchmaking.service.ts`. Without a callback secret, every inbound result fails
+  signature verification, which is indistinguishable from an attack in the logs. Both are
+  refused at the admin layer with the reason shown on the card, not merely by disabling
+  the control.
+- **There is deliberately no delete.** A provider that has run a contest is joined to
+  historical rounds by `providerKey`, and `gameKey` is immutable, so deleting the row orphans
+  that history while every screen still renders a key it cannot resolve. Same reasoning as the
+  catalogue sync reporting missing titles rather than removing them.
+
+**And one live defect the tests found:** the first time a callback secret was stored counted
+as a rotation, stamping `rotatedAt` on a provider that had never rotated anything. It was
+found only because the presence-booleans test asserted the **whole** credential object rather
+than the three fields it cared about - the extra field was the evidence.
 
 ### 4.2 The rules an operator enters, and the limit of "no developer needed"
 

@@ -297,7 +297,7 @@ export default function CompetitionsListSection() {
         <p className="text-gray-500 mb-6">
           Create your first trading competition to get started
         </p>
-        <Link href="/competitions/create">
+        <Link href="/competitions/new">
           <Button className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-gray-900 font-bold">
             Create Competition
           </Button>
@@ -508,11 +508,11 @@ export default function CompetitionsListSection() {
               Delete Competition?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-gray-400">
-              Are you sure you want to delete "
+              Are you sure you want to delete &quot;
               <span className="font-semibold text-gray-300">
                 {competitionToDelete?.name}
               </span>
-              "?
+              &quot;?
               <br />
               <br />
               This action cannot be undone. All participants and related data
@@ -544,7 +544,7 @@ export default function CompetitionsListSection() {
             <DialogDescription className="text-gray-400">
               Are you sure you want to cancel{" "}
               <span className="text-white font-semibold">
-                "{competitionToCancel?.name}"
+                &quot;{competitionToCancel?.name}&quot;
               </span>
               ?
             </DialogDescription>

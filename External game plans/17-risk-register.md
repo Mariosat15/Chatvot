@@ -706,7 +706,10 @@ cannot honestly be pulled forward.
       platform fee after provider cost, or `limits.allowedGameTypes` still excludes provider
       games (X7)
 - [ ] Fraud gate covering provider entries
-- [ ] Reconciliation job and unresolved-round policy live
+- [ ] Reconciliation job and unresolved-round policy live - **the logic is built and probed
+      (X3, 4 Sep 2026), but "live" means running on the worker, which is X9.** The four
+      stages, the polling schedule and all three policies exist and are tested; nothing
+      calls them on a timer yet. Do not tick this until the worker does
 - [ ] Every alert in `15` section 7 firing to a real destination
 - [ ] Manual round resolution usable by an admin without a developer
 - [ ] Rollback rehearsed: disable provider games and confirm the platform behaves exactly

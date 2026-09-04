@@ -650,6 +650,195 @@ indistinguishable from a test that does not work.** Use a helper that escapes th
 then relaxes every newline to `\r?\n`, keep anchors ASCII, and confirm the file actually
 changed before believing either outcome.
 
+### Six things from X3, rounds and result ingestion (4 September 2026)
+
+X3 is code-complete: `game_round` and `provider_event` in both apps, `RoundService`, the
+signed callback route, `ResultIngestionService` with chapter 06's eleven gates, and the
+four-stage reconciliation net. **Rehearsals 1-6 of `07` s9 are green against the mock**, six
+guards probed. Nothing player-visible.
+
+- **"Enforced in the database" is a claim about a named index, and this one enforced
+ something else.** `07` s4 credited `{ contestId, userId, attemptNumber }` with "one live
+ round per player per contest". It does not: attempt 1 `launched` beside attempt 2
+ `launched` satisfies that index perfectly, which is exactly the abandon-and-peek the rule
+ exists to stop. Closed with a **partial unique index** on `{ contestId, userId }` filtered
+ to the live statuses. Two traps inside the fix: scope it with `contestId: { $type:
+ "objectId" }` or every practice round collides with the player's previous one, and it must
+ be `$type` because **MongoDB forbids `$ne` in a `partialFilterExpression`** - the obvious
+ spelling fails at index-build time with an error that never mentions the restriction.
+ Same shape as the R7 correction: **a document asserting a protection is not evidence one
+ exists.**
+- **For a late result the dangerous window is `finalizing`, not `completed`** - and the
+ obvious check misses it entirely. During `finalizing`, ranking is being computed from
+ participant scores, so a score written then may or may not be counted **depending purely
+ on timing**. That is worse than a genuinely late result, which is at least consistently
+ excluded and alerted; this one is a coin flip that leaves no trace. Both contest models
+ carry the state and both are treated as closed, along with `cancelled` and
+ `emergency_ended`.
+- **Two correct rules can force an awkward implementation, and the tidy-looking option is
+ the wrong one.** An attempt must be consumed **on creation** (`03` s1.3) or a player
+ abandons a bad round and retries free forever; a provider 5xx must consume **nothing**
+ (`01` s6a). Since `{ contestId, userId, attemptNumber }` is unique, **a surviving row of
+ any status permanently burns that attempt number** - so the rollback has to *delete* the
+ pending round. Marking it `voided` reads like the careful choice and silently costs the
+ player an attempt.
+- **A backoff with no cap silently disables the stage it belongs to.** Poll backoff doubles
+ from 30s; uncapped it eventually exceeds the grace window, so the round sits un-polled
+ until the final sweep and stage 2 has effectively been switched off - no error, no log
+ line. Related: **reaching the give-up stage is always critical**, even under `score_zero`
+ where the contest settles on time, because it means the provider never reported and all
+ three earlier stages failed. And the player is **always** told: a round silently scored
+ zero is indistinguishable, from the player's seat, from being cheated.
+- **Name an obligation you are deferring, in a field, so the next phase cannot miss it.**
+ The `exclude` unresolved policy owes a refund, but paying it in the reconciliation service
+ would put a second money writer beside settlement - and removing a player changes the
+ prize pool, so the refund and the re-split are one transaction. It returns
+ `refundOwed: true` instead. Same reasoning kept contest round fields
+ (`attemptsPolicy`, `unresolvedRoundPolicy`, `playWindowEnd`) as a passed-in config rather
+ than six new mirrored fields for a path nothing calls yet. **Do not let a summary imply
+ `exclude` is fully implemented.**
+- **The `**/games/*` ESLint wildcard collided for the second time**, now with
+ `lib/services/games` after `database/models/games` in X2. Negated again - and the wildcard
+ is **kept deliberately** now the cost is known. Anchoring it to `**/lib/games/*` would end
+ the collisions, but the rule matches the **import string**, so a nested file writing
+ `../../games/trading` would stop being caught. **That trade is the wrong way round for a
+ guard:** a false positive is noisy and fixed in a minute, a missed violation is silent and
+ is the whole point of the rule. Expect one negation per new `games/` directory.
+
+**And the fixture lesson, recurring for the third time: a fixture trimmed to the fields the
+test reads will fail everything at once for one unrelated reason.** The `Competition` fixture
+omitted `slug`, `startTime`, `endTime` and `startingCapital` - none of which a round
+touches - and **34 tests failed on a single validation error**. Mongoose validates the
+document, not the subset you care about. It keeps recurring because trimming a fixture always
+feels like tidying.
+
+### Five things from the X6 provider-admin slice (4 September 2026)
+
+Provider registration, credentials and the per-title enable switch are code-complete
+(`12` s4.1a). Two of `12` s4's five destinations; health, round inspector and manual
+resolution deliberately left.
+
+- **A structural test that greps source code must strip comments first, and the failure
+ teaches the wrong lesson if you skip it.** The assertion "no route mentions
+ `requireAdminAuth`" went red on a *comment* in the route explaining why `requireAdminAuth`
+ is the wrong helper. **A test that reads prose fails in both directions**: it flags a
+ correct file that discusses the anti-pattern, and it passes a broken one whose only mention
+ of the right helper is in a comment. Strip block and line comments, then match. This is the
+ same class as the aside-verification rule - documentation written beside code is an
+ instrument, and here it was being read *as* the code.
+- **`requireAdminAuth` is not an authorization check, and it is the natural thing to reach
+ for.** It asks only whether the caller is an admin at all, so an employee granted one
+ unrelated section passes it; `requireSectionAccess(id)` is the grant. **Fourth instance of
+ the class** after Prerequisite A, the internal-secret fallbacks and the unprotected
+ suspicion-score route, so carry the rule not the instances. And pin it with **two** tests:
+ one for the helper, one that **counts exported handlers and counts guards**, because a file
+ whose `GET` is guarded and whose `PATCH` is not passes the first check while leaving the
+ mutation wide open.
+- **When a UI can never display a stored secret, a blank field must mean "keep".** The
+ alternative is silent: an operator editing only the environment submits every secret box
+ empty, and if empty meant "clear" that harmless edit breaks every inbound callback with no
+ error raised anywhere. Offer removal explicitly instead. The general form: **the safe
+ reading of an empty input depends on whether the user can see what is already there**, and
+ write-only fields invert the usual answer.
+- **A switch that cannot work must refuse, with the reason, rather than merely being
+ disabled.** Enabling a provider with no installed adapter would leave
+ `resolveEnabledProvider` refusing every round with a message no operator can act on - a
+ control that appears to work and silently does nothing, the same shape as the
+ trading-shaped services in `matchmaking.service.ts`. Same for a missing callback secret,
+ where every result then fails signature verification and **looks identical to an attack in
+ the logs.** Greying out the control is not enough; the card has to say which of the two is
+ missing.
+- **Do not offer delete on anything joined to history.** A provider that has run a contest is
+ reached by `providerKey`, and `gameKey` is immutable, so deleting the row orphans the stats
+ while every screen still renders a key it cannot resolve. Disable is the reversible
+ operation. Same reasoning as the catalogue sync reporting missing titles rather than
+ removing them, and as retiring a disabled game's rows rather than deleting them (R29).
+
+**Two more, both about how a defect was found rather than what it was.** The live bug in this
+slice - the first-ever credential save being recorded as a rotation - was caught only because
+the test asserted the **whole** credential object rather than the three fields it cared
+about; the extra `rotatedAt` was the evidence. **Assert the whole object when the object is
+small enough**, because a field you did not ask about is the only way to notice one you did
+not expect. And **probe with a helper that relaxes newlines and confirms the file changed**:
+setting `$ErrorActionPreference = 'Stop'` in a probe script made `npx`'s harmless
+`ExperimentalWarning` on stderr abort the run, which printed nothing and looked exactly like
+six passing probes.
+
+**One more ESLint wildcard collision, the third, exactly as predicted.** `**/games/*` began
+rejecting `@/components/admin/games/GameProvidersSection` the moment that folder existed,
+after `database/models/games` in X2 and `lib/services/games` in X3. Negated again; the
+wildcard stays, for the reason already recorded. **Three collisions is now enough to state
+the expectation plainly: any new directory named `games/` anywhere in the tree will trip
+this rule on its first import, and the fix is one negation, not a narrower rule.**
+
+### Five things from the X6 contest wizard (4 September 2026)
+
+The provider contest wizard, its `configSchema`-generated settings form and the `03` s4.1
+pre-flight checklist are code-complete, 49 tests, all 15 guards probed. It creates a
+**draft**; nothing publishes or settles it.
+
+- **A hand-written input interface is where an invented field survives a typecheck.** The
+ pre-flight checklist takes its facts as arguments rather than importing the model - which
+ is right, because it keeps the checks pure and cheap to test - but it also means the
+ compiler has nothing to disagree with. The first draft read `title.billsPerRound`, **a
+ field `provider_game` does not have**, and that warning would have been permanently
+ unreachable. **A checklist item gated on a field nobody populates is an item that never
+ runs.** Checking the model's real field list also turned up `lastSuccessfulRoundAt`, which
+ *does* exist and is what the sandbox-freshness check now reads. Same class as the R7
+ correction and the `challengeId` aside: **an unverified field name in a plan or an
+ interface is a claim, not a fact.**
+- **Narrowing a `required` field is a change to the OTHER game's contract.** Making
+ `startingCapital` conditional reads as "provider games don't need it". What it does is
+ move a guarantee trading relies on out of the schema and into a predicate - and the
+ `?? "trading"` in it is load-bearing, not defensive, because **invariant 5 resolves an
+ absent label to trading.** Written `this.gameType === "trading"`, an unlabelled trading
+ contest saves with no capital and every downstream calculation divides by it. Pin it in
+ **both** copies: a conditional requirement that differs between the apps is a validation
+ rule whose outcome depends on which process saved the document, and `check:mirrors`
+ compares field paths and enum values - **not predicate bodies.**
+- **A "no additional coding" claim has exactly one failure mode: something that enumerates
+ games.** For a schema-driven form that means a `switch` on game code. The renderer branches
+ on the declared field *type* and a test asserts the file contains no `gameCode`, `gameKey`
+ or `providerKey` at all. Without it the first title needing a special case makes the
+ acceptance criterion quietly false while every existing test still passes. Same shape as
+ invariant 9 and the trading-shaped services in `matchmaking.service.ts`.
+- **A schema parser must fail closed, and permissiveness here is worse than refusing.**
+ Unsupported keywords (`allOf`, `pattern`, `oneOf`) refuse the whole schema rather than
+ being skipped. Skipping renders a form missing half the real constraints and then validates
+ against the half it understood - **reporting success while accepting settings the provider
+ rejects at play time.** The same instinct that makes the market-hours gate fail closed on
+ an unknown game. Related, from the checklist: **keep warnings and refusals separate**, or
+ the whole thing gets bypassed. Three items are advisory - the platform master switch being
+ off (scheduling ahead of a launch is legitimate), a stale sandbox round, and the per-round
+ cost acknowledgement - and turning any into a refusal pushes an operator to switch external
+ games on platform-wide just to draft a contest. Conversely the hard refusals **accumulate
+ rather than stopping at the first**: an operator fixing one per submission gives up.
+- **Refuse a contest missing its round settings; never default them.** Falling back to
+ single-attempt with a grace period is the tidy-looking option and it is wrong - the contest
+ runs, players play, and the settings governing their money are ones no operator chose. This
+ is what closes X3's `RoundContestConfig` deferral, and the general rule is the same one
+ behind the `entryBlockThreshold` fix: **a stored value and an absent one are different
+ facts.**
+
+**A deviation worth the precedent, because the instinct is to absorb it.** `12` s2 describes
+**one** wizard whose fourth step becomes dynamic; **two** were built, with a game picker
+routing to either. That section sets two acceptance criteria - *no trading field in a
+provider contest* and *trading creation unchanged* - which one wizard satisfies only after
+refactoring the 2,892-line form live trading contests depend on. Two paths satisfy both
+immediately, and merging later becomes a UI refactor against a green suite rather than the
+first thing attempted. **Recorded in `12` s2.1 rather than quietly rewriting the plan to
+match** - and the picker **redirects straight to trading when no provider game exists**,
+because a "choose your game" screen with one choice is friction on the path operators use
+daily, and friction there is how a new screen gets worked around.
+
+**Probing lesson, fourth instance, and this time the harness lied twice.** One probe
+reported `PROBE DID NOT APPLY` (4-space indent in the pattern, 2 in the file) and **every**
+probe reported "OTHER test", because `Out-String` wraps at the console width and a long test
+name arrived split across two lines, so the literal match silently missed it. Both outcomes
+look exactly like a broken test. Fixes are in `tools/probe-contest-wizard.ps1`: **collapse
+all whitespace in captured output before matching**, and **assert the file actually changed
+before believing any outcome**. **A probe harness needs its own probe.**
+
 ## The rule
 
 **Documentation is part of the deliverable, not a follow-up task.** A phase is not
@@ -687,8 +876,9 @@ On every change during implementation:
 | `14-implementation-phases.md`, `00-README.md`, `PROGRESS.md` and the roadmap sections of both New-Games-Plan HTMLs | Phase list, effort estimates and totals appear in five places. Changing one means changing all five. **P1–P7 and their 14–19 week total are superseded** by the X-phases — all four `.md`/HTML entry points now carry that notice, and the live figure is **23–30 weeks**. **Stage 0 (6–9 days) is unchanged and still active.** The partner HTML's timeline SVG is drawn to scale — rescale the bars, not just the labels. Note the partner HTML must not carry the Stage 0 figure at all |
 | The mirror-drift counts, wherever they appear | `New games plan` `00-README.md`, `12-risk-register.md`, `00a`, `03-data-model-changes.md`; `External game plans` `17-risk-register.md`, `18-migration-testing-rollout.md`; both internal HTMLs. Measured 1 Sep 2026 by the guard itself: **75 mirrored model pairs, 11 drifted** (all now synced), plus 19 action and 51 service files. Earlier documents said "~21 files, 3 drifted", or "10 drifted" — both are stale, as is any figure of "31" for the stale `.d.ts` files, which was 112 (see the row below). Do not hand-count these; run `npm run check:mirrors:list` |
 | `External game plans/19-game-masters.md`, `New games plan/15` section 5, and the Game Master sections of the internal HTMLs | The Game Master system is the same system in both scenarios. `19` sections 1–4 are the authoritative analysis; `New games plan/15` section 5 restates it. **A fact corrected in one must be corrected in the other** |
-| The admin navigation structure, wherever it appears | `External game plans/12` s1 (grouping table), s1.1 (tab list) and s1.1a (what was built); `New games plan/07` "Target structure" and its BUILT notice; `External game plans/PROGRESS.md` X6 row and work log. **The live structure is `apps/admin/components/admin/AdminDashboard.tsx`'s `menuGroups` plus `apps/admin/lib/admin/game-sections.ts`** — read those, not the prose, and remember `07` was the accurate chapter and `12` the drifted one. There is **no top-level TRADING group**; trading is a destination inside GAMES. Any document describing one is stale |
+| The admin navigation structure, wherever it appears | `External game plans/12` s1 (grouping table), s1.1 (tab list) and s1.1a (what was built); `New games plan/07` "Target structure" and its BUILT notice; `External game plans/PROGRESS.md` X6 row and work log. **The live structure is `apps/admin/components/admin/AdminDashboard.tsx`'s `menuGroups` plus `apps/admin/lib/admin/game-sections.ts`** — read those, not the prose, and remember `07` was the accurate chapter and `12` the drifted one. There is **no top-level TRADING group**; trading is a destination inside GAMES, and since 4 Sep 2026 **Game Providers sits beside it in the same group** — a provider supplies games, it is not a game, so it must not be nested under one. Any document describing a top-level TRADING group is stale |
 | The competition entry paths, wherever they appear | `New games plan` `00a`, `01-current-state-audit.md`, `05-prizes-money-layer.md`, `12-risk-register.md`, `PROGRESS.md`; `External game plans` `PROGRESS.md` and `17-risk-register.md`; `ChartVolt-New-Games-Plan.html`. There were **four** writers, now **two** — `lib/services/contest-entry.service.ts` behind both gates, plus the batch route fixed in place and the admin copy deleted. Any document still saying "two duplicate join paths" as a *present* fact is stale; as a description of what Stage 0 started from it is correct, so **say which** |
+| The game-provider admin surface, wherever it appears | `External game plans/12` s4 (the five destinations), s4.1 (copy the UX not the persistence) and s4.1a (what was built); `09` E5 checklist; `PROGRESS.md` X6 row and work log; `ChartVolt-External-Games-Plan.html` E5 row. **Two of the five destinations exist** — Providers and the per-title Games list. Any document implying E5 is finished is stale, and any implying the whole of X6 is done is more so: X6 also carries the contest wizard, analytics by provider and the Game Master creation API. **Credentials live only in `WhiteLabel.gameProviderCredentials` behind `select: false`** — a document describing them on `game_provider` is describing the payment-provider pattern that was deliberately not copied |
 | `ChartVolt-New-Games-Plan.html` and `-Partners.html` | The partner version must **never** mention Stage 0, the duplicate join paths, the admin mirror drift, or any current defect |
 | Any model change | Exists twice: `database/models/` and `apps/admin/database/models/`. Update both in the same commit. **`npm run check:mirrors` now enforces this** in CI and on `git push`, comparing field paths *and* enum values. Do not "fix" a failure by deleting an enum value to make two sides agree — that orphans every document already storing it. Add to the side that lacks it. Deliberate differences go in `tools/model-mirror/allowlist.ts` **with a reason** |
 | Committed compiled `.js` files under `database/` and `lib/` | **All 113 deleted 1 Sep 2026** (57 `.js` + 56 `.js.map`), owner approved. A *separate, earlier* accident from the `.d.ts` one — emitted 22 Dec 2025, same 57 modules, and **six to seven months stale**. Critically, **these were NOT inert**: vitest resolved the stale `.js` in preference to the `.ts`, which made every model and every money-critical service **unimportable in tests** and blocked the whole of Defect 1. `tsx`, esbuild and `next build` all resolve the `.ts` correctly, so production was never affected — which is why it survived unnoticed. Two rules follow: **when deleting emitted output, look for the other half of the emit** (a `tsc` run that produced `.d.ts` produced `.js` too — the first cleanup removed one half and left the harmful one), and **prove which file a resolver picks rather than reasoning about it** — a missing export makes a perfect probe. The `.gitignore` rule is scoped to `/database/**` and `/lib/**`, never a blanket `*.js`, because `ecosystem.config.js`, `scripts/*.js`, `worker/build.mjs` and the `api-server` build are hand-written |

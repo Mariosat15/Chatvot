@@ -138,6 +138,52 @@ callbacks, duplicates, bad signatures, conflicting scores, late results.
 > are trustworthy, and retrofitting that assumption is far more expensive than
 > establishing it now.
 
+#### BUILT 4 September 2026 - code-complete
+
+All five deliverables exist, and **rehearsals 1-6 of `07` section 9 are green against the
+mock** (`__tests__/services/round-lifecycle.test.ts`, 49 tests, all six central guards
+probed by reintroducing the defect). Rehearsals 7-10 need contest settlement or a running
+worker and belong to X5 and X8; they are listed as documented gaps at the foot of the test
+file rather than left to look forgotten.
+
+| Built | Where |
+|---|---|
+| `game_round` + `provider_event` | `database/models/games/`, mirrored (**79 pairs agree**) |
+| `RoundService` | `lib/services/games/round.service.ts` + `round-types.ts` |
+| Signed callback endpoint | `app/api/games/providers/[providerKey]/events/route.ts` |
+| `ResultIngestionService` | `lib/services/games/result-ingestion.service.ts` |
+| Signature verification | `lib/services/games/callback-verification.ts` |
+| Reconciliation net | `lib/services/games/reconciliation.service.ts` |
+| Contest acceptance (gate 9) | `lib/services/games/contest-state.ts` |
+
+**Nothing is player-visible.** `externalGamesEnabled` still defaults to false, and no route
+creates a provider contest.
+
+**Chapter 04 left three gaps that had to be decided rather than guessed.** All three are now
+recorded in `04` sections 3.3 and 3.4:
+
+1. **"One live round per player per contest" was not actually enforced by any documented
+ index.** `07` section 4 says it is "enforced in the database", but the only index `04`
+ listed prevents a duplicate attempt *number* - and attempt 1 launched beside attempt 2
+ launched satisfies that perfectly, which is exactly the abandon-and-peek the rule exists
+ to stop. Closed with a **partial unique index** on `{ contestId, userId }` filtered to the
+ live statuses.
+2. **No transition table for `status`.** `04` lists seven values and says nothing about
+ which moves are legal, so every call site would have decided for itself. Now
+ `ROUND_TRANSITIONS` in the model.
+3. **`provider_event.eventType` and `processingResult` had no enum.** Free-text outcomes
+ drift into near-synonyms and the admin filter silently stops matching some of them, so
+ `EVENT_PROCESSING_RESULTS` names the twelve.
+
+**Two deliberate deferrals, recorded so nobody "fixes" the gap.** Contest-level round fields
+(`attemptsPolicy`, `unresolvedRoundPolicy`, `resultGracePeriodSeconds`, `playWindowEnd`) are
+**passed in** as `RoundContestConfig` rather than read from `Competition`, so X3 adds no
+field to the contest models - X5 wires them without changing this service. And the
+`exclude` policy's **refund is named, not paid**: `ReconciliationOutcome.refundOwed` is the
+obligation, and settlement honours it. Paying it here would put a second money writer beside
+settlement, and removing a player changes the prize pool, so the refund and the re-split are
+one transaction that belongs to X5.
+
 ### E3 - Real adapter against the sandbox
 
 - Implement the real provider adapter
@@ -162,16 +208,37 @@ ranked, prizes paid, ledger balanced to the cent.
 
 ### E5 - Admin panel
 
-- Provider list, health, enable/disable, catalogue sync
-- Game list with our own enable switch, independent of the provider's
-- Contest creation with a **settings form generated from `configSchema`**
-- Pre-flight validation from `03` section 4.1, including the sandbox smoke round
-- Round inspector - status, score, raw event, replay link
-- Manual round resolution, with a mandatory reason and an audit entry
-- Pause, extend and cancel controls on a live contest
+**`PARTIALLY BUILT` 4 September 2026** - provider registration, credentials, the per-title
+enable switch (`12` s4.1a), and now contest creation with pre-flight validation (`12` s2.1)
+are code-complete. Taken out of order because E3 cannot start without a signed provider, and
+the owner's "admin first" instruction puts these screens ahead of any player screen. The
+remaining items are held back on purpose: **health** wants the `provider_health_check` time
+series from `04` s3.5, and the **round inspector**, **manual resolution** and the **live
+contest controls** are most useful once E3 has produced real rounds to inspect. Building
+them against the mock now would ship screens whose only content is fixtures.
+
+- [x] Provider list, enable/disable, catalogue sync
+- [ ] Provider health
+- [x] Game list with our own enable switch, independent of the provider's
+- [x] Contest creation with a **settings form generated from `configSchema`**
+- [x] Pre-flight validation from `03` section 4.1, including the sandbox smoke round
+- [ ] Round inspector - status, score, raw event, replay link
+- [ ] Manual round resolution, with a mandatory reason and an audit entry
+- [ ] Pause, extend and cancel controls on a live contest
 
 **Done when:** an admin can create, run, monitor and if necessary rescue a contest
-without a developer.
+without a developer. **Not yet met, and the gap is now narrower and more precisely
+stated:** an operator can register a provider, choose which titles are live, and create a
+contest on one with settings drawn from the game's own schema — but that contest is a
+**draft**, and nothing publishes, runs or settles it. Publishing is **X5/E4**; the monitor
+and rescue half of this criterion is the four unticked items above.
+
+**What "creation works" excludes, said explicitly so no later summary reads it as
+finished.** No player can see or join the result. The wizard covers competitions only;
+challenges on a provider game are **E8**. Editing a provider contest after creation is not
+built, so `CompetitionEditorForm.tsx`'s pre-existing field gap — noted in `12` s2 — is now
+load-bearing rather than cosmetic: provider game settings are currently uneditable once
+saved.
 
 Remember the mirror: every model touched here exists twice.
 
