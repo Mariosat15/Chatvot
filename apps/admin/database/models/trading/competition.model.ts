@@ -185,16 +185,38 @@ export interface ICompetition extends Document {
   winnerPnL?: number;
   noWinners?: boolean;
   earlyEndReason?: string;
+  /**
+   * The stored result of a finished contest.
+   *
+   * FOUR FIELDS WERE BEING DISCARDED HERE UNTIL X5, and three of them were trading's.
+   * Finalization has always written `isTied`, `qualificationStatus` and
+   * `disqualificationReason` into this array, and this schema declared none of them - so
+   * Mongoose's strict mode dropped them on every save while reporting success. The stored
+   * leaderboard has therefore never recorded whether a rank was shared or why a player was
+   * disqualified, and every screen reading it back has shown neither.
+   *
+   * `score` is the X5 addition. Without it a provider contest's stored leaderboard would
+   * hold ranks and prizes but no results at all.
+   *
+   * The trading fields stay optional because a game with no virtual account has no capital
+   * and no profit - chapter 05 section 10: generalised, explicitly scoped, or absent.
+   */
   finalLeaderboard?: {
     rank: number;
     userId: string;
     username: string;
-    finalCapital: number;
-    pnl: number;
-    pnlPercentage: number;
-    totalTrades: number;
-    winRate: number;
     prizeAmount: number;
+    /** Trading. */
+    finalCapital?: number;
+    pnl?: number;
+    pnlPercentage?: number;
+    totalTrades?: number;
+    winRate?: number;
+    /** Score-reporting games. Stored RAW, never the negated comparison value. */
+    score?: number;
+    isTied?: boolean;
+    qualificationStatus?: string;
+    disqualificationReason?: string;
   }[];
 
   // Admin
@@ -588,12 +610,18 @@ const CompetitionSchema = new Schema<ICompetition>(
         rank: Number,
         userId: String,
         username: String,
+        prizeAmount: Number,
         finalCapital: Number,
         pnl: Number,
         pnlPercentage: Number,
         totalTrades: Number,
         winRate: Number,
-        prizeAmount: Number,
+        // Add-only, X5. `score` is what a provider contest's result IS; the other three
+        // have been written by trading finalization all along and silently discarded.
+        score: Number,
+        isTied: Boolean,
+        qualificationStatus: String,
+        disqualificationReason: String,
       },
     ],
     createdBy: {

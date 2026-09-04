@@ -12,21 +12,48 @@
  */
 
 import { getGameModuleOrTrading } from "@/lib/games/registry";
-import type { GameModule } from "@/lib/games/types";
+import type { GameModule, ScoreDirection } from "@/lib/games/types";
 
+/**
+ * A participant being ranked, in any game.
+ *
+ * THE TRADING FIELDS ARE OPTIONAL AS OF X5, and finding that they were not is the third
+ * instance of one defect. X1 added `score` to `RankableParticipant` and removed nothing,
+ * which was right - but this is a DIFFERENT interface, and it still demanded eight trading
+ * fields, so a provider participant could not be passed to `calculateRankings` at all.
+ * `CompetitionParticipant` demanded three capital fields for the same reason. The rule:
+ * when you add a field for a new case, check what the old fields still DEMAND. The
+ * interesting requirement is always the one nobody touched.
+ *
+ * Making them optional is safe here because THE RANKING ENGINE READS NONE OF THEM. Every
+ * ranking and tie-break value comes from `gameModule.getRankingValue`, so these fields
+ * exist for the trading module to read and for three qualification and tie-split rules -
+ * each of which now tolerates their absence rather than producing NaN.
+ */
 export interface ParticipantData {
   userId: string;
   username: string;
-  currentCapital: number;
-  pnl: number;
-  pnlPercentage: number;
-  totalTrades: number;
-  winningTrades: number;
-  losingTrades: number;
-  winRate: number;
   status: string;
   enteredAt: Date;
-  startingCapital: number;
+  /** Trading. Absent for any game that does not run a virtual account. */
+  currentCapital?: number;
+  pnl?: number;
+  pnlPercentage?: number;
+  totalTrades?: number;
+  winningTrades?: number;
+  losingTrades?: number;
+  winRate?: number;
+  startingCapital?: number;
+  /** Score-reporting games, including every provider title. */
+  score?: number;
+  /**
+   * Which way this title's score sorts. Absent means higher is better.
+   *
+   * Typed as the union rather than `string` so this interface stays assignable to
+   * `RankableParticipant`. A plain `string` compiles here and then fails at every call
+   * into the game module, which is a confusing place to discover the real problem.
+   */
+  scoreDirection?: ScoreDirection;
 }
 
 export interface RankedParticipant extends ParticipantData {
@@ -164,22 +191,23 @@ function checkQualification(
 
   // Check minimum trades - ONLY when competition is COMPLETED
   // During active competitions, users can still meet the requirement
-  if (isCompleted && participant.totalTrades < rules.minimumTrades) {
+  // Reason for `?? 0`: a game with no trades must read as zero rather than undefined. The
+  // comparison happened to be safe already (`undefined < n` is false), but the REASON
+  // STRING was not - it would have told a player "Insufficient trades (undefined/0)".
+  const tradeCount = participant.totalTrades ?? 0;
+  if (isCompleted && tradeCount < rules.minimumTrades) {
     return {
       qualified: false,
-      reason: `Insufficient trades (${participant.totalTrades}/${rules.minimumTrades})`,
+      reason: `Insufficient trades (${tradeCount}/${rules.minimumTrades})`,
     };
   }
 
   // Check minimum win rate - ONLY when competition is COMPLETED
-  if (
-    isCompleted &&
-    rules.minimumWinRate &&
-    participant.winRate < rules.minimumWinRate
-  ) {
+  const winRate = participant.winRate ?? 0;
+  if (isCompleted && rules.minimumWinRate && winRate < rules.minimumWinRate) {
     return {
       qualified: false,
-      reason: `Win rate too low (${participant.winRate.toFixed(1)}% < ${rules.minimumWinRate}%)`,
+      reason: `Win rate too low (${winRate.toFixed(1)}% < ${rules.minimumWinRate}%)`,
     };
   }
 
@@ -535,15 +563,24 @@ export function distributePrizesWithTies(
       } else if (rules.tiePrizeDistribution === "split_weighted") {
         // Split based on secondary metrics (e.g., capital)
         const totalWeight = winnersAtRank.reduce(
-          (sum, w) => sum + w.currentCapital,
+          (sum, w) => sum + (w.currentCapital ?? 0),
           0,
         );
         // Total pool for this group: base + all bonuses
         const totalGroupPercentage =
           basePercentage + bonusPercentagePerWinner * winnersCount;
 
+        // Reason: weighting by capital divides by the group's total capital, so a game
+        // with no capital - or a trading group where everyone is at zero - divides by zero
+        // and every prize in the group becomes NaN. A NaN prize is not a behaviour worth
+        // preserving, so an unweightable group falls back to an equal share. The
+        // alternative silently writes NaN into a wallet transaction.
+        const equalFallback = totalWeight <= 0;
+
         winnersAtRank.forEach((winner) => {
-          const weight = winner.currentCapital / totalWeight;
+          const weight = equalFallback
+            ? 1 / winnersAtRank.length
+            : (winner.currentCapital ?? 0) / totalWeight;
           const grossPrize =
             (grossPrizePool * totalGroupPercentage * weight) / 100;
           const netPrize = grossPrize * (1 - platformFeeFraction);

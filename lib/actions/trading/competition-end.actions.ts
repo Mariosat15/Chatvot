@@ -4,8 +4,6 @@ import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import TradingPosition from "@/database/models/trading/trading-position.model";
-import CreditWallet from "@/database/models/trading/credit-wallet.model";
-import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 import { fetchRealForexPrices } from "@/lib/services/real-forex-prices.service";
 import { getMultipleSymbolConfigs } from "@/lib/services/symbol-config.service";
 import {
@@ -14,8 +12,13 @@ import {
   getQuoteToUsdRate,
   getConversionPairSymbols,
 } from "@/lib/services/pnl-calculator.service";
-import { Types } from "mongoose";
-import { routeToTradingSettlement } from "@/lib/games/settlement";
+import {
+  resolveSettlementPath,
+  routeToTradingSettlement,
+} from "@/lib/games/settlement";
+import { payContestPrizes } from "@/lib/services/settlement/prize-payout.service";
+import { settleFeesAndGameMasters } from "@/lib/services/settlement/fees.service";
+import { completeContest } from "@/lib/services/settlement/contest-completion.service";
 
 /**
  * End a competition and distribute prizes
@@ -38,12 +41,25 @@ export async function finalizeCompetition(competitionId: string) {
     .lean<{ gameType?: string } | null>();
 
   if (label) {
-    const route = routeToTradingSettlement(
+    const route = resolveSettlementPath(
       label.gameType,
       `competition ${competitionId}`,
     );
 
-    if (!route.ok) {
+    // X5: a provider contest settles through its own path, which reuses this one's
+    // ranking, prize, fee and completion stages and skips only the two that are about
+    // trades. Dispatching HERE rather than at the call sites is the whole point of seam 3
+    // - there are ten callers of this function in this app and one of them is a page
+    // component, so every one of them, including the ones nobody has written yet, gets
+    // the right path by construction.
+    if (route.path === "provider") {
+      const { finalizeProviderCompetition } = await import(
+        "@/lib/services/settlement/provider-finalize"
+      );
+      return await finalizeProviderCompetition(competitionId);
+    }
+
+    if (route.path === "none") {
       console.error(`❌ [COMPETITION] ${route.error}`);
       return { success: false, error: route.error };
     }
@@ -791,777 +807,53 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
       `💎 Calculated ${prizeDistributions.length} prize distributions (including ties)`,
     );
 
-    let totalDistributed = 0;
-    const winnerTransactions = [];
+    // Pay the winners. Extracted by X5 into `payContestPrizes` so that a provider contest
+    // is paid by this exact code rather than a second copy of it - Stage 0's lesson that
+    // one bug duplicated is not drift, and that no guard catches it.
+    const {
+      totalDistributed,
+      winnersPaid,
+      walletMap,
+    } = await payContestPrizes({
+      session,
+      contest: competition,
+      distributions: prizeDistributions,
+      leaderboard,
+    });
 
-    // PERF: Batch-fetch all winner wallets in ONE query instead of N findOne calls
-    const allWinnerUserIds = prizeDistributions
-      .map((d) => leaderboard.find((l) => l.userId === d.userId)?.userId)
-      .filter(Boolean) as string[];
-
-    const existingWallets = await CreditWallet.find({
-      userId: { $in: allWinnerUserIds },
-    }).session(session);
-
-    const walletMap = new Map(
-      existingWallets.map((w) => [w.userId.toString(), w]),
-    );
-
-    // Distribute to each winner
-    for (const dist of prizeDistributions) {
-      const winner = leaderboard.find((l) => l.userId === dist.userId);
-
-      if (winner) {
-        const prizeAmount = dist.prizeAmount;
-        winner.prizeAmount = prizeAmount;
-        totalDistributed += prizeAmount;
-
-        console.log(
-          `  🏆 Rank ${dist.rank}${dist.isTied ? " (TIED)" : ""}: ${winner.username} wins ${prizeAmount} credits`,
-        );
-
-        // Get winner's wallet from pre-fetched map (or create if doesn't exist)
-        let winnerWallet = walletMap.get(winner.userId.toString());
-        if (!winnerWallet) {
-          const created = await CreditWallet.create(
-            [
-              {
-                userId: winner.userId,
-                creditBalance: 0,
-                totalDeposited: 0,
-                totalWithdrawn: 0,
-                totalSpentOnCompetitions: 0,
-                totalWonFromCompetitions: 0,
-                isActive: true,
-                kycVerified: false,
-                withdrawalEnabled: false,
-              },
-            ],
-            { session },
-          );
-          // Reason: Mongoose create() returns array; guard for safety
-          winnerWallet = created[0] ?? null;
-          if (!winnerWallet) {
-            throw new Error(`Failed to create wallet for winner ${winner.userId}`);
-          }
-          walletMap.set(winner.userId.toString(), winnerWallet);
-        }
-
-        // Add credits to winner's wallet — use { new: true } for accurate balance tracking
-        const updatedWinnerWallet = await CreditWallet.findOneAndUpdate(
-          { userId: winner.userId },
-          {
-            $inc: {
-              creditBalance: prizeAmount,
-              totalWonFromCompetitions: prizeAmount,
-            },
-          },
-          { session, new: true },
-        );
-        const balanceAfter = updatedWinnerWallet?.creditBalance || prizeAmount;
-        const balanceBefore = balanceAfter - prizeAmount;
-
-        // Update the walletMap with fresh data so GM fee code sees correct balance
-        if (updatedWinnerWallet) {
-          walletMap.set(winner.userId.toString(), updatedWinnerWallet);
-        }
-
-        // Create transaction record
-        const transaction = await WalletTransaction.create(
-          [
-            {
-              userId: winner.userId,
-              transactionType: "competition_win",
-              amount: prizeAmount,
-              balanceBefore,
-              balanceAfter,
-              competitionId: competition._id,
-              status: "completed",
-              description: dist.isTied
-                ? `🏆 Prize for Rank ${winner.rank} (Tied) in ${competition.name}`
-                : `🏆 Prize for Rank ${winner.rank} in ${competition.name}`,
-              metadata: {
-                rank: winner.rank,
-                isTied: dist.isTied,
-                finalPnl: winner.pnl,
-                finalCapital: winner.finalCapital,
-                qualificationStatus: winner.qualificationStatus,
-                disqualificationReason: winner.disqualificationReason,
-              },
-            },
-          ],
-          { session },
-        );
-
-        // Reason: Mongoose create() returns array; guard for safety
-        const createdTx = transaction[0];
-        if (createdTx) {
-          winnerTransactions.push(createdTx);
-        }
-
-        // TODO: Send email notification
-        console.log(`  📧 Email notification queued for ${winner.username}`);
-      }
-    }
-
-    // STEP 4: Calculate platform fee
-    // IMPORTANT: Platform fee is ONLY the % taken, NOT the entire pool when no winners
+    // STEP 4: the platform fee, the unclaimed pool and the Game Masters' share.
+    //
+    // Extracted by X5 into `settleFeesAndGameMasters` so a provider contest takes its fee
+    // and pays its referrers through the same code. The four stages are one call because
+    // the order between them is load-bearing - see the service for why.
     const qualifiedWinners = rankedParticipants.filter(
       (p) => p.qualificationStatus === "qualified",
     );
     const expectedWinners = competition.prizeDistribution?.length || 0;
     const actualWinners = prizeDistributions.length;
 
-    // Calculate the ACTUAL platform fee (only the percentage portion)
-    // When winners exist: fee = prizePool - totalDistributed (the % taken from each winner)
-    // When NO winners: fee = prizePool * feePercentage (still only the % portion, not the entire pool)
-    let actualPlatformFee: number;
-    if (actualWinners > 0) {
-      // Normal case: fee is what wasn't distributed to winners
-      actualPlatformFee = prizePool - totalDistributed;
-    } else {
-      // No winners case: fee is still only the fee percentage, NOT the entire pool
-      // The remaining goes to unclaimed pools, not to platform fee
-      actualPlatformFee = prizePool * platformFeeFraction;
-    }
-
-    console.log(
-      `💼 Platform fee calculated: ${actualPlatformFee.toFixed(2)} credits (${competition.platformFeePercentage}% of pool)`,
-    );
-
-    // NOTE: Platform fee is recorded ONLY in PlatformTransaction (via PlatformFinancialsService)
-    // We do NOT create a WalletTransaction for platform fees to avoid duplicate records
-
-    // STEP 4.5: Record unclaimed pool funds and platform earnings in financials
-    const { PlatformFinancialsService } =
-      await import("@/lib/services/platform-financials.service");
-
-    // ONLY record unclaimed pool when NO winners at all received prizes
-    // When actualWinners > 0, all funds are distributed/redistributed - nothing is unclaimed
-    if (actualWinners === 0 && prizePool > 0) {
-      // All funds (minus platform fee) are unclaimed because no one got any prizes
-      const unclaimedNet = prizePool * (1 - platformFeeFraction); // Pool minus the fee portion
-
-      // Determine reason for unclaimed
-      let unclaimedReason:
-        | "no_participants"
-        | "all_disqualified"
-        | "no_qualified_winners";
-      if (participants.length === 0) {
-        unclaimedReason = "no_participants";
-      } else if (qualifiedWinners.length === 0) {
-        unclaimedReason = "all_disqualified";
-      } else {
-        unclaimedReason = "no_qualified_winners";
-      }
-
-      console.log(
-        `💰 Recording unclaimed pool: ${unclaimedNet.toFixed(2)} credits (${unclaimedReason})`,
-      );
-      console.log(
-        `   Platform fee: ${actualPlatformFee.toFixed(2)} + Unclaimed: ${unclaimedNet.toFixed(2)} = ${prizePool.toFixed(2)} (total pool)`,
-      );
-
-      await PlatformFinancialsService.recordUnclaimedPool({
-        competitionId: competition._id.toString(),
-        competitionName: competition.name,
-        poolAmount: unclaimedNet,
-        reason: unclaimedReason,
-        winnersCount: 0,
-        expectedWinnersCount: expectedWinners,
-        description: `Unclaimed pool from ${competition.name}: ${unclaimedReason.replace(/_/g, " ")} - No prizes awarded`,
+    const { grossPlatformFee: actualPlatformFee, gmEarnings: actualGmEarnings } =
+      await settleFeesAndGameMasters({
+        session,
+        contest: competition,
+        prizePool,
+        totalDistributed,
+        prizeWinnerCount: actualWinners,
+        expectedWinners,
+        qualifiedWinnersCount: qualifiedWinners.length,
+        participants: participants.map((p) => ({ userId: p.userId })),
+        walletMap,
+        platformFeeFraction,
       });
-    } else if (actualWinners > 0 && actualWinners < expectedWinners) {
-      // Log that prizes were redistributed (not unclaimed)
-      console.log(
-        `📊 Prize redistribution: ${actualWinners} winners received ${expectedWinners} prize positions worth of prizes`,
-      );
-      console.log(
-        `   Extra prize %s were redistributed as bonus to existing winners - no unclaimed funds`,
-      );
-    }
-
-    // STEP 4.6: Calculate Game Master referral fees FIRST (before recording platform fee)
-    // GM fees come FROM the platform fee, so we need to calculate them first
-    console.log(`🎮 Calculating Game Master referral fees...`);
-
-    let totalGmEarnings = 0; // Track total GM earnings to subtract from platform fee
-    // Reason: gmSubscription is a lean MongoDB document from native driver findOne.
-    // Using Record<string, unknown> with index signature for the subscription document.
-    type GmSubDoc = { _id: unknown; [key: string]: unknown };
-    const gmPayments: Array<{
-      gmId: string;
-      gmSubscription: GmSubDoc;
-      users: { userId: string; userName: string; userEmail: string }[];
-      feePercentage: number;
-      totalEarning: number;
-    }> = [];
-
-    try {
-      const db = Competition.db.db;
-      if (db) {
-        // Get participant user IDs
-        const participantUserIds = participants.map((p) => p.userId);
-
-        // DEBUG: Log participant userIds being searched
-        console.log(
-          `   🔍 Searching for referrals with userIds: ${participantUserIds.join(", ")}`,
-        );
-
-        // Use UserReferral collection as source of truth for referral relationships
-        // This is more reliable than user.referredByGameMasterId field
-        const userReferrals = await db
-          .collection("userreferrals")
-          .find({
-            userId: { $in: participantUserIds },
-            isActive: true,
-            gameMasterId: { $exists: true, $ne: null },
-          })
-          .toArray();
-
-        console.log(
-          `   Found ${userReferrals.length} referred participants (via UserReferral collection)`,
-        );
-
-        // DEBUG: Log each found referral
-        for (const ref of userReferrals) {
-          console.log(
-            `   📋 UserReferral: userId=${ref.userId}, gameMasterId=${ref.gameMasterId}, isActive=${ref.isActive}`,
-          );
-        }
-
-        // Also check user.referredByGameMasterId as fallback
-        const referredParticipantsFromUser = await db
-          .collection("user")
-          .find({
-            id: { $in: participantUserIds },
-            referredByGameMasterId: { $exists: true, $ne: null },
-          })
-          .toArray();
-
-        console.log(
-          `   Found ${referredParticipantsFromUser.length} referred participants (via user.referredByGameMasterId)`,
-        );
-
-        // Create a merged map of userId -> gameMasterId (UserReferral takes precedence)
-        const referralMap = new Map<
-          string,
-          { gmId: string; userName: string; userEmail: string }
-        >();
-
-        // First add from user collection (fallback)
-        for (const user of referredParticipantsFromUser) {
-          referralMap.set(user.id, {
-            gmId: user.referredByGameMasterId,
-            userName: user.name || "Unknown",
-            userEmail: user.email,
-          });
-        }
-
-        // Then add/override from UserReferral collection (source of truth)
-        for (const ref of userReferrals) {
-          referralMap.set(ref.userId, {
-            gmId: ref.gameMasterId,
-            userName: ref.userName || "Unknown",
-            userEmail: ref.userEmail,
-          });
-        }
-
-        console.log(
-          `   Total unique referred participants: ${referralMap.size}`,
-        );
-
-        // DEBUG: Log referralMap contents
-        for (const [userId, refData] of referralMap) {
-          console.log(
-            `   📍 referralMap: userId=${userId} -> gmId=${refData.gmId}, userName=${refData.userName}`,
-          );
-        }
-
-        // Group by game master
-        const gmEarningsMap = new Map<
-          string,
-          {
-            gmId: string;
-            users: { userId: string; userName: string; userEmail: string }[];
-            totalEntryFees: number;
-          }
-        >();
-
-        for (const [userId, refData] of referralMap) {
-          const gmId = refData.gmId;
-          const participant = participants.find((p) => p.userId === userId);
-          if (!participant || !gmId) {
-            console.log(
-              `   ⚠️ Skipping userId=${userId}: participant found=${!!participant}, gmId=${gmId}`,
-            );
-            continue;
-          }
-
-          if (!gmEarningsMap.has(gmId)) {
-            gmEarningsMap.set(gmId, {
-              gmId,
-              users: [],
-              totalEntryFees: 0,
-            });
-          }
-
-          const gmData = gmEarningsMap.get(gmId)!;
-          gmData.users.push({
-            userId,
-            userName: refData.userName,
-            userEmail: refData.userEmail,
-          });
-          gmData.totalEntryFees += competition.entryFee;
-        }
-
-        // DEBUG: Log gmEarningsMap contents
-        console.log(`   📊 gmEarningsMap has ${gmEarningsMap.size} GM(s):`);
-        for (const [gmId, data] of gmEarningsMap) {
-          console.log(
-            `   📊 GM ${gmId}: ${data.users.length} user(s), totalEntryFees=${data.totalEntryFees}`,
-          );
-        }
-
-        // Calculate earnings for each game master (but don't pay yet)
-        // Also track inactive GM fees for platform reconciliation
-        const inactiveGmFees: Array<{
-          gmId: string;
-          gmEmail?: string;
-          users: { userId: string; userName: string; userEmail: string }[];
-          wouldHaveEarned: number;
-          feePercentage: number;
-          subscriptionStatus: string;
-        }> = [];
-
-        for (const [gmId, gmData] of gmEarningsMap) {
-          // First check if there's ANY subscription (active or not)
-          const anySubscription = await db
-            .collection("gamemastersubscriptions")
-            .findOne({
-              userId: gmId,
-            });
-
-          // Check for ACTIVE and NOT PAUSED subscription
-          const gmSubscription = await db
-            .collection("gamemastersubscriptions")
-            .findOne({
-              userId: gmId,
-              status: "active",
-              isPaused: { $ne: true }, // Must NOT be paused
-            });
-
-          // IMPORTANT: Get CURRENT package settings (not cached subscription limits)
-          // This ensures if admin changes package settings, all GMs with that package see the update
-          let currentFeePercentage = 5; // Default fallback
-          if (gmSubscription?.packageId) {
-            try {
-              const currentPackage = await db
-                .collection("marketplaceitems")
-                .findOne({
-                  _id: new Types.ObjectId(gmSubscription.packageId),
-                });
-              if (
-                currentPackage?.gameMasterConfig?.referralFeePercentage !==
-                undefined
-              ) {
-                currentFeePercentage =
-                  currentPackage.gameMasterConfig.referralFeePercentage;
-                console.log(
-                  `   📦 Using current package settings: ${currentFeePercentage}% from "${currentPackage.name}"`,
-                );
-              } else {
-                // Fallback to cached subscription limits if package not found
-                currentFeePercentage =
-                  gmSubscription.limits?.referralFeePercentage || 5;
-                console.log(
-                  `   ⚠️ Package not found, using cached subscription limits: ${currentFeePercentage}%`,
-                );
-              }
-            } catch {
-              // Fallback to cached subscription limits
-              currentFeePercentage =
-                gmSubscription?.limits?.referralFeePercentage || 5;
-              console.log(
-                `   ⚠️ Error fetching package, using cached: ${currentFeePercentage}%`,
-              );
-            }
-          } else if (gmSubscription) {
-            currentFeePercentage =
-              gmSubscription.limits?.referralFeePercentage || 5;
-          }
-
-          if (!gmSubscription) {
-            // GM has no active subscription OR is paused - record this for platform reconciliation
-            const defaultFeePercentage = currentFeePercentage;
-            const wouldHaveEarned =
-              gmData.users.length *
-              competition.entryFee *
-              (defaultFeePercentage / 100);
-            let subscriptionStatus =
-              anySubscription?.status || "no_subscription";
-
-            // Check if specifically paused
-            if (
-              anySubscription?.status === "active" &&
-              anySubscription?.isPaused
-            ) {
-              subscriptionStatus = "paused";
-            }
-
-            console.log(
-              `   ⚠️ Game master ${gmId} has no earning-eligible subscription (status: ${subscriptionStatus}), retaining fee for platform`,
-            );
-            console.log(
-              `   💰 Would have earned: €${wouldHaveEarned.toFixed(2)} from ${gmData.users.length} referrals`,
-            );
-
-            inactiveGmFees.push({
-              gmId,
-              gmEmail: anySubscription?.userEmail,
-              users: gmData.users,
-              wouldHaveEarned,
-              feePercentage: defaultFeePercentage,
-              subscriptionStatus,
-            });
-            continue;
-          }
-
-          const feePercentage = currentFeePercentage;
-          const totalEarning =
-            gmData.users.length * competition.entryFee * (feePercentage / 100);
-
-          totalGmEarnings += totalEarning;
-          gmPayments.push({
-            gmId,
-            gmSubscription,
-            users: gmData.users,
-            feePercentage,
-            totalEarning,
-          });
-
-          console.log(
-            `   📊 GM ${gmId}: ${gmData.users.length} referrals × €${competition.entryFee} × ${feePercentage}% = €${totalEarning.toFixed(2)}`,
-          );
-        }
-
-        // Record retained GM fees for platform reconciliation
-        if (inactiveGmFees.length > 0) {
-          console.log(
-            `   📊 Recording ${inactiveGmFees.length} inactive GM fee(s) for reconciliation...`,
-          );
-          for (const inactiveGm of inactiveGmFees) {
-            try {
-              await PlatformFinancialsService.recordRetainedGmFee({
-                sourceType: "competition",
-                sourceId: competition._id.toString(),
-                sourceName: competition.name,
-                gameMasterId: inactiveGm.gmId,
-                gameMasterEmail: inactiveGm.gmEmail,
-                referredUsersCount: inactiveGm.users.length,
-                amount: inactiveGm.wouldHaveEarned,
-                originalFeePercentage: inactiveGm.feePercentage,
-                subscriptionStatus: inactiveGm.subscriptionStatus,
-                referredUserIds: inactiveGm.users.map((u) => u.userId),
-              });
-            } catch (recordError) {
-              console.error(
-                `   ⚠️ Failed to record retained GM fee for ${inactiveGm.gmId}:`,
-                recordError,
-              );
-            }
-          }
-        }
-      }
-    } catch (gmCalcError) {
-      console.error("   ⚠️ Error calculating Game Master fees:", gmCalcError);
-      // Continue without GM fees if calculation fails
-    }
-
-    // SAFEGUARD: Cap total GM earnings at the gross platform fee
-    // This prevents platform from losing money if GM referral % > platform fee %
-    let actualGmEarnings = totalGmEarnings;
-    if (totalGmEarnings > actualPlatformFee) {
-      console.warn(
-        `   ⚠️ WARNING: Total GM earnings (${totalGmEarnings.toFixed(2)}) exceed platform fee (${actualPlatformFee.toFixed(2)})`,
-      );
-      console.warn(
-        `   ⚠️ Capping GM earnings at platform fee to prevent platform loss`,
-      );
-
-      // Scale down all GM payments proportionally
-      const scaleFactor = actualPlatformFee / totalGmEarnings;
-      for (const payment of gmPayments) {
-        payment.totalEarning = payment.totalEarning * scaleFactor;
-      }
-      actualGmEarnings = actualPlatformFee; // Cap at platform fee
-    }
-
-    // Calculate NET platform fee (platform fee minus GM referral fees)
-    const netPlatformFee = Math.max(0, actualPlatformFee - actualGmEarnings);
-
-    console.log(`💼 Platform fee breakdown:`);
-    console.log(
-      `   Gross platform fee: €${actualPlatformFee.toFixed(2)} (${competition.platformFeePercentage}%)`,
-    );
-    console.log(
-      `   GM referral fees:   €${actualGmEarnings.toFixed(2)} (from ${gmPayments.reduce((sum, p) => sum + p.users.length, 0)} referrals)`,
-    );
-    if (totalGmEarnings !== actualGmEarnings) {
-      console.log(
-        `   (Capped from €${totalGmEarnings.toFixed(2)} to prevent platform loss)`,
-      );
-    }
-    console.log(`   NET platform fee:   €${netPlatformFee.toFixed(2)}`);
-
-    // Record NET platform fee in financials (after subtracting GM fees)
-    if (netPlatformFee > 0) {
-      await PlatformFinancialsService.recordPlatformFee({
-        amount: netPlatformFee,
-        sourceType: "competition",
-        sourceId: competition._id.toString(),
-        sourceName: competition.name,
-        description: `Platform fee (${competition.platformFeePercentage}% - ${totalGmEarnings.toFixed(2)} GM fees) from ${competition.name}`,
-        // Reason: Stored at recording time so the financial dashboard can
-        // break down competition fees by admin vs GM without expensive joins.
-        isGmCreated: !!competition.gameMasterId,
-      });
-    }
-
-    // STEP 4.7: Distribute Game Master referral fees (now that we've calculated and recorded platform fee)
-    console.log(`🎮 Distributing Game Master referral fees...`);
-    try {
-      const db = Competition.db.db;
-      if (db && gmPayments.length > 0) {
-        for (const payment of gmPayments) {
-          const { gmId, gmSubscription, users, feePercentage, totalEarning } =
-            payment;
-
-          // Calculate per-user earning from the (potentially scaled) totalEarning
-          const perUserEarning = totalEarning / users.length;
-
-          // Create earning records for each referred user (with idempotency check)
-          for (const user of users) {
-            const entryFee = competition.entryFee;
-            // Use the calculated per-user earning (which may have been scaled if capped)
-            const grossEarning = perUserEarning;
-            const platformFee = 0; // GM gets full referral %, platform fee already deducted above
-            const netEarning = grossEarning - platformFee;
-            // Calculate effective percentage (may be lower than package rate if capped)
-            const effectivePercentage = (perUserEarning / entryFee) * 100;
-
-            // IDEMPOTENCY: Check if earning already exists for this competition + GM + user
-            // Uses session so the check is snapshot-consistent with the transaction
-            const existingEarning = await db.collection("gamemasterearnings").findOne({
-              sourceType: "competition",
-              sourceId: competition._id.toString(),
-              gameMasterId: gmId,
-              referredUserId: user.userId,
-            }, { session });
-
-            if (existingEarning) {
-              console.log(`   ⏩ GM earning already recorded for ${user.userName} in competition ${competition._id}, skipping duplicate`);
-              continue;
-            }
-
-            // Create GameMasterEarning record (inside transaction so it's rolled back if commit fails)
-            await db.collection("gamemasterearnings").insertOne({
-              gameMasterId: gmId,
-              gameMasterEmail: gmSubscription.userEmail,
-              sourceType: "competition",
-              sourceId: competition._id.toString(),
-              sourceName: competition.name,
-              referredUserId: user.userId,
-              referredUserEmail: user.userEmail,
-              referredUserName: user.userName,
-              entryFeeAmount: entryFee,
-              earningPercentage: effectivePercentage, // May be scaled down if capped
-              originalPercentage: feePercentage, // Original package rate
-              grossEarning,
-              platformFee,
-              netEarning,
-              status: "pending",
-              eventStartTime: competition.startTime,
-              eventEndTime: competition.endTime,
-              participantCount: participants.length,
-              wasCapped: effectivePercentage < feePercentage, // Flag if earnings were reduced
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            }, { session });
-
-            console.log(
-              `   💰 GM ${gmId} earned ${netEarning.toFixed(2)} from ${user.userName}${effectivePercentage < feePercentage ? " (capped)" : ""}`,
-            );
-          }
-
-          // Update game master subscription stats (inside transaction for consistency)
-          await db.collection("gamemastersubscriptions").updateOne(
-            { _id: gmSubscription._id as import("mongoose").Types.ObjectId },
-            {
-              $inc: {
-                totalEarnings: totalEarning,
-                pendingEarnings: totalEarning,
-              },
-              $set: { updatedAt: new Date() },
-            },
-            { session },
-          );
-
-          // Credit to game master's wallet (reuse walletMap from prize distribution)
-          let gmWallet = walletMap.get(gmId.toString());
-          if (!gmWallet) {
-            // Not in pre-fetched map, fetch individually (GM wasn't a winner)
-            gmWallet = await CreditWallet.findOne({ userId: gmId }).session(
-              session,
-            );
-          }
-          if (!gmWallet) {
-            const created = await CreditWallet.create(
-              [
-                {
-                  userId: gmId,
-                  creditBalance: 0,
-                  totalDeposited: 0,
-                  totalWithdrawn: 0,
-                  totalSpentOnCompetitions: 0,
-                  totalWonFromCompetitions: 0,
-                  isActive: true,
-                  kycVerified: false,
-                  withdrawalEnabled: false,
-                },
-              ],
-              { session },
-            );
-            // Reason: Mongoose create() returns array; guard for safety
-            gmWallet = created[0] ?? null;
-            if (!gmWallet) {
-              throw new Error(`Failed to create wallet for GM ${gmId}`);
-            }
-            walletMap.set(gmId.toString(), gmWallet);
-          }
-
-          // Use findOneAndUpdate with { new: true } for accurate balance tracking.
-          // This ensures balanceBefore is correct even if the GM was also a prize winner.
-          const updatedGmWallet = await CreditWallet.findOneAndUpdate(
-            { userId: gmId },
-            { $inc: { creditBalance: totalEarning } },
-            { session, new: true },
-          );
-          const balanceAfter = updatedGmWallet?.creditBalance || totalEarning;
-          const balanceBefore = balanceAfter - totalEarning;
-
-          // Create wallet transaction
-          await WalletTransaction.create(
-            [
-              {
-                userId: gmId,
-                transactionType: "gamemaster_earning",
-                amount: totalEarning,
-                balanceBefore,
-                balanceAfter,
-                competitionId: competition._id,
-                status: "completed",
-                description: `🎮 Game Master referral earnings from ${competition.name} (${users.length} referred users)`,
-                metadata: {
-                  competitionId: competition._id.toString(),
-                  competitionName: competition.name,
-                  referredUsersCount: users.length,
-                  feePercentage,
-                },
-              },
-            ],
-            { session },
-          );
-
-          // Update earnings status to paid (inside transaction)
-          await db.collection("gamemasterearnings").updateMany(
-            {
-              gameMasterId: gmId,
-              sourceId: competition._id.toString(),
-              sourceType: "competition",
-            },
-            {
-              $set: {
-                status: "paid",
-                paidAt: new Date(),
-              },
-            },
-            { session },
-          );
-
-          // Update subscription pending earnings (inside transaction)
-          await db.collection("gamemastersubscriptions").updateOne(
-            { _id: gmSubscription._id as import("mongoose").Types.ObjectId },
-            {
-              $inc: { pendingEarnings: -totalEarning },
-            },
-            { session },
-          );
-
-          console.log(
-            `   ✅ GM ${gmId}: Total earned ${totalEarning.toFixed(2)} from ${users.length} referrals`,
-          );
-        }
-      }
-    } catch (gmError) {
-      console.error(
-        "   ⚠️ Error processing Game Master fees (non-blocking):",
-        gmError,
-      );
-      // Don't fail the competition finalization for GM fee errors
-    }
 
     // STEP 5: Update competition and participant statuses
-    console.log(`🎯 Updating competition status...`);
-    competition.status = "completed";
-    competition.winnerId = leaderboard[0]?.userId;
-    competition.winnerPnL = leaderboard[0]?.pnl;
-    competition.finalLeaderboard = leaderboard;
-    // Mark as no-winners when all participants are disqualified
-    if (actualWinners === 0) {
-      competition.noWinners = true;
-    }
-    await competition.save({ session });
-
-    // CRITICAL: Update ALL participant statuses to 'completed' so they don't block withdrawals!
-    // Only update participants that are still 'active' (not liquidated/disqualified)
-    const participantUpdateResult = await CompetitionParticipant.updateMany(
-      {
-        competitionId: competition._id,
-        status: "active",
-      },
-      {
-        $set: { status: "completed" },
-      },
-      { session },
-    );
-    console.log(
-      `   ✅ Updated ${participantUpdateResult.modifiedCount} participant statuses to 'completed'`,
-    );
-
-    // Reason: Persist final rank on each CompetitionParticipant so that dashboard,
-    // profile, leaderboard, and matchmaking can count wins (currentRank === 1)
-    // and podium finishes (currentRank <= 3). Without this, currentRank stays 0
-    // from join time and all win stats read as zero.
-    if (leaderboard.length > 0) {
-      const rankBulkOps = leaderboard.map((entry) => ({
-        updateOne: {
-          filter: {
-            competitionId: competition._id,
-            userId: entry.userId,
-          },
-          update: {
-            $set: { currentRank: entry.rank },
-          },
-        },
-      }));
-      const rankResult = await CompetitionParticipant.bulkWrite(rankBulkOps, {
-        session,
-      });
-      console.log(
-        `   ✅ Updated final ranks for ${rankResult.modifiedCount} participants`,
-      );
-    }
+    console.log(`ðŸŽ¯ Updating competition status...`);
+    await completeContest({
+      session,
+      contest: competition,
+      leaderboard,
+      prizeWinnerCount: actualWinners,
+    });
 
     // SAFETY NET: guarantee no position survives finalization, regardless of any
     // per-position error in the close loop above. Force-close any straggler still
@@ -1605,16 +897,13 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
     }
 
     console.log(`✅ Competition ${competition.name} finalized successfully!`);
-    console.log(`   Winners: ${winnerTransactions.length}`);
+    console.log(`   Winners: ${winnersPaid}`);
     console.log(`   Total Distributed: ${totalDistributed} credits`);
     console.log(
       `   Gross Platform Fee: ${actualPlatformFee.toFixed(2)} credits (${competition.platformFeePercentage}%)`,
     );
     console.log(
       `   GM Referral Fees: ${actualGmEarnings.toFixed(2)} credits (paid to Game Masters)`,
-    );
-    console.log(
-      `   Net Platform Fee: ${netPlatformFee.toFixed(2)} credits (platform keeps)`,
     );
     console.log(
       `   Platform Net Earned: ${(prizePool - totalDistributed - actualGmEarnings).toFixed(2)} credits`,
@@ -1782,7 +1071,7 @@ async function _finalizeCompetitionAttempt(competitionId: string) {
         competitionId: competition._id.toString(),
         competitionName: competition.name,
         totalParticipants: participants.length,
-        winnersCount: winnerTransactions.length,
+        winnersCount: winnersPaid,
         prizePool,
         platformFee: finalPlatformFee2,
         totalDistributed,

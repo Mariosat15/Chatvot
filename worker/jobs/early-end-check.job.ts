@@ -196,7 +196,11 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
             result.competitionsEnded++;
           } else {
             result.errors.push(
-              `Competition ${competition._id}: ${finalizeResult?.message || "Failed to finalize"}`,
+              // Reason: a failed finalization reports its reason on `error`; `message` is
+              // only set on success. Reading `message` alone recorded every failure as the
+              // bare string "Failed to finalize", losing the reason - and X5 adds a refusal
+              // (a contest whose game has no settlement path) that this would have swallowed.
+              `Competition ${competition._id}: ${finalizeResult?.error || finalizeResult?.message || "Failed to finalize"}`,
             );
           }
         }
@@ -675,7 +679,8 @@ export async function runEarlyEndCheckForTest(
             result.competitionsEnded++;
           } else {
             result.errors.push(
-              `Competition ${competition._id}: ${finalizeResult?.message || "Failed"}`,
+              // Reason: see the sibling site above - failures carry `error`, not `message`.
+              `Competition ${competition._id}: ${finalizeResult?.error || finalizeResult?.message || "Failed"}`,
             );
           }
         }

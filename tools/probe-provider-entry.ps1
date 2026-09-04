@@ -209,4 +209,72 @@ Probe -Name 'our own misconfiguration is leaked to the player' `
     // `maxDurationSeconds` lives on the catalogue row' `
   -ExpectRed 'gives a neutral message when OUR configuration is the problem'
 
+Write-Host "`n=== the settlement path ===" -ForegroundColor Cyan
+
+$Suite = '__tests__/services/provider-settlement.test.ts'
+
+Probe -Name 'THE DISPATCH STOPS ROUTING PROVIDER CONTESTS - they fall through to trading' `
+  -File 'lib/actions/trading/competition-end.actions.ts' `
+  -Find '    if (route.path === "provider") {' `
+  -Replace '    if (false) {' `
+  -ExpectRed 'ranks by score and pays the winners'
+
+Probe -Name 'the dispatch FAILS OPEN, settling an unknown game as trading' `
+  -File 'lib/games/settlement.ts' `
+  -Find '  if (!gameModule) {
+    return {
+      path: "none",
+      reason: "unknown_game",' `
+  -Replace '  if (!gameModule) {
+    return {
+      path: "trading",
+      reason: "unknown_game",' `
+  -ExpectRed 'FAILS CLOSED on a label with no registered module'
+
+Probe -Name 'the leaderboard stores the negated comparison value instead of the raw score' `
+  -File 'lib/services/settlement/provider-settlement.service.ts' `
+  -Find '      score: p.score,' `
+  -Replace '      score: p.scoreDirection === "lower_is_better" && p.score !== undefined ? -p.score : p.score,' `
+  -ExpectRed 'stores the RAW score even when the title sorts downward'
+
+Probe -Name 'winnerPnL is written unconditionally, claiming a puzzle had a profit' `
+  -File 'lib/services/settlement/contest-completion.service.ts' `
+  -Find '  if (leaderboard[0]?.pnl !== undefined) {
+    contest.winnerPnL = leaderboard[0].pnl;
+  }' `
+  -Replace '  contest.winnerPnL = leaderboard[0]?.pnl ?? 0;' `
+  -ExpectRed 'records no winner PnL, because a puzzle has none'
+
+Probe -Name 'score is un-declared on finalLeaderboard again (strict mode discards it)' `
+  -File 'database/models/trading/competition.model.ts' `
+  -Find '        score: Number,
+        isTied: Boolean,' `
+  -Replace '        isTied: Boolean,' `
+  -ExpectRed 'actually PERSISTS the leaderboard fields the schema used to discard'
+
+Probe -Name 'isTied is un-declared again - the pre-existing trading defect returns' `
+  -File 'database/models/trading/competition.model.ts' `
+  -Find '        isTied: Boolean,
+        qualificationStatus: String,' `
+  -Replace '        qualificationStatus: String,' `
+  -ExpectRed 'actually PERSISTS the leaderboard fields the schema used to discard'
+
+Probe -Name 'the ledger row writes finalPnl for a game that has none' `
+  -File 'lib/services/settlement/prize-payout.service.ts' `
+  -Find '  if (winner.pnl !== undefined) metadata.finalPnl = winner.pnl;' `
+  -Replace '  metadata.finalPnl = winner.pnl ?? 0;' `
+  -ExpectRed "puts the score on the winner's ledger row, not a phantom PnL"
+
+Probe -Name 'the prize-pool integrity cap is removed' `
+  -File 'lib/services/settlement/provider-settlement.service.ts' `
+  -Find '  if (prizePool > actualCollectedFees && actualCollectedFees > 0) {' `
+  -Replace '  if (false) {' `
+  -ExpectRed 'caps a prize pool inflated beyond the fees actually collected'
+
+Probe -Name 'the lock is not released when settlement refuses, stranding the contest' `
+  -File 'lib/actions/trading/competition-end.actions.ts' `
+  -Find '    if (route.path === "none") {' `
+  -Replace '    if (route.path === "none" && false) {' `
+  -ExpectRed 'refuses a contest whose game has no module, leaving it untouched'
+
 Write-Host "`n=== done ===`n" -ForegroundColor Cyan

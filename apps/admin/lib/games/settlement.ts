@@ -1,5 +1,5 @@
 import { getGameModuleOrTrading, resolveGameType } from "./registry";
-import { TRADING_GAME_TYPE } from "./types";
+import { TRADING_GAME_TYPE, PROVIDER_GAME_TYPE } from "./types";
 
 /**
  * X1 seam 3: which module settles a contest.
@@ -63,4 +63,48 @@ export function routeToTradingSettlement(
   }
 
   return { ok: true };
+}
+
+/**
+ * Which settlement path settles this contest - the X5 replacement for asking only whether
+ * trading applies.
+ *
+ * WHY A SEPARATE FUNCTION RATHER THAN A THIRD OUTCOME ON THE ONE ABOVE. Challenges still
+ * have only a trading path, and `routeToTradingSettlement` is what asks them the yes/no
+ * question. Widening it would have made every challenge caller handle a "provider" answer
+ * it cannot act on, so the narrow question keeps its narrow function.
+ *
+ * IT FAILS CLOSED ON AN UNKNOWN LABEL, and that asymmetry is deliberate. Wrongly refusing
+ * to settle leaves a contest visibly stuck and someone reports it within the hour; wrongly
+ * settling pays real credits to the wrong players and is not reversible. So a label with
+ * no registered module refuses, and never falls through to trading.
+ */
+export type SettlementPath =
+  | { path: "trading" }
+  | { path: "provider" }
+  | { path: "none"; error: string; reason: "unknown_game" | "no_settle_path" };
+
+export function resolveSettlementPath(
+  gameType: string | null | undefined,
+  contestDescription: string,
+): SettlementPath {
+  const resolved = resolveGameType(gameType);
+  const gameModule = getGameModuleOrTrading(resolved);
+
+  if (!gameModule) {
+    return {
+      path: "none",
+      reason: "unknown_game",
+      error: `Cannot settle ${contestDescription}: no game module is registered for "${resolved}". Refusing rather than settling it as trading, which would pay the wrong players.`,
+    };
+  }
+
+  if (gameModule.type === TRADING_GAME_TYPE) return { path: "trading" };
+  if (gameModule.type === PROVIDER_GAME_TYPE) return { path: "provider" };
+
+  return {
+    path: "none",
+    reason: "no_settle_path",
+    error: `Cannot settle ${contestDescription}: it is a ${gameModule.label} contest and no settlement path is implemented for it yet.`,
+  };
 }
