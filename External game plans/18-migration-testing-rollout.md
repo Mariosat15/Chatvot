@@ -219,7 +219,7 @@ The eight tests that gate everything else:
   throwing
 - A contest with a missing game label reads as trading
 - Trading settle path aborts on a non-trading contest
-- All five finalization entry points dispatch
+- Finalization dispatches inside the four finalize functions, covering all **ten** main-app call sites (the "five" here was wrong; `11` s2 seam 3 has the re-counted list)
 
 ### Tier 4 - provider integration (X2, X3)
 

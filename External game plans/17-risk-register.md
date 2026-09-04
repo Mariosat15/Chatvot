@@ -15,7 +15,7 @@ chapter covers risks to the programme and to the application.
 |---|---|---|---|---|
 | **R1** | Money paths refactored without tests first | Critical | High | **X0** |
 | **R2** | Admin mirror drift | Critical | **ALREADY OCCURRED** | **X0** |
-| **R3** | Trading settlement runs against a provider contest | Critical | High | X1, X5 |
+| **R3** | Trading settlement runs against a provider contest | Critical | High | X1, X5 - **CLOSED 4 Sep 2026** |
 | **R4** | Double finalization pays twice | Critical | Medium | X0, X1 |
 | **R5** | Dead Inngest crons re-registered | Critical | Low | X0, X1 |
 | **R13** | Ledger enum renamed | Critical | Low | X1, X8 |
@@ -47,6 +47,7 @@ chapter covers risks to the programme and to the application.
 | R21 | Dashboard mega-action split | Medium | Medium | X7 |
 | R22 | New admin sections invisible - RBAC | Low | High | X6 |
 | R23 | Notification links point to `/trade` | Medium | High | X6 |
+| R31 | Game Master package set to 0% is paid 5% instead | Medium | **ALREADY OCCURRED** if such a package exists | Own commit before X12 |
 | R24 | Scope creep before anything ships | Medium | **High** | All |
 | R25 | Round write contention under load | Medium | Medium | X12 |
 | X15 | "Challenge any user" harassment surface - no report-user feature exists | Medium | Medium | X10 |
@@ -187,24 +188,48 @@ cries wolf gets switched off. In the end the allowlist needed exactly **one** en
 other difference was a real defect. Syncing is **add-only**; removing an enum value to
 force a match orphans every document already carrying it.
 
-### R3 - Trading settlement runs against a provider contest
+### R3 - Trading settlement runs against a provider contest - **CLOSED 4 September 2026**
 
 The highest-consequence risk in the programme.
-`lib/actions/trading/competition-end.actions.ts` is ~**1,500 lines**; steps 2-4 close
-forex positions and recalculate PnL. Pointed at a provider contest it finds no positions,
-computes zero for everyone, ranks everyone equal, and **pays prizes to the wrong players
-without erroring**.
+`lib/actions/trading/competition-end.actions.ts` (~**1,500 lines** when this was written,
+**1,174** since the X5 extraction); steps 2-4 close forex positions and recalculate PnL.
+Pointed at a provider contest it finds no positions, computes zero for everyone, ranks
+everyone equal, and **pays prizes to the wrong players without erroring**.
 
-**Five** entry points reach finalization and every one must dispatch on game type:
+**Two facts in the original entry were wrong, and both are corrected in `11` section 2
+seam 3, which is the authoritative count.** There are **ten** call sites in the main app,
+not five - the list below missed both `early-end-check` calls, the `claim-early-end` route
+and a finalize invoked from a **page component**, and `POST /api/finalize-old-competitions`
+**does not exist at all**. The original list is kept here only so the correction is legible:
 
 1. `worker/jobs/competition-end.job.ts`
 2. `worker/jobs/challenge-finalize.job.ts`
 3. Lazy auto-finalize inside `getCompetitionById`
-4. `POST /api/finalize-old-competitions`
+4. `POST /api/finalize-old-competitions` - **this route does not exist**
 5. The admin emergency-cancel route
 
-**Mitigation:** dispatch at all five, plus an assertion in the trading settle path that
-aborts if the game type is not trading. Loud failure is recoverable.
+**Mitigation as originally written:** dispatch at all five, plus an assertion in the trading
+settle path that aborts if the game type is not trading. Loud failure is recoverable.
+
+**What was actually built, and it is deliberately not the above.** Dispatching *at the call
+sites* is only correct while the list is complete and stays complete, and this codebase adds
+finalize callers. The dispatch went **inside** `finalizeCompetition` and `finalizeChallenge`
+instead - four dispatch points across two apps rather than ten and counting - so every
+caller is correct by construction, including the ones nobody has written yet. X1 built the
+refusal (`routeToTradingSettlement`, 19 tests); **X5 built the provider path it refuses in
+favour of** (`resolveSettlementPath` plus `lib/services/settlement/`).
+
+**Why this is closed rather than reduced.** The dangerous outcome was a provider contest
+being *paid out by trading logic*. That is now impossible in three independent ways: the
+gate refuses before the optimistic lock is taken, a second gate inside the attempt function
+refuses after it and restores `active`, and the provider path composes the shared money
+stages rather than the trading ones. The five trading payout tests and the golden ranking
+regression are byte-identical throughout, which is what makes the extraction credible.
+
+**Two related exposures are NOT closed by this and keep their own entries:** the challenge
+path was not extracted (`challenge-finalize.actions.ts`, 1,803 lines, its own copy of all
+three stages - X10), and **R26** stands, because the admin cron's finalize copy still pays
+no Game Masters.
 
 ### R4 - Double finalization
 
@@ -245,6 +270,19 @@ account for.
 **Mitigation:** fix in X1 or X5. It is a prerequisite for the Game Master acceptance
 criteria in `19` section 7, and the mirror-drift CI check from X0 should have caught it -
 verify the check covers action files, not only models.
+
+**Status after X5, 4 September 2026: still open, but the shape of the fix changed.** The
+earnings logic is no longer 500 inline lines to duplicate - X5 extracted it to
+`lib/services/settlement/game-master-fees/` and **mirrored the service into `apps/admin`**,
+so the admin copy now has a function to call. That is the whole remaining work, and it was
+deliberately not done here: it is a money-path change in the app with no player traffic but
+also with the weaker test coverage, and bundling it into a 900-line extraction would have
+meant the payout tests staying green no longer proved the extraction was faithful.
+
+**One caution for whoever closes it.** Do not assume the admin path is merely *missing* the
+call. The admin `finalizeCompetition` has no retry wrapper and no optimistic lock, loading
+the competition inside a transaction instead - the finding from X1 that **the four finalize
+functions are not four copies of one function**. Read it before adding the call.
 
 Note the size difference is not subtle and generalises: `competition-end.actions.ts` is
 72 KB in the main app against 38 KB in the admin app, and `challenge-finalize.actions.ts`
@@ -534,6 +572,39 @@ existed; `tsc` caught it as `TS2304: Cannot find name`. **The lesson is to sweep
 old name after a rename and read every hit**, because the compiler catches the ones that
 break and says nothing about the ones that still compile and now mean something else.
 
+### R31 - A Game Master package configured at 0% is paid 5% instead
+
+**A live defect, found 4 September 2026 while extracting the settlement stages, deliberately
+NOT fixed in that commit, and confirmed by a second reading rather than assumed.**
+
+`lib/services/settlement/game-master-fees/calculate.ts` resolves the referral rate as
+`gmSubscription.limits.referralFeePercentage || 5` at **three** sites. A package genuinely
+configured at **0%** is falsy in JavaScript, so it falls through to the 5% default and **the
+platform pays commission that nobody agreed to**, on every contest, silently. The fix is one
+character - `??`.
+
+**What turns this from "looks wrong" to "is wrong" is that the two money paths already
+disagree.** `lib/actions/trading/challenge-finalize.actions.ts` lines **994** and **1000**
+resolve the same value with `??`. So a Game Master on a 0% package earns nothing from a
+challenge and 5% from a competition, from the same stored configuration. One of the two is a
+bug by definition, and `??` is the one matching the stored intent - **a stored value and an
+absent one are different facts**, the rule that also made `canEnterChallenges` and
+`entryBlockThreshold` defects.
+
+**Why it was preserved verbatim through the extraction**, which is the part worth carrying
+forward: the entire value of moving ~900 lines of money code is that the five trading payout
+tests and the golden ranking regression staying green *proves* nothing moved. A behaviour
+change made in the same commit destroys that proof for the sake of one line. **Fix it in its
+own commit, with its own test**, and expect the fix to be visible in payout figures for any
+Game Master currently on a 0% package.
+
+| | |
+|---|---|
+| **Severity** | Medium - real money, but bounded by how many packages are set to 0% |
+| **Likelihood** | **ALREADY OCCURRED** wherever such a package exists |
+| **Phase** | Its own commit, before X12 |
+| **Note** | Check whether any 0% package exists in production before sizing this. If none does, it is a latent bug rather than an active loss - and say which, rather than implying an active loss |
+
 **Swept and confirmed unaffected:** the challenge finalization path uses
 `challenge.platformFeeAmount`, an absolute amount, and only ever renders
 `platformFeePercentage` into a display string beside a `%` sign. No fraction confusion
@@ -687,7 +758,7 @@ cannot honestly be pulled forward.
 
 - [ ] Gate 1 complete
 - [ ] Trading regression: historical competitions recompute to **identical** rankings
-- [ ] Finalization dispatches on game type at all **5** entry points
+- [x] Finalization dispatches on game type - **inside** the four finalize functions, not at the **ten** call sites (`11` s2 seam 3 corrects the "5" this line used to claim)
 - [ ] Trading settle path asserts and aborts on a non-trading contest
 - [ ] Dead Inngest crons deleted or fenced
 - [x] Market-hours gating scoped to `needsMarketHours` - **done 4 Sep 2026**, at all three

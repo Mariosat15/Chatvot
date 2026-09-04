@@ -247,6 +247,36 @@ Unchanged from today. Provider games slot in without touching it.
 Steps 2 to 12 are existing code. Only step 1 is new, and it is the subject of
 `07-failure-modes-and-edge-cases.md`.
 
+### 9.1 What X5 actually did to this list, 4 September 2026
+
+**The order above held**, which is the useful result - the prediction that provider games
+slot in without touching it was correct. What changed is *where the steps live*, because
+"existing code" turned out to mean "existing code welded to position closing".
+
+Steps 3 to 6 and 12 were **extracted** from `lib/actions/trading/competition-end.actions.ts`
+into `lib/services/settlement/` (mirrored into `apps/admin`) so they can run without the
+trading-only stages that used to precede them in the same transaction:
+
+| Step | Now lives in |
+|---|---|
+| 3-4 Rank, resolve ties, calculate prizes | `competition-ranking.service.ts` + `distributePrizesWithTies` (unmoved; now reachable independently) |
+| 5 Platform fee, unclaimed pool, Game Master share | `settlement/fees.service.ts`, `settlement/game-master-fees/` |
+| 6 Credit winners | `settlement/prize-payout.service.ts` |
+| 12 Statuses, final leaderboard, participant ranks | `settlement/contest-completion.service.ts` |
+
+**One correction to make to this list rather than leave implied.** It reads as though step
+12 "update leaderboards" merely stores what step 3 computed. It did not: `finalLeaderboard`
+declared only trading's numeric fields, so `isTied`, `qualificationStatus` and
+`disqualificationReason` were computed by step 3 and **silently discarded** by strict mode at
+step 12, on every finalization that has ever run. Fixed and round-tripped by a test. The
+general form is the one recorded across these documents already - **a value computed is not
+a value stored**, and only a read of real saved data can tell the difference.
+
+**Steps 7 to 11 are still trading-only in practice** and are X7's problem, not X5's. Nothing
+in the provider settlement path awards normalised points, XP, ratings or badges yet, so do
+not read "prizes paid" as "the cross-game layers are live" - section 10's rule still has to
+be applied to them.
+
 ---
 
 ## 10. No aggregate may be trading-only

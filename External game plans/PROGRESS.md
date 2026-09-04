@@ -264,27 +264,39 @@ path below is kept for reference only; do not plan against it.
    credentials and the per-title switch, and the contest wizard with pre-flight validation.
 
 6. **X5** - contest integration and settlement. **PARTIALLY BUILT, 4 September 2026.**
-   Publish, entry and ranking are done; play, settlement and the refund are not.
+   Publish, entry, ranking, round launch and settlement are done; the `exclude` refund is not.
 
-**Where the next engineer should actually start.** X5's first half landed on 4 September:
-a provider contest can be published, entered and ranked. **It still cannot be played and
-nobody is paid**, so the remaining X6 screens - health, the round inspector, manual
-resolution - would still be built against fixtures, which is the argument that held them
-back originally.
+**Where the next engineer should actually start.** X5 landed in two halves on 4 September,
+and the end of the second one is the milestone the programme has been working towards:
+**a provider contest can now be published, entered, played and paid.** The pilot no longer
+depends on anything unbuilt in the engine.
 
-The three pieces of X5 that remain, in dependency order:
+One piece of X5 remains:
 
-- **Round launch for players.** The round service is finished (X3) and the contest bridge
-  reads its settings off the stored contest. What is missing is the player-facing surface
-  that calls it, which is the first thing that needs a player screen at all.
-- **Settlement.** `routeToTradingSettlement` correctly refuses a provider contest with
-  `no_settle_path`, which is the right answer and a dead end until there is a settle path.
-  The work is an extraction, not a wiring job: the trading finalize function's ranking,
-  prize-distribution, Game Master and leaderboard-write stages need to be reachable
-  **without** its position-closing and P&L-recalculation stages.
-- **The `exclude` refund.** Still `refundOwed: true`. Removing a player changes the prize
-  pool, so the refund and the re-split must be one transaction, which means it belongs with
-  settlement rather than before it.
+- **The `exclude` refund.** Still `refundOwed: true`. Removing an unresolved player changes
+  the prize pool, so the refund and the re-split must be one transaction. It is now the
+  *only* thing standing between the engine and a complete contest lifecycle, and it is
+  unblocked, because the settlement transaction it has to join exists.
+
+**What this unblocks, and it is the more useful way to read it.** The remaining X6 screens -
+provider health, the round inspector, manual resolution - no longer have to be built against
+fixtures, which was the argument that held them back. There is now a real round to inspect
+and a real settled contest to show. **X4 still jumps the queue the moment a provider is
+signed**, unchanged: everything after that point is guesswork until a real provider has
+answered a real call.
+
+**Three things `X5 code-complete` does not mean**, and the first two are the ones that would
+embarrass a demo:
+
+- **No player screen calls the launch endpoint.** The route exists and is tested; the UI
+  is X7.
+- **No admin button calls the publish route.** Checked rather than assumed - nothing under
+  `apps/admin/components/` fetches it. So the whole lifecycle is reachable **by API and by
+  test, not by clicking**, and finishing that is X6's remaining slice. Do not read "a
+  provider contest can be published" as "an operator can publish one".
+- **The challenge path was not touched.** `lib/actions/trading/challenge-finalize.actions.ts`
+  still carries its own copy of the payout, fee and completion logic, so a provider
+  *challenge* is X10 work and not a by-product of this phase.
 
 **X4 still jumps ahead if a provider is signed**, for the unchanged reason: everything
 built after that point is guesswork until a real provider has answered a real call.
@@ -321,7 +333,7 @@ numbers in chapters `01`-`09` remain resolvable. **Plan against the X-phases bel
 | **X2** | Provider abstraction + mock adapter | `09` E1 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026. Nothing player-visible - `externalGamesEnabled` defaults false |
 | **X3** | Round lifecycle + result ingestion | `09` E2 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026. **Rehearsals 1-6 of `07` s9 green** against the mock (49 tests, 6 guards probed). 7-10 need X5/X8 |
 | **X4** | Real adapter against sandbox | `09` E3 | 1 week | `NOT STARTED` |
-| **X5** | Contest integration + settlement | `09` E4 | 1 week | `PARTIALLY BUILT` - publish, entry and ranking done 4 Sep 2026. Play, settlement and the `exclude` refund remain |
+| **X5** | Contest integration + settlement | `09` E4 | 1 week | `PARTIALLY BUILT` - publish, entry, ranking, **round launch and settlement** all code-complete 4 Sep 2026. **A provider contest can now be published, entered, played and paid.** Only the **`exclude` refund** remains (entry-fee return plus prize-pool re-split in one transaction). Settlement was an **extraction**: the payout, fee/GM and completion stages moved to `lib/services/settlement/` and trading was rewired onto them |
 | **X6** | Admin: nav restructure incl. **the single Trading section**, RBAC, provider registration, game-aware wizard, analytics, **GM creation API + wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | `PARTIALLY DONE` - nav restructure and single Trading destination **built and owner-tested 2 Sep 2026**. **Provider registration, credentials and the per-title catalogue switch code-complete 4 Sep 2026** (`12` s4.1a). **Contest wizard from `configSchema` + pre-flight validation code-complete 4 Sep 2026** (`12` s2.1) - creates a **draft only**; nothing publishes or settles it. Still `NOT STARTED`: provider health panel, round inspector, manual resolution, live-contest controls, provider contest **editing**, analytics by provider, GM creation API |
 | **X6.5** | **Admin wording pass** - brought forward from X8 so operators never work a games platform labelled "trading" | `14` | 0.5-1 week | `NOT STARTED` |
 | **X7** | Player UI + points, leaderboards, badges, levels, **profile and cross-game stats**, **per-game GM analytics** | `09` E6 + `13` + `05` + `19` | 3-4 weeks | `NOT STARTED` |
@@ -582,6 +594,95 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 4 Sep 2026 - X5 SECOND HALF - ROUND LAUNCH AND SETTLEMENT - CODE-COMPLETE
+
+**Shipped:** a provider contest can now be **played and paid**. With the first half, that
+completes the lifecycle end to end apart from the `exclude` refund.
+
+- `lib/services/games/round-launch.service.ts` and
+  `POST /api/competitions/[id]/rounds` - the player-facing surface over X3's round service.
+- `lib/services/settlement/` (mirrored into the admin app) - the three stages that are
+  about money rather than about trades, **extracted** from `finalizeCompetition`:
+  `prize-payout.service.ts`, `fees.service.ts` (platform fee, unclaimed pool, Game Master
+  share), `contest-completion.service.ts`, plus `game-master-fees/` split into
+  `calculate.ts` and `distribute.ts` to stay under the 500-line limit.
+- `lib/services/settlement/provider-settlement.service.ts` composes those three behind
+  `provider-finalize.ts`, which owns the optimistic lock, the transaction and the
+  transient-error retry - the same wrapper shape as the trading path.
+- `resolveSettlementPath` in `lib/games/settlement.ts` extends X1's seam-3 gate from
+  "trading or refuse" to "trading, provider, or refuse".
+- `lib/actions/trading/competition-end.actions.ts` **1885 -> 1174 lines**, rewired onto
+  the three shared services.
+
+**Deviated from plan:** none on the design. `11` seam 3 called for exactly this extraction
+and it is what was built. Two facts in that chapter were **stale rather than wrong** and are
+corrected there: the file is no longer ~1,500 lines, and the sweep is no longer at line
+1807. The **ten** call sites it counts are confirmed accurate - 6 `finalizeCompetition`
+plus 4 `finalizeChallenge`, re-counted rather than assumed.
+
+**Four latent defects found and fixed on the way, three of which affected TRADING already.**
+The point of recording them together: they were all found by *generalising* code, not by
+looking for bugs, which is the recurring argument for doing the extraction rather than
+writing a second copy.
+
+- **`Competition.finalLeaderboard` declared only trading's numeric fields**, so strict mode
+  silently discarded `isTied`, `qualificationStatus` and `disqualificationReason` on **every
+  finalization that has ever run**. Trading computes all three and stored none of them.
+  Declared in both copies, and round-tripped through a real save by a test - because
+  declaring a field is not evidence it stores.
+- **`split_weighted` tie distribution divided by the sum of participants' capital with no
+  guard.** A tie between wiped-out accounts produced `NaN` prizes. Latent since before X5.
+- **`worker/jobs/early-end-check.job.ts` logged `finalizeResult?.message`** on failure, but
+  failures carry `error` - so every failed finalization was recorded as the bare string
+  "Failed to finalize" with no reason, at two sites. X5 adds a refusal this would have
+  swallowed, which is why it was fixed here rather than noted.
+- **`ParticipantData` required trading's fields**, so the ranking service could not be
+  handed a participant that has a score and no capital.
+
+**One defect was deliberately NOT fixed, and the reason matters more than the defect.** The
+Game Master referral fee resolves as `limits.referralFeePercentage || 5`, so a package
+configured at **0%** is falsy and the platform pays 5% commission nobody agreed to. Writing
+`??` fixes it in one character. It was preserved verbatim through the extraction anyway,
+because the entire value of moving 900 lines of money code is that the payout tests staying
+green *means* something - a behaviour change smuggled in alongside would have destroyed that
+guarantee for one line. **New evidence found while documenting it**, which upgrades it from
+"looks wrong" to "the two money paths disagree": `challenge-finalize.actions.ts` lines 994
+and 1000 use `??` for the same lookup. Recorded as its own task.
+
+**Deferred:**
+
+- **The `exclude` refund.** Unblocked now - the transaction it must join exists.
+- **The challenge path.** `challenge-finalize.actions.ts` (1,803 lines) still holds its own
+  copy of all three stages. Not touched, on purpose: a challenge is its own money flow and
+  the second extraction is X10, not a free by-product of this one.
+- **The admin cron's finalize copy** still does not pay Game Masters at all (R26). The
+  shared services now exist in `apps/admin`, so the fix is smaller than it was, but it is
+  a money-path change with its own test burden.
+- **No player screen** calls the launch route. That is X7.
+
+**Verification:** 666 tests pass (36 files). **27 probes, all red** - including the five
+trading payout tests and the golden ranking regression, which are the proof the money path
+is unchanged. `check:mirrors` 79 agree / 0 drifted. Lint clean. Main typecheck 17, of which
+2 are stale `.next` generated validators referencing the route deleted in Prerequisite B and
+15 are the pre-existing set, none in changed files. Admin typecheck **225 -> 223**, and the
+drop was chased down rather than accepted: six errors merely moved line numbers when the
+file shrank, and the two that genuinely vanished are the worker logging bug above - real
+code reaching for a field its own type denied it.
+
+**One probing lesson, and it found a weak test rather than weak code.** The probe that
+deletes the pre-lock game gate **stayed green**. The reason is that the older post-lock X1
+gate refuses an unknown game too, so the contest ends up back at `active` either way and a
+status-only assertion cannot tell the two apart - the difference is only that the pre-lock
+gate never *claims* the contest, so a crash between the two writes cannot strand it in
+`finalizing`. Fixed by asserting `updatedAt` never moved, which is the only surviving
+evidence. **When a probe stays green, decide whether the test is weak or the claim is wrong
+before assuming either** - this is the second time that question has had different answers
+on the same day.
+
+**Next chat should:** close the `exclude` refund, then fix the GM `||` as its own commit.
 
 ---
 

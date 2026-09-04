@@ -96,7 +96,7 @@ strict mode has already discarded the evidence.
 
 | | |
 |---|---|
-| **File** | `lib/actions/trading/competition-end.actions.ts`, ~**1,500 lines**. Steps 2-4 are trading-specific |
+| **File** | `lib/actions/trading/competition-end.actions.ts`, **1,174 lines since X5** - it was ~1,500 when this chapter was written and 1,885 immediately before the extraction. Steps 2-4 are trading-specific |
 | **Also** | `challenge-finalize.actions.ts` repeats the logic |
 | **Change** | Extract the position-closing block to a trading game module, and dispatch on the game label before it runs |
 | **Danger** | This is the highest-risk change in the whole programme. See risk **R3** in `17` |
@@ -110,7 +110,7 @@ start of X1, by grepping for calls rather than trusting the list:
 | `worker/jobs/early-end-check.job.ts:182` **and `:664`** | `finalizeCompetition` |
 | `app/api/competitions/[id]/claim-early-end/route.ts:100` | `finalizeCompetition` |
 | `lib/actions/trading/competition.actions.ts:158` - the lazy auto-finalize | `finalizeCompetition` |
-| `checkAndFinalizeCompetitions()` sweep, `competition-end.actions.ts:1807` | `finalizeCompetition` |
+| `checkAndFinalizeCompetitions()` sweep, `competition-end.actions.ts:1126` - **was `:1807`; the X5 extraction moved it** | `finalizeCompetition` |
 | `worker/jobs/challenge-finalize.job.ts:153` | `finalizeChallenge` |
 | `app/api/challenges/[id]/route.ts:50` | `finalizeChallenge` |
 | **`app/(root)/challenges/[id]/page.tsx:109`** - a page render | `finalizeChallenge` |
@@ -182,6 +182,53 @@ participant rank persist. A provider contest needs **everything from ranking onw
 without the front half - not a second implementation and not a wiring job. Writing a
 parallel payout routine is the one change in this programme that can pay the wrong people,
 and R3 already rates it the highest-risk change here.
+
+#### Seam 3 COMPLETE 4 September 2026 - the extraction
+
+Built exactly as described above, which is worth stating plainly because the temptation at
+this point is always to write the second copy and move on.
+
+`lib/services/settlement/` (mirrored into `apps/admin`) now holds the three stages that are
+about **money** rather than about **trades**:
+
+| Module | Stage |
+|---|---|
+| `prize-payout.service.ts` | Wallet credits and the `competition_win` ledger rows |
+| `fees.service.ts` | Platform fee, unclaimed-pool handling, Game Master share |
+| `game-master-fees/calculate.ts` + `distribute.ts` | Split out of the above to stay under the 500-line limit |
+| `contest-completion.service.ts` | Statuses, `finalLeaderboard`, participant final ranks |
+
+`provider-settlement.service.ts` composes those three plus `calculateRankings`, and
+`provider-finalize.ts` wraps it in the optimistic lock, transaction and transient-error
+retry - deliberately the same wrapper shape as trading rather than a shared one, because
+the earlier finding stands: **the finalize functions are not copies of one function.**
+`resolveSettlementPath` extends the gate from "trading or refuse" to "trading, provider, or
+refuse", still failing closed.
+
+**The point of extracting rather than reimplementing is a test property, not tidiness.** The
+five trading payout tests and the golden ranking regression staying green is the *only*
+evidence that no trading payout moved, and that evidence is only worth anything if nothing
+else changed at the same time. That is why a **known one-character defect was preserved
+verbatim** - the Game Master fee reads `limits.referralFeePercentage || 5`, so a package
+configured at 0% falls through to 5%. It is now known to be a genuine bug rather than a
+guess, because `challenge-finalize.actions.ts:994` and `:1000` use `??` for the same
+lookup - **the two money paths disagree with each other.** Fixing it is its own commit.
+
+**Three things this did NOT cover**, each easy to assume it did:
+
+- **The challenge path.** `challenge-finalize.actions.ts` is still 1,803 lines with its own
+  copy of all three stages. A provider *challenge* is X10.
+- **The admin cron's own finalize copy** still pays no Game Masters (R26). The shared
+  services exist in `apps/admin` now, so the fix is smaller - not done.
+- **The `exclude` refund.** Still `refundOwed: true`.
+
+**And one finding about the gate itself, from probing.** Deleting the pre-lock game gate left
+the test suite **green**, because the post-lock gate above refuses an unknown game too and
+the contest ends up back at `active` either way. The gates are not redundant - the pre-lock
+one never *claims* the contest, so a crash between the claim and the release cannot strand
+it in `finalizing` - but that difference is invisible in the end state. The test now asserts
+`updatedAt` never moved. **A guard whose value is "no write happened" needs a test that can
+observe a write, not a state.**
 
 ### Seam 4 - In-progress gameplay writes
 

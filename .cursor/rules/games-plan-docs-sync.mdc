@@ -895,6 +895,66 @@ mode would have discarded it while the function reported success. It was dropped
 than declared, because `updatedAt` already carries the timestamp and the audit log already
 carries who did it - **add a mirrored field only when something will read it.**
 
+### Six things from X5's second half - round launch and settlement (4 September 2026)
+
+A provider contest can now be **published, entered, played and paid**. Only the `exclude`
+refund remains. The settlement stages live in `lib/services/settlement/`, mirrored, and
+`competition-end.actions.ts` went from **1,885 to 1,174 lines**.
+
+- **Extraction versus reimplementation is a claim about what your GREEN TESTS MEAN, not
+  about tidiness.** The five trading payout tests and the golden ranking regression staying
+  green is the only evidence that no payout moved - and it is only evidence if nothing else
+  changed in the same commit. That is why a **known one-character defect was preserved
+  verbatim**: the Game Master fee reads `limits.referralFeePercentage || 5`, so a package
+  configured at 0% falls through to 5%. Fixing it there would have bought one line and cost
+  the proof for 900. **Carry the general form: while extracting, a behaviour change is not a
+  small addition, it is the destruction of the only guarantee the extraction offers.**
+- **Generalising code is a better bug-finding instrument than looking for bugs.** Four
+  defects surfaced and **three were pre-existing TRADING defects**: `finalLeaderboard`
+  declared only trading's numeric fields, so `isTied`, `qualificationStatus` and
+  `disqualificationReason` were computed and **silently discarded on every finalization ever
+  run**; `split_weighted` tie distribution divided by tied participants' summed capital with
+  no guard, so a tie between wiped-out accounts paid `NaN`; and the early-end worker logged
+  `finalizeResult?.message` where failures carry `error`, recording every failure as the
+  bare string "Failed to finalize". None was reachable by reading the trading path alone.
+- **When a probe stays green, ask whether the TEST is weak before assuming the claim is
+  wrong - the answer differs, and it differed twice on one day.** In X5's first half the
+  claim was wrong (the `isAtRisk` guard changes no answer). Here the test was weak: deleting
+  the pre-lock game gate left the suite green, because the post-lock gate refuses too and
+  the contest lands back on `active` either way. The gates are **not** redundant - only the
+  pre-lock one never *claims* the contest, so a crash between claim and release cannot
+  strand it in `finalizing` - but that is a difference in **writes, not in state.** The fix
+  was to assert `updatedAt` never moved. **A guard whose whole value is "no write happened"
+  needs a test that can observe a write.**
+- **A refusal code the UI must branch on is not an implementation detail to collapse.** The
+  first `LaunchRefusal` folded "attempts exhausted", "a round is already live" and "the
+  provider is down" into `contest_not_open`, which **lied** - the contest is open, the
+  player simply cannot start another round. The three need three different affordances
+  (disable, offer to resume, offer to retry). Pass the lifecycle refusals through unchanged;
+  a generic code forces the UI to guess and it will guess wrong.
+- **Two disagreeing copies of one rule prove one of them is a bug, and that is the cheapest
+  proof available.** The GM `||` looked like a possible judgement call until
+  `challenge-finalize.actions.ts:994` and `:1000` turned up doing the same lookup with `??`.
+  One stored configuration, two answers. **When you find a suspicious operator in duplicated
+  logic, read the sibling copy before deciding whether it is deliberate** - and note this is
+  the fourth "one rule, two copies" finding, after `referenceId`, `failedReason` and
+  `challengeId`, none of which `check:mirrors` can see, because it compares models.
+- **Chase a typecheck count that FALLS, with the same suspicion as one that rises - but
+  expect the boring explanation too.** Admin went 225 -> 223. Six errors had merely **moved
+  line numbers** because the file shrank by 711 lines, which a count cannot show; only two
+  genuinely vanished, and those marked the worker logging bug above - real code reaching for
+  a field its own type denied it. **Diff the error lists, never the counts**, and the
+  reliable way to get the baseline is `git stash push --include-untracked`, because untracked
+  new files stay in the program and report their own errors otherwise.
+
+**And the accuracy rule that nearly got broken writing this up.** "A provider contest can be
+published and paid" was about to be recorded without checking that an operator can *do* it.
+Nothing under `apps/admin/components/` fetches the publish route, and no player screen calls
+the launch route - the whole lifecycle is reachable **by API and by test, not by clicking.**
+**Before writing that a capability exists, grep for its caller**, or a demo discovers the gap
+instead. Same class as the paired-document drift rule: the restatement was going to be wrong
+while every underlying fact was right.
+
 ## The rule
 
 **Documentation is part of the deliverable, not a follow-up task.** A phase is not
@@ -937,6 +997,7 @@ On every change during implementation:
 | The game-provider admin surface, wherever it appears | `External game plans/12` s4 (the five destinations), s4.1 (copy the UX not the persistence) and s4.1a (what was built); `09` E5 checklist; `PROGRESS.md` X6 row and work log; `ChartVolt-External-Games-Plan.html` E5 row. **Two of the five destinations exist** — Providers and the per-title Games list. Any document implying E5 is finished is stale, and any implying the whole of X6 is done is more so: X6 also carries the contest wizard, analytics by provider and the Game Master creation API. **Credentials live only in `WhiteLabel.gameProviderCredentials` behind `select: false`** — a document describing them on `game_provider` is describing the payment-provider pattern that was deliberately not copied |
 | `ChartVolt-New-Games-Plan.html` and `-Partners.html` | The partner version must **never** mention Stage 0, the duplicate join paths, the admin mirror drift, or any current defect |
 | The contest-entry participant row, wherever it appears | `External game plans/11` seam 2 (and its build note), `09` E4, `PROGRESS.md` X5 row and work log. The row is built by **`lib/services/contest-entry/participant-seat.ts`**, not inline in the service - read that, not the prose. Two facts are load-bearing: the three virtual-capital fields are **conditional on `(this.gameKey \|\| "trading") === "trading"`** in both model copies, and `gameKey` is **copied from the contest, never defaulted**. Any document saying a participant always carries `startingCapital` is stale |
+| The settlement stages, wherever they appear | `External game plans/11` seam 3 (design, the BUILT note and the COMPLETE note), `09` E4 second-half notes, `05` s9.1, `17` (R3 **closed**, R26 **still open**, R31 **new**), `19` s1 and s6, `New games plan/15` s5; `PROGRESS.md` X5 row and work log. **The live code is `lib/services/settlement/`, mirrored into `apps/admin`** — prize payout, fees plus Game Master share, and completion, with `provider-settlement.service.ts` and `provider-finalize.ts` composing them for provider contests. Read those, not the prose. Four facts drift easily: `competition-end.actions.ts` is **1,174 lines** (it was ~1,500 in the chapters and 1,885 before the extraction) and the sweep is at **`:1126`, not `:1807`**; there are **ten** finalize call sites in the main app, not five, and any document saying five is stale; the **challenge path was NOT extracted** and still holds its own copy of all three stages, so a document implying settlement is unified everywhere is wrong; and **no admin button publishes and no player screen plays** — the lifecycle is reachable by API and by test only |
 | Any model change | Exists twice: `database/models/` and `apps/admin/database/models/`. Update both in the same commit. **`npm run check:mirrors` now enforces this** in CI and on `git push`, comparing field paths *and* enum values. It does **not** compare `required` predicate bodies, so a conditional requirement that differs between the apps is a validation rule whose outcome depends on which process saved the document, and the guard stays green. Do not "fix" a failure by deleting an enum value to make two sides agree — that orphans every document already storing it. Add to the side that lacks it. Deliberate differences go in `tools/model-mirror/allowlist.ts` **with a reason** |
 | Committed compiled `.js` files under `database/` and `lib/` | **All 113 deleted 1 Sep 2026** (57 `.js` + 56 `.js.map`), owner approved. A *separate, earlier* accident from the `.d.ts` one — emitted 22 Dec 2025, same 57 modules, and **six to seven months stale**. Critically, **these were NOT inert**: vitest resolved the stale `.js` in preference to the `.ts`, which made every model and every money-critical service **unimportable in tests** and blocked the whole of Defect 1. `tsx`, esbuild and `next build` all resolve the `.ts` correctly, so production was never affected — which is why it survived unnoticed. Two rules follow: **when deleting emitted output, look for the other half of the emit** (a `tsc` run that produced `.d.ts` produced `.js` too — the first cleanup removed one half and left the harmful one), and **prove which file a resolver picks rather than reasoning about it** — a missing export makes a perfect probe. The `.gitignore` rule is scoped to `/database/**` and `/lib/**`, never a blanket `*.js`, because `ecosystem.config.js`, `scripts/*.js`, `worker/build.mjs` and the `api-server` build are hand-written |
 | Committed `.d.ts` files | **All 112 deleted 1 Sep 2026** (57 `.d.ts` + 55 `.d.ts.map`), owner approved, with a `.gitignore` rule. They were orphaned February 2026 build output, stale, and **inert** — TypeScript resolves the sibling `.ts` first; proven by identical typechecks before and after (16 main, 225 admin). Earlier documents said "two", then "31 + 31" — the 31 counted only `database/` and missed 26 files under `lib/`. **Never treat a `.d.ts` as a third copy of a model to maintain.** Two files are deliberately kept and must stay tracked: `types/global.d.ts` (hand-written, no sibling `.ts`) and `websocket-server/dist/index.d.ts` (separate build). The rule for any future cleanup: delete a `.d.ts` only if a sibling `.ts` exists and it is not under `dist/` |

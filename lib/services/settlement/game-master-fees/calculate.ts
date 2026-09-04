@@ -100,7 +100,12 @@ async function buildReferralMap(
  * pays commission nobody agreed to. Writing `??` here fixes it - and this extraction is
  * not the place, because the whole value of moving 900 lines of money code is that the
  * payout tests staying green MEANS something. A behaviour change smuggled in alongside
- * would destroy that guarantee for the sake of one line. Recorded as a separate defect.
+ * would destroy that guarantee for the sake of one line.
+ *
+ * It is a bug rather than a judgement call, because the two money paths already disagree:
+ * `challenge-finalize.actions.ts` lines 994 and 1000 resolve the same value with `??`, so
+ * one stored configuration yields 0% on a challenge and 5% on a competition. Tracked as
+ * R31 in `External game plans/17-risk-register.md`; fix it in its own commit.
  */
 async function resolveFeePercentage(
   db: SettlementDb,

@@ -47,7 +47,7 @@ not itself the revenue event.
 
 | | |
 |---|---|
-| **Where it happens** | `lib/actions/trading/competition-end.actions.ts` lines 931-1459, at finalization. Challenges: `challenge-finalize.actions.ts` lines 798-1380 |
+| **Where it happens** | **Since the X5 extraction, 4 Sep 2026: `lib/services/settlement/game-master-fees/` (`calculate.ts` + `distribute.ts`), mirrored into `apps/admin`.** It was inline at `competition-end.actions.ts` lines 931-1459. Challenges are **unchanged and still inline**: `challenge-finalize.actions.ts` lines 798-1380 |
 | **Attribution** | `userreferrals` where `isActive: true`, falling back to `user.referredByGameMasterId` |
 | **Formula** | `referred_player_count x entryFee x (feePercentage / 100)` |
 | **Percentage of** | The **entry fee** - not the platform fee, not the prize pool |
@@ -212,7 +212,7 @@ Neither is caused by this project, and both are cheap now and awkward later.
 
 | Defect | Evidence | Impact |
 |---|---|---|
-| **The admin app does not pay Game Masters** | `apps/admin/lib/actions/trading/competition-end.actions.ts` has **no Game Master earnings logic** - only `isGmCreated` on platform-fee recording (line 709). The main app's copy has all 500 lines of it | A competition finalized through the admin app pays **no Game Master earnings at all**. Silent revenue loss for the Game Master |
+| **The admin app does not pay Game Masters** | `apps/admin/lib/actions/trading/competition-end.actions.ts` has **no Game Master earnings logic** - only `isGmCreated` on platform-fee recording (line 709). **Still true after X5**, but the fix is now much smaller: the shared `lib/services/settlement/game-master-fees/` exists in `apps/admin` too, so the admin copy has a service to call rather than 500 lines to duplicate | A competition finalized through the admin app pays **no Game Master earnings at all**. Silent revenue loss for the Game Master |
 | **`toggleCompetitionCreation` is a dead UI reference** | Called in `GameMasterManagementSection.tsx` lines 164-189; **not implemented** in the `PATCH /api/gamemasters/[id]` handler. `competitionCreationOverride` and `overrideLimits` exist on the schema with no reader or writer | An admin clicks a button that does nothing. Worse once provider games exist and disabling a Game Master's creation rights actually matters |
 
 Also worth noting: the renewal worker extends `endDate` by **30 days hardcoded**

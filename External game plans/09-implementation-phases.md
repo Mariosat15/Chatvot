@@ -208,9 +208,11 @@ ranked, prizes paid, ledger balanced to the cent.
 
 #### E4 build notes - PARTIALLY BUILT, 4 September 2026
 
-**Built: publish, entry and ranking. Not built: play, settlement and the refund.** A
-provider contest can now be published, entered and correctly ordered. Nobody can play one
-and nobody is paid. Do not read "entry works" as "the contest works".
+**This section describes the FIRST half only. Play and settlement landed later the same day
+- see the second-half notes below for the current state.** As of this half: built were
+publish, entry and ranking; not built were play, settlement and the refund. A provider
+contest could be published, entered and correctly ordered, but nobody could play one and
+nobody was paid.
 
 `ProviderGameModule` exists at `lib/games/provider/`, mirrored into the admin app, and is
 registered in both registries. One module serves every title from every provider - a new
@@ -242,8 +244,8 @@ creation could not: whether the settings actually persisted.
 
 | Not built | Why |
 |---|---|
-| Round launch for players | Needs a player-facing surface; the round service itself is done (X3) |
-| Provider settlement | `routeToTradingSettlement` correctly returns `no_settle_path`. Paying out needs the trading finalize path's ranking, prize and Game Master stages reachable without its position-closing stage - an extraction, not a wiring job |
+| Round launch for players | **BUILT later the same day - see the E4 second-half notes below** |
+| Provider settlement | **BUILT later the same day - see the E4 second-half notes below** |
 | The `exclude` refund | Still `refundOwed: true`. Removing a player changes the prize pool, so the refund and the re-split are one transaction, and that transaction belongs with settlement |
 | Unpublish | There is deliberately no unpublish. A visible contest can be paid into; hiding it would strand paid entrants. Cancel is the reversible operation, and it refunds |
 
@@ -256,6 +258,43 @@ The `isAtRisk` guard against dividing by absent capital changes no answer today,
 `NaN < 60` is false exactly as the guard's explicit `false` is. It is kept for readability
 and because the accident holds only for `<`, and the code comment now says so instead of
 claiming a fix.
+
+#### E4 second-half build notes - ROUND LAUNCH AND SETTLEMENT, 4 September 2026
+
+**The "Done when" above is now met apart from the `exclude` refund:** a sandbox contest runs
+entry fees in, scores collected, ranked and prizes paid, with the ledger attributable to the
+contest. Read the two build-note sections together - the first half's warning that "entry
+works" is not "the contest works" no longer applies, but its list of what was deferred does
+not describe the current state either.
+
+**Round launch.** `lib/services/games/round-launch.service.ts` and
+`POST /api/competitions/[id]/rounds` sit over X3's round service. Two design points:
+
+- **The lifecycle refusals are surfaced, not collapsed.** The first version folded
+  "attempts exhausted", "a round is already live" and "the provider is down" into a generic
+  `contest_not_open`, which *lied* - the contest is open, the player simply cannot start
+  another round. The UI must react to all three differently: disable, offer to resume, offer
+  to retry.
+- **The per-title switch is re-checked at play time**, not only at publish. A title disabled
+  after a contest opened must stop new rounds.
+
+**Settlement was built as the extraction the plan called for**, and `11` seam 3 carries the
+detail. In summary: `lib/services/settlement/` holds prize payout, fees/Game Master share
+and completion as three shared stages; trading was rewired onto them
+(`competition-end.actions.ts` 1,885 -> 1,174 lines); and a provider contest composes the
+same three, skipping only the two that close positions and price them.
+
+**Three of the four defects this turned up were TRADING defects**, which is the strongest
+argument available for extracting rather than writing a parallel payout routine:
+`finalLeaderboard` had never stored `isTied`, `qualificationStatus` or
+`disqualificationReason` on any finalization ever run; `split_weighted` tie distribution
+produced `NaN` prizes when tied participants' capital summed to zero; and the early-end
+worker logged every finalization failure as the bare string "Failed to finalize", because
+it read `message` where failures carry `error`.
+
+Tests: `__tests__/services/provider-round-launch.test.ts` and
+`__tests__/services/provider-settlement.test.ts`. Full suite **666 green**, `tools/probe-provider-entry.ps1`
+now **27 probes, all red**.
 
 ### E5 - Admin panel
 

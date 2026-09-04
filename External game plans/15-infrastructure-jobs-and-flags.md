@@ -138,9 +138,12 @@ contests. Switching trading off is far safer than expected.
 ### The critical one
 
 `finalizeCompetition` must dispatch on game type **before** any position-closing code
-runs. All **five** entry points listed in `11` section 2 reach it. Add an assertion in
-the trading settle path: **abort if the game type is not trading.** A loud failure is
-recoverable; paying the wrong winners is not. This is risk **R3**.
+runs. The **ten** call sites listed in `11` section 2 reach it - that section re-counted
+them on 4 September 2026 and the "five" this line used to claim was wrong. Add an assertion
+in the trading settle path: **abort if the game type is not trading.** A loud failure is
+recoverable; paying the wrong winners is not. This is risk **R3**, **closed 4 September
+2026** - and the dispatch went *inside* the four finalize functions rather than at the call
+sites, precisely because a list of ten that keeps growing is not a thing to depend on.
 
 `settleContest()` must also be idempotent - refuse to write a second `competition_win`
 ledger entry for a contest already settled. A stuck `finalizing` state resets to `active`
@@ -229,7 +232,7 @@ process to supervise.
 - [ ] The price streamer does not initialise when trading is off and no trading contest is
       active - **verified in logs**
 - [ ] A trading contest running when the flag is flipped still finalises correctly
-- [ ] All five finalization entry points dispatch on game type
+- [x] Finalization dispatches on game type inside the four finalize functions, covering all **ten** main-app call sites (not "five" - see `11` s2 seam 3)
 - [ ] The trading settle path aborts loudly on a non-trading contest
 - [ ] The dead Inngest crons are deleted or fenced
 - [ ] The reconciliation and provider health jobs run on the worker
