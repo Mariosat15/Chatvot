@@ -15,6 +15,7 @@
 |---|---|
 | **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done.** A provider contest can be created, **published from the admin screen** (5 Sep 2026), entered, played and paid - and since 5 Sep 2026 it is paid **correctly**, which it was not before: two P0 defects meant every player tied on a score of zero and split the pool equally, and a lower-is-better game ranked backwards. A stuck round can now be **inspected and ended by an operator** (5 Sep 2026). **The whole lifecycle is now reachable by clicking** - the player round launch screen landed 5 Sep 2026 at `/competitions/[id]/play`, which also fixed a live defect: a provider-contest player was being sent to the forex trading workspace by a button labelled "Start Trading". **No provider selected**, which is what X4 needs |
 | **Next action** | **Commercially: find and assess a provider using `08`** - X4 cannot start without one, and nothing else in the programme is blocked on engineering. Technically the next slices are provider **health** (the last of X6's five admin destinations) and the game-aware **contest list and dashboard** (`13` s4/s5), which is where the remaining trading-shaped player screens live |
+| **Money defects closed** | **R26 closed 5 Sep 2026** - the admin cron's finalize copy paid **no** Game Master earnings and recorded no `retained_gm_fee` either, so the commission silently stayed with the platform. This one was **actively losing money rather than latent**: both apps run `checkAndFinalizeCompetitions` on an every-minute cron, so payment depended on which cron won the race. **Not retroactive - no backfill**, and past contests cannot be found by querying for retained rows because none were written. Also **R31** (a 0% Game Master rate paid 5%) and the two P0 score defects, same day |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
 | **Owner instruction on record** | **External games only, no in-house game** (2 Sep 2026). **One step at a time, admin first, do not break the running app.** |
 | **Not owner-tested** | Everything after the 2 Sep navigation restructure. X1-X3, X5, the provider admin slice and the contest wizard are all **code-complete, awaiting owner test** - and "code-complete" here excludes the replay script and the label backfill, neither of which has been run against production |
@@ -606,6 +607,88 @@ Newest at the top.
 
 ---
 
+### 5 Sep 2026 - R26 CLOSED - THE ADMIN CRON PAID NO GAME MASTERS
+
+**Shipped:** `apps/admin/lib/actions/trading/competition-end.actions.ts` now calls
+`settleFeesAndGameMasters` - the shared stage X5 extracted - in place of its own inline fee
+arithmetic. Before this, a competition finalized by the **admin** cron paid its Game Masters
+nothing and wrote no `retained_gm_fee` row either, so the commission stayed with the platform
+with nothing in the ledger explaining why.
+
+**This one was actively losing money, not latent, and that distinction is the whole reason it
+was picked next.** Both apps register `checkAndFinalizeCompetitions` on an every-minute
+Inngest cron, so whether a referrer was paid for any given contest depended on nothing but
+which cron claimed it first. There is no configuration that turns this on or off and no error
+raised either way.
+
+**Not retroactive, and stated plainly because a summary would round it up.** Contests already
+finalized by the admin path are not repaired, and **no backfill was written**. Two reasons:
+the affected contests cannot be found by querying for retained rows, because none were
+written - only a reconciliation of referred players' entry fees against earnings per contest
+will find them - and crediting wallets from inferred history is a money writer that needs an
+owner decision before it needs code.
+
+**Verification:** 802 tests pass (46 files), up from 797. **5 probes, all behaving as
+designed.** Typecheck **list-diffed, not counted**, against a `git stash push
+--include-untracked` baseline: main 17 -> 17 and admin 223 -> 223, both lists **identical**,
+nothing appearing and nothing disappearing. Lint clean. `check:mirrors` 79 agree / 0 drifted.
+
+**Four things worth carrying forward.**
+
+- **The platform-fee record had to change with the payout, not gain a line beside it.** The
+  Game Masters' share is carved *out* of the platform fee, so the figure booked as platform
+  income has to be net of the commission. Adding the referral payout while still recording
+  the gross fee would count the same credits twice in two different books - and it would have
+  reviewed as a correct fix, which is why the parity suite asserts the net figure explicitly.
+- **The four finalize functions really are not four copies of one function**, as X1 warned.
+  The admin path has no retry wrapper and no optimistic lock, loading the competition inside
+  the transaction, so its idempotency comes from a `status !== "active"` guard. The first
+  idempotency probe was aimed at the duplicate check inside `distribute.ts` and **stayed
+  green**, because a second finalize refuses at the status guard long before the referral
+  stage runs. The check is not dead, it is unreachable *here*. The claim in the test comment
+  was wrong and was corrected, and the probe re-aimed at the guard that actually holds.
+- **A comment asserting correctness was wrong in three files, and a control probe is what
+  proved it.** The `walletMap` handed from the prize stage to the fee stage was documented as
+  mattering "for correctness, not just query count". It does not: both stages read the
+  post-credit balance back from `findOneAndUpdate({ new: true })`, and neither reads a balance
+  out of the map - it decides only whether a wallet must be created. A probe passing an empty
+  map moves identical money and **must stay green**. Fifth instance of the aside-verification
+  rule, so carry the class: **a comment claiming a property is a claim, not a fact.**
+- **Extracting shared code hid this defect from the heuristic that found it.** R26 was spotted
+  because `competition-end.actions.ts` was 72 KB in the main app against 38 KB in admin. It is
+  now 45 KB against 37 KB - not because admin gained the logic, but because the main app shed
+  ~27 KB into the shared services. The same size comparison today raises nothing, while the
+  identical divergence in `challenge-finalize.actions.ts` (70 KB against 42 KB, its own copy of
+  all three stages in each app) is still there to find. That is an argument for parity tests,
+  not against extraction.
+
+**Two harness bugs fixed on the way, both of which had produced false results.** The probe
+script read and wrote with `Get-Content -Raw` / UTF-8, and Windows PowerShell decodes with the
+system ANSI codepage - so every emoji in the touched services came back as mojibake and was
+written back that way. The probes passed, the files were quietly mangled, and it surfaced two
+steps later as unexplained typecheck errors. Both directions now pin UTF-8 **without a BOM**,
+with an `Assert-RoundTrip` check before any probe runs. Separately, the harness judged a probe
+by searching whole-suite output for the expected test's **name**, which vitest prints for a
+passing test as readily as a failing one - every probe reported RED beside "failing tests: 0".
+It now runs the expected test alone with `-t` and reads the summary counts, then runs the suite
+again purely to measure blast radius.
+
+**And a self-inflicted one worth recording, because it wasted ten minutes and looked like a
+hang.** The harness reports through `Write-Host`, which writes to the host rather than the
+pipeline, so piping the script to `Select-String` filtered a stream that was nearly empty and
+showed no progress at all. Redirect a child PowerShell process's output to a file instead.
+**Silence from a filtered pipeline is not evidence of a hung process.**
+
+**Deferred:** the **challenge** path still holds its own copy of all three settlement stages
+in both apps, and the same referral divergence has not been checked there - it is the obvious
+next place to look, and it is X10. No backfill for historical admin-finalized contests.
+
+**Next chat should:** commercially, find and assess a provider (`08`) - X4 is blocked on it.
+Technically, either provider **health** (X6's last admin destination) or the game-aware
+contest list and dashboard (`13` s4/s5).
+
+---
+
 ### 5 Sep 2026 - X7/E6 SLICE - THE PLAYER PLAY SCREEN - CODE-COMPLETE
 
 **Shipped:** a player who has entered a provider contest can now start a round, play it, and see a
@@ -1012,7 +1095,8 @@ that stayed green were resolved individually rather than waved through.
 **Deferred:** ~~the GM referral fee `|| 5` (R31)~~ **fixed 5 September 2026, see the entry
 below.** Also still open at the time: ~~no admin button publishes a contest~~ (**built 5 Sep
 2026**), ~~no player screen launches a round~~ (**built 5 Sep 2026**), the challenge path keeps
-its own copy of settlement, and R26 (the admin cron pays no Game Masters).
+its own copy of settlement, and ~~R26 (the admin cron pays no Game Masters)~~ (**closed 5 Sep
+2026**).
 
 **Next chat should:** close the two X6 slices that make the lifecycle clickable - a publish
 button and the round inspector.
@@ -1161,7 +1245,8 @@ and 1000 use `??` for the same lookup. Recorded as its own task.
   the second extraction is X10, not a free by-product of this one.
 - **The admin cron's finalize copy** still does not pay Game Masters at all (R26). The
   shared services now exist in `apps/admin`, so the fix is smaller than it was, but it is
-  a money-path change with its own test burden.
+  a money-path change with its own test burden. **Closed 5 September 2026** - see the R26
+  entry at the top of this log.
 - **No player screen** calls the launch route. That is X7.
 
 **Verification:** 666 tests pass (36 files). **27 probes, all red** - including the five

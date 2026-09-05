@@ -1060,12 +1060,12 @@
     <p style="margin-bottom:0"><b>One correction to what this section used to claim.</b> It said an unlabelled competition &ldquo;gets settled by trading code and pays the wrong players&rdquo;. That was wrong: a missing label deliberately resolves to trading, which is correct for all six of these writers, so there was never a live payout bug here. The real harm arrives later and far more quietly &mdash; the day a cross-game total groups by game key, an unlabelled contest silently drops out of it, and because the key is immutable once written it cannot be corrected in place afterwards. Still worth doing separately: replacing the hand-rolled inserts with the same creation path the admin wizard uses, since two divergent creation paths for one object is precisely the defect class the prerequisite fixes exist to remove.</p>
   </div>
 
-  <h3>Two live defects found while writing this chapter</h3>
-  <p>Neither is caused by this project. Both are cheap now and awkward later.</p>
+  <h3>Two live defects found while writing this chapter &mdash; the first is now fixed</h3>
+  <p>Neither is caused by this project. Both were cheap then and awkward later. The first was closed on 5 September 2026; the second is still open.</p>
   <div class="tw"><table>
     <thead><tr><th style="width:330px">Defect</th><th>Impact</th></tr></thead>
     <tbody>
-      <tr><td><b>The admin app pays no Game Master earnings</b><br /><span style="color:#6b7d8f">The main app has roughly 500 lines of earnings logic at settlement. The admin mirror has none of it</span></td><td>A competition settled through the admin app pays the Game Master <b>nothing</b>, and records no explanation on the platform ledger either. Silent revenue loss, invisible until a Game Master asks</td></tr>
+      <tr><td><b>The admin app pays no Game Master earnings</b> &mdash; <b style="color:#1a7f4b">fixed 5 September 2026</b><br /><span style="color:#6b7d8f">The main app had roughly 500 lines of earnings logic at settlement. The admin mirror had none of it. It now calls the same shared settlement stage, and books the platform fee net of the commission</span></td><td>A competition settled through the admin app paid the Game Master <b>nothing</b>, and recorded no explanation on the platform ledger either. Unlike most entries here this was <b>actively losing money rather than waiting to</b>: both apps run the finalize cron every minute, so whether a referrer was paid depended on which cron claimed the contest first. <b>The fix does not repair past contests</b>, and they cannot be found by searching the ledger, because the missing rows were never written &mdash; only a reconciliation of referred players' entry fees against earnings will find them</td></tr>
       <tr><td><b>A dead admin button</b><br /><span style="color:#6b7d8f">The management screen calls an action the API never implemented; two schema fields have no reader or writer</span></td><td>An admin clicks a control that does nothing. It matters more once disabling a Game Master's creation rights actually protects money</td></tr>
     </tbody>
   </table></div>

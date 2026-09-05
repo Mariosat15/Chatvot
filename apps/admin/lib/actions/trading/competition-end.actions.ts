@@ -19,6 +19,7 @@ import {
 import { getMultipleSymbolConfigs } from "@/lib/services/symbol-config.service";
 import mongoose from "mongoose";
 import { routeToTradingSettlement } from "@/lib/games/settlement";
+import { settleFeesAndGameMasters } from "@/lib/services/settlement/fees.service";
 
 /**
  * End a competition and distribute prizes
@@ -549,6 +550,13 @@ export async function finalizeCompetition(competitionId: string) {
     let totalDistributed = 0;
     const winnerTransactions = [];
 
+    // Collected for the fee-and-referral stage below, which reuses it rather than re-reading
+    // each wallet. It is a query cache and nothing more - every ledger balance in that stage
+    // is read back from `findOneAndUpdate({ new: true })`, so an empty map would produce the
+    // same money. Built here so this loop wires up exactly like the main app's, which is the
+    // property R26 is about.
+    const walletMap = new Map<string, { userId: string; creditBalance: number }>();
+
     // Distribute to each winner
     for (const dist of prizeDistributions) {
       const winner = leaderboard.find((l) => l.userId === dist.userId);
@@ -589,6 +597,11 @@ export async function finalizeCompetition(competitionId: string) {
             throw new Error(`Failed to create wallet for winner ${winner.userId}`);
           }
         }
+
+        walletMap.set(winner.userId.toString(), {
+          userId: winner.userId.toString(),
+          creditBalance: winnerWallet.creditBalance || 0,
+        });
 
         const balanceBefore = winnerWallet.creditBalance || 0;
         const balanceAfter = balanceBefore + prizeAmount;
@@ -643,96 +656,38 @@ export async function finalizeCompetition(competitionId: string) {
       }
     }
 
-    // STEP 4: Calculate platform fee
-    // IMPORTANT: Platform fee is ONLY the % taken, NOT the entire pool when no winners
+    // STEP 4: the platform fee, the unclaimed pool and the Game Masters' share.
+    //
+    // R26: this used to be an inline copy of the fee arithmetic with NO referral stage at
+    // all, so a competition finalized here paid its Game Masters nothing and recorded no
+    // `retained_gm_fee` either - the commission simply stayed with the platform, with no
+    // ledger row explaining why. Both apps run `checkAndFinalizeCompetitions` on an
+    // every-minute cron, so whether a referrer was paid depended on which cron claimed the
+    // contest first. It is now the same call the main app makes.
+    //
+    // Reason the platform-fee RECORD changed with it rather than the commission being added
+    // beside the old block: the Game Masters' share is carved OUT of the platform fee, so the
+    // figure booked as platform income must be net of it. Paying a referrer while still
+    // recording the gross fee would count the same credits twice in two different books.
     const qualifiedWinners = rankedParticipants.filter(
       (p) => p.qualificationStatus === "qualified",
     );
     const expectedWinners = competition.prizeDistribution?.length || 0;
     const actualWinners = prizeDistributions.length;
 
-    // Calculate the ACTUAL platform fee (only the percentage portion)
-    // When winners exist: fee = prizePool - totalDistributed (the % taken from each winner)
-    // When NO winners: fee = prizePool * feePercentage (still only the % portion, not the entire pool)
-    let actualPlatformFee: number;
-    if (actualWinners > 0) {
-      // Normal case: fee is what wasn't distributed to winners
-      actualPlatformFee = prizePool - totalDistributed;
-    } else {
-      // No winners case: fee is still only the fee percentage, NOT the entire pool
-      // The remaining goes to unclaimed pools, not to platform fee
-      actualPlatformFee = prizePool * platformFeeFraction;
-    }
-
-    console.log(
-      `💼 Platform fee calculated: ${actualPlatformFee.toFixed(2)} credits (${competition.platformFeePercentage}% of pool)`,
-    );
-
-    // NOTE: Platform fee is recorded ONLY in PlatformTransaction (via PlatformFinancialsService)
-    // We do NOT create a WalletTransaction for platform fees to avoid duplicate records
-
-    // STEP 4.5: Record unclaimed pool funds and platform earnings in financials
-    const { PlatformFinancialsService } =
-      await import("@/lib/services/platform-financials.service");
-
-    // ONLY record unclaimed pool when NO winners at all received prizes
-    // When actualWinners > 0, all funds are distributed/redistributed - nothing is unclaimed
-    if (actualWinners === 0 && prizePool > 0) {
-      // All funds (minus platform fee) are unclaimed because no one got any prizes
-      const unclaimedNet = prizePool * (1 - platformFeeFraction); // Pool minus the fee portion
-
-      // Determine reason for unclaimed
-      let unclaimedReason:
-        | "no_participants"
-        | "all_disqualified"
-        | "no_qualified_winners";
-      if (participants.length === 0) {
-        unclaimedReason = "no_participants";
-      } else if (qualifiedWinners.length === 0) {
-        unclaimedReason = "all_disqualified";
-      } else {
-        unclaimedReason = "no_qualified_winners";
-      }
-
-      console.log(
-        `💰 Recording unclaimed pool: ${unclaimedNet.toFixed(2)} credits (${unclaimedReason})`,
-      );
-      console.log(
-        `   Platform fee: ${actualPlatformFee.toFixed(2)} + Unclaimed: ${unclaimedNet.toFixed(2)} = ${prizePool.toFixed(2)} (total pool)`,
-      );
-
-      await PlatformFinancialsService.recordUnclaimedPool({
-        competitionId: competition._id.toString(),
-        competitionName: competition.name,
-        poolAmount: unclaimedNet,
-        reason: unclaimedReason,
-        winnersCount: 0,
-        expectedWinnersCount: expectedWinners,
-        description: `Unclaimed pool from ${competition.name}: ${unclaimedReason.replace(/_/g, " ")} - No prizes awarded`,
+    const { grossPlatformFee: actualPlatformFee } =
+      await settleFeesAndGameMasters({
+        session,
+        contest: competition,
+        prizePool,
+        totalDistributed,
+        prizeWinnerCount: actualWinners,
+        expectedWinners,
+        qualifiedWinnersCount: qualifiedWinners.length,
+        participants: participants.map((p) => ({ userId: p.userId })),
+        walletMap,
+        platformFeeFraction,
       });
-    } else if (actualWinners > 0 && actualWinners < expectedWinners) {
-      // Log that prizes were redistributed (not unclaimed)
-      console.log(
-        `📊 Prize redistribution: ${actualWinners} winners received ${expectedWinners} prize positions worth of prizes`,
-      );
-      console.log(
-        `   Extra prize %s were redistributed as bonus to existing winners - no unclaimed funds`,
-      );
-    }
-
-    // Record platform fee in financials
-    if (actualPlatformFee > 0) {
-      await PlatformFinancialsService.recordPlatformFee({
-        amount: actualPlatformFee,
-        sourceType: "competition",
-        sourceId: competition._id.toString(),
-        sourceName: competition.name,
-        description: `Platform fee (${competition.platformFeePercentage}%) from ${competition.name}`,
-        // Reason: Stored at recording time so the financial dashboard can
-        // break down competition fees by admin vs GM without expensive joins.
-        isGmCreated: !!competition.gameMasterId,
-      });
-    }
 
     // STEP 5: Update competition and participant statuses
     console.log(`🎯 Updating competition status...`);

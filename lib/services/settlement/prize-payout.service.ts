@@ -45,9 +45,13 @@ export interface PrizePayoutResult {
   /**
    * Handed back so the Game Master stage can reuse it.
    *
-   * It matters for correctness, not just for saving a query: a Game Master who is ALSO a
-   * prize winner must have their referral credit computed from the balance after the prize,
-   * and a stale wallet read would report the wrong `balanceBefore` on the ledger row.
+   * IT IS A QUERY CACHE AND NOTHING MORE, and this comment used to claim otherwise - that a
+   * Game Master who also won a prize needed it for `balanceBefore` to come out right. The
+   * concern is real; the map is not what answers it. Both stages read the post-credit balance
+   * back from `findOneAndUpdate({ new: true })` and derive `balanceBefore` from that, and
+   * neither ever reads a balance out of the map - it is used only to decide whether a wallet
+   * has to be created. Passing an empty one moves exactly the same money, which is pinned by a
+   * control probe in `tools/probe-admin-gm-parity.ps1` that must stay green.
    */
   walletMap: Map<string, CreditWalletDoc>;
 }

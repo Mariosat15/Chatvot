@@ -173,7 +173,14 @@ get wrong and are worth stating here:
  Second rule from the same area: **never import both copies of one model into a single
  test.** Both register under the same name via `models.X || model(...)`, so the second
  import silently returns the first and the test examines the wrong schema while looking
- correct.
+ correct. **Superseded for vitest since 5 Sep 2026, and only for vitest:** `vitest.config.ts`
+ sets `resolve.dedupe: ["mongoose"]`, so there is one instance and `Model.base` is moot in
+ tests. That change is what made admin **actions** testable at all rather than only greppable,
+ and it is required rather than convenient — a session belongs to a `MongoClient`, so
+ connecting the second instance to the same URI still could not share one transaction. The
+ bullet above remains true of the running apps, and do not remove the dedupe to "clean up"
+ the config: the symptom returns as a 10-second buffering timeout that reads like a slow
+ database.
 - **A synced schema is not a working feature — the `brandingFiles` bug proved it twice.**
  Found and **fixed** 1 Sep 2026. The upload routes key the map by filename and **Mongoose
  refuses map keys containing a dot**. The sync changed the failure mode without removing it:
@@ -1270,6 +1277,81 @@ play on a different subdomain, so the play domain is a fact X4 collects from a r
 then the message origin is derived from the launch URL actually loaded, together with
 `event.source === frame.contentWindow`, which no unrelated window can satisfy.
 
+### Five things from R26, the admin cron that paid no Game Masters (5 September 2026)
+
+R26 is closed: `apps/admin`'s `finalizeCompetition` calls `settleFeesAndGameMasters`, the same
+shared stage the main app calls, and books the platform fee **net** of the commission. Pinned by
+`__tests__/services/admin-finalize-gamemaster-parity.test.ts` (5 tests) and
+`tools/probe-admin-gm-parity.ps1` (5 probes). **The fix is not retroactive and no backfill was
+written.**
+
+- **Distinguish a defect that is LOSING money from one that is merely reachable, because it
+  changes what you build next.** Almost every finding in this programme has been latent — a
+  provider contest that has never settled, a 0% package the admin UI would not let you create.
+  This one was live: both apps register `checkAndFinalizeCompetitions` on an every-minute cron,
+  so whether a referrer was paid depended on **which cron claimed the contest first**. There is
+  no flag, no error and no log line on either branch. **Before scheduling a money defect, check
+  whether anything actually reaches the broken path today** — and when it does, say so in the
+  register, because "already occurred" and "would occur" get triaged differently.
+- **When a payout is carved OUT of a fee, adding the payout means changing the fee's RECORD in
+  the same edit.** The Game Masters' share comes out of the platform fee, so the figure booked as
+  platform income must be net of it. Paying the referrer while still recording the gross fee
+  counts the same credits twice in two different books — and it reviews as a correct fix, since
+  the referral row that was missing is now there. The parity suite therefore asserts the **net**
+  figure explicitly, not just the earnings row. General form: **a new money row is an incomplete
+  fix until you have asked which existing row it was taken from.**
+- **A probe that stays green is a question with three answers, and the third one appeared here:
+  the guard is real but UNREACHABLE on this path.** After "weak test" and "wrong claim", this was
+  a correct check in `distribute.ts` that a second finalize never reaches, because the admin path
+  refuses at `status !== "active"` long before the referral stage runs. That is the X1 finding
+  again — **the four finalize functions are not four copies of one function**; this one has no
+  retry wrapper and no optimistic lock, so its idempotency lives somewhere different from the main
+  app's. The probe was re-aimed at the guard that actually holds the property, and **the test's
+  comment, which had asserted the wrong mechanism, was corrected rather than quietly deleted.**
+- **Extracting shared code HIDES divergence from a size comparison, which is how this defect was
+  found in the first place.** R26 was spotted because `competition-end.actions.ts` was 72 KB in
+  the main app against 38 KB in admin, and a 34 KB gap between two supposed copies is worth
+  reading. It is now **45 KB against 37 KB** — not because admin gained the logic, but because the
+  main app shed ~27 KB into shared services. **The same heuristic applied to the same pair today
+  raises nothing.** The identical shape is still unexamined in `challenge-finalize.actions.ts`
+  (70 KB against 42 KB, its own copy of all three stages in each app). This argues for parity
+  tests, not against extraction — and note `check:mirrors` compares **models**, so it has never
+  had an opinion about either file.
+- **Say that a fix is not retroactive, and say why the damage cannot be queried for.** Contests
+  already finalized by the admin cron paid nothing and wrote **no `retained_gm_fee` row either**,
+  so the affected set cannot be found by searching the ledger for retained rows — only by
+  reconciling referred players' entry fees against earnings per contest. No backfill was written,
+  deliberately: which contests to compensate is an owner decision, and a script that credits
+  wallets from inferred history is an unreviewed money writer. **"Fixed" without "not
+  retroactive" is the kind of summary that makes somebody stop looking.**
+
+**And a fifth instance of the aside-verification rule, this time in three files at once.** The
+`walletMap` passed from the prize stage to the fee stage was documented in both apps as mattering
+"for correctness, not just query count" — supposedly so a Game Master who also won a prize had
+their commission's `balanceBefore` computed after the prize. The concern is real; **the map is not
+what answers it.** Both stages read the post-credit balance back from
+`findOneAndUpdate({ new: true })`, and neither reads a balance out of the map at all — it decides
+only whether a wallet must be created. A **control probe** passing an empty map moves identical
+money and must stay green. Comments corrected in both copies, with the correction left visible.
+
+**Two harness lessons, both of which had already produced a false result.** `Get-Content -Raw`
+and `[File]::ReadAllText` disagree on Windows: PowerShell 5.1 decodes with the system ANSI
+codepage, so **every emoji in the touched services came back as mojibake and was written back that
+way** — probes passed, files were quietly mangled, and it surfaced two steps later as unexplained
+typecheck errors. Pin UTF-8 **without a BOM** on the read *and* the write, and assert a lossless
+round trip before probing. Separately, the harness judged probes by searching whole-suite output
+for the expected test's **name**, which vitest prints for a passing test as readily as a failing
+one, so every probe reported RED beside "failing tests: 0". Run the expected test alone with `-t`
+and read the summary counts; run the suite again only to measure blast radius.
+
+**And one self-inflicted lesson that cost ten minutes and looked exactly like a hang.** Piping the
+harness to `Select-String` showed nothing for eleven minutes, and it was killed as hung. The script
+reports through `Write-Host`, which writes to the **host, not the pipeline**, so the filter was
+reading a nearly empty stream while the probes ran normally — they finish in about two minutes.
+Redirect a child PowerShell process's output to a file and poll that. **Silence from a filtered
+pipeline is not evidence of a stalled process**, and killing a probe harness mid-run is how an
+injected defect gets committed.
+
 ## The rule
 
 **Documentation is part of the deliverable, not a follow-up task.** A phase is not
@@ -1319,6 +1401,7 @@ On every change during implementation:
 | The settlement stages, wherever they appear | `External game plans/11` seam 3 (design, the BUILT note and the COMPLETE note), `09` E4 second-half notes, `05` s9.1, `17` (R3 **closed**, R26 **still open**, R31 **new**), `19` s1 and s6, `New games plan/15` s5; `PROGRESS.md` X5 row and work log. **The live code is `lib/services/settlement/`, mirrored into `apps/admin`** — prize payout, fees plus Game Master share, and completion, with `provider-settlement.service.ts` and `provider-finalize.ts` composing them for provider contests. Read those, not the prose. Four facts drift easily: `competition-end.actions.ts` is **1,174 lines** (it was ~1,500 in the chapters and 1,885 before the extraction) and the sweep is at **`:1126`, not `:1807`**; there are **ten** finalize call sites in the main app, not five, and any document saying five is stale; the **challenge path was NOT extracted** and still holds its own copy of all three stages, so a document implying settlement is unified everywhere is wrong; and **the whole lifecycle became clickable on 5 Sep 2026** — an admin button publishes and a player screen plays (`13` s1.1a). Any document saying nothing publishes, or that the player half is API-only, is stale as a present fact though correct as history — **say which** |
 | The provider score seam, wherever it appears | `External game plans/05` s2.0a (what was built) and s2 (the direction bullet), `17` R32/R33 and the summary table, `PROGRESS.md` status block, X5 row and work log, `ChartVolt-External-Games-Plan.html` E4 row. **The live code is `lib/services/games/participant-score.service.ts`, called from gate 11b of `result-ingestion.service.ts`, plus `resolveContestScoreDirection` in `provider-settlement.service.ts`** (mirrored) — read those, not the prose. Four facts drift easily: the seam **did not exist** until 5 Sep 2026 despite several documents asserting it did, so a document implying X5 shipped a correct payout is wrong; **`scoreDirection` is NOT stored on the participant** and a document saying it is describes a reverted first attempt; aggregation by `attemptsPolicy` happens **in the sync, not at settlement**; and both defects were **latent, never occurred** — no provider contest has ever settled, so **nothing was backfilled and the fix is not retroactive**. `participant-score.service.ts` is **not mirrored**, deliberately: mirroring it would create the second door for scores that `02` s10 rule 3 forbids |
 | The Game Master referral percentage, wherever it appears | `External game plans/19-game-masters.md` s1 (the "Percentage source" row and the row beneath it), `17-risk-register.md` R31 and the summary table, `11` seam 3's extraction note, `PROGRESS.md` work log; the internal HTML s15. **The live code is `resolveFeePercentage` in `lib/services/settlement/game-master-fees/calculate.ts` and `buildSubscriptionLimits` in `lib/services/gamemaster/subscription-limits.ts`**, both mirrored — read those, not the prose. Three facts drift easily: the **current package is the normal read** and `subscription.limits` is only a fallback for a deleted package, so any document implying the cached rate is what gets paid is wrong; **a configured 0% means 0%** since 5 Sep 2026, and any document saying a 0% package is paid 5% is stale as a present fact though correct as history — **say which**; and the fix is **not retroactive**, so subscriptions written before that date still hold whatever `\|\| 5` produced. `New games plan/15` s5 does **not** restate the percentage mechanics — checked, so do not add it there on consistency grounds |
+| Who pays Game Master earnings at settlement, wherever it appears | `External game plans/19-game-masters.md` s1 (the "Where it happens" row), s6's defect table and s7's acceptance list; `17-risk-register.md` R26, the summary table, the R3 note and the X1 acceptance list; `11` seam 3's "three things this did NOT cover"; `PROGRESS.md` status block and work log; the internal HTML's "two live defects" table. **The live code is `settleFeesAndGameMasters` in `lib/services/settlement/fees.service.ts` and `lib/services/settlement/game-master-fees/`, mirrored, called by `finalizeCompetition` in BOTH apps** — read those, not the prose. Four facts drift easily: the admin app **does** pay Game Masters since 5 Sep 2026 (R26), so any document saying it pays none is stale as a present fact though correct as history — **say which**; the fix is **not retroactive and nothing was backfilled**, and the affected contests **cannot be found by querying the ledger** because the missing rows were never written; the platform fee is booked **net** of the commission, so a document describing the gross fee as platform income is wrong; and the **challenge** path still holds its own inline copy in both apps with **the same divergence unchecked**, which is X10. `New games plan/15` s5 does **not** restate any of this — checked, so do not add it there on consistency grounds |
 | Any model change | Exists twice: `database/models/` and `apps/admin/database/models/`. Update both in the same commit. **`npm run check:mirrors` now enforces this** in CI and on `git push`, comparing field paths *and* enum values. It does **not** compare `required` predicate bodies, so a conditional requirement that differs between the apps is a validation rule whose outcome depends on which process saved the document, and the guard stays green. Do not "fix" a failure by deleting an enum value to make two sides agree — that orphans every document already storing it. Add to the side that lacks it. Deliberate differences go in `tools/model-mirror/allowlist.ts` **with a reason** |
 | Committed compiled `.js` files under `database/` and `lib/` | **All 113 deleted 1 Sep 2026** (57 `.js` + 56 `.js.map`), owner approved. A *separate, earlier* accident from the `.d.ts` one — emitted 22 Dec 2025, same 57 modules, and **six to seven months stale**. Critically, **these were NOT inert**: vitest resolved the stale `.js` in preference to the `.ts`, which made every model and every money-critical service **unimportable in tests** and blocked the whole of Defect 1. `tsx`, esbuild and `next build` all resolve the `.ts` correctly, so production was never affected — which is why it survived unnoticed. Two rules follow: **when deleting emitted output, look for the other half of the emit** (a `tsc` run that produced `.d.ts` produced `.js` too — the first cleanup removed one half and left the harmful one), and **prove which file a resolver picks rather than reasoning about it** — a missing export makes a perfect probe. The `.gitignore` rule is scoped to `/database/**` and `/lib/**`, never a blanket `*.js`, because `ecosystem.config.js`, `scripts/*.js`, `worker/build.mjs` and the `api-server` build are hand-written |
 | Committed `.d.ts` files | **All 112 deleted 1 Sep 2026** (57 `.d.ts` + 55 `.d.ts.map`), owner approved, with a `.gitignore` rule. They were orphaned February 2026 build output, stale, and **inert** — TypeScript resolves the sibling `.ts` first; proven by identical typechecks before and after (16 main, 225 admin). Earlier documents said "two", then "31 + 31" — the 31 counted only `database/` and missed 26 files under `lib/`. **Never treat a `.d.ts` as a third copy of a model to maintain.** Two files are deliberately kept and must stay tracked: `types/global.d.ts` (hand-written, no sibling `.ts`) and `websocket-server/dist/index.d.ts` (separate build). The rule for any future cleanup: delete a `.d.ts` only if a sibling `.ts` exists and it is not under `dist/` |

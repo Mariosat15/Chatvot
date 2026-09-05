@@ -19,7 +19,7 @@ chapter covers risks to the programme and to the application.
 | **R4** | Double finalization pays twice | Critical | Medium | X0, X1 |
 | **R5** | Dead Inngest crons re-registered | Critical | Low | X0, X1 |
 | **R13** | Ledger enum renamed | Critical | Low | X1, X8 |
-| **R26** | Admin-app finalization pays no Game Master earnings | Critical | **ALREADY OCCURRED** | X1 or X5 |
+| **R26** | Admin-app finalization pays no Game Master earnings | Critical | **ALREADY OCCURRED** | X1 or X5 - **CLOSED 5 Sep 2026**, not retroactive |
 | **X1** | Abstraction cannot be proven without the provider | **High** | **High** | X4 |
 | **X2** | Single supplier on the critical path | **High** | Medium | All |
 | **X3** | No cost floor - per-round fee kills cheap contests | **High** | Medium | Before X4 |
@@ -228,10 +228,11 @@ refuses after it and restores `active`, and the provider path composes the share
 stages rather than the trading ones. The five trading payout tests and the golden ranking
 regression are byte-identical throughout, which is what makes the extraction credible.
 
-**Two related exposures are NOT closed by this and keep their own entries:** the challenge
-path was not extracted (`challenge-finalize.actions.ts`, 1,803 lines, its own copy of all
-three stages - X10), and **R26** stands, because the admin cron's finalize copy still pays
-no Game Masters.
+**One related exposure is NOT closed by this and keeps its own entry:** the challenge path was
+not extracted (`challenge-finalize.actions.ts`, 1,803 lines in the main app against 1,182 in
+admin, its own copy of all three stages in each - X10). **R26 was the second, and it is now
+closed** (5 Sep 2026) - the admin cron's finalize copy calls the shared fee-and-referral stage.
+Correct as history, stale as a present fact, so say which.
 
 ### R4 - Double finalization
 
@@ -253,10 +254,12 @@ fence them.**
 in the financial ledger. Renaming one orphans financial history and breaks reconciliation.
 Covered by the never-rename list in `14` section 6.
 
-### R26 - Admin-app finalization pays no Game Master earnings
+### R26 - Admin-app finalization pays no Game Master earnings (FIXED 5 Sep 2026)
 
 **A live defect found while writing `19`, not a prediction.** An instance of R2, but severe
-enough on its own to have an ID.
+enough on its own to have an ID. **Unlike most entries here it was actively losing money**,
+not latent: both apps run `checkAndFinalizeCompetitions` on an every-minute cron, so whether
+a referrer was paid depended on nothing more than which cron claimed the contest first.
 
 `lib/actions/trading/competition-end.actions.ts` contains roughly 500 lines of Game Master
 earnings logic at lines 931-1459. The admin mirror,
@@ -273,23 +276,59 @@ account for.
 criteria in `19` section 7, and the mirror-drift CI check from X0 should have caught it -
 verify the check covers action files, not only models.
 
-**Status after X5, 4 September 2026: still open, but the shape of the fix changed.** The
-earnings logic is no longer 500 inline lines to duplicate - X5 extracted it to
-`lib/services/settlement/game-master-fees/` and **mirrored the service into `apps/admin`**,
-so the admin copy now has a function to call. That is the whole remaining work, and it was
-deliberately not done here: it is a money-path change in the app with no player traffic but
-also with the weaker test coverage, and bundling it into a 900-line extraction would have
-meant the payout tests staying green no longer proved the extraction was faithful.
+**Closed 5 September 2026.** `apps/admin/lib/actions/trading/competition-end.actions.ts` now
+calls `settleFeesAndGameMasters` - the same shared stage the main app calls - in place of its
+inline fee arithmetic. Pinned by `__tests__/services/admin-finalize-gamemaster-parity.test.ts`
+(5 tests, 5 probes, `tools/probe-admin-gm-parity.ps1`), which runs **both apps' finalize
+functions over identical fixtures and compares every ledger row**, rather than asserting that
+the admin app pays *something*.
 
-**One caution for whoever closes it.** Do not assume the admin path is merely *missing* the
-call. The admin `finalizeCompetition` has no retry wrapper and no optimistic lock, loading
-the competition inside a transaction instead - the finding from X1 that **the four finalize
-functions are not four copies of one function**. Read it before adding the call.
+**The fix is not retroactive, and this is the part to state plainly rather than let a summary
+round up.** Every competition already finalized by the admin cron paid its Game Masters
+nothing, and there is no `retained_gm_fee` row marking those either - so the gap cannot be
+found by querying for retained rows, only by reconciling referred players' entry fees against
+earnings per contest. **No backfill was written.** Doing it correctly needs an owner decision
+about which historical contests to compensate, and a script that credits wallets from
+inferred history is a money writer nobody has reviewed.
 
-Note the size difference is not subtle and generalises: `competition-end.actions.ts` is
-72 KB in the main app against 38 KB in the admin app, and `challenge-finalize.actions.ts`
-is 70 KB against 42 KB. The duplicated **services and actions** are the larger version of
-R2 and a field-comparison script cannot help with them.
+**Two things the fix had to get right, both of which the caution below predicted.**
+
+- **The platform-fee RECORD had to change with it, not just gain a payout beside it.** The
+  Game Masters' share is carved *out* of the platform fee, so the figure booked as platform
+  income must be net of the commission. Paying a referrer while still recording the gross fee
+  counts the same credits twice in two different books - a reconciliation defect that would
+  have looked exactly like a correct fix on review, which is why the parity suite asserts the
+  net figure explicitly rather than only the earnings row.
+- **It is genuinely not four copies of one function.** The admin `finalizeCompetition` has no
+  retry wrapper and no optimistic lock, loading the competition inside the transaction
+  instead, so its idempotency comes from a `status !== "active"` guard rather than from the
+  lock. That matters for the test: the first idempotency probe was aimed at the duplicate
+  check inside `distribute.ts` and **stayed green**, because a second finalize refuses at the
+  status guard long before the referral stage runs. The probe was re-aimed at the guard that
+  actually provides the property. **A probe that stays green is a question, not an answer** -
+  here the claim in the test's comment was wrong, and the comment was corrected.
+
+**And one claim this work disproved, recorded because it was written in three files.** The
+comments on `PrizePayoutResult.walletMap` and `DistributeGmFeesInput.walletMap` asserted the
+map "matters for correctness, not just query count" - that a Game Master who also won a prize
+needed it so their commission's `balanceBefore` came out after the prize. The concern is real;
+the map is not what answers it. Both stages read the post-credit balance back from
+`findOneAndUpdate({ new: true })`, and neither reads a balance out of the map at all - it is
+used only to decide whether a wallet must be created. **A control probe passing an empty map
+moves identical money and must stay green.** Comments corrected in both copies.
+
+**A note on the size heuristic that found R26 in the first place, because it has just become
+much weaker.** The gap was the tell: `competition-end.actions.ts` was 72 KB in the main app
+against 38 KB in the admin app, and a 34 KB difference between two files that are supposed to
+be copies is worth reading. It is now **45 KB against 37 KB** - and *not* because the admin
+copy gained the missing logic. The main app shed ~27 KB into
+`lib/services/settlement/`, which both apps share. So the same heuristic applied to the same
+pair today would raise no flag, while the identical defect in the **challenge** path is still
+there to find: `challenge-finalize.actions.ts` is **70 KB against 42 KB**, and it still holds
+its own copy of all three settlement stages in both apps. **Extracting shared code hides
+divergence from a size comparison**, which is an argument for the parity test rather than
+against the extraction. The duplicated **services and actions** remain the larger version of
+R2, and a field-comparison script cannot help with either.
 
 ### R27 - Internal routes authenticated by a plain header (FIXED 1 Sep 2026)
 
@@ -865,7 +904,10 @@ cannot honestly be pulled forward.
       failing **closed** on an unknown game type
 - [x] **Every raw-driver contest insert sets the game label explicitly** - **done 4 Sep
       2026**. Note this was **six** inserts, not the two this line assumed (R7)
-- [ ] **Admin-app finalization pays Game Master earnings identically to the main app** (R26)
+- [x] **Admin-app finalization pays Game Master earnings identically to the main app** (R26) -
+      **done 5 Sep 2026**, proven by running *both* finalize functions over identical fixtures
+      and comparing every ledger row, not by asserting the admin app pays something. **Existing
+      contests were not backfilled**
 - [ ] `minParticipants` cannot be set below 2 on any creation path, admin or Game Master
 - [ ] Every failure rehearsal in `07` section 9 green **against the mock**
 

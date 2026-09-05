@@ -29,11 +29,13 @@ export interface DistributeGmFeesInput {
   };
   participantCount: number;
   /**
-   * Reused from the prize payout stage.
+   * Reused from the prize payout stage, as a QUERY CACHE only.
    *
-   * It matters for correctness, not just query count: a Game Master who also won a prize
-   * must have their commission's `balanceBefore` computed from the balance AFTER the
-   * prize, or the ledger contradicts itself.
+   * This comment used to say it mattered for correctness - that a Game Master who also won a
+   * prize needed it so their commission's `balanceBefore` was computed after the prize. The
+   * ledger row is indeed correct, and `new: true` on the update below is what makes it so: the
+   * map's value is read only by the `if (!gmWallet)` existence test, never for arithmetic.
+   * See the fuller note on `PrizePayoutResult.walletMap`.
    */
   walletMap: Map<string, CreditWalletDoc>;
 }

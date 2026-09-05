@@ -225,8 +225,19 @@ the extraction commit would have shipped the wrong character in the wrong place.
 
 - **The challenge path.** `challenge-finalize.actions.ts` is still 1,803 lines with its own
   copy of all three stages. A provider *challenge* is X10.
-- **The admin cron's own finalize copy** still pays no Game Masters (R26). The shared
-  services exist in `apps/admin` now, so the fix is smaller - not done.
+- **The admin cron's own finalize copy** paid no Game Masters (R26). ~~The shared services
+  exist in `apps/admin` now, so the fix is smaller - not done.~~ **Closed 5 September 2026**
+  - it calls `settleFeesAndGameMasters`, and the platform fee it books is now net of the
+  commission. Two notes for anyone reading this seam afterwards. The fix confirmed the X1
+  finding that **the four finalize functions are not four copies of one function**: the admin
+  path has no retry wrapper and no optimistic lock, so its idempotency comes from a
+  `status !== "active"` guard, and a probe aimed at the duplicate check inside `distribute.ts`
+  stayed green because that check is unreachable here. And **extracting the stages made this
+  defect harder to spot, not easier** - the 34 KB size gap that originally flagged it has
+  closed to 8 KB because the main app shed code into the shared services, so the same
+  heuristic applied to the same pair today raises nothing. That argues for the parity test in
+  `__tests__/services/admin-finalize-gamemaster-parity.test.ts`, which compares every ledger
+  row between the two apps over identical fixtures.
 - **The `exclude` refund.** ~~Still `refundOwed: true`.~~ **Closed 4 September 2026** - see
   the note below, which also records the sibling gap this list did not know about.
 

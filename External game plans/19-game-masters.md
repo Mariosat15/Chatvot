@@ -47,7 +47,7 @@ not itself the revenue event.
 
 | | |
 |---|---|
-| **Where it happens** | **Since the X5 extraction, 4 Sep 2026: `lib/services/settlement/game-master-fees/` (`calculate.ts` + `distribute.ts`), mirrored into `apps/admin`.** It was inline at `competition-end.actions.ts` lines 931-1459. Challenges are **unchanged and still inline**: `challenge-finalize.actions.ts` lines 798-1380 |
+| **Where it happens** | **Since the X5 extraction, 4 Sep 2026: `lib/services/settlement/game-master-fees/` (`calculate.ts` + `distribute.ts`), mirrored into `apps/admin`.** It was inline at `competition-end.actions.ts` lines 931-1459. **Since 5 Sep 2026 (R26) the admin app's `finalizeCompetition` calls it too**, via `settleFeesAndGameMasters` - before that it called nothing and paid nobody. Challenges are **unchanged and still inline** in both apps: `challenge-finalize.actions.ts` lines 798-1380, and **whether the same referral divergence exists there has not been checked** |
 | **Attribution** | `userreferrals` where `isActive: true`, falling back to `user.referredByGameMasterId` |
 | **Formula** | `referred_player_count x entryFee x (feePercentage / 100)` |
 | **Percentage of** | The **entry fee** - not the platform fee, not the prize pool |
@@ -213,7 +213,7 @@ Neither is caused by this project, and both are cheap now and awkward later.
 
 | Defect | Evidence | Impact |
 |---|---|---|
-| **The admin app does not pay Game Masters** | `apps/admin/lib/actions/trading/competition-end.actions.ts` has **no Game Master earnings logic** - only `isGmCreated` on platform-fee recording (line 709). **Still true after X5**, but the fix is now much smaller: the shared `lib/services/settlement/game-master-fees/` exists in `apps/admin` too, so the admin copy has a service to call rather than 500 lines to duplicate | A competition finalized through the admin app pays **no Game Master earnings at all**. Silent revenue loss for the Game Master |
+| ~~**The admin app does not pay Game Masters**~~ **FIXED 5 Sep 2026 (R26)** | `apps/admin/lib/actions/trading/competition-end.actions.ts` had **no Game Master earnings logic** - only `isGmCreated` on platform-fee recording. It now calls `settleFeesAndGameMasters`, the same shared stage the main app calls, and books the platform fee **net** of the commission. Pinned by `__tests__/services/admin-finalize-gamemaster-parity.test.ts`, which runs *both* apps' finalize functions over identical fixtures and compares every ledger row | A competition finalized through the admin app paid **no Game Master earnings at all** and recorded no `retained_gm_fee` either. Silent revenue loss, and **actively occurring** - both apps run the finalize cron every minute, so payment depended on which cron won the race. **The fix is not retroactive and no backfill was written**; affected contests cannot be found by querying for retained rows, since none exist |
 | **`toggleCompetitionCreation` is a dead UI reference** | Called in `GameMasterManagementSection.tsx` lines 164-189; **not implemented** in the `PATCH /api/gamemasters/[id]` handler. `competitionCreationOverride` and `overrideLimits` exist on the schema with no reader or writer | An admin clicks a button that does nothing. Worse once provider games exist and disabling a Game Master's creation rights actually matters |
 
 Also worth noting: the renewal worker extends `endDate` by **30 days hardcoded**
@@ -303,8 +303,11 @@ draft claimed, and it is why this chapter exists.
 - [ ] The Game Master share still **never exceeds the platform fee**, asserted by test
 - [ ] **Platform margin after provider cost is never negative** on a Game Master-created
       contest, asserted by test
-- [ ] A competition finalized through the **admin app** pays Game Master earnings
-      identically to the main app
+- [x] A competition finalized through the **admin app** pays Game Master earnings
+      identically to the main app - **done 5 Sep 2026 (R26)**, proven by a parity suite that
+      settles the same fixture through both apps and compares every ledger row, including
+      that the platform fee is booked **net** of the commission. **Historical contests
+      finalized by the admin cron were not backfilled**
 - [ ] Earnings and referrals are reportable by game, for both the Game Master and the
       admin
 - [ ] Nothing about trading Game Masters changes - proven by the same historical
