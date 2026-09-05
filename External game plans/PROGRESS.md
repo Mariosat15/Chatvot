@@ -13,8 +13,8 @@
 
 | | |
 |---|---|
-| **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done.** A provider contest can be created, **published from the admin screen** (5 Sep 2026), entered, played and paid - and since 5 Sep 2026 it is paid **correctly**, which it was not before: two P0 defects meant every player tied on a score of zero and split the pool equally, and a lower-is-better game ranked backwards. A stuck round can now be **inspected and ended by an operator** (5 Sep 2026). **The player half is still API-only** - no player screen launches a round. **No provider selected**, which is what X4 needs |
-| **Next action** | **The player-facing round launch screen** (`09` E6), which is the last piece of the lifecycle reachable only by API. In parallel, commercially: find and assess a provider using `08`, since X4 cannot start without one |
+| **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done.** A provider contest can be created, **published from the admin screen** (5 Sep 2026), entered, played and paid - and since 5 Sep 2026 it is paid **correctly**, which it was not before: two P0 defects meant every player tied on a score of zero and split the pool equally, and a lower-is-better game ranked backwards. A stuck round can now be **inspected and ended by an operator** (5 Sep 2026). **The whole lifecycle is now reachable by clicking** - the player round launch screen landed 5 Sep 2026 at `/competitions/[id]/play`, which also fixed a live defect: a provider-contest player was being sent to the forex trading workspace by a button labelled "Start Trading". **No provider selected**, which is what X4 needs |
+| **Next action** | **Commercially: find and assess a provider using `08`** - X4 cannot start without one, and nothing else in the programme is blocked on engineering. Technically the next slices are provider **health** (the last of X6's five admin destinations) and the game-aware **contest list and dashboard** (`13` s4/s5), which is where the remaining trading-shaped player screens live |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
 | **Owner instruction on record** | **External games only, no in-house game** (2 Sep 2026). **One step at a time, admin first, do not break the running app.** |
 | **Not owner-tested** | Everything after the 2 Sep navigation restructure. X1-X3, X5, the provider admin slice and the contest wizard are all **code-complete, awaiting owner test** - and "code-complete" here excludes the replay script and the label backfill, neither of which has been run against production |
@@ -342,7 +342,7 @@ numbers in chapters `01`-`09` remain resolvable. **Plan against the X-phases bel
 | **X2** | Provider abstraction + mock adapter | `09` E1 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026. Nothing player-visible - `externalGamesEnabled` defaults false |
 | **X3** | Round lifecycle + result ingestion | `09` E2 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026. **Rehearsals 1-6 of `07` s9 green** against the mock (49 tests, 6 guards probed). 7-10 need X5/X8 |
 | **X4** | Real adapter against sandbox | `09` E3 | 1 week | `NOT STARTED` |
-| **X5** | Contest integration + settlement | `09` E4 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026, **with two P0 payout defects found and fixed 5 Sep 2026** - publish, entry, ranking, round launch, settlement and **all three unresolved-round policies**. **A provider contest can be published, entered, played and paid. Publishing became clickable on 5 Sep 2026 (X6 slice); the player round launch is still API-only.** Settlement was an **extraction**: the payout, fee/GM and completion stages moved to `lib/services/settlement/` and trading was rewired onto them. Closing `exclude` also closed **`hold_and_alert`**, which nothing had ever consumed. **The two P0s are why "code-complete" must never be read as "correct":** no code path wrote `participant.score`, so every player settled on zero and split the pool equally; and settlement read `scoreDirection` off a field neither participant copy declared, so a lower-is-better game paid the slowest player first |
+| **X5** | Contest integration + settlement | `09` E4 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026, **with two P0 payout defects found and fixed 5 Sep 2026** - publish, entry, ranking, round launch, settlement and **all three unresolved-round policies**. **A provider contest can be published, entered, played and paid. Publishing became clickable on 5 Sep 2026 (X6 slice), and the player round launch on the same day (`13` s1.1a) - the lifecycle is no longer API-only anywhere.** Settlement was an **extraction**: the payout, fee/GM and completion stages moved to `lib/services/settlement/` and trading was rewired onto them. Closing `exclude` also closed **`hold_and_alert`**, which nothing had ever consumed. **The two P0s are why "code-complete" must never be read as "correct":** no code path wrote `participant.score`, so every player settled on zero and split the pool equally; and settlement read `scoreDirection` off a field neither participant copy declared, so a lower-is-better game paid the slowest player first |
 | **X6** | Admin: nav restructure incl. **the single Trading section**, RBAC, provider registration, game-aware wizard, analytics, **GM creation API + wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | `PARTIALLY DONE` - nav restructure and single Trading destination **built and owner-tested 2 Sep 2026**. **Provider registration, credentials and the per-title catalogue switch code-complete 4 Sep 2026** (`12` s4.1a). **Contest wizard from `configSchema` + pre-flight validation code-complete 4 Sep 2026** (`12` s2.1) - creates a **draft**. **The publish control is code-complete 5 Sep 2026** (`12` s3.1a), which also made the competitions list game-aware: `draft` admitted as a status, its own badge, a Drafts count, a provider game badge, and the trading Edit button **withheld** from provider contests because `PUT /api/competitions/[id]` blind-assigns that form's body. **The round inspector and manual resolution are code-complete 5 Sep 2026** (`12` s4.2a) - read-only inspection plus **ending** a stuck round (void/abandoned/expired) with a mandatory reason; it deliberately **cannot enter a score**. Still `NOT STARTED`: provider health panel, live-contest controls, provider contest **editing**, analytics by provider, GM creation API |
 | **X6.5** | **Admin wording pass** - brought forward from X8 so operators never work a games platform labelled "trading" | `14` | 0.5-1 week | `NOT STARTED` |
 | **X7** | Player UI + points, leaderboards, badges, levels, **profile and cross-game stats**, **per-game GM analytics** | `09` E6 + `13` + `05` + `19` | 3-4 weeks | `NOT STARTED` |
@@ -606,6 +606,92 @@ Newest at the top.
 
 ---
 
+### 5 Sep 2026 - X7/E6 SLICE - THE PLAYER PLAY SCREEN - CODE-COMPLETE
+
+**Shipped:** a player who has entered a provider contest can now start a round, play it, and see a
+confirmed result **by clicking**. That was the last part of the provider lifecycle reachable only
+by API and by test. 42 tests, 20 probes, every one red on the expected test.
+
+**And it closed a live defect nobody had filed.** No player screen read `gameType` at all, so a
+provider contest rendered the trading lobby and its CTA said **"Start Trading"**, linking to
+`/competitions/[id]/trade` - the forex workspace, with charts, an order form, positions and margin.
+A player who had paid to enter a puzzle contest arrived at a trading terminal for a game with no
+market, and **nothing errored**. Same shape as the trading-shaped services in
+`matchmaking.service.ts` and the admin list rendering drafts in the grey it uses for finished
+contests: the screen keeps working and keeps being wrong.
+
+**Files touched:** `app/(root)/competitions/[id]/play/page.tsx` (new),
+`components/games/` (new - `ProviderRoundHost`, `ProviderGameFrame`, `provider-frame-messages`,
+`RoundPreflight`, `RoundResultPanel`, `play-state`),
+`lib/services/games/round-status.service.ts` (new),
+`app/api/competitions/[id]/rounds/route.ts` (gained a `GET`),
+`components/trading/CompetitionEntryButton.tsx`,
+`app/(root)/competitions/[id]/trade/page.tsx`, `eslint.config.mjs`,
+`__tests__/games/` (three suites), `tools/probe-player-play.ps1`.
+
+**Deviated from plan - the route was corrected before shipping, not after.** `09` E6 called it
+`/play/[contestId]`; `13` section 1 called it `/competitions/[id]/play`. **Two chapters disagreed
+about a URL players bookmark**, and the paired-document rule is written as though a restatement
+drifts from its source - here the source drifted from the chapter that owns routing. `13` won.
+Building at the wrong path would have meant renaming a live URL or running two play routes for
+ever, and checking cost one search.
+
+**Deviated - only the provider branch of the dispatcher was built.** `13` describes `/play` as a
+dispatcher rendering trading gameplay too, with `/trade` reduced to a permanent redirect *inwards*.
+That needs `TradingPageContent` and its six context providers moved, which is a change to the live
+trading path carrying **R18** (a price feed opened for a chess player) and **R19**. So the redirect
+currently runs **outwards**: a trading contest reaching `/play` goes to `/trade`. When X7 moves
+them it flips direction and no URL changes. **No loop is possible either way** - the two guards are
+exact complements of `isProviderContest`, pinned by a test, because an overlap gives an infinite
+redirect rather than a wrong screen.
+
+**Five things worth carrying:**
+
+- **A GET must never consume an attempt, and a server component is a GET.** An attempt is spent
+  when a round is *created*, deliberately, so launching from the page's render would burn a paying
+  player's only attempt because **Next.js prefetches `<Link>` targets on hover**. Nothing errors and
+  nothing logs. The page renders a button and the POST happens on the click - which is why the play
+  screen is a state machine rather than a redirect through the launch API, and why that is not a
+  complication to simplify away later.
+- **The score has no route through the browser, which is stronger than remembering not to read
+  one.** The frame message type has no score field, so a `finished` carrying `score`, `rawScore`,
+  `points`, `prize` and `rank` parses to an object with two keys. Proven behaviourally rather than
+  structurally, and asserted on the **whole** object, because a field you did not think to check is
+  the only way to notice one you did not expect.
+- **The sandbox omission is the feature.** `allow-top-navigation` is absent, so a game cannot
+  navigate the player's entire page away from ChartVolt - which a provider bug or a compromised
+  game would do mid-contest, looking to the player exactly like our site crashing.
+- **`!expectedOrigin` appeared twice, and the first test could not tell the two apart.** One copy
+  skips attaching the listener, one refuses the render. A probe that killed the **render** guard
+  left the suite green, because the listener's copy satisfied a bare `/if \(!expectedOrigin\)/`.
+  Fourth instance of the weak-structural-test class: **assert position within the construct and
+  count the occurrences**, never a bare identifier.
+- **The `**/games/*` ESLint wildcard collided for the FOURTH time**, on `components/games`, after
+  `database/models/games`, `lib/services/games` and `components/admin/games`. One negation, as
+  expected. Written as a separate exception rather than a blanket `!**/components/**`, because a
+  components folder is exactly where somebody would eventually put a game module's own logic "to
+  keep it near the screen".
+
+**Owner tested:** not yet. Verified here: 797 tests pass (up from 796), `tsc --noEmit` at **17
+errors, byte-identical to baseline** with none in the changed files and none disappearing, lint
+clean on every new file, `check:mirrors` green. `next build` **compiles successfully** but fails at
+static export on `/arena` with `ReplicaSetNoPrimary` - **confirmed pre-existing by stashing and
+rebuilding**, so it is Atlas being unreachable from this machine, not this change.
+
+**Deferred, and none of it is silent:** no live leaderboard during play (`13` s11's polling
+recommendation); no practice mode; **no game-aware dashboard** - `ActiveCompetitionCard` and
+`CompetitionsTable` still render PnL, positions and recent trades and label the action "Trade Now",
+so the destination is right but the card is still trading-shaped, and making it game-aware is a
+rewrite of components every trading player sees daily; and **no CSP `frame-src` allowlist**, because
+there is no Content-Security-Policy in `next.config.ts` at all and **nothing to allowlist yet** -
+`game_provider` stores the provider's *API* host and the play domain is a fact X4 collects from a
+real provider.
+
+**Next chat should:** stop building and **find a provider** (`08`). Nothing in the programme is
+blocked on engineering now; X4 is blocked on a commercial decision.
+
+---
+
 ### 5 Sep 2026 - TWO P0 PAYOUT DEFECTS - THE SCORE SEAM WAS NEVER BUILT
 
 **Shipped:** provider contests now pay the players who actually won. Two defects, both in the
@@ -764,8 +850,9 @@ on the list; and provider contest **editing**, which the publish control makes m
 rather than less.
 
 **Not done, said plainly:** **no player screen starts a round**, so the play step is still
-API-only and X7/E6 owns it. There is deliberately **no unpublish** - a visible contest can
-already have been paid into, and cancel-with-refund is the reversible operation.
+API-only and X7/E6 owns it. **(Built the same day - see the play-screen entry below.)** There is
+deliberately **no unpublish** - a visible contest can already have been paid into, and
+cancel-with-refund is the reversible operation.
 
 **Next chat should:** build the round inspector (`12` s4) - round status, score, the raw
 provider event and a manual resolution action with a mandatory reason and an audit entry.
@@ -924,8 +1011,8 @@ that stayed green were resolved individually rather than waved through.
 
 **Deferred:** ~~the GM referral fee `|| 5` (R31)~~ **fixed 5 September 2026, see the entry
 below.** Also still open at the time: ~~no admin button publishes a contest~~ (**built 5 Sep
-2026**), no player screen launches a round, the challenge path keeps its own copy of
-settlement, and R26 (the admin cron pays no Game Masters).
+2026**), ~~no player screen launches a round~~ (**built 5 Sep 2026**), the challenge path keeps
+its own copy of settlement, and R26 (the admin cron pays no Game Masters).
 
 **Next chat should:** close the two X6 slices that make the lifecycle clickable - a publish
 button and the round inspector.
@@ -1136,7 +1223,8 @@ back half rather than a wiring job, and doing it badly is the one change in this
 that can pay the wrong people, so it is its own piece of work.
 
 **Owner tested:** not yet. Nothing is player-visible - `externalGamesEnabled` is still
-false and no player screen exists for a provider contest.
+false and no player screen exists for a provider contest. **(A play screen was built 5 Sep 2026 -
+correct as history, stale as a present fact.)**
 
 **Deferred:** round launch for players, provider settlement, and the `exclude` policy's
 entry-fee refund (still `refundOwed: true`). No unpublish, deliberately: a visible contest

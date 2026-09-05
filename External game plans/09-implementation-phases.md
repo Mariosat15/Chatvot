@@ -337,9 +337,9 @@ Tests: 15 new in `provider-settlement.test.ts`, 2 in `provider-settlement-late-h
 (a mocked race, because the pre-lock gate makes the in-transaction one otherwise
 unreachable). Full suite **683 green**, mirrors 79/0, both typechecks at baseline.
 
-**Still not built after E4:** ~~no admin button publishes a contest~~ - **the publish control
-was built 5 September 2026 as an E5 slice, see below** - and no player screen launches a round,
-so the player half of the lifecycle is still reachable by API and by test only. The `exclude`
+**Still not built after E4:** ~~no admin button publishes a contest~~ and ~~no player screen
+launches a round~~ - **both were built 5 September 2026**, the publish control as an E5 slice and
+the play screen as an E6 slice, so nothing in the lifecycle is API-only any more. The `exclude`
 refund is on the **provider** settlement path; trading has no rounds to be unresolved, which is
 correct rather than a gap.
 
@@ -377,9 +377,10 @@ ingestion door and it lives in the main app. An operator who voids a player's on
 applied `score_zero` by hand, which the dialog says before the confirm rather than after.
 
 **What "publishing works" excludes, said explicitly so no later summary reads it as
-finished.** A published contest can be entered and settled, but **no player screen starts a
-round**, so the play step is still API-only and E6 owns it. The wizard covers competitions
-only; challenges on a provider game are **E8**.
+finished.** ~~No player screen starts a round~~ - **the play screen was built the same day, see
+E6** - so a published contest can now be entered, played and settled by clicking. What publishing
+still excludes: the wizard covers **competitions only**, and challenges on a provider game are
+**E8**.
 
 **And editing is still not built, which the publish control makes more visible rather than
 less.** `/competitions/edit/[id]` renders the trading editor and `PUT
@@ -394,16 +395,40 @@ Remember the mirror: every model touched here exists twice.
 
 ### E6 - Player UI and rewards
 
-- Contest browse and lobby, showing game thumbnails and rules
-- `/play/[contestId]` iframe host, with origin checks and a strict message allowlist
-- Live leaderboard during play
-- Result screen with the generic `scoreBreakdown` renderer
-- Practice mode, if supported
-- Points, ratings, badges and milestones wired to `gameKey`
-- Notifications and journey entries
+- [ ] Contest browse and lobby, showing game thumbnails and rules
+- [x] **`/competitions/[id]/play` iframe host, with origin checks and a strict message allowlist** (5 Sep 2026, `13` s1.1a)
+- [ ] Live leaderboard during play
+- [x] **Result screen with the generic `scoreBreakdown` renderer** (5 Sep 2026, `13` s1.1a)
+- [ ] Practice mode, if supported
+- [ ] Points, ratings, badges and milestones wired to `gameKey`
+- [ ] Notifications and journey entries
 
 **Done when:** a player can browse, join, practise, play, see their position and
 receive prizes and rewards without touching a trading screen.
+
+**The route in the first bullet was corrected, not chosen.** This chapter said
+`/play/[contestId]` and `13` section 1 said `/competitions/[id]/play`, so the two chapters
+disagreed with each other about a URL players bookmark. `13` is the routing chapter and it is
+right - a contest's gameplay belongs under the contest - so the build followed `13` and this
+chapter was corrected to match. **The direction of the drift is the useful part:** the paired-
+document rule is written as though a restatement drifts from its source, and here the source
+drifted from the chapter that owns the subject. Checking cost one search; not checking would have
+meant either renaming a live URL or keeping two play routes for ever.
+
+**The play half is built; browsing and rewards are not.** A player who has entered a provider
+contest can now start a round, play it, and see a confirmed result, by clicking. What they cannot
+yet do is *find* the contest by game - `/competitions` is still the trading-shaped list, so a
+provider contest is discovered there among trading ones with no thumbnail and no rules summary.
+
+**Three things the play screen deliberately does not do, stated so no summary reads it as
+finished.** There is no live leaderboard during play, so a player sees their standing only when
+they return to the contest page. There is no practice mode, which needs `supportsPractice` and a
+free unranked path. And **the dashboard is still trading-shaped**: `ActiveCompetitionCard` and
+`CompetitionsTable` render PnL, positions and recent trades and link to `/trade`. The trade route
+now redirects a provider contest to `/play`, so the destination is right, but the card's contents
+and its "Trade Now" label are still wrong for a puzzle. Making them game-aware is a rewrite of
+components every trading player sees daily, so it is deferred to the dashboard pass rather than
+half-done here - see `PROGRESS.md`.
 
 ### E7 - Resilience, reconciliation and monitoring
 

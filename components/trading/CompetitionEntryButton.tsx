@@ -24,6 +24,7 @@ import { useAppSettings } from "@/contexts/AppSettingsContext";
 import ActionTermsDialog, {
   ACTION_TERM_SLUGS,
 } from "@/components/ActionTermsDialog";
+import { isProviderContest } from "@/lib/services/games/contest-config";
 
 // Level names for display
 const LEVEL_NAMES: Record<number, { icon: string; title: string }> = {
@@ -70,6 +71,22 @@ export default function CompetitionEntryButton({
   const startingCapital =
     competition.startingCapital || competition.startingTradingPoints || 0;
   const canAfford = userBalance >= entryFee;
+
+  /**
+   * Whether this contest is played through an external game provider rather than by trading.
+   *
+   * Reason it uses the strict helper rather than `gameType === "provider"`: this decides where
+   * the button SENDS the player, and `/play` can do nothing without a provider key and a game
+   * code. A contest labelled provider but missing them would land the player on a screen that
+   * can only refuse, whereas leaving them on the contest page at least tells them the truth.
+   * That is the opposite of the admin list's question, which is only "how should this row be
+   * labelled" and therefore uses the looser `hasProviderGameLabel`.
+   *
+   * `contest-config.ts` is model-free, so importing it into a client component pulls no database
+   * code into the browser bundle - its only import is a type.
+   */
+  const isProviderGame = isProviderContest(competition);
+
   const isActive = competition.status === "active";
   const isUpcoming = competition.status === "upcoming";
   const isCompleted = competition.status === "completed";
@@ -223,14 +240,22 @@ export default function CompetitionEntryButton({
                 </div>
               </div>
 
-              <Link
-                href={`/competitions/${competition._id}/trade?viewOnly=true`}
-              >
-                <Button className="w-full bg-purple-500 hover:bg-purple-600 cursor-pointer active:scale-95 transition-all duration-150 shadow-lg hover:shadow-purple-500/25">
-                  <History className="mr-2 h-4 w-4" />
-                  View Trade History
-                </Button>
-              </Link>
+              {/*
+                Withheld from a provider contest, not relabelled: there are no trades to show,
+                so the destination has nothing in it. The page's own "View Results" link already
+                covers what a provider player wants here, and offering a history button that
+                opens an empty trading terminal would read as their rounds having been lost.
+              */}
+              {!isProviderGame && (
+                <Link
+                  href={`/competitions/${competition._id}/trade?viewOnly=true`}
+                >
+                  <Button className="w-full bg-purple-500 hover:bg-purple-600 cursor-pointer active:scale-95 transition-all duration-150 shadow-lg hover:shadow-purple-500/25">
+                    <History className="mr-2 h-4 w-4" />
+                    View Trade History
+                  </Button>
+                </Link>
+              )}
             </>
           ) : (
             /* Active Participant */
@@ -243,7 +268,9 @@ export default function CompetitionEntryButton({
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
                     {isActive
-                      ? "Start trading now"
+                      ? isProviderGame
+                        ? "Play your round now"
+                        : "Start trading now"
                       : isCompleted
                         ? "Competition has ended"
                         : "Competition will start soon"}
@@ -252,19 +279,37 @@ export default function CompetitionEntryButton({
               </div>
 
               {isActive ? (
-                <Link href={`/competitions/${competition._id}/trade`}>
+                /*
+                  A provider contest is played at /play, never at /trade. Reason this is a
+                  branch and not a redirect on the trade page alone: the trade route guards
+                  itself too, but a player who is shown a button labelled "Start Trading" for a
+                  puzzle has already been told something false, and a bounce afterwards does not
+                  unsay it.
+                */
+                <Link
+                  href={
+                    isProviderGame
+                      ? `/competitions/${competition._id}/play`
+                      : `/competitions/${competition._id}/trade`
+                  }
+                >
                   <Button className="w-full bg-blue-500 hover:bg-blue-600 cursor-pointer active:scale-95 transition-all duration-150 shadow-lg hover:shadow-blue-500/25">
                     <Trophy className="mr-2 h-4 w-4" />
-                    Start Trading
+                    {isProviderGame ? "Play" : "Start Trading"}
                   </Button>
                 </Link>
               ) : isUpcoming ? (
                 <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
                   <p className="text-xs text-yellow-400 text-center">
-                    ⏰ Trading will unlock when the competition starts
+                    ⏰{" "}
+                    {isProviderGame
+                      ? "Play will unlock when the competition starts"
+                      : "Trading will unlock when the competition starts"}
                   </p>
                 </div>
-              ) : isCompleted ? (
+              ) : isCompleted && !isProviderGame ? (
+                /* See the disqualified branch above for why a provider contest gets no
+                   trade-history button. */
                 <Link
                   href={`/competitions/${competition._id}/trade?viewOnly=true`}
                 >

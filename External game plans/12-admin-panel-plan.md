@@ -370,10 +370,12 @@ that the *strict* helper is not imported - a different claim, which the other tw
 keep satisfying. The badge had no test at all. **A probe aimed at the wrong test is
 indistinguishable from a test that does not work.**
 
-**What this does not include:** no player screen starts a round, so the play step remains
-API-only; there is no unpublish, deliberately, because a visible contest can already have been
-paid into and cancel-with-refund is the reversible operation; and the round inspector, manual
-resolution and live-contest controls in section 4 are still unbuilt.
+**What this does not include:** ~~no player screen starts a round~~ (**built the same day** -
+`13` s1.1a); there is no unpublish, deliberately, because a visible contest can already have been
+paid into and cancel-with-refund is the reversible operation; and ~~the round inspector, manual
+resolution~~ (**also built the same day** - section 4.2a) and the live-contest controls in section
+4 are still unbuilt. **Correct as history, stale as a present fact** - only the live-contest
+controls and provider health remain.
 
 ---
 

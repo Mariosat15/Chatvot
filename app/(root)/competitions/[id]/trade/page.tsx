@@ -10,6 +10,7 @@ import { getCompetitionTradeHistory } from "@/lib/actions/trading/trade-history.
 import { getUserOrders } from "@/lib/actions/trading/order.actions";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import { connectToDatabase } from "@/database/mongoose";
+import { isProviderContest } from "@/lib/services/games/contest-config";
 import TradingInterface, {
   TradingModeProvider,
 } from "@/components/trading/TradingInterface";
@@ -58,6 +59,32 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
   const competition = await getCompetitionById(competitionId);
   if (!competition) {
     redirect("/competitions");
+  }
+
+  /**
+   * A provider-game contest is not traded, so it must never render this workspace.
+   *
+   * This page is charts, an order form, positions and margin - all of which are meaningless for
+   * a puzzle or a quiz, and none of which would ERROR. Before this guard a player who joined a
+   * provider contest and followed a bookmark, a dashboard card or a stale link arrived at a
+   * forex terminal for a game with no market, and the screen worked perfectly while being
+   * entirely wrong. The button that used to send them here now sends them to `/play`, but a URL
+   * outlives a button, so the destination has to refuse as well.
+   *
+   * Reason it redirects rather than 404s: the player is a legitimate entrant who wants to play.
+   *
+   * NO LOOP IS POSSIBLE, and it is worth stating because the play route redirects back here. The
+   * two guards are exact complements of the same predicate: this one bounces a contest when
+   * `isProviderContest` is true, and `/play` bounces one only when `getPlayState` answers
+   * `not_provider_contest`, which is that same predicate being false. Pinned by a test, because a
+   * later change to either condition that made them overlap would produce an infinite redirect
+   * rather than a wrong screen.
+   *
+   * Chapter 13 section 1 makes this redirect permanent and eventually reverses its direction, once
+   * the trading gameplay moves into the dispatcher at `/play`. Until then it points outwards.
+   */
+  if (isProviderContest(competition)) {
+    redirect(`/competitions/${competitionId}/play`);
   }
 
   // Check if competition is active OR if user is viewing results of completed competition
@@ -133,11 +160,20 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
   // Calculate daily realized P&L (from today's closed trades)
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const dailyRealizedPnl = tradeHistory
-    .filter((trade: any) => trade.closedAt && new Date(trade.closedAt) >= today)
+  // Reason for the local type rather than `any`: the `eslint-disable` that used to sit here
+  // covered only the next line and so suppressed nothing, which the linter itself reported as an
+  // unused directive. Naming the three fields this calculation reads is both accurate and
+  // narrower than `any`, and it changes no behaviour - `?? 0` still covers an absent number.
+  type ClosedTradeRow = {
+    closedAt?: Date | string | null;
+    pnl?: number | null;
+    realizedPnl?: number | null;
+  };
+
+  const dailyRealizedPnl = (tradeHistory as ClosedTradeRow[])
+    .filter((trade) => trade.closedAt && new Date(trade.closedAt) >= today)
     .reduce(
-      (sum: number, trade: any) => sum + (trade.pnl ?? trade.realizedPnl ?? 0),
+      (sum: number, trade) => sum + (trade.pnl ?? trade.realizedPnl ?? 0),
       0,
     );
 

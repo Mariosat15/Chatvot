@@ -5,6 +5,10 @@ import {
   launchContestRound,
   type LaunchRefusal,
 } from "@/lib/services/games/round-launch.service";
+import {
+  getPlayState,
+  type PlayStateRefusal,
+} from "@/lib/services/games/round-status.service";
 
 /**
  * POST /api/competitions/[id]/rounds - start a round in a provider-game competition.
@@ -55,6 +59,74 @@ function statusFor(refusal: LaunchRefusal): number {
       return 503;
     default:
       return 500;
+  }
+}
+
+/**
+ * GET /api/competitions/[id]/rounds - the caller's own play state in this contest.
+ *
+ * Two jobs, and it is one endpoint because they want exactly the same data. Before playing,
+ * the pre-flight panel needs the attempts remaining and any round left in flight. After the
+ * provider's iframe reports that it has finished, the client polls this until the round leaves
+ * a live status - because **the iframe's message is a UI hint and the real result arrives at
+ * the signed callback from the provider's servers.** Asking our own database is the only way
+ * to know whether a score actually landed.
+ *
+ * IT MUST NEVER CONSUME AN ATTEMPT. A GET is retried by browsers, prefetched by Next.js and
+ * repeated by pollers; the POST beside it burns an attempt on creation, deliberately, so the
+ * two must not be confusable. That is also why the play page renders a button rather than
+ * launching on load - see `app/(root)/play/[competitionId]/page.tsx`.
+ */
+function statusForPlayState(refusal: PlayStateRefusal): number {
+  switch (refusal) {
+    case "not_found":
+      return 404;
+    case "not_a_participant":
+      return 403;
+    case "not_provider_contest":
+      return 400;
+    case "misconfigured":
+      return 503;
+    default:
+      return 500;
+  }
+}
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
+
+    const { id: competitionId } = await params;
+
+    // THE USER ID COMES FROM THE SESSION, NEVER FROM THE REQUEST. `getPlayState` scopes every
+    // query to it, which is what stops this being a way to read another player's score before
+    // the leaderboard is published. A query parameter here would be a silent information leak
+    // that returns 200 with correct-looking data.
+    const outcome = await getPlayState(competitionId, session.user.id);
+
+    if (!outcome.success) {
+      return NextResponse.json(
+        { success: false, error: outcome.error, refusal: outcome.refusal },
+        { status: statusForPlayState(outcome.refusal) },
+      );
+    }
+
+    return NextResponse.json({ success: true, ...outcome.state });
+  } catch (error) {
+    console.error("❌ Round state route failed:", error);
+    return NextResponse.json(
+      { success: false, error: "Something went wrong. Please contact support." },
+      { status: 500 },
+    );
   }
 }
 

@@ -101,8 +101,9 @@ export default [
           // with a "games/" segment, not just the games code layer. It caught
           // "@/database/models/games/provider-game.model" when X2 added that folder, and
           // "@/lib/services/games/result-ingestion.service" when X3 added that one, and
-          // "@/components/admin/games/GameProvidersSection" when X6 added that one. All
-          // three read exactly like a real violation.
+          // "@/components/admin/games/GameProvidersSection" when X6 added that one, and
+          // "@/components/games/ProviderRoundHost" when the player play screen added the
+          // fourth. All four read exactly like a real violation.
           //
           // THE WILDCARD IS KEPT DELIBERATELY, NOW THAT THE COST IS KNOWN. Anchoring it to
           // "**/lib/games/*" would end the collisions, but the rule matches the import
@@ -115,9 +116,14 @@ export default [
           // None of the exceptions weakens anything. Models are governed by invariant 2,
           // which bans them INSIDE game modules; importing one from the engine is ordinary.
           // lib/services/games IS engine code - the round and ingestion services own
-          // contest-side lifecycle, not any one game's rules. And components/admin/games
-          // is admin UI: a React screen is not a game module and has no scoring rules to
-          // leak, so nothing can bypass the registry through it.
+          // contest-side lifecycle, not any one game's rules. And components/games and
+          // components/admin/games are UI: a React screen is not a game module and has no
+          // scoring rules to leak, so nothing can bypass the registry through it.
+          //
+          // Note the player and admin UI exceptions are written separately rather than as one
+          // "!**/components/**" - a components folder is exactly where somebody would
+          // eventually put a game module's own logic "just to keep it near the screen", and a
+          // blanket exemption would let that through silently.
           group: [
             "**/games/*",
             "**/games/*/**",
@@ -128,6 +134,7 @@ export default [
             "!**/tools/games/**",
             "!**/models/games/**",
             "!**/services/games/**",
+            "!**/components/games/**",
             "!**/components/admin/games/**",
           ],
           message:

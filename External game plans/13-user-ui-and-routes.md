@@ -46,6 +46,89 @@ gameplay component:
 
 ---
 
+## 1.1a What was built - the provider half of the dispatcher (5 Sep 2026)
+
+**Status: the provider branch is code-complete. The trading branch is not, and the redirect
+therefore runs the opposite way round from the target above.**
+
+A player who has entered a provider contest can now start a round, play it in the frame, and see a
+confirmed result, **by clicking**. Before this the whole play step was reachable by API and by test
+only. 42 tests, 20 probes all red on the expected test.
+
+### Files
+
+| File | Role |
+|---|---|
+| `app/(root)/competitions/[id]/play/page.tsx` | The route. Reads state, renders the host. **Never launches a round.** |
+| `components/games/ProviderRoundHost.tsx` | The state machine: preflight, launching, playing, confirming, settled |
+| `components/games/ProviderGameFrame.tsx` | The iframe and the three checks on every inbound message |
+| `components/games/provider-frame-messages.ts` | The four-message allowlist, the height clamp, the origin derivation. Model-free and framework-free |
+| `components/games/RoundPreflight.tsx` | What a player is told before an attempt is spent |
+| `components/games/RoundResultPanel.tsx` | The result, including the generic `scoreBreakdown` renderer |
+| `components/games/play-state.ts` | The browser's copy of `PlayState`. Pinned field-for-field against the service |
+| `lib/services/games/round-status.service.ts` | `getPlayState` - the caller's own attempts and rounds. **Not mirrored** |
+| `app/api/competitions/[id]/rounds/route.ts` | Gained a `GET` beside the existing `POST` |
+
+### The route is the one this chapter specifies, and it had to be corrected to get there
+
+`09` E6 called it `/play/[contestId]`; this chapter called it `/competitions/[id]/play`. The build
+follows this chapter. Getting it wrong would have meant renaming a URL players had bookmarked, or
+running two play routes for ever.
+
+**The redirect currently points outwards, which is the reverse of the target.** A trading contest
+reaching `/play` is sent to `/trade`, not rendered here, because the trading branch needs
+`TradingPageContent` and its six context providers moved - a change to the live trading path
+carrying **R18** and **R19**. When X7 moves them, the redirect flips direction and no URL changes.
+**No loop is possible in either arrangement**: the two guards are exact complements of
+`isProviderContest`, and a test pins that, because an overlap produces an infinite redirect rather
+than a wrong screen.
+
+### Five things worth carrying
+
+- **A GET must never consume an attempt, and a server component is a GET.** An attempt is spent
+  when a round is *created*, deliberately, so a page that launched on render would burn a paying
+  player's only attempt because **Next.js prefetches `<Link>` targets on hover**. The page renders
+  a button; the POST happens on the click. This is the reason the play screen is a state machine
+  rather than a redirect through the launch API, and it is easy to lose in a later "simplification".
+- **The score has no route through the browser, which is stronger than remembering not to read
+  one.** `ProviderFrameMessage` has no score field at all, so a `finished` message carrying
+  `score`, `rawScore`, `points`, `prize` and `rank` yields an object with two keys. `finished`
+  means "go ask the server", never "the player scored X". Proven behaviourally, not structurally.
+- **The sandbox omission is the feature.** `allow-top-navigation` is absent, so a game cannot
+  navigate the player's whole page away from ChartVolt - which a provider bug or a compromised game
+  would otherwise do mid-contest, looking to the player exactly like our site crashing.
+  `allow-popups` is absent for the same reason, matching the spec's "no external links out".
+- **Three checks on every message, and the strongest is the one nobody writes first.**
+  `event.source === frame.contentWindow` proves the message came from the window we opened and
+  cannot be forged by an unrelated page; the origin check catches a frame that has navigated itself
+  elsewhere; the allowlist catches the rest. The source check is silent because a page receives
+  constant `postMessage` traffic from extensions and dev tools, while an origin mismatch on our own
+  frame is logged, because that is a real integration fault.
+- **"Resume" and "Play" are different promises.** Relaunching a live round returns the *same* round
+  with a fresh launch URL, because `createRound` is idempotent on a live round - so resuming costs
+  nothing. Labelling it "Play" would tell a player they were spending an attempt they are not, and
+  some would decline and let a round expire instead.
+
+### What it does not do
+
+- **No live leaderboard during play** (section 11's polling recommendation is unimplemented). A
+  player sees their standing when they return to the contest page.
+- **No practice mode.** Needs `supportsPractice` and a free, unranked path.
+- **No game-aware dashboard.** `ActiveCompetitionCard` and `CompetitionsTable` still render PnL,
+  positions and recent trades and label the action "Trade Now". The `/trade` route redirects, so
+  the *destination* is right, but the card is still trading-shaped. Deferred to the dashboard pass
+  in section 5 rather than half-done, because it is a rewrite of components every trading player
+  sees daily.
+- **No CSP `frame-src` allowlist.** There is no Content-Security-Policy in `next.config.ts` at all,
+  so adding one is a platform-wide change that would also have to account for the Nuvei payment
+  flow and the tutorial embeds. There is also **nothing to allowlist yet** - `game_provider` stores
+  `baseUrl`, the provider's *API* host, and the spec's own example puts play on a different
+  subdomain, so the play domain is a fact we collect from a real provider at X4. Until then the
+  message origin is derived from the launch URL we actually loaded, which is the check that
+  matters. **Do not record this as done.**
+
+---
+
 ## 2. Provider scoping - the mistake that must not be made
 
 Six React context providers are mounted on the two trade pages today:
@@ -279,10 +362,14 @@ Split across **X7** and **X8**; the provider-specific play and result screens fr
 ## 13. Acceptance criteria
 
 - [ ] A player can browse, join, play and collect prizes for a provider game **without
-      seeing a trading screen**
+      seeing a trading screen** — **play and results done** (5 Sep 2026, s1.1a); browsing is
+      not, so the contest is still found in the trading-shaped `/competitions` list
 - [ ] The six trading providers do **not** mount for a provider contest - verified in the
-      browser, not assumed
-- [ ] `/trade` still resolves for every existing link
+      browser, not assumed — **structurally true** since `/competitions/[id]/play` is a
+      separate route that mounts none of them, but **not yet verified in a browser**, which is
+      the half of this criterion that catches a provider hoisted into a shared layout
+- [x] `/trade` still resolves for every existing link — it renders trading as before and
+      redirects **only** a provider contest, which nothing could previously reach through it
 - [ ] A player with no trading history sees no trading panel anywhere
 - [ ] `tradingEnabled = false` produces a coherent product with no dead links and no
       empty panels
