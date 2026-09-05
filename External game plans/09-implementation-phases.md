@@ -6,13 +6,13 @@ nothing touching money goes live until everything around it has been proven.
 > ## SUPERSEDED - USE `10` SECTION 3
 >
 > **The owner decided external-only on 2 September 2026:** provider games are the only new
-> games, and no in-house game is built. This chapter assumed the opposite - that the
+> games. **Amended 5 Sep 2026: one in-house game IS built as a hedge** (X4a, `21`), speaking the provider protocol rather than as a game module. This chapter assumed the opposite - that the
 > `New games plan` would also deliver Stage 0, the game-module foundation and all the
 > platform-wide work, leaving external games as an addition to an already-generalised
 > platform.
 >
 > **The operative plan is `10-external-only-programme.md` section 3** - a self-contained
-> X0-X12 sequence of **23-30 weeks**, running **admin-first** at the owner's instruction.
+> X0-X12 sequence of **26.5-35 weeks** (including X4a), running **admin-first** at the owner's instruction.
 >
 > **Nothing below is wasted, and that is why the chapter is kept.** Every E-phase survives
 > inside the X-phases - E1 becomes X2, E2 becomes X3, and so on - so the phase *contents*,

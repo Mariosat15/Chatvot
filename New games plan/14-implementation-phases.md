@@ -18,7 +18,7 @@ The build order for the **New Games Plan**. Each phase is independently shippabl
 > | **P1** foundation | **X1**, from `External game plans/11` |
 > | **P2** in-house Trivia | **Not being built** |
 > | **P3**-**P7** | **X6**-**X11**, from `External game plans/12`-`16` |
-> | The 14-19 week total | Replaced by **23-30 weeks** for X1-X12. Longer, not shorter: the provider integration costs more than the in-house game it replaces, every platform-wide change is identical either way, and the owner's 2 September brief added ~3 weeks of new scope |
+> | The 14-19 week total | Replaced by **26.5-35 weeks** for X1-X12 (including X4a, the in-house hedge game approved 5 Sep 2026). Longer, not shorter: the provider integration costs more than the in-house game it replaces, every platform-wide change is identical either way, and the owner's 2 September brief added ~3 weeks of new scope |
 >
 > Two owner instructions came with the decision and both change the order rather than the
 > contents: **admin-first**, and **one step at a time so the running app is never broken.**

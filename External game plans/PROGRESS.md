@@ -17,7 +17,7 @@
 | **Next action** | **Commercially: find and assess a provider using `08`** - X4 cannot start without one, and nothing else in the programme is blocked on engineering. Technically the next slices are provider **health** (the last of X6's five admin destinations) and the game-aware **contest list and dashboard** (`13` s4/s5), which is where the remaining trading-shaped player screens live |
 | **Money defects closed** | **R26 closed 5 Sep 2026** - the admin cron's finalize copy paid **no** Game Master earnings and recorded no `retained_gm_fee` either, so the commission silently stayed with the platform. This one was **actively losing money rather than latent**: both apps run `checkAndFinalizeCompetitions` on an every-minute cron, so payment depended on which cron won the race. **Not retroactive - no backfill**, and past contests cannot be found by querying for retained rows because none were written. Also **R31** (a 0% Game Master rate paid 5%) and the two P0 score defects, same day |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
-| **Planned, awaiting an owner decision** | **X4a - the reference provider** (`21`). A fake company registered through the real admin screens, serving a **real playable skill game from its own origin**, reporting through the real signed callback. It exists because **the review gate the programme is sequenced around cannot currently be held**: `mock.adapter.ts` returns a hostname that does not resolve, so the play screen's iframe fails to load and the final step has never been performed by a person. **No commercial dependency**, 1-1.5 weeks as a harness. The decision in `21` s8 is whether it also serves as **open question 10's in-house hedge game**, which shares the same "before X4" deadline and is mechanically the same work at a much higher quality bar. **Recommendation: build the harness, decide the hedge separately** - and note that doing so leaves risk **X8 exactly where it is** |
+| **Next phase, scope decided** | **X4a - ChartVolt as a first-party provider, with a real playable game** (`21`), **3.5-5 weeks**, starting before the provider health panel. It exists because **the review gate the programme is sequenced around cannot currently be held**: `mock.adapter.ts` returns a hostname that does not resolve, so the play screen's iframe fails to load and the final step has never been performed by a person. **Owner decided 5 Sep 2026 that it is both** the reference implementation *and* open question 10's hedge game - which **modifies the 2 Sep "no in-house game is built" decision** and is recorded in the decision log rather than by editing that entry. **No commercial dependency.** Two things not to misread: **risk X8 is reduced when it ships, not now**, and X4a **shrinks X4 without replacing it** - a provider we control cannot rehearse a real partner's auth, error shapes, latency or pricing |
 | **Owner instruction on record** | **External games only, no in-house game** (2 Sep 2026). **One step at a time, admin first, do not break the running app.** |
 | **Not owner-tested** | Everything after the 2 Sep navigation restructure. X1-X3, X5, the provider admin slice and the contest wizard are all **code-complete, awaiting owner test** - and "code-complete" here excludes the replay script and the label backfill, neither of which has been run against production |
 | **Last updated** | 5 September 2026 |
@@ -131,7 +131,7 @@ from it change facts stated in this folder:
 | Scenario | Meaning | Programme | Documents | Status |
 |---|---|---|---|---|
 | **Add-on** | The `New games plan` is delivered too - foundation, an in-house game, all platform work. External games are an addition | E1-E9, 7.5-8 weeks engineering on top | `01`-`09` | **NOT being pursued** |
-| **External-only** | **Provider games are the only new games.** No in-house game | X0-X12, **23-30 weeks** total | `01`-`09` **and** `10`-`20` | **CHOSEN** |
+| **External-first** | Provider games are the route. **One in-house game is built as a hedge** - X4a, 5 Sep 2026, speaking the provider protocol rather than as a game module | X0-X12 incl. **X4a**, **26.5-35 weeks** total | `01`-`09` **and** `10`-`21` | **CHOSEN** |
 
 **Read `10`-`20`, not just `01`-`09`.** Chapters `01`-`09` were written assuming the
 `New games plan` would deliver the foundation and every platform-wide change. It will
@@ -142,7 +142,7 @@ that delegates it to a chapter in this folder.
 **What this decision does NOT mean.** It is **not** the cheaper route, and it must never
 be presented internally as one. Dropping the in-house game saves ~3.5 weeks; a correct
 provider integration costs ~7. Every platform-wide change - admin, navigation, wording,
-flags, catalogue, scoring, profile - is identical either way. **23-30 weeks against
+flags, catalogue, scoring, profile - is identical either way. **26.5-35 weeks against
 12-17**, and see the caveat in `10` section 2 - the 12-17 figure was never updated for the
 owner's 2 September brief, so the gap is not the price of the decision. What it buys is a
 catalogue of many titles and no per-title content burden, at
@@ -343,7 +343,7 @@ numbers in chapters `01`-`09` remain resolvable. **Plan against the X-phases bel
 | **X1** | Foundation: game label, score, registry, four seams, **GM insert game label** | `11` + `19` s3.1 | 2.5-3.5 weeks | **`CODE-COMPLETE`** 4 Sep 2026. Ranking gate **cleared** (replay: 4/4 reproduced exactly). Backfill written, **not yet `--apply`d** |
 | **X2** | Provider abstraction + mock adapter | `09` E1 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026. Nothing player-visible - `externalGamesEnabled` defaults false |
 | **X3** | Round lifecycle + result ingestion | `09` E2 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026. **Rehearsals 1-6 of `07` s9 green** against the mock (49 tests, 6 guards probed). 7-10 need X5/X8 |
-| **X4a** | **Reference provider + a real playable game** - a fake company registered through the real admin screens, serving a real skill game from its own origin, reporting through the real signed callback | `21` | 1-1.5 weeks | `PLANNED` - **owner decision outstanding**: harness only, or also open question 10's hedge game (`21` s8). **No commercial dependency** - the only remaining work on the shortest useful path that does not wait on a contract. Exists because **the review gate `10` s4 is sequenced around cannot currently be held**: `mock.adapter.ts` returns `https://mock.provider.test/...`, which does not resolve, so the play screen's iframe fails to load and the last step of the lifecycle has never been performed by a person |
+| **X4a** | **ChartVolt as a first-party provider + a real playable game** - registered through the real admin screens, served from its own origin, reporting through the real signed callback. **Doubles as the in-house hedge game** | `21` | **3.5-5 weeks** | `PLANNED, NEXT` - scope **decided 5 Sep 2026: it is both** the reference implementation and open question 10's hedge game, which is why the estimate is not 1-1.5 weeks. **No commercial dependency** - the only remaining work on the shortest useful path that does not wait on a contract. Exists because **the review gate `10` s4 is sequenced around cannot currently be held**: `mock.adapter.ts` returns `https://mock.provider.test/...`, which does not resolve, so the play screen's iframe fails to load and the last step of the lifecycle has never been performed by a person. **Runs before the provider health panel**, so health can be proven by watching it go red |
 | **X4** | Real adapter against sandbox | `09` E3 | 1 week | `NOT STARTED` - **blocked on a signed provider**. X4a shrinks it but **does not replace it**: a harness we control cannot rehearse a real partner's auth, error shapes, latency or pricing |
 | **X5** | Contest integration + settlement | `09` E4 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026, **with two P0 payout defects found and fixed 5 Sep 2026** - publish, entry, ranking, round launch, settlement and **all three unresolved-round policies**. **A provider contest can be published, entered, played and paid. Publishing became clickable on 5 Sep 2026 (X6 slice), and the player round launch on the same day (`13` s1.1a) - the lifecycle is no longer API-only anywhere.** Settlement was an **extraction**: the payout, fee/GM and completion stages moved to `lib/services/settlement/` and trading was rewired onto them. Closing `exclude` also closed **`hold_and_alert`**, which nothing had ever consumed. **The two P0s are why "code-complete" must never be read as "correct":** no code path wrote `participant.score`, so every player settled on zero and split the pool equally; and settlement read `scoreDirection` off a field neither participant copy declared, so a lower-is-better game paid the slowest player first |
 | **X6** | Admin: nav restructure incl. **the single Trading section**, RBAC, provider registration, game-aware wizard, analytics, **GM creation API + wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | `PARTIALLY DONE` - nav restructure and single Trading destination **built and owner-tested 2 Sep 2026**. **Provider registration, credentials and the per-title catalogue switch code-complete 4 Sep 2026** (`12` s4.1a). **Contest wizard from `configSchema` + pre-flight validation code-complete 4 Sep 2026** (`12` s2.1) - creates a **draft**. **The publish control is code-complete 5 Sep 2026** (`12` s3.1a), which also made the competitions list game-aware: `draft` admitted as a status, its own badge, a Drafts count, a provider game badge, and the trading Edit button **withheld** from provider contests because `PUT /api/competitions/[id]` blind-assigns that form's body. **The round inspector and manual resolution are code-complete 5 Sep 2026** (`12` s4.2a) - read-only inspection plus **ending** a stuck round (void/abandoned/expired) with a mandatory reason; it deliberately **cannot enter a score**. Still `NOT STARTED`: provider health panel, live-contest controls, provider contest **editing**, analytics by provider, GM creation API |
@@ -370,29 +370,36 @@ and each one is a real addition rather than a re-label:
 - **X11.5 is entirely new.** Smart onboarding and interest-based matchmaking appear nowhere
   in chapters `01`-`19`. New chapter `20`.
 
-**Net effect: 23-30 weeks for X1-X12**, up from 20-26. The increase is ~3 weeks of genuinely
-new scope, not a re-estimate of existing scope.
+**Net effect of the 2 September brief: 23-30 weeks for X1-X12**, up from 20-26. The increase
+is ~3 weeks of genuinely new scope, not a re-estimate of existing scope.
+
+**Superseded on 5 September 2026: the live figure is 26.5-35**, after X4a added the in-house
+hedge game. The 23-30 above is kept because this section is specifically about what the
+2 September brief changed, and rewriting it would erase the itemisation that makes the
+increase believable. **Read it as history, not as the current total.**
 
 **Game Master work is not a separate phase.** It is distributed: the game label on both
 Game Master competition inserts is a **gate inside X1**, the creation API and UI land in
 X6, analytics in X7, tier wording in X8. Total ~2.5 weeks, all inside the figures above.
 See `19`.
 
-**X1-X12: 23-30 weeks**, plus X0 separately. **The shortest useful path is X0-X5 plus a
+**X1-X12: 26.5-35 weeks**, plus X0 separately. **The shortest useful path is X0-X5 plus a
 minimal slice of X6 - nine to eleven weeks of engineering, 11-14 in calendar terms**
 because X4 onward waits on sandbox access. It produces a provider contest a player can pay
 for and play, and that is the right place to pause and review against real behaviour.
 
-**The 23-30 figure does NOT yet include X4a (`21`), and that is deliberate rather than an
-omission.** The phase list, the effort figures and the total appear in four places - this
-table, `10` section 3, `00-README.md` and section 16 of the internal HTML, whose diagram 10
-is **drawn to scale** and must be rescaled rather than relabelled. Changing all four for a
-figure that depends on an unanswered question would mean doing it twice: X4a is **1-1.5
-weeks as a harness** and materially more if the owner also treats it as open question 10's
-hedge game (`21` s8). **Sync all four the moment that decision lands**, and until then read
-23-30 as excluding X4a. Note the harness week is not purely additive either - some of it is
-X4 work brought forward, so the honest statement after the decision may be a smaller
-increase than 1-1.5.
+**Revised 5 September 2026 to 26.5-35 weeks, and the 23-30 figure is now stale.** X4a adds
+**3.5-5 weeks** because the owner decided it is both the reference implementation and the
+in-house hedge game (`21` s8) rather than the 1-1.5 week harness first proposed. **This is
+real new scope, not a re-estimate** - it is a second game the platform now owns, chosen
+deliberately to buy down risk X8, and any summary presenting 26.5-35 as the same programme
+re-scored is wrong. In practice some of X4a overlaps X4, so the delivered increase may be
+smaller; **X4's own 1-week estimate is left untouched** rather than optimistically reduced
+before the overlap is real.
+
+**Any figure of 23-30 is now stale, as are 20-26 and 18-24.** The figure appears in four
+places - this table, `10` section 3, `00-README.md` and section 16 of the internal HTML, whose
+**diagram 10 is drawn to scale, so rescale the bars rather than relabelling them.**
 
 That shortest path is unchanged by the admin-first decision, and the reason is worth
 stating because it looks contradictory: **admin-first orders the work inside X6 and X7, it
@@ -430,6 +437,8 @@ X12 pilot. All three are in `17` section 7.
 | 30 Aug 2026 | **Game Masters get their own chapter, `19`** | An earlier draft called them "four smaller items, three to four days". The real system is three collections, 28 routes, a tier economy, a referral chain, a renewal worker job and two earning paths. The real figure is ~2.5 weeks, and one item inside it is a gate |
 | 30 Aug 2026 | **Game Masters may not create provider contests at launch** - `limits.allowedGameTypes` defaults to `["trading"]` | A provider charges per round; the Game Master share is a percentage of the entry fee taken **before** that cost, and the existing cap is against **gross** platform fee. A popular low-fee contest can therefore be net loss-making while still paying the Game Master. They still **earn** from referred players in provider contests from day one - only creation is gated. Revisit once the share is computed on net fee after provider cost. `19` section 5 |
 | **2 Sep 2026** | **EXTERNAL-ONLY. Provider games are the only new games; no in-house game is built** | Owner decision, closing open question 0. Chapters `10`-`20` own every platform-wide change that `01`-`09` had delegated to the `New games plan`. The then-current 20-26 week figure was accepted knowing it is the broader route, not the cheaper one; the same brief that carried the decision added ~3 weeks of scope, taking it to **23-30**. **Consequence to keep visible: there is no in-house fallback if the provider search or the pricing fails**, which raises rather than removes open question 10 |
+| **5 Sep 2026** | **AN IN-HOUSE GAME IS BEING BUILT AFTER ALL, as the hedge - closing open question 10 in the affirmative.** Phase **X4a**, chapter `21`. It doubles as the reference implementation that proves the provider seam | Owner decision. **This modifies the 2 Sep external-only decision, whose wording "no in-house game is built" is now false**, and it is recorded here rather than by quietly editing that entry. What survives is the important part: the programme is still external-**first**, and `New games plan` P2's in-house Trivia game is still not being built. What changed is that the platform will fund **one** game of its own as insurance against the provider search or the pricing failing - the exposure risk **X8** describes, which the 2 Sep decision raised rather than removed and which no amount of test tooling touches. **Three consequences that are design, not estimate:** the provider row must represent **ChartVolt as first-party**, never a placeholder company, because a provider joined to contest history can never be deleted or renamed away from it; the game speaks the **provider protocol**, so the hedge costs none of P1/P2's in-house module architecture; and the **arm's-length rules become more important, not less** - every shortcut that integrates it deeply destroys both purposes at once. Estimate 1-1.5 weeks becomes **3.5-5**. **X8 is reduced when it ships, not now** |
+| **5 Sep 2026** | **X4a runs BEFORE the provider health panel** | Owner decision, and the reason generalises: a health panel wired to a mock that always answers "fine" **renders green for ever** and cannot be shown to work. Building the thing that can genuinely be switched off first means health is provable by observing it go red. Same failure shape as the trading-shaped services - the screen reports success while telling you nothing |
 | **2 Sep 2026** | **Build admin-first, one step at a time, without breaking the running app** | Owner instruction. Admin is where a game becomes addable at all, and the admin app is a separate process with no player traffic - a broken admin screen inconveniences an operator, a broken player screen costs money and trust. Reorders work **inside** X6/X7 and after; **X1 still comes first**, because a second game must be representable before it can be administered |
 | **2 Sep 2026** | **Trading becomes one game among several, and all trading administration collapses into a single Trading section with its own internal tabs** | Owner requirement. Today ~60 admin sections interleave trading-specific and generic ones, so trading cannot be hidden or reasoned about as a unit. `12` section 1 gains the internal tab list |
 | **2 Sep 2026** | **Games are registered by an operator the way payment providers are** - a provider list, credentials, sandbox/production toggle, test-connection, enable per title | Owner requirement, and the pattern already exists in `PaymentProvidersSection.tsx` + `payment-provider.model.ts`. **Copy the UX, not the storage:** that model embeds `credentials[]` in the readable document and has a `saveToEnv` flag that writes secrets to `.env`. `04` section 3.1 deliberately keeps game credentials out of `game_provider` so admin screens can read it freely. `12` section 4 records the split |
@@ -463,7 +472,7 @@ X12 pilot. All three are in `17` section 7.
 |---|---|---|---|---|
 | 8 | Is there a **committed date** for sandbox access, not just a promise? | Commercial | Before X1 starts - five weeks of work is blocked on it | **X1** |
 | 9 | Will a **second provider** be evaluated before public launch, even if only one goes live? | Commercial | Before X12 | **X2**, **X6** |
-| 10 | **RAISED IN PRIORITY 2 Sep 2026.** Is a small **in-house insurance game** worth keeping on the backlog as a hedge? See `10` section 5. The external-only decision removes the fallback that made this optional - if the provider search or the pricing fails, the platform has funded the entire foundation and admin programme and still has one game. **Now entangled with X4a (`21`), 5 Sep 2026:** the reference provider's playable game is mechanically the same thing at a lower quality bar, and shares this deadline. `21` s8 puts the two side by side. **Answering this question no longer only decides a backlog item - it decides how X4a is built**, because a harness and a product game diverge on day one | **Owner** | **Before X4** - the last point where the answer is still cheap, and now also **before X4a starts** | **X2**, `21` |
+| ~~10~~ | **ANSWERED YES, 5 Sep 2026 - the hedge game is being built**, as phase **X4a** (`21`), where it doubles as the reference implementation for the provider seam. The question was: is a small in-house insurance game worth keeping on the backlog, given the external-only decision left no fallback if the provider search or the pricing fails? It is no longer on the backlog - it is scheduled, before X4, at **3.5-5 weeks**. **It modifies the 2 Sep decision's "no in-house game is built"** - see the decision log. **Risk X8 is reduced when it ships, not now** | **Owner** | **ANSWERED** | `21` |
 | 11 | How is the **Game Master revenue share** calculated when a provider charges per round? | Product | Before Game Masters touch provider games. Default: exclude them | `16` s3 |
 | 12 | Does the provider's catalogue justify pulling the **games catalogue (X11)** forward? Ten titles at once changes the answer | Product | After the first catalogue sync | `16` s1 |
 
@@ -618,6 +627,99 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 5 Sep 2026 - X4a PLANNED - AN IN-HOUSE GAME AFTER ALL, AND THE REVIEW GATE THAT CANNOT BE HELD
+
+**Shipped:** documentation only. No code. New chapter
+`21-reference-provider-and-mock-game.md`, phase **X4a** added to the programme, and two owner
+decisions recorded.
+
+**What X4a is:** ChartVolt registered as a **first-party provider** through the real admin
+screens, serving a **real playable skill game from its own origin**, reporting through the
+**real signed callback**. It is simultaneously the reference implementation that proves the
+provider seam and - after the owner's decision below - the platform's in-house hedge game.
+
+**Why it earns a phase, and this is the part worth keeping.** The programme is sequenced around
+a review gate (`10` s4): build the shortest useful path, then watch a real player pay for and
+play a non-trading game before committing to the rest. **That review is currently impossible to
+hold, and nobody had noticed.** Every part of the path is built except X4, X4 is blocked on a
+contract, and `mock.adapter.ts` returns `https://mock.provider.test/play/<roundId>` - a hostname
+that does not resolve. So the play screen shipped earlier today renders an iframe that fails to
+load. Everything up to the last step is proven by tests, and **the step a player actually cares
+about has never been performed by a person.** The general form, which is this project's
+recurring shape in a new place: **a green suite tells you the parts work, never that the whole
+thing has been done once.**
+
+**Owner decision 1 - it is BOTH, so an in-house game is being built.** The recommendation in
+this chapter's first draft was the harness alone; it was **overruled**, and the reasoning for
+the choice made is better than the recommendation it replaced. Harness-only leaves risk **X8**
+untouched - the whole foundation and admin programme funded and still exactly one game if the
+provider search or the pricing fails - and no amount of test tooling touches that. **This
+modifies the 2 September external-only decision, whose wording "no in-house game is built" is
+now false**, and it is recorded in the decision log rather than by editing that entry, because
+a change of direction is the fact a future reader needs.
+
+**Three consequences that are design rather than estimate:**
+
+- **The provider row must represent ChartVolt as first-party, never a placeholder company.** A
+  provider joined to contest history can never be deleted, and `gameKey` is immutable, so
+  whatever name is on that row when the first contest settles is in production data, financial
+  reports and audit trails for ever. **Get the name right before the first settlement, because
+  there is no cleanup path.**
+- **The game speaks the provider protocol, so the hedge costs none of P1/P2's in-house module
+  architecture.** It is a provider game that happens to be ours. That is why 3.5-5 weeks buys
+  something the dropped in-house plan would have charged much more for, and it is why "no
+  in-house game *module*" is still true while "no in-house game" is not.
+- **The arm's-length rules matter more, not less.** As a product there will be pressure to
+  share types, call internal services, skip the signature. Every such shortcut destroys both
+  purposes at once - it stops being a valid reference implementation *and* stops proving the
+  seam can carry a real game. **Zero imports from this repo, asserted by a check rather than by
+  review.**
+
+**Owner decision 2 - X4a runs before the provider health panel**, and the reason generalises: a
+health panel wired to a mock that always answers "fine" **renders green for ever and cannot be
+shown to work.** Building the thing that can genuinely be switched off first makes health
+provable by watching it go red. Same failure shape as the trading-shaped services - the screen
+reports success while telling you nothing.
+
+**Files touched:** `21` (new), `10` s3 table + effort paragraph + hard-ordering diagram + s4,
+`17` risk X8 + summary row, `00-README.md` (five places), `09` header note, `PROGRESS.md`
+(status block, X-phase table, decision log, open question 10, documents list, three totals, the
+2 Sep work-log entry), `ChartVolt-External-Games-Plan.html` (**diagram 10 rescaled**, figcaption,
+s14 sub-heading, s16 shortest-path, FAQ row), `New games plan` PROGRESS / `00-README` / `14` /
+both HTMLs, and the sync rule's opening scenario statement plus two new paired-document rows.
+
+**Deviated from plan:** the estimate rose from the 1-1.5 weeks first proposed to **3.5-5**, and
+the programme total from **23-30 to 26.5-35 weeks**. Recorded as real new scope, never a
+re-estimate - it is a second game the platform now owns.
+
+**Two things found while syncing, both of which are the reason the sync rule exists.** The
+internal HTML's FAQ row still said **"twenty to twenty-six weeks"** - two revisions behind, stale
+before today's change and missed by the 2 September pass. And **diagram 10 needed a genuine
+rescale**, not a relabel: the axis went from 28 to 32 weeks and every bar in both routes was
+recomputed, verified by script (route A 376px = 16.5 weeks, route B 678px = 29.7, and **the two
+pale blue platform bars still exactly equal at 171px**, which is the entire argument of the
+figure). **X4a is deliberately drawn in the same mid-blue as the in-house route's game
+segment** - the external-only route now visibly contains the thing it was defined by not
+containing, and that is the honest reading rather than a mistake.
+
+**Deferred, deliberately:** whether to tell prospective licensing partners we are also building
+our own title. The partner HTML got the timeline figure and an internal note only. It cuts both
+ways - it shows we can run a game properly, and it tells them we are a potential competitor -
+so it is a commercial call, and **it must not be resolved by consistency with the internal
+documents.**
+
+**Owner tested:** nothing to test; no code shipped.
+
+**Next chat should:** wait for the owner to say start. Then **X4a**, beginning with the game
+concept itself, since everything else depends on it - it must be **skill-based** (chance
+inverts the regulatory position), needs a **lower-is-better** sibling title to make
+`scoreDirection` observable, and must be a **paid multi-player format**, never paid
+single-player. Then provider health, then the game-aware contest list and dashboard. **Do not
+let any summary claim risk X8 is mitigated** - it is reduced when the game ships, not when the
+plan is written.
 
 ---
 
@@ -2491,6 +2593,11 @@ tested, so nothing is *blocking* X1 - the hold is a deliberate one, not a depend
 **The scenario question is closed.** External games only; no in-house game is built. That
 was the single blocking decision in this folder, and chapters `10`-`20` are now the
 operative plan rather than a contingency.
+
+**Amended 5 September 2026, and only the second sentence changed: one in-house game IS being
+built**, as a hedge (X4a, `21`). The scenario question itself stays closed - the route is still
+external-first, and this folder is still the operative plan. **Correct as a record of what was
+decided on 2 September; stale as a description of today.**
 
 **Owner brief, in their order:** admin first and one step at a time so the running app is
 never broken; an admin area where games are added easily; trading demoted to one game with

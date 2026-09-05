@@ -1,4 +1,4 @@
-﻿# PROGRESS - New Games Plan
+# PROGRESS - New Games Plan
 
 > **Read this file first in any new chat about the games plan.**
 >
@@ -17,7 +17,7 @@
 |---|---|
 | **Status** | **STAGE 0 SIGNED OFF BY THE OWNER, 2 SEPTEMBER 2026.** Prerequisites A and B, Defects 2, 1 and 1b, the `SuspicionScore` races and the `challengeId` ledger field are all shipped and tested. **The gate that blocked every games phase is now open.** No open engineering items |
 | **Next action** | Owner runs the test checklist in `00a` — 5 manual items, plus the Prerequisite B checklist. Owner also needs to **allowlist this machine's IP in MongoDB Atlas** so the release script can be run; the code fix releases the affected player regardless |
-| **Scenario** | **EXTERNAL-ONLY, decided 2 Sep 2026.** No in-house game is built. P1-P7 in this folder are superseded by the X-phases in `External game plans/` — see the box below. **Stage 0 is unaffected and still the active work** |
+| **Scenario** | **EXTERNAL-FIRST, decided 2 Sep 2026, amended 5 Sep 2026.** One in-house game **is** built as a hedge (`External game plans/21`, phase X4a) - but it speaks the **provider protocol**, so it does not resurrect this folder's game-module architecture, and P2's Trivia game is still not being built. P1-P7 in this folder are superseded by the X-phases in `External game plans/` — see the box below. **Stage 0 is unaffected and still the active work** |
 | **Owner instruction on record** | "I will need to start today" (1 Sep 2026), superseding "don't start anything" (17 Aug 2026) |
 | **Last updated** | 2 September 2026 |
 
@@ -43,7 +43,7 @@ does not start until the owner ticks the Stage 0 sign-off gate.
 >
 > **The work did not shrink.** Dropping the in-house game saves ~3.5 weeks; a correct
 > provider integration costs ~7, and every platform-wide change is identical either way.
-> The external programme is **23-30 weeks** against this folder's 14-19. If a summary
+> The external programme is **26.5-35 weeks** against this folder's 14-19. If a summary
 > anywhere implies external-only was the cheaper choice, it is wrong - see
 > `External game plans/00-README.md`.
 >

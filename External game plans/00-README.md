@@ -13,7 +13,7 @@ in-house game is built.**
 
 | Scenario | What it means | Status |
 |---|---|---|
-| **External-only** | **Provider games are the only new games.** No in-house game. This folder stands on its own and owns the foundation and every platform-wide change | **CHOSEN** |
+| **External-first** | Provider games are the route, and **one in-house game is built as a hedge** (X4a, 5 Sep 2026) - a provider game that happens to be ours, so it needs no game-module architecture. This folder stands on its own and owns the foundation and every platform-wide change | **CHOSEN** |
 | **Add-on** | The `New games plan` is also delivered - Stage 0, the foundation, an in-house game, all the platform-wide work. External games are an addition | **Not being pursued** |
 
 **Read `01`-`09` and `10`-`20`.** Chapters `01`-`08` are unaffected by the decision - the
@@ -46,25 +46,43 @@ platform work is the same either way.
 | Route | To a second playable, payable game | To a full games platform |
 |---|---|---|
 | In-house game first | ~8-10 weeks | 12-17 weeks (not updated - route not pursued) |
-| External-only | ~11-14 weeks, gated on a signed contract | **23-30 weeks** |
+| External-only | **~12-15 weeks with no commercial dependency**, via X4a | **26.5-35 weeks** |
 
 What the external route buys is **breadth and no content burden** - potentially a whole
 catalogue rather than one game, with the questions, artwork and refresh cycle as the
 provider's cost, not ours. The full reasoning is in `10` sections 2 and 5.
 
-**23-30 weeks, not the 20-26 previously stated.** The owner's 2 September brief added ~3
-weeks of real scope: a player profile specification, opponent selection for challenges,
-and smart onboarding with matchmaking. `10` section 3.1 itemises it. Do not present the
-new figure as a re-estimate of the old programme.
+**26.5-35 weeks, revised 5 September 2026.** It was 20-26, then 23-30 after the owner's 2
+September brief added ~3 weeks of real scope - a player profile specification, opponent
+selection for challenges, and smart onboarding with matchmaking (`10` section 3.1). The latest
+increase is **X4a at 3.5-5 weeks**: the owner decided the reference provider's game is built
+to a player-facing standard and becomes the platform's in-house hedge (`21`). **Any figure of
+23-30, 20-26 or 18-24 is stale, and none of these increases is a re-estimate** - each is scope
+that was not previously in the plan.
+
+**The second column of the table above changed for a different reason and is the more useful
+number.** "To a second playable, payable game" was ~11-14 weeks *gated on a signed contract*;
+with X4a it is ~12-15 weeks **with no commercial dependency at all**, because the game being
+played is one we control. That is the practical point of the phase: it converts the programme's
+first reviewable milestone from something a third party can delay into something we can
+schedule.
 
 ### The consequence of the decision that must stay visible
 
-There is now **no in-house game to fall back on.** In the add-on scenario, a failed
-provider relationship left a working Trivia game behind. Here, if the provider search or
-the pricing fails, the platform will have funded the whole foundation, admin and player
-programme and still have exactly one game. That is risk **X8**, and it is why the question
-of keeping a small in-house game on the backlog as insurance moved *forward* to before X4
-rather than away. `10` section 5.
+There was **no in-house game to fall back on.** In the add-on scenario, a failed provider
+relationship left a working Trivia game behind. Here, if the provider search or the pricing
+failed, the platform would have funded the whole foundation, admin and player programme and
+still had exactly one game. That is risk **X8**, and it is why the question of keeping a small
+in-house game on the backlog as insurance moved *forward* to before X4 rather than away.
+`10` section 5.
+
+**Answered on 5 September 2026: the hedge is being built**, as phase **X4a** (`21`), where it
+doubles as the reference implementation that proves the provider seam. **Two things not to
+misread.** It **modifies** the external-only decision - the sentence "no in-house game is
+built" is now false, though the programme is still external-*first* and `New games plan` P2's
+Trivia game is still not being built. And **risk X8 is reduced when X4a ships, not now**: until
+the game is playable the exposure is exactly what it was, and the existence of a plan must not
+be allowed to feel like a mitigation.
 
 ---
 
@@ -342,10 +360,10 @@ the foundation absorbed, and `11` owns the seam work directly.
 | Aspect | Assessment |
 |---|---|
 | **Technical feasibility** | **High.** No money crosses the boundary, and the primitive is simple: create a round, receive a score |
-| **Effort - external-only, the chosen route** | **23-30 weeks**, because the foundation and every platform-wide change come with it, plus the ~3 weeks added by the owner's 2 Sep 2026 brief. See `10` section 3 |
+| **Effort - external-only, the chosen route** | **26.5-35 weeks**, because the foundation and every platform-wide change come with it, plus the ~3 weeks added by the owner's 2 Sep 2026 brief and **3.5-5 weeks for X4a**, the in-house hedge game decided 5 Sep 2026. Any figure of 23-30 is stale. See `10` section 3 and `21` |
 | **Effort - add-on scenario** | **7.5-8 weeks** engineering on top of the game-module foundation. **Route not pursued** - kept for reference only |
 | **Is it cheaper than an in-house game?** | **No.** It is broader. Dropping the in-house game saves ~3.5 weeks; the integration costs ~7. The prize is a catalogue and no content burden, not a saving |
-| **Is there a fallback if the provider fails?** | **No, not any more.** That is the cost of the decision, and it is why a small in-house hedge game is open question 10 with a deadline of before X4. See `17` risk X8 |
+| **Is there a fallback if the provider fails?** | **Not yet - but one is now being built.** Open question 10 was answered yes on 5 Sep 2026: phase **X4a** (`21`) delivers a real in-house game, which also serves as the reference implementation for the provider seam. **The exposure is unchanged until it ships**, so risk **X8** stays open rather than being downgraded on the strength of a plan |
 | **Hardest part** | Result ingestion done properly: signatures, idempotency, late arrivals, and rounds that never report |
 | **Biggest technical risk** | A round that never returns a result while real prize money waits on it. Addressed in `07-failure-modes-and-edge-cases.md` |
 | **Biggest commercial risk** | Per-round cost. If a provider charges per session, cheap or free contests can cost more to run than they earn. Modelled in `08-provider-evaluation-checklist.md` |

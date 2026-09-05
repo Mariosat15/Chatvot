@@ -25,7 +25,7 @@
 > the current codebase, and `15-platform-transformation-and-gaps.md` is still the record of
 > the games-first direction.
 >
-> **The decision did not make the work smaller.** External-only is **23-30 weeks** against
+> **The decision did not make the work smaller.** External-first is **26.5-35 weeks** against
 > this folder's 14-19, because every platform-wide change is identical either way and the
 > provider integration costs more than the in-house game it replaces. If any summary
 > implies it was the cheaper option, it is wrong.

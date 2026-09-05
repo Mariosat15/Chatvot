@@ -1,6 +1,19 @@
 # 21 - The reference provider and its game (phase X4a)
 
-**Status: PLANNED, not started. Owner decision outstanding on scope - see section 8.**
+**Status: PLANNED, not started. Scope DECIDED 5 September 2026 - see section 8.**
+
+**The owner's decision: it is BOTH.** The game is built to a real quality bar and becomes the
+in-house hedge, closing open question 10 in the affirmative, while still serving as the
+reference implementation that proves the provider seam. Estimate rises from 1-1.5 weeks to
+**3.5-5 weeks**. Sequenced **before** provider health, so the health panel can be proven to go
+red against something that can genuinely be switched off.
+
+**This modifies a load-bearing decision and must not be read as a small change.** The 2
+September external-only decision states "provider games are the only new games; **no in-house
+game is built**". That sentence is now false. What survives of the decision is the important
+part - the programme is still external-**first**, and the in-house Trivia game of
+`New games plan` P2 is still not being built - but the platform is now deliberately funding one
+game of its own as insurance. See the decision log entry of 5 September 2026 in `PROGRESS.md`.
 
 A fake game company, registered through the real admin screens exactly as a real provider
 would be, serving a **real playable skill game from its own origin**, reporting scores
@@ -146,15 +159,18 @@ somebody else's round.
 
 | Deliverable | Notes |
 |---|---|
-| The game itself | A small **skill-based** game. Chance-determined outcomes invert the regulatory position and are out of scope entirely |
-| A second title, lower-is-better | A time trial or similar, purely to make `scoreDirection` observable |
+| The game itself | A small **skill-based** game, now to a **player-facing quality bar**. Chance-determined outcomes invert the regulatory position and are out of scope entirely |
+| A second title, lower-is-better | A time trial or similar, to make `scoreDirection` observable - and, as a product, a second real thing to play |
 | A standalone service | Own port/hostname, own storage, own signing. Zero imports from this repo |
-| Spec-ambiguity log | Every question the implementer had to answer by guessing. **The most valuable output** |
-| Content set | Tagline, description, rules, how-to-play, thumbnail, banner, for both titles |
+| Spec-ambiguity log | Every question the implementer had to answer by guessing. **The most valuable output for the external programme** |
+| Content set | Tagline, description, rules, how-to-play, thumbnail, banner, for both titles, localised |
+| Mobile support | Now in scope, because real players will use it on a phone |
 | A runbook | How to start it, register it, and drive each failure case on demand |
 
-**Estimate: 1-1.5 weeks** as a harness. Materially more if it becomes a product game, which
-is the section 8 decision.
+**Estimate: 3.5-5 weeks**, following the 5 September scope decision in section 8. It was
+1-1.5 weeks as a harness; the increase is game design, art, mobile, localisation, content and
+the QA that a paid game needs. **Not purely additive** - roughly half a week of it is X4 work
+brought forward.
 
 ---
 
@@ -177,18 +193,27 @@ Stating this matters, because a green harness invites the conclusion that X4 is 
 
 ## 6. Risks specific to this phase
 
-**A fake company in production data is permanent.** `gameKey` is immutable because it is the
-join key for every historical stat, providers joined to history cannot be deleted, and a
-disabled game's rows are retired rather than removed. So **if this harness ever settles a
-real contest in production, the fake company is in our data for ever.** Two acceptable
-answers, and they must be chosen rather than defaulted into: run it in staging and dev only,
-or accept a permanently retired provider row knowingly. There is no third option that
-involves cleaning up afterwards.
+**The provider row is permanent, which is why it must be first-party.** `gameKey` is immutable
+because it is the join key for every historical stat, providers joined to contest history
+cannot be deleted, and a disabled game's rows are retired rather than removed. So the moment
+this settles one real contest, **whatever name is on that provider row is in our production
+data, financial reports and audit trail for ever.** Under the 5 September scope decision that
+is fine, because the row represents ChartVolt - but it is precisely why a placeholder company
+name must not be used even during development. **Get the name right before the first contest
+settles, not after**, because there is no cleanup path.
 
-**It must never be reachable by a player in production.** Three gates already exist -
-`externalGamesEnabled`, the provider's `enabled`, and the per-title `chartvoltEnabled` - and
-a harness should not rely on all three being remembered. Name the provider row so plainly
-that nobody mistakes it for a signed partner.
+**Being first-party removes a gate we would otherwise rely on.** The harness version was to be
+kept away from players by `externalGamesEnabled`, the provider's `enabled` and the per-title
+`chartvoltEnabled`. A product game is *meant* to be reachable, so those three stop being a
+safety net and become ordinary launch controls. That makes the **pre-launch quality bar the
+only thing standing between an unfinished game and a paying player**, which is an argument for
+finishing it properly rather than shipping the harness and improving it in place.
+
+**"It is our game" removes one risk and adds another.** Risk X4 - *we cannot fix their game* -
+does not apply: a scoring quirk or a mobile bug is a sprint task, not a support ticket to a
+third party. In exchange the platform now owns a game's content, balance, support and
+lifecycle for ever, which is the burden the external-only decision was chosen to avoid. That
+trade is deliberate; it should not be rediscovered later as a surprise.
 
 **Designing the spec around our own implementation.** If the harness is awkward to build, the
 temptation is to change the spec to suit it. Sometimes correct, sometimes exactly backwards:
@@ -220,31 +245,61 @@ on the shortest useful path that does not wait on a contract. It also shares ope
 
 ---
 
-## 8. The decision the owner must make first
+## 8. Scope - decided 5 September 2026
 
-**Is this a throwaway harness, or is it open question 10's in-house hedge game?**
+**The question was: a throwaway harness, or also open question 10's in-house hedge game? The
+owner chose both.** The recommendation in the first draft of this chapter was the harness
+alone; it was **not** taken, and the reasoning for the choice made is stronger than the
+recommendation it overruled, so it is recorded here rather than in a footnote.
 
-The answer changes the quality bar, the cost, the ownership and the risk position, and it
-cannot be deferred until after the work, because building a harness and building a product
-game diverge on day one.
-
-| | Harness only | Also the hedge game |
+| | Harness only (recommended, **not chosen**) | **Also the hedge game (CHOSEN)** |
 |---|---|---|
-| Quality bar | Good enough to drive every path | Good enough for paying players |
-| Cost | 1-1.5 weeks | Materially more - art, mobile, localisation, content, support |
-| If the provider search fails | We still have one game (risk X8 stands) | We have a second real game; X8 is materially reduced |
-| Ongoing burden | Dev-only, no players | A product with a content and support cost |
+| Quality bar | Good enough to drive every path | **Good enough for paying players** |
+| Cost | 1-1.5 weeks | **3.5-5 weeks** - game design, art, mobile, localisation, content, QA |
+| If the provider search fails | One game. Risk X8 stands untouched | **A second real game. X8 materially reduced** |
+| Ongoing burden | Dev-only, no players | A product, with content and support cost |
 | Risk | Scope creep into the right column | Distraction from the external programme |
 
-**Recommendation: build the harness now, decide the hedge separately.** The harness is cheap,
-unblocks the review gate, and de-risks X4 regardless of the hedge answer - and if the hedge is
-later approved, everything learned here transfers. Deciding the hedge *first* risks spending
-weeks on a product game while the actual blocker is still commercial.
+**Why the more expensive answer is defensible.** The harness-only option leaves the platform
+in the position risk X8 describes: the entire foundation and admin programme funded, and still
+exactly one game if the provider search or the pricing fails. That is the single largest
+exposure in the external-only route, it was raised rather than removed by the 2 September
+decision, and no amount of test tooling touches it. Paying ~3 weeks to convert a throwaway
+harness into a real second game buys down the programme's biggest risk with work that was
+partly going to be done anyway.
 
-**But note what that recommendation does not do:** it leaves risk X8 exactly where it is. The
-platform would have funded the entire foundation and admin programme and still have one game
-if the provider search fails. The harness does not change that, and it must not be allowed to
-*feel* as though it has, which is the likeliest misreading of this whole phase.
+### The consequence that changes the design, not just the estimate
+
+**It is no longer a fake company. It is ChartVolt as a first-party provider.**
+
+The harness version was going to register something like "Mock Games Ltd". For a game that
+real players pay to enter, that is wrong in a way that cannot be undone later: a provider
+joined to contest history **cannot be deleted**, `gameKey` is immutable, and a disabled game's
+rows are retired rather than removed. A fake company name would therefore sit in production
+data, on financial reports and in audit trails, for ever, attached to a real product. The
+provider row must represent **ChartVolt itself**, honestly labelled as first-party.
+
+### And the part that makes this cheaper than it looks
+
+**Our game speaks the provider protocol, so the hedge costs no in-house game-module
+architecture.** `New games plan` P1/P2 designed an entire in-house module path - registry,
+module contract, per-game scoring - and that plan was dropped with the external-only decision.
+This game does not resurrect it. It is a provider game that happens to be ours, so it arrives
+through the seam that already exists and is already tested. One mechanism, two benefits.
+
+**But the arm's-length rules in section 2 now matter more, not less.** As a product there will
+be pressure to integrate it deeply - share types, call internal services, skip the signature.
+Every such shortcut destroys both purposes at once: it stops being a valid reference
+implementation, *and* it stops proving the seam can carry a real game. **The arm's length is
+the hedge's value, not an inconvenience it inherits from the harness.**
+
+### What is still true after the decision
+
+Risk **X8 is not yet reduced** - it is reduced *when this ships*, and a plan is not a game.
+Until it is playable, the exposure is unchanged and any summary implying otherwise is wrong.
+Section 5 also stands in full: this still does not rehearse a real provider's authentication,
+error shapes, latency or pricing. **X4a shrinks X4. It does not replace it, and it is not a
+substitute for finding a provider.**
 
 ---
 
@@ -262,5 +317,21 @@ if the provider search fails. The harness does not change that, and it must not 
 - [ ] The content set renders on the game page for both titles
 - [ ] The spec-ambiguity log exists and every entry is resolved in
       `01-provider-contract-specification.md` **and** the HTML, with the version bumped
-- [ ] The harness cannot move money, demonstrated rather than asserted
-- [ ] Nothing in this phase is reachable by a player in production
+- [ ] The game service cannot move money, demonstrated rather than asserted
+- [ ] The provider row is labelled as **ChartVolt first-party**, not a placeholder company -
+      checked before the first contest settles, because the row cannot be renamed away from
+      history afterwards
+- [ ] **Zero imports from this repository** in the game service, asserted by a check rather
+      than by review - this is what keeps it a valid reference implementation as it grows into
+      a product
+
+Added by the 5 September scope decision, because it is now a product:
+
+- [ ] Playable on a phone
+- [ ] Content localised into every locale the platform serves
+- [ ] The game is **skill-based**, with a written argument for why, fit to sit alongside
+      `legal/ChartVolt-Regulatory-Defence-Pack.html`
+- [ ] Nothing about it improves a player's score for money - no paid retries, extra time,
+      hints or easier content, per the marketplace constraint
+- [ ] It is a **paid multi-player format**: contests of two or more, challenges of exactly
+      two, and practice free and unranked. No paid single-player mode

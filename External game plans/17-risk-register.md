@@ -24,7 +24,7 @@ chapter covers risks to the programme and to the application.
 | **X2** | Single supplier on the critical path | **High** | Medium | All |
 | **X3** | No cost floor - per-round fee kills cheap contests | **High** | Medium | Before X4 |
 | **X7** | Game Master provider contest is net loss-making | **High** | **High** if ungated | Before X6 |
-| **X8** | **No fallback game** now external-only is decided - X2 with its mitigation removed | **High** | Medium | Before X4 |
+| **X8** | **No fallback game** now external-only is decided - X2 with its mitigation removed | **High** | Medium | Before X4 - **mitigation approved 5 Sep 2026 (X4a, `21`), STILL OPEN until it ships** |
 | **X13** | Trading-only matchmaker silently returns trading matches on a games platform | **High** | **High** | X11.5 |
 | **X14** | Inferred game interest read as consent to stranger invitations | **High** | Medium | X11.5 |
 | **R29** | **Disabling a game retroactively demotes players** who earned levels, points or ranks in it | **High** | **High** | **X1** - the design decision is made there |
@@ -501,6 +501,25 @@ the last point at which the answer is still cheap, since X4 is where spend start
 against a specific provider's sandbox. Keeping a two-to-three week in-house game on the
 backlog converts X2 and X8 from existential to inconvenient. `10` section 5.
 
+**Mitigation APPROVED 5 September 2026, and the risk STAYS OPEN.** Open question 10 was
+answered yes: phase **X4a** (`21`) builds a real in-house game to a player-facing standard,
+which also serves as the reference implementation that proves the provider seam. **Do not
+downgrade this entry on the strength of that.** Until the game is playable the exposure is
+exactly what it was, and the whole failure mode of a risk register is entries marked mitigated
+because a plan exists. Close it when a player can pay to enter the in-house game and be paid,
+not when the chapter is written.
+
+**Two notes for whoever closes it.** The mitigation is **cheaper than the 2-3 weeks estimated
+above for a reason worth knowing**: because the game speaks the provider protocol rather than
+being an in-house game *module*, it needs none of `New games plan` P1/P2's module architecture,
+and it doubles as the reference implementation - so a single piece of work reduces X8, X1 (the
+abstraction cannot be proven without the provider) and X6 (the registry gets only one real
+implementation) at once. Against that, it **adds** the burden the external-only decision was
+taken to avoid: the platform now owns a game's content, balance and support for ever. And note
+what it does *not* touch - **X3, the per-round cost floor, is a commercial unknown about a
+provider's pricing**, and a game of our own that costs nothing per round tells us nothing about
+it. A summary implying X4a de-risks the commercial question is wrong.
+
 ### X13-X18 - onboarding and matchmaking
 
 **Added 2 September 2026** with chapter `20`. Listed in full in `20` section 8; summarised
@@ -848,7 +867,7 @@ Four mechanisms let them through, and each is worth carrying:
 
 ### R24 - Scope creep, and why it is rated High likelihood
 
-This programme is **23-30 weeks**, and every chapter contains something reasonable to
+This programme is **26.5-35 weeks**, and every chapter contains something reasonable to
 want. The failure mode is not a technical one: it is reaching week 20 with a broad,
 half-finished platform and no provider contest that has ever taken a real entry fee.
 

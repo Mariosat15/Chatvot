@@ -1,7 +1,7 @@
 # 10 - The External-Only Programme
 
 > **THIS IS THE CHOSEN SCENARIO.** Decided by the owner on **2 September 2026**:
-> provider games are the only new games; no in-house game is built. Read this chapter
+> provider games are the route. **Amended 5 September 2026: one in-house game IS built, as a hedge** - phase X4a, chapter `21`, which also serves as the reference implementation for the provider seam. Read this chapter
 > **instead of** `09-implementation-phases.md`, which describes the add-on route that is
 > no longer being pursued.
 >
@@ -70,7 +70,7 @@ to do with who supplies the gameplay.
 | Route | To a second playable, payable game | To a full games platform |
 |---|---|---|
 | In-house Trivia first | ~8-10 weeks | **12-17 weeks** |
-| External-only | ~11-14 weeks, and gated on a contract | **23-30 weeks** |
+| External-only | **~12-15 weeks with no commercial dependency**, via X4a | **26.5-35 weeks** |
 
 Both right-hand figures predate the owner's 2 September 2026 brief; the external-only one
 has been updated for it, the in-house one has not, because that route is not being
@@ -97,6 +97,7 @@ so nothing is written twice.
 | **X1** | Foundation: game label, general score, registry, the four seams, trading wrapped as a module, **and the game label on both Game Master competition inserts** | `11`, `19` s3.1, was `New games plan` P1 | 2.5-3.5 weeks | No |
 | **X2** | Provider abstraction and mock adapter | `09` E1 | 1 week | No |
 | **X3** | Round lifecycle and result ingestion | `09` E2 | 1 week | No |
+| **X4a** | **ChartVolt as a first-party provider, with a real playable game.** Registered through the real admin screens, served from its own origin, reporting through the real signed callback. **Doubles as the in-house hedge game** (open question 10, answered yes 5 Sep 2026) | `21` | **3.5-5 weeks** | No |
 | **X4** | Real adapter against the sandbox | `09` E3 | 1 week | **Sandbox** |
 | **X5** | Contest integration and settlement | `09` E4 | 1 week | Sandbox |
 | **X6** | Admin: provider screens **plus** navigation restructure including **the single Trading section**, RBAC, game-aware create wizard, provider registration, analytics, settings, **and the Game Master creation API and wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | Sandbox |
@@ -109,8 +110,20 @@ so nothing is written twice.
 | **X11.5** | **Smart onboarding, game interests and challenge matchmaking** | `20` | 2-3 weeks | No |
 | **X12** | Hardening, staged pilot, public launch | `09` E9 + `18` | 3-5 weeks | **Production** |
 
-**X1-X12: 23-30 weeks.** Plus X0 at 6-9 days, delivered and signed off separately. X0 started 1 September 2026; its first item, a simulator authentication fix, has already shipped as commit `d5d3a328`.
+**X1-X12: 26.5-35 weeks**, revised 5 September 2026 from 23-30 by the addition of **X4a**.
+Plus X0 at 6-9 days, delivered and signed off separately. X0 started 1 September 2026; its
+first item, a simulator authentication fix, has already shipped as commit `d5d3a328`.
 One experienced developer on this codebase, testing included.
+
+**The X4a increase is new scope, not a re-estimate.** The owner decided on 5 September that the
+reference provider's game is built to a player-facing standard and becomes the platform's
+in-house hedge, which is a second game the platform now owns rather than a test fixture. It was
+scoped at 1-1.5 weeks as a harness. The reason for paying the difference is risk **X8**: the
+external-only route leaves the platform with exactly one game if the provider search or the
+pricing fails, that exposure was raised rather than removed by the 2 September decision, and no
+amount of test tooling touches it. **It also modifies that decision's wording "no in-house game
+is built"** - see the decision log in `PROGRESS.md`. **Any figure of 23-30, 20-26 or 18-24 is
+stale.**
 
 ### 3.1 What changed on 2 September 2026, and why
 
@@ -168,12 +181,21 @@ Master-created provider contest would be settled by trading code.
 ```
 X0 (signed off) -> X1 -> X2 -> X3 -> X5 -> X12
                           \
-                           X4 (needs sandbox) ---> X5
+                           X4a (no dependency) -> X4 (needs sandbox) ---> X5
 ```
 
 `X3` before `X5` is not negotiable: settlement must never be built on a result path
 that has not been proven against lost callbacks, duplicates, bad signatures and late
 arrivals.
+
+**`X4a` before `X4`, added 5 September 2026, and before the provider health panel.** X4a has
+no external dependency, so it is the only remaining work on the shortest useful path that a
+contract cannot delay. It goes ahead of the health panel for a reason worth generalising: a
+health panel wired to a mock that always answers "fine" **renders green for ever and cannot be
+shown to work**, so building something that can genuinely be switched off first is what makes
+health provable. Note X4a does **not** unblock X4 - X4 still needs a signed provider and a
+sandbox, and a provider we control cannot rehearse a real partner's authentication, error
+shapes, latency or pricing.
 
 **Revised 2 September 2026 for admin-first:** `X6` and `X6.5` **complete before** `X7`
 begins, rather than overlapping it. That is the whole practical content of the admin-first
@@ -189,6 +211,16 @@ of engineering, 11-14 weeks in calendar terms** because X4 onward waits on sandb
 access - produces a provider contest that an admin can create and a player can pay for
 and play. That is the first point at which the decision can be reviewed against real
 player behaviour rather than assumption, and it is the right place to pause.
+
+**Status 5 September 2026: every part of this path is built except X4, and X4 is blocked on a
+contract - so the review it exists to enable cannot be held.** That is not a scheduling
+detail, it is the reason **X4a** exists. `mock.adapter.ts` returns
+`https://mock.provider.test/play/<roundId>`, a hostname that does not resolve, so the player
+play screen renders an iframe that fails to load: everything up to the final step is proven by
+tests, and **the step a player actually cares about has never been performed by a person.**
+X4a substitutes a game we control for the missing provider, which makes the pause reviewable
+without a signature. With it, the path becomes **X0-X3 + X4a + X5 + a minimal slice of X6**,
+roughly **12-15 weeks of engineering with no commercial dependency at all**.
 
 ---
 
