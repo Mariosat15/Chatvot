@@ -13,8 +13,8 @@
 
 | | |
 |---|---|
-| **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done.** A provider contest can be created, **published from the admin screen** (5 Sep 2026), entered, played and paid - and since 5 Sep 2026 it is paid **correctly**, which it was not before: two P0 defects meant every player tied on a score of zero and split the pool equally, and a lower-is-better game ranked backwards. **The player half is still API-only** - no player screen launches a round. **No provider selected**, which is what X4 needs |
-| **Next action** | **The round inspector and manual resolution screen** (`12` s4), so an operator can see a stuck round and act on it. In parallel, commercially: find and assess a provider using `08`, since X4 cannot start without one |
+| **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done.** A provider contest can be created, **published from the admin screen** (5 Sep 2026), entered, played and paid - and since 5 Sep 2026 it is paid **correctly**, which it was not before: two P0 defects meant every player tied on a score of zero and split the pool equally, and a lower-is-better game ranked backwards. A stuck round can now be **inspected and ended by an operator** (5 Sep 2026). **The player half is still API-only** - no player screen launches a round. **No provider selected**, which is what X4 needs |
+| **Next action** | **The player-facing round launch screen** (`09` E6), which is the last piece of the lifecycle reachable only by API. In parallel, commercially: find and assess a provider using `08`, since X4 cannot start without one |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
 | **Owner instruction on record** | **External games only, no in-house game** (2 Sep 2026). **One step at a time, admin first, do not break the running app.** |
 | **Not owner-tested** | Everything after the 2 Sep navigation restructure. X1-X3, X5, the provider admin slice and the contest wizard are all **code-complete, awaiting owner test** - and "code-complete" here excludes the replay script and the label backfill, neither of which has been run against production |
@@ -343,7 +343,7 @@ numbers in chapters `01`-`09` remain resolvable. **Plan against the X-phases bel
 | **X3** | Round lifecycle + result ingestion | `09` E2 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026. **Rehearsals 1-6 of `07` s9 green** against the mock (49 tests, 6 guards probed). 7-10 need X5/X8 |
 | **X4** | Real adapter against sandbox | `09` E3 | 1 week | `NOT STARTED` |
 | **X5** | Contest integration + settlement | `09` E4 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026, **with two P0 payout defects found and fixed 5 Sep 2026** - publish, entry, ranking, round launch, settlement and **all three unresolved-round policies**. **A provider contest can be published, entered, played and paid. Publishing became clickable on 5 Sep 2026 (X6 slice); the player round launch is still API-only.** Settlement was an **extraction**: the payout, fee/GM and completion stages moved to `lib/services/settlement/` and trading was rewired onto them. Closing `exclude` also closed **`hold_and_alert`**, which nothing had ever consumed. **The two P0s are why "code-complete" must never be read as "correct":** no code path wrote `participant.score`, so every player settled on zero and split the pool equally; and settlement read `scoreDirection` off a field neither participant copy declared, so a lower-is-better game paid the slowest player first |
-| **X6** | Admin: nav restructure incl. **the single Trading section**, RBAC, provider registration, game-aware wizard, analytics, **GM creation API + wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | `PARTIALLY DONE` - nav restructure and single Trading destination **built and owner-tested 2 Sep 2026**. **Provider registration, credentials and the per-title catalogue switch code-complete 4 Sep 2026** (`12` s4.1a). **Contest wizard from `configSchema` + pre-flight validation code-complete 4 Sep 2026** (`12` s2.1) - creates a **draft**. **The publish control is code-complete 5 Sep 2026** (`12` s3.1a), which also made the competitions list game-aware: `draft` admitted as a status, its own badge, a Drafts count, a provider game badge, and the trading Edit button **withheld** from provider contests because `PUT /api/competitions/[id]` blind-assigns that form's body. Still `NOT STARTED`: provider health panel, round inspector, manual resolution, live-contest controls, provider contest **editing**, analytics by provider, GM creation API |
+| **X6** | Admin: nav restructure incl. **the single Trading section**, RBAC, provider registration, game-aware wizard, analytics, **GM creation API + wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | `PARTIALLY DONE` - nav restructure and single Trading destination **built and owner-tested 2 Sep 2026**. **Provider registration, credentials and the per-title catalogue switch code-complete 4 Sep 2026** (`12` s4.1a). **Contest wizard from `configSchema` + pre-flight validation code-complete 4 Sep 2026** (`12` s2.1) - creates a **draft**. **The publish control is code-complete 5 Sep 2026** (`12` s3.1a), which also made the competitions list game-aware: `draft` admitted as a status, its own badge, a Drafts count, a provider game badge, and the trading Edit button **withheld** from provider contests because `PUT /api/competitions/[id]` blind-assigns that form's body. **The round inspector and manual resolution are code-complete 5 Sep 2026** (`12` s4.2a) - read-only inspection plus **ending** a stuck round (void/abandoned/expired) with a mandatory reason; it deliberately **cannot enter a score**. Still `NOT STARTED`: provider health panel, live-contest controls, provider contest **editing**, analytics by provider, GM creation API |
 | **X6.5** | **Admin wording pass** - brought forward from X8 so operators never work a games platform labelled "trading" | `14` | 0.5-1 week | `NOT STARTED` |
 | **X7** | Player UI + points, leaderboards, badges, levels, **profile and cross-game stats**, **per-game GM analytics** | `09` E6 + `13` + `05` + `19` | 3-4 weeks | `NOT STARTED` |
 | **X8** | Player wording, `tradingEnabled`, infrastructure gating | `14` + `15` | 1-1.5 weeks | `NOT STARTED` |
@@ -687,7 +687,9 @@ retroactive**.
 this work interrupted. Note the manual-resolution half needs an architectural decision recorded
 first: the single ingestion function lives in the **main app only** and mirroring it would
 create the second door for scores that chapter `02` s10 rule 3 forbids, so an admin-triggered
-resolution cannot simply call it in-process.
+resolution cannot simply call it in-process. **(Built later the same day - see the round
+inspector entry below, where that decision was taken: resolution ends a round, it does not
+score one.)**
 
 ---
 
@@ -767,6 +769,92 @@ already have been paid into, and cancel-with-refund is the reversible operation.
 
 **Next chat should:** build the round inspector (`12` s4) - round status, score, the raw
 provider event and a manual resolution action with a mandatory reason and an audit entry.
+**(Built the same day - see the entry below.)**
+
+---
+
+### 5 Sep 2026 - X6 SLICE - THE ROUND INSPECTOR AND MANUAL RESOLUTION
+
+**Shipped:** an operator can see every round that needs a decision, read the raw provider
+deliveries for it, and **end** it with a mandatory reason. Until today the only answer to a
+stuck round was to wait for the four-stage reconciliation net and hope.
+
+- `apps/admin/lib/admin/round-resolution-actions.ts` - new, model-free. The three actions,
+  their target statuses, their operator-facing consequences, `MIN_REASON_LENGTH`, and a
+  `Map`-based `isResolutionAction` guard. **Imported by both the service and the dialog.**
+- `apps/admin/lib/services/games/round-resolution.service.ts` - new.
+  `listRoundsNeedingAttention`, `getRoundDetail`, `resolveRoundManually`.
+- `apps/admin/app/api/games/rounds/` - list, `[roundId]` detail, `[roundId]/resolve`.
+- `RoundInspectorSection.tsx`, `RoundDetailPanel.tsx`, `ResolveRoundDialog.tsx` - new.
+- `admin-employee.model.ts` - `round-inspector` added to `ADMIN_SECTIONS` (**add-only**).
+- `AdminDashboard.tsx` - menu entry beside Game Providers inside GAMES, plus the render case.
+
+**The architectural decision the previous entry said had to be taken first, taken: manual
+resolution ends a round, it does not score one.** `applyResult` is the single ingestion door
+and it lives in the **main app only**; mirroring it into admin to offer a score box would build
+the second door chapter `02` s10 rule 3 forbids, in the app with the widest privileges and the
+least traffic. So the operator writes a **status** - void, abandoned or expired - never a
+number. That is sufficient rather than a compromise, because `assessUnresolvedRounds` derives
+both of its answers from `round.status === "unresolved"`, so a round moved off that status
+releases whatever it was holding.
+
+**Files touched:** the eight above. **Verification:** 21 new tests
+(`__tests__/admin/round-inspector.test.ts`), full suite green, **12 probes all red**, admin
+`next build` clean, `check:mirrors` clean, lint clean on the changed files. `round-resolution-*`
+and the admin API routes are **admin-only and not mirrored**, so `check:mirrors` says nothing
+about them.
+
+**Five findings, and the first is about the tooling rather than the code.**
+
+- **The probe harness destroyed the file it was probing, and reported success.** Next.js dynamic
+  routes contain `[roundId]`, which **PowerShell reads as a wildcard character class**, so
+  `Get-Content $File` matched nothing and returned `$null` - while `Set-Content -LiteralPath`
+  wrote it back perfectly well. The route was emptied and then "restored" to nothing. Every
+  probe against it went red **on the expected test**, for entirely the wrong reason. The tell
+  was the *failure count*: 5-7 tests red for a one-line change where the honest number is 1 or
+  2. **A probe that reports more damage than it caused is not reporting on your guard.** Fixed
+  with `-LiteralPath` on the read and a refusal to write when the read came back empty.
+- **An import is not a use, and it defeated three assertions in one file.**
+  `toContain("canTransitionRound")` stayed true when the call was replaced by a hand-rolled
+  status check, because the name is still in the import line;
+  `toContain("MIN_REASON_LENGTH")` stayed true when the check became `if (false)`, because the
+  constant is still named in the error message; and `indexOf("resolveRoundManually")` found the
+  **import on line 8** and compared an ordering against that. **Match the call with its
+  arguments, and assert the operator rather than the operand.**
+- **A shared list beats a duplicated one even when the duplication has a good excuse.** The
+  action ids and their consequences were first written twice, because the service imports
+  Mongoose models and a client component must not pull those into the browser. Real constraint,
+  wrong answer - it is the **"one rule, two copies"** shape behind four defects here already
+  (`referenceId`, `failedReason`, `challengeId`, the GM `||`), none of which `check:mirrors` can
+  see. A model-free module both sides import removes the drift, whose symptom would have been a
+  button offering an id the server had renamed, failing with a 400 that reads like a permissions
+  problem.
+- **An object lookup on a request-supplied key is not safe because it is guarded.** Both `in`
+  and object indexing reach the prototype chain, so `"toString"` and `"__proto__"` pass the
+  check - and `ACTIONS["__proto__"]` returns `Object.prototype`, which is **truthy**, survives a
+  `!target` test and only fails later on a missing `.status`. **Safe by accident is not safe.** A
+  `Map` has no prototype chain, so the lookup is total and the guard is the same object the
+  server switches on.
+- **Only `hold_and_alert` actually stops a contest settling**, so only those rounds carry the
+  "holding settlement" badge. Badging every unresolved round would make it meaningless exactly
+  where it must be trusted, since the other two policies settle on time. Same reasoning makes the
+  dialog report whether settlement was **actually** released: a contest can be held by several
+  rounds, and an operator told "settlement unblocked" while three others still hold it stops
+  believing the message.
+
+**Deferred:** provider **health** (the last of `12` s4's five destinations), live-contest
+pause/extend/cancel controls, and provider contest **editing**. The inspector lists only rounds
+needing a decision - unresolved, or live and past expiry - because including completed rounds
+buries the handful that matter; completed rounds are reachable by id.
+
+**Not done, said plainly:** an operator **cannot enter a score**, by design. Voiding a player's
+only attempt means they finish on zero - `score_zero` applied by hand - and the dialog says so
+**above** the confirm button, because that is a decision about a paying player's contest rather
+than a cleanup task.
+
+**Next chat should:** build the player-facing round launch screen (`09` E6). It is the last
+piece of the provider lifecycle reachable only by API, and until it exists no player can play a
+provider game by clicking.
 
 ---
 
@@ -1169,6 +1257,9 @@ ids); `apps/admin/components/admin/AdminDashboard.tsx`;
 deliberately: health wants the `provider_health_check` time series from `04` s3.5, and the
 inspector and resolution screens are most useful once X4 has produced real rounds to inspect.
 Building them against the mock now would ship screens whose only content is fixtures.
+**(The inspector and manual resolution were built on 5 Sep 2026 after all - the reconciliation
+net turned out to be the only answer to a stuck round, which is not an answer an operator can
+give. Health remains outstanding for the reason above.)**
 
 **Six guards probed** by reintroducing each defect and confirming the suite turned red:
 leaking a secret value into the provider list, ignoring `providerStatus` on the per-title

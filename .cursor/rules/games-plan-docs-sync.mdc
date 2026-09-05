@@ -716,7 +716,8 @@ feels like tidying.
 
 Provider registration, credentials and the per-title enable switch are code-complete
 (`12` s4.1a). Two of `12` s4's five destinations; health, round inspector and manual
-resolution deliberately left.
+resolution deliberately left. (**The inspector and manual resolution were built the next
+day** — `12` s4.2a. Health is still outstanding.)
 
 - **A structural test that greps source code must strip comments first, and the failure
  teaches the wrong lesson if you skip it.** The assertion "no route mentions
@@ -1165,6 +1166,54 @@ severity and `billsPerRound`, carry the class rather than the cases - and **leav
 correction visible in the file** rather than quietly fixing the tense, because the next reader
 needs to know the sentence was once believed.
 
+### Five things from the X6 round inspector and manual resolution (5 September 2026)
+
+An operator can now list the rounds needing a decision, read the raw provider deliveries and
+**end** one with a mandatory reason. `12` s4.2a, 21 tests, 12 probes red. **It cannot enter a
+score, deliberately**, and that scoping is the load-bearing part: `applyResult` is the single
+ingestion door and it lives in the **main app only**, so a score box in admin would build the
+second door `02` s10 rule 3 forbids, in the app with the widest privileges and the least
+traffic. Ending a round is sufficient because `assessUnresolvedRounds` derives both its answers
+from `round.status === "unresolved"`.
+
+- **A probe harness can destroy the file it is probing and report success — and the tell is the
+  failure COUNT, not the failure.** Next.js dynamic routes contain `[roundId]`, which
+  **PowerShell parses as a wildcard character class**, so `Get-Content $File` matched nothing
+  and returned `$null` while `Set-Content -LiteralPath` wrote it back happily. The route was
+  emptied, then "restored" to nothing. Every probe went red **on the expected test**, for
+  entirely the wrong reason. **5–7 tests red for a one-line change is the signal**; the honest
+  number is 1 or 2. Two rules: `-LiteralPath` on the **read** as well as the write, and refuse
+  to write when the read came back empty. Fifth probing instance, so carry the general form: **a
+  probe that reports more damage than it caused is not reporting on your guard.**
+- **An import is not a use, and it defeated three assertions in one file.**
+  `toContain("canTransitionRound")` stayed true when the call was replaced by a hand-rolled
+  status check, because the name is still in the import line; `toContain("MIN_REASON_LENGTH")`
+  stayed true when the check became `if (false)`, because the constant is still named in the
+  error *message*; and `indexOf("resolveRoundManually")` found the **import on line 8** and
+  ordered against that. **Match the call with its arguments, and assert the operator, not the
+  operand** — `/reason\.length\s*<\s*MIN_REASON_LENGTH/`, not the constant's name.
+- **A shared list beats a duplicated one even when the duplication has a good excuse.** The
+  action ids and their operator-facing consequences were first written twice, because the
+  service imports Mongoose models and a client component must not pull those into the browser.
+  Real constraint, wrong answer — this is the **"one rule, two copies"** shape behind four
+  defects here already (`referenceId`, `failedReason`, `challengeId`, the GM `||`), none of
+  which `check:mirrors` can see. A **model-free** module both sides import is the fix, and note
+  the drift it prevents is not cosmetic: a button offering an id the server has renamed fails
+  with a 400 that reads like a permissions problem.
+- **An object lookup on a request-supplied key is not safe because it is guarded.** Both `in`
+  and object indexing walk the prototype chain, so `"toString"` and `"__proto__"` pass the
+  check — and `ACTIONS["__proto__"]` returns `Object.prototype`, which is **truthy**, survives a
+  `!target` test, and only fails later on a missing `.status`. **Safe by accident is not safe.**
+  A `Map` has no prototype chain, so the lookup is total and the validator is the same object
+  the server switches on.
+- **A badge that appears on everything cannot be trusted where it matters.** Only
+  `hold_and_alert` actually stops a contest settling, so only those rounds are badged as holding
+  settlement; the other two policies settle on time. Same reasoning makes the dialog report
+  whether settlement was **actually** released rather than announcing it: a contest can be held
+  by several rounds, and an operator told "settlement unblocked" while three others still hold
+  it stops believing the message. Same class as **no aggregate may silently mean "trading
+  only"** — a label that is right in general and wrong in the case you are looking at.
+
 ## The rule
 
 **Documentation is part of the deliverable, not a follow-up task.** A phase is not
@@ -1205,7 +1254,8 @@ On every change during implementation:
 | The admin navigation structure, wherever it appears | `External game plans/12` s1 (grouping table), s1.1 (tab list) and s1.1a (what was built); `New games plan/07` "Target structure" and its BUILT notice; `External game plans/PROGRESS.md` X6 row and work log. **The live structure is `apps/admin/components/admin/AdminDashboard.tsx`'s `menuGroups` plus `apps/admin/lib/admin/game-sections.ts`** — read those, not the prose, and remember `07` was the accurate chapter and `12` the drifted one. There is **no top-level TRADING group**; trading is a destination inside GAMES, and since 4 Sep 2026 **Game Providers sits beside it in the same group** — a provider supplies games, it is not a game, so it must not be nested under one. Any document describing a top-level TRADING group is stale |
 | The competition entry paths, wherever they appear | `New games plan` `00a`, `01-current-state-audit.md`, `05-prizes-money-layer.md`, `12-risk-register.md`, `PROGRESS.md`; `External game plans` `PROGRESS.md` and `17-risk-register.md`; `ChartVolt-New-Games-Plan.html`. There were **four** writers, now **two** — `lib/services/contest-entry.service.ts` behind both gates, plus the batch route fixed in place and the admin copy deleted. Any document still saying "two duplicate join paths" as a *present* fact is stale; as a description of what Stage 0 started from it is correct, so **say which** |
 | The publish control and the competitions list, wherever they appear | `External game plans/12` s3.1a (what was built) and s2.1's draft note, `09` E5 checklist and its "still not built after E4" note, `PROGRESS.md` X6 row, the status block and the work log, `ChartVolt-External-Games-Plan.html` E5 row. **The live code is `apps/admin/components/admin/games/PublishContestButton.tsx`, `apps/admin/lib/admin/contest-game-label.ts` and `CompetitionsListSection.tsx`** — read those, not the prose. Four facts drift easily: the list helper is **`hasProviderGameLabel`**, which asks about the **label alone** and is deliberately *not* the stricter `isProviderContest` in `contest-config.ts`, so a document conflating them is describing a bug; **`contest-game-label.ts` is admin-only and not mirrored**, so `check:mirrors` says nothing about it; **Edit is withheld from provider contests on purpose**, because `PUT /api/competitions/[id]` blind-assigns the trading form's body, and a document calling that a cosmetic gap is wrong; and there is **no unpublish and no game filter**, the first deliberately and permanently, the second only until there is more than one provider game |
-| The game-provider admin surface, wherever it appears | `External game plans/12` s4 (the five destinations), s4.1 (copy the UX not the persistence) and s4.1a (what was built); `09` E5 checklist; `PROGRESS.md` X6 row and work log; `ChartVolt-External-Games-Plan.html` E5 row. **Two of the five destinations exist** — Providers and the per-title Games list. Any document implying E5 is finished is stale, and any implying the whole of X6 is done is more so: X6 also carries the contest wizard, analytics by provider and the Game Master creation API. **Credentials live only in `WhiteLabel.gameProviderCredentials` behind `select: false`** — a document describing them on `game_provider` is describing the payment-provider pattern that was deliberately not copied |
+| The game-provider admin surface, wherever it appears | `External game plans/12` s4 (the five destinations), s4.1 (copy the UX not the persistence) and s4.1a (what was built); `09` E5 checklist; `PROGRESS.md` X6 row and work log; `ChartVolt-External-Games-Plan.html` E5 row. **Four of the five destinations exist** — Providers, the per-title Games list, and since 5 Sep 2026 the round inspector and manual resolution (`12` s4.2a). Only provider **health** is left, and any document saying the inspector or manual resolution is outstanding is stale as a present fact though correct as history — **say which**. Any document implying E5 is finished is stale, and any implying the whole of X6 is done is more so: X6 also carries analytics by provider and the Game Master creation API. **Credentials live only in `WhiteLabel.gameProviderCredentials` behind `select: false`** — a document describing them on `game_provider` is describing the payment-provider pattern that was deliberately not copied |
+| The round inspector and manual resolution, wherever they appear | `External game plans/12` s4.2a (what was built), `09` E5 checklist, `PROGRESS.md` X6 row, status block and work log, `ChartVolt-External-Games-Plan.html` E5 row. **The live code is `apps/admin/lib/admin/round-resolution-actions.ts`, `apps/admin/lib/services/games/round-resolution.service.ts`, `apps/admin/app/api/games/rounds/**` and `apps/admin/components/admin/games/Round*.tsx`** — read those, not the prose. Three facts drift easily: resolution **ends** a round (`voided` / `abandoned` / `expired`) and **cannot enter a score**, so any document describing manual scoring is describing a second ingestion door that `02` s10 rule 3 forbids; the action list lives in **one model-free module imported by both the service and the dialog**, so a document showing it in either file alone is describing the duplication that was deliberately removed; and **none of these files is mirrored** — `apps/admin/lib/admin/` and the admin API routes are admin-only, so `check:mirrors` says nothing about them. **Nothing in this slice is mirrored at all** — `admin-employee.model.ts`, which gained the `round-inspector` section id, also exists only in `apps/admin`. That id is a Mongoose enum value and therefore **add-only**: removing it orphans every employee document storing it |
 | `ChartVolt-New-Games-Plan.html` and `-Partners.html` | The partner version must **never** mention Stage 0, the duplicate join paths, the admin mirror drift, or any current defect |
 | The contest-entry participant row, wherever it appears | `External game plans/11` seam 2 (and its build note), `09` E4, `PROGRESS.md` X5 row and work log. The row is built by **`lib/services/contest-entry/participant-seat.ts`**, not inline in the service - read that, not the prose. Two facts are load-bearing: the three virtual-capital fields are **conditional on `(this.gameKey \|\| "trading") === "trading"`** in both model copies, and `gameKey` is **copied from the contest, never defaulted**. Any document saying a participant always carries `startingCapital` is stale |
 | The unresolved-round policies, wherever they appear | `External game plans/07` s2.3 (the three policies) and **s2.3a** (what was built), `09` E2's deferral note and the **E4 third-half** notes, `11` seam 3, `PROGRESS.md` X5 row and work log, `ChartVolt-External-Games-Plan.html` E4 row. **The live code is `lib/services/settlement/unresolved-rounds.ts` and `exclusion-refund.ts`**, mirrored. Three facts drift easily: settlement does **not** consume `refundOwed` or `blocksSettlement` — it re-derives both from `round.status = "unresolved"`, so any document saying settlement reads those flags is wrong; the policies apply to **provider** settlement only, since trading has no rounds; and the `hold_and_alert` gate sits **before** the optimistic lock, with a second gate inside the transaction that is reachable only by the mocked race in `provider-settlement-late-hold.test.ts`. Any document listing the `exclude` refund as outstanding is stale as a present fact, though correct as history — **say which** |

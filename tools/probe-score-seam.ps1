@@ -28,7 +28,14 @@ function Probe {
     [string]$ExpectRed
   )
 
-  $original = Get-Content $File -Raw
+  # -LiteralPath on the read too: a Next.js dynamic-route path contains [brackets], which
+  # PowerShell parses as a wildcard, so a plain Get-Content silently returns $null while
+  # Set-Content -LiteralPath still writes - which destroys the file under test.
+  $original = Get-Content -LiteralPath $File -Raw
+  if ([string]::IsNullOrWhiteSpace($original)) {
+    Write-Host "  [CANNOT READ FILE - ABORTING PROBE] $Name" -ForegroundColor Magenta
+    return
+  }
   $patched = [regex]::Replace($original, (Relax $Find), $Replace.Replace('$', '$$'), 1)
 
   if ($patched -eq $original) {

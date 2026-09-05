@@ -428,8 +428,8 @@ will otherwise reasonably ask why they differ.
 ### 4.1a What was built - 4 September 2026
 
 **`CODE-COMPLETE`, awaiting owner test.** Two of the five destinations in the table above:
-**Providers** and the per-title **Games** list. Health, round inspector and manual
-resolution are not built - see the deviation note in `PROGRESS.md`.
+**Providers** and the per-title **Games** list. Health is not built; the **round inspector and
+manual resolution were built on 5 September 2026** - see section 4.2a.
 
 | Piece | File |
 |---|---|
@@ -500,6 +500,84 @@ game from the panel" is wrong in a way that will be discovered at the worst mome
 Trading keeps a **hand-written** config component registered in
 `apps/admin/lib/games/registry.tsx`. Its settings are too specific to schematise and
 there is exactly one of them.
+
+---
+
+### 4.2a The round inspector and manual resolution - BUILT 5 September 2026
+
+**`CODE-COMPLETE`, awaiting owner test.** The third and fourth of the five destinations. An
+operator can now see a stuck round, read every delivery the provider attempted for it, and end
+it - rather than waiting on the reconciliation net and hoping.
+
+| Piece | File |
+|---|---|
+| RBAC id (add-only) | `round-inspector` in `apps/admin/database/models/admin-employee.model.ts` |
+| Menu entry + render case | `apps/admin/components/admin/AdminDashboard.tsx`, beside Game Providers inside GAMES |
+| Action list, shared by client and server | `apps/admin/lib/admin/round-resolution-actions.ts` |
+| Rules | `apps/admin/lib/services/games/round-resolution.service.ts` |
+| Routes | `apps/admin/app/api/games/rounds/` - list, detail, `[roundId]/resolve` |
+| UI | `RoundInspectorSection.tsx`, `RoundDetailPanel.tsx`, `ResolveRoundDialog.tsx` |
+| Tests | `__tests__/admin/round-inspector.test.ts`, 21 tests, 12 probes all red |
+
+**The scoping decision, which is the load-bearing part: manual resolution deliberately cannot
+enter a score.** Chapter `02` s10 rule 3 puts every score through one function, and that
+function - `applyResult` - lives in the **main app only**. Mirroring it into admin to offer a
+score box would create the second door the rule exists to prevent, in the app with the widest
+privileges and the least traffic. So the operator's power is to **end** the round: void,
+abandoned or expired. That writes a status, never a score.
+
+**Ending a round is enough to release a held contest**, which is what makes the narrower scope
+sufficient rather than a compromise. `assessUnresolvedRounds` derives both of its answers from
+`round.status === "unresolved"`, so a round moved off that status holds nothing. It also needs
+no participant-score re-sync, because only `completed` rounds contribute and a voided round
+never counted.
+
+**What the UI must say, and does: a voided round scores nothing for that player.** If it was
+their only attempt they finish on zero - the `score_zero` outcome applied by hand. That is a
+decision about a paying player's contest, not a cleanup task, so the consequence is shown above
+the confirm button rather than after it, and the reason is mandatory at 10 characters following
+the manual-deposit and emergency-cancel precedent.
+
+**Five findings, and the first is about the tooling rather than the code.**
+
+- **A probe harness destroyed the file it was testing, and reported success.** These are Next.js
+  dynamic routes, so the path contains `[roundId]` - which **PowerShell parses as a wildcard
+  character class**. `Get-Content $File` matched nothing and returned `$null` while
+  `Set-Content -LiteralPath` wrote perfectly well, so the harness emptied the route and then
+  "restored" it to nothing. Every probe against that file went red **on the expected test**, for
+  entirely the wrong reason. Two rules: **`-LiteralPath` on the read as well as the write**, and
+  **refuse to write when the read came back empty.** The tell was the failure count - 5 to 7
+  tests red for a one-line change, where the honest number is 1 or 2. **A probe that reports more
+  damage than it caused is not reporting on your guard.**
+- **An import is not a use, and it defeated three assertions in one file.** `toContain
+  ("canTransitionRound")` stayed true when the call was replaced by a hand-rolled status check,
+  because the name was still in the import line; `toContain("MIN_REASON_LENGTH")` stayed true
+  when the check became `if (false)`, because the constant is still named in the error message;
+  and `indexOf("resolveRoundManually")` found the import on line 8 and compared an ordering
+  against that. **Match the call, with its arguments, and assert the operator rather than the
+  operand.**
+- **A shared list beats a duplicated one even when the duplication has a good excuse.** The
+  action ids and their operator-facing consequences were first written twice, because the service
+  imports Mongoose models and a client component cannot pull those into the browser. That is a
+  real constraint and the wrong answer - it is the **"one rule, two copies"** shape behind four
+  defects here already, none of which `check:mirrors` can see. The fix is a model-free module
+  both sides import. The drift it prevents: a button offering an id the server has renamed,
+  failing with a 400 that reads like a permissions problem.
+- **An object lookup on a request-supplied key is not safe just because it is guarded.** `in`
+  and object indexing both reach the prototype chain, so `"toString"` and `"__proto__"` pass -
+  and `ACTIONS["__proto__"]` returns `Object.prototype`, which is truthy, survives a `!target`
+  check and only fails later on a missing `.status`. **Safe by accident is not safe.** A `Map`
+  has no prototype chain, so the lookup is total.
+- **Only `hold_and_alert` actually stops a contest settling**, so only those rounds carry the
+  "holding settlement" badge. Flagging every unresolved round would make the badge meaningless
+  exactly where it needs to be trusted, since the other two policies settle on time. For the
+  same reason the dialog reports whether settlement was *actually* released - a contest can be
+  held by several rounds, and an operator told "settlement unblocked" while three others still
+  hold it would stop looking.
+
+**Still not built from the five destinations:** provider **health**. And the inspector lists only
+rounds needing a decision - unresolved, or live and past expiry - because a list including
+completed rounds buries the handful that matter. Completed rounds are reachable by id.
 
 ---
 

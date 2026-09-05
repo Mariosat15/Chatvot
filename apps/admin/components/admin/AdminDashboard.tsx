@@ -88,6 +88,7 @@ import DatabaseSection from "@/components/admin/DatabaseSection";
 import UsersSection from "@/components/admin/UsersSection";
 import PaymentProvidersSection from "@/components/admin/PaymentProvidersSection";
 import GameProvidersSection from "@/components/admin/games/GameProvidersSection";
+import RoundInspectorSection from "@/components/admin/games/RoundInspectorSection";
 import PendingPaymentsSection from "@/components/admin/PendingPaymentsSection";
 import FailedDepositsSection from "@/components/admin/FailedDepositsSection";
 import FraudMonitoringSection from "@/components/admin/FraudMonitoringSection";
@@ -323,6 +324,16 @@ const menuGroups: MenuGroup[] = [
         id: "game-providers",
         label: "Game Providers",
         icon: <Plug className="h-5 w-5" />,
+        color: "text-violet-400",
+        bgColor: "bg-violet-500/10 hover:bg-violet-500/20",
+      },
+      // The round inspector (X6). A separate destination and a separate grant from Game
+      // Providers: registering a provider is configuration, while ending a player's round is a
+      // decision about that player's contest.
+      {
+        id: "round-inspector",
+        label: "Round Inspector",
+        icon: <Search className="h-5 w-5" />,
         color: "text-violet-400",
         bgColor: "bg-violet-500/10 hover:bg-violet-500/20",
       },
@@ -1133,6 +1144,8 @@ export default function AdminDashboard({
         return <PaymentProvidersSection key={currentRefreshKey} />;
       case "game-providers":
         return <GameProvidersSection key={currentRefreshKey} />;
+      case "round-inspector":
+        return <RoundInspectorSection key={currentRefreshKey} />;
       case "server-monitor":
         return <ServerMonitorSection key={currentRefreshKey} />;
       case "server-fleet":

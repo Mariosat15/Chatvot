@@ -360,16 +360,21 @@ them against the mock now would ship screens whose only content is fixtures.
 - [x] Contest creation with a **settings form generated from `configSchema`**
 - [x] Pre-flight validation from `03` section 4.1, including the sandbox smoke round
 - [x] **Publish control on a draft provider contest** (5 Sep 2026, `12` s3.1a)
-- [ ] Round inspector - status, score, raw event, replay link
-- [ ] Manual round resolution, with a mandatory reason and an audit entry
+- [x] **Round inspector** - status, score, raw provider events, integrity flags (5 Sep 2026, `12` s4.2a)
+- [x] **Manual round resolution**, with a mandatory reason and an audit entry (5 Sep 2026, `12` s4.2a). **It cannot enter a score, deliberately** - it ends a round, because scores go through the one ingestion function in the main app
 - [ ] Pause, extend and cancel controls on a live contest
 
 **Done when:** an admin can create, run, monitor and if necessary rescue a contest
 without a developer. **Not yet met, and the gap is now narrower and more precisely
 stated:** an operator can register a provider, choose which titles are live, create a
-contest on one with settings drawn from the game's own schema, **and publish it so players
-can see and enter it.** What remains is the *monitor and rescue* half - the three unticked
-items above.
+contest on one with settings drawn from the game's own schema, **publish it so players
+can see and enter it, and inspect and end a round that got stuck.** What remains is
+provider **health**, and the pause/extend/cancel controls on a live contest.
+
+**What "rescue works" excludes, said explicitly.** Manual resolution **ends** a round - void,
+abandoned or expired - and **cannot enter a score**, because `applyResult` is the single
+ingestion door and it lives in the main app. An operator who voids a player's only attempt has
+applied `score_zero` by hand, which the dialog says before the confirm rather than after.
 
 **What "publishing works" excludes, said explicitly so no later summary reads it as
 finished.** A published contest can be entered and settled, but **no player screen starts a

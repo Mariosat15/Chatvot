@@ -26,6 +26,10 @@ export const ADMIN_SECTIONS = [
   // renders no screen, and a grant mapping to no screen is where privilege widening starts.
   "game-providers",
   "provider-health",
+  // The round inspector (X6). A separate grant from `game-providers` on purpose: registering a
+  // provider is a configuration job, while voiding a player's round is a decision about that
+  // player's contest, and the two are not the same trust.
+  "round-inspector",
   // User Management
   "users",
   "badges",
