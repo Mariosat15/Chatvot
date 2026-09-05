@@ -33,7 +33,6 @@ export interface PreflightInput {
     supportsCompetition: boolean;
     supportsOneVsOne: boolean;
     maxDurationSeconds?: number;
-    billsPerRound?: boolean;
   };
 
   /** From the `game_provider` row and platform settings. */
@@ -55,7 +54,15 @@ export interface PreflightInput {
   attemptsAllowed?: number;
   unresolvedRoundPolicy: UnresolvedRoundPolicy;
 
-  /** Operator ticked "I accept the per-round cost". Only consulted when it matters. */
+  /**
+   * Operator ticked "I accept the per-round cost".
+   *
+   * Consulted for any multi-attempt policy, NOT only for providers known to bill per
+   * round - because nothing records whether a provider does. `provider_game` has no
+   * billing field, and inventing one here would be a guess dressed as a fact. Warning
+   * whenever the policy multiplies rounds is the honest version: it is occasionally
+   * unnecessary, where the alternative is occasionally an unexpected invoice.
+   */
   perRoundCostAcknowledged?: boolean;
   /** When a sandbox round last succeeded for this title and configuration. */
   lastSandboxRoundAt?: Date | null;
@@ -173,9 +180,9 @@ export function runPreflight(input: PreflightInput): PreflightResult {
         `The "${input.attemptsPolicy}" attempts policy needs an attempts allowance of at least 2.`,
       );
     }
-    if (input.title.billsPerRound && !input.perRoundCostAcknowledged) {
+    if (!input.perRoundCostAcknowledged) {
       warnings.push(
-        `This provider bills per round, and this policy lets each player start up to ${input.attemptsAllowed ?? "several"} rounds. Confirm you accept the cost.`,
+        `This policy lets each player start up to ${input.attemptsAllowed ?? "several"} rounds. If this provider bills per round, the cost multiplies by that much - confirm you accept it.`,
       );
     }
   } else if (input.attemptsAllowed !== undefined && input.attemptsAllowed > 1) {
@@ -205,12 +212,13 @@ export function runPreflight(input: PreflightInput): PreflightResult {
   // --- the unresolved-round policy ------------------------------------------------------
 
   if (input.unresolvedRoundPolicy === "exclude") {
-    // Honest about a known limit rather than silently doing half of it. The refund a
-    // removed player is owed is not paid by the reconciliation service - removing a player
-    // changes the prize pool, so the refund and the re-split are one transaction that
-    // belongs with settlement.
+    // The warning is kept, but it no longer says the refund is manual - that became false
+    // the moment settlement started paying it, and a stale caution is worse than none: an
+    // operator who reads it either avoids a policy that now works, or refunds by hand on
+    // top of the automatic one. It now describes what the policy DOES, because removing a
+    // paid entrant and re-splitting a pool is a consequential choice either way.
     warnings.push(
-      "The exclude policy removes a player whose result never arrives, and the entry-fee refund that owes is not yet automatic. Prefer score-zero or hold-and-alert until it is.",
+      "The exclude policy removes a player whose result never arrives: their entry fee is returned automatically at settlement and the prize pool is re-split without them, so the winners share a smaller pot than the one advertised at entry.",
     );
   }
 

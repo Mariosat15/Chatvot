@@ -215,6 +215,18 @@ export async function reconcileRound(
  * So this marks the round and NAMES the obligation in its return value. X5 must honour it.
  * The obligation is deliberately impossible to miss: `exclude` returns
  * `refundOwed: true`, and a settlement path that ignores it fails its own test.
+ *
+ * X5 HONOURS BOTH, AND NOT BY READING THESE FLAGS (4 Sep 2026). `refundOwed` and
+ * `blocksSettlement` are return values in a worker process that has exited long before a
+ * contest settles, and nothing persists them - so `lib/services/settlement/
+ * unresolved-rounds.ts` re-derives the same facts from the one thing this function WRITES,
+ * which is `status: "unresolved"`. That is why the write above happens before the outcome is
+ * built, and it is also what makes a contest settled by a path that never ran the net - the
+ * lazy auto-finalize, a manual admin trigger - honour the policy anyway.
+ *
+ * The flags are still worth returning: they are what a caller logs and alerts on. But do not
+ * make them the mechanism, or a policy silently stops applying whenever settlement is
+ * reached by a route the net did not drive.
  */
 async function applyUnresolvedPolicy(
   round: IGameRound,

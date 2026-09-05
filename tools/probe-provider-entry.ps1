@@ -277,4 +277,117 @@ Probe -Name 'the lock is not released when settlement refuses, stranding the con
   -Replace '    if (route.path === "none" && false) {' `
   -ExpectRed 'refuses a contest whose game has no module, leaving it untouched'
 
+Write-Host "`n=== the unresolved-round policies ===" -ForegroundColor Cyan
+
+$Suite = '__tests__/services/provider-settlement.test.ts'
+
+Probe -Name 'THE EXCLUSION FILTER IS REMOVED - a refunded player is ranked and paid too' `
+  -File 'lib/services/settlement/provider-settlement.service.ts' `
+  -Find '  const participants = allParticipants.filter((p) => !excluded.has(p.userId));' `
+  -Replace '  const participants = allParticipants;' `
+  -ExpectRed 'does NOT pay them a prize as well'
+
+Probe -Name 'exclusion relies on the participant status instead of filtering' `
+  -File 'lib/services/settlement/provider-settlement.service.ts' `
+  -Find '  const excluded = new Set(assessment.excludedUserIds);' `
+  -Replace '  const excluded = new Set<string>();' `
+  -ExpectRed 'does NOT pay them a prize as well'
+
+Probe -Name 'the pool is not reduced by the refunded fees' `
+  -File 'lib/services/settlement/provider-settlement.service.ts' `
+  -Find '    prizePool = Math.max(0, prizePool - refund.totalRefunded);' `
+  -Replace '    prizePool = Math.max(0, prizePool);' `
+  -ExpectRed 'reduces the pool even when the integrity cap cannot do it for us'
+# Reason this names the awkward test rather than the obvious one: with the participant count
+# already reduced, the integrity cap recomputes the same pool by a different route and the
+# obvious test passes without this line. Only a contest whose pool sits BELOW the fees
+# collected can tell the two apart.
+
+Probe -Name 'the participant count is left at its original value' `
+  -File 'lib/services/settlement/provider-settlement.service.ts' `
+  -Find '    participantCount = Math.max(0, participantCount - refundedCount);' `
+  -Replace '    participantCount = Math.max(0, participantCount);' `
+  -ExpectRed 'the remaining winners are paid from the reduced pot'
+
+Probe -Name 'the refund is never paid - the obligation goes back to being named only' `
+  -File 'lib/services/settlement/provider-settlement.service.ts' `
+  -Find '  const refund = await refundExcludedParticipants({' `
+  -Replace '  const refund = await (async () => ({ refundedUserIds: [] as string[], totalRefunded: 0, alreadyRefundedUserIds: [] as string[] }))(); void refundExcludedParticipants; const _unused = ({' `
+  -ExpectRed "returns the excluded player's entry fee"
+
+Probe -Name 'THE IDEMPOTENCY CHECK IS REMOVED - a second settlement refunds again' `
+  -File 'lib/services/settlement/exclusion-refund.ts' `
+  -Find '  const alreadyRefunded = new Set(priorRefunds.map((t) => t.userId));' `
+  -Replace '  const alreadyRefunded = new Set<string>();' `
+  -ExpectRed 'does not refund twice when the contest is settled again'
+
+Probe -Name 'the per-player dedupe is dropped - best_of_n refunds once per round' `
+  -File 'lib/services/settlement/unresolved-rounds.ts' `
+  -Find '  const userIds = [...new Set(rounds.map((r) => r.userId))];' `
+  -Replace '  const userIds = rounds.map((r) => r.userId);' `
+  -ExpectRed 'refunds a player ONCE even with several unresolved rounds'
+
+Probe -Name 'a refund is recorded as winnings' `
+  -File 'lib/services/settlement/exclusion-refund.ts' `
+  -Find '          totalSpentOnCompetitions: -entryFee,
+          totalRefunded: entryFee,' `
+  -Replace '          totalWonFromCompetitions: entryFee,' `
+  -ExpectRed 'records the refund as a reversed spend, never as winnings'
+
+Probe -Name 'the refund row is not attributed to the competition' `
+  -File 'lib/services/settlement/exclusion-refund.ts' `
+  -Find '          competitionId,
+          status: "completed",' `
+  -Replace '          status: "completed",' `
+  -ExpectRed 'writes a refund row attributed to the competition'
+
+Probe -Name 'the participant is not marked refunded' `
+  -File 'lib/services/settlement/exclusion-refund.ts' `
+  -Find '    await CompetitionParticipant.updateOne(' `
+  -Replace '    await Promise.resolve(); void CompetitionParticipant; const _skip = (' `
+  -ExpectRed 'marks the participant refunded'
+
+Probe -Name 'HOLD_AND_ALERT STOPS BLOCKING - a held contest settles and pays out' `
+  -File 'lib/services/settlement/unresolved-rounds.ts' `
+  -Find '  if (policy === "hold_and_alert") {' `
+  -Replace '  if (false) {' `
+  -ExpectRed 'pays nobody and leaves the contest claimable'
+
+Probe -Name 'the hold gate moves AFTER the lock - the contest is claimed and released' `
+  -File 'lib/services/settlement/provider-finalize.ts' `
+  -Find '    if (held.blocksSettlement) {' `
+  -Replace '    if (held.blocksSettlement && false) {' `
+  -ExpectRed 'pays nobody and leaves the contest claimable'
+
+# The stranding bug and the in-transaction hold check are probed by
+# `tools/probe-reprobe.ps1`, because they can only be reached through the mocked race in
+# `provider-settlement-late-hold.test.ts` - the pre-lock gate catches every refusal this
+# suite can produce, so probed against this file both stayed green.
+
+Probe -Name 'the hold becomes permanent - a resolved round still refuses' `
+  -File 'lib/services/settlement/unresolved-rounds.ts' `
+  -Find '  if (rounds.length === 0) {' `
+  -Replace '  if (false) {' `
+  -ExpectRed 'settles normally once the round is no longer unresolved'
+
+Probe -Name 'score_zero starts refunding, because the policy check is dropped' `
+  -File 'lib/services/settlement/unresolved-rounds.ts' `
+  -Find '  if (policy === "score_zero") {' `
+  -Replace '  if (false) {' `
+  -ExpectRed 'settles on time and refunds nobody'
+
+Probe -Name 'an absent policy defaults to exclude instead of score_zero' `
+  -File 'lib/services/settlement/unresolved-rounds.ts' `
+  -Find '  if (stored === "exclude" || stored === "hold_and_alert") return stored;
+  return "score_zero";' `
+  -Replace '  if (stored === "hold_and_alert") return stored;
+  return "exclude";' `
+  -ExpectRed 'is the fallback for a contest that predates the field'
+
+# DELIBERATELY NOT PROBED: passing `contestId` as a plain string. It stayed green, and the
+# claim was wrong rather than the test being weak - Mongoose casts a string to ObjectId when
+# the query executes, verified directly. The explicit construction is for the reader; the
+# `isValid` guard beside it is the load-bearing part, because an unparseable id throws a
+# CastError that would abort a settlement which could otherwise pay everyone.
+
 Write-Host "`n=== done ===`n" -ForegroundColor Cyan

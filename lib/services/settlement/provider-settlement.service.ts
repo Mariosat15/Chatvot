@@ -3,6 +3,8 @@ import CompetitionParticipant from "@/database/models/trading/competition-partic
 import { payContestPrizes } from "./prize-payout.service";
 import { settleFeesAndGameMasters } from "./fees.service";
 import { completeContest } from "./contest-completion.service";
+import { assessUnresolvedRounds } from "./unresolved-rounds";
+import { refundExcludedParticipants } from "./exclusion-refund";
 import type { SettlementLeaderboardEntry } from "./types";
 
 /**
@@ -54,6 +56,12 @@ interface ProviderCompetitionDoc {
   gameMasterId?: string | null;
   gameKey?: string;
   rules?: Record<string, unknown>;
+  /**
+   * Drives the `exclude` refund and the `hold_and_alert` block. Read from the STORED
+   * contest, never passed in by a caller - the same reasoning as the market-hours gate
+   * taking its game type from the stored label rather than from request input.
+   */
+  unresolvedRoundPolicy?: string;
   status: string;
   save(opts: { session: import("mongoose").ClientSession }): Promise<unknown>;
 }
@@ -74,7 +82,7 @@ export async function settleProviderCompetition(
 
   console.log(`🏁 Settling provider contest ${competitionId}`);
 
-  const participants = await CompetitionParticipant.find({
+  const allParticipants = await CompetitionParticipant.find({
     competitionId,
   })
     .session(session)
@@ -89,7 +97,56 @@ export async function settleProviderCompetition(
       }[]
     >();
 
-  console.log(`Found ${participants.length} participants`);
+  console.log(`Found ${allParticipants.length} participants`);
+
+  // The contest's unresolved-round policy, applied here because this is the only place it
+  // CAN be applied: it needs to move money and re-split the pool in one transaction.
+  //
+  // Re-derived from the stored rounds rather than taken from `reconcileRound`'s return
+  // value, which is ephemeral and belongs to a worker process that has already exited.
+  const assessment = await assessUnresolvedRounds({
+    competitionId,
+    storedPolicy: competition.unresolvedRoundPolicy,
+    session,
+  });
+
+  // The NORMAL hold gate is before the optimistic lock, so a parked contest is left
+  // untouched rather than claimed and released. Reaching this one means a round became
+  // unresolved between that read and this transaction - rare, and it must still not pay out.
+  //
+  // It is a genuine second gate, not decoration: `provider-settlement-late-hold.test.ts`
+  // drives exactly that race and goes red without this block. Note what makes the refusal
+  // safe is in the caller - a `success: false` return has to abort and release the claim, or
+  // this check trades a wrong payout for a contest stranded in `finalizing` for ever.
+  if (assessment.blocksSettlement) {
+    return {
+      success: false,
+      error:
+        assessment.blockReason ??
+        "Settlement is held: a round in this contest never reported a result.",
+    };
+  }
+
+  const refund = await refundExcludedParticipants({
+    session,
+    contest: competition,
+    userIds: assessment.excludedUserIds,
+  });
+
+  // EXCLUSION IS DONE BY FILTERING, NOT BY THE STATUS FIELD, and that is load-bearing.
+  // `calculateRankings` does not filter on participant status at all - it reads `status`
+  // only for the liquidation rule - so a player marked `refunded` would still be ranked and
+  // could still be paid a prize. Their money would go out twice, as a refund and as
+  // winnings. The refund service sets the status for the audit trail and every screen that
+  // reads it; removing them from the contest is this line.
+  const excluded = new Set(assessment.excludedUserIds);
+  const participants = allParticipants.filter((p) => !excluded.has(p.userId));
+
+  if (excluded.size > 0) {
+    console.log(
+      `🚫 [EXCLUDE] ${excluded.size} player(s) removed from ranking; ${refund.refundedUserIds.length} refunded (${refund.totalRefunded} credits), ${refund.alreadyRefundedUserIds.length} already refunded by an earlier run`,
+    );
+  }
 
   const { calculateRankings, distributePrizesWithTies } = await import(
     "@/lib/services/competition-ranking.service"
@@ -147,11 +204,37 @@ export async function settleProviderCompetition(
     }),
   );
 
+  // THE RE-SPLIT. Entry does `$inc: { currentParticipants: 1, prizePool: entryFee }` with
+  // the FULL fee - the platform fee is taken later, out of the pool, not at the door - so a
+  // refund removes exactly `entryFee` from both. Reducing by anything else is how a pool
+  // drifts away from the fees behind it.
+  //
+  // It is persisted, not just held in a local: `finalLeaderboard` and the fee stage are
+  // computed from the reduced pool, and a stored pool that still counted the removed player
+  // would contradict the payouts on every screen that reads the contest.
+  const refundedCount = refund.refundedUserIds.length;
+  let prizePool = competition.prizePool || 0;
+  let participantCount = competition.currentParticipants || 0;
+
+  if (refund.totalRefunded > 0) {
+    prizePool = Math.max(0, prizePool - refund.totalRefunded);
+    participantCount = Math.max(0, participantCount - refundedCount);
+    await Competition.findByIdAndUpdate(
+      competitionId,
+      {
+        $set: { prizePool, currentParticipants: participantCount },
+      },
+      { session },
+    );
+  }
+
   // The same integrity cap the trading path applies. A stored pool higher than the fees
   // actually collected means phantom credits would be created out of a bug elsewhere.
-  const actualCollectedFees =
-    (competition.currentParticipants || 0) * (competition.entryFee || 0);
-  let prizePool = competition.prizePool || 0;
+  //
+  // `participantCount` is the post-refund figure deliberately: computing the cap from the
+  // original count would leave headroom for exactly the fees that were just handed back,
+  // so the cap would stop catching the case it exists for.
+  const actualCollectedFees = participantCount * (competition.entryFee || 0);
 
   if (prizePool > actualCollectedFees && actualCollectedFees > 0) {
     console.error(

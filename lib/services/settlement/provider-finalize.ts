@@ -4,6 +4,7 @@ import {
   settleProviderCompetition,
   type ProviderSettlementResult,
 } from "./provider-settlement.service";
+import { assessUnresolvedRounds } from "./unresolved-rounds";
 
 /**
  * The lock, the transaction and the retry around provider settlement.
@@ -67,6 +68,31 @@ async function attemptProviderFinalize(
 ): Promise<ProviderSettlementResult> {
   await connectToDatabase();
 
+  // THE HOLD GATE, BEFORE THE LOCK. Under `hold_and_alert` an unreported round means this
+  // contest must not settle until a human resolves it - which is a condition that persists,
+  // not a transient failure. Checking it here leaves the contest completely untouched;
+  // checking it after the claim would set `finalizing` and rely on the release path, and
+  // every sweep would churn the status of a contest that is deliberately parked.
+  //
+  // Same reasoning as the game-label gate in `finalizeCompetition`, and the same reason it
+  // cannot be proven by asserting the end status: both placements refuse. The difference is
+  // whether a write happened.
+  const policyDoc = await Competition.findById(competitionId)
+    .select("unresolvedRoundPolicy")
+    .lean<{ unresolvedRoundPolicy?: string } | null>();
+
+  if (policyDoc) {
+    const held = await assessUnresolvedRounds({
+      competitionId,
+      storedPolicy: policyDoc.unresolvedRoundPolicy,
+    });
+
+    if (held.blocksSettlement) {
+      console.warn(`⏸️ [PROVIDER] ${held.blockReason}`);
+      return { success: false, error: held.blockReason };
+    }
+  }
+
   // Only one caller can move `active -> finalizing`. Everyone else gets null and stops,
   // which is what makes a double cron delivery harmless.
   const lockResult = await Competition.findOneAndUpdate(
@@ -109,6 +135,26 @@ async function attemptProviderFinalize(
       competition as unknown as Parameters<typeof settleProviderCompetition>[0],
       session,
     );
+
+    // A REFUSAL MUST NOT COMMIT, AND MUST RELEASE THE CLAIM. Until this existed, a
+    // `success: false` return committed the transaction anyway and left the contest at
+    // `finalizing` for ever - no later attempt could claim it, no cron would pick it up,
+    // and nobody would be paid. It was latent rather than live only because nothing
+    // returned a refusal yet; the hold-and-alert check above is the first thing that can.
+    //
+    // The catch block below cannot cover this, because a returned refusal is not a thrown
+    // error - which is exactly why this file's own warning about the release being "easy to
+    // leave out and impossible to notice in a test that only checks the happy path" applied
+    // to itself.
+    if (!result.success) {
+      await session.abortTransaction();
+      session.endSession();
+      await Competition.updateOne(
+        { _id: competitionId, status: "finalizing" },
+        { $set: { status: "active" } },
+      );
+      return result;
+    }
 
     await session.commitTransaction();
     session.endSession();

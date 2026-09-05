@@ -184,6 +184,12 @@ obligation, and settlement honours it. Paying it here would put a second money w
 settlement, and removing a player changes the prize pool, so the refund and the re-split are
 one transaction that belongs to X5.
 
+**Both deferrals are now closed** (4 September 2026, E4 third-half notes), and the second
+was closed differently from how this paragraph implies: settlement does **not** consume
+`refundOwed`. That flag is a return value in a worker process that has exited by the time a
+contest settles, so settlement re-derives the obligation from `round.status = "unresolved"`,
+the one thing stage 4 persists. The flags remain what a caller logs and alerts on.
+
 ### E3 - Real adapter against the sandbox
 
 - Implement the real provider adapter
@@ -246,7 +252,7 @@ creation could not: whether the settings actually persisted.
 |---|---|
 | Round launch for players | **BUILT later the same day - see the E4 second-half notes below** |
 | Provider settlement | **BUILT later the same day - see the E4 second-half notes below** |
-| The `exclude` refund | Still `refundOwed: true`. Removing a player changes the prize pool, so the refund and the re-split are one transaction, and that transaction belongs with settlement |
+| The `exclude` refund | **BUILT 4 September 2026 - see the E4 third-half notes below.** It was the last item on this list, and closing it turned up a sibling gap nothing had recorded |
 | Unpublish | There is deliberately no unpublish. A visible contest can be paid into; hiding it would strand paid entrants. Cancel is the reversible operation, and it refunds |
 
 Tests: `__tests__/services/provider-entry-and-ranking.test.ts` (23), all guards probed by
@@ -261,11 +267,12 @@ claiming a fix.
 
 #### E4 second-half build notes - ROUND LAUNCH AND SETTLEMENT, 4 September 2026
 
-**The "Done when" above is now met apart from the `exclude` refund:** a sandbox contest runs
-entry fees in, scores collected, ranked and prizes paid, with the ledger attributable to the
-contest. Read the two build-note sections together - the first half's warning that "entry
-works" is not "the contest works" no longer applies, but its list of what was deferred does
-not describe the current state either.
+**The "Done when" above is now met apart from the `exclude` refund** - which was itself
+closed hours later, so see the third-half notes. A sandbox contest runs entry fees in,
+scores collected, ranked and prizes paid, with the ledger attributable to the contest. Read
+the build-note sections together - the first half's warning that "entry works" is not "the
+contest works" no longer applies, but its list of what was deferred does not describe the
+current state either.
 
 **Round launch.** `lib/services/games/round-launch.service.ts` and
 `POST /api/competitions/[id]/rounds` sit over X3's round service. Two design points:
@@ -295,6 +302,45 @@ it read `message` where failures carry `error`.
 Tests: `__tests__/services/provider-round-launch.test.ts` and
 `__tests__/services/provider-settlement.test.ts`. Full suite **666 green**, `tools/probe-provider-entry.ps1`
 now **27 probes, all red**.
+
+#### E4 third-half build notes - THE UNRESOLVED-ROUND POLICIES, 4 September 2026
+
+**E4 is code-complete.** The `exclude` refund is paid and the pool re-split in the
+settlement transaction, and `hold_and_alert` blocks settlement. Chapter `07` section 2.3a is
+the account of what was built; `11` seam 3 holds the seam-level findings. What belongs here
+is what this phase's own planning got wrong.
+
+**The phase list tracked one obligation and there were two.** `refundOwed` appears in four
+documents, and every one of them presented it as the single remaining item. Nothing
+consumed `blocksSettlement` either - a `hold_and_alert` contest settled on time and paid
+out while the policy promised it would be held. It was invisible because it had never been
+written down, not because anyone decided against it. **The generalisation: an obligation
+recorded in four places is not more likely to be complete than one recorded nowhere - check
+the siblings of the thing being closed.**
+
+**Two defects were found under it, both worse than the gap being closed.** `exclude` did not
+merely fail to refund: because `calculateRankings` never filters on participant status, an
+excluded player stayed ranked and could be **paid a prize as well as being owed their fee
+back**. And `provider-finalize.ts` committed a `success: false` return and never released
+the claim, so the first refusal it ever produced would have parked the contest at
+`finalizing` permanently - unclaimable by any caller, cron or human.
+
+**Two probes stayed green for two different reasons, and the distinction is the useful
+part.** Deleting the pool reduction left the suite passing, because the integrity cap
+recomputes the same figure from the already-reduced participant count - so a *new* test was
+needed, seeding a pool below the fees collected, where the cap has headroom and cannot
+mask it. Passing `contestId` as a string also left the suite passing, and there the **claim
+was wrong**: Mongoose casts a string to ObjectId when the query runs, verified directly. One
+was a weak test, one was a false comment, and only running the probe separates them.
+
+Tests: 15 new in `provider-settlement.test.ts`, 2 in `provider-settlement-late-hold.test.ts`
+(a mocked race, because the pre-lock gate makes the in-transaction one otherwise
+unreachable). Full suite **683 green**, mirrors 79/0, both typechecks at baseline.
+
+**Still not built after E4:** no admin button publishes a contest and no player screen
+launches a round - the lifecycle is reachable by API and by test only. The `exclude` refund
+is on the **provider** settlement path; trading has no rounds to be unresolved, which is
+correct rather than a gap.
 
 ### E5 - Admin panel
 

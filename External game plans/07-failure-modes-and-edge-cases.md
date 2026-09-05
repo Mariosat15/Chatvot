@@ -56,6 +56,62 @@ The choice must be made when the contest is created, not improvised during an
 incident. Whichever is chosen, the affected player is **notified explicitly** rather
 than silently scored zero.
 
+#### 2.3a BUILT, 4 September 2026 - and there were two gaps here, not one
+
+All three policies are now honoured. Before this, **only `score_zero` worked, and it
+worked because it asks settlement to do nothing.** The other two were written, tested at
+the reconciliation layer, and consumed by nobody:
+
+- `exclude` left the player **ranked and unrefunded**. Not merely unpaid - because
+ `calculateRankings` does not filter on participant status at all, an excluded player
+ could still be ranked and **paid a prize while also being owed their fee back**.
+- `hold_and_alert` **settled on time and paid out**, exactly as though it were
+ `score_zero`, while the policy the operator chose promises the opposite.
+
+Only the first was recorded as an open obligation. The second was a genuine surprise, and
+it is the fourth instance of the rule that a plan's count is a hypothesis: **check every
+sibling of the thing you are fixing, not just the one a document named.**
+
+**Where it lives.** `lib/services/settlement/unresolved-rounds.ts` reads the state and
+`lib/services/settlement/exclusion-refund.ts` moves the money, both mirrored, both driven
+from `provider-settlement.service.ts` inside the settlement transaction. Pinned by 15 tests
+in `__tests__/services/provider-settlement.test.ts` and 2 in
+`provider-settlement-late-hold.test.ts`, every guard probed.
+
+Five things about the build that the table above cannot show:
+
+- **Settlement does not read `refundOwed` or `blocksSettlement`, and must not.** They are
+ return values in a worker process that has exited long before a contest settles, and
+ nothing persists them. Settlement re-derives both from the one thing stage 4 *writes* -
+ `round.status = "unresolved"`. That also means a contest settled by a path the net never
+ drove (the lazy auto-finalize, a manual admin trigger) honours the policy anyway; a
+ parameter would have made those paths silently skip it.
+- **Exclusion is done by filtering the participant list, never by the status field.** The
+ refund marks the participant `refunded` for the audit trail and every screen that reads
+ it, but `calculateRankings` reads `status` only for the liquidation rule - so the status
+ alone removes nobody. This is the whole double-payment defect, and it is one line.
+- **The refund happens before ranking, so the pool the winners are paid from is already the
+ reduced one.** Reducing after would pay prizes out of a pot that still counted a player
+ who had left. The reduction is the **full entry fee**, because entry adds the full fee and
+ the platform share is taken later out of the pool - a stale comment in both copies of
+ `competition-cancel.actions.ts` claimed the opposite and was corrected the same day.
+- **The `hold_and_alert` gate sits before the optimistic lock**, so a parked contest is left
+ completely untouched rather than claimed and released on every sweep. The second,
+ in-transaction check is a real gate rather than decoration - it catches a round going
+ unresolved between the two reads - but it exposed a latent bug that mattered more than
+ either policy: **a `success: false` return from settlement used to commit anyway and never
+ release the claim**, leaving the contest at `finalizing` for ever, where no caller, cron or
+ human could claim it again and nobody would be paid.
+- **A duplicate refund is prevented by a ledger check, not by the transaction.** The
+ transaction is atomic, so a failed run rolls back - but a run that stalls in `finalizing`
+ is reset to `active` after five minutes (R4) and the next sweep settles it *for real*, and
+ the first run had already committed.
+
+**Still not built:** the `exclude` refund fires only on the provider settlement path. The
+trading path cannot reach it, because trading has no rounds - which is correct, not a gap,
+but a document saying "settlement honours the unresolved policies" should say **provider
+settlement**.
+
 ---
 
 ## 3. Provider outage

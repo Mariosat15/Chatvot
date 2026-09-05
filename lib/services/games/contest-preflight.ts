@@ -212,12 +212,13 @@ export function runPreflight(input: PreflightInput): PreflightResult {
   // --- the unresolved-round policy ------------------------------------------------------
 
   if (input.unresolvedRoundPolicy === "exclude") {
-    // Honest about a known limit rather than silently doing half of it. The refund a
-    // removed player is owed is not paid by the reconciliation service - removing a player
-    // changes the prize pool, so the refund and the re-split are one transaction that
-    // belongs with settlement.
+    // The warning is kept, but it no longer says the refund is manual - that became false
+    // the moment settlement started paying it, and a stale caution is worse than none: an
+    // operator who reads it either avoids a policy that now works, or refunds by hand on
+    // top of the automatic one. It now describes what the policy DOES, because removing a
+    // paid entrant and re-splitting a pool is a consequential choice either way.
     warnings.push(
-      "The exclude policy removes a player whose result never arrives, and the entry-fee refund that owes is not yet automatic. Prefer score-zero or hold-and-alert until it is.",
+      "The exclude policy removes a player whose result never arrives: their entry fee is returned automatically at settlement and the prize pool is re-split without them, so the winners share a smaller pot than the one advertised at entry.",
     );
   }
 

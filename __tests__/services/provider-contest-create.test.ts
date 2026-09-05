@@ -430,13 +430,18 @@ describe("runPreflight - warnings that must not become refusals", () => {
     expect(result.warnings.join(" ")).toMatch(/master switch/i);
   });
 
-  it("warns that the exclude policy owes a refund it does not pay", () => {
-    // Honest about a known limit. Nothing may read `exclude` as finished.
+  it("warns that the exclude policy shrinks the pool the winners were promised", () => {
+    // FLIPPED, NOT DELETED, when settlement started paying the refund. This test used to
+    // pin the honest admission that `exclude` owed a refund nothing paid; keeping the same
+    // test and inverting what it asserts is what stops the warning silently reverting to a
+    // caution that is now false. The reason for a warning at all has changed: not "this is
+    // half-built" but "this removes a paid entrant and the winners share a smaller pot".
     const result = runPreflight(
       preflightInput({ unresolvedRoundPolicy: "exclude" }),
     );
     expect(result.ok).toBe(true);
-    expect(result.warnings.join(" ")).toMatch(/not yet automatic/i);
+    expect(result.warnings.join(" ")).toMatch(/re-split/i);
+    expect(result.warnings.join(" ")).not.toMatch(/not yet automatic/i);
   });
 
   it("warns when no sandbox round has ever succeeded for the title", () => {

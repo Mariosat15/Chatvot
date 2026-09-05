@@ -189,6 +189,66 @@ async function prizeRows(competitionId: string) {
   );
 }
 
+async function refundRows(competitionId: string) {
+  return (
+    (await mongoose.connection.db
+      ?.collection("wallettransactions")
+      .find({ competitionId, transactionType: "competition_refund" })
+      .toArray()) ?? []
+  );
+}
+
+async function participantOf(competitionId: string, userId: string) {
+  return mongoose.connection.db
+    ?.collection("competitionparticipants")
+    .findOne({ competitionId, userId });
+}
+
+/**
+ * A round that never reported, which is the only state settlement can read.
+ *
+ * `status: "unresolved"` is what reconciliation stage 4 writes, and it is the ONLY part of
+ * the policy outcome that survives - `refundOwed` and `blocksSettlement` are return values
+ * in a worker that has long since exited by the time a contest settles. A test that handed
+ * settlement the outcome object would be testing something the production path can never
+ * receive.
+ */
+async function seedUnresolvedRound(
+  competitionId: string,
+  userId: string,
+  attemptNumber = 1,
+): Promise<void> {
+  await mongoose.connection.db?.collection("game_round").insertOne({
+    roundId: `round-${userId}-${attemptNumber}-${competitionId.slice(-6)}`,
+    providerKey: "mock",
+    gameCode: "mock-puzzle",
+    gameKey: GAME_KEY,
+    userId,
+    contestType: "competition",
+    // Reason for the ObjectId: `contestId` is declared as one, and a string here would
+    // match nothing while the test still looked correct - every assertion about exclusion
+    // would pass for the wrong reason, because nothing would be excluded.
+    contestId: new mongoose.Types.ObjectId(competitionId),
+    attemptNumber,
+    mode: "ranked",
+    status: "unresolved",
+    expiresAt: new Date(Date.now() - 30 * 60 * 1000),
+    createdAt: new Date(),
+  });
+}
+
+async function setPolicy(
+  competitionId: string,
+  policy: "score_zero" | "exclude" | "hold_and_alert",
+): Promise<void> {
+  await mongoose.connection.db
+    ?.collection("competitions")
+    .updateOne(
+      { _id: new mongoose.Types.ObjectId(competitionId) },
+      { $set: { unresolvedRoundPolicy: policy } },
+    );
+}
+
 beforeAll(async () => {
   await startTestMongo();
   await ensureCollections([
@@ -446,5 +506,296 @@ describe("settling a provider competition", () => {
     expect(Number(competition?.updatedAt)).toBe(Number(before?.updatedAt));
     expect(await wonBy(PLAYERS[0].id)).toBe(0);
     expect((await prizeRows(competitionId)).length).toBe(0);
+  });
+});
+
+/**
+ * The unresolved-round policies, which settlement is the only place that can honour.
+ *
+ * Chapter 07 gives a contest three answers for a round that never reports, chosen at
+ * creation so that nobody decides mid-incident when the choice stops being neutral.
+ * Reconciliation stage 4 writes `status: "unresolved"` and NAMES the consequence in a
+ * return value - `refundOwed`, `blocksSettlement` - then deliberately stops, because both
+ * consequences need to move money and re-split a pool in one transaction.
+ *
+ * Until this point NEITHER was consumed anywhere. `exclude` left the player ranked and
+ * unrefunded, so they could be paid a prize AND be owed their fee back; `hold_and_alert`
+ * settled on time and paid out while promising the opposite. Only `score_zero` worked, and
+ * it worked because it asks settlement to do nothing.
+ */
+describe("the unresolved-round policies", () => {
+  const UNRESOLVED_PLAYER = PLAYERS[1]; // Bo, who would otherwise finish second and be paid.
+
+  describe("exclude", () => {
+    async function seedExcluded(): Promise<string> {
+      const competitionId = await seedFinishedProviderContest();
+      await setPolicy(competitionId, "exclude");
+      await seedUnresolvedRound(competitionId, UNRESOLVED_PLAYER.id);
+      return competitionId;
+    }
+
+    it("returns the excluded player's entry fee", async () => {
+      const competitionId = await seedExcluded();
+
+      await finalizeCompetition(competitionId);
+
+      expect(await balanceOf(UNRESOLVED_PLAYER.id)).toBe(
+        START_BALANCE + ENTRY_FEE,
+      );
+    });
+
+    it("does NOT pay them a prize as well", async () => {
+      // The defect this pins is a double payment, not a missing one. `calculateRankings`
+      // does not filter on participant status - it reads `status` only for the liquidation
+      // rule - so marking a player `refunded` leaves them ranked and payable. Bo is seeded
+      // second of three with a rank-2 prize, so a settlement that ranks them pays twice:
+      // once as a refund and once as winnings.
+      const competitionId = await seedExcluded();
+
+      await finalizeCompetition(competitionId);
+
+      const rows = await prizeRows(competitionId);
+      expect(rows.some((r) => r.userId === UNRESOLVED_PLAYER.id)).toBe(false);
+      // Exactly the entry fee back, no more: proves the refund landed and no prize did.
+      expect(await wonBy(UNRESOLVED_PLAYER.id)).toBe(ENTRY_FEE);
+    });
+
+    it("re-splits the pool, so the remaining winners are paid from the reduced pot", async () => {
+      const competitionId = await seedExcluded();
+
+      await finalizeCompetition(competitionId);
+
+      // Pool was 3 x 100; one fee is returned, so 200 remains. The platform takes 20%,
+      // leaving 160 to distribute, and rank 1 takes 60% of it.
+      const competition = await readCompetition(competitionId);
+      expect(competition?.prizePool).toBe(200);
+      expect(await wonBy(PLAYERS[0].id)).toBeCloseTo(96, 2);
+
+      // And the participant count follows the pool. Reason it must: the integrity cap is
+      // `currentParticipants * entryFee`, so leaving the count at 3 would leave headroom
+      // for exactly the fee just handed back - the cap would stop catching its own case.
+      expect(competition?.currentParticipants).toBe(2);
+    });
+
+    it("reduces the pool even when the integrity cap cannot do it for us", async () => {
+      // THIS TEST EXISTS BECAUSE A PROBE STAYED GREEN. Deleting the pool reduction left the
+      // suite passing, and the reason is that the integrity cap below it computes
+      // `currentParticipants * entryFee` and had already been given the reduced count - so
+      // it capped 300 down to 200 and produced the right answer by a completely different
+      // route. The two agree only while the stored pool is at or above the fees collected.
+      //
+      // Seeded at 250 against 300 of collected fees, the cap has 200 of headroom and never
+      // fires. The reduction must then do the work alone: 250 - 100 = 150. A settlement
+      // relying on the cap pays out of 200 instead, which is 50 credits of fees that were
+      // handed back to a player.
+      const competitionId = await seedFinishedProviderContest({
+        prizePool: 250,
+      });
+      await setPolicy(competitionId, "exclude");
+      await seedUnresolvedRound(competitionId, UNRESOLVED_PLAYER.id);
+
+      await finalizeCompetition(competitionId);
+
+      expect((await readCompetition(competitionId))?.prizePool).toBe(150);
+      // 150 less 20% platform fee is 120; rank 1 takes 60% of that.
+      expect(await wonBy(PLAYERS[0].id)).toBeCloseTo(72, 2);
+    });
+
+    it("writes a refund row attributed to the competition", async () => {
+      // Reason: an unattributable money row is the defect Stage 0 found twice, with
+      // `referenceId` on entry fees and `challengeId` across the whole challenge trail.
+      // Neither was a wrong balance and both were a broken audit trail.
+      const competitionId = await seedExcluded();
+
+      await finalizeCompetition(competitionId);
+
+      const rows = await refundRows(competitionId);
+      expect(rows.length).toBe(1);
+      expect(rows[0].userId).toBe(UNRESOLVED_PLAYER.id);
+      expect(rows[0].amount).toBe(ENTRY_FEE);
+      expect(rows[0].competitionId).toBe(competitionId);
+      expect(rows[0].balanceBefore).toBe(START_BALANCE);
+      expect(rows[0].balanceAfter).toBe(START_BALANCE + ENTRY_FEE);
+    });
+
+    it("records the refund as a reversed spend, never as winnings", async () => {
+      // Reason: a refund that increments `totalWonFromCompetitions` credits the player with
+      // winnings they never earned on every stats and leaderboard screen that reads it.
+      const competitionId = await seedExcluded();
+
+      await finalizeCompetition(competitionId);
+
+      const wallet = await mongoose.connection.db
+        ?.collection("creditwallets")
+        .findOne({ userId: UNRESOLVED_PLAYER.id });
+
+      expect(wallet?.totalWonFromCompetitions).toBe(0);
+      expect(wallet?.totalRefunded).toBe(ENTRY_FEE);
+      expect(wallet?.totalSpentOnCompetitions).toBe(-ENTRY_FEE);
+    });
+
+    it("marks the participant refunded", async () => {
+      const competitionId = await seedExcluded();
+
+      await finalizeCompetition(competitionId);
+
+      const participant = await participantOf(
+        competitionId,
+        UNRESOLVED_PLAYER.id,
+      );
+      expect(participant?.status).toBe("refunded");
+    });
+
+    it("refunds a player ONCE even with several unresolved rounds", async () => {
+      // Reachable under `best_of_n`: one player, three attempts, none of which reported.
+      // Refunding per round rather than per player pays the entry fee back three times and
+      // takes three fees out of the pool.
+      const competitionId = await seedFinishedProviderContest();
+      await setPolicy(competitionId, "exclude");
+      await seedUnresolvedRound(competitionId, UNRESOLVED_PLAYER.id, 1);
+      await seedUnresolvedRound(competitionId, UNRESOLVED_PLAYER.id, 2);
+      await seedUnresolvedRound(competitionId, UNRESOLVED_PLAYER.id, 3);
+
+      await finalizeCompetition(competitionId);
+
+      expect((await refundRows(competitionId)).length).toBe(1);
+      expect(await wonBy(UNRESOLVED_PLAYER.id)).toBe(ENTRY_FEE);
+      expect((await readCompetition(competitionId))?.prizePool).toBe(200);
+    });
+
+    it("does not refund twice when the contest is settled again", async () => {
+      // Not a theoretical path: a run that stalls in `finalizing` is reset to `active`
+      // after five minutes (R4) and the next sweep settles it for real. The transaction
+      // being atomic does not help - the first run committed.
+      const competitionId = await seedExcluded();
+
+      await finalizeCompetition(competitionId);
+      await mongoose.connection.db
+        ?.collection("competitions")
+        .updateOne(
+          { _id: new mongoose.Types.ObjectId(competitionId) },
+          { $set: { status: "active" } },
+        );
+      await finalizeCompetition(competitionId);
+
+      expect((await refundRows(competitionId)).length).toBe(1);
+      expect(await wonBy(UNRESOLVED_PLAYER.id)).toBe(ENTRY_FEE);
+    });
+
+    it("leaves the other players ranked in order", async () => {
+      const competitionId = await seedExcluded();
+
+      await finalizeCompetition(competitionId);
+
+      const competition = await readCompetition(competitionId);
+      const board = (competition?.finalLeaderboard ?? []) as {
+        rank: number;
+        userId: string;
+      }[];
+
+      expect(board.map((e) => e.userId)).toEqual([
+        PLAYERS[0].id,
+        PLAYERS[2].id,
+      ]);
+      expect(board.map((e) => e.rank)).toEqual([1, 2]);
+    });
+  });
+
+  describe("hold_and_alert", () => {
+    async function seedHeld(): Promise<string> {
+      const competitionId = await seedFinishedProviderContest();
+      await setPolicy(competitionId, "hold_and_alert");
+      await seedUnresolvedRound(competitionId, UNRESOLVED_PLAYER.id);
+      return competitionId;
+    }
+
+    it("refuses to settle at all", async () => {
+      const competitionId = await seedHeld();
+
+      const result = await finalizeCompetition(competitionId);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/held/i);
+    });
+
+    it("pays nobody and leaves the contest claimable", async () => {
+      // The failure mode without this is not a crash: the contest settles on time and pays
+      // out, exactly as though the policy were `score_zero`, while the policy the operator
+      // chose promises settlement is held until a human decides.
+      const competitionId = await seedHeld();
+
+      const before = await readCompetition(competitionId);
+      await finalizeCompetition(competitionId);
+
+      const competition = await readCompetition(competitionId);
+      expect(competition?.status).toBe("active");
+      // Reason for the timestamp: the gate sits BEFORE the optimistic lock, so a held
+      // contest is never claimed. Checking after the claim would leave every sweep churning
+      // `active -> finalizing -> active` on a contest that is deliberately parked, and the
+      // end status alone cannot tell those two placements apart.
+      expect(Number(competition?.updatedAt)).toBe(Number(before?.updatedAt));
+      expect(await wonBy(PLAYERS[0].id)).toBe(0);
+      expect((await prizeRows(competitionId)).length).toBe(0);
+      expect((await refundRows(competitionId)).length).toBe(0);
+    });
+
+    it("settles normally once the round is no longer unresolved", async () => {
+      // Reason this matters: the hold must be a hold, not a permanent refusal. A human
+      // voiding or resolving the round has to leave the contest settleable.
+      const competitionId = await seedHeld();
+
+      expect((await finalizeCompetition(competitionId)).success).toBe(false);
+
+      await mongoose.connection.db
+        ?.collection("game_round")
+        .updateMany(
+          { contestId: new mongoose.Types.ObjectId(competitionId) },
+          { $set: { status: "voided" } },
+        );
+
+      const result = await finalizeCompetition(competitionId);
+
+      expect(result.success).toBe(true);
+      expect(await wonBy(PLAYERS[0].id)).toBeGreaterThan(0);
+    });
+  });
+
+  describe("score_zero", () => {
+    it("settles on time and refunds nobody", async () => {
+      // The default, and the one policy that was already correct. Pinned so the two fixes
+      // above cannot start refunding or holding contests that did not ask for it.
+      const competitionId = await seedFinishedProviderContest();
+      await setPolicy(competitionId, "score_zero");
+      await seedUnresolvedRound(competitionId, UNRESOLVED_PLAYER.id);
+
+      const result = await finalizeCompetition(competitionId);
+
+      expect(result.success).toBe(true);
+      expect((await refundRows(competitionId)).length).toBe(0);
+      expect((await readCompetition(competitionId))?.prizePool).toBe(300);
+      // Bo keeps their seeded score and their rank-2 prize.
+      expect(await wonBy(UNRESOLVED_PLAYER.id)).toBeGreaterThan(0);
+    });
+
+    it("is the fallback for a contest that predates the field", async () => {
+      // Reason it must default this way round: an absent policy defaulting to `exclude`
+      // would refund players nobody configured a refund for, and defaulting to
+      // `hold_and_alert` would freeze every legacy contest the first time a round went
+      // missing. Doing nothing is the only safe absent-value behaviour here - the opposite
+      // instinct to a capability gate, because "closed" here means moving money.
+      const competitionId = await seedFinishedProviderContest();
+      await mongoose.connection.db
+        ?.collection("competitions")
+        .updateOne(
+          { _id: new mongoose.Types.ObjectId(competitionId) },
+          { $unset: { unresolvedRoundPolicy: "" } },
+        );
+      await seedUnresolvedRound(competitionId, UNRESOLVED_PLAYER.id);
+
+      const result = await finalizeCompetition(competitionId);
+
+      expect(result.success).toBe(true);
+      expect((await refundRows(competitionId)).length).toBe(0);
+    });
   });
 });

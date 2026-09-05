@@ -110,7 +110,14 @@ export async function cancelCompetitionAndRefund(
       }
 
       // Calculate FULL refund (entry fee that was charged)
-      // The prizePool already has the platform fee deducted, but we refund the ORIGINAL entry fee
+      //
+      // Reason the full fee is the right amount, corrected 4 Sep 2026: the pool holds the
+      // WHOLE entry fee. `contest-entry.service.ts` does `$inc: { prizePool: entryFee }`
+      // and the platform fee is taken later, out of the pool, not at the door. This comment
+      // used to claim the pool arrived here already net of the platform fee, which would
+      // have made refunding the whole fee look like an overpayment - and it is the same fact
+      // the `exclude` re-split in `lib/services/settlement/provider-settlement.service.ts`
+      // depends on, so a reader acting on the old version would under-reduce the pool there.
       const refundAmount = entryFee;
       const newBalance = wallet.creditBalance + refundAmount;
 
