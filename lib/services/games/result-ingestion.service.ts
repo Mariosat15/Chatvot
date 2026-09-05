@@ -9,6 +9,7 @@ import ProviderGame from "@/database/models/games/provider-game.model";
 import { getProviderAdapter } from "@/lib/services/game-providers/registry";
 import type { NormalisedRoundResult } from "@/lib/services/game-providers/contract";
 import { canContestAcceptScore } from "./contest-state";
+import { syncParticipantScore } from "./participant-score.service";
 import {
   checkTimestamp,
   extractEventId,
@@ -64,6 +65,12 @@ export interface IngestOutcome {
   roundId?: string;
   /** Raised for anything an operator must look at. */
   alert?: "warning" | "critical";
+  /**
+   * The participant's score after this result was folded in, when there was a participant to
+   * update. Absent for practice, for a challenge, and when the sync could not run - so it is
+   * deliberately not a substitute for reading the participant row.
+   */
+  participantScore?: number;
 }
 
 /** Records the outcome on the stored event. Never throws - the score already landed. */
@@ -438,6 +445,33 @@ export async function applyResult(args: {
   round.resultSource = source;
   await round.save();
 
+  // ── GATE 11b: carry the score up to the participant, where ranking reads it ────────────
+  //
+  // AFTER the save, never before: `syncParticipantScore` recomputes from persisted rounds,
+  // so running it first would omit the very result being ingested.
+  //
+  // This was missing entirely until 5 Sep 2026, and settlement's own comment asserted it was
+  // here. Without it every provider participant settled on `score: 0`, tied at rank 1, and
+  // split the prize pool equally however well they played.
+  const scoreSync = await syncParticipantScore({
+    contestId: round.contestId,
+    userId: round.userId,
+    contestType: round.contestType,
+    scoreDirection: normalised.scoreDirection,
+  });
+
+  // Reason the ingestion still succeeds when the sync does not: the round result IS stored,
+  // and the provider has done nothing wrong. Returning a failure would make it retry, and
+  // gate 6 would then ignore the retry as a duplicate - so the provider would keep trying
+  // and the score would still be missing. Loud log instead, and the recomputation is
+  // self-healing: any later result for the same player recomputes from scratch, and the
+  // round inspector can force a re-sync.
+  if (!scoreSync.synced && round.contestType === "competition") {
+    console.error(
+      `❌ Round ${round.roundId} scored but the participant score was not updated: ${scoreSync.reason}`,
+    );
+  }
+
   await record({
     result: "scored",
     roundId: round.roundId,
@@ -450,6 +484,7 @@ export async function applyResult(args: {
     message: "Result recorded.",
     eventId,
     roundId: round.roundId,
+    participantScore: scoreSync.synced ? scoreSync.score : undefined,
   };
 }
 

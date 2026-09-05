@@ -1,5 +1,6 @@
 import Competition from "@/database/models/trading/competition.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import ProviderGame from "@/database/models/games/provider-game.model";
 import { payContestPrizes } from "./prize-payout.service";
 import { settleFeesAndGameMasters } from "./fees.service";
 import { completeContest } from "./contest-completion.service";
@@ -21,10 +22,25 @@ import type { SettlementLeaderboardEntry } from "./types";
  * `challengeId` by nine, producing the rule that one bug duplicated is not drift and that
  * no mirror guard will ever catch it. Money code gets one writer.
  *
- * WHERE THE SCORES COME FROM. Nothing here computes a score. They were written to
- * `participant.score` by the single ingestion function as each round's result arrived, and
- * reconciliation has already applied the contest's unresolved-round policy to anything
- * that never came back. By the time settlement runs, the scores are simply facts.
+ * WHERE THE SCORES COME FROM. Nothing here computes a score. They are written to
+ * `participant.score` by `syncParticipantScore`, called from the single ingestion function as
+ * each round's result arrives, and reconciliation has already applied the contest's
+ * unresolved-round policy to anything that never came back. By the time settlement runs, the
+ * scores are simply facts.
+ *
+ * THAT PARAGRAPH WAS FALSE UNTIL 5 SEPTEMBER 2026, and it is worth leaving the correction
+ * visible rather than quietly fixing the tense. `applyResult` wrote `game_round` and stopped;
+ * no code path had ever written `participant.score`. Every provider participant would have
+ * settled on the seat default of zero, tied at rank 1, and taken an equal share of the pool
+ * regardless of how well they played.
+ *
+ * Note the ingestion function lives in the MAIN app only, deliberately - mirroring it would
+ * make two doors for scores, which is the one thing chapter 02 section 10 rule 3 forbids. This
+ * settlement service is mirrored; the thing that feeds it is not.
+ *
+ * The tests below could not catch it because they seed the scores they rank, so they proved
+ * that ranking works *given* scores and never that a score arrives. **An aside in a comment
+ * is a claim, not a fact** - and this file's aside was the claim that hid the missing seam.
  */
 
 export interface ProviderSettlementResult {
@@ -67,6 +83,52 @@ interface ProviderCompetitionDoc {
 }
 
 /**
+ * Which way this contest's scores rank, read once from the catalogue title.
+ *
+ * Reason it defaults to higher-is-better rather than refusing: an unrecognised or missing
+ * direction must not silently INVERT a leaderboard, and upward is the direction every points
+ * game uses. This is the same fail-closed instinct as the market-hours gate, applied to sort
+ * order - the safe answer is the one that cannot reverse a result.
+ *
+ * The narrowing is deliberate rather than a cast. `scoreDirection` is a schema enum, but a
+ * document written before the enum existed, or one hand-edited, can hold anything; treating
+ * only the one known downward value as downward means no other string can reverse a payout.
+ */
+async function resolveContestScoreDirection(
+  gameKey: string | undefined,
+  session: import("mongoose").ClientSession,
+): Promise<"higher_is_better" | "lower_is_better"> {
+  // Reason this is a real case and not defensive noise: `gameKey` is optional on the contest
+  // document, and the typecheck caught the assumption that it is not. An absent label cannot
+  // resolve a title, so there is nothing to read and the safe upward default applies.
+  if (!gameKey) {
+    console.warn(
+      "⚠️ Provider contest has no gameKey at settlement; ranking scores as higher-is-better.",
+    );
+    return "higher_is_better";
+  }
+
+  const title = await ProviderGame.findOne({ gameKey })
+    .select("scoreDirection")
+    .session(session)
+    .lean<{ scoreDirection?: string } | null>();
+
+  if (!title) {
+    // Not fatal: the contest's own scores are still rankable, and refusing here would strand
+    // a settleable contest because a catalogue row was removed. Loud, because a missing title
+    // means `gameKey` no longer resolves and that affects more than this sort.
+    console.warn(
+      `⚠️ No catalogue entry for "${gameKey}" at settlement; ranking scores as higher-is-better.`,
+    );
+    return "higher_is_better";
+  }
+
+  return title.scoreDirection === "lower_is_better"
+    ? "lower_is_better"
+    : "higher_is_better";
+}
+
+/**
  * Settle a provider contest inside the caller's transaction.
  *
  * Takes the already-locked document rather than an id, because the optimistic
@@ -91,7 +153,6 @@ export async function settleProviderCompetition(
         userId: string;
         username?: string;
         score?: number;
-        scoreDirection?: string;
         status?: string;
         enteredAt?: Date;
       }[]
@@ -152,6 +213,20 @@ export async function settleProviderCompetition(
     "@/lib/services/competition-ranking.service"
   );
 
+  // ONE direction for the whole contest, read from the catalogue title.
+  //
+  // This used to be read off each participant row, which was a defect on two counts. The
+  // field was declared on neither `CompetitionParticipant` copy, so the read returned
+  // `undefined` for every player and the fallback below was not a fail-safe but the only
+  // branch - a race game ranked as though higher were better, paying the slowest player
+  // first. And it was the wrong SHAPE besides: chapter 05 section 2 keeps direction off the
+  // participant precisely so two rows in one leaderboard cannot disagree.
+  //
+  // Note why the typecheck never objected: the participant read is a `.lean<{...}>()` with a
+  // hand-written generic, so the compiler checked the annotation rather than the schema.
+  // **An explicitly-typed lean read is a place a field that does not exist looks real.**
+  const direction = await resolveContestScoreDirection(competition.gameKey, session);
+
   // Reason: `gameType` is passed so `calculateRankings` dispatches to the provider game
   // module, which ranks on `score` and applies the title's direction. Omit it and the
   // shared ranking step falls back to trading, reads every score as a missing PnL, ties
@@ -162,14 +237,7 @@ export async function settleProviderCompetition(
       userId: p.userId,
       username: p.username || "Anonymous",
       score: p.score,
-      // Reason: narrowed from the stored string, defaulting to higher-is-better. An
-      // unrecognised direction must NOT silently invert a leaderboard, so anything other
-      // than the one known downward value is treated as upward - the same fail-safe
-      // reasoning as the market-hours gate, applied to sort order.
-      scoreDirection:
-        p.scoreDirection === "lower_is_better"
-          ? ("lower_is_better" as const)
-          : ("higher_is_better" as const),
+      scoreDirection: direction,
       status: p.status ?? "active",
       enteredAt: p.enteredAt ?? new Date(),
     })),

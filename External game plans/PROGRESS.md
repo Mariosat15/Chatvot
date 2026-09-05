@@ -13,7 +13,7 @@
 
 | | |
 |---|---|
-| **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done.** A provider contest can be created, **published from the admin screen** (5 Sep 2026), entered, played and paid. **The player half is still API-only** - no player screen launches a round. **No provider selected**, which is what X4 needs |
+| **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done.** A provider contest can be created, **published from the admin screen** (5 Sep 2026), entered, played and paid - and since 5 Sep 2026 it is paid **correctly**, which it was not before: two P0 defects meant every player tied on a score of zero and split the pool equally, and a lower-is-better game ranked backwards. **The player half is still API-only** - no player screen launches a round. **No provider selected**, which is what X4 needs |
 | **Next action** | **The round inspector and manual resolution screen** (`12` s4), so an operator can see a stuck round and act on it. In parallel, commercially: find and assess a provider using `08`, since X4 cannot start without one |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
 | **Owner instruction on record** | **External games only, no in-house game** (2 Sep 2026). **One step at a time, admin first, do not break the running app.** |
@@ -342,7 +342,7 @@ numbers in chapters `01`-`09` remain resolvable. **Plan against the X-phases bel
 | **X2** | Provider abstraction + mock adapter | `09` E1 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026. Nothing player-visible - `externalGamesEnabled` defaults false |
 | **X3** | Round lifecycle + result ingestion | `09` E2 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026. **Rehearsals 1-6 of `07` s9 green** against the mock (49 tests, 6 guards probed). 7-10 need X5/X8 |
 | **X4** | Real adapter against sandbox | `09` E3 | 1 week | `NOT STARTED` |
-| **X5** | Contest integration + settlement | `09` E4 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026 - publish, entry, ranking, round launch, settlement and **all three unresolved-round policies**. **A provider contest can be published, entered, played and paid. Publishing became clickable on 5 Sep 2026 (X6 slice); the player round launch is still API-only.** Settlement was an **extraction**: the payout, fee/GM and completion stages moved to `lib/services/settlement/` and trading was rewired onto them. Closing `exclude` also closed **`hold_and_alert`**, which nothing had ever consumed |
+| **X5** | Contest integration + settlement | `09` E4 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026, **with two P0 payout defects found and fixed 5 Sep 2026** - publish, entry, ranking, round launch, settlement and **all three unresolved-round policies**. **A provider contest can be published, entered, played and paid. Publishing became clickable on 5 Sep 2026 (X6 slice); the player round launch is still API-only.** Settlement was an **extraction**: the payout, fee/GM and completion stages moved to `lib/services/settlement/` and trading was rewired onto them. Closing `exclude` also closed **`hold_and_alert`**, which nothing had ever consumed. **The two P0s are why "code-complete" must never be read as "correct":** no code path wrote `participant.score`, so every player settled on zero and split the pool equally; and settlement read `scoreDirection` off a field neither participant copy declared, so a lower-is-better game paid the slowest player first |
 | **X6** | Admin: nav restructure incl. **the single Trading section**, RBAC, provider registration, game-aware wizard, analytics, **GM creation API + wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | `PARTIALLY DONE` - nav restructure and single Trading destination **built and owner-tested 2 Sep 2026**. **Provider registration, credentials and the per-title catalogue switch code-complete 4 Sep 2026** (`12` s4.1a). **Contest wizard from `configSchema` + pre-flight validation code-complete 4 Sep 2026** (`12` s2.1) - creates a **draft**. **The publish control is code-complete 5 Sep 2026** (`12` s3.1a), which also made the competitions list game-aware: `draft` admitted as a status, its own badge, a Drafts count, a provider game badge, and the trading Edit button **withheld** from provider contests because `PUT /api/competitions/[id]` blind-assigns that form's body. Still `NOT STARTED`: provider health panel, round inspector, manual resolution, live-contest controls, provider contest **editing**, analytics by provider, GM creation API |
 | **X6.5** | **Admin wording pass** - brought forward from X8 so operators never work a games platform labelled "trading" | `14` | 0.5-1 week | `NOT STARTED` |
 | **X7** | Player UI + points, leaderboards, badges, levels, **profile and cross-game stats**, **per-game GM analytics** | `09` E6 + `13` + `05` + `19` | 3-4 weeks | `NOT STARTED` |
@@ -603,6 +603,91 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 5 Sep 2026 - TWO P0 PAYOUT DEFECTS - THE SCORE SEAM WAS NEVER BUILT
+
+**Shipped:** provider contests now pay the players who actually won. Two defects, both in the
+money path, both found while mapping the code for the round inspector rather than by a test.
+
+**Defect 1 - nothing wrote `participant.score`.** `applyResult` wrote `game_round` and stopped;
+`buildParticipantSeat` seats every player at `score: 0`. So **every participant in a provider
+contest would have settled on zero, tied at rank 1, and taken an equal share of the prize pool
+regardless of how well they played.** Not a crash - in production it reads as a
+prize-distribution bug, which is the same disguise the trading `pnl` defect wore.
+
+Fixed by `lib/services/games/participant-score.service.ts`, called from **gate 11b** of the
+single ingestion function, after the round is saved. It **recomputes from persisted rounds
+rather than incrementing**, which makes it idempotent and independent of arrival order - a poll
+and a callback for one round carry different event ids by design, so gate 6 does not dedupe
+them, and a late attempt-1 result can land after attempt 2. Aggregation follows
+`attemptsPolicy`: `single` and `best_of_n` take the best attempt, `sum_of_n` adds them.
+
+**Defect 2 - `scoreDirection` was read off a field that does not exist.** Settlement narrowed
+`p.scoreDirection` from each participant; the field is declared on **neither**
+`CompetitionParticipant` copy. So the read was `undefined` for every player and the fail-safe
+default beside it was the *only* branch: **every lower-is-better contest - a race, a time
+trial, golf-style scoring - ranked upward and paid the slowest player first.** Fixed by
+`resolveContestScoreDirection`, which reads the catalogue title once per contest.
+
+**Files touched:** `lib/services/games/participant-score.service.ts` (new),
+`lib/services/games/result-ingestion.service.ts` (gate 11b + `participantScore` on the
+outcome), `lib/services/settlement/provider-settlement.service.ts` **and its admin mirror**
+(direction from the catalogue; the false comment corrected in place),
+`__tests__/services/participant-score-sync.test.ts` (new, 9),
+`__tests__/services/participant-score-arrival.test.ts` (new, 9),
+`__tests__/services/provider-settlement.test.ts` (fixture corrected),
+`tools/probe-score-seam.ps1` (new, 11 probes), `External game plans/05` s2.0a and s2.
+
+**Deviated from plan:** the first fix declared `scoreDirection` on both participant copies,
+which is the smaller diff and satisfies the read that already existed. **Reverted** - chapter
+`05` s2 says direction is threaded in from the catalogue so that duplicating it per row cannot
+create a second place for it to be wrong, and the failure that prevents is worse than the one
+it costs: per-row storage lets two rows in one leaderboard disagree, so half the board negates
+and half does not. A uniformly wrong direction is coherent and visibly wrong; an incoherent one
+looks plausible and cannot be explained to a player. **The chapter was right and the code was
+wrong** - the opposite of the usual drift direction.
+
+**Owner tested:** not yet. **736 tests pass** (41 files, 18 new). All **11 probes red**,
+including the one that matters most - removing the seam entirely, restoring the exact code that
+shipped as "X5 code-complete", turns 5 tests red. Both typechecks back to baseline (**main 17,
+admin 223**) after the diff caught a real assumption: `gameKey` is optional on the contest
+document, so the direction resolver handles an absent label rather than asserting it away.
+`check:mirrors` 79 agree, 0 drifted. ESLint clean on every changed file.
+
+**Five things that generalise, and the last two are about how tests lie:**
+
+- **An aside in a comment is a claim, not a fact.** `provider-settlement.service.ts` opened by
+  asserting the seam existed. Fourth instance after `challengeId`, the R7 severity and
+  `billsPerRound`, so carry the class, not the cases. The correction is left visible in the file
+  rather than the tense quietly fixed.
+- **"Code-complete" is not "correct", and a phase summary must not imply it is.** X5 was
+  declared code-complete with both defects in it, verified by a green suite.
+- **A fixture that supplies the value under test has tested the consumer, not the producer.**
+  The settlement suites seed `score: 900 / 500 / 100` and rank them, which is silent on whether
+  a score ever arrives. Second instance after trading's `pnl`. When a value crosses a seam, one
+  test must start on the far side of it.
+- **A raw-driver fixture can prove anything, because it is not bound by the schema the
+  application writes through.** The settlement test seeded `scoreDirection` on participants via
+  `db.collection(...).insertMany`, which bypasses Mongoose strict mode - so the test was green
+  while no production path could write that field. It also guessed the collection name
+  (`providergames`; the schema sets `provider_game`), and **writing to a collection nothing
+  reads has the same symptom as writing the wrong value.**
+- **An explicitly-typed `.lean<{...}>()` is a place a field that does not exist looks real.**
+  The compiler checked the hand-written generic rather than the schema, which is why neither
+  typecheck ever objected and the usual "errors that disappear after a model sync" signal was
+  absent.
+
+**Deferred:** nothing from this fix. Historical rows are unaffected - no provider contest has
+ever settled, so there is nothing to backfill and **the fix must not be described as
+retroactive**.
+
+**Next chat should:** build the round inspector and manual resolution screen (X6), which is what
+this work interrupted. Note the manual-resolution half needs an architectural decision recorded
+first: the single ingestion function lives in the **main app only** and mirroring it would
+create the second door for scores that chapter `02` s10 rule 3 forbids, so an admin-triggered
+resolution cannot simply call it in-process.
 
 ---
 

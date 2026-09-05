@@ -1117,6 +1117,54 @@ and reported a guard missing that was present. Assert **position within the cons
 instead - condition, then branch separator, then the guarded thing - and count the occurrences
 so a second unguarded one cannot hide behind the first.
 
+### Five things from R32 and R33, the missing score seam (5 September 2026)
+
+Both closed. `lib/services/games/participant-score.service.ts` carries a round's score up to
+`participant.score` from **gate 11b** of the single ingestion function, and
+`resolveContestScoreDirection` reads the ranking direction from the catalogue title once per
+contest. Found while mapping the code for the round inspector, **a day after X5 was called
+code-complete**, and both would have paid the wrong players.
+
+- **"Code-complete" is not "correct", and the gap between them is exactly where a green suite
+  is most dangerous.** X5 shipped with no code path writing `participant.score` at all, so
+  every provider participant would have settled on zero, tied at rank 1, and split the pool
+  equally however well they played - and with `scoreDirection` read from a field neither
+  participant copy declares, so every lower-is-better game paid the slowest player first.
+  Neither raises an error. **Say what a completion claim excludes**, and never let it imply
+  the path has been exercised end to end.
+- **A fixture that supplies the value under test has tested the consumer, not the producer.**
+  The settlement suites seed `score: 900 / 500 / 100` and rank them, which proves ranking works
+  *given* scores and is structurally silent on whether one ever arrives. Second instance after
+  trading finalization's `pnl`, so carry the rule: **when a value crosses a seam, one test must
+  start on the far side of it.**
+- **A raw-driver fixture can prove anything, because it is not bound by the schema the
+  application writes through.** `db.collection(...).insertMany` bypasses Mongoose strict mode
+  entirely, so the settlement test stored `scoreDirection` on participants - a field no
+  production path could ever write - and then read it back green. Two corollaries: seed through
+  the model or seed the thing production actually reads, and **check the collection name**,
+  because these schemas set explicit ones (`provider_game`, `game_round`) and writing to a
+  guessed pluralised collection has the same symptom as writing the wrong value.
+- **An explicitly-typed `.lean<{...}>()` is a place a field that does not exist looks real.**
+  The compiler checks the hand-written generic, not the schema, which is why neither typecheck
+  ever objected to the direction read and the usual "errors that *disappear* after a model
+  sync" signal never appeared. **Do not treat a clean typecheck as evidence that a read matches
+  its schema.**
+- **When the code and a chapter disagree, check which one is wrong before making them agree -
+  the drift runs both ways.** The first fix declared `scoreDirection` on both participant
+  copies, which is the smaller diff and satisfies the read that already existed. `05` s2 rules
+  it out, and the failure it prevents is worse than the one it costs: per-row storage lets two
+  rows in **one** leaderboard disagree, so half the board negates and half does not. A
+  uniformly wrong direction is coherent and visibly wrong; an incoherent one looks plausible
+  and cannot be explained to a player. **Here the chapter was right and the code was wrong**,
+  the opposite of the paired-document drift the table below is written for.
+
+**And the general form of why both defects were invisible, which is now the fourth instance:
+an aside in a comment is a claim, not a fact.** `provider-settlement.service.ts` opened by
+asserting that ingestion already wrote `participant.score`. After `challengeId`, the R7
+severity and `billsPerRound`, carry the class rather than the cases - and **leave the
+correction visible in the file** rather than quietly fixing the tense, because the next reader
+needs to know the sentence was once believed.
+
 ## The rule
 
 **Documentation is part of the deliverable, not a follow-up task.** A phase is not
@@ -1162,6 +1210,7 @@ On every change during implementation:
 | The contest-entry participant row, wherever it appears | `External game plans/11` seam 2 (and its build note), `09` E4, `PROGRESS.md` X5 row and work log. The row is built by **`lib/services/contest-entry/participant-seat.ts`**, not inline in the service - read that, not the prose. Two facts are load-bearing: the three virtual-capital fields are **conditional on `(this.gameKey \|\| "trading") === "trading"`** in both model copies, and `gameKey` is **copied from the contest, never defaulted**. Any document saying a participant always carries `startingCapital` is stale |
 | The unresolved-round policies, wherever they appear | `External game plans/07` s2.3 (the three policies) and **s2.3a** (what was built), `09` E2's deferral note and the **E4 third-half** notes, `11` seam 3, `PROGRESS.md` X5 row and work log, `ChartVolt-External-Games-Plan.html` E4 row. **The live code is `lib/services/settlement/unresolved-rounds.ts` and `exclusion-refund.ts`**, mirrored. Three facts drift easily: settlement does **not** consume `refundOwed` or `blocksSettlement` — it re-derives both from `round.status = "unresolved"`, so any document saying settlement reads those flags is wrong; the policies apply to **provider** settlement only, since trading has no rounds; and the `hold_and_alert` gate sits **before** the optimistic lock, with a second gate inside the transaction that is reachable only by the mocked race in `provider-settlement-late-hold.test.ts`. Any document listing the `exclude` refund as outstanding is stale as a present fact, though correct as history — **say which** |
 | The settlement stages, wherever they appear | `External game plans/11` seam 3 (design, the BUILT note and the COMPLETE note), `09` E4 second-half notes, `05` s9.1, `17` (R3 **closed**, R26 **still open**, R31 **new**), `19` s1 and s6, `New games plan/15` s5; `PROGRESS.md` X5 row and work log. **The live code is `lib/services/settlement/`, mirrored into `apps/admin`** — prize payout, fees plus Game Master share, and completion, with `provider-settlement.service.ts` and `provider-finalize.ts` composing them for provider contests. Read those, not the prose. Four facts drift easily: `competition-end.actions.ts` is **1,174 lines** (it was ~1,500 in the chapters and 1,885 before the extraction) and the sweep is at **`:1126`, not `:1807`**; there are **ten** finalize call sites in the main app, not five, and any document saying five is stale; the **challenge path was NOT extracted** and still holds its own copy of all three stages, so a document implying settlement is unified everywhere is wrong; and **an admin button now publishes (5 Sep 2026) but no player screen plays** — the *player* half of the lifecycle is reachable by API and by test only. Any document saying nothing publishes is stale as a present fact, though correct as history — **say which** |
+| The provider score seam, wherever it appears | `External game plans/05` s2.0a (what was built) and s2 (the direction bullet), `17` R32/R33 and the summary table, `PROGRESS.md` status block, X5 row and work log, `ChartVolt-External-Games-Plan.html` E4 row. **The live code is `lib/services/games/participant-score.service.ts`, called from gate 11b of `result-ingestion.service.ts`, plus `resolveContestScoreDirection` in `provider-settlement.service.ts`** (mirrored) — read those, not the prose. Four facts drift easily: the seam **did not exist** until 5 Sep 2026 despite several documents asserting it did, so a document implying X5 shipped a correct payout is wrong; **`scoreDirection` is NOT stored on the participant** and a document saying it is describes a reverted first attempt; aggregation by `attemptsPolicy` happens **in the sync, not at settlement**; and both defects were **latent, never occurred** — no provider contest has ever settled, so **nothing was backfilled and the fix is not retroactive**. `participant-score.service.ts` is **not mirrored**, deliberately: mirroring it would create the second door for scores that `02` s10 rule 3 forbids |
 | The Game Master referral percentage, wherever it appears | `External game plans/19-game-masters.md` s1 (the "Percentage source" row and the row beneath it), `17-risk-register.md` R31 and the summary table, `11` seam 3's extraction note, `PROGRESS.md` work log; the internal HTML s15. **The live code is `resolveFeePercentage` in `lib/services/settlement/game-master-fees/calculate.ts` and `buildSubscriptionLimits` in `lib/services/gamemaster/subscription-limits.ts`**, both mirrored — read those, not the prose. Three facts drift easily: the **current package is the normal read** and `subscription.limits` is only a fallback for a deleted package, so any document implying the cached rate is what gets paid is wrong; **a configured 0% means 0%** since 5 Sep 2026, and any document saying a 0% package is paid 5% is stale as a present fact though correct as history — **say which**; and the fix is **not retroactive**, so subscriptions written before that date still hold whatever `\|\| 5` produced. `New games plan/15` s5 does **not** restate the percentage mechanics — checked, so do not add it there on consistency grounds |
 | Any model change | Exists twice: `database/models/` and `apps/admin/database/models/`. Update both in the same commit. **`npm run check:mirrors` now enforces this** in CI and on `git push`, comparing field paths *and* enum values. It does **not** compare `required` predicate bodies, so a conditional requirement that differs between the apps is a validation rule whose outcome depends on which process saved the document, and the guard stays green. Do not "fix" a failure by deleting an enum value to make two sides agree — that orphans every document already storing it. Add to the side that lacks it. Deliberate differences go in `tools/model-mirror/allowlist.ts` **with a reason** |
 | Committed compiled `.js` files under `database/` and `lib/` | **All 113 deleted 1 Sep 2026** (57 `.js` + 56 `.js.map`), owner approved. A *separate, earlier* accident from the `.d.ts` one — emitted 22 Dec 2025, same 57 modules, and **six to seven months stale**. Critically, **these were NOT inert**: vitest resolved the stale `.js` in preference to the `.ts`, which made every model and every money-critical service **unimportable in tests** and blocked the whole of Defect 1. `tsx`, esbuild and `next build` all resolve the `.ts` correctly, so production was never affected — which is why it survived unnoticed. Two rules follow: **when deleting emitted output, look for the other half of the emit** (a `tsc` run that produced `.d.ts` produced `.js` too — the first cleanup removed one half and left the harmful one), and **prove which file a resolver picks rather than reasoning about it** — a missing export makes a perfect probe. The `.gitignore` rule is scoped to `/database/**` and `/lib/**`, never a blanket `*.js`, because `ecosystem.config.js`, `scripts/*.js`, `worker/build.mjs` and the `api-server` build are hand-written |

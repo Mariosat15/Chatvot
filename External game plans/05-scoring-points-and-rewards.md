@@ -26,6 +26,36 @@ identical to the design in the `New games plan`.
 provider result -> adapter -> NormalisedRoundResult.rawScore -> participant.score
 ```
 
+### 2.0a BUILT, and the arrow above was missing for a day (5 September 2026)
+
+The last hop is `syncParticipantScore` in `lib/services/games/participant-score.service.ts`,
+called from gate 11b of the single ingestion function, **after** the round is saved.
+
+**It did not exist when X5 was declared code-complete.** `applyResult` wrote `game_round` and
+stopped, `buildParticipantSeat` seats every player at `score: 0`, and nothing in between. Every
+participant in a provider contest would have settled on zero, tied at rank 1, and taken an
+**equal share of the prize pool regardless of how well they played**. Real money, and in
+production it reads as a prize-distribution bug rather than as a missing score.
+
+Four things about how it hid, each of which generalises:
+
+- **`provider-settlement.service.ts` asserted in a comment that the seam existed.** Fourth
+  instance of the class, after `challengeId`, the R7 severity and `billsPerRound`: **an aside
+  in a comment is a claim, not a fact.**
+- **The settlement tests seed the scores they rank** (900 / 500 / 100), so they proved ranking
+  works *given* scores and were structurally silent on whether one ever arrives. Second
+  instance after trading finalization's `pnl`, so carry the rule: **a fixture that supplies the
+  value under test has tested the consumer, not the producer.** When a value crosses a seam,
+  one test must start on the far side of it - that is
+  `__tests__/services/participant-score-arrival.test.ts`.
+- **Aggregation happens here, not at settlement.** `attemptsPolicy` decides it: `single` and
+  `best_of_n` take the best attempt, `sum_of_n` adds them. "Best" consults the direction, so an
+  unconditional `Math.max` would rank a time trial by who was slowest.
+- **It recomputes from persisted rounds rather than incrementing**, which is what makes it
+  idempotent and order-independent. A poll and a callback for one round carry different event
+  ids by design, so gate 6 does not dedupe them - and a late result for attempt 1 can arrive
+  after attempt 2's. This is also why an operator-triggered re-sync is a safe operation.
+
 Rules:
 
 - **Ranking uses `rawScore` only.** Never `scoreBreakdown`, which is display detail
@@ -80,6 +110,30 @@ Two consequences to keep:
 - **`scoreDirection` is threaded in at finalization from the catalogue, not stored on every
   participant row.** It is a ranking input, identical for every player in a contest, and
   duplicating it per row would create a second place for it to be wrong.
+
+  **This chapter was right and the code was wrong, until 5 September 2026.**
+  `provider-settlement.service.ts` read `p.scoreDirection` off each participant - a field
+  declared on **neither** `CompetitionParticipant` copy. So the read returned `undefined` for
+  every player and the "fail-safe" fallback beside it was not a fallback but the only branch:
+  **every lower-is-better contest ranked upward and paid the slowest player first.** It now
+  reads the title once, via `resolveContestScoreDirection`.
+
+  Three lessons, and the first two are the reusable ones:
+
+  - **An explicitly-typed `.lean<{...}>()` is a place a field that does not exist looks real.**
+    The compiler checked the hand-written generic, not the schema, so neither typecheck ever
+    objected - which is why the usual "errors that disappear after a sync" signal was absent.
+  - **A raw-driver fixture can prove anything, because it is not bound by the schema the
+    application writes through.** The settlement test seeded `scoreDirection` on participants
+    through `db.collection(...).insertMany`, which bypasses Mongoose strict mode entirely. The
+    test was green and the production path could not work. Seed through the model, or seed the
+    thing production actually reads.
+  - **The first fix went the wrong way, and this chapter is why it was caught.** Declaring the
+    field on the participant would have satisfied the existing read with the smaller diff. The
+    reasoning above rules it out, and the failure it prevents is worse than the one it costs:
+    per-row storage lets two rows in one leaderboard disagree, so half the board negates and
+    half does not. A uniformly wrong direction is coherent and visibly wrong; an incoherent one
+    looks plausible and cannot be explained to a player.
 - **The provider module ignores `rankingMethod` entirely.** Trading's six methods are six
   different questions you can ask of a trading account; a provider game reports one number.
   Offering an operator a choice here would be six labels for one behaviour - a setting that

@@ -48,6 +48,8 @@ chapter covers risks to the programme and to the application.
 | R22 | New admin sections invisible - RBAC | Low | High | X6 |
 | R23 | Notification links point to `/trade` | Medium | High | X6 |
 | R31 | A Game Master rate configured at 0% is treated as unset | Medium | **CLOSED 5 Sep 2026.** Latent, not occurred - the admin UI could not store a 0% rate | Fixed in its own commit |
+| R32 | Provider scores never reached `participant.score`, so every player tied at zero and split the pool equally | **High** | **CLOSED 5 Sep 2026.** Latent - no provider contest has ever settled, so nothing to backfill and the fix is **not** retroactive | `lib/services/games/participant-score.service.ts`, gate 11b |
+| R33 | `scoreDirection` was read from a field neither participant copy declared, so a lower-is-better game paid the slowest player first | **High** | **CLOSED 5 Sep 2026.** Latent, same reason as R32 | `resolveContestScoreDirection` reads the catalogue title once |
 | R24 | Scope creep before anything ships | Medium | **High** | All |
 | R25 | Round write contention under load | Medium | Medium | X12 |
 | X15 | "Challenge any user" harassment surface - no report-user feature exists | Medium | Medium | X10 |
@@ -748,6 +750,45 @@ Renaming one orphans user progress. Change display names, never IDs.
 
 Covered in `15` section 2. Preferred behaviour: **refuse to disable trading while active
 trading contests exist**, naming them.
+
+---
+
+### R32 and R33 - The score seam and its direction - **BOTH CLOSED, 5 September 2026**
+
+Two defects in the provider payout path, found while mapping the code for the round inspector.
+Recorded together because they were one missing seam seen from two ends. Full detail in `05`
+section 2.0a and the `PROGRESS.md` work log; the reason they belong in the register is what they
+teach about *how* a money defect survives a green test suite.
+
+**R32.** No code path wrote `participant.score`. `applyResult` wrote `game_round` and stopped,
+and `buildParticipantSeat` seats every player at zero - so every participant in a provider
+contest would have settled tied at rank 1 and taken an **equal share of the prize pool
+regardless of how well they played.**
+
+**R33.** Settlement read `scoreDirection` off each participant, a field declared on **neither**
+`CompetitionParticipant` copy. The read was always `undefined`, so the fail-safe default beside
+it was the only branch and **every lower-is-better contest paid the slowest player first.**
+
+**Both are latent, not occurred**, and saying which matters: no provider contest has ever
+settled. There is nothing to backfill and **the fix must not be described as retroactive.**
+
+**Rate the likelihood High, not Medium**, for the same reason R29 is rated High: nothing about
+either defect looks wrong on review. The seam's absence is invisible because the file that
+consumes it *says* the seam exists, and the direction read is a plausible line of code against a
+field name that reads as real.
+
+Four mechanisms let them through, and each is worth carrying:
+
+- **An aside in a comment is a claim, not a fact.** Fourth instance, after `challengeId`, this
+  register's own R7 severity, and `billsPerRound`.
+- **A fixture that supplies the value under test has tested the consumer, not the producer.**
+  The settlement suites seed the scores they rank.
+- **A raw-driver fixture is not bound by the schema the application writes through.**
+  `db.collection(...).insertMany` bypasses Mongoose strict mode, so the test stored a field no
+  production path could.
+- **An explicitly-typed `.lean<{...}>()` hides a field that does not exist**, because the
+  compiler checks the generic rather than the schema - which is why the usual "errors that
+  disappear after a model sync" signal never appeared.
 
 ---
 

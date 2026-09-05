@@ -134,6 +134,30 @@ async function seedFinishedProviderContest(
     createdAt: new Date(),
   });
 
+  // THE CATALOGUE TITLE, which is where the ranking direction comes from.
+  //
+  // This used to be seeded as `scoreDirection` on each PARTICIPANT, and that fixture is the
+  // reason a real defect stayed green for a day. `CompetitionParticipant` declares no such
+  // field, so no production code path could ever write it - but these rows go in through
+  // `db.collection(...).insertMany`, the **raw MongoDB driver**, which does not apply Mongoose
+  // strict mode. The fixture therefore wrote a field the schema forbids, settlement read it
+  // back, and the test proved a behaviour production could not reach.
+  //
+  // Generalises, and it is the sharpest version of a rule already recorded three times: **a
+  // raw-driver fixture can prove anything, because it is not bound by the schema the
+  // application writes through.** Seed through the model, or seed the thing production
+  // actually reads.
+  // `provider_game`, not the pluralised default: the schema sets an explicit collection name.
+  // A raw-driver fixture that guesses this writes to a collection nothing reads, and the
+  // symptom is identical to the value being wrong.
+  await db?.collection("provider_game").insertOne({
+    providerKey: "mock",
+    gameCode: "mock-puzzle",
+    gameKey: options.gameKey ?? GAME_KEY,
+    displayName: "Mock Puzzle",
+    scoreDirection: options.scoreDirection ?? "higher_is_better",
+  });
+
   await db?.collection("competitionparticipants").insertMany(
     PLAYERS.map((p, index) => ({
       competitionId: id.toString(),
@@ -141,9 +165,6 @@ async function seedFinishedProviderContest(
       username: p.name,
       gameKey: options.gameKey ?? GAME_KEY,
       score: p.score,
-      ...(options.scoreDirection
-        ? { scoreDirection: options.scoreDirection }
-        : {}),
       status: "active",
       enteredAt: new Date(Date.now() - 90 * 60 * 1000 + index * 1000),
     })),
