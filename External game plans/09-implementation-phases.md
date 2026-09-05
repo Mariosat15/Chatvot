@@ -337,9 +337,10 @@ Tests: 15 new in `provider-settlement.test.ts`, 2 in `provider-settlement-late-h
 (a mocked race, because the pre-lock gate makes the in-transaction one otherwise
 unreachable). Full suite **683 green**, mirrors 79/0, both typechecks at baseline.
 
-**Still not built after E4:** no admin button publishes a contest and no player screen
-launches a round - the lifecycle is reachable by API and by test only. The `exclude` refund
-is on the **provider** settlement path; trading has no rounds to be unresolved, which is
+**Still not built after E4:** ~~no admin button publishes a contest~~ - **the publish control
+was built 5 September 2026 as an E5 slice, see below** - and no player screen launches a round,
+so the player half of the lifecycle is still reachable by API and by test only. The `exclude`
+refund is on the **provider** settlement path; trading has no rounds to be unresolved, which is
 correct rather than a gap.
 
 ### E5 - Admin panel
@@ -358,23 +359,31 @@ them against the mock now would ship screens whose only content is fixtures.
 - [x] Game list with our own enable switch, independent of the provider's
 - [x] Contest creation with a **settings form generated from `configSchema`**
 - [x] Pre-flight validation from `03` section 4.1, including the sandbox smoke round
+- [x] **Publish control on a draft provider contest** (5 Sep 2026, `12` s3.1a)
 - [ ] Round inspector - status, score, raw event, replay link
 - [ ] Manual round resolution, with a mandatory reason and an audit entry
 - [ ] Pause, extend and cancel controls on a live contest
 
 **Done when:** an admin can create, run, monitor and if necessary rescue a contest
 without a developer. **Not yet met, and the gap is now narrower and more precisely
-stated:** an operator can register a provider, choose which titles are live, and create a
-contest on one with settings drawn from the game's own schema — but that contest is a
-**draft**, and nothing publishes, runs or settles it. Publishing is **X5/E4**; the monitor
-and rescue half of this criterion is the four unticked items above.
+stated:** an operator can register a provider, choose which titles are live, create a
+contest on one with settings drawn from the game's own schema, **and publish it so players
+can see and enter it.** What remains is the *monitor and rescue* half - the three unticked
+items above.
 
-**What "creation works" excludes, said explicitly so no later summary reads it as
-finished.** No player can see or join the result. The wizard covers competitions only;
-challenges on a provider game are **E8**. Editing a provider contest after creation is not
-built, so `CompetitionEditorForm.tsx`'s pre-existing field gap — noted in `12` s2 — is now
-load-bearing rather than cosmetic: provider game settings are currently uneditable once
-saved.
+**What "publishing works" excludes, said explicitly so no later summary reads it as
+finished.** A published contest can be entered and settled, but **no player screen starts a
+round**, so the play step is still API-only and E6 owns it. The wizard covers competitions
+only; challenges on a provider game are **E8**.
+
+**And editing is still not built, which the publish control makes more visible rather than
+less.** `/competitions/edit/[id]` renders the trading editor and `PUT
+/api/competitions/[id]` does a blind `Object.assign` of whatever that form submits, so
+opening a provider contest in it writes trading fields onto it. The list therefore
+**withholds the Edit button from provider contests and says why**, rather than greying it
+out - the same reasoning as a provider switch that cannot work refusing with a reason. Until
+a provider editor exists, cancel and recreate is the honest instruction, and
+`CompetitionEditorForm.tsx`'s field gap - noted in `12` s2 - stays load-bearing.
 
 Remember the mirror: every model touched here exists twice.
 

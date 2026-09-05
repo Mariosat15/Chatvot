@@ -13,8 +13,8 @@
 
 | | |
 |---|---|
-| **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done.** A provider contest can be published, entered, played and paid **by API and by test only** - no admin button publishes one and no player screen launches a round. **No provider selected**, which is what X4 needs |
-| **Next action** | **The two X6 slices that make the lifecycle clickable** - a publish control and the round inspector. In parallel, commercially: find and assess a provider using `08`, since X4 cannot start without one |
+| **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done.** A provider contest can be created, **published from the admin screen** (5 Sep 2026), entered, played and paid. **The player half is still API-only** - no player screen launches a round. **No provider selected**, which is what X4 needs |
+| **Next action** | **The round inspector and manual resolution screen** (`12` s4), so an operator can see a stuck round and act on it. In parallel, commercially: find and assess a provider using `08`, since X4 cannot start without one |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
 | **Owner instruction on record** | **External games only, no in-house game** (2 Sep 2026). **One step at a time, admin first, do not break the running app.** |
 | **Not owner-tested** | Everything after the 2 Sep navigation restructure. X1-X3, X5, the provider admin slice and the contest wizard are all **code-complete, awaiting owner test** - and "code-complete" here excludes the replay script and the label backfill, neither of which has been run against production |
@@ -342,8 +342,8 @@ numbers in chapters `01`-`09` remain resolvable. **Plan against the X-phases bel
 | **X2** | Provider abstraction + mock adapter | `09` E1 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026. Nothing player-visible - `externalGamesEnabled` defaults false |
 | **X3** | Round lifecycle + result ingestion | `09` E2 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026. **Rehearsals 1-6 of `07` s9 green** against the mock (49 tests, 6 guards probed). 7-10 need X5/X8 |
 | **X4** | Real adapter against sandbox | `09` E3 | 1 week | `NOT STARTED` |
-| **X5** | Contest integration + settlement | `09` E4 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026 - publish, entry, ranking, round launch, settlement and **all three unresolved-round policies**. **A provider contest can be published, entered, played and paid, by API and by test - no admin button publishes one and no player screen launches a round.** Settlement was an **extraction**: the payout, fee/GM and completion stages moved to `lib/services/settlement/` and trading was rewired onto them. Closing `exclude` also closed **`hold_and_alert`**, which nothing had ever consumed |
-| **X6** | Admin: nav restructure incl. **the single Trading section**, RBAC, provider registration, game-aware wizard, analytics, **GM creation API + wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | `PARTIALLY DONE` - nav restructure and single Trading destination **built and owner-tested 2 Sep 2026**. **Provider registration, credentials and the per-title catalogue switch code-complete 4 Sep 2026** (`12` s4.1a). **Contest wizard from `configSchema` + pre-flight validation code-complete 4 Sep 2026** (`12` s2.1) - creates a **draft only**; nothing publishes or settles it. Still `NOT STARTED`: provider health panel, round inspector, manual resolution, live-contest controls, provider contest **editing**, analytics by provider, GM creation API |
+| **X5** | Contest integration + settlement | `09` E4 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026 - publish, entry, ranking, round launch, settlement and **all three unresolved-round policies**. **A provider contest can be published, entered, played and paid. Publishing became clickable on 5 Sep 2026 (X6 slice); the player round launch is still API-only.** Settlement was an **extraction**: the payout, fee/GM and completion stages moved to `lib/services/settlement/` and trading was rewired onto them. Closing `exclude` also closed **`hold_and_alert`**, which nothing had ever consumed |
+| **X6** | Admin: nav restructure incl. **the single Trading section**, RBAC, provider registration, game-aware wizard, analytics, **GM creation API + wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | `PARTIALLY DONE` - nav restructure and single Trading destination **built and owner-tested 2 Sep 2026**. **Provider registration, credentials and the per-title catalogue switch code-complete 4 Sep 2026** (`12` s4.1a). **Contest wizard from `configSchema` + pre-flight validation code-complete 4 Sep 2026** (`12` s2.1) - creates a **draft**. **The publish control is code-complete 5 Sep 2026** (`12` s3.1a), which also made the competitions list game-aware: `draft` admitted as a status, its own badge, a Drafts count, a provider game badge, and the trading Edit button **withheld** from provider contests because `PUT /api/competitions/[id]` blind-assigns that form's body. Still `NOT STARTED`: provider health panel, round inspector, manual resolution, live-contest controls, provider contest **editing**, analytics by provider, GM creation API |
 | **X6.5** | **Admin wording pass** - brought forward from X8 so operators never work a games platform labelled "trading" | `14` | 0.5-1 week | `NOT STARTED` |
 | **X7** | Player UI + points, leaderboards, badges, levels, **profile and cross-game stats**, **per-game GM analytics** | `09` E6 + `13` + `05` + `19` | 3-4 weeks | `NOT STARTED` |
 | **X8** | Player wording, `tradingEnabled`, infrastructure gating | `14` + `15` | 1-1.5 weeks | `NOT STARTED` |
@@ -606,6 +606,85 @@ Newest at the top.
 
 ---
 
+### 5 Sep 2026 - X6 SLICE - THE PUBLISH CONTROL, AND A TRADING-SHAPED LIST
+
+**Shipped:** an operator can now publish a draft provider contest by clicking. Until today the
+publish route had **zero callers anywhere in the repository** - the whole provider lifecycle was
+reachable by API and by test only.
+
+- `apps/admin/components/admin/games/PublishContestButton.tsx` - new. Posts to the publish
+  route, renders the **accumulated** refusal list, raises warnings separately after the
+  success message.
+- `apps/admin/lib/admin/contest-game-label.ts` - new, admin-only, **not mirrored**.
+  `hasProviderGameLabel()` and `resolveContestGameType()`.
+- `apps/admin/components/admin/CompetitionsListSection.tsx` - `draft` in the status union, its
+  own amber badge and icon, a **Drafts** summary card, a provider game badge, the publish
+  control, and the trading Edit button **withheld** from provider contests.
+- `__tests__/admin/provider-contest-publish-ui.test.ts` - 21 tests.
+  `tools/probe-publish-ui.ps1` - 21 probes, all red.
+
+**Deviated from plan:** `12` s3 described this as "game column, game filter, provider column".
+Built the **game badge** and no filter, because the Drafts count plus the badge already answer
+the question an operator has after the wizard redirects them here, and a filter control is
+worth building once there is more than one provider game to filter by. Recorded in `12` s3.1a
+rather than rewriting s3.
+
+**The finding, and it is the reason this was more than a button.**
+`CompetitionsListSection.tsx` was **already rendering provider drafts, wrongly, and silently.**
+`GET /api/competitions` applies no filter, so drafts have appeared there since the wizard
+shipped - and the screen's `Competition` interface did not admit `"draft"`, so it fell through
+`getStatusColor`'s default into **the same grey the screen uses for a completed contest.** An
+unpublished contest looked finished. Nothing errored, nothing logged. The trading-shaped
+service failure in its UI form: **the screen kept working and kept being wrong.** Adding a
+Publish button on top of that would have made the wrong control the easiest to press.
+
+**Three further things that generalise.**
+
+- **A helper's name is part of its contract, and reusing this one would have failed silently
+  in the worst direction.** `isProviderContest` already exists in `contest-config.ts` and
+  answers a **stricter** question - label *and* provider key *and* game code, because a
+  labelled contest with no keys cannot launch a round. A screen asks *what kind of row is
+  this*, and a half-built provider contest is still one for badging and for keeping out of the
+  trading editor. Importing the strict helper would have compiled, read correctly, and
+  rendered a keyless provider contest as a **trading** one - with the Edit button.
+- **A control that would corrupt data must be withheld with its reason, not greyed out.**
+  `/competitions/edit/[id]` renders the trading editor and `PUT /api/competitions/[id]` does a
+  blind `Object.assign` of that form's body. Same reasoning as a provider switch that cannot
+  work refusing with a reason.
+- **A probe that stays green has a third cause: the test does not exist.** Blanking the game
+  badge's condition left the suite green - the probe was aimed at a test asserting the strict
+  helper is not *imported*, which the other two call sites keep satisfying. Not a weak test and
+  not a wrong claim: **a missing one.** Added, re-aimed, red. And the first version of the
+  Edit-guard test scanned 300 characters backwards, began mid-identifier, and reported a guard
+  missing that was present - **a window whose size is a guess fails for reasons unrelated to
+  the code under test.**
+
+**Verified:** 718 tests green (21 new), all 21 probes red, admin `next build` clean, mirrors
+79/0, lint clean on the changed files. Both typechecks **byte-identical to baseline by list
+diff**, admin 223 and main **17**.
+
+**A stale baseline figure corrected while measuring, because a count that nobody can reproduce
+is worse than no count.** The main app is **17**, not the 16 recorded on 1 Sep - and the
+difference is not a regression. Two of the 17 are `.next/**/validator.ts` entries pointing at
+`app/api/fraud/suspicion-score/route.js`, the unprotected route **deleted** under Prerequisite
+B; they are generated build residue that a clean build clears, so the real figure is 15 plus 2
+artifacts. The 1 Sep row in the sync rule stays as written, because it is accurate as a
+statement about 1 Sep. **Diff the lists, never the counts** - the count rose while the list was
+identical.
+
+**Deferred:** the round inspector, manual resolution and live-contest controls; a game filter
+on the list; and provider contest **editing**, which the publish control makes more visible
+rather than less.
+
+**Not done, said plainly:** **no player screen starts a round**, so the play step is still
+API-only and X7/E6 owns it. There is deliberately **no unpublish** - a visible contest can
+already have been paid into, and cancel-with-refund is the reversible operation.
+
+**Next chat should:** build the round inspector (`12` s4) - round status, score, the raw
+provider event and a manual resolution action with a mandatory reason and an audit entry.
+
+---
+
 ### 4 Sep 2026 - X5 THIRD PIECE - THE UNRESOLVED-ROUND POLICIES - X5 CODE-COMPLETE
 
 **Shipped:** all three of chapter `07`'s answers to a round that never reports. **X5 is
@@ -671,9 +750,9 @@ that stayed green were resolved individually rather than waved through.
 **Owner tested:** not yet.
 
 **Deferred:** ~~the GM referral fee `|| 5` (R31)~~ **fixed 5 September 2026, see the entry
-below.** Also still open: no admin button publishes a contest, no player screen launches a
-round, the challenge path keeps its own copy of settlement, and R26 (the admin cron pays no
-Game Masters).
+below.** Also still open at the time: ~~no admin button publishes a contest~~ (**built 5 Sep
+2026**), no player screen launches a round, the challenge path keeps its own copy of
+settlement, and R26 (the admin cron pays no Game Masters).
 
 **Next chat should:** close the two X6 slices that make the lifecycle clickable - a publish
 button and the round inspector.

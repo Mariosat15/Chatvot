@@ -949,10 +949,11 @@ refund remains. The settlement stages live in `lib/services/settlement/`, mirror
 
 **And the accuracy rule that nearly got broken writing this up.** "A provider contest can be
 published and paid" was about to be recorded without checking that an operator can *do* it.
-Nothing under `apps/admin/components/` fetches the publish route, and no player screen calls
-the launch route - the whole lifecycle is reachable **by API and by test, not by clicking.**
+Nothing under `apps/admin/components/` fetched the publish route, and no player screen calls
+the launch route - the whole lifecycle was reachable **by API and by test, not by clicking.**
 **Before writing that a capability exists, grep for its caller**, or a demo discovers the gap
-instead. Same class as the paired-document drift rule: the restatement was going to be wrong
+instead. (**The publish half was closed 5 Sep 2026**; the player round launch still has no
+caller.) Same class as the paired-document drift rule: the restatement was going to be wrong
 while every underlying fact was right.
 
 ### Five things from X5's third piece - the unresolved-round policies (4 September 2026)
@@ -1064,6 +1065,58 @@ unescaped apostrophe moved 12 lines because of an added comment. **Diff the list
 the message text, not the counts and not the line numbers**, or a comment looks like a
 regression.
 
+### Five things from the X6 publish control (5 September 2026)
+
+An operator can now publish a draft provider contest by clicking. `PublishContestButton.tsx`,
+`lib/admin/contest-game-label.ts`, a game-aware `CompetitionsListSection`, 21 tests, 21
+probes all red. **No player screen starts a round**, so the play step is still API-only.
+
+- **A trading-shaped SCREEN fails exactly like a trading-shaped service, and this one had
+  been failing for a day before anybody looked.** `GET /api/competitions` applies no filter,
+  so provider drafts were already rendering in the admin list - and the component's
+  `Competition` interface did not admit `"draft"`, so it fell through `getStatusColor`'s
+  default into **the same grey the screen uses for a completed contest.** An unpublished
+  contest looked finished. No error, no log line. The rule: **when a type denies a state the
+  screen is already being handed, the screen is not type-safe, it is uninformed** - and the
+  `default:` arm of a status switch is where the new state goes to die quietly.
+- **A helper's NAME is part of its contract, and reusing an existing one is the natural
+  mistake.** `isProviderContest` already existed and answers a **stricter** question - label
+  *and* provider key *and* game code, because a labelled contest with no keys cannot launch a
+  round. A screen asks *what kind of row is this*, and a half-built provider contest is still
+  one for badging and for keeping out of the trading editor. Importing the strict helper would
+  have compiled, reviewed correctly, and rendered a keyless provider contest as a **trading**
+  one, Edit button and all. **When two questions differ, give them two names** - and the
+  general form: before writing `=== "provider"` inline, check which of the two questions you
+  are actually asking.
+- **A control that would corrupt data must be withheld with its reason stated, not greyed
+  out.** `/competitions/edit/[id]` renders the trading editor and `PUT
+  /api/competitions/[id]` does a blind `Object.assign` of that form's body, so the Edit link
+  is a **corruption path** on a provider contest rather than a confusing screen. Third
+  instance of this shape after a provider with no adapter and a `rankingMethod` a provider
+  game ignores, so carry it as a class: **a disabled control teaches nothing; a refusal that
+  names the missing thing is the feature.**
+- **A summary that counts by status is an aggregate that enumerates its cases.** The list's
+  four cards counted active, upcoming and completed, so a draft landed in `Total` and in none
+  of the others - the same failure as an aggregate that enumerates game types, one field
+  along. **Adding a status means auditing every place that switches on status**, and the
+  count cards are the one nobody thinks of.
+- **A probe that stays green has a THIRD cause, and it appeared here: the test does not
+  exist.** After "weak test" and "wrong claim", this one was **a missing test** - blanking the
+  game badge's condition left the suite green because the probe had been aimed at a test
+  asserting the strict helper is not *imported*, a different claim which the other two call
+  sites keep satisfying. **A probe aimed at the wrong test is indistinguishable from a test
+  that does not work**, so name the expected failing test in the probe and check that the red
+  one is the one you meant.
+
+**And two rules for structural tests specifically, both learned by getting them wrong here.**
+**Strip comments before matching** - these files explain the anti-patterns in prose, so a test
+that reads prose flags a correct file for discussing the mistake and passes a broken one whose
+only mention of the right thing is in a comment. And **never scan a fixed number of characters
+to find a guard**: the first Edit-guard test looked 300 characters back, began mid-identifier,
+and reported a guard missing that was present. Assert **position within the construct**
+instead - condition, then branch separator, then the guarded thing - and count the occurrences
+so a second unguarded one cannot hide behind the first.
+
 ## The rule
 
 **Documentation is part of the deliverable, not a follow-up task.** A phase is not
@@ -1103,11 +1156,12 @@ On every change during implementation:
 | `External game plans/19-game-masters.md`, `New games plan/15` section 5, and the Game Master sections of the internal HTMLs | The Game Master system is the same system in both scenarios. `19` sections 1–4 are the authoritative analysis; `New games plan/15` section 5 restates it. **A fact corrected in one must be corrected in the other** |
 | The admin navigation structure, wherever it appears | `External game plans/12` s1 (grouping table), s1.1 (tab list) and s1.1a (what was built); `New games plan/07` "Target structure" and its BUILT notice; `External game plans/PROGRESS.md` X6 row and work log. **The live structure is `apps/admin/components/admin/AdminDashboard.tsx`'s `menuGroups` plus `apps/admin/lib/admin/game-sections.ts`** — read those, not the prose, and remember `07` was the accurate chapter and `12` the drifted one. There is **no top-level TRADING group**; trading is a destination inside GAMES, and since 4 Sep 2026 **Game Providers sits beside it in the same group** — a provider supplies games, it is not a game, so it must not be nested under one. Any document describing a top-level TRADING group is stale |
 | The competition entry paths, wherever they appear | `New games plan` `00a`, `01-current-state-audit.md`, `05-prizes-money-layer.md`, `12-risk-register.md`, `PROGRESS.md`; `External game plans` `PROGRESS.md` and `17-risk-register.md`; `ChartVolt-New-Games-Plan.html`. There were **four** writers, now **two** — `lib/services/contest-entry.service.ts` behind both gates, plus the batch route fixed in place and the admin copy deleted. Any document still saying "two duplicate join paths" as a *present* fact is stale; as a description of what Stage 0 started from it is correct, so **say which** |
+| The publish control and the competitions list, wherever they appear | `External game plans/12` s3.1a (what was built) and s2.1's draft note, `09` E5 checklist and its "still not built after E4" note, `PROGRESS.md` X6 row, the status block and the work log, `ChartVolt-External-Games-Plan.html` E5 row. **The live code is `apps/admin/components/admin/games/PublishContestButton.tsx`, `apps/admin/lib/admin/contest-game-label.ts` and `CompetitionsListSection.tsx`** — read those, not the prose. Four facts drift easily: the list helper is **`hasProviderGameLabel`**, which asks about the **label alone** and is deliberately *not* the stricter `isProviderContest` in `contest-config.ts`, so a document conflating them is describing a bug; **`contest-game-label.ts` is admin-only and not mirrored**, so `check:mirrors` says nothing about it; **Edit is withheld from provider contests on purpose**, because `PUT /api/competitions/[id]` blind-assigns the trading form's body, and a document calling that a cosmetic gap is wrong; and there is **no unpublish and no game filter**, the first deliberately and permanently, the second only until there is more than one provider game |
 | The game-provider admin surface, wherever it appears | `External game plans/12` s4 (the five destinations), s4.1 (copy the UX not the persistence) and s4.1a (what was built); `09` E5 checklist; `PROGRESS.md` X6 row and work log; `ChartVolt-External-Games-Plan.html` E5 row. **Two of the five destinations exist** — Providers and the per-title Games list. Any document implying E5 is finished is stale, and any implying the whole of X6 is done is more so: X6 also carries the contest wizard, analytics by provider and the Game Master creation API. **Credentials live only in `WhiteLabel.gameProviderCredentials` behind `select: false`** — a document describing them on `game_provider` is describing the payment-provider pattern that was deliberately not copied |
 | `ChartVolt-New-Games-Plan.html` and `-Partners.html` | The partner version must **never** mention Stage 0, the duplicate join paths, the admin mirror drift, or any current defect |
 | The contest-entry participant row, wherever it appears | `External game plans/11` seam 2 (and its build note), `09` E4, `PROGRESS.md` X5 row and work log. The row is built by **`lib/services/contest-entry/participant-seat.ts`**, not inline in the service - read that, not the prose. Two facts are load-bearing: the three virtual-capital fields are **conditional on `(this.gameKey \|\| "trading") === "trading"`** in both model copies, and `gameKey` is **copied from the contest, never defaulted**. Any document saying a participant always carries `startingCapital` is stale |
 | The unresolved-round policies, wherever they appear | `External game plans/07` s2.3 (the three policies) and **s2.3a** (what was built), `09` E2's deferral note and the **E4 third-half** notes, `11` seam 3, `PROGRESS.md` X5 row and work log, `ChartVolt-External-Games-Plan.html` E4 row. **The live code is `lib/services/settlement/unresolved-rounds.ts` and `exclusion-refund.ts`**, mirrored. Three facts drift easily: settlement does **not** consume `refundOwed` or `blocksSettlement` — it re-derives both from `round.status = "unresolved"`, so any document saying settlement reads those flags is wrong; the policies apply to **provider** settlement only, since trading has no rounds; and the `hold_and_alert` gate sits **before** the optimistic lock, with a second gate inside the transaction that is reachable only by the mocked race in `provider-settlement-late-hold.test.ts`. Any document listing the `exclude` refund as outstanding is stale as a present fact, though correct as history — **say which** |
-| The settlement stages, wherever they appear | `External game plans/11` seam 3 (design, the BUILT note and the COMPLETE note), `09` E4 second-half notes, `05` s9.1, `17` (R3 **closed**, R26 **still open**, R31 **new**), `19` s1 and s6, `New games plan/15` s5; `PROGRESS.md` X5 row and work log. **The live code is `lib/services/settlement/`, mirrored into `apps/admin`** — prize payout, fees plus Game Master share, and completion, with `provider-settlement.service.ts` and `provider-finalize.ts` composing them for provider contests. Read those, not the prose. Four facts drift easily: `competition-end.actions.ts` is **1,174 lines** (it was ~1,500 in the chapters and 1,885 before the extraction) and the sweep is at **`:1126`, not `:1807`**; there are **ten** finalize call sites in the main app, not five, and any document saying five is stale; the **challenge path was NOT extracted** and still holds its own copy of all three stages, so a document implying settlement is unified everywhere is wrong; and **no admin button publishes and no player screen plays** — the lifecycle is reachable by API and by test only |
+| The settlement stages, wherever they appear | `External game plans/11` seam 3 (design, the BUILT note and the COMPLETE note), `09` E4 second-half notes, `05` s9.1, `17` (R3 **closed**, R26 **still open**, R31 **new**), `19` s1 and s6, `New games plan/15` s5; `PROGRESS.md` X5 row and work log. **The live code is `lib/services/settlement/`, mirrored into `apps/admin`** — prize payout, fees plus Game Master share, and completion, with `provider-settlement.service.ts` and `provider-finalize.ts` composing them for provider contests. Read those, not the prose. Four facts drift easily: `competition-end.actions.ts` is **1,174 lines** (it was ~1,500 in the chapters and 1,885 before the extraction) and the sweep is at **`:1126`, not `:1807`**; there are **ten** finalize call sites in the main app, not five, and any document saying five is stale; the **challenge path was NOT extracted** and still holds its own copy of all three stages, so a document implying settlement is unified everywhere is wrong; and **an admin button now publishes (5 Sep 2026) but no player screen plays** — the *player* half of the lifecycle is reachable by API and by test only. Any document saying nothing publishes is stale as a present fact, though correct as history — **say which** |
 | The Game Master referral percentage, wherever it appears | `External game plans/19-game-masters.md` s1 (the "Percentage source" row and the row beneath it), `17-risk-register.md` R31 and the summary table, `11` seam 3's extraction note, `PROGRESS.md` work log; the internal HTML s15. **The live code is `resolveFeePercentage` in `lib/services/settlement/game-master-fees/calculate.ts` and `buildSubscriptionLimits` in `lib/services/gamemaster/subscription-limits.ts`**, both mirrored — read those, not the prose. Three facts drift easily: the **current package is the normal read** and `subscription.limits` is only a fallback for a deleted package, so any document implying the cached rate is what gets paid is wrong; **a configured 0% means 0%** since 5 Sep 2026, and any document saying a 0% package is paid 5% is stale as a present fact though correct as history — **say which**; and the fix is **not retroactive**, so subscriptions written before that date still hold whatever `\|\| 5` produced. `New games plan/15` s5 does **not** restate the percentage mechanics — checked, so do not add it there on consistency grounds |
 | Any model change | Exists twice: `database/models/` and `apps/admin/database/models/`. Update both in the same commit. **`npm run check:mirrors` now enforces this** in CI and on `git push`, comparing field paths *and* enum values. It does **not** compare `required` predicate bodies, so a conditional requirement that differs between the apps is a validation rule whose outcome depends on which process saved the document, and the guard stays green. Do not "fix" a failure by deleting an enum value to make two sides agree — that orphans every document already storing it. Add to the side that lacks it. Deliberate differences go in `tools/model-mirror/allowlist.ts` **with a reason** |
 | Committed compiled `.js` files under `database/` and `lib/` | **All 113 deleted 1 Sep 2026** (57 `.js` + 56 `.js.map`), owner approved. A *separate, earlier* accident from the `.d.ts` one — emitted 22 Dec 2025, same 57 modules, and **six to seven months stale**. Critically, **these were NOT inert**: vitest resolved the stale `.js` in preference to the `.ts`, which made every model and every money-critical service **unimportable in tests** and blocked the whole of Defect 1. `tsx`, esbuild and `next build` all resolve the `.ts` correctly, so production was never affected — which is why it survived unnoticed. Two rules follow: **when deleting emitted output, look for the other half of the emit** (a `tsc` run that produced `.d.ts` produced `.js` too — the first cleanup removed one half and left the harmful one), and **prove which file a resolver picks rather than reasoning about it** — a missing export makes a perfect probe. The `.gitignore` rule is scoped to `/database/**` and `/lib/**`, never a blanket `*.js`, because `ecosystem.config.js`, `scripts/*.js`, `worker/build.mjs` and the `api-server` build are hand-written |

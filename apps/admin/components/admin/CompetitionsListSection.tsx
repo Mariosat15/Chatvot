@@ -20,9 +20,13 @@ import {
   Loader2,
   Crown,
   Shield,
+  FileEdit,
+  Gamepad2,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { PublishContestButton } from "@/components/admin/games/PublishContestButton";
+import { hasProviderGameLabel } from "@/lib/admin/contest-game-label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -108,11 +112,18 @@ interface Competition {
   name: string;
   description: string;
   slug: string;
-  status: "upcoming" | "active" | "completed" | "cancelled";
+  // `draft` was missing from this union while `GET /api/competitions` returned drafts
+  // unfiltered, so the type denied a state the screen was already rendering. It fell through
+  // `getStatusColor`'s default to the same grey as `completed`, which made an unpublished
+  // contest look like a finished one.
+  status: "draft" | "upcoming" | "active" | "completed" | "cancelled";
   startTime: string;
   endTime: string;
   entryFee: number;
-  startingCapital: number;
+  // Optional because a provider-game contest has no virtual trading capital - the field is
+  // conditionally required on the model for exactly that reason. Declaring it `number` here
+  // told every reader below that it is always present.
+  startingCapital?: number;
   maxParticipants: number;
   currentParticipants: number;
   prizePool: number;
@@ -120,6 +131,11 @@ interface Competition {
   assetClasses: string[];
   gameMasterId?: string;
   gameMasterName?: string;
+  // Absent on every contest created before the game label existed, which invariant 5
+  // resolves to trading. Read it through `hasProviderGameLabel`, never directly - and note
+  // that `GET /api/competitions` uses `.lean()`, so the schema default is NOT filled in.
+  gameType?: string;
+  gameKey?: string;
 }
 
 export default function CompetitionsListSection() {
@@ -253,6 +269,10 @@ export default function CompetitionsListSection() {
     switch (status) {
       case "active":
         return "bg-green-500/20 text-green-400 border-green-500/30";
+      // Amber, not grey: a draft is waiting on an operator, and the default grey it used to
+      // fall through to is the colour this screen uses for a finished contest.
+      case "draft":
+        return "bg-amber-500/20 text-amber-400 border-amber-500/30";
       case "upcoming":
         return "bg-blue-500/20 text-blue-400 border-blue-500/30";
       case "completed":
@@ -268,6 +288,8 @@ export default function CompetitionsListSection() {
     switch (status) {
       case "active":
         return <CheckCircle className="h-4 w-4" />;
+      case "draft":
+        return <FileEdit className="h-4 w-4" />;
       case "upcoming":
         return <Clock className="h-4 w-4" />;
       case "completed":
@@ -309,7 +331,10 @@ export default function CompetitionsListSection() {
   return (
     <div className="space-y-6">
       {/* Stats Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Five cards, not four. This summary counts by status, so it is an aggregate that
+          enumerates its cases - and a draft used to land in `Total` and in none of the
+          others, making unpublished contests the one state with no number of its own. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -319,6 +344,17 @@ export default function CompetitionsListSection() {
               </p>
             </div>
             <Trophy className="h-8 w-8 text-gray-600" />
+          </div>
+        </div>
+        <div className="bg-gray-800/50 border border-amber-500/30 rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500 uppercase">Drafts</p>
+              <p className="text-2xl font-bold text-amber-400">
+                {competitions.filter((c) => c.status === "draft").length}
+              </p>
+            </div>
+            <FileEdit className="h-8 w-8 text-amber-500/50" />
           </div>
         </div>
         <div className="bg-gray-800/50 border border-green-500/30 rounded-xl p-4">
@@ -389,6 +425,17 @@ export default function CompetitionsListSection() {
                     {competition.status.toUpperCase()}
                   </div>
 
+                  {/* Which game this contest is for. Shown only for provider contests: a
+                      badge on every row would label the overwhelming majority of them
+                      "trading", which is noise, and this screen's own heading already sits
+                      inside the Competitions group rather than under a game. */}
+                  {hasProviderGameLabel(competition) && (
+                    <div className="px-3 py-1 rounded-full border text-xs font-semibold flex items-center gap-1 bg-indigo-500/20 text-indigo-300 border-indigo-500/30">
+                      <Gamepad2 className="h-3 w-3" />
+                      {competition.gameKey ?? "Provider game"}
+                    </div>
+                  )}
+
                   {/* Creator Badge */}
                   {competition.gameMasterId ? (
                     <div className="px-3 py-1 rounded-full border text-xs font-semibold flex items-center gap-1 bg-purple-500/20 text-purple-400 border-purple-500/30">
@@ -455,16 +502,46 @@ export default function CompetitionsListSection() {
                   </Button>
                 </Link>
 
-                <Link href={`/competitions/edit/${competition._id}`}>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full border-yellow-500 text-yellow-400 hover:bg-yellow-500 hover:text-gray-900"
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit
-                  </Button>
-                </Link>
+                {/* Publish - draft provider contests only.
+                    Trading contests are never drafts, and the route refuses one anyway, so
+                    offering the button on a trading row would be a control that cannot work.
+                    The route re-runs the whole pre-flight checklist against the STORED
+                    contest, so a draft that has gone stale is refused here rather than
+                    published into a world that no longer supports it. */}
+                {competition.status === "draft" &&
+                  hasProviderGameLabel(competition) && (
+                    <PublishContestButton
+                      competitionId={competition._id}
+                      competitionName={competition.name}
+                      onPublished={fetchCompetitions}
+                    />
+                  )}
+
+                {/* Edit is deliberately withheld from provider contests, with the reason
+                    given rather than the button merely greyed out.
+                    `/competitions/edit/[id]` renders the trading editor, and `PUT
+                    /api/competitions/[id]` does a blind `Object.assign` of whatever that
+                    form submits - so saving a provider contest through it would write
+                    trading fields onto it and leave the provider settings unreviewed. A
+                    provider editor is still unbuilt; until it exists, cancel and recreate is
+                    the honest instruction. */}
+                {hasProviderGameLabel(competition) ? (
+                  <p className="text-xs text-gray-500 leading-snug max-w-[11rem]">
+                    Editing a provider contest is not built yet. Recreate it to
+                    change its settings.
+                  </p>
+                ) : (
+                  <Link href={`/competitions/edit/${competition._id}`}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full border-yellow-500 text-yellow-400 hover:bg-yellow-500 hover:text-gray-900"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                  </Link>
+                )}
 
                 {/* Cancel Button - Only for upcoming competitions */}
                 {competition.status === "upcoming" && (

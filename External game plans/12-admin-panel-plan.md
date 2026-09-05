@@ -253,7 +253,8 @@ reintroducing the defect.**
 filters `status: { $ne: "draft" }`, so a draft is invisible. That matters because the
 player-facing side of a provider contest is **X7**: every screen would render trading
 furniture, and the join path still copies trading starting capital onto the participant.
-Publishing belongs to **X5**. Note the exclusion is `$ne`, not an inclusion list — a
+The publishing *service* belongs to **X5**; the control that calls it was built 5 September
+2026 and is recorded in **s3.1a**. Note the exclusion is `$ne`, not an inclusion list — a
 stronger guarantee, because a status added later is hidden by default rather than
 accidentally exposed. A structural test pins that line, since the whole safety argument for
 creating provider contests now rests on it.
@@ -310,6 +311,69 @@ creating provider contests now rests on it.
 | Emergency cancel | `.../emergency-cancel` | Dispatch to `module.settleContest()`, or skip position closing entirely |
 | Adjust results | `.../adjust-results` | Write `score` and recompute normalised points, not trading metrics |
 | Force-finalize old | `/api/finalize-old-competitions` | Must dispatch on game type - this is one of the five entry points in `11` section 2, and risk **R3** |
+
+### 3.1a What was built - 5 September 2026, the publish control
+
+**The list is now game-aware enough to publish a draft, and the reason that is a bigger
+change than a button is that `CompetitionsListSection.tsx` was a trading-shaped screen
+already rendering provider contests wrongly.** `GET /api/competitions` applies no filter, so
+provider drafts had been appearing there since the wizard shipped - and the screen's
+`Competition` interface did not admit `"draft"` as a status, so it fell through
+`getStatusColor`'s default into the **same grey it uses for a completed contest.** Nothing
+errored. An unpublished contest simply looked finished.
+
+That is the failure shape this programme keeps meeting, in its UI form: **the screen kept
+working and kept being wrong.** Adding a Publish button without fixing it would have made the
+wrong control the easiest one to press.
+
+| Built | Detail |
+|---|---|
+| `PublishContestButton.tsx` | New, in `components/admin/games/`. Its own file because the list is already 617 lines, over the limit, and this control carries real behaviour |
+| The refusal list | `runPreflight` **accumulates** hard refusals rather than stopping at the first. The button renders all of them; a `toast.error` alone would have thrown that away and reintroduced one-problem-per-submission |
+| Warnings | Surfaced with `toast.warning` **after** the success message, so the three advisory items cannot be mistaken for failures |
+| `draft` in the status union, with its own amber badge and icon | It was a state the type denied while the screen rendered it |
+| A **Drafts** card in the summary | That summary counts by status, so it is an aggregate that enumerates its cases - a draft used to land in `Total` and in none of the others |
+| A provider game badge | Shown only for provider contests. Every other cue on the row is trading's: the trophy, the entry fee, the pool |
+| `lib/admin/contest-game-label.ts` | New, admin-only, **not mirrored**. `hasProviderGameLabel()` asks about the **label alone** |
+
+**Two decisions in there are load-bearing.**
+
+**The new helper is deliberately not `isProviderContest`, and reusing that name would have
+been the natural mistake.** `lib/services/games/contest-config.ts` already exports one, and
+it answers a stricter question: label **and** provider key **and** game code, because a
+labelled contest with no keys cannot launch a round. A screen is asking something else -
+*what kind of row is this* - and a half-built provider contest is still a provider contest for
+badging and for keeping out of the trading editor. Using the strict helper here would have
+rendered a keyless provider contest as a **trading** one, with a trading Edit button and no
+badge to suggest otherwise. Silent, and in the worst direction.
+
+**Edit is withheld from provider contests with the reason shown, not greyed out.**
+`/competitions/edit/[id]` renders the trading editor and `PUT /api/competitions/[id]` does a
+blind `Object.assign` of that form's body, so this link is a **corruption path**, not merely a
+confusing screen. Same reasoning as a provider switch that cannot work refusing with a reason
+rather than being disabled. Until a provider editor exists, cancel and recreate is the honest
+instruction.
+
+**Also worth recording: `startingCapital` was declared `number` and is never read here.** It
+was a lie in the type for every provider contest, which has none, and the honest fix was to
+mark it optional rather than to render a zero.
+
+Pinned by `__tests__/admin/provider-contest-publish-ui.test.ts` (21 tests, **21 probes all
+red**, `tools/probe-publish-ui.ps1`). The structural half **strips comments before matching**,
+which is not optional here: these files explain the anti-patterns in prose, and a test that
+reads prose flags a correct file for discussing the mistake while passing a broken one whose
+only mention of the right thing is in a comment.
+
+**One probe stayed green and it found a missing test, not a broken one.** Blanking the game
+badge's condition left the suite green, because the probe had been aimed at a test asserting
+that the *strict* helper is not imported - a different claim, which the other two call sites
+keep satisfying. The badge had no test at all. **A probe aimed at the wrong test is
+indistinguishable from a test that does not work.**
+
+**What this does not include:** no player screen starts a round, so the play step remains
+API-only; there is no unpublish, deliberately, because a visible contest can already have been
+paid into and cancel-with-refund is the reversible operation; and the round inspector, manual
+resolution and live-contest controls in section 4 are still unbuilt.
 
 ---
 
