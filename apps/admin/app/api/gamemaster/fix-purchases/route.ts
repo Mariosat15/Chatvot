@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { ObjectId } from "mongodb";
 import { verifyAdminAuth } from "@/lib/admin/auth";
 import { connectToDatabase } from "@/database/mongoose";
+import { buildSubscriptionLimits } from "@/lib/services/gamemaster/subscription-limits";
 
 /**
  * POST /api/gamemaster/fix-purchases
@@ -184,11 +185,11 @@ export async function POST() {
           autoRenew: true,
           renewalPrice: item.price,
           referralCode,
-          limits: {
-            maxCompetitionsPerDay: config.maxCompetitionsPerDay || 1,
-            maxUsersPerCompetition: config.maxUsersPerCompetition || 50,
-            referralFeePercentage: config.referralFeePercentage || 5,
-          },
+          // Reason for the shared builder: this repair route previously stored a 0% package
+          // as 5%, and it also omitted both permission flags and relied on schema defaults.
+          // A repair route writing a different limits shape from the purchase route is how a
+          // repair introduces the drift it was run to remove.
+          limits: buildSubscriptionLimits(config),
           currentPeriodCompetitionsCreated: 0,
           lastCompetitionResetDate: now,
           totalCompetitionsCreated: 0,

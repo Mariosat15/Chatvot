@@ -8,6 +8,7 @@ import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subs
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import mongoose from "mongoose";
+import { buildSubscriptionLimits } from "@/lib/services/gamemaster/subscription-limits";
 
 /**
  * POST /api/marketplace/purchase
@@ -315,14 +316,7 @@ export async function POST(request: NextRequest) {
         existingSubscription.endDate = endDate; // Includes carried over days
         existingSubscription.nextRenewalDate = endDate;
         existingSubscription.renewalPrice = item.price;
-        existingSubscription.limits = {
-          maxCompetitionsPerDay: config.maxCompetitionsPerDay || 1,
-          maxUsersPerCompetition: config.maxUsersPerCompetition || 50,
-          referralFeePercentage: config.referralFeePercentage || 5,
-          canCreateCompetitions: config.canCreateCompetitions !== false,
-          canEarnFromChallenges: config.canEarnFromChallenges === true,
-          challengeReferralFeePercentage: config.challengeReferralFeePercentage,
-        };
+        existingSubscription.limits = buildSubscriptionLimits(config);
         existingSubscription.currentPeriodCompetitionsCreated = 0;
         existingSubscription.lastCompetitionResetDate = now;
         existingSubscription.expiryWarnings = {}; // Reset expiry warnings
@@ -356,15 +350,7 @@ export async function POST(request: NextRequest) {
               autoRenew: true,
               renewalPrice: item.price,
               referralCode,
-              limits: {
-                maxCompetitionsPerDay: config.maxCompetitionsPerDay || 1,
-                maxUsersPerCompetition: config.maxUsersPerCompetition || 50,
-                referralFeePercentage: config.referralFeePercentage || 5,
-                canCreateCompetitions: config.canCreateCompetitions !== false,
-                canEarnFromChallenges: config.canEarnFromChallenges === true,
-                challengeReferralFeePercentage:
-                  config.challengeReferralFeePercentage,
-              },
+              limits: buildSubscriptionLimits(config),
               currentPeriodCompetitionsCreated: 0,
               lastCompetitionResetDate: now,
               totalCompetitionsCreated: 0,

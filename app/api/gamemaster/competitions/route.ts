@@ -206,7 +206,9 @@ export async function POST(request: NextRequest) {
       maxUsersPerCompetition: subscription.limits?.maxUsersPerCompetition || 50,
       canCreateCompetitions:
         subscription.limits?.canCreateCompetitions !== false,
-      referralFeePercentage: subscription.limits?.referralFeePercentage || 5,
+      // Reason for `??`: a package configured at 0% is a configuration, not an absence, and
+      // this figure is what the Game Master is told they earn (R31).
+      referralFeePercentage: subscription.limits?.referralFeePercentage ?? 5,
     };
 
     if (subscription.packageId) {
@@ -223,7 +225,7 @@ export async function POST(request: NextRequest) {
             canCreateCompetitions:
               currentPackage.gameMasterConfig.canCreateCompetitions !== false,
             referralFeePercentage:
-              currentPackage.gameMasterConfig.referralFeePercentage || 5,
+              currentPackage.gameMasterConfig.referralFeePercentage ?? 5,
           };
           console.log(
             `[GM Competition] Using current package settings:`,

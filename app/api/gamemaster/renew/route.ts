@@ -7,6 +7,10 @@ import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subs
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import mongoose from "mongoose";
+import {
+  buildSubscriptionLimits,
+  type GameMasterSubscriptionLimits,
+} from "@/lib/services/gamemaster/subscription-limits";
 
 /**
  * POST /api/gamemaster/renew
@@ -73,22 +77,8 @@ export async function POST() {
     // plain object below means we must include every required field
     // (canEarnFromChallenges is required: true on the schema).
     const existingLimits = subscription.limits ?? {};
-    let packageConfig: {
-      maxCompetitionsPerDay: number;
-      maxUsersPerCompetition: number;
-      referralFeePercentage: number;
-      canCreateCompetitions: boolean;
-      canEarnFromChallenges: boolean;
-      challengeReferralFeePercentage?: number;
-    } = {
-      maxCompetitionsPerDay: existingLimits.maxCompetitionsPerDay ?? 1,
-      maxUsersPerCompetition: existingLimits.maxUsersPerCompetition ?? 50,
-      referralFeePercentage: existingLimits.referralFeePercentage ?? 5,
-      canCreateCompetitions: existingLimits.canCreateCompetitions !== false,
-      canEarnFromChallenges: existingLimits.canEarnFromChallenges === true,
-      challengeReferralFeePercentage:
-        existingLimits.challengeReferralFeePercentage,
-    };
+    let packageConfig: GameMasterSubscriptionLimits =
+      buildSubscriptionLimits(existingLimits);
 
     if (subscription.packageId) {
       const currentPackage = await MarketplaceItem.findById(
@@ -98,22 +88,13 @@ export async function POST() {
         renewalPrice = currentPackage.price;
         durationDays =
           currentPackage.gameMasterConfig.subscriptionDurationDays || 30;
-        packageConfig = {
-          maxCompetitionsPerDay:
-            currentPackage.gameMasterConfig.maxCompetitionsPerDay || 1,
-          maxUsersPerCompetition:
-            currentPackage.gameMasterConfig.maxUsersPerCompetition || 50,
-          referralFeePercentage:
-            currentPackage.gameMasterConfig.referralFeePercentage || 5,
-          canCreateCompetitions:
-            currentPackage.gameMasterConfig.canCreateCompetitions !== false,
-          canEarnFromChallenges:
-            currentPackage.gameMasterConfig.canEarnFromChallenges === true,
-          challengeReferralFeePercentage:
-            currentPackage.gameMasterConfig.challengeReferralFeePercentage ??
-            currentPackage.gameMasterConfig.referralFeePercentage ??
-            0,
-        };
+        // Reason the challenge rate is no longer copied from the competition rate here: the
+        // helper leaves it absent, and both money paths already fall back to the competition
+        // rate when it is. Copying froze the rate as at renewal day, so a later change to
+        // the package stopped reaching challenges while the subscription looked correct.
+        packageConfig = buildSubscriptionLimits(
+          currentPackage.gameMasterConfig,
+        );
       }
     }
 

@@ -13,11 +13,12 @@
 
 | | |
 |---|---|
-| **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **First code shipped and owner-tested 2 Sep 2026** - the admin navigation restructure, a slice of X6 taken out of order. No provider selected |
-| **Next action** | **Await the owner's go-ahead for X1.** Nothing blocks it; the hold is deliberate. Commercial work can proceed in parallel: find and assess a provider using `08` |
-| **Blocked by** | **Nothing technical.** Stage 0 / X0 was the standing gate and it was **signed off 2 Sep 2026**. X1 waits only on the owner saying to start. A signed provider is still needed from X4 onward; X1-X3 and most of the admin work need no provider at all |
-| **Owner instruction on record** | **External games only, no in-house game** (2 Sep 2026). **One step at a time, admin first, do not break the running app.** **Do not start X1 until told** (2 Sep 2026) |
-| **Last updated** | 2 September 2026 |
+| **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done.** A provider contest can be published, entered, played and paid **by API and by test only** - no admin button publishes one and no player screen launches a round. **No provider selected**, which is what X4 needs |
+| **Next action** | **The two X6 slices that make the lifecycle clickable** - a publish control and the round inspector. In parallel, commercially: find and assess a provider using `08`, since X4 cannot start without one |
+| **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
+| **Owner instruction on record** | **External games only, no in-house game** (2 Sep 2026). **One step at a time, admin first, do not break the running app.** |
+| **Not owner-tested** | Everything after the 2 Sep navigation restructure. X1-X3, X5, the provider admin slice and the contest wizard are all **code-complete, awaiting owner test** - and "code-complete" here excludes the replay script and the label backfill, neither of which has been run against production |
+| **Last updated** | 5 September 2026 |
 
 ### DEFERRED WORK, APPROVED BUT NOT SCHEDULED
 
@@ -263,20 +264,25 @@ path below is kept for reference only; do not plan against it.
    are done**: the navigation restructure (owner-tested), provider registration,
    credentials and the per-title switch, and the contest wizard with pre-flight validation.
 
-6. **X5** - contest integration and settlement. **PARTIALLY BUILT, 4 September 2026.**
-   Publish, entry, ranking, round launch and settlement are done; the `exclude` refund is not.
+6. **X5** - contest integration and settlement. **CODE-COMPLETE, 4 September 2026.**
+   Publish, entry, ranking, round launch, settlement and all three unresolved-round
+   policies.
 
-**Where the next engineer should actually start.** X5 landed in two halves on 4 September,
-and the end of the second one is the milestone the programme has been working towards:
-**a provider contest can now be published, entered, played and paid.** The pilot no longer
-depends on anything unbuilt in the engine.
+**Where the next engineer should actually start.** X5 landed in three pieces on 4 September,
+and the end of it is the milestone the programme has been working towards: **a provider
+contest can now be published, entered, played, paid, and settled correctly when a result
+never arrives.** The pilot no longer depends on anything unbuilt in the engine.
 
-One piece of X5 remains:
+The last piece closed two gaps rather than the one that was tracked:
 
-- **The `exclude` refund.** Still `refundOwed: true`. Removing an unresolved player changes
-  the prize pool, so the refund and the re-split must be one transaction. It is now the
-  *only* thing standing between the engine and a complete contest lifecycle, and it is
-  unblocked, because the settlement transaction it has to join exists.
+- **The `exclude` refund** is paid and the prize pool re-split inside the settlement
+  transaction, so the pool can never be paid out while still counting a removed player.
+- **`hold_and_alert` now actually blocks settlement.** Nothing consumed `blocksSettlement`
+  either - a held contest settled on time and paid out while the policy promised the
+  opposite. Only `score_zero` had ever worked, and it worked because it asks settlement to
+  do nothing. That gap was invisible because it had never been written down, whereas
+  `refundOwed` was recorded in four documents. **An obligation recorded in four places is
+  no more likely to be complete than one recorded nowhere.**
 
 **What this unblocks, and it is the more useful way to read it.** The remaining X6 screens -
 provider health, the round inspector, manual resolution - no longer have to be built against
@@ -297,6 +303,9 @@ embarrass a demo:
 - **The challenge path was not touched.** `lib/actions/trading/challenge-finalize.actions.ts`
   still carries its own copy of the payout, fee and completion logic, so a provider
   *challenge* is X10 work and not a by-product of this phase.
+- **The unresolved-round policies apply to provider settlement only.** Trading has no rounds
+  that can go unresolved, so there is nothing to honour there - correct, not a gap, but a
+  summary saying "settlement honours the policies" should say *provider* settlement.
 
 **X4 still jumps ahead if a provider is signed**, for the unchanged reason: everything
 built after that point is guesswork until a real provider has answered a real call.
@@ -333,7 +342,7 @@ numbers in chapters `01`-`09` remain resolvable. **Plan against the X-phases bel
 | **X2** | Provider abstraction + mock adapter | `09` E1 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026. Nothing player-visible - `externalGamesEnabled` defaults false |
 | **X3** | Round lifecycle + result ingestion | `09` E2 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026. **Rehearsals 1-6 of `07` s9 green** against the mock (49 tests, 6 guards probed). 7-10 need X5/X8 |
 | **X4** | Real adapter against sandbox | `09` E3 | 1 week | `NOT STARTED` |
-| **X5** | Contest integration + settlement | `09` E4 | 1 week | `PARTIALLY BUILT` - publish, entry, ranking, **round launch and settlement** all code-complete 4 Sep 2026. **A provider contest can now be published, entered, played and paid.** Only the **`exclude` refund** remains (entry-fee return plus prize-pool re-split in one transaction). Settlement was an **extraction**: the payout, fee/GM and completion stages moved to `lib/services/settlement/` and trading was rewired onto them |
+| **X5** | Contest integration + settlement | `09` E4 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026 - publish, entry, ranking, round launch, settlement and **all three unresolved-round policies**. **A provider contest can be published, entered, played and paid, by API and by test - no admin button publishes one and no player screen launches a round.** Settlement was an **extraction**: the payout, fee/GM and completion stages moved to `lib/services/settlement/` and trading was rewired onto them. Closing `exclude` also closed **`hold_and_alert`**, which nothing had ever consumed |
 | **X6** | Admin: nav restructure incl. **the single Trading section**, RBAC, provider registration, game-aware wizard, analytics, **GM creation API + wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | `PARTIALLY DONE` - nav restructure and single Trading destination **built and owner-tested 2 Sep 2026**. **Provider registration, credentials and the per-title catalogue switch code-complete 4 Sep 2026** (`12` s4.1a). **Contest wizard from `configSchema` + pre-flight validation code-complete 4 Sep 2026** (`12` s2.1) - creates a **draft only**; nothing publishes or settles it. Still `NOT STARTED`: provider health panel, round inspector, manual resolution, live-contest controls, provider contest **editing**, analytics by provider, GM creation API |
 | **X6.5** | **Admin wording pass** - brought forward from X8 so operators never work a games platform labelled "trading" | `14` | 0.5-1 week | `NOT STARTED` |
 | **X7** | Player UI + points, leaderboards, badges, levels, **profile and cross-game stats**, **per-game GM analytics** | `09` E6 + `13` + `05` + `19` | 3-4 weeks | `NOT STARTED` |
@@ -594,6 +603,159 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 4 Sep 2026 - X5 THIRD PIECE - THE UNRESOLVED-ROUND POLICIES - X5 CODE-COMPLETE
+
+**Shipped:** all three of chapter `07`'s answers to a round that never reports. **X5 is
+code-complete.**
+
+- `lib/services/settlement/unresolved-rounds.ts` - reads which rounds are sitting at
+  `unresolved` and turns the contest's policy into an instruction for this settlement run.
+- `lib/services/settlement/exclusion-refund.ts` - returns the entry fee, writes a ledger
+  row attributed to the competition, marks the participant `refunded`.
+- `provider-settlement.service.ts` - refund before ranking, players filtered out of
+  ranking, pool and participant count reduced, all in the settlement transaction.
+- `provider-finalize.ts` - the `hold_and_alert` gate **before** the optimistic lock, and
+  the lock release on a returned refusal.
+
+**Files touched:** the four above plus their admin mirrors;
+`lib/services/games/contest-preflight.ts` (the operator warning, which had become false);
+`lib/services/games/reconciliation.service.ts` (comment); both copies of
+`competition-cancel.actions.ts` (a wrong comment about the prize pool);
+`__tests__/services/provider-settlement.test.ts` (+15),
+`__tests__/services/provider-settlement-late-hold.test.ts` (new, 2),
+`__tests__/services/provider-contest-create.test.ts` (one test flipped);
+`tools/probe-provider-entry.ps1`, `tools/probe-reprobe.ps1`.
+
+**Deviated from plan:** three ways, all worth keeping.
+
+- **The tracked gap was one of two.** Every document presented the `exclude` refund as the
+  last item. Nothing consumed `blocksSettlement` either, so a `hold_and_alert` contest
+  **settled on time and paid out** while promising to be held. Both were closed together
+  because they are the same read and the same insertion point.
+- **Settlement does not consume `refundOwed` / `blocksSettlement`, as `09` E2 implied it
+  would.** They are return values in a worker that has exited by the time a contest
+  settles. Settlement re-derives both from `round.status = "unresolved"`, which is the only
+  thing stage 4 persists - and that is also what makes a contest finalized by a path the
+  net never drove honour the policy anyway.
+- **Two pre-existing defects were fixed on the way**, both worse than the gap being closed.
+  `exclude` did not merely fail to refund: `calculateRankings` never filters on participant
+  status, so an excluded player stayed ranked and could be **paid a prize as well as being
+  owed their fee back**. And `provider-finalize.ts` committed a `success: false` return
+  without releasing the claim, so its first ever refusal would have parked the contest at
+  `finalizing` permanently - unclaimable by any caller, cron or human. The file's own
+  warning about the release being "easy to leave out and impossible to notice in a test
+  that only checks the happy path" applied to itself, because **a `catch` block is not a
+  refusal handler.**
+
+**Verified:** full suite **683 green** (37 files), mirrors **79 agree / 0 drifted**, lint
+clean, main typecheck **17** and admin **223** - both exactly at baseline, with no errors in
+the changed files and none disappearing. 17 new probes: 14 red first time, and the three
+that stayed green were resolved individually rather than waved through.
+
+- **The pool reduction** was masked by the integrity cap, which recomputes the same figure
+  from the already-reduced participant count. Needed a new test seeding a pool *below* the
+  fees collected, where the cap has headroom and cannot cover for it.
+- **The lock release and the in-transaction hold check** were unreachable, not useless: the
+  pre-lock gate catches every refusal the ordinary suite can produce. Reached with a mocked
+  assessment that answers differently with and without a session - which is exactly the
+  race the second gate exists for.
+- **Passing `contestId` as a string** stayed green because **the claim was wrong**:
+  Mongoose casts a string to ObjectId when the query executes, verified directly. The
+  comment was corrected. The raw MongoDB driver does *not* cast, which is why the test
+  helper needs a real ObjectId - the two halves are genuinely different, and conflating
+  them is what produced the false comment.
+
+**Owner tested:** not yet.
+
+**Deferred:** ~~the GM referral fee `|| 5` (R31)~~ **fixed 5 September 2026, see the entry
+below.** Also still open: no admin button publishes a contest, no player screen launches a
+round, the challenge path keeps its own copy of settlement, and R26 (the admin cron pays no
+Game Masters).
+
+**Next chat should:** close the two X6 slices that make the lifecycle clickable - a publish
+button and the round inspector.
+
+---
+
+### 5 Sep 2026 - R31 - A CONFIGURED 0% REFERRAL RATE - FIXED
+
+**Shipped:** a Game Master rate configured at 0% now means 0% everywhere it is stored, read
+or displayed. Not an X-phase - a defect carried out of the X5 extraction, fixed in its own
+commit as that extraction promised.
+
+**The register had the wrong branch, and checking before fixing is the whole story here.**
+R31 said a 0% *package* was paid 5%. It was not: `resolveFeePercentage` reads the current
+package first and that branch already tested `!== undefined`, so a package that exists and
+says 0 returned 0. The three `||` sites were the **fallbacks onto the cached
+`subscription.limits`**, reached only when the package has been deleted or the subscription
+carries no `packageId`. Proven before any code changed - three of six new tests failed with
+`expected 5 to be 0`, and the current-package one passed. **A fix aimed at the register's
+sentence would have changed the one branch that was already right.**
+
+**The larger half nothing had recorded.** Six writers copied a package's config onto a
+subscription with `config.referralFeePercentage || 5`, so **buying a 0% package stored 5%** -
+purchase ×2, `activate`, `renew`, the admin `fix-purchases` repair route, and a hand-run
+script. That is the durable defect: the wrong value is persisted, a stored 5 is
+indistinguishable from a deliberate 5, and it reached the **challenge** path through the data
+rather than the code, since `challenge-finalize` resolves with `??` and faithfully paid the
+5% that purchase had wrongly stored.
+
+**And why a 0% package was almost certainly never created.** The admin editor declared the
+input `min={0}` and then made 0 unreachable - a stored 0 rendered as 5, and `onChange` wrote
+`parseFloat(e.target.value) || 5`, so **typing 0 was rewritten to 5 on the keystroke.** A
+control that advertises a value and silently refuses it. This is what makes R31 **latent
+rather than an active loss**, and the entry now says so.
+
+**Files:**
+
+- `lib/services/gamemaster/subscription-limits.ts` (**new**, mirrored) -
+  `buildSubscriptionLimits()`, now the only writer of the cached limits shape. Used by
+  purchase ×2, `activate`, `renew`, `fix-purchases`.
+- `lib/services/settlement/game-master-fees/calculate.ts` (+ mirror) - three fallback
+  expressions become one `cachedRateOrDefault()`.
+- `apps/admin/components/admin/MarketplaceSection.tsx` - the input keeps 0, in the value, the
+  handler and the `>= 10` warning threshold.
+- Displays: the marketplace page, the arsenal card, the package summary, the AI content
+  prompt, and `GET /api/gamemaster/competitions`.
+- `tools/gamemaster/report-stale-subscription-limits.ts` (**new**) - report-only, lists
+  subscriptions whose cached limits disagree with their package.
+
+**`Number.isFinite`, not a bare `??`, and this is the part a one-character fix gets wrong.**
+These values arrive from `parseFloat` on an admin form, so `NaN` is one keystroke away, and
+`??` passes it onto a required `Number` path. A `NaN` percentage is worse than the bug being
+fixed: every multiplication downstream becomes `NaN` and nothing checks. **`||` was wrong
+about 0 and accidentally right about `NaN`; the fix has to keep the second half.**
+
+**Not repaired retroactively.** A code fix changes future writes only, so existing
+subscriptions still hold whatever `|| 5` produced. The tool is report-only. Renewal re-copies
+from the package, so an auto-renewing subscription repairs itself within one period - which is
+why this is a report worth reading before deciding to write anything, not a migration to run
+blind.
+
+**Deferred, and named rather than left silent:** `scripts/fix-existing-gm-purchases.ts:240`
+is the seventh writer and still holds `|| 5`. It is hand-run, carries its own local types and
+no path aliases so it cannot import the shared builder as written, and it was not editable
+from this environment. It is the one path that can reintroduce a stored 5% over a 0% package.
+Three `|| 0` display sites were left **deliberately** - a stored 0 renders as 0 when the
+fallback is the same number, so the expression is odd and the behaviour is right.
+
+**Verification:** 697 tests pass (14 new); **8 probes all red**, including one that required
+strengthening a test - see below. `check:mirrors` 79 agree / 0 drifted. Typecheck error lists
+**diffed, not counted**, against a stashed baseline: main identical at 17, admin identical at
+223 with three errors merely shifted one line by an added import. The one new lint warning was
+also a line shift, the same pre-existing unescaped apostrophe 12 lines lower.
+
+**One probe stayed green, and it was a weak test of mine.** Removing the `!== undefined` check
+left the suite green because the test seeded the package at 0% *and* the cache at 0%, so the
+wrong branch produced the right answer. Fixed by seeding the cache at 5, which makes the
+assertion say which source was read. **Two sources have to disagree before a test can prove
+which one is used** - the general form of the same trap that made the pre-lock hold gate
+unprovable by status alone.
+
+**Owner tested:** not yet.
 
 ---
 
@@ -1279,6 +1441,10 @@ creates a provider contest.
  money writer beside settlement, and removing a player changes the prize pool - so the
  refund and the re-split are one transaction belonging to X5. **Do not let a summary imply
  `exclude` is fully implemented.**
+ **Both deferrals closed 4 Sep 2026** (see the X5 third-piece entry). Kept as written
+ because it is an accurate record of what X3 decided - but note X5 did **not** consume
+ `refundOwed`, since a return value cannot cross a process boundary; it re-derives the
+ obligation from `round.status = "unresolved"`.
 
 #### Two things about the tooling, both of which cost time
 

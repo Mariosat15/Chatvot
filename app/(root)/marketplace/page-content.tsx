@@ -1860,7 +1860,7 @@ function GameMasterCard({
                   <span className="text-xs">Referral Fee</span>
                 </div>
                 <p className="text-emerald-400 font-semibold">
-                  {config.referralFeePercentage || 5}%
+                  {config.referralFeePercentage ?? 5}%
                 </p>
               </div>
             </div>

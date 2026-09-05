@@ -47,7 +47,7 @@ chapter covers risks to the programme and to the application.
 | R21 | Dashboard mega-action split | Medium | Medium | X7 |
 | R22 | New admin sections invisible - RBAC | Low | High | X6 |
 | R23 | Notification links point to `/trade` | Medium | High | X6 |
-| R31 | Game Master package set to 0% is paid 5% instead | Medium | **ALREADY OCCURRED** if such a package exists | Own commit before X12 |
+| R31 | A Game Master rate configured at 0% is treated as unset | Medium | **CLOSED 5 Sep 2026.** Latent, not occurred - the admin UI could not store a 0% rate | Fixed in its own commit |
 | R24 | Scope creep before anything ships | Medium | **High** | All |
 | R25 | Round write contention under load | Medium | Medium | X12 |
 | X15 | "Challenge any user" harassment surface - no report-user feature exists | Medium | Medium | X10 |
@@ -572,38 +572,96 @@ existed; `tsc` caught it as `TS2304: Cannot find name`. **The lesson is to sweep
 old name after a rename and read every hit**, because the compiler catches the ones that
 break and says nothing about the ones that still compile and now mean something else.
 
-### R31 - A Game Master package configured at 0% is paid 5% instead
+### R31 - A Game Master rate configured at 0% is treated as unset - **CLOSED, 5 September 2026**
 
-**A live defect, found 4 September 2026 while extracting the settlement stages, deliberately
-NOT fixed in that commit, and confirmed by a second reading rather than assumed.**
+**Found 4 September 2026 while extracting the settlement stages, deliberately NOT fixed in
+that commit, and fixed on 5 September. The entry below has been rewritten, because checking
+the risk against the code before fixing it showed the register had the wrong branch.**
 
-`lib/services/settlement/game-master-fees/calculate.ts` resolves the referral rate as
-`gmSubscription.limits.referralFeePercentage || 5` at **three** sites. A package genuinely
-configured at **0%** is falsy in JavaScript, so it falls through to the 5% default and **the
-platform pays commission that nobody agreed to**, on every contest, silently. The fix is one
-character - `??`.
+#### What this entry used to claim, and why it was wrong
 
-**What turns this from "looks wrong" to "is wrong" is that the two money paths already
-disagree.** `lib/actions/trading/challenge-finalize.actions.ts` lines **994** and **1000**
-resolve the same value with `??`. So a Game Master on a 0% package earns nothing from a
-challenge and 5% from a competition, from the same stored configuration. One of the two is a
-bug by definition, and `??` is the one matching the stored intent - **a stored value and an
-absent one are different facts**, the rule that also made `canEnterChallenges` and
-`entryBlockThreshold` defects.
+It said `calculate.ts` resolved the rate as `limits.referralFeePercentage || 5` at three
+sites, so **a package configured at 0% was paid 5%**. The first half was true and the
+conclusion was not. The function reads the **current package first**, and that branch tested
+`!== undefined`:
 
-**Why it was preserved verbatim through the extraction**, which is the part worth carrying
-forward: the entire value of moving ~900 lines of money code is that the five trading payout
-tests and the golden ranking regression staying green *proves* nothing moved. A behaviour
-change made in the same commit destroys that proof for the sake of one line. **Fix it in its
-own commit, with its own test**, and expect the fix to be visible in payout figures for any
-Game Master currently on a 0% package.
+```ts
+if (currentPackage?.gameMasterConfig?.referralFeePercentage !== undefined) {
+  return currentPackage.gameMasterConfig.referralFeePercentage;   // 0 returns 0. Correct.
+}
+```
+
+So a package that exists and says 0 always yielded 0. The three `||` sites were the
+**fallbacks onto the cached `subscription.limits`**, reached only when the package has been
+**deleted** or the subscription carries **no `packageId`**. Proven by a test before any fix:
+of six cases, the three cached-fallback ones failed with `expected 5 to be 0` and the
+current-package one passed.
+
+**The general rule, and the reason this correction is recorded rather than quietly fixed: a
+risk register entry is a claim, not a fact.** A fix aimed at this entry's sentence would have
+changed the one branch that was already right. **Correcting a risk downward while closing it
+is the same documentation duty as raising one** - the second time this has been needed, after
+R7.
+
+#### The bigger half, which nothing had recorded
+
+**Six writers copied a package's configuration onto a subscription with
+`config.referralFeePercentage || 5`, so buying a 0% package STORED 5%.** The purchase route
+twice (upgrade and first purchase), the admin `fix-purchases` repair route, `activate`,
+`renew`, and `scripts/fix-existing-gm-purchases.ts`. **Count the writers**, again: the
+tracked risk named one file and there were seven across two concerns.
+
+That is the worse defect, for two reasons. It is **durable** - the wrong value is persisted,
+and a stored 5 is indistinguishable from a deliberate 5. And it **reaches the challenge path
+through the data**: `challenge-finalize.actions.ts` resolves the fallback with `??` and was
+otherwise correct, so it faithfully paid the 5% that the purchase route had wrongly stored.
+The two paths did disagree, as this entry said, but not for the reason it gave.
+
+#### And the reason a 0% package was hard to find in the first place
+
+`apps/admin/components/admin/MarketplaceSection.tsx` declared the input `min={0}` and then
+made 0 unreachable: `value={...referralFeePercentage || 5}` rendered a stored 0 as **5**, so
+an operator could not see their own configuration, and `onChange` wrote
+`parseFloat(e.target.value) || 5`, so **typing 0 was immediately rewritten to 5**. A control
+that advertises a value and silently refuses it - the same shape as enabling a provider with
+no adapter. **A 0% package could only ever be created by calling the API directly**, which is
+why "check whether any exists in production" was the right instinct and would probably have
+returned none.
+
+#### The fix
+
+| Layer | Change |
+|---|---|
+| Settlement read | `lib/services/settlement/game-master-fees/calculate.ts` + admin mirror: the three fallbacks become one `cachedRateOrDefault()` helper |
+| Cached-limits write | New `lib/services/gamemaster/subscription-limits.ts` (mirrored) - `buildSubscriptionLimits()` is now the only writer of the limits shape, used by purchase ×2, activate, renew and fix-purchases |
+| Admin editor | The value and the handler both keep 0; the `>= 10` warning threshold too |
+| Displays | `??` in the marketplace page, the arsenal card, the package summary, and the AI content prompt |
+| Stored rows | `tools/gamemaster/report-stale-subscription-limits.ts`, report-only, lists subscriptions whose cache disagrees with their package |
+
+**`Number.isFinite`, not a bare `??`.** These values arrive from `parseFloat` on an admin
+form, so `NaN` is one keystroke away, and `??` passes it straight through onto a required
+`Number` path. `NaN` percentages are worse than the bug being fixed: every multiplication
+downstream becomes `NaN` and nothing checks. **`||` was wrong about 0 and accidentally right
+about `NaN`; the fix has to keep the second half.**
+
+**Why it was preserved verbatim through the extraction**, which is still the part worth
+carrying forward: the entire value of moving ~900 lines of money code is that the five
+trading payout tests and the golden ranking regression staying green *proves* nothing moved.
+A behaviour change made in the same commit destroys that proof for the sake of one line.
 
 | | |
 |---|---|
-| **Severity** | Medium - real money, but bounded by how many packages are set to 0% |
-| **Likelihood** | **ALREADY OCCURRED** wherever such a package exists |
-| **Phase** | Its own commit, before X12 |
-| **Note** | Check whether any 0% package exists in production before sizing this. If none does, it is a latent bug rather than an active loss - and say which, rather than implying an active loss |
+| **Severity** | Medium - real money, but narrower on the payout path than this entry claimed and wider on the write path |
+| **Likelihood** | **Latent, not an active loss.** The admin UI could not store a 0% rate, so a package configured at 0% was almost certainly never created. Say latent, not occurred |
+| **Status** | **CLOSED 5 September 2026.** 14 tests in `__tests__/services/game-master-fee-percentage.test.ts`, 8 probes in `tools/probe-gm-fee.ps1` |
+| **Not repaired retroactively** | A code fix changes future writes only. Existing subscriptions still hold whatever `\|\| 5` produced, and the report tool is report-only. Renewal re-copies from the package, so an auto-renewing subscription repairs itself within one period |
+| **One writer left** | `scripts/fix-existing-gm-purchases.ts:240` still reads `config.referralFeePercentage \|\| 5`. It is a hand-run repair script with its own local types and no path aliases, so it cannot import the shared builder as written, and it was not editable from the environment this fix was made in. **Named here rather than left silent**, because it is the one path that can reintroduce a stored 5% over a 0% package. Anyone running it should change `\|\|` to `??` on the three limit fields first |
+
+**Three sites deliberately unchanged**, so a later sweep does not "fix" them: `|| 0` in
+`UserFullDetailPanel.tsx` (twice) and `GameMasterDetailView.tsx`. A stored 0 renders as 0
+through a truthy check, because the fallback and the value are the same number - **the
+expression is odd and the behaviour is right**, and changing it would be churn in a diff whose
+whole purpose is provable behaviour.
 
 **Swept and confirmed unaffected:** the challenge finalization path uses
 `challenge.platformFeeAmount`, an absolute amount, and only ever renders

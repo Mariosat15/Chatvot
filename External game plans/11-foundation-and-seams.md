@@ -209,10 +209,17 @@ refuse", still failing closed.
 five trading payout tests and the golden ranking regression staying green is the *only*
 evidence that no trading payout moved, and that evidence is only worth anything if nothing
 else changed at the same time. That is why a **known one-character defect was preserved
-verbatim** - the Game Master fee reads `limits.referralFeePercentage || 5`, so a package
-configured at 0% falls through to 5%. It is now known to be a genuine bug rather than a
+verbatim** - the Game Master fee's cached-rate fallback read `limits.referralFeePercentage
+|| 5`, so a stored 0% fell through to 5%. It was known to be a genuine bug rather than a
 guess, because `challenge-finalize.actions.ts:994` and `:1000` use `??` for the same
-lookup - **the two money paths disagree with each other.** Fixing it is its own commit.
+lookup - **the two money paths disagreed with each other.**
+
+**Fixed in its own commit, 5 September 2026 (R31), and the deferral paid off twice over.**
+Separating it did not merely protect the extraction's proof - it bought the room to check the
+claim, and the claim was wrong: the defect was on the *fallback*, not on the live
+current-package read, which already tested `!== undefined`. It also turned up the larger half
+nothing had recorded, six routes storing a 0% package as 5%. **A one-character fix made in
+the extraction commit would have shipped the wrong character in the wrong place.**
 
 **Three things this did NOT cover**, each easy to assume it did:
 
@@ -220,7 +227,40 @@ lookup - **the two money paths disagree with each other.** Fixing it is its own 
   copy of all three stages. A provider *challenge* is X10.
 - **The admin cron's own finalize copy** still pays no Game Masters (R26). The shared
   services exist in `apps/admin` now, so the fix is smaller - not done.
-- **The `exclude` refund.** Still `refundOwed: true`.
+- **The `exclude` refund.** ~~Still `refundOwed: true`.~~ **Closed 4 September 2026** - see
+  the note below, which also records the sibling gap this list did not know about.
+
+#### The unresolved-round policies, 4 September 2026 - and the stranding bug they found
+
+`exclude` and `hold_and_alert` are both honoured now, by
+`lib/services/settlement/unresolved-rounds.ts` (reads the state) and
+`exclusion-refund.ts` (moves the money), mirrored, driven from
+`provider-settlement.service.ts`. Chapter `07` section 2.3a is the full account. Four
+things belong *here*, because they are about the seam rather than the policy:
+
+- **This list named one gap and there were two.** Nothing consumed `blocksSettlement`
+  either, so a `hold_and_alert` contest settled and paid out while promising it would be
+  held. Fourth instance of the counting rule, and the variant worth carrying: **when a
+  document records one unfinished obligation, check its siblings** - `refundOwed` was
+  tracked in four documents and `blocksSettlement` in none, purely because only one of them
+  had been written down.
+- **The seam is the write, not the flag.** Settlement re-derives both obligations from
+  `round.status = "unresolved"` rather than consuming the reconciliation outcome, because
+  that outcome lives in a worker that has exited. The general form: **a cross-process seam
+  can only be a persisted fact.** It is also what makes the lazy auto-finalize and a manual
+  admin trigger honour the policy without knowing it exists.
+- **A returned refusal is not a thrown error, and this file's own warning applied to
+  itself.** Seam 3 was written with the release path called out as "easy to leave out and
+  impossible to notice in a test that only checks the happy path" - and
+  `provider-finalize.ts` then committed a `success: false` result and left the contest at
+  `finalizing` for ever. Latent only because nothing returned a refusal yet; the hold gate
+  is the first thing that can. **A `catch` block is not a refusal handler.**
+- **The pre-lock finding from seam 3 repeated exactly, and so did its remedy.** Both hold
+  gates refuse, so the end state cannot tell them apart; the test asserts `updatedAt` never
+  moved. And the in-transaction gate could only be *reached* by mocking the assessment to
+  answer differently with and without a session - the race it exists for. Probed against
+  the ordinary suite it stayed green, which looked like a useless guard and was actually an
+  unreachable test.
 
 **And one finding about the gate itself, from probing.** Deleting the pre-lock game gate left
 the test suite **green**, because the post-lock gate above refuses an unknown game too and

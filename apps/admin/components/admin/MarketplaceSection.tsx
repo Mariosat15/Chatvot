@@ -1748,20 +1748,32 @@ export default function MarketplaceSection() {
                         </div>
                         <Input
                           type="number"
+                          // Reason for `??` rather than `||` on both the value and the
+                          // handler: this control declares `min={0}` and then made 0
+                          // unreachable. A stored 0% rendered as 5%, so an operator could
+                          // not see their own configuration, and typing 0 was immediately
+                          // rewritten to 5 - a control that appears to work and silently
+                          // refuses the value it advertises. It is the reason a 0% package
+                          // could only be created by calling the API directly (R31).
                           value={
                             editingItem.gameMasterConfig
-                              ?.referralFeePercentage || 5
+                              ?.referralFeePercentage ?? 5
                           }
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const parsed = parseFloat(e.target.value);
                             setEditingItem({
                               ...editingItem,
                               gameMasterConfig: {
                                 ...editingItem.gameMasterConfig!,
-                                referralFeePercentage:
-                                  parseFloat(e.target.value) || 5,
+                                // Clearing the field is not the same as typing 0, so an
+                                // empty box falls back while a real 0 is kept. A bare `??`
+                                // would store `NaN` here and poison every payout it reaches.
+                                referralFeePercentage: Number.isFinite(parsed)
+                                  ? parsed
+                                  : 5,
                               },
-                            })
-                          }
+                            });
+                          }}
                           min={0}
                           max={50}
                           step={0.5}
@@ -1771,7 +1783,7 @@ export default function MarketplaceSection() {
                           % of entry fees the Game Master earns from their
                           referrals (e.g., 5%, 7.5%, 10%)
                         </p>
-                        {(editingItem.gameMasterConfig?.referralFeePercentage ||
+                        {(editingItem.gameMasterConfig?.referralFeePercentage ??
                           5) >= 10 && (
                           <div className="mt-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                             <p className="text-xs text-yellow-400 flex items-center gap-2">
@@ -2022,7 +2034,7 @@ export default function MarketplaceSection() {
                             % of challenge entry fees from referred users. Leave
                             empty to use the same % as competitions (
                             {editingItem.gameMasterConfig
-                              ?.referralFeePercentage || 5}
+                              ?.referralFeePercentage ?? 5}
                             %)
                           </p>
                           <button
@@ -2040,7 +2052,7 @@ export default function MarketplaceSection() {
                           >
                             Reset to use competition fee (
                             {editingItem.gameMasterConfig
-                              ?.referralFeePercentage || 5}
+                              ?.referralFeePercentage ?? 5}
                             %)
                           </button>
                         </div>
@@ -2064,7 +2076,7 @@ export default function MarketplaceSection() {
                         <div className="bg-gray-900/50 rounded-lg p-3">
                           <div className="text-2xl font-bold text-green-400">
                             {editingItem.gameMasterConfig
-                              ?.referralFeePercentage || 5}
+                              ?.referralFeePercentage ?? 5}
                             %
                           </div>
                           <div className="text-xs text-gray-400">Comp Fee</div>

@@ -955,6 +955,115 @@ the launch route - the whole lifecycle is reachable **by API and by test, not by
 instead. Same class as the paired-document drift rule: the restatement was going to be wrong
 while every underlying fact was right.
 
+### Five things from X5's third piece - the unresolved-round policies (4 September 2026)
+
+X5 is code-complete. All three of chapter `07`'s answers to a round that never reports are
+honoured: `lib/services/settlement/unresolved-rounds.ts` reads the state,
+`exclusion-refund.ts` moves the money, both mirrored.
+
+- **An obligation recorded in four places is no more likely to be complete than one
+ recorded nowhere.** Every document tracked the `exclude` refund as X5's last item.
+ Nothing consumed `blocksSettlement` either, so a `hold_and_alert` contest **settled on
+ time and paid out** while the policy promised it would be held - invisible purely because
+ it had never been written down. This is the counting rule in a new shape: after "count the
+ writers" (four entry paths, ten finalize sites, six raw inserts), now **count the
+ siblings of the obligation you are closing.** A to-do list is evidence of what somebody
+ wrote down, never of what is outstanding.
+- **A cross-process seam can only ever be a persisted fact.** `reconcileRound` returns
+ `refundOwed` and `blocksSettlement`, and four documents implied settlement would consume
+ them - but they are return values in a worker that has exited long before a contest
+ settles, and nothing persists them. Settlement re-derives both from
+ `round.status = "unresolved"`, the one thing stage 4 writes. The bonus, and the reason to
+ prefer this even where a parameter would work: a contest finalized by a path the net never
+ drove - the lazy auto-finalize, a manual admin trigger - honours the policy without
+ knowing it exists. **A flag passed in makes every other caller silently skip the rule.**
+- **A `catch` block is not a refusal handler, and this file's own warning applied to
+ itself.** `provider-finalize.ts` was written with the lock release called out as "easy to
+ leave out and impossible to notice in a test that only checks the happy path" - and it
+ then committed a `success: false` return and left the contest at `finalizing` for ever,
+ unclaimable by any caller, cron or human, with nobody paid. Latent only because nothing
+ returned a refusal yet. **Any function that both holds a lock and calls something
+ returning a result object needs the release on the returned-refusal path, not just the
+ thrown one.**
+- **A status field that reads as authoritative removes nobody.** `exclude` did not merely
+ fail to refund: `calculateRankings` reads participant `status` only for the liquidation
+ rule, so a player marked `refunded` stayed ranked and could be **paid a prize as well as
+ being owed their fee back**. Exclusion has to be a filter on the list handed to ranking.
+ Before trusting a status to gate anything, **grep for who reads it** - the same lesson as
+ grepping for a capability's caller before writing that it exists.
+- **When a probe stays green, the three causes need three different responses, and only
+ running it separates them.** All three appeared on one day. *Weak test:* deleting the pool
+ reduction passed, because the integrity cap recomputes the same figure from the
+ already-reduced participant count - fixed by a new test seeding a pool **below** the fees
+ collected, where the cap has headroom and cannot cover for it. *Unreachable test:* the
+ lock release and the in-transaction hold gate are caught by the pre-lock gate in every
+ ordinary path, so they needed a mocked race answering differently with and without a
+ session. *Wrong claim:* `contestId` as a plain string passed because **Mongoose casts it
+ when the query executes** - the comment asserting a silent miss was false and was
+ corrected. Note the near-miss inside that one: the raw MongoDB driver does **not** cast,
+ so the test helper genuinely needs a real ObjectId, and conflating the two halves is what
+ produced the wrong comment in the first place.
+
+**And a documentation duty that comes with shipping a deferral: an operator-facing warning
+that has become false is worse than no warning.** The pre-flight checklist told operators
+the `exclude` refund was "not yet automatic". Left alone, an operator either avoids a policy
+that now works or pays a second refund by hand on top of the automatic one. **The test
+pinning it was flipped, not deleted** - same rule as every defect test, since the comment
+explaining why the caution existed is the most valuable part. The warning itself was kept
+and rewritten, because removing a paid entrant and shrinking the pot is consequential
+whether or not it is automated.
+
+### Five things from R31, the configured 0% referral rate (5 September 2026)
+
+R31 is closed: a Game Master rate configured at 0% now means 0% wherever it is stored, read
+or shown. `lib/services/gamemaster/subscription-limits.ts` (mirrored) is the single writer of
+a subscription's cached limits, `calculate.ts`'s three fallbacks became one helper, 14 tests,
+8 probes, and `tools/gamemaster/report-stale-subscription-limits.ts` is report-only.
+
+- **A risk register entry is a claim about the code, not a fact about it — and this one named
+ the wrong branch.** R31 said a 0% *package* was paid 5%. It was not: the current-package
+ read already tested `!== undefined`, so 0 returned 0. The `||` sites were the **fallbacks
+ onto the cached `subscription.limits`**, reachable only when the package has been deleted or
+ the subscription has no `packageId`. **A fix aimed at the register's sentence would have
+ changed the one branch that was already right.** Second instance after R7, so carry the
+ class rather than the two cases: **check a risk against the code before fixing it, and
+ correcting it downward is the same documentation duty as raising one.** The register, the
+ chapter, `11`, PROGRESS and the internal HTML were all corrected together.
+- **`||` was wrong about 0 and accidentally right about `NaN`, so the one-character fix is
+ wrong.** These values arrive from `parseFloat` on an admin form, so `NaN` is one keystroke
+ away, and `??` passes it straight onto a required `Number` path — where every multiplication
+ downstream silently becomes `NaN` and nothing checks. The general form: **when replacing a
+ truthy check, enumerate everything it was catching**, because a falsy guard usually catches
+ more than the one value that motivated the change. `Number.isFinite`, not `??`.
+- **The tracked half was the read; the untracked half was the write, and the write was
+ worse.** Six routes copied a package's config onto a subscription with
+ `config.referralFeePercentage || 5`, so **buying a 0% package stored 5%** — durable, and a
+ stored 5 is indistinguishable from a deliberate 5. It also reached the **challenge** path
+ *through the data*: that path resolves with `??` and was correct, and faithfully paid the
+ wrong number it had been given. **When two code paths disagree, check whether one of them is
+ merely reading what the other wrote** before concluding which is buggy. And **count the
+ writers**, again: one file named, seven found.
+- **A control that advertises a value and then refuses it is why nobody had hit the bug.**
+ The admin editor declared the fee input `min={0}`, rendered a stored 0 as **5**, and wrote
+ `parseFloat(e.target.value) || 5`, so **typing 0 was rewritten to 5 on the keystroke** — a
+ 0% package could only be created by calling the API directly. That is what makes R31
+ **latent rather than an active loss**, and saying which is the difference between a register
+ entry that is believed and one that is not. Same shape as enabling a provider with no
+ adapter, and as a `rankingMethod` a provider game ignores.
+- **Two sources must disagree before a test can prove which one was read.** A probe removing
+ the `!== undefined` check stayed green because the test seeded the package at 0% *and* the
+ cache at 0%: the wrong branch produced the right answer. Seeding the cache at 5 turned it
+ red. This is the precedence-test form of the same trap that made the pre-lock hold gate
+ unprovable by end status alone — **when a probe stays green, ask whether the fixture can
+ distinguish the branches at all**, before concluding the test is weak or the claim is wrong.
+
+**And a verification note that saved a false finding twice in one pass.** The admin typecheck
+and the lint output both appeared to gain entries. Every one was a **line shift** — three
+`fix-purchases` errors moved by one line because of an added import, and a pre-existing
+unescaped apostrophe moved 12 lines because of an added comment. **Diff the lists and compare
+the message text, not the counts and not the line numbers**, or a comment looks like a
+regression.
+
 ## The rule
 
 **Documentation is part of the deliverable, not a follow-up task.** A phase is not
@@ -997,7 +1106,9 @@ On every change during implementation:
 | The game-provider admin surface, wherever it appears | `External game plans/12` s4 (the five destinations), s4.1 (copy the UX not the persistence) and s4.1a (what was built); `09` E5 checklist; `PROGRESS.md` X6 row and work log; `ChartVolt-External-Games-Plan.html` E5 row. **Two of the five destinations exist** — Providers and the per-title Games list. Any document implying E5 is finished is stale, and any implying the whole of X6 is done is more so: X6 also carries the contest wizard, analytics by provider and the Game Master creation API. **Credentials live only in `WhiteLabel.gameProviderCredentials` behind `select: false`** — a document describing them on `game_provider` is describing the payment-provider pattern that was deliberately not copied |
 | `ChartVolt-New-Games-Plan.html` and `-Partners.html` | The partner version must **never** mention Stage 0, the duplicate join paths, the admin mirror drift, or any current defect |
 | The contest-entry participant row, wherever it appears | `External game plans/11` seam 2 (and its build note), `09` E4, `PROGRESS.md` X5 row and work log. The row is built by **`lib/services/contest-entry/participant-seat.ts`**, not inline in the service - read that, not the prose. Two facts are load-bearing: the three virtual-capital fields are **conditional on `(this.gameKey \|\| "trading") === "trading"`** in both model copies, and `gameKey` is **copied from the contest, never defaulted**. Any document saying a participant always carries `startingCapital` is stale |
+| The unresolved-round policies, wherever they appear | `External game plans/07` s2.3 (the three policies) and **s2.3a** (what was built), `09` E2's deferral note and the **E4 third-half** notes, `11` seam 3, `PROGRESS.md` X5 row and work log, `ChartVolt-External-Games-Plan.html` E4 row. **The live code is `lib/services/settlement/unresolved-rounds.ts` and `exclusion-refund.ts`**, mirrored. Three facts drift easily: settlement does **not** consume `refundOwed` or `blocksSettlement` — it re-derives both from `round.status = "unresolved"`, so any document saying settlement reads those flags is wrong; the policies apply to **provider** settlement only, since trading has no rounds; and the `hold_and_alert` gate sits **before** the optimistic lock, with a second gate inside the transaction that is reachable only by the mocked race in `provider-settlement-late-hold.test.ts`. Any document listing the `exclude` refund as outstanding is stale as a present fact, though correct as history — **say which** |
 | The settlement stages, wherever they appear | `External game plans/11` seam 3 (design, the BUILT note and the COMPLETE note), `09` E4 second-half notes, `05` s9.1, `17` (R3 **closed**, R26 **still open**, R31 **new**), `19` s1 and s6, `New games plan/15` s5; `PROGRESS.md` X5 row and work log. **The live code is `lib/services/settlement/`, mirrored into `apps/admin`** — prize payout, fees plus Game Master share, and completion, with `provider-settlement.service.ts` and `provider-finalize.ts` composing them for provider contests. Read those, not the prose. Four facts drift easily: `competition-end.actions.ts` is **1,174 lines** (it was ~1,500 in the chapters and 1,885 before the extraction) and the sweep is at **`:1126`, not `:1807`**; there are **ten** finalize call sites in the main app, not five, and any document saying five is stale; the **challenge path was NOT extracted** and still holds its own copy of all three stages, so a document implying settlement is unified everywhere is wrong; and **no admin button publishes and no player screen plays** — the lifecycle is reachable by API and by test only |
+| The Game Master referral percentage, wherever it appears | `External game plans/19-game-masters.md` s1 (the "Percentage source" row and the row beneath it), `17-risk-register.md` R31 and the summary table, `11` seam 3's extraction note, `PROGRESS.md` work log; the internal HTML s15. **The live code is `resolveFeePercentage` in `lib/services/settlement/game-master-fees/calculate.ts` and `buildSubscriptionLimits` in `lib/services/gamemaster/subscription-limits.ts`**, both mirrored — read those, not the prose. Three facts drift easily: the **current package is the normal read** and `subscription.limits` is only a fallback for a deleted package, so any document implying the cached rate is what gets paid is wrong; **a configured 0% means 0%** since 5 Sep 2026, and any document saying a 0% package is paid 5% is stale as a present fact though correct as history — **say which**; and the fix is **not retroactive**, so subscriptions written before that date still hold whatever `\|\| 5` produced. `New games plan/15` s5 does **not** restate the percentage mechanics — checked, so do not add it there on consistency grounds |
 | Any model change | Exists twice: `database/models/` and `apps/admin/database/models/`. Update both in the same commit. **`npm run check:mirrors` now enforces this** in CI and on `git push`, comparing field paths *and* enum values. It does **not** compare `required` predicate bodies, so a conditional requirement that differs between the apps is a validation rule whose outcome depends on which process saved the document, and the guard stays green. Do not "fix" a failure by deleting an enum value to make two sides agree — that orphans every document already storing it. Add to the side that lacks it. Deliberate differences go in `tools/model-mirror/allowlist.ts` **with a reason** |
 | Committed compiled `.js` files under `database/` and `lib/` | **All 113 deleted 1 Sep 2026** (57 `.js` + 56 `.js.map`), owner approved. A *separate, earlier* accident from the `.d.ts` one — emitted 22 Dec 2025, same 57 modules, and **six to seven months stale**. Critically, **these were NOT inert**: vitest resolved the stale `.js` in preference to the `.ts`, which made every model and every money-critical service **unimportable in tests** and blocked the whole of Defect 1. `tsx`, esbuild and `next build` all resolve the `.ts` correctly, so production was never affected — which is why it survived unnoticed. Two rules follow: **when deleting emitted output, look for the other half of the emit** (a `tsc` run that produced `.d.ts` produced `.js` too — the first cleanup removed one half and left the harmful one), and **prove which file a resolver picks rather than reasoning about it** — a missing export makes a perfect probe. The `.gitignore` rule is scoped to `/database/**` and `/lib/**`, never a blanket `*.js`, because `ecosystem.config.js`, `scripts/*.js`, `worker/build.mjs` and the `api-server` build are hand-written |
 | Committed `.d.ts` files | **All 112 deleted 1 Sep 2026** (57 `.d.ts` + 55 `.d.ts.map`), owner approved, with a `.gitignore` rule. They were orphaned February 2026 build output, stale, and **inert** — TypeScript resolves the sibling `.ts` first; proven by identical typechecks before and after (16 main, 225 admin). Earlier documents said "two", then "31 + 31" — the 31 counted only `database/` and missed 26 files under `lib/`. **Never treat a `.d.ts` as a third copy of a model to maintain.** Two files are deliberately kept and must stay tracked: `types/global.d.ts` (hand-written, no sibling `.ts`) and `websocket-server/dist/index.d.ts` (separate build). The rule for any future cleanup: delete a `.d.ts` only if a sibling `.ts` exists and it is not under `dist/` |

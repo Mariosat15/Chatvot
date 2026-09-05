@@ -95,18 +95,47 @@ async function buildReferralMap(
  * admin changing a package's terms takes effect for every Game Master on it. The cached
  * `limits.referralFeePercentage` is the fallback for when the package has been deleted.
  *
- * THE `||` BELOW IS PRESERVED FROM THE ORIGINAL DELIBERATELY, AND IT IS WRONG. A package
- * configured with a 0% referral fee is falsy, so it falls through to 5% and the platform
- * pays commission nobody agreed to. Writing `??` here fixes it - and this extraction is
- * not the place, because the whole value of moving 900 lines of money code is that the
- * payout tests staying green MEANS something. A behaviour change smuggled in alongside
- * would destroy that guarantee for the sake of one line.
+ * R31 IS FIXED HERE (5 September 2026), AND THE RISK AS WRITTEN OVERSTATED IT. The register
+ * said a 0% package "is paid 5% instead". That was never true of the branch above: the
+ * current-package check tests `!== undefined`, so a package that exists and says 0 correctly
+ * yields 0. The defect was in the two FALLBACKS onto the cached `subscription.limits`, which
+ * are reached when the package has been deleted or the subscription carries no `packageId` -
+ * there, `||` read a stored 0 as absent and paid 5% commission nobody agreed to.
  *
- * It is a bug rather than a judgement call, because the two money paths already disagree:
- * `challenge-finalize.actions.ts` lines 994 and 1000 resolve the same value with `??`, so
- * one stored configuration yields 0% on a challenge and 5% on a competition. Tracked as
- * R31 in `External game plans/17-risk-register.md`; fix it in its own commit.
+ * Correcting a risk while fixing it is part of the fix: a fix aimed at the register's
+ * sentence would have changed the one branch that was already right.
+ *
+ * It was a bug rather than a judgement call because the two money paths disagreed on one
+ * stored value - `challenge-finalize.actions.ts` resolves the same fallback with `??`, so a
+ * cached 0 paid 0% on a challenge and 5% on a competition. They now agree.
+ *
+ * WHY IT WAS LEFT IN PLACE DURING X5, since the comment that used to be here explained the
+ * deferral: the extraction moved ~900 lines of money code, and the only evidence that no
+ * payout moved was the payout tests producing identical figures. A behaviour change
+ * smuggled in alongside would have destroyed that guarantee for the sake of one line.
  */
+/**
+ * The cached rate, or the default when the subscription genuinely stores none.
+ *
+ * One function for all three fallback sites rather than the same expression three times -
+ * two of the three were identical and a fix applied to the one somebody happened to be
+ * reading would have left the others paying 5%.
+ *
+ * `Number.isFinite` rather than a bare `??`: a stored `NaN` would otherwise propagate into
+ * `entryFee * (feePercentage / 100)` and make every earning `NaN`, silently, because nothing
+ * downstream checks. `??` alone fixes 0 and introduces that.
+ */
+function cachedRateOrDefault(
+  gmSubscription: {
+    limits?: { referralFeePercentage?: number };
+  } | null,
+): number {
+  const cached = gmSubscription?.limits?.referralFeePercentage;
+  return typeof cached === "number" && Number.isFinite(cached)
+    ? cached
+    : DEFAULT_REFERRAL_FEE_PERCENTAGE;
+}
+
 async function resolveFeePercentage(
   db: SettlementDb,
   gmSubscription: { packageId?: string; limits?: { referralFeePercentage?: number } } | null,
@@ -123,23 +152,14 @@ async function resolveFeePercentage(
         return currentPackage.gameMasterConfig.referralFeePercentage;
       }
 
-      return (
-        gmSubscription.limits?.referralFeePercentage ||
-        DEFAULT_REFERRAL_FEE_PERCENTAGE
-      );
+      return cachedRateOrDefault(gmSubscription);
     } catch {
-      return (
-        gmSubscription?.limits?.referralFeePercentage ||
-        DEFAULT_REFERRAL_FEE_PERCENTAGE
-      );
+      return cachedRateOrDefault(gmSubscription);
     }
   }
 
   if (gmSubscription) {
-    return (
-      gmSubscription.limits?.referralFeePercentage ||
-      DEFAULT_REFERRAL_FEE_PERCENTAGE
-    );
+    return cachedRateOrDefault(gmSubscription);
   }
 
   return DEFAULT_REFERRAL_FEE_PERCENTAGE;

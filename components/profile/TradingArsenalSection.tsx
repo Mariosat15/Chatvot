@@ -1120,7 +1120,7 @@ function GameMasterSubscriptionCard({
               <p className="text-sm text-gray-400">
                 {subscription.limits?.canCreateCompetitions
                   ? "Create competitions & earn referrals"
-                  : `Earn ${subscription.limits?.referralFeePercentage || 5}% from referrals`}
+                  : `Earn ${subscription.limits?.referralFeePercentage ?? 5}% from referrals`}
               </p>
             </div>
           </div>

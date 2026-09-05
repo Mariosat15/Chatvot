@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import { MarketplaceItem } from "@/database/models/marketplace/marketplace-item.model";
 import { UserPurchase } from "@/database/models/marketplace/user-purchase.model";
 import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
+import { buildSubscriptionLimits } from "@/lib/services/gamemaster/subscription-limits";
 
 /**
  * POST /api/gamemaster/activate
@@ -112,11 +113,7 @@ export async function POST(request: NextRequest) {
       renewalPrice: item.price,
       referralCode: referralCode!,
       referralLink: `${process.env.NEXT_PUBLIC_APP_URL || "https://app.chartvolt.com"}/register?ref=${referralCode!}`,
-      limits: {
-        maxCompetitionsPerDay: gmConfig.maxCompetitionsPerDay,
-        maxUsersPerCompetition: gmConfig.maxUsersPerCompetition,
-        referralFeePercentage: gmConfig.referralFeePercentage,
-      },
+      limits: buildSubscriptionLimits(gmConfig),
       currentPeriodCompetitionsCreated: 0,
       lastCompetitionResetDate: startDate,
       totalCompetitionsCreated: 0,

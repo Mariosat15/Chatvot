@@ -584,18 +584,18 @@ function getGameMasterPrompt(config?: Record<string, unknown>): string {
     whatYouGetSection = `
 - **${gmConfig.maxCompetitionsPerDay || 1} Competition${(gmConfig.maxCompetitionsPerDay || 1) > 1 ? "s" : ""} per Day** - Host engaging trading battles for your community
 - **Up to ${gmConfig.maxUsersPerCompetition || 30} Participants** - Perfect size for competitive events
-- **${gmConfig.referralFeePercentage || 5}% Referral Earnings** - Earn from every entry fee your referred users pay
+- **${gmConfig.referralFeePercentage ?? 5}% Referral Earnings** - Earn from every entry fee your referred users pay
 - **${gmConfig.subscriptionDurationDays || 30} Days Duration** - Full subscription period`;
   } else {
     whatYouGetSection = `
-- **${gmConfig.referralFeePercentage || 5}% Referral Earnings** - Earn from every entry fee your referred users pay in ANY competition
+- **${gmConfig.referralFeePercentage ?? 5}% Referral Earnings** - Earn from every entry fee your referred users pay in ANY competition
 - **${gmConfig.subscriptionDurationDays || 30} Days Duration** - Full subscription period
 - **Passive Income Focus** - No competition management required`;
   }
 
   if (canEarnFromChallenges) {
     whatYouGetSection += `
-- **${gmConfig.challengeReferralFeePercentage || gmConfig.referralFeePercentage || 5}% Challenge Earnings** - Earn from 1v1 challenge referrals`;
+- **${gmConfig.challengeReferralFeePercentage ?? gmConfig.referralFeePercentage ?? 5}% Challenge Earnings** - Earn from 1v1 challenge referrals`;
   }
 
   const packageType = canCreateCompetitions
@@ -640,14 +640,14 @@ IMPORTANT: This package ${canCreateCompetitions ? "CAN create competitions and e
 
 Package configuration:
 - Subscription Duration: ${gmConfig.subscriptionDurationDays || 30} days
-- Referral Fee Percentage: ${gmConfig.referralFeePercentage || 5}%
+- Referral Fee Percentage: ${gmConfig.referralFeePercentage ?? 5}%
 ${
   canCreateCompetitions
     ? `- Max Competitions Per Day: ${gmConfig.maxCompetitionsPerDay || 1}
 - Max Users Per Competition: ${gmConfig.maxUsersPerCompetition || 30}`
     : "- Competition Creation: DISABLED (Referral-Only Package)"
 }
-- Can Earn From Challenges: ${canEarnFromChallenges ? `Yes (${gmConfig.challengeReferralFeePercentage || gmConfig.referralFeePercentage || 5}%)` : "No"}
+- Can Earn From Challenges: ${canEarnFromChallenges ? `Yes (${gmConfig.challengeReferralFeePercentage ?? gmConfig.referralFeePercentage ?? 5}%)` : "No"}
 
 Create content that:
 1. ${canCreateCompetitions ? "Highlights both competition hosting AND referral earning potential" : "Focuses ENTIRELY on passive referral income - DO NOT mention hosting competitions"}

@@ -51,7 +51,8 @@ not itself the revenue event.
 | **Attribution** | `userreferrals` where `isActive: true`, falling back to `user.referredByGameMasterId` |
 | **Formula** | `referred_player_count x entryFee x (feePercentage / 100)` |
 | **Percentage of** | The **entry fee** - not the platform fee, not the prize pool |
-| **Percentage source** | Live from `marketplaceitems.gameMasterConfig.referralFeePercentage`, falling back to `subscription.limits.referralFeePercentage` (default 5) |
+| **Percentage source** | Live from `marketplaceitems.gameMasterConfig.referralFeePercentage`, falling back to `subscription.limits.referralFeePercentage` (default 5). **The fallback is reached only when the package has been deleted or the subscription carries no `packageId`** - the live read is the normal path, and getting that distinction wrong is what made R31's original wording point at the wrong branch |
+| **A configured 0% means 0%** | Since **5 Sep 2026** (R31). The fallback used `\|\| 5`, and six routes stored a 0% package as 5%. Both now resolve with a finite-number check, and `lib/services/gamemaster/subscription-limits.ts` is the single writer of the cached limits shape |
 | **Hard cap** | Total Game Master earnings **may never exceed the gross platform fee**. Payments are scaled down proportionally if they would. Lines 1228-1245 |
 | **If inactive or paused** | No payment. The platform keeps the share, recorded as `retained_gm_fee` on the platform ledger |
 | **Ledger entries** | `gamemaster_earning` for competitions, `gamemaster_challenge_referral` for challenges |
