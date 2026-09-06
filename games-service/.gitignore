@@ -1,0 +1,13 @@
+# Build output. `tsc` emits here, and committing emitted JavaScript beside its TypeScript is how
+# this repository once made every model unimportable in tests - a stale `.js` that the test runner
+# resolved in preference to the `.ts`.
+dist/
+
+# Probe harness logs. Written by tools/probe-*.ps1 through a redirect, because the harness reports
+# through Write-Host and a filtered pipeline shows nothing while the probes run normally.
+tools/.probe-*.log
+tools/.probe-*.err
+
+# Local secrets. The service refuses to boot without them, so there will be a file like this.
+.env
+.env.local

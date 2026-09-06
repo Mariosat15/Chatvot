@@ -67,6 +67,19 @@ function Invoke-Probe {
     [int]$MaxRed = 2
   )
 
+  # The suite is checked before anything is patched, because a probe pointed at a file that is not
+  # a test suite reports GREEN - the expected test cannot fail if it never ran - and GREEN is the
+  # outcome that reads as a broken guard. This is not hypothetical: `$PLAY` and `$play` are the
+  # SAME variable in PowerShell, which is case-insensitive, so a suite variable and a source-file
+  # variable differing only in case silently became one and twelve probes ran `src/rounds/play.ts`
+  # as their test suite. It printed nothing and exited 0.
+  if (-not (Test-Path -LiteralPath $Suite)) {
+    throw "Invoke-Probe: suite '$Suite' does not exist"
+  }
+  if ((Split-Path -Leaf $Suite) -notlike 'test-*.ts') {
+    throw "Invoke-Probe: '$Suite' is not a test suite - check for a case-insensitive variable collision"
+  }
+
   $original = Read-Source $File
   $pattern = To-Pattern $Find
   $patched = [regex]::Replace($original, $pattern, [System.Text.RegularExpressions.MatchEvaluator] { param($m) $Replace }, 1)
@@ -85,10 +98,21 @@ function Invoke-Probe {
     $redTests = @($lines | Where-Object { $_ -like 'FAIL *' } | ForEach-Object { $_.Substring(5).Trim() })
     $expected = ($ExpectRed -replace '\s+', ' ').Trim()
     $hitExpected = $redTests -contains $expected
-    $summary = ($lines | Where-Object { $_ -match '^\d+ passed, \d+ failed$' } | Select-Object -Last 1)
+    # Unanchored at the front on purpose: the API and play suites label their totals
+    # ("API tests: 40 passed, 0 failed"), and an anchored pattern silently logged nothing.
+    $summary = ($lines | Where-Object { $_ -match '\d+ passed, \d+ failed$' } | Select-Object -Last 1)
   }
   finally {
     Write-Source $File $original
+  }
+
+  # No summary line at all means the suite did not run to completion - it crashed on import, or it
+  # was never a suite. Reporting that as GREEN blames the guard for a harness fault, which is the
+  # one thing this file exists to prevent.
+  if (-not $summary) {
+    Write-Host "  ??    $Name" -ForegroundColor Yellow
+    Write-Host "        SUITE PRODUCED NO SUMMARY - it did not run. This result means nothing." -ForegroundColor Yellow
+    return [pscustomobject]@{ Name = $Name; Outcome = 'DID-NOT-APPLY' }
   }
 
   if ($hitExpected -and $redTests.Count -le $MaxRed) {
