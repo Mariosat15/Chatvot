@@ -401,7 +401,9 @@ Remember the mirror: every model touched here exists twice.
 
 ### E6 - Player UI and rewards
 
-- [ ] Contest browse and lobby, showing game thumbnails and rules
+- [~] Contest browse and lobby, showing game thumbnails and rules - **the lobby is built and
+  themed** (6 Sep 2026, `13` s4.1b and s4.1c); **browse is not**, and neither is a rules surface a
+  game can fill
 - [x] **`/competitions/[id]/play` iframe host, with origin checks and a strict message allowlist** (5 Sep 2026, `13` s1.1a)
 - [ ] Live leaderboard during play
 - [x] **Result screen with the generic `scoreBreakdown` renderer** (5 Sep 2026, `13` s1.1a)
@@ -425,6 +427,16 @@ meant either renaming a live URL or keeping two play routes for ever.
 contest can now start a round, play it, and see a confirmed result, by clicking. What they cannot
 yet do is *find* the contest by game - `/competitions` is still the trading-shaped list, so a
 provider contest is discovered there among trading ones with no thumbnail and no rules summary.
+
+**The lobby is the half of that first bullet which IS built**, since 6 September 2026: a provider
+contest gets its own lobby (`13` s4.1b) wearing the trading lobby's exact chrome (`13` s4.1c). The
+bullet stays unfinished rather than ticked because the other two things it asks for are genuinely
+absent - **browsing by game**, and **thumbnails and a rules summary**. The second is not styling:
+`provider_game` carries no rules content a lobby could render, and the trading lobby's rules
+accordion is entirely trading material, so there is nothing to put in the panel the supplied
+mock-up draws. **A half-built bullet ticked is how a plan starts lying about itself**, which is the
+same reason the `exclude` refund was tracked as outstanding in four places while nothing consumed
+`blocksSettlement` at all.
 
 **Three things the play screen deliberately does not do, stated so no summary reads it as
 finished.** There is no live leaderboard during play, so a player sees their standing only when

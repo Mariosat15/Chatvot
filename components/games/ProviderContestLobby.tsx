@@ -1,18 +1,20 @@
 import Link from "next/link";
-import {
-  ArrowLeft,
-  Clock,
-  Coins,
-  Gamepad2,
-  Info,
-  RotateCcw,
-  Trophy,
-  Users,
-} from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { GameIcon } from "@/components/ui/GameIcon";
 import { connectToDatabase } from "@/database/mongoose";
 import ProviderGame from "@/database/models/games/provider-game.model";
 import CompetitionEntryButton from "@/components/trading/CompetitionEntryButton";
+import UTCClock from "@/components/trading/UTCClock";
+import InlineCountdown from "@/components/trading/InlineCountdown";
 import ProviderLeaderboard from "@/components/games/ProviderLeaderboard";
+import {
+  HeroFigure,
+  PanelNote,
+  PanelRow,
+  SidePanel,
+  StatusBadge,
+} from "@/components/games/lobby-ui";
 import { getPlayState } from "@/lib/services/games/round-status.service";
 import { isProviderContest } from "@/lib/services/games/contest-config";
 
@@ -39,6 +41,16 @@ import { isProviderContest } from "@/lib/services/games/contest-config";
  * three and a lobby that stays silent generates support tickets: when the play window opens and
  * closes, how many attempts are left, and what happens if a round never finishes. The third is
  * the one nobody thinks to show and the one that costs money when it happens.
+ *
+ * THE CHROME IS THE TRADING LOBBY'S, DELIBERATELY AND EXACTLY (owner requirement, 6 Sep 2026).
+ * Same page shell, same back-button-and-UTC-clock header, same gradient hero with a watermark
+ * icon behind it, same uppercase hero figures, same two-thirds/one-third grid, same panel
+ * shells, same 3D `GameIcon` set. The first version of this screen was correct and looked like
+ * a different application - flat lucide glyphs, a narrower container, small plain headings -
+ * and a player reaching it from the same competitions list reads that as a different site
+ * rather than as a different game. What is emphatically NOT shared is the content: no capital,
+ * no margin, no leverage, no asset classes, no profit and loss, no trade counts. `05` section
+ * 10 makes that binding rather than stylistic.
  */
 
 interface ProviderContestLobbyProps {
@@ -106,8 +118,8 @@ export default async function ProviderContestLobby({
   */
   /*
     `displayName` and `scoreType`, both of which `provider-game.model.ts` really declares. The
-    first draft of this read `tagline` as well - a field the model does NOT have, which would have
-    rendered nothing for ever while looking entirely correct. Sixth instance of the class, after
+    first draft of this read a third field the model does NOT have, which would have rendered
+    nothing for ever while looking entirely correct. Sixth instance of the class, after
     `billsPerRound` on the pre-flight checklist, `publishedAt` on the publish update,
     `scoreDirection` on the participant, `suspensionEndsAt` on the restriction and `referenceId`
     on the wallet transaction: **an unverified field name is a claim, not a fact**, and a
@@ -165,188 +177,249 @@ export default async function ProviderContestLobby({
   */
   const scoreLabel = title?.scoreType === "duration_ms" ? "Time" : "Score";
 
+  const status = String(competition.status ?? "");
+  const isActive = status === "active";
+  const isCompleted = status === "completed";
+  const isCancelled = status === "cancelled";
+
+  /*
+    The fourth hero figure is a countdown on a running or upcoming contest and a word on a
+    finished one, which is what the trading lobby does. `InlineCountdown` is reused rather than
+    reimplemented: a game lobby that formats "2d 4h" differently from the trading lobby is the
+    same inconsistency as a different card radius, and it would also be a second place for the
+    "Started"/"Ended" wording to drift.
+  */
+  const countdownTarget = isActive ? competition.endTime : competition.startTime;
+
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
-      <Link
-        href="/competitions"
-        className="mb-6 inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-200"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        All competitions
-      </Link>
-
-      <div className="mb-6">
-        <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1">
-          <Gamepad2 className="h-3.5 w-3.5 text-blue-300" />
-          <span className="text-xs font-medium text-blue-200">{gameName}</span>
+    <div className="flex min-h-screen flex-col gap-4 sm:gap-6 p-3 sm:p-4 md:p-8 overflow-x-hidden">
+      <div className="flex items-center justify-between flex-wrap gap-2 sm:gap-4">
+        <Link href="/competitions">
+          <Button
+            variant="ghost"
+            className="w-fit gap-2 text-gray-400 hover:text-gray-100 min-h-[44px]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Back to Competitions</span>
+            <span className="sm:hidden">Back</span>
+          </Button>
+        </Link>
+        <div className="hidden sm:block">
+          <UTCClock />
         </div>
-        <h1 className="text-2xl font-semibold text-white">{competition.name}</h1>
-        {competition.description && (
-          <p className="mt-2 max-w-2xl text-sm text-gray-400">
-            {competition.description}
-          </p>
-        )}
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Fact
-          icon={<Trophy className="h-4 w-4 text-amber-300" />}
-          label="Prize pool"
-          value={`${currencySymbol}${(competition.prizePool ?? 0).toLocaleString()}`}
-        />
-        <Fact
-          icon={<Coins className="h-4 w-4 text-emerald-300" />}
-          label="Entry fee"
-          value={
-            competition.entryFee
-              ? `${currencySymbol}${competition.entryFee.toLocaleString()}`
-              : "Free"
-          }
-        />
-        <Fact
-          icon={<Users className="h-4 w-4 text-sky-300" />}
-          label="Players"
-          value={`${competition.currentParticipants ?? 0} / ${competition.maxParticipants ?? 0}`}
-        />
-        {/*
-          The score, not PnL. A puzzle has no profit and loss, and `05` section 10 makes this a
-          binding rule rather than a style point: every figure is either generalised across
-          games or explicitly scoped to one. There is no third option, and the failure mode of
-          getting it wrong is not a crash - a trading-only figure keeps computing and keeps
-          rendering.
-        */}
-        <Fact
-          icon={<Gamepad2 className="h-4 w-4 text-violet-300" />}
-          label="Your score"
-          value={state ? state.participantScore.toLocaleString() : "-"}
-        />
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <div className="space-y-4">
-          <ProviderLeaderboard
-            rows={leaderboard}
-            currentUserId={userId}
-            scoreLabel={scoreLabel}
-          />
+      {/* Hero - the trading lobby's header, with a joystick watermark instead of a trophy */}
+      <div className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-yellow-500/20 via-gray-800 to-gray-900 p-4 sm:p-6 md:p-8 shadow-xl border border-yellow-500/20">
+        <div className="absolute top-0 right-0 opacity-10">
+          <GameIcon name="joystick1" size={192} />
         </div>
 
-        <div className="space-y-4">
-          <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
-            <CompetitionEntryButton
-              competition={competition}
-              userBalance={walletBalance}
-              isUserIn={isUserIn}
-              isFull={isFull}
-              participantStatus={participantStatus}
-              registrationClosed={registrationClosed}
+        <div className="relative z-10">
+          <StatusBadge status={status} />
+
+          {/*
+            The game's identity, from the catalogue. A pill rather than a line of text because
+            the contest name is the h1 and the game is the category it belongs to - the same
+            relationship the admin competitions list draws with its game badge.
+          */}
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1">
+            <GameIcon name="joystick1" size={14} />
+            <span className="text-xs font-semibold text-violet-200">
+              {gameName}
+            </span>
+          </div>
+
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-100 mb-2">
+            {competition.name}
+          </h1>
+          {competition.description && (
+            <p className="text-gray-400 mb-6 max-w-2xl">
+              {competition.description}
+            </p>
+          )}
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+            <HeroFigure
+              label="Prize Pool"
+              tone="prize"
+              value={`${currencySymbol}${(competition.prizePool ?? 0).toLocaleString()}`}
             />
-
+            <HeroFigure
+              label="Entry Fee"
+              value={
+                competition.entryFee
+                  ? `${currencySymbol}${competition.entryFee.toLocaleString()}`
+                  : "Free"
+              }
+            />
+            <HeroFigure
+              label="Players"
+              value={`${competition.currentParticipants ?? 0}/${competition.maxParticipants ?? 0}`}
+              note={
+                status === "upcoming" && competition.minParticipants > 0 ? (
+                  <p
+                    className={`text-xs mt-1 ${
+                      (competition.currentParticipants ?? 0) <
+                      competition.minParticipants
+                        ? "text-orange-400"
+                        : "text-green-400"
+                    }`}
+                  >
+                    Min: {competition.minParticipants}
+                    {(competition.currentParticipants ?? 0) <
+                    competition.minParticipants
+                      ? " (need more!)"
+                      : " ✓"}
+                  </p>
+                ) : undefined
+              }
+            />
             {/*
-              A control that cannot work must refuse with its reason rather than be quietly
-              disabled - third instance of the rule, after a provider enabled with no adapter and
-              the Edit button withheld from a provider contest. A greyed-out button teaches the
-              player nothing and sends them to support; this at least tells an operator what is
-              missing.
+              The score, not PnL. A puzzle has no profit and loss, and `05` section 10 makes this
+              a binding rule rather than a style point: every figure is either generalised across
+              games or explicitly scoped to one. There is no third option, and the failure mode of
+              getting it wrong is not a crash - a trading-only figure keeps computing and keeps
+              rendering.
+
+              A dash, never a zero, for a player with no scored round. Same read-side rule as the
+              leaderboard cell and the dashboard card: an absent score and a score of nothing are
+              different facts, and conflating them is what made every provider participant tie.
             */}
-            {isUserIn && !canLaunch && (
-              <p className="mt-3 text-xs text-amber-300">
+            {isUserIn ? (
+              <HeroFigure
+                label="Your Score"
+                value={state ? state.participantScore.toLocaleString() : "-"}
+              />
+            ) : (
+              <HeroFigure
+                label={
+                  isCancelled
+                    ? "Status"
+                    : isActive
+                      ? "Time Remaining"
+                      : isCompleted
+                        ? "Status"
+                        : "Starts In"
+                }
+                tone={isCancelled ? "cancelled" : isActive ? "live" : "neutral"}
+                value={
+                  isCancelled ? (
+                    "Cancelled"
+                  ) : isCompleted ? (
+                    "Completed"
+                  ) : countdownTarget ? (
+                    <InlineCountdown
+                      targetDate={new Date(countdownTarget).toISOString()}
+                      type={isActive ? "end" : "start"}
+                    />
+                  ) : (
+                    "-"
+                  )
+                }
+              />
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          {/* The trading lobby's leaderboard shell, with a score board inside it */}
+          <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4 sm:p-6">
+            <div className="flex items-center gap-2 mb-4 sm:mb-6 flex-wrap">
+              <GameIcon name="trophy" size={20} />
+              <h2 className="text-lg sm:text-xl font-bold text-gray-100">
+                Leaderboard
+              </h2>
+              {/*
+                "players", never "traders". The trading lobby's identical pill says traders, and
+                copying it wholesale is the trading-shaped-label problem in the one place a
+                player is certain to read.
+              */}
+              <span className="px-2 py-0.5 rounded-full bg-gray-700 text-gray-300 text-xs font-medium">
+                {leaderboard.length} players
+              </span>
+            </div>
+            <ProviderLeaderboard
+              rows={leaderboard}
+              currentUserId={userId}
+              scoreLabel={scoreLabel}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <CompetitionEntryButton
+            competition={competition}
+            userBalance={walletBalance}
+            isUserIn={isUserIn}
+            isFull={isFull}
+            participantStatus={participantStatus}
+            registrationClosed={registrationClosed}
+          />
+
+          {/*
+            A control that cannot work must refuse with its reason rather than be quietly
+            disabled - third instance of the rule, after a provider enabled with no adapter and
+            the Edit button withheld from a provider contest. A greyed-out button teaches the
+            player nothing and sends them to support; this at least tells an operator what is
+            missing.
+          */}
+          {isUserIn && !canLaunch && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <GameIcon name="warning" size={16} className="mt-0.5 shrink-0" />
+              <p className="text-xs text-amber-300">
                 This competition is missing the game details needed to start a
                 round. Nothing has been charged for an attempt. Please contact
                 support.
               </p>
-            )}
-          </div>
+            </div>
+          )}
 
           {(playWindowStart || playWindowEnd) && (
-            <Panel icon={<Clock className="h-4 w-4 text-gray-400" />} title="Play window">
-              {playWindowStart && <Line label="Opens" value={playWindowStart} />}
-              {playWindowEnd && <Line label="Closes" value={playWindowEnd} />}
-              <p className="mt-2 text-xs text-gray-500">
+            <SidePanel icon="timer" title="Play window" accent="sky">
+              <div className="space-y-2">
+                {playWindowStart && (
+                  <PanelRow label="Opens" value={playWindowStart} />
+                )}
+                {playWindowEnd && (
+                  <PanelRow label="Closes" value={playWindowEnd} />
+                )}
+              </div>
+              <PanelNote>
                 The play window can be narrower than the competition itself, so
                 check both.
-              </p>
-            </Panel>
+              </PanelNote>
+            </SidePanel>
           )}
 
           {state && (
-            <Panel
-              icon={<RotateCcw className="h-4 w-4 text-gray-400" />}
-              title="Your attempts"
-            >
-              <Line
+            <SidePanel icon="target" title="Your attempts" accent="violet">
+              <PanelRow
                 label="Remaining"
+                emphasis
                 value={`${state.attemptsRemaining} of ${state.attemptsPermitted}`}
               />
-              {attemptsCopy && (
-                <p className="mt-2 text-xs text-gray-500">{attemptsCopy}</p>
-              )}
-              <p className="mt-2 text-xs text-gray-500">
+              {attemptsCopy && <PanelNote>{attemptsCopy}</PanelNote>}
+              <PanelNote>
                 An attempt is used the moment a round opens, even if you leave
                 before finishing.
-              </p>
-            </Panel>
+              </PanelNote>
+            </SidePanel>
           )}
 
           {unresolvedCopy && (
-            <Panel
-              icon={<Info className="h-4 w-4 text-gray-400" />}
+            <SidePanel
+              icon="guideBook"
               title="If a round does not finish"
+              accent="amber"
             >
-              <p className="text-xs text-gray-400">{unresolvedCopy}</p>
-            </Panel>
+              <PanelNote>{unresolvedCopy}</PanelNote>
+            </SidePanel>
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function Fact({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-3">
-      <div className="mb-1 flex items-center gap-2">
-        {icon}
-        <span className="text-xs text-gray-500">{label}</span>
-      </div>
-      <p className="text-sm font-semibold text-white">{value}</p>
-    </div>
-  );
-}
-
-function Panel({
-  icon,
-  title,
-  children,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4">
-      <div className="mb-2 flex items-center gap-2">
-        {icon}
-        <h2 className="text-sm font-medium text-gray-200">{title}</h2>
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function Line({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 text-xs">
-      <span className="text-gray-500">{label}</span>
-      <span className="text-gray-300">{value}</span>
     </div>
   );
 }

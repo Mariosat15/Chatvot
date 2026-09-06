@@ -14,7 +14,7 @@
 | | |
 |---|---|
 | **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done - all five of its admin destinations now exist (provider health, 6 Sep 2026), but analytics by provider and the Game Master creation API do not.** A provider contest can be created, **published from the admin screen** (5 Sep 2026), entered, played and paid - and since 5 Sep 2026 it is paid **correctly**, which it was not before: two P0 defects meant every player tied on a score of zero and split the pool equally, and a lower-is-better game ranked backwards. A stuck round can now be **inspected and ended by an operator** (5 Sep 2026). **The whole lifecycle is now reachable by clicking** - the player round launch screen landed 5 Sep 2026 at `/competitions/[id]/play`, which also fixed a live defect: a provider-contest player was being sent to the forex trading workspace by a button labelled "Start Trading". **No provider selected**, which is what X4 needs |
-| **Player screens** | **R37 closed 6 Sep 2026, and it is the one to read first if a provider board looks odd.** Neither app's `getCompetitionLeaderboard` passed `score` or `scoreDirection` to the ranking engine, so **every provider participant tied on zero and the board rendered in tie-break order** - and a lower-is-better title was *reversed on screen while correct at settlement*, so a player could lead all week and be paid last. **Latent for money, live for players:** settlement resolves both fields itself, so no payout was ever wrong and **nothing was backfilled**. Fixed by moving `resolveScoreDirection` out of settlement into a shared mirrored module used by all three consumers. Same day, `RoundPreflight` stopped offering an enabled **Play** button on a contest that had not started, and **the lobby became game-aware** - `app/(root)/competitions/[id]/page.tsx` now branches to `ProviderContestLobby`, which shows the play window, attempts remaining and what happens if a round never finishes, with a score leaderboard instead of one whose columns are profit and loss. The trading path below the branch is **byte-identical**. Also 6 Sep 2026, **the dashboard contest cards became game-aware** (`13` s5.1a) - and the load-bearing part is that **the plan named the wrong components**: `ActiveCompetitionCard` and `CompetitionsTable` are both orphaned, and the live one is `ContestsSidebar`, which no chapter mentioned. Fixing only what the plan named would have closed the item with the defect still on screen. See `13` s4.1a and s5.1a for exactly what is and is not built - **the trading panels, the per-game summary cards and the mega-action split are still outstanding** |
+| **Player screens** | **R37 closed 6 Sep 2026, and it is the one to read first if a provider board looks odd.** Neither app's `getCompetitionLeaderboard` passed `score` or `scoreDirection` to the ranking engine, so **every provider participant tied on zero and the board rendered in tie-break order** - and a lower-is-better title was *reversed on screen while correct at settlement*, so a player could lead all week and be paid last. **Latent for money, live for players:** settlement resolves both fields itself, so no payout was ever wrong and **nothing was backfilled**. Fixed by moving `resolveScoreDirection` out of settlement into a shared mirrored module used by all three consumers. Same day, `RoundPreflight` stopped offering an enabled **Play** button on a contest that had not started, and **the lobby became game-aware** - `app/(root)/competitions/[id]/page.tsx` now branches to `ProviderContestLobby`, which shows the play window, attempts remaining and what happens if a round never finishes, with a score leaderboard instead of one whose columns are profit and loss. The trading path below the branch is **byte-identical**. Also 6 Sep 2026, **the dashboard contest cards became game-aware** (`13` s5.1a) - and the load-bearing part is that **the plan named the wrong components**: `ActiveCompetitionCard` and `CompetitionsTable` are both orphaned, and the live one is `ContestsSidebar`, which no chapter mentioned. Fixing only what the plan named would have closed the item with the defect still on screen. See `13` s4.1a and s5.1a for exactly what is and is not built - **the trading panels, the per-game summary cards and the mega-action split are still outstanding**. Finally, on **owner instruction 6 Sep 2026, the game lobby was restyled to wear the trading lobby's exact chrome** (`13` s4.1c) - the lobby built that morning was correct and *looked like a different application*, which on a platform taking entry fees is a trust problem rather than a taste one. It shares the page shell, hero gradient, hero typography, grid, panel shells and 3D icon set, and **still shares none of the trading content**. Pinned by tests that read **both** lobbies and compare them, so restyling the trading page turns them red rather than letting the two drift apart. **Not verified by eye** - the automated browser has no session, so this is proven by comparison against the trading lobby's own source and by the suite, not by a screenshot |
 | **Next action** | **Technically: finish X4a** - pull and rebuild on the server, start `chartvolt-games`, register it through the admin screens, and drive one round end to end. **No DNS, nginx or certificate work is needed** since the play surface is proxied through the platform app (owner's choice, 6 Sep 2026). The game is **playable by a human in a browser**, **R34 is closed**, and the service is now **deployable** - PM2 entry, nginx block, `env.example` and a runbook in `deploy/README.md` (all 6 Sep 2026) - so nothing technical stands between the two halves. **Owner decided 6 Sep 2026 to deploy first and rehearse against the live site**, rather than complete the local rehearsal. Provider **health** - the last of X6's five admin destinations - **shipped 6 Sep 2026** (`12` s4.2b), so what remains of the player surface is the trading panels themselves and the per-game summary cards. **Commercially, in parallel: find and assess a provider using `08`** - X4 cannot start without one, and nothing in the programme is blocked on that search |
 | **Money defects closed** | **R26 closed 5 Sep 2026** - the admin cron's finalize copy paid **no** Game Master earnings and recorded no `retained_gm_fee` either, so the commission silently stayed with the platform. This one was **actively losing money rather than latent**: both apps run `checkAndFinalizeCompetitions` on an every-minute cron, so payment depended on which cron won the race. **Not retroactive - no backfill**, and past contests cannot be found by querying for retained rows because none were written. Also **R31** (a 0% Game Master rate paid 5%) and the two P0 score defects, same day |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
@@ -629,6 +629,85 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 6 Sep 2026 - `13` s4.1c - THE GAME LOBBY NOW WEARS THE TRADING LOBBY'S THEME
+
+**Shipped:** `components/games/lobby-ui.tsx` (`HeroFigure`, `SidePanel`, `PanelRow`, `PanelNote`,
+`StatusBadge`), with `ProviderContestLobby.tsx` and `ProviderLeaderboard.tsx` rebuilt on it. The
+game lobby now uses the trading lobby's page shell, its back-button-and-UTC-clock header, its
+gradient hero with a watermark icon, its uppercase hero figures, its two-thirds/one-third grid,
+its panel shells, its 3D `GameIcon` set, its rank medals and its tinted leaderboard rows -
+**and still no capital, margin, leverage, asset classes, profit and loss or trade counts.** The
+two owner-supplied reference images are committed to
+`External game plans/design-reference/`. 12 new tests (**55** in
+`provider-play-ui.test.ts`, up from 43), `tools/probe-lobby-theme.ps1` with **15 probes, all red
+on the expected test with a blast radius of exactly 1**. Full suite 966 green, typecheck at the
+15-error baseline, lint clean.
+
+**Why it was worth a slice of its own.** The lobby built earlier the same day was *correct*: it
+answered all three of `13` s4's questions and showed no trading figure. It also looked like a
+different website, because it was written with flat lucide glyphs, its own container width and
+its own card shells. A player reaches both lobbies from the same `/competitions` list, one click
+apart, so that difference is not read as *a different game* - it is read as *a different site*,
+and on a platform taking entry fees that is trust rather than taste. **It is the mirror image of
+the defect the lobby branch exists for:** that one stopped a game contest wearing trading
+*content*, this one stops it wearing a stranger's *chrome*.
+
+**Five things that generalise:**
+
+- **A consistency guard must COMPARE the two screens, never snapshot one of them.** Seven
+  `it.each` cases read the trading page *and* the game lobby and assert the same class string is
+  in both. Hard-coding today's design would have passed for ever while the trading lobby was
+  restyled and the two drifted apart - the exact failure the guard exists to catch. **The
+  paired-document drift rule, applied to code**, and note it runs in the direction nobody checks:
+  changing the *trading* page is what turns it red.
+- **Sharing chrome must not become sharing code.** `lobby-ui.tsx` is deliberately **not** an
+  abstraction over the trading lobby; the trading page keeps its own copies of every class string
+  and stays byte-identical. Refactoring it to import from here is the tidy-looking option and it
+  destroys the only thing that makes the trading lobby's behaviour evidence that nothing moved -
+  the same trade that kept a known one-character fee defect verbatim during the settlement
+  extraction. A future reader will see the duplication and want to fix it; the reason not to is in
+  the file.
+- **When the instruction and the mock-up disagree, the instruction wins and the difference gets
+  recorded.** The supplied style sheet is violet; the trading lobby is gold. A violet hero would
+  have been mock-accurate and inconsistent, which is what the owner asked *against*. The game
+  identity is carried by a joystick watermark and a violet catalogue-name pill instead, and the
+  mock's own not-built items - per-game hero artwork, the four stat cards as bordered tiles, the
+  footer help strip - are named in `13` s4.1c so a summary cannot round them up to done.
+- **Copying a shell copies its labels, and one of them was wrong.** The trading leaderboard's
+  count pill says "traders". Lifted wholesale it would have said that on a puzzle contest, in the
+  one place on the page a player is certain to read. Same class as the trading-shaped services in
+  `matchmaking.service.ts`: **the label agrees with the old world and keeps agreeing after it
+  ends.** A test pins "players" and forbids "traders".
+- **A partial Tailwind class built by interpolation fails as a broken CSS build, not as a bug.**
+  `border-${accent}-500/30` names a class that exists in the TypeScript and in no stylesheet, so
+  the panel renders completely unstyled and the next reader goes looking at the build. The accent
+  is a lookup, and a test forbids any `(bg|text|border|from|to|via)-${` in either file. It is a
+  `Map` rather than an object for the reason the round-resolution action list is one - object
+  indexing walks the prototype chain, and **safe by accident is not safe** - which is also what
+  the `security/detect-object-injection` warning was right to refuse to distinguish.
+
+**A typing lesson, small but exactly the shape that survives review.** `HeroFigure.value` was
+first typed `string`, which forced the live countdown in through a second `note` slot - putting
+the figure in the footnote's position and the footnote in the figure's, then overriding both
+class strings to make the output look right. It rendered correctly and would have broken on the
+next edit. **When a prop has to be smuggled in through a slot meant for something else, the type
+is wrong, not the caller.**
+
+**Owner tested:** no. **This was not verified by eye** - the automated browser has no session and
+the page is behind sign-in, so the evidence is the comparison against the trading lobby's own
+source plus the suite. Owner review is the remaining step, at `/competitions/<id>` on a provider
+contest.
+
+**Deferred:** the mock's hero artwork per game, its stat cards as bordered tiles, and its footer
+help strip with a **View Rules** button. The last is real outstanding work rather than styling: a
+provider title has no rules surface yet, and the trading lobby's rules accordion is entirely
+trading content.
+
+**Next chat should:** finish X4a - deploy `games-service` to the server, register ChartVolt Games
+through the admin screens and drive one round end to end by clicking.
 
 ---
 

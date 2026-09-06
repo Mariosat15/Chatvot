@@ -40,6 +40,7 @@ const ROUNDS_ROUTE = "app/api/competitions/[id]/rounds/route.ts";
 const LOBBY_PAGE = "app/(root)/competitions/[id]/page.tsx";
 const PROVIDER_LOBBY = "components/games/ProviderContestLobby.tsx";
 const PROVIDER_BOARD = "components/games/ProviderLeaderboard.tsx";
+const LOBBY_UI = "components/games/lobby-ui.tsx";
 
 describe("a page load never consumes an attempt", () => {
   /**
@@ -514,6 +515,121 @@ describe("the provider leaderboard shows a score and nothing it does not have", 
     // which is precisely the defect R37 closed.
     expect(code).not.toMatch(/scoreDirection/);
     expect(code).not.toMatch(/\.sort\(/);
+  });
+});
+
+/**
+ * THE GAME LOBBY AND THE TRADING LOBBY MUST LOOK LIKE ONE PRODUCT (owner requirement, 6 Sep
+ * 2026), while sharing none of the trading content.
+ *
+ * These are the strongest tests in this file, and they are worth explaining. Every other
+ * assertion here reads one file and checks it against a rule written in a comment. **These read
+ * BOTH lobbies and compare them to each other**, so the guard survives the trading lobby being
+ * restyled: change the hero gradient on the trading page and these go red, pointing at the game
+ * lobby that has to follow. A test that hard-coded the class string instead would stay green
+ * while the two screens drifted apart, which is the failure it exists to catch.
+ *
+ * The reason it matters more than it sounds: a player reaches both screens from the same
+ * competitions list. A different corner radius, border tone or heading size is read as a
+ * different website, not as a different game. The first version of this lobby was functionally
+ * correct - it answered all three of `13` s4's questions - and looked like a separate
+ * application, because it was written with flat icons and its own spacing.
+ */
+describe("the game lobby wears the trading lobby's theme", () => {
+  /** The class strings whose being IDENTICAL in both files is the whole property. */
+  const SHARED_CHROME = [
+    // The page shell: same padding ramp, same overflow guard, same gap.
+    "flex min-h-screen flex-col gap-4 sm:gap-6 p-3 sm:p-4 md:p-8 overflow-x-hidden",
+    // The hero: gradient, radius ramp, shadow and tinted border.
+    "relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-yellow-500/20 via-gray-800 to-gray-900 p-4 sm:p-6 md:p-8 shadow-xl border border-yellow-500/20",
+    // The two-column split and the leaderboard panel it sits in.
+    "grid grid-cols-1 lg:grid-cols-3 gap-6",
+    "rounded-xl bg-gray-800/50 border border-gray-700 p-4 sm:p-6",
+    // The hero figure's label and value typography.
+    "text-[11px] sm:text-xs text-gray-500 uppercase tracking-wider",
+    "text-xl sm:text-2xl md:text-3xl font-bold",
+    // The h1.
+    "text-2xl sm:text-3xl md:text-4xl font-bold text-gray-100 mb-2",
+  ];
+
+  it.each(SHARED_CHROME)("uses the trading lobby's own class string: %s", (chrome) => {
+    const trading = readCode(LOBBY_PAGE);
+    const game = readCode(PROVIDER_LOBBY) + readCode(LOBBY_UI);
+
+    // Asserting it is in the trading page too is not redundant - it is what makes this a
+    // comparison rather than a hard-coded snapshot of today's design.
+    expect(trading).toContain(chrome);
+    expect(game).toContain(chrome);
+  });
+
+  it("heads its panels with the same 3D icon set, not flat glyphs", () => {
+    const lobby = readCode(PROVIDER_LOBBY);
+    const ui = readCode(LOBBY_UI);
+    const board = readCode(PROVIDER_BOARD);
+
+    // The trading lobby heads every panel with `GameIcon`. Mixing lucide line icons into the
+    // same column is the single most visible way two screens stop looking like one product.
+    expect(ui).toMatch(/<GameIcon\s+name=\{icon\}/);
+    expect(board).toMatch(/<RankIcon rank=\{row\.currentRank\}/);
+
+    // ArrowLeft is the one exception, because the trading lobby's back button uses it too.
+    const lucide = lobby.match(/from "lucide-react"/g) ?? [];
+    expect(lucide.length).toBeLessThanOrEqual(1);
+    for (const flat of ["<Clock", "<Trophy", "<Users", "<Coins", "<Info", "<Medal"]) {
+      expect(lobby).not.toContain(flat);
+      expect(board).not.toContain(flat);
+    }
+  });
+
+  it("reuses the trading lobby's time components instead of formatting time itself", () => {
+    const code = readCode(PROVIDER_LOBBY);
+
+    // A game lobby that renders "2d 4h" differently from the trading lobby is the same
+    // inconsistency as a different card radius - and it would be a second place for the
+    // "Started"/"Ended" wording to drift.
+    expect(code).toMatch(/<UTCClock\s*\/>/);
+    expect(code).toMatch(/<InlineCountdown[\s\S]{0,200}targetDate=/);
+    expect(code).not.toMatch(/1000 \* 60 \* 60/);
+  });
+
+  it("says players, never traders", () => {
+    const code = readCode(PROVIDER_LOBBY);
+
+    // The trading lobby's identical count pill says "traders". Copying it wholesale is the
+    // trading-shaped-label problem in the one place on the page a player is certain to read.
+    expect(code).toMatch(/leaderboard\.length\}\s*players/);
+    expect(code).not.toMatch(/traders/);
+  });
+
+  it("builds no Tailwind class by interpolation", () => {
+    const ui = readCode(LOBBY_UI);
+    const lobby = readCode(PROVIDER_LOBBY);
+
+    // Tailwind compiles the classes it can SEE in the source, so `border-${accent}-500/30` is a
+    // class that exists in the TypeScript and in no stylesheet. It renders completely unstyled
+    // and reads as a broken CSS build rather than as a bug in this file - which is why the
+    // accent is a lookup table. Conditional whole class strings are fine; a partial is not.
+    for (const code of [ui, lobby]) {
+      expect(code).not.toMatch(/(bg|text|border|from|to|via)-\$\{/);
+    }
+  });
+
+  it("renders no trading panel from the trading lobby", () => {
+    const code = readCode(PROVIDER_LOBBY);
+
+    // The reason the lobby is a branch rather than a set of guards is that none of this belongs
+    // on a game screen. Sharing the chrome must not become sharing the content.
+    for (const panel of [
+      "CompetitionDashboard",
+      "CompetitionLeaderboard",
+      "getDifficultyData",
+      "riskSettings",
+      "marginCall",
+      "leverage",
+      "startingCapital",
+    ]) {
+      expect(code).not.toContain(panel);
+    }
   });
 });
 

@@ -284,6 +284,93 @@ tests, and the absence of a failure line read as "the guard did not fire". **A `
 matching no test is a fault in the probe, never in the code**, and all three harnesses now report
 it as `PROBE BROKEN` in its own colour rather than as a green.
 
+### 4.1c The theme pass - one product, two games (owner requirement, 6 September 2026)
+
+The lobby built in 4.1b was **correct and looked like a different application.** It answered all
+three of section 4's questions, showed no trading figure, and used flat lucide glyphs, its own
+narrower container, its own small plain headings and its own card shells. The owner's instruction
+is short and worth quoting as the acceptance criterion: *"make the games lobby identical like the
+trading lobby theme we need consistency, the game lobby however will not show any trading related
+content or stats but the theme must be the same."*
+
+**Why this is not a cosmetic ticket.** A player reaches both lobbies from the same
+`/competitions` list, one click apart. A different corner radius, border tone, heading size or
+icon style is not read as *a different game* - it is read as *a different website*, and on a
+platform that takes entry fees that is a trust problem rather than a taste problem. It is also
+the mirror image of the defect this whole chapter exists for: 4.1b stopped a game contest wearing
+trading **content**, and this stops it wearing a **stranger's chrome**.
+
+**What is shared, and what is emphatically not.** The chrome is shared: the page shell, the
+back-button-and-UTC-clock header, the gradient hero with an icon watermark behind it, the
+uppercase hero figures, the two-thirds/one-third grid, the panel shells, the 3D `GameIcon` set,
+the rank medals, the tinted row cards and the blue "You" chip. The content is not, and `05`
+section 10 makes that binding rather than stylistic: no capital, no margin, no leverage, no asset
+classes, no profit and loss, no trade counts.
+
+Five facts drift easily:
+
+- **The live code is `components/games/lobby-ui.tsx`** (`HeroFigure`, `SidePanel`, `PanelRow`,
+  `PanelNote`, `StatusBadge`), plus the rebuilt `ProviderContestLobby.tsx` and
+  `ProviderLeaderboard.tsx`. None of the three is mirrored, so `check:mirrors` says nothing about
+  any of them. Read those, not this prose.
+- **`lobby-ui.tsx` is NOT an abstraction over the trading lobby and must not become one.** The
+  trading page keeps its own copies of every class string and is still byte-identical.
+  Refactoring it to import from here would destroy the guarantee that makes the trading lobby's
+  behaviour trustworthy evidence that nothing moved - the same trade that kept a known
+  one-character fee defect verbatim during the settlement extraction. A document describing this
+  file as shared UI *between* the two lobbies is describing a change that has not happened and
+  should not.
+- **The consistency is pinned by tests that read BOTH lobbies and compare them**, not by
+  hard-coded class strings. Seven `it.each` cases assert the same string appears in the trading
+  page *and* in the game lobby, so restyling the trading hero turns them red and points at the
+  game lobby that has to follow. A snapshot of today's design would have stayed green while the
+  two screens drifted apart, which is the failure the guard exists for. **The paired-document
+  drift rule, applied to code.**
+- **The hero keeps trading's GOLD gradient**, with the game identity carried by a `joystick1`
+  watermark and a violet catalogue-name pill. The style sheet below is drawn in violet, and a
+  violet hero would have been the mock-accurate choice and the inconsistent one. Consistency was
+  the instruction; the mock is the future direction.
+- **The count pill says "players", never "traders".** The trading lobby's identical pill says
+  traders, and copying the shell wholesale is the trading-shaped-label problem in the one place
+  on the page a player is certain to read. Same class as `matchmaking.service.ts`: **the label
+  agrees with the old world and keeps agreeing after it ends.**
+
+**The accent lookup is a `Map`, and the comment beside it is load-bearing.** Tailwind compiles
+the classes it can *see* in the source, so `border-${accent}-500/30` names a class that exists in
+the TypeScript and in no stylesheet - the panel renders completely unstyled, which reads as a
+broken CSS build rather than as a bug in that file. A test asserts no partial class is ever built
+by interpolation. It is a `Map` rather than an object for the reason the round-resolution action
+list is one: object indexing walks the prototype chain, and *safe by accident is not safe*.
+
+`__tests__/games/provider-play-ui.test.ts` is now **55 tests**, up from 43, and
+`tools/probe-lobby-theme.ps1` is **15 probes, every one red on the expected test with a blast
+radius of exactly 1**. Full suite 966 tests green, typecheck at the 15-error baseline, lint clean.
+
+**Not verified by eye, and saying so is part of the deliverable.** The automated browser has no
+session and the page is behind sign-in, so this was proven by comparison against the trading
+lobby's own source and by the suite - **not by a screenshot.** Owner review is the remaining step.
+
+#### The saved design reference
+
+`External game plans/design-reference/` holds the two images the owner supplied, deliberately
+committed rather than left in a chat:
+
+| File | What it is |
+|---|---|
+| `trading-lobby-as-built.png` | The live trading lobby, which is **the theme being matched** |
+| `game-lobby-target-and-style-sheet.png` | A game lobby mock-up (*Circuit Perfect*) beside a **ChartVolt style sheet** - background and header art, an icon set, stat cards, four status cards, four button styles, a leaderboard row, avatars, panels and glow elements |
+
+The owner's framing: *"see the image how the app will have the theme in the future, just save
+that for reference, modify as needed, the images data are just examples."* So the numbers,
+names and artwork in them are illustrative, and **the style sheet is a direction of travel, not
+an acceptance criterion for this slice.** Three things in it are genuinely not built and must not
+be summarised as done: the **hero artwork** per game (the mock's car; we render an icon
+watermark), the **four stat cards as bordered tiles** (the trading lobby renders plain figures on
+the gradient, and trading is the reference the instruction named), and the **footer help strip
+with a View Rules button** - a rules surface for a provider title is real outstanding work, since
+the trading lobby's rules accordion is entirely trading content and a game has nothing to put in
+it yet.
+
 ---
 
 ## 5. Dashboard
