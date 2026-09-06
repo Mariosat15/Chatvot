@@ -297,7 +297,83 @@ describe("the pre-flight tells a player what an attempt costs", () => {
 
   it("disables the control when there is nothing left to spend", () => {
     const code = readCode(PREFLIGHT);
-    expect(code).toMatch(/disabled=\{launching\s*\|\|\s*exhausted\s*\|\|\s*windowClosed\}/);
+    // `blocked` now carries the exhausted and window cases along with the contest's own state.
+    // Asserting the aggregate rather than the list is deliberate: the next reason to refuse
+    // should be added to `blocked`, not bolted onto this expression, and a test naming the
+    // three original terms would quietly permit a fourth that the button ignores.
+    expect(code).toMatch(/disabled=\{launching\s*\|\|\s*blocked\}/);
+    expect(code).toMatch(/const blocked\s*=/);
+    expect(code).toMatch(/exhausted/);
+    expect(code).toMatch(/windowClosed/);
+  });
+});
+
+/**
+ * THE CONTEST'S OWN STATE, which this screen ignored until 6 September 2026.
+ *
+ * It read attempts and the play window and offered a fully enabled Play button on a contest
+ * that had not started. Nothing was lost by pressing it - the launch service refuses anything
+ * but `active` and consumes no attempt - but the player got a red error instead of an
+ * explanation, on the very first screen a new entrant sees. A control that appears to work and
+ * does nothing is the same failure as a provider enabled with no adapter.
+ */
+describe("the pre-flight refuses what the server would refuse", () => {
+  it("reads the contest status, which is already on the state it is given", () => {
+    const code = readCode(PREFLIGHT);
+    expect(code).toMatch(/state\.contestStatus\s*===\s*"upcoming"/);
+    expect(code).toMatch(/state\.contestStatus\s*!==\s*"active"/);
+  });
+
+  it("treats a draft contest as not started, because a URL reaches one before publish", () => {
+    const code = readCode(PREFLIGHT);
+    expect(code).toMatch(/state\.contestStatus\s*===\s*"draft"/);
+  });
+
+  it("blocks resume as well as play, because the status gate runs before the resume path", () => {
+    const code = readCode(PREFLIGHT);
+
+    // The subtle one. `exhausted` deliberately excludes a live round, so resume survives a
+    // spent allowance. The contest's status must NOT be excluded that way: a round in a
+    // finished contest cannot be reopened, so `blocked` has to be independent of `resuming`.
+    // Asserting position is what catches a later `&& !resuming` being appended to it.
+    const blocked = code.match(/const blocked\s*=[\s\S]*?;/);
+    expect(blocked).not.toBeNull();
+    expect(blocked![0]).not.toMatch(/resuming/);
+  });
+
+  it("gives every refusal its own wording rather than one generic message", () => {
+    const code = readCode(PREFLIGHT);
+
+    // Five distinct reasons, five distinct things a player can do about them. Collapsing them
+    // was the first mistake made on `LaunchRefusal`, where "attempts exhausted", "a round is
+    // already live" and "the provider is down" all became `contest_not_open` and the UI had to
+    // guess which affordance to offer.
+    expect(code).toMatch(/has not started yet/i);
+    expect(code).toMatch(/no longer accepting rounds/i);
+    expect(code).toMatch(/has not opened/i);
+    expect(code).toMatch(/window .*has closed|has closed/i);
+    expect(code).toMatch(/used all of your attempts/i);
+  });
+
+  it("does not colour a not-yet-started contest as an error", () => {
+    const code = readCode(PREFLIGHT);
+
+    // The red box is for a rejected action. Having just joined a contest that starts tomorrow
+    // is the normal case, and rendering it in red teaches a player something is broken. Count
+    // the red containers so a second one cannot be added for `blockedReason` unnoticed.
+    const redPanels = code.match(/border-red-500\/30/g) ?? [];
+    expect(redPanels.length).toBe(1);
+
+    const refusalPanel = code.match(/\{refusal &&[\s\S]*?\)\}/);
+    expect(refusalPanel).not.toBeNull();
+    expect(refusalPanel![0]).toMatch(/border-red-500\/30/);
+  });
+
+  it("does not promise an attempt cost on a contest that cannot be played", () => {
+    const code = readCode(PREFLIGHT);
+    // "Starting uses one attempt" beside a disabled button reads as a warning about something
+    // the player cannot do.
+    expect(code).toMatch(/!resuming\s*&&\s*!blocked/);
   });
 });
 

@@ -56,6 +56,46 @@ Four things about how it hid, each of which generalises:
   ids by design, so gate 6 does not dedupe them - and a late result for attempt 1 can arrive
   after attempt 2's. This is also why an operator-triggered re-sync is a safe operation.
 
+### 2.0b The READ path had the same hole, and nobody looked for a day (6 September 2026)
+
+Fixing 2.0a fixed where a score is **written** and where **settlement** reads it. There is a
+third consumer, and it renders to players continuously rather than once at the end:
+`getCompetitionLeaderboard`, in both apps.
+
+Both copies were written for trading and both dropped the two fields a provider game ranks on.
+The main app's projection listed trading metrics, so `score` was never selected at all; neither
+app's `participantData` mapping carried `score` or `scoreDirection`. Every provider participant
+therefore reached `calculateRankings` with an undefined score, `getProviderRankingValue` read
+`score ?? 0`, **the whole field tied on zero, and the board rendered in tie-break or document
+order.** Recorded as **R37**.
+
+**Say what it did and did not cost, because the two halves triage differently.** No payout was
+affected - settlement resolves both fields itself, so **nothing was backfilled and the fix is
+not retroactive.** But the board is a live read, so a lower-is-better contest was **reversed on
+screen and correct at the payout**: a player could lead a race-time contest all week and be paid
+last, having been shown a ranking that looked deliberate the whole time.
+
+**The fix moved the decision rather than copying it.** `resolveContestScoreDirection` was a
+private helper inside `provider-settlement.service.ts` - which is precisely why the leaderboard
+had none. It is now `lib/services/games/score-direction.service.ts`, mirrored, and used by
+settlement and both leaderboards, so **the board a player reads and the payout that eventually
+runs cannot rank a title differently.** Fifth instance of "one rule, two copies", after
+`referenceId`, `failedReason`, `challengeId` and the Game Master `||` - and note again that
+`check:mirrors` compares models, so it has never had an opinion about any of them.
+
+Two rules from it, both of which apply well beyond scoring:
+
+- **"Count the callers" has a read-side form.** The rule already caught four entry paths, ten
+  finalize sites, six raw inserts and seven subscription writers. Here it is a *seam*: the
+  producer and the money consumer were both fixed, and a third consumer nobody enumerated stayed
+  broken. `rg` for the ranking function finds six call sites; **two are reads and both were
+  wrong.**
+- **`scoreDirection` still must not be stored per row.** Declaring it on the participant is the
+  smaller diff and satisfies every read - and it is ruled out by section 2 for a reason worth
+  restating: per-row storage lets two rows in **one** board disagree, so half the leaderboard
+  negates and half does not. A uniformly wrong direction is coherent and visibly wrong; an
+  incoherent one looks plausible and cannot be explained to a player.
+
 Rules:
 
 - **Ranking uses `rawScore` only.** Never `scoreBreakdown`, which is display detail
@@ -116,7 +156,12 @@ Two consequences to keep:
   declared on **neither** `CompetitionParticipant` copy. So the read returned `undefined` for
   every player and the "fail-safe" fallback beside it was not a fallback but the only branch:
   **every lower-is-better contest ranked upward and paid the slowest player first.** It now
-  reads the title once, via `resolveContestScoreDirection`.
+  reads the title once, via **`resolveScoreDirection` in
+  `lib/services/games/score-direction.service.ts`** - a shared, mirrored module rather than the
+  private helper it started as. It was made shared on 6 September 2026 when **R37** showed that
+  keeping it private to settlement is exactly why both leaderboards had no direction at all; see
+  section 2.0b. Any document naming `resolveContestScoreDirection` as a present fact is stale,
+  though correct as history.
 
   Three lessons, and the first two are the reusable ones:
 

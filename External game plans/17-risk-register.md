@@ -53,6 +53,7 @@ chapter covers risks to the programme and to the application.
 | R34 | **The platform cannot honour the callback authentication its own issued spec promises.** `01` s2.2 and the requirements HTML both promise `Bearer {CALLBACK_TOKEN}`, "a token we issue to you". No such field exists - `gameProviderCredentials` holds `apiKey`, `apiSecret` and `callbackSecret`, the credentials dialog offers three inputs, and `loadProviderSecrets` sets `callbackToken: credentials.apiKey`. So gate 3 expects a provider to authenticate **inbound** with the credential they issued us for **outbound** calls | Medium | **CLOSED 6 Sep 2026, found the same day by X4a.** Latent throughout - no real provider ever existed and the mock uses its own header, so **nothing was ever refused in production and there is nothing to backfill.** It was **not workaroundable by configuration**, because there was nowhere to type the value; a conforming provider was rejected and logged as "either credentials are wrong or someone is probing the endpoint", so a correct integration **read as an attack** | Additive `callbackToken` on both `whitelabel.model.ts` copies, `callbackToken \|\| apiKey` in `loadProviderSecrets` for backward compatibility, a fourth credentials input grouped by **which side issued it**, and a `setProviderEnabled` refusal that requires the **explicit** field so the fallback cannot become permanent. `__tests__/services/provider-callback-token.test.ts` (8 tests) + `tools/probe-callback-token.ps1` (14 probes). **Fixing it exposed a sibling defect that was already reachable:** a provider could be enabled with a callback secret and no token at all, which is a switch turned on into a configuration where every result fails at gate 3 |
 | R35 | **A provider's `replayUrl` can leak a live contest's content.** Section 8 requires a `replayUrl` on every result and defines nothing about it - not what it serves, who may open it, whether it authenticates, or how long it lives. A contest's boards are **identical for every player** by design, because that is what makes the ranking a fair comparison. So a replay that shows *the puzzle* rather than *the player's own attempt* lets a player who has finished read the content of a contest still being played | Medium | **OPEN, found 6 Sep 2026 by X4a** as ambiguity A14. Latent on our side: `games-service` builds a `replayUrl` and **no route serves it**, so the platform is handed a URL answering `NOT_FOUND` - a promise made inside a signed payload. The risk is a **third party's** replay screen, which we do not control and cannot inspect | Specify it in `01` and the requirements HTML: the player's own submitted attempt, not the content; token-scoped to that round; and no earlier than the contest's `playWindowEnd`. Then either serve it or remove the field |
 | R36 | **A plain-http `NEXT_PUBLIC_BASE_URL` gives the provider a result callback it cannot use.** `round-launch.service.ts:273` builds `resultCallbackUrl` from it, so it is where every score is POSTed. Two consequences, and the second is the one that would be mistaken for a provider fault: the callback token travels unencrypted, and **certbot installs an http → https redirect as a matter of course while the fetch specification converts a POST following a 301 into a GET** - so the result arrives as a GET, is rejected, and the round is written off as unresolved. The visible symptom is players reporting vanished scores days later | Medium | **CLOSED 6 Sep 2026. Found on the owner's live deployment**, which held `http://chartvolt.com/` against an https site - and found by the games setup script's origin check while doing something else entirely, not by analysis. Latent: no provider round has ever launched in production, so **nothing was backfilled and there is nothing to backfill.** The guard already refused an *absent* value while accepting an explicitly-set localhost - **the same failure reached by a value that looks configured** | `publicBaseUrl()` refuses plain http and loopback hosts under `NODE_ENV=production` only, failing closed on anything `URL` cannot parse. Five tests in `__tests__/services/provider-round-launch.test.ts` + `tools/probe-launch-base-url.ps1` (7 probes). **The development carve-out is pinned as firmly as the refusals**, because every local rehearsal serves plain http on loopback and a guard that fires there gets switched off rather than fixed. `resultCallbackUrl` appears at five call sites and **only one constructs it** - verified with `rg`, so the single guard covers all of them |
+| R37 | **The provider leaderboard ranked on nothing.** Both `getCompetitionLeaderboard` copies were written for trading: the main app's projection listed only trading metrics so `score` was never selected, and neither app's `participantData` mapping carried `score` or `scoreDirection`. So every provider participant reached `calculateRankings` with `score` undefined, `getProviderRankingValue` read `score ?? 0`, **the whole field tied on zero, and the board rendered in whatever order the tie-breakers or the documents happened to give.** A lower-is-better title was worse than wrong - it was *reversed on the board and correct at settlement*, so a player could lead a race-time contest all week and be paid last | High | **CLOSED 6 Sep 2026, found by writing a test for something else** - a reproduction of the owner's live error page, which this was not. Latent for payouts: settlement resolves both fields itself (R32/R33), so **no prize has ever been misapplied and nothing was backfilled.** Not latent for players: the board is a live read, so any provider contest entered before this date displayed a meaningless order. **This is R32/R33 one layer out** - the write path was fixed on 5 Sep and the two READ paths were never examined, which is the "count the callers" rule applied to a seam rather than to a writer | `resolveScoreDirection` extracted to `lib/services/games/score-direction.service.ts` (mirrored) and now used by **settlement and both leaderboards**, so the live board and the payout cannot disagree. 11 tests in `__tests__/services/provider-contest-lobby-shape.test.ts`, `tools/probe-leaderboard-score.ps1` (5 probes, all red). **`scoreDirection` is still not stored per row** - `05` s2 forbids it, because per-row storage lets two rows in one board disagree, which is incoherent rather than merely wrong |
 | R24 | Scope creep before anything ships | Medium | **High** | All |
 | R25 | Round write contention under load | Medium | Medium | X12 |
 | X15 | "Challenge any user" harassment surface - no report-user feature exists | Medium | Medium | X10 |
@@ -850,6 +851,63 @@ Four mechanisms let them through, and each is worth carrying:
 - **An explicitly-typed `.lean<{...}>()` hides a field that does not exist**, because the
   compiler checks the generic rather than the schema - which is why the usual "errors that
   disappear after a model sync" signal never appeared.
+
+---
+
+### R37 - The same seam, one layer out, on the READ path - **CLOSED, 6 September 2026**
+
+R32 and R33 fixed the seam where a score is **written** and where settlement **reads** it. Neither
+looked at the third consumer: `getCompetitionLeaderboard`, which both apps call to render a live
+board. Both copies were written for trading, and both dropped the two fields a provider game
+ranks on - the main app's projection never selected `score`, and neither app's `participantData`
+mapping carried `score` or `scoreDirection`.
+
+So every provider participant arrived at `calculateRankings` with `score` undefined,
+`getProviderRankingValue` read `score ?? 0`, **the entire field tied on zero, and the board
+rendered in whatever order the tie-breakers or the document order happened to produce.**
+
+**The lower-is-better case is the one to state plainly, because it is worse than a wrong board.**
+Settlement resolves the direction itself, so a race-time contest was **reversed on the
+leaderboard and correct at the payout.** A player could watch themselves lead all week and be
+paid last, and every screen they saw would have looked deliberate.
+
+**Latent for money, live for players, and the distinction is the whole triage.** No prize has
+ever been misapplied, because settlement never depended on these mappings - so **nothing was
+backfilled and the fix is not retroactive.** But a leaderboard is a live read, so any provider
+contest entered before 6 September displayed a meaningless order to whoever opened it. "Closed"
+without that sentence would make somebody stop looking.
+
+**Rate it High.** Same reason as R32: nothing looks wrong. A projection listing trading fields
+reads as an optimisation, a mapping listing trading fields reads as complete, and the board
+renders without an error, an empty state or a log line.
+
+Three mechanisms, and the first two generalise beyond this defect:
+
+- **"Count the callers" applies to a SEAM, not only to a writer.** The rule has now caught four
+  competition entry paths, ten finalize sites, six raw inserts and seven subscription writers.
+  This is its read-side form: fixing where a value is produced and where money consumes it left
+  a third consumer nobody enumerated. `rg` for the ranking function found six call sites, of
+  which **two were reads and both were broken.**
+- **A shared decision must be moved, not copied - and not left private to its first caller.**
+  `resolveContestScoreDirection` was a private helper inside `provider-settlement.service.ts`,
+  which is exactly why the leaderboard had none. It is now
+  `lib/services/games/score-direction.service.ts`, mirrored, used by settlement and both
+  leaderboards, so **the live board and the payout cannot rank differently.** Fifth instance of
+  "one rule, two copies" after `referenceId`, `failedReason`, `challengeId` and the Game Master
+  `||`, none of which `check:mirrors` can see, because it compares models.
+- **A green probe has a fourth cause: the property is held redundantly.** An unrecognised stored
+  direction cannot invert a board, and two separate single-site probes proved nothing - the
+  resolver narrows it, and `getProviderRankingValue` independently tests equality against the one
+  downward value, so **either alone is sufficient and neither can express the property's
+  absence.** Add it to weak test, wrong claim and missing test. The probe now breaks both files
+  at once; both guards are kept, because the redundancy is cheap and a silently reversed
+  leaderboard is not something a player can be compensated for.
+
+**How it was found is worth recording, because it was not by analysis.** The owner reported a
+generic error page after entering a provider contest. The reproduction seeded a provider contest
+and exercised each of the lobby's reads in turn - and the crash was **not** among them. The
+leaderboard test written along the way failed for an entirely different reason. **A reproduction
+that disproves its own hypothesis is still the thing that found the defect.**
 
 ---
 

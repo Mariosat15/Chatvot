@@ -14,6 +14,7 @@ import CompetitionParticipant from "@/database/models/trading/competition-partic
 import mongoose from "mongoose";
 // Static imports for better performance (no dynamic import overhead)
 import { calculateRankings } from "@/lib/services/competition-ranking.service";
+import { resolveScoreDirection } from "@/lib/services/games/score-direction.service";
 import { getUsersWithTitles } from "@/lib/services/xp-level.service";
 import { getTitleByXP } from "@/lib/constants/levels";
 
@@ -443,24 +444,43 @@ export const getCompetitionLeaderboard = async (
 
     // Get competition to access rules
     const competition = (await Competition.findById(competitionId)
-      .select("rules status gameType")
+      .select("rules status gameType gameKey")
       .lean()) as {
       rules?: Record<string, unknown>;
       status: string;
       gameType?: string;
+      gameKey?: string;
     } | null;
     if (!competition) {
       throw new Error("Competition not found");
     }
 
     // OPTIMIZATION: Only select needed fields
+    //
+    // `score` is here because a provider contest ranks on it and nothing else. Its absence was
+    // a live defect: the projection listed only trading metrics, so every provider participant
+    // arrived at the ranking engine with `score` undefined, the engine read `score ?? 0`, and
+    // the whole field tied on zero. The leaderboard still rendered, in an order decided by
+    // whatever the tie-breakers or the document order happened to be. No error, no empty state.
     const participants = await CompetitionParticipant.find({
       competitionId: competitionId,
     })
       .select(
-        "userId username currentCapital pnl pnlPercentage totalTrades winningTrades losingTrades status enteredAt startingCapital",
+        "userId username currentCapital pnl pnlPercentage totalTrades winningTrades losingTrades status enteredAt startingCapital score",
       )
       .lean();
+
+    // Which way this contest's scores rank, read once from the catalogue rather than per row.
+    //
+    // Reason it is resolved here and threaded onto every participant: direction is a property
+    // of the TITLE, not of a player, so storing it per row would let two rows in one
+    // leaderboard disagree - half the board negating and half not, which is incoherent rather
+    // than merely wrong. `05` s2 rules that out, and settlement resolves it the same way
+    // through the same function, so the live board and the payout cannot rank differently.
+    const scoreDirection =
+      competition.gameType === "provider"
+        ? await resolveScoreDirection(competition.gameKey)
+        : undefined;
 
     // OPTIMIZATION: Create Map for O(1) lookups instead of O(n) .find()
     const participantMap = new Map(participants.map((p) => [p.userId, p]));
@@ -480,6 +500,10 @@ export const getCompetitionLeaderboard = async (
       status: p.status,
       enteredAt: p.enteredAt,
       startingCapital: p.startingCapital,
+      // The two fields a provider game ranks on. Raw, never pre-negated: the engine negates at
+      // the moment of comparison so a race time shows as 92.4 seconds and not as -92.4.
+      score: p.score,
+      scoreDirection,
     }));
 
     // Use competition rules or defaults

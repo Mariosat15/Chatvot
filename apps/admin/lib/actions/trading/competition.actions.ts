@@ -445,6 +445,17 @@ export const getCompetitionLeaderboard = async (
     const { getUsersWithTitles } =
       await import("@/lib/services/xp-level.service");
     const { getTitleByXP } = await import("@/lib/constants/levels");
+    const { resolveScoreDirection } = await import(
+      "@/lib/services/games/score-direction.service"
+    );
+
+    // Which way this contest's scores rank, read once from the catalogue rather than per row.
+    // Resolved through the same function settlement uses, so the board an operator reads and
+    // the payout that eventually runs cannot rank a lower-is-better game differently.
+    const scoreDirection =
+      competition.gameType === "provider"
+        ? await resolveScoreDirection(competition.gameKey)
+        : undefined;
 
     // Prepare participant data
      
@@ -461,6 +472,11 @@ export const getCompetitionLeaderboard = async (
       status: p.status,
       enteredAt: p.enteredAt,
       startingCapital: p.startingCapital,
+      // The two fields a provider game ranks on. Their absence meant an operator inspecting a
+      // provider contest saw every player tied on zero, in document order - the same defect
+      // as the player leaderboard, because both mappings were written for trading.
+      score: p.score,
+      scoreDirection,
     }));
 
     // Use competition rules or defaults

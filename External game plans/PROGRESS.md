@@ -14,6 +14,7 @@
 | | |
 |---|---|
 | **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done.** A provider contest can be created, **published from the admin screen** (5 Sep 2026), entered, played and paid - and since 5 Sep 2026 it is paid **correctly**, which it was not before: two P0 defects meant every player tied on a score of zero and split the pool equally, and a lower-is-better game ranked backwards. A stuck round can now be **inspected and ended by an operator** (5 Sep 2026). **The whole lifecycle is now reachable by clicking** - the player round launch screen landed 5 Sep 2026 at `/competitions/[id]/play`, which also fixed a live defect: a provider-contest player was being sent to the forex trading workspace by a button labelled "Start Trading". **No provider selected**, which is what X4 needs |
+| **Player screens** | **R37 closed 6 Sep 2026, and it is the one to read first if a provider board looks odd.** Neither app's `getCompetitionLeaderboard` passed `score` or `scoreDirection` to the ranking engine, so **every provider participant tied on zero and the board rendered in tie-break order** - and a lower-is-better title was *reversed on screen while correct at settlement*, so a player could lead all week and be paid last. **Latent for money, live for players:** settlement resolves both fields itself, so no payout was ever wrong and **nothing was backfilled**. Fixed by moving `resolveScoreDirection` out of settlement into a shared mirrored module used by all three consumers. Same day, `RoundPreflight` stopped offering an enabled **Play** button on a contest that had not started. **The lobby page itself is still trading-shaped** - see `13` s4.1a for exactly what is and is not built |
 | **Next action** | **Technically: finish X4a** - pull and rebuild on the server, start `chartvolt-games`, register it through the admin screens, and drive one round end to end. **No DNS, nginx or certificate work is needed** since the play surface is proxied through the platform app (owner's choice, 6 Sep 2026). The game is **playable by a human in a browser**, **R34 is closed**, and the service is now **deployable** - PM2 entry, nginx block, `env.example` and a runbook in `deploy/README.md` (all 6 Sep 2026) - so nothing technical stands between the two halves. **Owner decided 6 Sep 2026 to deploy first and rehearse against the live site**, rather than complete the local rehearsal. After X4a: provider **health** (the last of X6's five admin destinations) and the game-aware **contest list and dashboard** (`13` s4/s5), where the remaining trading-shaped player screens live. **Commercially, in parallel: find and assess a provider using `08`** - X4 cannot start without one, and nothing in the programme is blocked on that search |
 | **Money defects closed** | **R26 closed 5 Sep 2026** - the admin cron's finalize copy paid **no** Game Master earnings and recorded no `retained_gm_fee` either, so the commission silently stayed with the platform. This one was **actively losing money rather than latent**: both apps run `checkAndFinalizeCompetitions` on an every-minute cron, so payment depended on which cron won the race. **Not retroactive - no backfill**, and past contests cannot be found by querying for retained rows because none were written. Also **R31** (a 0% Game Master rate paid 5%) and the two P0 score defects, same day |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
@@ -628,6 +629,97 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 6 Sep 2026 - R37 - THE PROVIDER LEADERBOARD RANKED ON NOTHING, AND THE PRE-FLIGHT OFFERED A BUTTON THAT COULD ONLY FAIL
+
+**Shipped:**
+
+1. **R37, a P0 read-path defect.** `getCompetitionLeaderboard` in **both** apps was written for
+   trading and dropped the two fields a provider game ranks on. The main app's projection listed
+   only trading metrics, so `score` was never selected; neither app's `participantData` mapping
+   carried `score` or `scoreDirection`. Every provider participant therefore reached
+   `calculateRankings` with an undefined score, `getProviderRankingValue` read `score ?? 0`, and
+   **the whole field tied on zero** - the board rendered in tie-break or document order.
+2. **`resolveScoreDirection` moved out of settlement into a shared module.**
+   `lib/services/games/score-direction.service.ts`, mirrored, now used by settlement and both
+   leaderboards, so the live board and the eventual payout cannot rank a title differently.
+3. **`RoundPreflight` reads `contestStatus`.** It previously offered a fully enabled **Play**
+   button on a contest that had not started; the launch service refused it and the player got a
+   red error box on the first screen they see. Five refusals, five wordings, and resume is
+   blocked too because the status gate runs before the idempotent resume path.
+4. **A reproduction harness for the lobby's data shape**, which is the thing that found all of
+   this - `__tests__/services/provider-contest-lobby-shape.test.ts`, plus
+   `tools/games/inspect-provider-contest.ts` for reading a real contest's stored document.
+
+**Files touched:** `lib/services/games/score-direction.service.ts` (new, mirrored),
+`lib/actions/trading/competition.actions.ts` and its admin copy,
+`lib/services/settlement/provider-settlement.service.ts` and its admin copy (private helper
+replaced by the shared import), `components/games/RoundPreflight.tsx`,
+`__tests__/services/provider-contest-lobby-shape.test.ts` (new, 11 tests),
+`__tests__/games/provider-play-ui.test.ts` (+8 tests, one pinned expression updated),
+`tools/probe-leaderboard-score.ps1` and `tools/probe-preflight-status.ps1` (new, 5 + 7 probes,
+all red), `tools/games/inspect-provider-contest.ts` (new).
+
+**Deviated from plan:** nothing was planned. This began as a reproduction of the owner's generic
+error page after entering a provider contest, and **that hypothesis was wrong** - see below.
+
+**Owner tested:** no. The owner's original report (a "Something went wrong" page) is **not
+explained by either fix** and remains open; see the next-chat note.
+
+**Deferred:** the lobby page itself, which still renders trading panels and PnL labels for a
+provider contest. Scoped and split in `13` s4.1a rather than half-done, because the page is a
+server component with a great many trading reads and making it game-aware is a branch at the
+top, not a field-by-field guard. Also deferred: per-game ranking labels
+(`ranking-config.service.ts`), and a game filter on the list - the latter deliberately, since one
+provider game makes a one-option filter pure friction.
+
+**Gates:** 895 tests pass (50 files), `check:mirrors` clean, ESLint clean on every touched file,
+and **both typechecks diff to zero lines** against a `git stash --include-untracked` baseline.
+
+**Seven things worth carrying:**
+
+- **"Count the callers" has a read-side form, and this is it.** The rule has caught four entry
+  paths, ten finalize sites, six raw inserts and seven subscription writers. R32/R33 fixed where
+  a score is produced and where money consumes it; **a third consumer nobody enumerated stayed
+  broken for a day.** `rg` for the ranking function returns six call sites - two are reads, and
+  both were wrong. Fix a seam, then grep for everyone standing on it.
+- **A private helper is where a shared decision goes to be duplicated - or worse, forgotten.**
+  `resolveContestScoreDirection` lived inside `provider-settlement.service.ts`, which is exactly
+  why both leaderboards had no direction at all. Fifth "one rule, two copies" instance after
+  `referenceId`, `failedReason`, `challengeId` and the Game Master `||`, and `check:mirrors`
+  compares models so it has never had an opinion about any of them.
+- **A green probe has a FOURTH cause: the property is held redundantly.** After weak test, wrong
+  claim and missing test - an unrecognised stored direction cannot invert a board, and two
+  separate single-site probes both stayed green, because the resolver narrows the value *and*
+  `getProviderRankingValue` independently tests equality against the one downward value. **Either
+  alone is sufficient, so no single-site change can express the property's absence.** The probe
+  now breaks both files at once. Both guards were kept, and the resolver's comment - which had
+  implied it was *the* guard - was corrected in place rather than quietly reworded.
+- **A reproduction that disproves its own hypothesis is still what finds the defect.** Every
+  lobby read was exercised and none crashed; the fields a provider contest lacks turned out to be
+  absent-but-guarded or filled by schema defaults, verified against a real MongoDB rather than
+  reasoned about. The leaderboard test written on the way failed for a completely different
+  reason. **Do not abandon a harness because the hypothesis was wrong.**
+- **A fixture must be able to distinguish the branches, or the probe is meaningless.** The
+  lower-is-better test needed its catalogue row's `gameKey` to match the contest's exactly -
+  otherwise the resolver finds no title, warns, returns the upward default, and the test passes
+  for the wrong reason while looking like a correct higher-is-better assertion.
+- **Assert the aggregate, not the list of terms.** The button's `disabled` test now pins
+  `launching || blocked` rather than the three original reasons. A test naming the terms silently
+  permits a fourth reason being computed and ignored - which is how this defect existed at all.
+- **Two lint warnings were worth fixing rather than suppressing.** `detect-object-injection` on
+  indexing a record by a key from a local constant is a false positive *as a security finding*,
+  but `Object.hasOwn` is genuinely more correct here: a bare index walks the prototype chain, so
+  a field named like something on `Object.prototype` would report as **stored** on a document
+  that stores nothing - and "is this field stored" is the only question the tool answers.
+
+**Next chat should:** either take the lobby page (`13` s4.1a, the largest remaining player
+surface) or **get the owner's exact reproduction for the "Something went wrong" page**, which is
+still unexplained. Two facts to carry into that: every lobby read was exercised against a real
+provider contest without throwing, and `getCompetitionLeaderboard` **rethrows a generic error**,
+so a failure inside it surfaces as exactly that page with the real cause only in the server log.
 
 ---
 

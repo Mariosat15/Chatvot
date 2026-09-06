@@ -109,10 +109,45 @@ than a wrong screen.
   nothing. Labelling it "Play" would tell a player they were spending an attempt they are not, and
   some would decline and let a round expire instead.
 
+### 1.1b The pre-flight now refuses what the server would refuse (6 September 2026)
+
+`RoundPreflight` read attempts and the play window and **ignored the contest's own state**, so a
+contest that had not started rendered a fully enabled **Play** button. Pressing it lost nothing -
+the launch service refuses anything but `active` and consumes no attempt - but the player got a
+red error box where they should have got an explanation, on the first screen a new entrant sees.
+**A control that appears to work and does nothing** is the same failure as a provider enabled
+with no adapter, or a `rankingMethod` a provider game ignores.
+
+It mirrors `PLAYABLE_STATUSES` rather than inventing a rule, and `draft` is grouped with
+`upcoming` because an unpublished contest is reachable by URL. Five refusals get five distinct
+wordings, for the reason `LaunchRefusal` learned in X5: a generic message forces the player to
+guess which of "come back later", "it's over" and "you're out of attempts" applies.
+
+Three things about it are load-bearing and easy to undo:
+
+- **Resume is blocked too.** `exhausted` deliberately excludes a live round, so resume survives a
+  spent allowance - but the status gate in the launch service runs **before** the idempotent
+  resume path, so a round in a finished contest cannot be reopened however harmless that looks.
+  `blocked` is therefore independent of `resuming`, and a test asserts that appending
+  `&& !resuming` to it turns red.
+- **Not-yet-started is not an error, and must not be red.** The red panel reports a *rejected
+  action*. Having just joined a contest that opens tomorrow is the normal case, and colouring it
+  as a failure teaches a player something is broken. The test counts the red containers so a
+  second one cannot appear unnoticed.
+- **The attempt-cost hint is hidden while blocked.** "Starting uses one attempt" beside a
+  disabled button reads as a warning about something the player cannot do.
+
+`__tests__/games/provider-play-ui.test.ts` (28 tests) and `tools/probe-preflight-status.ps1`
+(7 probes, all red).
+
 ### What it does not do
 
 - **No live leaderboard during play** (section 11's polling recommendation is unimplemented). A
-  player sees their standing when they return to the contest page.
+  player sees their standing when they return to the contest page. When they do, **the board is
+  now ranked correctly** - it was not until 6 September 2026, when **R37** found that neither
+  app's `getCompetitionLeaderboard` passed `score` or `scoreDirection` to the ranking engine, so
+  every provider participant tied on zero. See `05` section 2.0b; a document implying the
+  provider board has always ranked on score is wrong.
 - **No practice mode.** Needs `supportsPractice` and a free, unranked path.
 - **No game-aware dashboard.** `ActiveCompetitionCard` and `CompetitionsTable` still render PnL,
   positions and recent trades and label the action "Trade Now". The `/trade` route redirects, so
@@ -178,6 +213,24 @@ For provider contests the lobby must show three things the trading lobby never n
 **when the play window opens and closes**, **how many attempts remain**, and **what
 happens if a round does not finish**. Players will hit all three, and a lobby that does
 not answer them generates support tickets.
+
+### 4.1a What is built of this row, and what is not (6 September 2026)
+
+Three parts done, the lobby itself outstanding. Stating the split matters because "the play
+screen works" has been read as "the lobby is game-aware", and it is not.
+
+| Part | State |
+|---|---|
+| The CTA's destination | **Built.** `CompetitionEntryButton` sends a provider contest to `/play` and a trading contest to `/trade`, using the strict `isProviderContest` because a destination needs the keys, not just the label. Both trade-history links are withheld and **counted** in a test, so a third unguarded one cannot hide behind them |
+| The play window, attempts and refusals | **Built, on the play screen** - section 1.1b. The pre-flight now reads `contestStatus` as well, so it refuses what the server would refuse instead of offering a button that errors |
+| The leaderboard's ranking metric | **Built.** R37, `05` s2.0b |
+| The lobby page itself | **NOT built.** `app/(root)/competitions/[id]/page.tsx` still renders the trading lobby for a provider contest: trading panels, "PnL" labels, and no play window, attempts or unresolved-round policy. The route is correct and nothing crashes - the fields a provider contest lacks are either absent-but-guarded or filled by schema defaults, which was verified against a real MongoDB rather than reasoned about (`__tests__/services/provider-contest-lobby-shape.test.ts`) - but a player reads a trading screen for a puzzle contest |
+| Ranking labels per game | **NOT built.** `ranking-config.service.ts` is untouched, so a provider board still labels its column with trading wording |
+| Filter by game | **NOT built**, and deliberately deferred: there is one provider game, so a filter with one option is friction on a page players use daily. Revisit when the catalogue has a second title |
+
+**The lobby is the next piece of this section**, and it is larger than it looks: the page is a
+server component with a great many trading reads, so making it game-aware is a branch at the top
+rather than a field-by-field guard.
 
 ---
 
