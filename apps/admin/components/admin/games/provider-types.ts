@@ -12,6 +12,8 @@ export interface ProviderCredentialStatus {
   environment: "sandbox" | "production";
   hasApiKey: boolean;
   hasApiSecret: boolean;
+  /** The bearer token we issue for their inbound results. R34. */
+  hasCallbackToken: boolean;
   hasCallbackSecret: boolean;
   hasPreviousCallbackSecret: boolean;
   rotatedAt?: string;

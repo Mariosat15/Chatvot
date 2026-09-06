@@ -218,6 +218,7 @@ describe("X6 game providers admin", () => {
       });
       await saveCredentials("acme-games", {
         environment: "sandbox",
+        callbackToken: "tok3n-value",
         callbackSecret: "s3cret-value",
       });
 
@@ -244,7 +245,20 @@ describe("X6 game providers admin", () => {
       expect(result.error).toMatch(/callback secret/i);
     });
 
-    it("enables once an adapter and a callback secret both exist", async () => {
+    it("refuses when no callback token is stored", async () => {
+      /*
+       * Added with R34, and it closes a hole that WAS ALREADY REACHABLE rather than one the
+       * new field introduced: before the callback token existed, a provider could be enabled
+       * with a callback secret and nothing else, and every result would then be refused at
+       * GATE 3 for an absent bearer token - `alert: "critical"`, logged as somebody probing
+       * the endpoint. So this screen could turn a switch on into a configuration where
+       * nothing could ever work, which is precisely what the adapter and callback-secret
+       * refusals above exist to prevent.
+       *
+       * It deliberately does NOT accept the `apiKey` fallback that `loadProviderSecrets`
+       * still honours for backward compatibility. A transitional path that new integrations
+       * can keep using is one nobody ever removes.
+       */
       await registerProvider({
         providerKey: MOCK_PROVIDER_KEY,
         displayName: "Mock",
@@ -252,6 +266,28 @@ describe("X6 game providers admin", () => {
       });
       await saveCredentials(MOCK_PROVIDER_KEY, {
         environment: "sandbox",
+        apiKey: "the-key-they-issued-us",
+        callbackSecret: "s3cret-value",
+      });
+
+      const result = await setProviderEnabled(MOCK_PROVIDER_KEY, true);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/callback token/i);
+      expect((await GameProvider.findOne({ providerKey: MOCK_PROVIDER_KEY }))?.enabled).toBe(
+        false,
+      );
+    });
+
+    it("enables once an adapter, a callback token and a callback secret all exist", async () => {
+      await registerProvider({
+        providerKey: MOCK_PROVIDER_KEY,
+        displayName: "Mock",
+        baseUrl: "https://mock.test",
+      });
+      await saveCredentials(MOCK_PROVIDER_KEY, {
+        environment: "sandbox",
+        callbackToken: "tok3n-value",
         callbackSecret: "s3cret-value",
       });
 
@@ -275,6 +311,7 @@ describe("X6 game providers admin", () => {
       });
       await saveCredentials(MOCK_PROVIDER_KEY, {
         environment: "sandbox",
+        callbackToken: "tok3n-value",
         callbackSecret: "s3cret-value",
       });
       await setProviderEnabled(MOCK_PROVIDER_KEY, true);
@@ -291,13 +328,14 @@ describe("X6 game providers admin", () => {
 
     it("keeps the stored value when a field is submitted blank", async () => {
       // THE SILENT FAILURE THIS PREVENTS: the UI can never show a stored secret, so an
-      // operator changing only the environment submits three empty boxes. If empty meant
+      // operator changing only the environment submits four empty boxes. If empty meant
       // "clear", that harmless edit would break every inbound callback with no error
       // raised anywhere.
       await saveCredentials(MOCK_PROVIDER_KEY, {
         environment: "sandbox",
         apiKey: "key-one",
         apiSecret: "secret-one",
+        callbackToken: "token-one",
         callbackSecret: "callback-one",
       });
 
@@ -305,6 +343,7 @@ describe("X6 game providers admin", () => {
         environment: "production",
         apiKey: "",
         apiSecret: undefined,
+        callbackToken: "\t",
         callbackSecret: "   ",
       });
 
@@ -316,6 +355,7 @@ describe("X6 game providers admin", () => {
       expect(credential?.environment).toBe("production");
       expect(credential?.apiKey).toBe("key-one");
       expect(credential?.apiSecret).toBe("secret-one");
+      expect(credential?.callbackToken).toBe("token-one");
       expect(credential?.callbackSecret).toBe("callback-one");
     });
 
@@ -409,13 +449,15 @@ describe("X6 game providers admin", () => {
     it("returns presence booleans, and none of the stored values appear anywhere in it", async () => {
       const apiKey = "key-abc123";
       const apiSecret = "secret-def456";
+      const callbackToken = "token-jkl012";
       const callbackSecret = "callback-ghi789";
-      const secrets = [apiKey, apiSecret, callbackSecret];
+      const secrets = [apiKey, apiSecret, callbackToken, callbackSecret];
 
       await saveCredentials(MOCK_PROVIDER_KEY, {
         environment: "sandbox",
         apiKey,
         apiSecret,
+        callbackToken,
         callbackSecret,
       });
 
@@ -426,6 +468,7 @@ describe("X6 game providers admin", () => {
         environment: "sandbox",
         hasApiKey: true,
         hasApiSecret: true,
+        hasCallbackToken: true,
         hasCallbackSecret: true,
         hasPreviousCallbackSecret: false,
         rotatedAt: undefined,
@@ -438,6 +481,39 @@ describe("X6 game providers admin", () => {
       for (const secret of secrets) {
         expect(serialised).not.toContain(secret);
       }
+    });
+
+    it("reports a missing credential as absent rather than present", async () => {
+      /*
+       * THE TEST ABOVE CANNOT CATCH A HARDCODED `true`, which is how this one came to exist:
+       * a probe replacing `hasCallbackToken: Boolean(credential.callbackToken)` with a
+       * literal `true` left the suite GREEN, because that fixture stores every credential,
+       * so the wrong branch produced the right answer. The fixture could not distinguish the
+       * branches at all - the third cause of a green probe, after a weak test and a wrong
+       * claim.
+       *
+       * It is also the case that matters operationally. A badge reading "set" for a token
+       * that was never stored is worse than no badge: the operator has no way to discover
+       * why `setProviderEnabled` refuses them, and the eventual failure looks like the
+       * provider's fault.
+       */
+      await saveCredentials(MOCK_PROVIDER_KEY, {
+        environment: "sandbox",
+        callbackSecret: "callback-only",
+      });
+
+      const providers = await listProviders();
+      const row = providers.find((p) => p.providerKey === MOCK_PROVIDER_KEY);
+
+      expect(row?.credentials).toEqual({
+        environment: "sandbox",
+        hasApiKey: false,
+        hasApiSecret: false,
+        hasCallbackToken: false,
+        hasCallbackSecret: true,
+        hasPreviousCallbackSecret: false,
+        rotatedAt: undefined,
+      });
     });
   });
 
@@ -597,6 +673,28 @@ describe("X6 game providers admin", () => {
       expect(source).toContain("apiKeyChanged");
       expect(source).not.toMatch(/newValue:\s*\{[^}]*apiKey:\s*body\.apiKey/);
     });
+
+    it("forwards the callback token from the request body to the service", () => {
+      /*
+       * R34. The route is a seam with no other test on it: the dialog can send the field and
+       * the service can store it, and a route that quietly drops it between them would leave
+       * both halves passing their own tests while an operator's callback token is never
+       * saved. The screen would then show "Callback token: not set" after a successful save,
+       * which reads as a UI bug rather than a dropped field.
+       *
+       * Asserted as the ARGUMENT to `saveCredentials`, not merely as the name appearing in
+       * the file - it is also in the body type and the audit block, so a bare `toContain`
+       * would pass with the argument removed. Fourth instance of that class in this repo.
+       */
+      const source = readCode(
+        "apps/admin/app/api/games/providers/[providerKey]/credentials/route.ts",
+      );
+      // No `s` flag: this program targets below es2018, where it is a compile error - and it
+      // would be inert here anyway, since a negated class already matches newlines.
+      expect(source).toMatch(
+        /saveCredentials\([^)]*callbackToken:\s*body\.callbackToken/,
+      );
+    });
   });
 
   describe("the credentials dialog cannot display a secret", () => {
@@ -605,7 +703,7 @@ describe("X6 game providers admin", () => {
         "apps/admin/components/admin/games/ProviderCredentialsDialog.tsx",
       );
 
-      // The three inputs are initialised to empty strings, not from `provider`.
+      // The four inputs are initialised to empty strings, not from `provider`.
       expect(dialog).toContain('useState("")');
       expect(dialog).not.toMatch(/useState\(\s*provider\?\.credentials\?\.(api|callback)/);
 
@@ -613,7 +711,9 @@ describe("X6 game providers admin", () => {
       // even if a future edit tried.
       const types = readCode("apps/admin/components/admin/games/provider-types.ts");
       expect(types).toContain("hasApiKey: boolean");
+      expect(types).toContain("hasCallbackToken: boolean");
       expect(types).not.toMatch(/^\s*apiKey\?:\s*string/m);
+      expect(types).not.toMatch(/^\s*callbackToken\?:\s*string/m);
     });
   });
 });

@@ -45,6 +45,16 @@ export interface ProviderSecrets {
   callbackSecret?: string;
   previousCallbackSecret?: string;
   callbackToken?: string;
+  /**
+   * Which stored field `callbackToken` came from.
+   *
+   * Reason this exists rather than the caller simply trusting the token: the `apiKey`
+   * fallback below is a transitional path, and a transitional path with no way to observe
+   * it is one nobody ever removes. Gate 3 does not branch on this - a provider on the
+   * legacy value must still be accepted - but a test can assert which field was read, which
+   * is the only way to prove the precedence rather than the outcome.
+   */
+  callbackTokenSource?: "callbackToken" | "apiKey";
 }
 
 /**
@@ -68,6 +78,7 @@ export async function loadProviderSecrets(
       gameProviderCredentials?: {
         providerKey: string;
         apiKey?: string;
+        callbackToken?: string;
         callbackSecret?: string;
         previousCallbackSecret?: string;
       }[];
@@ -82,10 +93,40 @@ export async function loadProviderSecrets(
     (c) => c.providerKey === providerKey,
   );
 
+  /*
+   * THE ISSUED SPECIFICATION'S OWN FIELD FIRST, THE OLD SUBSTITUTION SECOND. This is R34.
+   *
+   * `01` section 2.2 and the requirements HTML both promise the provider
+   * `Authorization: Bearer {CALLBACK_TOKEN}` - "a token we issue to you". This line used to
+   * read `callbackToken: credentials?.apiKey`, so gate 3 compared the inbound bearer against
+   * the key the PROVIDER issued US for outbound calls. A provider implementing the document
+   * exactly was refused, and gate 3's refusal is `alert: "critical"` with the message
+   * "either credentials are wrong or someone is probing the endpoint" - so a correct
+   * integration read as an attack, which is the worst possible first day of a partnership.
+   *
+   * `||` rather than `??`, and the distinction is deliberate. For a credential string every
+   * falsy value - `undefined`, `null` and `""` - means the same thing, absent, and a blank
+   * stored token must fall through rather than being offered to gate 3. `??` would return
+   * `""`, and while gate 3 does reject an empty token, relying on that is relying on a guard
+   * somewhere else: `safeEqual("", "")` is true, so an empty token compared against an
+   * absent `Authorization` header would otherwise authenticate anyone.
+   *
+   * The fallback is transitional and must not become permanent. `setProviderEnabled` in the
+   * admin app requires an explicit `callbackToken` before a provider can be turned on, so
+   * nothing new can rely on it, while a provider already enabled on the old value keeps
+   * working rather than having every result rejected on deploy.
+   */
+  const callbackToken = credentials?.callbackToken || credentials?.apiKey;
+
   return {
     callbackSecret: credentials?.callbackSecret,
     previousCallbackSecret: credentials?.previousCallbackSecret,
-    callbackToken: credentials?.apiKey,
+    callbackToken,
+    callbackTokenSource: credentials?.callbackToken
+      ? "callbackToken"
+      : callbackToken
+        ? "apiKey"
+        : undefined,
   };
 }
 

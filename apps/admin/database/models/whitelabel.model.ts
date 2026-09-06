@@ -106,11 +106,32 @@ export interface WhiteLabelDocument extends Document {
   // `callbackSecret` is separate from `apiSecret` and both are per-environment, because
   // chapter 06 section 8 requires the callback secret to be rotatable with no downtime -
   // which means accepting the old and the new value at once during a rotation.
+  //
+  // THERE ARE FOUR CREDENTIALS AND TWO DIRECTIONS, which is the distinction risk R34 was
+  // about. `apiKey`/`apiSecret` are issued to us BY the provider and travel OUTBOUND on
+  // every call we make to them. `callbackToken`/`callbackSecret` are issued BY US to them
+  // and travel INBOUND on every result they send. The token authenticates, the secret
+  // signs.
   gameProviderCredentials: {
     providerKey: string;
     environment: "sandbox" | "production";
     apiKey?: string;
     apiSecret?: string;
+    /**
+     * The bearer token we issue to the provider for their INBOUND result callbacks.
+     *
+     * Added 6 September 2026 to close R34. `01` section 2.2 and the requirements HTML sent
+     * to providers both promise `Authorization: Bearer {CALLBACK_TOKEN}`, described as "a
+     * token we issue to you" - and until this field existed there was nowhere to issue one,
+     * so `loadProviderSecrets` substituted `apiKey`. That asked a provider to authenticate
+     * inbound with the credential they had issued us for outbound calls, so a provider who
+     * implemented the document exactly was rejected and logged as a probable attack.
+     *
+     * Reason it is a separate field rather than a reuse of `apiSecret`: the two directions
+     * must be independently rotatable, and a provider must never need our signing secret in
+     * order to authenticate to us.
+     */
+    callbackToken?: string;
     callbackSecret?: string;
     /** Kept during a rotation so in-flight callbacks signed with the old value verify. */
     previousCallbackSecret?: string;
@@ -356,6 +377,8 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
           },
           apiKey: { type: String },
           apiSecret: { type: String },
+          // See the interface comment: inbound bearer token, issued by us. R34.
+          callbackToken: { type: String },
           callbackSecret: { type: String },
           previousCallbackSecret: { type: String },
           rotatedAt: { type: Date },

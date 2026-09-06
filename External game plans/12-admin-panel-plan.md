@@ -460,16 +460,26 @@ manual resolution were built on 5 September 2026** - see section 4.2a.
   the mutation open.
 - **"Blank means keep" is the only safe reading of an empty secret box, and the alternative
   fails silently.** Because the UI can never display a stored secret, an operator editing the
-  environment submits three empty boxes. If empty meant "clear", that harmless edit would
+  environment submits four empty boxes. If empty meant "clear", that harmless edit would
   break every inbound callback with no error raised anywhere. There is no clear-by-blank path;
   removal is explicit.
 - **Enabling has to refuse when it cannot work, or the switch lies.** Without an installed
   adapter, `resolveEnabledProvider` refuses every round with a message no operator can act on -
   a switch that appears to work and silently does nothing, the same shape as the trading-shaped
   services in `matchmaking.service.ts`. Without a callback secret, every inbound result fails
-  signature verification, which is indistinguishable from an attack in the logs. Both are
+  signature verification, which is indistinguishable from an attack in the logs. Without a
+  **callback token** (added 6 Sep 2026 with R34) every result fails one gate earlier, at the
+  bearer check, and is logged as a suspected attack for the same reason. All three are
   refused at the admin layer with the reason shown on the card, not merely by disabling
-  the control.
+  the control. **The third refusal closed a hole that was already reachable** - the screen
+  could turn a provider on into a configuration where nothing could ever work, which is
+  precisely what the other two exist to prevent.
+- **Four credential boxes are two pairs, and the screen has to say which side issued each.**
+  `apiKey`/`apiSecret` come from the provider and travel outbound; `callbackToken`/
+  `callbackSecret` are ours and travel inbound. Four unlabelled boxes named "key", "secret",
+  "token", "secret" invite an operator to paste one value into two of them, and the resulting
+  failure is logged as an attack rather than a typo. **R34 was this same confusion made in
+  code**, so the grouping is defect prevention rather than decoration.
 - **There is deliberately no delete.** A provider that has run a contest is joined to
   historical rounds by `providerKey`, and `gameKey` is immutable, so deleting the row orphans
   that history while every screen still renders a key it cannot resolve. Same reasoning as the
@@ -479,6 +489,13 @@ manual resolution were built on 5 September 2026** - see section 4.2a.
 as a rotation, stamping `rotatedAt` on a provider that had never rotated anything. It was
 found only because the presence-booleans test asserted the **whole** credential object rather
 than the three fields it cared about - the extra field was the evidence.
+
+**A second one, found by a probe rather than a test, and the mechanism is the lesson.** The
+presence badge was replaced with a hardcoded `true` and the suite stayed **green**: the fixture
+stores every credential, so the wrong branch produced the right answer and nothing could tell
+the two apart. The test that had to be written asserts a **missing** credential reads `false` -
+which is also the case that matters, because a badge saying "set" for a token that was never
+stored leaves the operator no way to discover why enabling refuses them.
 
 ### 4.2 The rules an operator enters, and the limit of "no developer needed"
 

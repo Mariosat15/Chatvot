@@ -62,7 +62,7 @@ describe("what a provider's game frame is allowed to tell us", () => {
     // fields is deliberate: a field we did not think to check is exactly the one that would
     // slip through, which is how the admin credential rotation bug was caught.
     expect(Object.keys(parsed as object).sort()).toEqual(["height", "type"]);
-    expect((parsed as Record<string, unknown>).score).toBeUndefined();
+    expect((parsed as unknown as Record<string, unknown>).score).toBeUndefined();
   });
 
   it("rejects prototype-chain keys instead of treating them as message types", () => {

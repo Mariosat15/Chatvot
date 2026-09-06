@@ -95,7 +95,7 @@ Index: `{ competitionId: 1, score: -1 }` for leaderboard reads.
 | Field | Notes |
 |---|---|
 | `gameProviders` | Array of `{ providerKey, enabled, baseUrl, displayName }` |
-| `gameProviderCredentials` | API key, API secret, callback secret per provider. **Never returned to the client** |
+| `gameProviderCredentials` | **Four credentials per provider, in two pairs, and the pairing is load-bearing.** `apiKey` and `apiSecret` are issued to us **by** the provider and travel outbound; `callbackToken` and `callbackSecret` are issued **by us** to them and travel inbound - the token authenticates the request, the secret signs the body. Plus `previousCallbackSecret` and `rotatedAt` for the rotation window. **Never returned to the client** - the admin screen gets presence booleans. `callbackToken` was added 6 Sep 2026 to close **R34**: without it the platform compared a provider's inbound bearer against the API key they had issued us, so a provider implementing the published spec was refused and logged as a suspected attack |
 | `externalGamesEnabled` | Master kill switch for all provider games |
 
 ---

@@ -41,6 +41,8 @@ export interface CredentialStatus {
   environment: "sandbox" | "production";
   hasApiKey: boolean;
   hasApiSecret: boolean;
+  /** The bearer token we issue for their inbound results. R34. */
+  hasCallbackToken: boolean;
   hasCallbackSecret: boolean;
   /** Present during a rotation window, when both secrets are accepted. */
   hasPreviousCallbackSecret: boolean;
@@ -160,6 +162,7 @@ export async function listProviders(): Promise<ProviderSummary[]> {
             environment: credential.environment,
             hasApiKey: Boolean(credential.apiKey),
             hasApiSecret: Boolean(credential.apiSecret),
+            hasCallbackToken: Boolean(credential.callbackToken),
             hasCallbackSecret: Boolean(credential.callbackSecret),
             hasPreviousCallbackSecret: Boolean(credential.previousCallbackSecret),
             rotatedAt: credential.rotatedAt,
@@ -312,6 +315,30 @@ export async function setProviderEnabled(
           "Add a callback secret before enabling this provider, or every result it sends will be rejected as unsigned.",
       };
     }
+
+    /*
+     * THE SAME GATE FOR THE TOKEN, AND THE HOLE IT CLOSES WAS ALREADY REACHABLE.
+     *
+     * Before R34 a provider could be enabled with a callback secret and nothing else, and
+     * every result would then fail GATE 3 rather than gate 5 - refused for an absent bearer
+     * token, with `alert: "critical"` and a message about someone probing the endpoint. So
+     * the screen already had a switch that could be turned on into a configuration where
+     * nothing could ever work, which is exactly what the adapter and callback-secret checks
+     * above exist to prevent. Found while fixing R34 by asking what else gate 3 needs; the
+     * sibling check was simply missing.
+     *
+     * It requires the EXPLICIT field, not the `apiKey` fallback in `loadProviderSecrets`.
+     * Reason: the fallback exists so a provider enabled before this field existed keeps
+     * working, and accepting it here would let every new integration keep relying on it -
+     * a transitional path nobody can observe is a transitional path nobody removes.
+     */
+    if (!credential.callbackToken) {
+      return {
+        success: false,
+        error:
+          "Add a callback token before enabling this provider. It is the bearer token they send with every result, and without it each one is refused and logged as a suspected attack.",
+      };
+    }
   }
 
   provider.enabled = enabled;
@@ -339,6 +366,7 @@ export interface SaveCredentialsInput {
   /** Blank or omitted means "keep the stored value". Never means "clear it". */
   apiKey?: string;
   apiSecret?: string;
+  callbackToken?: string;
   callbackSecret?: string;
   /** When true, the outgoing callback secret is kept as `previousCallbackSecret`. */
   rotateCallbackSecret?: boolean;
@@ -352,6 +380,10 @@ export interface SaveCredentialsInput {
  * would submit empty secret fields - and if empty meant "clear", that harmless edit would
  * silently break every inbound callback. There is a separate explicit clear for the rare
  * case where removal is intended.
+ *
+ * FOUR FIELDS, TWO DIRECTIONS. `apiKey` and `apiSecret` are the provider's, used outbound.
+ * `callbackToken` and `callbackSecret` are ours, used inbound - the token authenticates the
+ * request and the secret signs the body. Conflating the two directions is what R34 was.
  *
  * ROTATION KEEPS THE OLD SECRET (chapter 06 section 8). A callback signed moments before
  * the rotation is still in flight when the new secret lands, and rejecting it would discard
@@ -375,6 +407,7 @@ export async function saveCredentials(
     environment: input.environment,
     apiKey: firstNonBlank(input.apiKey, existing?.apiKey),
     apiSecret: firstNonBlank(input.apiSecret, existing?.apiSecret),
+    callbackToken: firstNonBlank(input.callbackToken, existing?.callbackToken),
     callbackSecret: firstNonBlank(input.callbackSecret, existing?.callbackSecret),
     previousCallbackSecret: existing?.previousCallbackSecret,
     rotatedAt: existing?.rotatedAt,

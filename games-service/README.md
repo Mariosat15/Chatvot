@@ -41,6 +41,19 @@ It is enforced rather than trusted: **`npm run check:isolation`**.
   here it is load-bearing rather than incidental: module resolution, not discipline, is what
   keeps the two sides apart.
 
+### And one deliberate entry in the platform's config
+
+The platform's root `tsconfig.json` **excludes `games-service`**, alongside `apps`,
+`api-server` and `worker` - every other separate process. It has to, because the two configs
+disagree on purpose: the platform sets `allowJs: true` and this service does not.
+`tools/test-board.ts` imports the browser's `board.js` to drive it headlessly, so under this
+config the import needs a `@ts-expect-error` and under the platform's it is flagged as an
+unnecessary one. **The same file cannot satisfy both**, and the service's own config is the
+one that should win, because this is the config the service ships with.
+
+Removing that exclusion is not silent - it surfaces immediately as one typecheck error - so
+there is no guard, only this note.
+
 ---
 
 ## The games

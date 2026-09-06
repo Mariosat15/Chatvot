@@ -36,6 +36,7 @@ export async function PUT(
       environment?: "sandbox" | "production";
       apiKey?: string;
       apiSecret?: string;
+      callbackToken?: string;
       callbackSecret?: string;
     };
 
@@ -50,6 +51,7 @@ export async function PUT(
       environment: body.environment,
       apiKey: body.apiKey,
       apiSecret: body.apiSecret,
+      callbackToken: body.callbackToken,
       callbackSecret: body.callbackSecret,
     });
     if (!result.success) {
@@ -68,6 +70,7 @@ export async function PUT(
         environment: body.environment,
         apiKeyChanged: Boolean(body.apiKey?.trim()),
         apiSecretChanged: Boolean(body.apiSecret?.trim()),
+        callbackTokenChanged: Boolean(body.callbackToken?.trim()),
         callbackSecretChanged: Boolean(body.callbackSecret?.trim()),
       },
     });

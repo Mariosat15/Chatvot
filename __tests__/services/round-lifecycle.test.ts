@@ -94,7 +94,12 @@ beforeEach(async () => {
       {
         providerKey: MOCK_PROVIDER_KEY,
         environment: "sandbox",
-        apiKey: CALLBACK_TOKEN,
+        // The spec-conforming field, not `apiKey`. Reason: `loadProviderSecrets` still
+        // falls back to `apiKey` for a provider enabled before R34, so seeding the fallback
+        // here would leave every gate-3 test in this file exercising the legacy path rather
+        // than the one production takes. The fallback has its own tests in
+        // `provider-callback-token.test.ts`.
+        callbackToken: CALLBACK_TOKEN,
         callbackSecret: CALLBACK_SECRET,
       },
     ],

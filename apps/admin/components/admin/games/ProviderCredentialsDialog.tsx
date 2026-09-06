@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { KeyRound, Loader2, ShieldAlert, RotateCcw } from "lucide-react";
 import {
@@ -33,8 +33,15 @@ import type { GameProviderRow } from "./provider-types";
  *
  * BLANK MEANS "KEEP THE STORED VALUE", never "clear it", and the labels say so. Getting
  * this wrong would be silent: an operator opening this dialog to switch environment and
- * saving would submit three empty boxes, and if empty meant "clear" that harmless action
+ * saving would submit four empty boxes, and if empty meant "clear" that harmless action
  * would break every inbound result with no error anywhere.
+ *
+ * THE FOUR FIELDS ARE TWO PAIRS AND THE SCREEN SAYS WHICH, because conflating them is what
+ * R34 was: the platform promised providers a callback token in its own published spec and
+ * had nowhere to store one, so it compared their inbound bearer against the API key they had
+ * issued us. An operator handed four unlabelled boxes will eventually paste the same value
+ * into two of them, and the resulting failure looks like an attack rather than a typo - so
+ * the grouping is a defect-prevention measure, not decoration.
  */
 
 interface Props {
@@ -55,6 +62,7 @@ export default function ProviderCredentialsDialog({
   );
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
+  const [callbackToken, setCallbackToken] = useState("");
   const [callbackSecret, setCallbackSecret] = useState("");
   const [saving, setSaving] = useState(false);
   const [closingRotation, setClosingRotation] = useState(false);
@@ -66,6 +74,7 @@ export default function ProviderCredentialsDialog({
   const clearFields = () => {
     setApiKey("");
     setApiSecret("");
+    setCallbackToken("");
     setCallbackSecret("");
   };
 
@@ -81,6 +90,7 @@ export default function ProviderCredentialsDialog({
             environment,
             apiKey,
             apiSecret,
+            callbackToken,
             callbackSecret,
           }),
         },
@@ -147,6 +157,10 @@ export default function ProviderCredentialsDialog({
               <StoredBadge label="API key" present={Boolean(status?.hasApiKey)} />
               <StoredBadge label="API secret" present={Boolean(status?.hasApiSecret)} />
               <StoredBadge
+                label="Callback token"
+                present={Boolean(status?.hasCallbackToken)}
+              />
+              <StoredBadge
                 label="Callback secret"
                 present={Boolean(status?.hasCallbackSecret)}
               />
@@ -199,28 +213,47 @@ export default function ProviderCredentialsDialog({
             </Select>
           </div>
 
-          <SecretField
-            id="apiKey"
-            label="API key"
-            value={apiKey}
-            onChange={setApiKey}
-            stored={Boolean(status?.hasApiKey)}
-          />
-          <SecretField
-            id="apiSecret"
-            label="API secret"
-            value={apiSecret}
-            onChange={setApiSecret}
-            stored={Boolean(status?.hasApiSecret)}
-          />
-          <SecretField
-            id="callbackSecret"
-            label="Callback secret"
-            value={callbackSecret}
-            onChange={setCallbackSecret}
-            stored={Boolean(status?.hasCallbackSecret)}
-            hint="Used to prove a result really came from this provider. Changing it starts a rotation window in which the old secret is still accepted."
-          />
+          <FieldGroup
+            title="Issued to us by the provider"
+            caption="Sent on every call we make to them."
+          >
+            <SecretField
+              id="apiKey"
+              label="API key"
+              value={apiKey}
+              onChange={setApiKey}
+              stored={Boolean(status?.hasApiKey)}
+            />
+            <SecretField
+              id="apiSecret"
+              label="API secret"
+              value={apiSecret}
+              onChange={setApiSecret}
+              stored={Boolean(status?.hasApiSecret)}
+            />
+          </FieldGroup>
+
+          <FieldGroup
+            title="Issued by us to the provider"
+            caption="Sent on every result they send back to us. Give them both of these."
+          >
+            <SecretField
+              id="callbackToken"
+              label="Callback token"
+              value={callbackToken}
+              onChange={setCallbackToken}
+              stored={Boolean(status?.hasCallbackToken)}
+              hint="Their bearer token. Generate a long random value, store it here and give the provider the same value. Without it every result they send is refused and recorded as a suspected attack."
+            />
+            <SecretField
+              id="callbackSecret"
+              label="Callback secret"
+              value={callbackSecret}
+              onChange={setCallbackSecret}
+              stored={Boolean(status?.hasCallbackSecret)}
+              hint="Used to prove a result really came from this provider. Changing it starts a rotation window in which the old secret is still accepted."
+            />
+          </FieldGroup>
         </div>
 
         <DialogFooter>
@@ -234,6 +267,33 @@ export default function ProviderCredentialsDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Groups the two credential pairs by which side issued them.
+ *
+ * Reason it is a heading rather than a comment: the direction is the only thing that tells an
+ * operator which value goes in which box, and four boxes named "key", "secret", "token",
+ * "secret" are otherwise indistinguishable. R34 was this confusion made in code.
+ */
+function FieldGroup({
+  title,
+  caption,
+  children,
+}: {
+  title: string;
+  caption: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-3 rounded-lg border border-white/10 p-3">
+      <div>
+        <div className="text-sm font-medium text-white/90">{title}</div>
+        <p className="text-xs text-white/50">{caption}</p>
+      </div>
+      {children}
+    </div>
   );
 }
 

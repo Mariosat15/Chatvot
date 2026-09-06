@@ -200,16 +200,40 @@ protocol and not that the two sides agree - a stub returns what it is told. The 
 that spans both sides recomputes the HMAC from the stored secret over the exact bytes handed to
 `fetch`, which is the construction the service's inbound guard uses.
 
-**The phase has already produced its first real finding, which is the point of it.** The issued
-specification promises `Authorization: Bearer {CALLBACK_TOKEN}` - "a token we issue to you" - and
-**the platform has no such field**. `gameProviderCredentials` stores `apiKey`, `apiSecret` and
-`callbackSecret`; the credentials dialog offers three inputs; and `loadProviderSecrets` sets
-`callbackToken: credentials.apiKey`. A provider implementing the document exactly is refused at
-gate 3, and the log line says "either credentials are wrong or someone is probing the endpoint" -
-so **a correct integration reads as an attack**. Recorded as **R34**, open, and it must be fixed
-before the end-to-end rehearsal. Note it was found by building against the document rather than
-by reading the code, which is exactly the mechanism section 2 says makes this phase worth doing:
-a spec written by the same people as the platform is never tested by them re-reading it.
+**The phase produced its first real finding within a day, which is the point of it, and it is
+now FIXED (R34, 6 September 2026).** The issued specification promises
+`Authorization: Bearer {CALLBACK_TOKEN}` - "a token we issue to you" - and **the platform had no
+such field**. `gameProviderCredentials` stored `apiKey`, `apiSecret` and `callbackSecret`; the
+credentials dialog offered three inputs; and `loadProviderSecrets` set
+`callbackToken: credentials.apiKey`. A provider implementing the document exactly was refused at
+gate 3, and that log line says "either credentials are wrong or someone is probing the endpoint" -
+so **a correct integration read as an attack**. Note it was found by building against the document
+rather than by reading the code, which is exactly the mechanism section 2 says makes this phase
+worth doing: a spec written by the same people as the platform is never tested by them re-reading
+it.
+
+**Four things about the fix that generalise.**
+
+- **The spec was right and the code was wrong, so the code moved.** The tempting alternative was
+  to amend `01` and re-issue the requirements HTML to describe what the platform actually did.
+  That is the cheaper diff and it is the wrong direction: providers may already be building
+  against the issued version, and a document that changes to match a defect teaches everyone that
+  the document is not the contract.
+- **Fixing it exposed a sibling hole that was already reachable.** A provider could be enabled
+  with a callback secret and no token at all, so the screen could turn a switch on into a
+  configuration where **every** result fails at gate 3 and is logged as an attack. That is
+  precisely what the adapter and callback-secret refusals on the same screen exist to prevent;
+  the third check was simply missing. Found by asking what else gate 3 needs, not by a test.
+- **The compatibility fallback is deliberate, and it is fenced.** `loadProviderSecrets` still
+  reads `apiKey` when no `callbackToken` is stored, because a schema default fixes future rows
+  only and no migration can invent a value both sides already agree on. But `setProviderEnabled`
+  demands the **explicit** field, so nothing new can rely on it - **a transitional path that new
+  integrations may keep using is one nobody ever removes.**
+- **`||` rather than `??`, and the reason is a live hole rather than style.** For a credential
+  string every falsy value means absent, and `??` would hand gate 3 an empty token - where
+  `safeEqual("", "")` is **true**, so a request carrying no `Authorization` header at all would
+  authenticate. Gate 3 does guard this separately, which is exactly why it must not be the only
+  place it is handled.
 
 **The play surface found a live defect in the service and two more gaps in the issued spec.**
 

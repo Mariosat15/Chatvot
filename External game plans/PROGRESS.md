@@ -14,10 +14,10 @@
 | | |
 |---|---|
 | **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done.** A provider contest can be created, **published from the admin screen** (5 Sep 2026), entered, played and paid - and since 5 Sep 2026 it is paid **correctly**, which it was not before: two P0 defects meant every player tied on a score of zero and split the pool equally, and a lower-is-better game ranked backwards. A stuck round can now be **inspected and ended by an operator** (5 Sep 2026). **The whole lifecycle is now reachable by clicking** - the player round launch screen landed 5 Sep 2026 at `/competitions/[id]/play`, which also fixed a live defect: a provider-contest player was being sent to the forex trading workspace by a button labelled "Start Trading". **No provider selected**, which is what X4 needs |
-| **Next action** | **Technically: finish X4a** - fix **R34**, then register `chartvolt-games` through the admin screens and drive one round end to end. The game itself is now **playable by a human in a browser** (6 Sep 2026), against the service's own smoke tool rather than a ChartVolt contest. After X4a: provider **health** (the last of X6's five admin destinations) and the game-aware **contest list and dashboard** (`13` s4/s5), where the remaining trading-shaped player screens live. **Commercially, in parallel: find and assess a provider using `08`** - X4 cannot start without one, and nothing in the programme is blocked on that search |
+| **Next action** | **Technically: finish X4a** - register `chartvolt-games` through the admin screens, issue it a callback token, and drive one round end to end. The game itself is now **playable by a human in a browser** and **R34 is closed** (both 6 Sep 2026), so nothing technical stands between the two halves. After X4a: provider **health** (the last of X6's five admin destinations) and the game-aware **contest list and dashboard** (`13` s4/s5), where the remaining trading-shaped player screens live. **Commercially, in parallel: find and assess a provider using `08`** - X4 cannot start without one, and nothing in the programme is blocked on that search |
 | **Money defects closed** | **R26 closed 5 Sep 2026** - the admin cron's finalize copy paid **no** Game Master earnings and recorded no `retained_gm_fee` either, so the commission silently stayed with the platform. This one was **actively losing money rather than latent**: both apps run `checkAndFinalizeCompetitions` on an every-minute cron, so payment depended on which cron won the race. **Not retroactive - no backfill**, and past contests cannot be found by querying for retained rows because none were written. Also **R31** (a 0% Game Master rate paid 5%) and the two P0 score defects, same day |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
-| **Phase in progress** | **X4a - STARTED 6 Sep 2026.** `games-service/` (the provider) and the `chartvolt-games` adapter (the platform) are both **code-complete and not yet connected** - no round has travelled between them, and the provider has never been registered through the admin screens. **The game is playable by a human**: the launch URL serves a real board, verified in a browser on both titles, which also fixed a live defect - an unstarted round reported itself as `finished`, so the first screen a paying player saw was a result screen for a round they had not played. It also **found a defect in the issued specification's own auth scheme**: there is no `callbackToken` field anywhere, so a provider implementing `Bearer {CALLBACK_TOKEN}` exactly is rejected and logged as a probable attack. Latent, not configurable around, and it blocks the end-to-end rehearsal. See the 6 Sep work-log entry |
+| **Phase in progress** | **X4a - STARTED 6 Sep 2026.** `games-service/` (the provider) and the `chartvolt-games` adapter (the platform) are both **code-complete and not yet connected** - no round has travelled between them, and the provider has never been registered through the admin screens. **The game is playable by a human**: the launch URL serves a real board, verified in a browser on both titles, which also fixed a live defect - an unstarted round reported itself as `finished`, so the first screen a paying player saw was a result screen for a round they had not played. It also **found and then closed a defect in the platform's own published auth scheme** (**R34**): there was no `callbackToken` field anywhere, so a provider implementing `Bearer {CALLBACK_TOKEN}` exactly was rejected and logged as a probable attack. Latent throughout, so nothing was backfilled. **Nothing technical now stands between the two halves** - what remains is registering the provider and pointing the service at the platform. See the two 6 Sep work-log entries |
 | **Next phase, scope decided** | **X4a - ChartVolt as a first-party provider, with a real playable game** (`21`), **3.5-5 weeks**, starting before the provider health panel. It exists because **the review gate the programme is sequenced around cannot currently be held**: `mock.adapter.ts` returns a hostname that does not resolve, so the play screen's iframe fails to load and the final step has never been performed by a person. **Owner decided 5 Sep 2026 that it is both** the reference implementation *and* open question 10's hedge game - which **modifies the 2 Sep "no in-house game is built" decision** and is recorded in the decision log rather than by editing that entry. **No commercial dependency.** Two things not to misread: **risk X8 is reduced when it ships, not now**, and X4a **shrinks X4 without replacing it** - a provider we control cannot rehearse a real partner's auth, error shapes, latency or pricing |
 | **Owner instruction on record** | **External games only, no in-house game** (2 Sep 2026). **One step at a time, admin first, do not break the running app.** |
 | **Not owner-tested** | Everything after the 2 Sep navigation restructure. X1-X3, X5, the provider admin slice and the contest wizard are all **code-complete, awaiting owner test** - and "code-complete" here excludes the replay script and the label backfill, neither of which has been run against production |
@@ -628,6 +628,77 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 6 Sep 2026 - R34 CLOSED - THE PLATFORM CAN NOW HONOUR ITS OWN ISSUED SPECIFICATION
+
+**Shipped:** the `callbackToken` credential, so a provider implementing
+`Authorization: Bearer {CALLBACK_TOKEN}` - which `01` s2.2 and the requirements HTML have promised
+all along - is accepted rather than refused and logged as a suspected attack. Additive on both
+`whitelabel.model.ts` copies, read first in `loadProviderSecrets`, and enterable through the
+credentials dialog as a fourth box.
+
+**Files touched:** `database/models/whitelabel.model.ts` + the admin mirror,
+`lib/services/games/callback-verification.ts`,
+`apps/admin/lib/services/game-providers/provider-admin.service.ts`,
+`apps/admin/app/api/games/providers/[providerKey]/credentials/route.ts`,
+`apps/admin/components/admin/games/{ProviderCredentialsDialog.tsx,provider-types.ts}`,
+`__tests__/services/provider-callback-token.test.ts` (new, 8 tests),
+`__tests__/admin/game-providers-admin.test.ts` (+3 tests, several updated),
+`__tests__/services/round-lifecycle.test.ts`, `tools/probe-callback-token.ps1` (14 probes, all
+red on the expected test). `check:mirrors` green, both typechecks **identical error for error**
+(18 main, 223 admin) after diffing the lists rather than the counts.
+
+**THE SPEC WAS RIGHT AND THE CODE WAS WRONG, SO THE CODE MOVED.** The cheaper diff was to amend
+`01` and re-issue the requirements HTML to describe what the platform actually did - and it is the
+wrong direction. Providers may already be building against the issued version, and a document that
+changes to match a defect teaches everyone that the document is not the contract. **No version
+bump**, because nothing provider-facing changed.
+
+**A SIBLING HOLE THAT WAS ALREADY REACHABLE, FOUND BY ASKING WHAT ELSE GATE 3 NEEDS.** A provider
+could be enabled with a callback secret and no token at all, so the screen could turn a switch on
+into a configuration where **every** result fails at gate 3 and is recorded as an attack. That is
+exactly what the adapter and callback-secret refusals on the same screen exist to prevent - the
+third check was simply missing. `setProviderEnabled` now refuses, naming the missing thing, and it
+demands the **explicit** field rather than accepting the compatibility fallback: **a transitional
+path that new integrations may keep using is one nobody ever removes.**
+
+**Three implementation details worth carrying forward.**
+
+- **`||` rather than `??`, and the reason is a live hole rather than style.** For a credential
+  string every falsy value means absent, and `??` would hand gate 3 an empty token - where
+  `safeEqual("", "")` is **true**, so a request carrying no `Authorization` header at all would
+  authenticate. Gate 3 guards this separately, which is exactly why it must not be the only place
+  it is handled. Both halves are pinned by their own test.
+- **A precedence test needs its two sources to DISAGREE.** Seeding the token and the key to the
+  same value cannot tell the branches apart - the wrong branch produces the right answer - which
+  is the trap that made R31's first probe useless. The fixture names them
+  `the-token-WE-issued-them` and `the-key-THEY-issued-us`, and `loadProviderSecrets` returns a
+  `callbackTokenSource` discriminator so a test can assert **which field was read** rather than
+  only the outcome.
+- **The refusal test asserts WHICH GATE refused.** Gates 3 and 5 both return `signature_invalid`,
+  so a test checking only the result code passes just as happily when the HMAC fails for an
+  unrelated reason. It reads the error text recorded by gate 1's stored event. The same collision
+  cost real time while writing this: the mock adapter's gate 5b uses its own header name, and
+  omitting it produced a `signature_invalid` that looked exactly like the bug being fixed.
+
+**One probe stayed green, and it was the third cause rather than a weak test or a wrong claim:
+the fixture could not distinguish the branches.** Replacing the presence badge with a hardcoded
+`true` changed nothing, because the test that checked presence booleans stores every credential.
+The test written to close it asserts that a **missing** credential reads `false` - which is also
+the case that matters operationally, since a badge saying "set" for a token that was never stored
+leaves an operator no way to discover why enabling refuses them.
+
+**Owner tested:** nothing. Latent throughout - no real provider has ever existed, the mock uses
+its own header, so **nothing was refused in production and there is nothing to backfill.**
+
+**Deferred:** nothing from R34. `chartvolt-games` still has to be registered through the admin
+screens and no round has yet travelled between the two halves.
+
+**Next chat should:** register `chartvolt-games` as a provider through the real admin screens,
+issue it a callback token, point `games-service` at the platform with a real `.env`, and drive one
+round end to end by clicking - the first time the two halves will have spoken.
 
 ---
 
