@@ -789,62 +789,121 @@ proving only that our code agrees with itself.
 Everything below is optional. If you do not run provider games, skip it — the platform runs
 exactly as before and the PM2 entry simply has nothing to serve.
 
+### There are two ways to expose it, and the default needs no nginx or DNS
+
+The service always runs as its own process on its own port - that separation is the point of it,
+and neither option changes it. The only question is **how the player's browser reaches it.**
+
+| | Proxy through the main app (default) | Its own `games.` subdomain |
+|---|---|---|
+| DNS record | none | one A record |
+| nginx | **no change** | one server block |
+| Certificate | **none** - uses the app's | one certbot run |
+| Putting it live | `git pull`, rebuild, `pm2 start` | the above, plus all three |
+| Game frame origin | same-origin with the platform | separate origin |
+
+**Use the proxy unless you have a reason not to.** On a server already carrying live traffic it
+removes every step that could affect the existing sites: putting the game live becomes the same
+pull-and-rebuild you already do for any change.
+
+**What the proxy costs, stated plainly.** The game frame becomes same-origin with the platform.
+Every part of the provider protocol is still exercised for real - signed outbound calls, the round
+lifecycle, the signed inbound callback, score ingestion, settlement - because none of that
+involves the browser. What is no longer rehearsed is the cross-origin part: the play screen's
+origin check passes trivially rather than being tested against a genuinely different origin, and
+the service's `frame-ancestors` policy is not what permits the embed. Recorded in `21` s4.1c.
+
+**And the question that decides whether that matters: no, an external provider needs neither.**
+They host their own play surface on their own domain, so all we store is its address. Adding
+providers later touches no nginx and no DNS, whichever option you pick here.
+
 ### What has to be true before a player can play
 
-Five things, and each one fails in a way that is easy to misread:
+Five things on the proxy route, and each fails in a way that is easy to misread:
 
 | Thing | If it is missing |
 |---|---|
 | The service is running | The admin catalogue sync reports the provider unreachable |
-| `games.yourdomain.com` resolves and has a certificate | The board's iframe is blocked as mixed content and stays **blank with nothing in any log** |
+| The main app has been **rebuilt** since this feature landed | `/play` returns the app's 404 page, so the frame renders a not-found screen |
 | `games-service/.env` is filled in | The service refuses to boot and names the variable on the first line of its log |
 | The four credentials match the admin panel | Every result is refused as `signature_invalid`, which looks identical to an attack |
 | The provider and its titles are enabled in the admin panel | Players see no games; the contest wizard offers nothing to schedule |
 
-### Step 1: DNS and the nginx block
+### Step 1: Nothing, on the proxy route
 
-Add the `games` A record (see [DNS Setup](#dns-setup)), then:
+Skip to step 2. The rewrites in `next.config.ts` put the play surface on the app's own origin at
+`/play`, so there is no DNS record, no nginx edit and no certificate.
+
+Three things are worth knowing about those rewrites, because each prevents a blank-frame failure
+that leaves nothing in any log. They are returned as a plain array, which Next.js treats as
+`afterFiles` - **real pages and files in `public/` are matched first and always win**, so the
+rules can only catch paths the app does not already serve. The path is `/play` specifically,
+because the service's own HTML references `/play/app.css` and `/play/app.js` **absolutely**. And
+artwork is mounted at `/play/assets/` rather than `/assets/`, because **the app already has a
+`public/assets` directory**. `__tests__/services/games-play-proxy.test.ts` pins all three,
+including the rule ordering - `/play/:path*` placed before the artwork rule would swallow it
+while both rules still read correctly in isolation.
+
+<details>
+<summary><b>Only if you want the separate subdomain instead</b></summary>
+
+Add the `games` A record (see [DNS Setup](#dns-setup)), then **use a separate nginx file** and
+never open the one serving your existing sites:
 
 ```bash
-# Fill in the games subdomain in the nginx config
-sed -i 's/GAMES_DOMAIN_PLACEHOLDER/games.yourdomain.com/g' /etc/nginx/sites-available/chartvolt
-
-nginx -t && systemctl reload nginx
-
-# Certificate. Without it the iframe is blocked as mixed content.
-certbot --nginx -d games.yourdomain.com
-```
-
-**On a server that is already live, prefer a separate file** and never open the one serving your
-existing sites:
-
-```bash
-# Copy just the games server block (and its upstream) into its own file
+# Copy the games server block and its upstream from deploy/nginx.conf into its own file
 sudo nano /etc/nginx/sites-available/chartvolt-games
 sudo ln -sf /etc/nginx/sites-available/chartvolt-games /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
+
+certbot --nginx -d games.yourdomain.com
 ```
 
 An `upstream` block is valid inside a `sites-available` file, because those files are included
 from within nginx's `http` context - so the games config is entirely self-contained and the
-existing site file is never touched. Two properties make this close to risk-free, and both are
-worth knowing before you run it: **it only adds a server block, never edits an existing one**, and
-**nginx refuses to apply a broken config** - a failed `nginx -t`, or a reload of a bad file, leaves
-the old configuration serving traffic and prints the error. The worst case is that the games
-subdomain does not work and you delete the file. Rolling back is
+existing site file is never touched. Two properties make this close to risk-free: **it only adds
+a server block, never edits an existing one**, and **nginx refuses to apply a broken config** - a
+failed `nginx -t`, or a reload of a bad file, leaves the old configuration serving traffic and
+prints the error. Rolling back is
 `rm /etc/nginx/sites-enabled/chartvolt-games && nginx -t && systemctl reload nginx`.
 
-Read the comment block above the games server block in `deploy/nginx.conf` before changing
-it. It deliberately sets **no `X-Frame-Options`** — the play page exists to be embedded — and
-adds no other headers, because an `add_header` there would replace the service's own
-`Referrer-Policy: no-referrer` and start leaking launch tokens in referrers.
+Then set `GAMES_PUBLIC_URL=https://games.yourdomain.com` and leave `GAMES_ASSET_BASE_URL` unset.
 
-### Step 2: Configure and start the service
+</details>
+
+If you do take the subdomain route, read the comment block above the games server block in
+`deploy/nginx.conf` before changing it. It deliberately sets **no `X-Frame-Options`** — the play
+page exists to be embedded — and adds no other headers, because an `add_header` there would
+replace the service's own `Referrer-Policy: no-referrer` and start leaking launch tokens in
+referrers.
+
+### Step 2: Pull and rebuild
+
+```bash
+cd /var/www/chartvolt
+git pull origin main
+
+# The main app carries the /play rewrites, and the admin app carries the provider screens.
+# Both need a rebuild; neither is optional.
+npm run build && pm2 restart chartvolt-web
+cd apps/admin && npm run build && pm2 restart chartvolt-admin && cd ../..
+```
+
+### Step 3: Configure and start the service
 
 ```bash
 cd /var/www/chartvolt/games-service
 cp env.example .env
 nano .env
+```
+
+On the proxy route, set the play origin to **the main site**, and point artwork at the `/play`
+prefix so the catalogue emits URLs the rewrites can resolve:
+
+```
+GAMES_PUBLIC_URL=https://yourdomain.com
+GAMES_ASSET_BASE_URL=https://yourdomain.com/play
+GAMES_FRAME_ANCESTORS=https://yourdomain.com https://www.yourdomain.com
 ```
 
 Two entries decide whether this is safe, so do not skim them:
@@ -861,22 +920,28 @@ them go into the admin panel in the next step.
 
 ```bash
 npm install && npm run build
+cd /var/www/chartvolt
 pm2 start ecosystem.config.js --only chartvolt-games
+pm2 save
 pm2 logs chartvolt-games --lines 30
 
 # Expect three lines, and no warning about sandbox mode:
 #   🎮 ChartVolt Games connected to chartvolt_games
-#   🎮 ChartVolt Games listening on https://games.yourdomain.com (port 4010)
+#   🎮 ChartVolt Games listening on https://yourdomain.com (port 4010)
 #   🔄 ChartVolt Games sweeper running every 15s
 
-curl -s http://127.0.0.1:4010/health          # {"ok":true,...,"sandbox":false}
-curl -sI https://games.yourdomain.com/play    # 200, and no X-Frame-Options header
+curl -s http://127.0.0.1:4010/health              # {"ok":true,...,"sandbox":false}
+curl -sI https://yourdomain.com/play              # 200, text/html
+curl -sI https://yourdomain.com/play/app.css      # 200, text/css
 ```
+
+Those last two are the proxy check. A **404** on `/play` means the main app was not rebuilt in
+step 2. A **502** means the service is not running.
 
 If `sandbox` is `true`, stop and fix it. Sandbox mode can force a score, and a forced score
 decides real prize money on a paid contest.
 
-### Step 3: Register it in the admin panel
+### Step 4: Register it in the admin panel
 
 **Admin → GAMES → Game Providers → Register provider.**
 
@@ -888,15 +953,16 @@ decides real prize money on a paid contest.
 
 The base URL is **loopback on purpose, and it is not a downgrade.** The platform and the
 provider are on the same machine, so API traffic never touches a network — which is safer
-than routing it out through the public subdomain and back. The player's browser still loads
-the board from `https://games.yourdomain.com`, because the launch URL is built from
-`GAMES_PUBLIC_URL`, and the provider specification treats the play origin as a separate fact
-from the API base URL for exactly this reason.
+than routing it out through a public address and back. The player's browser reaches the board
+by a different route entirely: the launch URL is built from `GAMES_PUBLIC_URL`, which is your
+main site on the proxy route or the games subdomain otherwise. The provider specification
+treats the play origin as a separate fact from the API base URL for exactly this reason, and
+that separation is what lets the proxy route work with no DNS or nginx change.
 
 Loopback is the **only** case where `http://` is accepted. A third-party provider must be
 `https://`, and a private LAN address is refused even over http.
 
-### Step 4: Credentials — four values, two directions
+### Step 5: Credentials — four values, two directions
 
 **Game Providers → the provider's row → Credentials.** Four boxes in two labelled groups, and
 the grouping is the whole point:
@@ -913,7 +979,7 @@ provider posts. Swapping them produces a signature error that reads like an atta
 A blank box means **keep the stored value**, not clear it — the dialog can never show you a
 secret, so an operator editing only the environment would otherwise wipe all four.
 
-### Step 5: Sync the catalogue, then enable
+### Step 6: Sync the catalogue, then enable
 
 1. **Sync games** on the provider's row. Two titles should appear: **Circuit Sprint**
    (higher score wins) and **Circuit Perfect** (fastest clean solve wins).

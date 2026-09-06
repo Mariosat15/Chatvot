@@ -190,7 +190,7 @@ service's own smoke tool, never yet launched from a ChartVolt contest.
 | **The playable board** | **Built.** `GET /play?t={token}` serves a real game: `public/play/` (4 files, no build step) behind `src/http/play-page.ts`. Dragging with a finger draws paths, the clock runs, a solved board advances, and the round settles into a signed result. Verified by a human-equivalent browser run on both titles. 11 headless tests drive the browser module against the server's verifier; 13 probes |
 | **Provider registration** | **NOT DONE through the admin screens.** The service now has a local `.env` and has been started - including **from its production `dist` build**, not only under `tsx` - and answers signed catalogue calls. Registration was attempted in the admin UI on 6 Sep 2026 and **found a live defect**: the base-URL validator required `https://` unconditionally, so a loopback provider could not be registered at all. Fixed (see 4.1b) |
 | **Any end-to-end round** | **NOT DONE.** No round has travelled between the two halves |
-| **Production deployment** | **Prepared, not performed.** PM2 entry `chartvolt-games`, an nginx server block for a `games.` subdomain, `games-service/env.example`, and a runbook in `deploy/README.md` covering DNS, TLS, the four credentials and the admin steps. Nothing has been deployed - see 4.1b for the two boot guards this work added |
+| **Production deployment** | **Prepared, not performed.** PM2 entry `chartvolt-games`, `games-service/env.example`, and a runbook in `deploy/README.md`. **Two exposure routes**: proxied through the platform app at `/play` (the default since 6 Sep 2026, owner's choice - no DNS, no nginx, no certificate) or its own `games.` subdomain (the nginx block is kept). Nothing has been deployed - see 4.1b for the two boot guards this work added and 4.1c for what the proxy route costs |
 | Mobile support | **Built for the game screen, not yet for the catalogue.** The board is sized from the viewport, uses `100dvh`, and sets `touch-action: none` so a drag does not scroll the page - which is the one CSS rule in the file that decides whether the game works on a phone at all |
 | Content set, localisation, runbook | **NOT STARTED.** Both titles declare `en` only, deliberately: declaring a locale and shipping English strings for it renders confident English copy on a Greek game page with nothing raising an error |
 
@@ -327,6 +327,59 @@ carve-out is probed by widening `isProduction()` to `return true` and checking t
 tests catch it. Two further probes check the carve-out has not leaked onto the credentials, where
 a production-only secret would restore the exact "absent configuration is permission to proceed"
 class the config module exists to remove.
+
+### 4.1c The play surface is proxied through the platform app, and that is a real trade
+
+The owner rejected the subdomain route on 6 September 2026 on deployment-risk grounds: a DNS
+record, an nginx server block and a certbot run on a server already carrying live traffic, none
+of which they were willing to perform. **The service still runs as its own process on its own
+port** - nothing about the separation the phase exists to prove has changed. What changed is how
+the *player's browser* reaches it: three rewrites in `next.config.ts` mount the play surface on
+the platform's own origin at `/play`.
+
+**State the cost rather than burying it, because a summary would round it up to "same thing".**
+The game frame is now **same-origin** with the platform. The provider *protocol* is entirely
+unaffected - signed outbound calls, the round lifecycle, the signed inbound callback, score
+ingestion and settlement all run exactly as before, because none of them involves a browser. What
+is no longer rehearsed is the browser half:
+
+- The play screen's `event.origin` check **passes trivially** instead of being tested against a
+  genuinely different origin. The check still runs; it is simply no longer discriminating.
+- The service's `frame-ancestors` policy is **not what permits the embed** - same-origin framing
+  is allowed by the platform's existing `X-Frame-Options: SAMEORIGIN`. The policy is still set and
+  still correct, just not load-bearing here.
+- The absent platform-side CSP `frame-src` allowlist stays absent, and stays untested.
+
+**All three close at X4 against a real provider and need no work here**, because an external
+provider is cross-origin by construction and hosts its own play surface. That is also the answer
+to the question the decision raised: **adding external providers requires no rewrite, no nginx
+change and no DNS record** - the platform stores their address and nothing more.
+
+**Four things about the implementation that generalise.**
+
+- **Check what the app already owns before claiming a URL prefix.** The obvious mount for catalogue
+  artwork was `/assets/`, and the platform has a `public/assets` directory. Under Next.js's
+  `afterFiles` semantics that prefix would be **shadowed by the real folder for any file that
+  exists and shadow the game for any that does not** - a half-working prefix, worse than either
+  outcome alone, and it would have looked correct in every test that happened to request a
+  missing file. Artwork is mounted at `/play/assets/` with `GAMES_ASSET_BASE_URL` set to match.
+- **Returning a bare array is the safety property, not a shorthand.** Next.js treats it as
+  `afterFiles`, so real pages and `public/` files match first and always win - which is what makes
+  these rules unable to change the behaviour of any existing route. The `beforeFiles` form would
+  invert exactly that. **A configuration shape can be a safety guarantee**, and it is worth a
+  comment saying so, because "tidying" it into the object form silently removes the guarantee.
+- **Rewrite order is behaviour, so a test must assert position and not contents.** `/play/:path*`
+  placed before the artwork rule swallows it and forwards to a path the service does not serve.
+  Both rules remain present and individually correct, so a contents assertion passes while every
+  thumbnail 404s. Same class as the guard-position lesson from the admin Edit button.
+- **A same-prefix constraint between two independent codebases needs writing down on both sides.**
+  The proxy works only because `index.html` uses absolute `/play/...` paths and the platform mounts
+  it at `/play`. Neither repository can see the other - `check:isolation` guarantees it - so the
+  coupling exists only in prose, and it is now stated in `games-service/README.md` as well as here.
+
+**What this does not change:** the service is still deployable on its own subdomain, the nginx
+block and its runbook section are kept, and `GAMES_PUBLIC_URL` still decides which. Switching
+later is two environment variables and a restart, with no code change.
 
 ---
 

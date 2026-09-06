@@ -137,7 +137,7 @@ See `env.example` for the annotated template to copy onto a server.
 | `GAMES_SANDBOX` | no, `false` | Enables force-score, force-status and suppress-callback. These decide prize money if they are ever reachable in production, so the safe value is the one you get by forgetting to set anything |
 | `GAMES_FRAME_ANCESTORS` | **in production** | The CSP allowlist. Unset leaves the game embeddable anywhere, which is right for a service not yet told who its customer is and wrong once real players arrive, so it is mandatory under `NODE_ENV=production` |
 | `GAMES_CALLBACK_HOST_ALLOWLIST` | no | Hostnames we will POST results to. Unset means any, so set it in production - the primary control is a shared secret, and shared secrets leak |
-| `GAMES_ASSET_BASE_URL` | no, `GAMES_PUBLIC_URL` | Where catalogue artwork is served from, for a CDN in front of the service |
+| `GAMES_ASSET_BASE_URL` | no, `GAMES_PUBLIC_URL` | Where catalogue artwork is served from, for a CDN in front of the service. **Required when the play surface is proxied through the platform app** rather than given its own subdomain: that app owns `public/assets`, so artwork is mounted at `/play/assets/` and this must be `<origin>/play` to match |
 | `GAMES_SWEEP_MS` | no, 15000 | The sweeper interval. Lowered by the tests so they drive the real timer |
 
 There is deliberately **no variable for where results are posted.** The callback address arrives
@@ -151,6 +151,14 @@ provider holding its own copy is a provider that keeps posting to a decommission
 The launch URL the platform is handed points at `GET /play?t={token}`, served from
 `public/play/` by `src/http/play-page.ts`. Four files, no build step and no framework: a phone on
 a bad connection is the target, and a bundler here would buy nothing.
+
+**The path `/play` is not arbitrary and must not be changed casually.** `index.html` references
+`/play/app.css` and `/play/app.js` **absolutely**, so anything that mounts the page at a different
+prefix serves a working document whose stylesheet and script both 404 - a blank white frame with
+nothing in any server log. It matters because the platform can expose this surface in two ways:
+on the service's own subdomain, or proxied through the platform app at the same `/play` path
+(`next.config.ts`, and `deploy/README.md` for which to choose). The proxy route works *because*
+the prefix is the same on both sides.
 
 **The client is an input device, not a source of truth.** It draws a board, it collects drags,
 and it posts the cells the player joined. It never computes or transmits a score - the server

@@ -14,7 +14,7 @@
 | | |
 |---|---|
 | **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done.** A provider contest can be created, **published from the admin screen** (5 Sep 2026), entered, played and paid - and since 5 Sep 2026 it is paid **correctly**, which it was not before: two P0 defects meant every player tied on a score of zero and split the pool equally, and a lower-is-better game ranked backwards. A stuck round can now be **inspected and ended by an operator** (5 Sep 2026). **The whole lifecycle is now reachable by clicking** - the player round launch screen landed 5 Sep 2026 at `/competitions/[id]/play`, which also fixed a live defect: a provider-contest player was being sent to the forex trading workspace by a button labelled "Start Trading". **No provider selected**, which is what X4 needs |
-| **Next action** | **Technically: finish X4a** - deploy `games-service` to a `games.` subdomain, register `chartvolt-games` through the admin screens, and drive one round end to end. The game is **playable by a human in a browser**, **R34 is closed**, and the service is now **deployable** - PM2 entry, nginx block, `env.example` and a runbook in `deploy/README.md` (all 6 Sep 2026) - so nothing technical stands between the two halves. **Owner decided 6 Sep 2026 to deploy first and rehearse against the live site**, rather than complete the local rehearsal. After X4a: provider **health** (the last of X6's five admin destinations) and the game-aware **contest list and dashboard** (`13` s4/s5), where the remaining trading-shaped player screens live. **Commercially, in parallel: find and assess a provider using `08`** - X4 cannot start without one, and nothing in the programme is blocked on that search |
+| **Next action** | **Technically: finish X4a** - pull and rebuild on the server, start `chartvolt-games`, register it through the admin screens, and drive one round end to end. **No DNS, nginx or certificate work is needed** since the play surface is proxied through the platform app (owner's choice, 6 Sep 2026). The game is **playable by a human in a browser**, **R34 is closed**, and the service is now **deployable** - PM2 entry, nginx block, `env.example` and a runbook in `deploy/README.md` (all 6 Sep 2026) - so nothing technical stands between the two halves. **Owner decided 6 Sep 2026 to deploy first and rehearse against the live site**, rather than complete the local rehearsal. After X4a: provider **health** (the last of X6's five admin destinations) and the game-aware **contest list and dashboard** (`13` s4/s5), where the remaining trading-shaped player screens live. **Commercially, in parallel: find and assess a provider using `08`** - X4 cannot start without one, and nothing in the programme is blocked on that search |
 | **Money defects closed** | **R26 closed 5 Sep 2026** - the admin cron's finalize copy paid **no** Game Master earnings and recorded no `retained_gm_fee` either, so the commission silently stayed with the platform. This one was **actively losing money rather than latent**: both apps run `checkAndFinalizeCompetitions` on an every-minute cron, so payment depended on which cron won the race. **Not retroactive - no backfill**, and past contests cannot be found by querying for retained rows because none were written. Also **R31** (a 0% Game Master rate paid 5%) and the two P0 score defects, same day |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
 | **Phase in progress** | **X4a - STARTED 6 Sep 2026.** `games-service/` (the provider) and the `chartvolt-games` adapter (the platform) are both **code-complete and not yet connected** - no round has travelled between them, and the provider has never been registered through the admin screens. **The game is playable by a human**: the launch URL serves a real board, verified in a browser on both titles, which also fixed a live defect - an unstarted round reported itself as `finished`, so the first screen a paying player saw was a result screen for a round they had not played. It also **found and then closed a defect in the platform's own published auth scheme** (**R34**): there was no `callbackToken` field anywhere, so a provider implementing `Bearer {CALLBACK_TOKEN}` exactly was rejected and logged as a probable attack. Latent throughout, so nothing was backfilled. **Nothing technical now stands between the two halves** - what remains is deploying the service and registering it. It is now **deployable**: a PM2 entry, an nginx block for a `games.` subdomain, `env.example` and a `deploy/README.md` runbook, plus **two production-only boot guards** for the play origin and the frame allowlist, both of which previously failed invisibly. Writing the runbook also found that the admin panel **could not register a loopback provider at all**. See the three 6 Sep work-log entries |
@@ -344,7 +344,7 @@ numbers in chapters `01`-`09` remain resolvable. **Plan against the X-phases bel
 | **X1** | Foundation: game label, score, registry, four seams, **GM insert game label** | `11` + `19` s3.1 | 2.5-3.5 weeks | **`CODE-COMPLETE`** 4 Sep 2026. Ranking gate **cleared** (replay: 4/4 reproduced exactly). Backfill written, **not yet `--apply`d** |
 | **X2** | Provider abstraction + mock adapter | `09` E1 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026. Nothing player-visible - `externalGamesEnabled` defaults false |
 | **X3** | Round lifecycle + result ingestion | `09` E2 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026. **Rehearsals 1-6 of `07` s9 green** against the mock (49 tests, 6 guards probed). 7-10 need X5/X8 |
-| **X4a** | **ChartVolt as a first-party provider + a real playable game** - registered through the real admin screens, served from its own origin, reporting through the real signed callback. **Doubles as the in-house hedge game** | `21` | **3.5-5 weeks** | `IN PROGRESS` since 6 Sep 2026. **Built:** the standalone `games-service` (seeded puzzle engine, two titles, all four spec endpoints, signed auth, retrying callback, reconciliation sweeper), the platform-side `chartvolt-games` adapter, mirrored, and **the playable board** - a human can start, drag, solve, submit and see a result, verified in a browser on both titles, **167 tests** in the service. Also **deployable**: PM2 entry, nginx block for a `games.` subdomain, `env.example`, and a `deploy/README.md` runbook, with the service proven to run from its production `dist` build. **Not built:** provider registration through the admin screens, and any end-to-end round - **the two halves have never spoken.** Four defects found and all four **fixed**: the missing `callbackToken` field (**R34**), an https-only base-URL rule that made a loopback provider unregisterable, and two invisible configuration defaults (a localhost play origin, an absent frame allowlist). Original scope **decided 5 Sep 2026: it is both** the reference implementation and open question 10's hedge game, which is why the estimate is not 1-1.5 weeks. **No commercial dependency** - the only remaining work on the shortest useful path that does not wait on a contract. Exists because **the review gate `10` s4 is sequenced around cannot currently be held**: `mock.adapter.ts` returns `https://mock.provider.test/...`, which does not resolve, so the play screen's iframe fails to load and the last step of the lifecycle has never been performed by a person. **Runs before the provider health panel**, so health can be proven by watching it go red |
+| **X4a** | **ChartVolt as a first-party provider + a real playable game** - registered through the real admin screens, served from its own origin, reporting through the real signed callback. **Doubles as the in-house hedge game** | `21` | **3.5-5 weeks** | `IN PROGRESS` since 6 Sep 2026. **Built:** the standalone `games-service` (seeded puzzle engine, two titles, all four spec endpoints, signed auth, retrying callback, reconciliation sweeper), the platform-side `chartvolt-games` adapter, mirrored, and **the playable board** - a human can start, drag, solve, submit and see a result, verified in a browser on both titles, **167 tests** in the service. Also **deployable**: PM2 entry, `env.example`, a `deploy/README.md` runbook, and the service proven to run from its production `dist` build. **Two exposure routes** - proxied through the platform app at `/play` (owner's choice, 6 Sep 2026: no DNS, no nginx, no certificate) or its own `games.` subdomain (nginx block kept). The proxy makes the frame same-origin, which costs the cross-origin rehearsal and nothing in the protocol - `21` s4.1c. **Not built:** provider registration through the admin screens, and any end-to-end round - **the two halves have never spoken.** Four defects found and all four **fixed**: the missing `callbackToken` field (**R34**), an https-only base-URL rule that made a loopback provider unregisterable, and two invisible configuration defaults (a localhost play origin, an absent frame allowlist). Original scope **decided 5 Sep 2026: it is both** the reference implementation and open question 10's hedge game, which is why the estimate is not 1-1.5 weeks. **No commercial dependency** - the only remaining work on the shortest useful path that does not wait on a contract. Exists because **the review gate `10` s4 is sequenced around cannot currently be held**: `mock.adapter.ts` returns `https://mock.provider.test/...`, which does not resolve, so the play screen's iframe fails to load and the last step of the lifecycle has never been performed by a person. **Runs before the provider health panel**, so health can be proven by watching it go red |
 | **X4** | Real adapter against sandbox | `09` E3 | 1 week | `NOT STARTED` - **blocked on a signed provider**. X4a shrinks it but **does not replace it**: a harness we control cannot rehearse a real partner's auth, error shapes, latency or pricing |
 | **X5** | Contest integration + settlement | `09` E4 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026, **with two P0 payout defects found and fixed 5 Sep 2026** - publish, entry, ranking, round launch, settlement and **all three unresolved-round policies**. **A provider contest can be published, entered, played and paid. Publishing became clickable on 5 Sep 2026 (X6 slice), and the player round launch on the same day (`13` s1.1a) - the lifecycle is no longer API-only anywhere.** Settlement was an **extraction**: the payout, fee/GM and completion stages moved to `lib/services/settlement/` and trading was rewired onto them. Closing `exclude` also closed **`hold_and_alert`**, which nothing had ever consumed. **The two P0s are why "code-complete" must never be read as "correct":** no code path wrote `participant.score`, so every player settled on zero and split the pool equally; and settlement read `scoreDirection` off a field neither participant copy declared, so a lower-is-better game paid the slowest player first |
 | **X6** | Admin: nav restructure incl. **the single Trading section**, RBAC, provider registration, game-aware wizard, analytics, **GM creation API + wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | `PARTIALLY DONE` - nav restructure and single Trading destination **built and owner-tested 2 Sep 2026**. **Provider registration, credentials and the per-title catalogue switch code-complete 4 Sep 2026** (`12` s4.1a). **Contest wizard from `configSchema` + pre-flight validation code-complete 4 Sep 2026** (`12` s2.1) - creates a **draft**. **The publish control is code-complete 5 Sep 2026** (`12` s3.1a), which also made the competitions list game-aware: `draft` admitted as a status, its own badge, a Drafts count, a provider game badge, and the trading Edit button **withheld** from provider contests because `PUT /api/competitions/[id]` blind-assigns that form's body. **The round inspector and manual resolution are code-complete 5 Sep 2026** (`12` s4.2a) - read-only inspection plus **ending** a stuck round (void/abandoned/expired) with a mandatory reason; it deliberately **cannot enter a score**. Still `NOT STARTED`: provider health panel, live-contest controls, provider contest **editing**, analytics by provider, GM creation API |
@@ -628,6 +628,70 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 6 Sep 2026 - X4a - THE PLAY SURFACE IS PROXIED THROUGH THE PLATFORM, ON OWNER'S INSTRUCTION
+
+**Shipped:** three rewrites in `next.config.ts` mounting the game's play surface on the
+platform's own origin at `/play`, plus `__tests__/services/games-play-proxy.test.ts` (7 tests).
+**Deploying the game now needs no DNS record, no nginx change and no certificate** - it is the
+same `git pull` and rebuild as any other change. Proven locally: the page, its stylesheet, its
+script and a catalogue thumbnail all serve through port 3000, and the platform's own `/` and
+`/assets/icons/logo.svg` still serve unchanged.
+
+**Owner decision, and the reason matters more than the choice.** The subdomain route was rejected
+on deployment risk - a DNS record, an nginx server block and a certbot run against a live server
+they were not willing to touch. **The service still runs as its own process, its own port, its own
+database, sharing no code with the platform.** Only the browser's route to it changed.
+
+**The cost, stated rather than buried: the game frame is now same-origin.** The provider protocol
+is untouched - signed outbound calls, the round lifecycle, the signed callback, score ingestion
+and settlement never involve a browser. What is no longer rehearsed is the browser half: the play
+screen's `event.origin` check **passes trivially** rather than being tested against a genuinely
+different origin, and `frame-ancestors` is not what permits the embed (the platform's existing
+`X-Frame-Options: SAMEORIGIN` allows it). All of it closes at X4 against a real provider, which is
+cross-origin by construction. Recorded in `21` s4.1c, not glossed.
+
+**And the answer to the owner's question, which is the reassuring part: an external provider needs
+neither a rewrite nor an nginx change nor a DNS record.** They host their own play surface on
+their own domain; the platform stores its address. This work is a one-time cost of being our own
+provider, not a per-provider cost.
+
+**Four things that generalise.**
+
+- **Check what the app already owns before claiming a URL prefix.** Artwork was going to be
+  mounted at `/assets/`, and the platform has a `public/assets` directory. Under Next.js's
+  `afterFiles` semantics that prefix is **shadowed by the real folder for any file that exists and
+  shadows the game for any that does not** - a half-working prefix, worse than either outcome
+  alone, and it would have passed any test that happened to request a missing file. One `Test-Path`
+  before writing the rule avoided it.
+- **A configuration shape can be the safety guarantee.** Returning a bare array makes Next.js
+  treat these as `afterFiles`, so real pages and `public/` files always win and the rules
+  **cannot** change any existing route's behaviour. The `beforeFiles` object form inverts exactly
+  that. It reads like a shorthand, so it is commented as a guarantee - "tidying" it into the
+  object form would silently remove the one property that makes this safe to add to a live app.
+- **Rewrite order is behaviour, so the test asserts position, not contents.** `/play/:path*` placed
+  before the artwork rule swallows it and forwards to a path the service does not serve. Both rules
+  stay present and individually correct, so a contents assertion passes while every thumbnail
+  404s. Same class as the fixed-character Edit-guard lesson: **assert position within the
+  construct.**
+- **A coupling between two deliberately isolated codebases lives only in prose, so write it on
+  both sides.** The proxy works only because `index.html` uses absolute `/play/...` paths and the
+  platform mounts it at `/play`. `check:isolation` guarantees neither repository can see the other,
+  so nothing mechanical can enforce this. Stated in `games-service/README.md` and `21` s4.1c.
+
+**Deviated from plan:** `21` and the runbook described a `games.` subdomain as the route. Both now
+carry two routes with the proxy as the default; **the nginx block and its instructions are kept,
+not deleted**, and switching is two environment variables and a restart with no code change.
+
+**Owner tested:** not yet. Nothing is deployed.
+
+**Deferred:** unchanged from the entry below, plus the cross-origin rehearsal and the platform CSP
+`frame-src` allowlist, both of which now wait for X4 rather than being available at X4a.
+
+**Next chat should:** walk the owner through the pull-and-rebuild, then register and enable
+`chartvolt-games` and drive one round end to end by clicking.
 
 ---
 
