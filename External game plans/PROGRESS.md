@@ -14,7 +14,7 @@
 | | |
 |---|---|
 | **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done.** A provider contest can be created, **published from the admin screen** (5 Sep 2026), entered, played and paid - and since 5 Sep 2026 it is paid **correctly**, which it was not before: two P0 defects meant every player tied on a score of zero and split the pool equally, and a lower-is-better game ranked backwards. A stuck round can now be **inspected and ended by an operator** (5 Sep 2026). **The whole lifecycle is now reachable by clicking** - the player round launch screen landed 5 Sep 2026 at `/competitions/[id]/play`, which also fixed a live defect: a provider-contest player was being sent to the forex trading workspace by a button labelled "Start Trading". **No provider selected**, which is what X4 needs |
-| **Player screens** | **R37 closed 6 Sep 2026, and it is the one to read first if a provider board looks odd.** Neither app's `getCompetitionLeaderboard` passed `score` or `scoreDirection` to the ranking engine, so **every provider participant tied on zero and the board rendered in tie-break order** - and a lower-is-better title was *reversed on screen while correct at settlement*, so a player could lead all week and be paid last. **Latent for money, live for players:** settlement resolves both fields itself, so no payout was ever wrong and **nothing was backfilled**. Fixed by moving `resolveScoreDirection` out of settlement into a shared mirrored module used by all three consumers. Same day, `RoundPreflight` stopped offering an enabled **Play** button on a contest that had not started. **The lobby page itself is still trading-shaped** - see `13` s4.1a for exactly what is and is not built |
+| **Player screens** | **R37 closed 6 Sep 2026, and it is the one to read first if a provider board looks odd.** Neither app's `getCompetitionLeaderboard` passed `score` or `scoreDirection` to the ranking engine, so **every provider participant tied on zero and the board rendered in tie-break order** - and a lower-is-better title was *reversed on screen while correct at settlement*, so a player could lead all week and be paid last. **Latent for money, live for players:** settlement resolves both fields itself, so no payout was ever wrong and **nothing was backfilled**. Fixed by moving `resolveScoreDirection` out of settlement into a shared mirrored module used by all three consumers. Same day, `RoundPreflight` stopped offering an enabled **Play** button on a contest that had not started, and **the lobby became game-aware** - `app/(root)/competitions/[id]/page.tsx` now branches to `ProviderContestLobby`, which shows the play window, attempts remaining and what happens if a round never finishes, with a score leaderboard instead of one whose columns are profit and loss. The trading path below the branch is **byte-identical**. See `13` s4.1a and s4.1b for exactly what is and is not built - **the dashboard cards are still trading-shaped** |
 | **Next action** | **Technically: finish X4a** - pull and rebuild on the server, start `chartvolt-games`, register it through the admin screens, and drive one round end to end. **No DNS, nginx or certificate work is needed** since the play surface is proxied through the platform app (owner's choice, 6 Sep 2026). The game is **playable by a human in a browser**, **R34 is closed**, and the service is now **deployable** - PM2 entry, nginx block, `env.example` and a runbook in `deploy/README.md` (all 6 Sep 2026) - so nothing technical stands between the two halves. **Owner decided 6 Sep 2026 to deploy first and rehearse against the live site**, rather than complete the local rehearsal. After X4a: provider **health** (the last of X6's five admin destinations) and the game-aware **contest list and dashboard** (`13` s4/s5), where the remaining trading-shaped player screens live. **Commercially, in parallel: find and assess a provider using `08`** - X4 cannot start without one, and nothing in the programme is blocked on that search |
 | **Money defects closed** | **R26 closed 5 Sep 2026** - the admin cron's finalize copy paid **no** Game Master earnings and recorded no `retained_gm_fee` either, so the commission silently stayed with the platform. This one was **actively losing money rather than latent**: both apps run `checkAndFinalizeCompetitions` on an every-minute cron, so payment depended on which cron won the race. **Not retroactive - no backfill**, and past contests cannot be found by querying for retained rows because none were written. Also **R31** (a 0% Game Master rate paid 5%) and the two P0 score defects, same day |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
@@ -668,12 +668,19 @@ error page after entering a provider contest, and **that hypothesis was wrong** 
 **Owner tested:** no. The owner's original report (a "Something went wrong" page) is **not
 explained by either fix** and remains open; see the next-chat note.
 
-**Deferred:** the lobby page itself, which still renders trading panels and PnL labels for a
-provider contest. Scoped and split in `13` s4.1a rather than half-done, because the page is a
-server component with a great many trading reads and making it game-aware is a branch at the
-top, not a field-by-field guard. Also deferred: per-game ranking labels
-(`ranking-config.service.ts`), and a game filter on the list - the latter deliberately, since one
-provider game makes a one-option filter pure friction.
+**Then, the same day, the lobby** (`13` s4.1b). `app/(root)/competitions/[id]/page.tsx` branches
+to `ProviderContestLobby` and returns, so the trading path below it is **byte-identical** -
+which is the only thing that makes the existing lobby behaviour evidence that nothing moved. New
+files: `components/games/ProviderContestLobby.tsx`, `components/games/ProviderLeaderboard.tsx`,
+`lib/utils/registration-deadline.ts`, plus `hasProviderGameLabel` in
+`lib/services/games/contest-config.ts`. The play-UI suite is **43 tests**, up from 28, plus
+`tools/probe-provider-lobby.ps1` (11 probes, all red). **Whole suite: 910 tests, up from 895.**
+
+**Deferred:** the dashboard cards (`ActiveCompetitionCard`, `CompetitionsTable`), which still
+show profit and loss and say "Trade Now" for every game; the full per-game ranking-label pass in
+`ranking-config.service.ts` (the score column's heading is game-aware, the rest is not); and a
+game filter on the contest list - the last deliberately, since one provider game makes a
+one-option filter pure friction.
 
 **Gates:** 895 tests pass (50 files), `check:mirrors` clean, ESLint clean on every touched file,
 and **both typechecks diff to zero lines** against a `git stash --include-untracked` baseline.
@@ -714,6 +721,25 @@ and **both typechecks diff to zero lines** against a `git stash --include-untrac
   but `Object.hasOwn` is genuinely more correct here: a bare index walks the prototype chain, so
   a field named like something on `Object.prototype` would report as **stored** on a document
   that stores nothing - and "is this field stored" is the only question the tool answers.
+- **A `-t` filter matching no test reports as GREEN, which is the opposite conclusion.** One
+  probe on the lobby slice reported the guard not firing; the real cause was a **missing
+  apostrophe** in the expected test's name, so vitest ran zero tests and the absence of a failure
+  line was read as a passing suite. Sixth probing instance, and the fix is now in all three
+  harnesses: assert that the output says `Tests N passed` *or* `Tests N failed` before
+  interpreting either, and report anything else as `PROBE BROKEN` in its own colour. **A `-t`
+  that matches nothing is always a fault in the probe, never in the code.**
+- **A sixth invented field name, caught by checking the schema rather than the typecheck.** The
+  lobby's first draft read `tagline` off the catalogue title; `provider-game.model.ts` does not
+  declare it, so it would have rendered nothing for ever while looking entirely correct. After
+  `billsPerRound`, `publishedAt`, `scoreDirection`, `suspensionEndsAt` and `referenceId`, the
+  class is settled: **a hand-written `.lean<{...}>()` generic is where an invented field survives
+  a typecheck**, because the compiler checks the generic and not the schema.
+- **A weaker question deserves its own name, and the pair must be provably different.**
+  `hasProviderGameLabel` (label only) chooses the screen; `isProviderContest` (label plus keys)
+  decides whether a round can launch. A test asserts they **disagree** on a keyless provider
+  contest - without it the two could quietly collapse into one and the weaker name would be
+  decoration. Same distinction the admin competitions list already draws, and the names are
+  shared across the apps on purpose even though the files are not.
 
 **Next chat should:** either take the lobby page (`13` s4.1a, the largest remaining player
 surface) or **get the owner's exact reproduction for the "Something went wrong" page**, which is

@@ -48,6 +48,30 @@ export function isProviderContest(
   );
 }
 
+/**
+ * True when this contest is LABELLED as a provider contest, whatever else it is missing.
+ *
+ * A DELIBERATELY WEAKER QUESTION THAN `isProviderContest`, WITH A DIFFERENT NAME BECAUSE IT IS
+ * A DIFFERENT QUESTION. Use this one to choose a screen or a badge; use the strict one to decide
+ * whether a round can actually be launched.
+ *
+ * The case that separates them is real rather than theoretical: a contest carrying the label but
+ * no `providerKey` cannot start a round, so the strict helper is right to refuse it - but it is
+ * still **not a trading contest**, and handing it the trading lobby would put charts, margin and
+ * an "Enter Terminal" button in front of someone who joined a puzzle. Reusing the strict helper
+ * for a screen decision compiles, reviews as correct, and renders a keyless provider contest as
+ * a trading one.
+ *
+ * `apps/admin/lib/admin/contest-game-label.ts` holds the admin app's copy under the same name.
+ * It is deliberately not the same file - the admin one is admin-only and unmirrored - but the
+ * NAME is shared on purpose, so the two apps ask this question in the same words.
+ */
+export function hasProviderGameLabel(
+  contest: Pick<ProviderContestFields, "gameType"> | null | undefined,
+): boolean {
+  return contest?.gameType === "provider";
+}
+
 export type ContestRoundConfigResult =
   | { ok: true; providerKey: string; gameCode: string; config: RoundContestConfig }
   | { ok: false; error: string };

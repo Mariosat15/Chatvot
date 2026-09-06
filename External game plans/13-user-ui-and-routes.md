@@ -224,13 +224,66 @@ screen works" has been read as "the lobby is game-aware", and it is not.
 | The CTA's destination | **Built.** `CompetitionEntryButton` sends a provider contest to `/play` and a trading contest to `/trade`, using the strict `isProviderContest` because a destination needs the keys, not just the label. Both trade-history links are withheld and **counted** in a test, so a third unguarded one cannot hide behind them |
 | The play window, attempts and refusals | **Built, on the play screen** - section 1.1b. The pre-flight now reads `contestStatus` as well, so it refuses what the server would refuse instead of offering a button that errors |
 | The leaderboard's ranking metric | **Built.** R37, `05` s2.0b |
-| The lobby page itself | **NOT built.** `app/(root)/competitions/[id]/page.tsx` still renders the trading lobby for a provider contest: trading panels, "PnL" labels, and no play window, attempts or unresolved-round policy. The route is correct and nothing crashes - the fields a provider contest lacks are either absent-but-guarded or filled by schema defaults, which was verified against a real MongoDB rather than reasoned about (`__tests__/services/provider-contest-lobby-shape.test.ts`) - but a player reads a trading screen for a puzzle contest |
-| Ranking labels per game | **NOT built.** `ranking-config.service.ts` is untouched, so a provider board still labels its column with trading wording |
+| The lobby page itself | **Built 6 Sep 2026** - see 4.1b |
+| Ranking labels per game | **Partly built.** The score column's heading comes from the title's `scoreType`, so a time trial says "Time" rather than "Score". The full `ranking-config.service.ts` pass is still outstanding |
 | Filter by game | **NOT built**, and deliberately deferred: there is one provider game, so a filter with one option is friction on a page players use daily. Revisit when the catalogue has a second title |
 
-**The lobby is the next piece of this section**, and it is larger than it looks: the page is a
-server component with a great many trading reads, so making it game-aware is a branch at the top
-rather than a field-by-field guard.
+### 4.1b The lobby, built as a branch rather than as guards (6 September 2026)
+
+`app/(root)/competitions/[id]/page.tsx` renders `ProviderContestLobby` and returns, and the
+trading path below it is **byte-identical**. Everything below the branch is the forex lobby -
+difficulty computed from leverage and starting capital, an asset-class list, a margin explainer,
+"Enter Terminal", and a leaderboard whose columns are profit and loss - and for a puzzle contest
+it rendered all of it **without an error.** Nothing crashed because the fields a provider contest
+lacks are either guarded or filled by schema defaults, which was **measured against a real
+MongoDB** (`__tests__/services/provider-contest-lobby-shape.test.ts`) rather than assumed. A
+paying player simply read a trading screen for a game with no market.
+
+**Why one branch and not conditionals.** Threading guards through 1,100 lines of trading layout
+touches every line the live trading lobby depends on, to serve a contest type that has never had
+a player. Branching once leaves the trading path unchanged, and that is the only thing which
+makes the existing lobby behaviour trustworthy evidence that nothing moved - the same argument
+that kept a known one-character defect verbatim while the settlement stages were extracted.
+
+Six facts about it drift easily:
+
+- **It branches on the LABEL, via `hasProviderGameLabel`, not on the strict
+  `isProviderContest`.** A contest labelled provider but missing its provider key cannot launch a
+  round, so the strict helper is right to refuse it - and it is **still not a trading contest**,
+  so showing it the trading lobby would hand a puzzle player an Enter Terminal button. The lobby
+  answers *what kind of screen is this*; whether Play can work is a separate question the
+  component asks with the strict helper and **refuses with a stated reason**. Reusing the strict
+  helper here compiles and reviews as correct.
+- **The branch must sit ABOVE the trading computation**, and a test asserts its position rather
+  than its presence. Placed after `getDifficultyData()` it would still render the right screen
+  while computing leverage and starting capital for a contest that has neither.
+- **The leaderboard is a different component, not a restyled one.**
+  `CompetitionLeaderboard`'s row type declares `currentCapital`, `pnl`, `pnlPercentage` and the
+  trade counts, and its props demand a `prizeDistribution` and a `minimumTrades`. Rendering it
+  would put zeroed profit and loss, and a "minimum trades" qualification note, in front of a
+  player who has never traded - `05` section 10's binding rule broken in the most visible place
+  available. `ProviderLeaderboard` shows rank, player and one score.
+- **An absent score is not zero.** A player mid-contest has no score, and rendering that as 0
+  puts them level with someone who genuinely scored nothing. This is the read-side form of the
+  `score ?? 0` that made every provider participant tie in R37.
+- **The board must not decide the ranking direction.** Rows arrive already ordered by
+  `calculateRankings`, which resolves the direction once from the catalogue. A `.sort()` here
+  would be a second place for the direction to be decided, which **is** R37.
+- **`isRegistrationClosed` was extracted, not copied.** The trading lobby held it inline with a
+  clamp against `startTime` that exists for documents an old bug wrote with a deadline an hour
+  *before* the start. A second copy forgetting the clamp would silently refuse entry to those
+  contests, with the contest visibly upcoming. Sixth "one rule, two copies" avoided.
+
+`__tests__/games/provider-play-ui.test.ts` (**43 tests**, up from 28) and
+`tools/probe-provider-lobby.ps1` (11 probes, all red). The figure was written as 54 before being
+checked - **run the suite rather than adding up the diff**, which is the same duty as verifying a
+throwaway aside.
+
+**A harness lesson came with it, and it produced a false result first.** One probe reported GREEN
+because its `Test` string was missing an apostrophe, so vitest's `-t` matched nothing, ran zero
+tests, and the absence of a failure line read as "the guard did not fire". **A `-t` filter
+matching no test is a fault in the probe, never in the code**, and all three harnesses now report
+it as `PROBE BROKEN` in its own colour rather than as a green.
 
 ---
 

@@ -37,6 +37,9 @@ const RESULT = "components/games/RoundResultPanel.tsx";
 const ENTRY_BUTTON = "components/trading/CompetitionEntryButton.tsx";
 const TRADE_PAGE = "app/(root)/competitions/[id]/trade/page.tsx";
 const ROUNDS_ROUTE = "app/api/competitions/[id]/rounds/route.ts";
+const LOBBY_PAGE = "app/(root)/competitions/[id]/page.tsx";
+const PROVIDER_LOBBY = "components/games/ProviderContestLobby.tsx";
+const PROVIDER_BOARD = "components/games/ProviderLeaderboard.tsx";
 
 describe("a page load never consumes an attempt", () => {
   /**
@@ -374,6 +377,208 @@ describe("the pre-flight refuses what the server would refuse", () => {
     // "Starting uses one attempt" beside a disabled button reads as a warning about something
     // the player cannot do.
     expect(code).toMatch(/!resuming\s*&&\s*!blocked/);
+  });
+});
+
+/**
+ * THE LOBBY, which kept working and kept being wrong for longer than anything else here.
+ *
+ * `app/(root)/competitions/[id]/page.tsx` is the forex trading lobby: difficulty from leverage
+ * and starting capital, an asset-class list, a margin explainer, "Enter Terminal", and a
+ * leaderboard whose columns are profit and loss. It rendered all of that for a puzzle contest
+ * without erroring, because the fields a provider contest lacks are either guarded or filled by
+ * schema defaults - measured against a real MongoDB in
+ * `__tests__/services/provider-contest-lobby-shape.test.ts`, not assumed.
+ */
+describe("a provider contest gets its own lobby, not the trading one", () => {
+  it("branches on the label rather than on the strict helper", () => {
+    const code = readCode(LOBBY_PAGE);
+
+    // The case that separates them: a contest labelled provider but missing its provider key
+    // cannot launch a round, so the strict helper refuses it - and it is still not a trading
+    // contest, so handing it the trading lobby gives a puzzle player an Enter Terminal button.
+    // Importing the strict helper here would compile and review as correct.
+    expect(code).toMatch(/hasProviderGameLabel\(competition\)/);
+    expect(code).not.toMatch(/isProviderContest\(/);
+  });
+
+  it("returns before any trading computation runs", () => {
+    const code = readCode(LOBBY_PAGE);
+
+    // Asserting POSITION, not presence. A branch placed after the difficulty calculation would
+    // still render the right screen while computing leverage and starting capital for a contest
+    // that has neither - and the test would pass on presence alone.
+    const branch = code.search(/hasProviderGameLabel\(competition\)/);
+    const difficulty = code.search(/getDifficultyData\(\)/);
+
+    expect(branch).toBeGreaterThan(-1);
+    expect(difficulty).toBeGreaterThan(branch);
+  });
+
+  it("does not duplicate the registration-deadline rule", () => {
+    const code = readCode(LOBBY_PAGE);
+
+    // The clamp against startTime exists for documents an old bug wrote with a deadline an hour
+    // BEFORE the start. A second copy that forgot it would silently refuse entry to those
+    // contests, with the contest visibly upcoming and the button saying registration had closed.
+    expect(code).toMatch(/isRegistrationClosed\(competition\)/);
+    const inlineCopies = code.match(/deadline < start \? start : deadline/g) ?? [];
+    expect(inlineCopies.length).toBe(0);
+  });
+
+  it("shows the three things a provider lobby must answer", () => {
+    const code = readCode(PROVIDER_LOBBY);
+
+    // `13` s4: players hit all three, and the third is the one nobody thinks to show and the one
+    // that costs money when it happens.
+    expect(code).toMatch(/Play window/);
+    expect(code).toMatch(/Your attempts/);
+    expect(code).toMatch(/If a round does not finish/);
+  });
+
+  it("refuses Play with a reason when the contest cannot launch a round", () => {
+    const code = readCode(PROVIDER_LOBBY);
+
+    // A disabled control teaches nothing. Third instance of the rule after a provider enabled
+    // with no adapter and Edit withheld from a provider contest.
+    expect(code).toMatch(/const canLaunch = isProviderContest\(competition\)/);
+    expect(code).toMatch(/isUserIn && !canLaunch/);
+    expect(code).toMatch(/missing the game details/i);
+  });
+
+  it("reads only fields the catalogue model actually declares", () => {
+    const code = readCode(PROVIDER_LOBBY);
+
+    // `tagline` was in the first draft and `provider-game.model.ts` does not have it, so it
+    // would have rendered nothing for ever while looking correct. A hand-written `.lean<{...}>()`
+    // generic is exactly where an invented field name survives a typecheck.
+    expect(code).toMatch(/\.select\("displayName scoreType"\)/);
+    expect(code).not.toMatch(/tagline/);
+  });
+
+  it("takes the game's name from the catalogue, never from the keys", () => {
+    const code = readCode(PROVIDER_LOBBY);
+
+    // `gameKey` is an internal join key that happens to read like English, and `providerKey` is
+    // the supplier's brand - `13` s4 requires provider-neutral labels.
+    expect(code).toMatch(/title\?\.displayName/);
+    expect(code).not.toMatch(/gameName = .*gameKey/);
+    expect(code).not.toMatch(/gameName = .*providerKey/);
+  });
+});
+
+describe("the provider leaderboard shows a score and nothing it does not have", () => {
+  it("is not the trading leaderboard", () => {
+    const lobby = readCode(PROVIDER_LOBBY);
+
+    // `CompetitionLeaderboard`'s row type declares currentCapital, pnl, pnlPercentage and the
+    // trade counts, and its props demand a prizeDistribution and a minimumTrades. Rendering it
+    // here would put zeroed profit and loss, and a "minimum trades" qualification note, in front
+    // of a player who has never traded - `05` s10's binding rule broken in the most visible
+    // place available.
+    expect(lobby).not.toMatch(/CompetitionLeaderboard/);
+    expect(lobby).toMatch(/<ProviderLeaderboard/);
+  });
+
+  it("renders no trading figure at all", () => {
+    const code = readCode(PROVIDER_BOARD);
+    for (const field of [
+      "currentCapital",
+      "startingCapital",
+      "pnlPercentage",
+      "totalTrades",
+      "winningTrades",
+      "minimumTrades",
+    ]) {
+      expect(code).not.toContain(field);
+    }
+    // `pnl` on its own, checked separately so `pnlPercentage` cannot satisfy it.
+    expect(code).not.toMatch(/\bpnl\b/);
+  });
+
+  it("distinguishes an absent score from a score of zero", () => {
+    const code = readCode(PROVIDER_BOARD);
+
+    // A player who has not finished a round has no score. Rendering that as 0 puts them level
+    // with someone who genuinely scored nothing - the read-side form of the `score ?? 0` that
+    // made every provider participant tie in R37.
+    expect(code).toMatch(/row\.score === undefined \|\| row\.score === null/);
+    expect(code).not.toMatch(/score \?\? 0/);
+  });
+
+  it("does not decide the ranking direction a second time", () => {
+    const code = readCode(PROVIDER_BOARD);
+
+    // Rows arrive already ordered by `calculateRankings`, which resolves the direction once from
+    // the catalogue. Sorting or negating here is a second place for the direction to be decided,
+    // which is precisely the defect R37 closed.
+    expect(code).not.toMatch(/scoreDirection/);
+    expect(code).not.toMatch(/\.sort\(/);
+  });
+});
+
+describe("the two questions about a provider contest are different questions", () => {
+  it("the label alone decides the screen", async () => {
+    const { hasProviderGameLabel, isProviderContest } = await import(
+      "../../lib/services/games/contest-config"
+    );
+
+    // The case that separates them. Both helpers must exist and must disagree here, or the pair
+    // has collapsed into one and the weaker name is decoration.
+    const keyless = { gameType: "provider" };
+    expect(hasProviderGameLabel(keyless)).toBe(true);
+    expect(isProviderContest(keyless)).toBe(false);
+
+    const whole = {
+      gameType: "provider",
+      gameConfig: { providerKey: "chartvolt-games", gameCode: "grid-logic" },
+    };
+    expect(hasProviderGameLabel(whole)).toBe(true);
+    expect(isProviderContest(whole)).toBe(true);
+
+    expect(hasProviderGameLabel({ gameType: "trading" })).toBe(false);
+    expect(hasProviderGameLabel(undefined)).toBe(false);
+  });
+});
+
+describe("the registration deadline keeps its legacy clamp", () => {
+  it("treats a deadline earlier than the start as the start", async () => {
+    const { isRegistrationClosed } = await import(
+      "../../lib/utils/registration-deadline"
+    );
+
+    // An old bug wrote a deadline one hour BEFORE the start. Those documents are still in the
+    // database, and without the clamp they are unjoinable from the moment they are created -
+    // silently, with the contest visibly upcoming.
+    const startTime = new Date(Date.now() + 60 * 60 * 1000);
+    const registrationDeadline = new Date(startTime.getTime() - 60 * 60 * 1000);
+
+    expect(isRegistrationClosed({ startTime, registrationDeadline })).toBe(false);
+  });
+
+  it("closes once the real deadline has passed", async () => {
+    const { isRegistrationClosed } = await import(
+      "../../lib/utils/registration-deadline"
+    );
+
+    const startTime = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const registrationDeadline = new Date(Date.now() - 60 * 60 * 1000);
+
+    expect(isRegistrationClosed({ startTime, registrationDeadline })).toBe(true);
+  });
+
+  it("is open when no deadline is set, and does not throw on an unparseable one", async () => {
+    const { isRegistrationClosed } = await import(
+      "../../lib/utils/registration-deadline"
+    );
+
+    expect(isRegistrationClosed({})).toBe(false);
+    // Reason: a lobby must render. Throwing here would take out the whole page over a bad date,
+    // which is a worse outcome than treating registration as open and letting the entry path -
+    // which holds the real guards and the money - refuse.
+    expect(
+      isRegistrationClosed({ registrationDeadline: "not a date" }),
+    ).toBe(false);
   });
 });
 

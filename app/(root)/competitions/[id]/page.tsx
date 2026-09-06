@@ -24,6 +24,9 @@ import CompetitionStatusMonitor from "@/components/trading/CompetitionStatusMoni
 import UTCClock from "@/components/trading/UTCClock";
 import LiveCountdown from "@/components/trading/LiveCountdown";
 import InlineCountdown from "@/components/trading/InlineCountdown";
+import ProviderContestLobby from "@/components/games/ProviderContestLobby";
+import { hasProviderGameLabel } from "@/lib/services/games/contest-config";
+import { isRegistrationClosed } from "@/lib/utils/registration-deadline";
 import { notFound, redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 import { auth } from "@/lib/better-auth/auth";
@@ -58,9 +61,14 @@ const CompetitionDetailsPage = async ({
         isUserInCompetition(id),
         getWalletBalance(),
         getTradingRiskSettings(),
-        AppSettingsModel.findById("app-settings").lean().catch(() => null),
+        // Reason the shape is declared on the query rather than cast at the use site: the cast
+        // was `as any`, which the pre-commit hook rejects now that this file is being edited.
+        // Naming the one field that is read is both narrower and self-documenting.
+        AppSettingsModel.findById("app-settings")
+          .lean<{ currency?: { symbol?: string } } | null>()
+          .catch(() => null),
       ]);
-    const currSymbol = (appSettings as any)?.currency?.symbol || "€";
+    const currSymbol = appSettings?.currency?.symbol || "€";
     // getUserParticipant depends on isUserIn — must be sequential
     const userParticipant = isUserIn ? await getUserParticipant(id) : null;
 
@@ -93,6 +101,52 @@ const CompetitionDetailsPage = async ({
     // the competition detail view (leaderboard, chart, etc.) from results.
     if (isCompleted && isUserIn && query.view !== "details") {
       redirect(`/competitions/${id}/results`);
+    }
+
+    // Reason it is extracted rather than inline: the clamp against `startTime` exists for
+    // documents an old bug wrote with a deadline an hour BEFORE the start, and a second copy
+    // that forgot it would silently refuse entry to those contests. See the helper.
+    const registrationClosed = isRegistrationClosed(competition);
+
+    /*
+      THE GAME BRANCH, AND IT IS DELIBERATELY THE WHOLE PAGE RATHER THAN A SET OF GUARDS.
+
+      Everything below this point is the forex trading lobby: difficulty computed from leverage
+      and starting capital, an asset-class list, a margin explainer, an "Enter Terminal" button
+      and a leaderboard whose columns are profit and loss. For a puzzle contest none of it means
+      anything - and it never crashed, which is why it survived: the fields a provider contest
+      lacks are either guarded or filled by schema defaults, verified against a real MongoDB in
+      `__tests__/services/provider-contest-lobby-shape.test.ts` rather than assumed. A paying
+      player just read a trading screen for a game with no market, exactly as they were sent to
+      the trading workspace by a "Start Trading" button before `/play` existed.
+
+      IT BRANCHES ON THE LABEL, NOT ON THE STRICT `isProviderContest`, and the difference decides
+      a real case. A contest labelled provider but missing its provider key cannot launch a round
+      - but it is still not a trading contest, and showing it the trading lobby would hand a
+      player an Enter Terminal button for a game. The lobby answers "what kind of screen is
+      this"; whether Play can work is a separate question the lobby component asks with the
+      strict helper and refuses with a stated reason. Same distinction the admin competitions
+      list draws, and giving the two questions two names is what stops one being used for the
+      other.
+
+      Returning here also means none of the trading computation runs for a provider contest, and
+      the trading path below is byte-identical - which is the only thing that makes the existing
+      lobby behaviour trustworthy evidence that nothing moved.
+    */
+    if (hasProviderGameLabel(competition)) {
+      return (
+        <ProviderContestLobby
+          competition={competition}
+          leaderboard={leaderboard}
+          isUserIn={isUserIn}
+          isFull={isFull}
+          userId={userId}
+          walletBalance={walletBalance.balance}
+          currencySymbol={currSymbol}
+          participantStatus={userParticipant?.status}
+          registrationClosed={registrationClosed}
+        />
+      );
     }
 
     const formatUTCDate = (date: Date) => {
@@ -498,17 +552,7 @@ const CompetitionDetailsPage = async ({
                 isFull={isFull}
                 participantStatus={userParticipant?.status}
                 userLevel={userLevel}
-                registrationClosed={
-                  // Reason: Check if registration deadline has passed to block new entries.
-                  // Legacy guard: deadline is never earlier than startTime (old bug set it to -1hr).
-                  (() => {
-                    if (!competition.registrationDeadline) return false;
-                    const deadline = new Date(competition.registrationDeadline);
-                    const start = new Date(competition.startTime);
-                    const effectiveDeadline = deadline < start ? start : deadline;
-                    return new Date() > effectiveDeadline;
-                  })()
-                }
+                registrationClosed={registrationClosed}
               />
             )}
 

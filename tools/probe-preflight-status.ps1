@@ -107,7 +107,13 @@ foreach ($probe in $probes) {
     Write-Source $Target $original
   }
 
-  if ($out -match 'Tests\s+(\d+)\s+failed') {
+  # A `-t` filter matching no test is a fault in the probe, never in the code - and without this
+  # branch it reports as GREEN, which is the opposite conclusion. One apostrophe in a test name
+  # was enough to produce that false result in tools/probe-provider-lobby.ps1.
+  if ($out -notmatch 'Tests\s+\d+\s+(passed|failed)') {
+    Write-Host "  PROBE BROKEN - no test matched `"$($probe.Test)`"" -ForegroundColor Magenta
+    $failures++
+  } elseif ($out -match 'Tests\s+(\d+)\s+failed') {
     $red = [int]$Matches[1]
     if ($red -eq 1) {
       Write-Host '  RED as expected (1 test failed)' -ForegroundColor Green
