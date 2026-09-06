@@ -260,6 +260,89 @@ describe("launching a round in a provider competition", () => {
   });
 });
 
+/**
+ * The production-only half of the base-URL check.
+ *
+ * WHY THIS NEEDED ITS OWN BLOCK
+ * -----------------------------
+ * A plain-http base URL passes every assertion above: it is absolute, it parses, and a round
+ * launches happily with a callback address the provider can never usefully post to. Found live
+ * on 6 September 2026 on a deployment running `http://chartvolt.com/` against an https site.
+ *
+ * `NODE_ENV` has to be reassigned rather than mocked, because the guard reads it at call time -
+ * which is the point, since a deployment's value is fixed long before this code runs.
+ */
+describe("the base URL a provider is told to post results to", () => {
+  let savedNodeEnv: string | undefined;
+
+  beforeEach(() => {
+    savedNodeEnv = process.env.NODE_ENV;
+  });
+
+  afterEach(() => {
+    // Reason for the cast: `NODE_ENV` is typed as a literal union, and restoring an
+    // `undefined` it may legitimately have had is not expressible without it.
+    (process.env as Record<string, string | undefined>).NODE_ENV = savedNodeEnv;
+  });
+
+  async function launchWith(baseUrl: string, nodeEnv: string) {
+    const contest = await seedPlayableWorld();
+    await seatFor(String(contest._id), ACTOR.userId);
+    process.env.NEXT_PUBLIC_BASE_URL = baseUrl;
+    (process.env as Record<string, string | undefined>).NODE_ENV = nodeEnv;
+
+    return launchContestRound(String(contest._id), ACTOR);
+  }
+
+  it("refuses plain http in production, because a 301 turns the result POST into a GET", async () => {
+    // Certbot installs the http -> https redirect as a matter of course, and the fetch
+    // specification converts a POST following a 301 into a GET. The result then arrives at
+    // our route as a GET, is rejected, and the round is written off as unresolved days later.
+    const outcome = await launchWith("http://chartvolt.test", "production");
+
+    expect(outcome.success).toBe(false);
+    if (!outcome.success) expect(outcome.refusal).toBe("misconfigured");
+    expect(await GameRound.countDocuments({})).toBe(0);
+  });
+
+  it("refuses a loopback host in production, even over https", async () => {
+    // The provider is a different process, and on a real integration a different company.
+    // 127.0.0.1 there means "post the result to yourself".
+    const outcome = await launchWith("https://127.0.0.1:3000", "production");
+
+    expect(outcome.success).toBe(false);
+    if (!outcome.success) expect(outcome.refusal).toBe("misconfigured");
+    expect(await GameRound.countDocuments({})).toBe(0);
+  });
+
+  it("accepts https on a real host in production", async () => {
+    // The control. Without it, a guard that refuses everything would pass both tests above.
+    const outcome = await launchWith("https://chartvolt.test", "production");
+
+    expect(outcome.success).toBe(true);
+    expect(await GameRound.countDocuments({})).toBe(1);
+  });
+
+  it("still allows plain http on loopback in development", async () => {
+    // Pins the carve-out, not just the guard. Every local rehearsal and every test here
+    // legitimately serves plain http on loopback, and a check that fired in development would
+    // be switched off rather than fixed - so widening this guard must turn a test red.
+    const outcome = await launchWith("http://localhost:3000", "development");
+
+    expect(outcome.success).toBe(true);
+    expect(await GameRound.countDocuments({})).toBe(1);
+  });
+
+  it("fails closed on a value the protocol test accepts but URL cannot parse", async () => {
+    // `https://` satisfies the regex and throws in `new URL`. Returning it anyway would hand
+    // the provider a callback address that is not an address.
+    const outcome = await launchWith("https://", "production");
+
+    expect(outcome.success).toBe(false);
+    if (!outcome.success) expect(outcome.refusal).toBe("misconfigured");
+  });
+});
+
 describe("the contest-level refusals", () => {
   it("refuses a competition that has not started", async () => {
     const contest = await seedPlayableWorld({ contestStatus: "upcoming" });

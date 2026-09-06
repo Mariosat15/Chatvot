@@ -84,6 +84,9 @@ const refuse = (refusal: LaunchRefusal, error: string): LaunchOutcome => ({
  */
 const PLAYABLE_STATUSES = new Set(["active"]);
 
+/** Hosts that mean "this machine", which a provider must never be told to post results to. */
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1", "0.0.0.0"]);
+
 /**
  * The public base URL, or null.
  *
@@ -92,12 +95,44 @@ const PLAYABLE_STATUSES = new Set(["active"]);
  * deployment launch real rounds whose results can never arrive - the provider POSTs into
  * nothing, our reconciliation eventually writes the player off under the unresolved-round
  * policy, and the only visible symptom is players complaining their scores vanished.
+ *
+ * PRODUCTION ALSO REJECTS PLAIN HTTP AND LOOPBACK, and that is not belt-and-braces - it is
+ * the same failure the paragraph above describes, reached by a value that looks configured.
+ * Found live on 6 Sep 2026: a deployment had `NEXT_PUBLIC_BASE_URL=http://chartvolt.com/`
+ * while the site served https.
+ *
+ *   - **Plain http.** Certbot installs an http -> https redirect as a matter of course, and a
+ *     POST that follows a 301 is converted to a GET by the fetch specification. The result
+ *     arrives at our route as a GET, is rejected, and the round is written off as unresolved.
+ *     The callback token would also travel unencrypted on the way.
+ *   - **Loopback.** The provider is a different process, and on a real integration a different
+ *     company. `127.0.0.1` there means "post the result to yourself".
+ *
+ * Development is deliberately exempt, for the same reason `assertPlayableOrigin` in the games
+ * service is: every local rehearsal and every test legitimately serves plain http on loopback,
+ * and a guard that fired there would be switched off rather than fixed.
  */
 function publicBaseUrl(): string | null {
   const raw = process.env.NEXT_PUBLIC_BASE_URL?.trim();
   if (!raw) return null;
   if (!/^https?:\/\//i.test(raw)) return null;
-  return raw.replace(/\/+$/, "");
+
+  const trimmed = raw.replace(/\/+$/, "");
+  if (process.env.NODE_ENV !== "production") return trimmed;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    // Fails closed. A value the regex accepts but `URL` cannot parse is not one to hand a
+    // provider as a callback address.
+    return null;
+  }
+
+  if (parsed.protocol !== "https:") return null;
+  if (LOOPBACK_HOSTS.has(parsed.hostname)) return null;
+
+  return trimmed;
 }
 
 interface StoredTitle {
@@ -116,7 +151,9 @@ export async function launchContestRound(
   const baseUrl = publicBaseUrl();
   if (!baseUrl) {
     console.error(
-      "❌ NEXT_PUBLIC_BASE_URL is not set to an absolute http(s) URL, so no provider round can be launched - the result callback would be unreachable.",
+      `❌ NEXT_PUBLIC_BASE_URL is unusable as a provider result callback, so no provider round can be launched. ` +
+        `It must be an absolute URL, and in production it must be https on a non-loopback host. ` +
+        `Current value: ${process.env.NEXT_PUBLIC_BASE_URL ?? "(unset)"}`,
     );
     return refuse(
       "misconfigured",

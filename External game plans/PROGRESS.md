@@ -631,6 +631,63 @@ Newest at the top.
 
 ---
 
+### 6 Sep 2026 - R36 - A LIVE DEPLOYMENT WOULD HAVE GIVEN THE PROVIDER AN UNUSABLE CALLBACK
+
+**Closed.** `publicBaseUrl()` in `lib/services/games/round-launch.service.ts` now refuses plain
+http and loopback hosts under `NODE_ENV=production`, failing closed on anything `URL` cannot
+parse. Five tests added to `__tests__/services/provider-round-launch.test.ts` (20 total),
+`tools/probe-launch-base-url.ps1` (7 probes, all red on the expected test).
+
+**Found on the owner's live server, and not by looking for it.** They ran the new
+`setup:env` on the real deployment and its origin check refused
+`NEXT_PUBLIC_BASE_URL=http://chartvolt.com/` against an https site. That variable is what
+`round-launch.service.ts:273` builds `resultCallbackUrl` from, so it is the address the provider
+POSTs every score to.
+
+**Why plain http is not a cosmetic problem.** Certbot installs an http → https redirect as a
+matter of course, and **the fetch specification converts a POST following a 301 into a GET** - so
+the result arrives at our route as a GET, is rejected, and the round is written off as unresolved
+days later. The visible symptom is players reporting vanished scores, and the natural first
+suspicion is the provider. The token would also have travelled unencrypted.
+
+**Latent, never occurred.** No provider round has ever launched in production. Nothing was
+backfilled and there is nothing to backfill.
+
+**Four things that generalise.**
+
+- **A guard that refuses an ABSENT value while accepting a WRONG one is the same defect reached
+  by a value that looks configured.** The function already refused an unset base URL, with a
+  comment explaining at length that a localhost fallback would launch rounds whose results can
+  never arrive - and then accepted an explicitly-set `http://localhost:3000` without comment. The
+  reasoning was written down and applied to only one of the two ways in. Same shape as
+  `entryBlockThreshold`: **a stored value and an absent one are different facts**, and here the
+  stored one was the dangerous one.
+- **A tool's validation caught a defect in the thing it was configuring.** The check exists to
+  stop the games service booting on a bad origin; it found the *platform* misconfigured. Worth
+  generalising: **a guard placed at a seam sees both sides of it**, so the value of validating
+  input is not only the refusal but what the refusal reveals about the caller.
+- **Pin a development carve-out as firmly as the refusal it exempts.** Every local rehearsal and
+  every test here legitimately serves plain http on loopback, so a guard that fired in
+  development would be switched off rather than fixed. The probe that **inverts** the environment
+  test is the one the pair exists for - it reads almost identically and leaves production wide
+  open. Its blast radius is 4 rather than 1, which is correct rather than tolerated: a smaller
+  number would mean the two halves were not independent.
+- **Count the writers, fifth instance.** `resultCallbackUrl` appears at five call sites; only one
+  constructs it and the rest pass it through, so a single guard covers every path. Verified with
+  `rg` rather than assumed - which is also how the earlier counts went wrong in the other
+  direction (four entry paths, ten finalize sites, six raw inserts, seven subscription writers).
+
+**Also flagged to the owner, not fixed:** `NEXT_PUBLIC_ADMIN_URL` and `BETTER_AUTH_URL` are read
+by email verification, payment return and auth redirect paths. If either is http on that
+deployment, the same class of problem applies outside games - but changing them is a platform-wide
+decision and belongs to the owner, not to this phase.
+
+**Owner tested:** not yet. They must set `NEXT_PUBLIC_BASE_URL=https://chartvolt.com` and rebuild
+before any provider round can launch, and **the rebuild is required rather than a restart**
+because `NEXT_PUBLIC_` values are baked into the build.
+
+---
+
 ### 6 Sep 2026 - X4a - ONE COMMAND WRITES THE SERVICE'S .env
 
 **Shipped:** `games-service/tools/setup-env.ts` (`npm run setup:env`). It generates the four
