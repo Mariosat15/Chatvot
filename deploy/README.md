@@ -815,6 +815,25 @@ nginx -t && systemctl reload nginx
 certbot --nginx -d games.yourdomain.com
 ```
 
+**On a server that is already live, prefer a separate file** and never open the one serving your
+existing sites:
+
+```bash
+# Copy just the games server block (and its upstream) into its own file
+sudo nano /etc/nginx/sites-available/chartvolt-games
+sudo ln -sf /etc/nginx/sites-available/chartvolt-games /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+An `upstream` block is valid inside a `sites-available` file, because those files are included
+from within nginx's `http` context - so the games config is entirely self-contained and the
+existing site file is never touched. Two properties make this close to risk-free, and both are
+worth knowing before you run it: **it only adds a server block, never edits an existing one**, and
+**nginx refuses to apply a broken config** - a failed `nginx -t`, or a reload of a bad file, leaves
+the old configuration serving traffic and prints the error. The worst case is that the games
+subdomain does not work and you delete the file. Rolling back is
+`rm /etc/nginx/sites-enabled/chartvolt-games && nginx -t && systemctl reload nginx`.
+
 Read the comment block above the games server block in `deploy/nginx.conf` before changing
 it. It deliberately sets **no `X-Frame-Options`** — the play page exists to be embedded — and
 adds no other headers, because an `add_header` there would replace the service's own
