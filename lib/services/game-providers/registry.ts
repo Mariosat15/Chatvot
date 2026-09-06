@@ -16,6 +16,10 @@
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import type { GameProviderAdapter } from "./contract";
 import { MockProviderAdapter, MOCK_PROVIDER_KEY } from "./adapters/mock.adapter";
+import {
+  ChartVoltGamesAdapter,
+  CHARTVOLT_GAMES_KEY,
+} from "./adapters/chartvolt-games.adapter";
 
 /**
  * Every adapter that exists in code, keyed by `providerKey`.
@@ -27,9 +31,16 @@ import { MockProviderAdapter, MOCK_PROVIDER_KEY } from "./adapters/mock.adapter"
  * scaffolding - chapter 09 E1 makes it the basis of every automated test and the reason
  * seven of nine phases can proceed without waiting on a provider. It is kept out of
  * production by `enabled` in settings, defaulting to false, exactly like a real provider.
+ *
+ * ChartVolt Games (X4a) is registered the same way and on the same terms. It is a FIRST-PARTY
+ * provider, not a placeholder: the games it supplies are ours, but they arrive through this
+ * seam like anyone else's, and it is subject to `externalGamesEnabled`, its own `enabled` flag
+ * and per-title `chartvoltEnabled` exactly as a third party is. Nothing here grants it a
+ * shortcut, because a shortcut is the one thing that would stop it proving the seam works.
  */
 const ADAPTERS = new Map<string, GameProviderAdapter>([
   [MOCK_PROVIDER_KEY, new MockProviderAdapter()],
+  [CHARTVOLT_GAMES_KEY, new ChartVoltGamesAdapter()],
 ]);
 
 /** Registers an adapter. Exported for tests and for the X9 second-adapter skeleton. */

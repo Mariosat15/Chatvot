@@ -14,13 +14,14 @@
 | | |
 |---|---|
 | **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done.** A provider contest can be created, **published from the admin screen** (5 Sep 2026), entered, played and paid - and since 5 Sep 2026 it is paid **correctly**, which it was not before: two P0 defects meant every player tied on a score of zero and split the pool equally, and a lower-is-better game ranked backwards. A stuck round can now be **inspected and ended by an operator** (5 Sep 2026). **The whole lifecycle is now reachable by clicking** - the player round launch screen landed 5 Sep 2026 at `/competitions/[id]/play`, which also fixed a live defect: a provider-contest player was being sent to the forex trading workspace by a button labelled "Start Trading". **No provider selected**, which is what X4 needs |
-| **Next action** | **Commercially: find and assess a provider using `08`** - X4 cannot start without one, and nothing else in the programme is blocked on engineering. Technically the next slices are provider **health** (the last of X6's five admin destinations) and the game-aware **contest list and dashboard** (`13` s4/s5), which is where the remaining trading-shaped player screens live |
+| **Next action** | **Technically: finish X4a** - the playable board behind the launch URL, then register `chartvolt-games` through the admin screens and drive one round end to end, which requires fixing **R34** first. After X4a: provider **health** (the last of X6's five admin destinations) and the game-aware **contest list and dashboard** (`13` s4/s5), where the remaining trading-shaped player screens live. **Commercially, in parallel: find and assess a provider using `08`** - X4 cannot start without one, and nothing in the programme is blocked on that search |
 | **Money defects closed** | **R26 closed 5 Sep 2026** - the admin cron's finalize copy paid **no** Game Master earnings and recorded no `retained_gm_fee` either, so the commission silently stayed with the platform. This one was **actively losing money rather than latent**: both apps run `checkAndFinalizeCompetitions` on an every-minute cron, so payment depended on which cron won the race. **Not retroactive - no backfill**, and past contests cannot be found by querying for retained rows because none were written. Also **R31** (a 0% Game Master rate paid 5%) and the two P0 score defects, same day |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
+| **Phase in progress** | **X4a - STARTED 6 Sep 2026.** `games-service/` (the provider) and the `chartvolt-games` adapter (the platform) are both **code-complete and not yet connected** - no round has travelled between them, the launch URL serves no board, and the provider has never been registered through the admin screens. It also **found a defect in the issued specification's own auth scheme**: there is no `callbackToken` field anywhere, so a provider implementing `Bearer {CALLBACK_TOKEN}` exactly is rejected and logged as a probable attack. Latent, not configurable around, and it blocks the end-to-end rehearsal. See the 6 Sep work-log entry |
 | **Next phase, scope decided** | **X4a - ChartVolt as a first-party provider, with a real playable game** (`21`), **3.5-5 weeks**, starting before the provider health panel. It exists because **the review gate the programme is sequenced around cannot currently be held**: `mock.adapter.ts` returns a hostname that does not resolve, so the play screen's iframe fails to load and the final step has never been performed by a person. **Owner decided 5 Sep 2026 that it is both** the reference implementation *and* open question 10's hedge game - which **modifies the 2 Sep "no in-house game is built" decision** and is recorded in the decision log rather than by editing that entry. **No commercial dependency.** Two things not to misread: **risk X8 is reduced when it ships, not now**, and X4a **shrinks X4 without replacing it** - a provider we control cannot rehearse a real partner's auth, error shapes, latency or pricing |
 | **Owner instruction on record** | **External games only, no in-house game** (2 Sep 2026). **One step at a time, admin first, do not break the running app.** |
 | **Not owner-tested** | Everything after the 2 Sep navigation restructure. X1-X3, X5, the provider admin slice and the contest wizard are all **code-complete, awaiting owner test** - and "code-complete" here excludes the replay script and the label backfill, neither of which has been run against production |
-| **Last updated** | 5 September 2026 |
+| **Last updated** | 6 September 2026 |
 
 ### DEFERRED WORK, APPROVED BUT NOT SCHEDULED
 
@@ -343,7 +344,7 @@ numbers in chapters `01`-`09` remain resolvable. **Plan against the X-phases bel
 | **X1** | Foundation: game label, score, registry, four seams, **GM insert game label** | `11` + `19` s3.1 | 2.5-3.5 weeks | **`CODE-COMPLETE`** 4 Sep 2026. Ranking gate **cleared** (replay: 4/4 reproduced exactly). Backfill written, **not yet `--apply`d** |
 | **X2** | Provider abstraction + mock adapter | `09` E1 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026. Nothing player-visible - `externalGamesEnabled` defaults false |
 | **X3** | Round lifecycle + result ingestion | `09` E2 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026. **Rehearsals 1-6 of `07` s9 green** against the mock (49 tests, 6 guards probed). 7-10 need X5/X8 |
-| **X4a** | **ChartVolt as a first-party provider + a real playable game** - registered through the real admin screens, served from its own origin, reporting through the real signed callback. **Doubles as the in-house hedge game** | `21` | **3.5-5 weeks** | `PLANNED, NEXT` - scope **decided 5 Sep 2026: it is both** the reference implementation and open question 10's hedge game, which is why the estimate is not 1-1.5 weeks. **No commercial dependency** - the only remaining work on the shortest useful path that does not wait on a contract. Exists because **the review gate `10` s4 is sequenced around cannot currently be held**: `mock.adapter.ts` returns `https://mock.provider.test/...`, which does not resolve, so the play screen's iframe fails to load and the last step of the lifecycle has never been performed by a person. **Runs before the provider health panel**, so health can be proven by watching it go red |
+| **X4a** | **ChartVolt as a first-party provider + a real playable game** - registered through the real admin screens, served from its own origin, reporting through the real signed callback. **Doubles as the in-house hedge game** | `21` | **3.5-5 weeks** | `IN PROGRESS` since 6 Sep 2026. **Built:** the standalone `games-service` (seeded puzzle engine, two titles, all four spec endpoints, signed auth, retrying callback, reconciliation sweeper) and the platform-side `chartvolt-games` adapter, mirrored. **Not built:** the playable board the launch URL points at, provider registration through the admin screens, and any end-to-end round - **the two halves have never spoken.** One defect found and deliberately left: the platform has **no `callbackToken` field**, so it cannot honour the auth scheme its own issued spec promises. Original scope **decided 5 Sep 2026: it is both** the reference implementation and open question 10's hedge game, which is why the estimate is not 1-1.5 weeks. **No commercial dependency** - the only remaining work on the shortest useful path that does not wait on a contract. Exists because **the review gate `10` s4 is sequenced around cannot currently be held**: `mock.adapter.ts` returns `https://mock.provider.test/...`, which does not resolve, so the play screen's iframe fails to load and the last step of the lifecycle has never been performed by a person. **Runs before the provider health panel**, so health can be proven by watching it go red |
 | **X4** | Real adapter against sandbox | `09` E3 | 1 week | `NOT STARTED` - **blocked on a signed provider**. X4a shrinks it but **does not replace it**: a harness we control cannot rehearse a real partner's auth, error shapes, latency or pricing |
 | **X5** | Contest integration + settlement | `09` E4 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026, **with two P0 payout defects found and fixed 5 Sep 2026** - publish, entry, ranking, round launch, settlement and **all three unresolved-round policies**. **A provider contest can be published, entered, played and paid. Publishing became clickable on 5 Sep 2026 (X6 slice), and the player round launch on the same day (`13` s1.1a) - the lifecycle is no longer API-only anywhere.** Settlement was an **extraction**: the payout, fee/GM and completion stages moved to `lib/services/settlement/` and trading was rewired onto them. Closing `exclude` also closed **`hold_and_alert`**, which nothing had ever consumed. **The two P0s are why "code-complete" must never be read as "correct":** no code path wrote `participant.score`, so every player settled on zero and split the pool equally; and settlement read `scoreDirection` off a field neither participant copy declared, so a lower-is-better game paid the slowest player first |
 | **X6** | Admin: nav restructure incl. **the single Trading section**, RBAC, provider registration, game-aware wizard, analytics, **GM creation API + wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | `PARTIALLY DONE` - nav restructure and single Trading destination **built and owner-tested 2 Sep 2026**. **Provider registration, credentials and the per-title catalogue switch code-complete 4 Sep 2026** (`12` s4.1a). **Contest wizard from `configSchema` + pre-flight validation code-complete 4 Sep 2026** (`12` s2.1) - creates a **draft**. **The publish control is code-complete 5 Sep 2026** (`12` s3.1a), which also made the competitions list game-aware: `draft` admitted as a status, its own badge, a Drafts count, a provider game badge, and the trading Edit button **withheld** from provider contests because `PUT /api/competitions/[id]` blind-assigns that form's body. **The round inspector and manual resolution are code-complete 5 Sep 2026** (`12` s4.2a) - read-only inspection plus **ending** a stuck round (void/abandoned/expired) with a mandatory reason; it deliberately **cannot enter a score**. Still `NOT STARTED`: provider health panel, live-contest controls, provider contest **editing**, analytics by provider, GM creation API |
@@ -627,6 +628,85 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 6 Sep 2026 - X4a - THE GAME SERVICE AND THE PLATFORM ADAPTER - CODE-COMPLETE BUT NOT YET CONNECTED
+
+**Shipped:** two halves that have not yet met. `games-service/` is a standalone provider - its own
+process, origin, database and `node_modules`, sharing **no code** with this repository and holding
+a deterministic seeded puzzle engine, two titles, the four specification endpoints, signed
+inbound auth, a retrying result callback and a reconciliation sweeper. In the platform,
+`chartvolt-games` is now a registered adapter. **Nothing player-visible, and no round has ever
+travelled between the two.**
+
+**Files touched:** `games-service/**` (24 source files, 4 test suites, 3 probe harnesses, an
+`AMBIGUITY-LOG.md` and a `README.md`), and in the platform
+`lib/services/game-providers/adapters/chartvolt-games.adapter.ts` plus
+`adapters/chartvolt-games/{connection,transport,normalise}.ts`,
+`lib/services/game-providers/callback-headers.ts`, `registry.ts`,
+`lib/services/games/callback-verification.ts`, and
+`__tests__/services/chartvolt-games-adapter.test.ts` (49 tests) with
+`tools/probe-chartvolt-games-adapter.ps1` (24 probes, all red on the expected test).
+Everything under `lib/services/game-providers/` is mirrored into `apps/admin` and verified
+byte-identical.
+
+**Deviated from plan:** three times, each recorded rather than absorbed.
+
+- `21` describes one provider adapter file. There are **four**, because the connection loader
+  touches the database, the transport signs and maps errors, and the normaliser is shared by the
+  callback and the fetch. The 500-line limit forces the split, and the split is the better shape.
+- The transport-header helpers **moved** out of `lib/services/games/callback-verification.ts`
+  into `lib/services/game-providers/callback-headers.ts`. That folder is mirrored into
+  `apps/admin` and the other is not, and the adapter needs the five-minute window. The
+  alternatives were both worse: mirroring `callback-verification.ts` wholesale would put
+  `loadProviderSecrets` into the admin app with nothing calling it - a dead helper that hands out
+  callback secrets, which is the `shouldBlockEntry` shape - and a second copy of the window in
+  the adapter is the "one rule, two copies" failure this codebase has had four times.
+- `verifyCallback` **cannot** verify a signature, and this is a finding rather than a shortcut.
+  The interface declares it **synchronous** and this provider's secret lives behind
+  `select: false` in the database, so there is no way to recompute an HMAC there. The mock can
+  only do it because its secret is a field on the instance. Gate 5 already verifies the HMAC with
+  the stored secret, so nothing is unchecked - but since the ingestion service says an adapter
+  returning `{ valid: true }` unchecked "turns this gate into a formality", the adapter instead
+  checks everything possible without a secret: all three headers present, the signature shaped as
+  `sha256=` plus 64 hex characters, and the timestamp window via the shared helper.
+
+**A DEFECT FOUND, NOT FIXED: THE PLATFORM CANNOT HONOUR ITS OWN ISSUED SPECIFICATION.**
+`01` section 2.2 and the requirements HTML sent to providers both promise
+`Authorization: Bearer {CALLBACK_TOKEN}` - "a token we issue to you", distinct from the
+`API_KEY` the provider issues to us. There is **no such field**:
+`gameProviderCredentials` stores `apiKey`, `apiSecret` and `callbackSecret` only, the credentials
+dialog offers three inputs, and `loadProviderSecrets` sets `callbackToken: credentials.apiKey`.
+So gate 3 expects a provider to authenticate **inbound** using the credential they issued us for
+**outbound** calls. A provider implementing the document exactly is rejected - and the log line
+says "either credentials are wrong or someone is probing the endpoint", so a correct integration
+reads as an attack. Two things make this worth stating carefully: it is **latent**, because no
+real provider exists and the mock uses its own header, and it is **not** fixable by configuration,
+because there is nowhere to type the value. Needs an additive `callbackToken` on both model
+copies, `callbackToken || apiKey` in the loader for backward compatibility, and a fourth
+credentials input. **Not done here** - it is a mirrored model change plus an admin UI change, and
+it belongs with the end-to-end rehearsal it blocks.
+
+**Owner tested:** nothing. Both halves are code-complete and unconnected.
+
+**Deferred:** the playable frame UI (the launch URL serves no board yet, so the round lifecycle is
+still API-only on the provider's side); registering the provider through the real admin screens;
+the end-to-end click-through; the failure rehearsals; and resolving the `AMBIGUITY-LOG.md`
+entries back into `01` and the requirements HTML with a version bump.
+
+**Two things not to misread.** `games-service` has **no `.env`**, so it has never been started
+against the platform - "code-complete" here means its own tests pass in-process against
+`mongodb-memory-server`. And the adapter's 49 tests run against a **stubbed `fetch`**: they prove
+the adapter's half of the protocol, not that the two sides agree. A stub returns what it is told,
+and a fixture that supplies the value under test has tested the consumer rather than the
+producer. The one assertion that does span both sides recomputes the HMAC from the stored secret
+over the exact bytes passed to `fetch`, which is the same construction the service's inbound guard
+uses.
+
+**Next chat should:** build the play surface the launch URL points at, then register
+`chartvolt-games` through the admin screens and drive one round end to end - at which point the
+callback-token defect above stops being latent and must be fixed.
 
 ---
 

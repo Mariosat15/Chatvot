@@ -172,6 +172,61 @@ somebody else's round.
 the QA that a paid game needs. **Not purely additive** - roughly half a week of it is X4 work
 brought forward.
 
+### 4.1a What has actually been built - 6 September 2026
+
+Read this before the sections above, which describe the target. **The two halves exist and have
+never spoken to each other**, so anything implying a working provider game is describing the plan.
+
+| | State |
+|---|---|
+| The standalone service | **Built.** `games-service/` - own process, own port (4010 by default), own database, own `node_modules`, **zero imports from this repository**, enforced by `tools/check-isolation.ts` |
+| The engine | **Built.** A deterministic seeded non-crossing-path puzzle: `engine/{rng,puzzle,generate,verify}.ts`. Generation is reproducible from a `contentSeed` indefinitely, and the verifier validates a submission **against the rules**, not against the generator's own stored solution, because a board has several valid solutions |
+| Two titles | **Built.** `circuit-sprint` (higher-is-better, integer) and `circuit-perfect` (lower-is-better, `duration_ms`), from one engine. The second exists so a ranking sign error cannot pass every test |
+| The four spec endpoints | **Built.** Catalogue, create round, fetch round, void round, plus signed inbound auth with a rotation window, a retrying result callback, and a four-stage reconciliation sweeper |
+| Spec-ambiguity log | **Built and open.** `games-service/AMBIGUITY-LOG.md`. **Not yet resolved back into `01` and the requirements HTML** |
+| The platform adapter | **Built.** `chartvolt-games` registered in both registry copies, four files under `lib/services/game-providers/adapters/`, mirrored into `apps/admin` and verified byte-identical. 49 tests, 24 probes |
+| **The playable board** | **NOT BUILT.** The launch URL has no screen behind it, so on the provider's side the lifecycle is reachable only by API and by test - the same gap the play screen closed on the platform's side on 5 September |
+| **Provider registration** | **NOT DONE.** `chartvolt-games` has never been registered through the admin screens, and `games-service` has no `.env`, so it has never been started against the platform |
+| **Any end-to-end round** | **NOT DONE.** No round has travelled between the two halves |
+| Content set, mobile, localisation, runbook | **NOT STARTED** |
+
+**Two claims to avoid making about what is built.** "Code-complete" for the service means its own
+suites pass in-process against `mongodb-memory-server`; it has never run against the platform. And
+the adapter's 49 tests run against a **stubbed `fetch`**, so they prove the adapter's half of the
+protocol and not that the two sides agree - a stub returns what it is told. The single assertion
+that spans both sides recomputes the HMAC from the stored secret over the exact bytes handed to
+`fetch`, which is the construction the service's inbound guard uses.
+
+**The phase has already produced its first real finding, which is the point of it.** The issued
+specification promises `Authorization: Bearer {CALLBACK_TOKEN}` - "a token we issue to you" - and
+**the platform has no such field**. `gameProviderCredentials` stores `apiKey`, `apiSecret` and
+`callbackSecret`; the credentials dialog offers three inputs; and `loadProviderSecrets` sets
+`callbackToken: credentials.apiKey`. A provider implementing the document exactly is refused at
+gate 3, and the log line says "either credentials are wrong or someone is probing the endpoint" -
+so **a correct integration reads as an attack**. Recorded as **R34**, open, and it must be fixed
+before the end-to-end rehearsal. Note it was found by building against the document rather than
+by reading the code, which is exactly the mechanism section 2 says makes this phase worth doing:
+a spec written by the same people as the platform is never tested by them re-reading it.
+
+**Three implementation decisions worth carrying forward:**
+
+- **`verifyCallback` cannot verify a signature for any provider whose secret is in the database.**
+  The interface declares it synchronous; the secret is behind `select: false`. The mock passes only
+  because its secret is a field on the instance. Gate 5 covers the HMAC, so nothing is unchecked -
+  but the adapter must still not return `{ valid: true }` unchecked, so it asserts what is
+  possible without a secret: three headers present, `sha256=` plus 64 hex characters, and the
+  timestamp window through the shared helper.
+- **The transport-header helpers moved into the mirrored folder.** `lib/services/game-providers/`
+  is mirrored into `apps/admin` and `lib/services/games/` is not. Mirroring
+  `callback-verification.ts` wholesale would have put `loadProviderSecrets` into the admin app
+  with nothing calling it - a dead helper that hands out callback secrets - and a second copy of
+  the five-minute window is the "one rule, two copies" failure this codebase has had four times.
+- **The outbound credential loader must NOT check whether the provider is enabled**, even though
+  the inbound `loadProviderSecrets` does. The sync route deliberately uses `getProviderAdapter`
+  rather than `resolveEnabledProvider` so an operator can see a catalogue before enabling
+  anything; a check there would make the first sync impossible, and the symptom would read as a
+  credentials fault.
+
 ---
 
 ## 5. What this does NOT prove
