@@ -443,7 +443,7 @@ manual resolution were built on 5 September 2026** - see section 4.2a.
 | UI | `apps/admin/components/admin/games/**` - section plus register, credentials and catalogue dialogs |
 | Tests | `__tests__/admin/game-providers-admin.test.ts`, 26 tests, six guards probed |
 
-**Five findings that generalise, all of them about a correct-looking thing that is wrong.**
+**Findings that generalise, all of them about a correct-looking thing that is wrong.**
 
 - **A structural test that reads source code must strip comments first, and this one had to
   learn that the hard way.** The assertion "no route mentions `requireAdminAuth`" failed - on
@@ -484,6 +484,19 @@ manual resolution were built on 5 September 2026** - see section 4.2a.
   historical rounds by `providerKey`, and `gameKey` is immutable, so deleting the row orphans
   that history while every screen still renders a key it cannot resolve. Same reasoning as the
   catalogue sync reporting missing titles rather than removing them.
+- **The base URL rule is "https, except loopback" - and the exception is the secure case, not
+  a relaxation.** Added 6 Sep 2026 after `isHttpsUrl` made it **impossible to register a
+  first-party provider at all**: `http://127.0.0.1:4010` was refused, and the refusal looked
+  entirely correct because an external provider certainly must be https. What it missed is that
+  a first-party provider shares the machine, so loopback traffic **never touches a network** -
+  it is safer than routing the same calls out through a public subdomain and back. Now
+  `isAcceptableProviderUrl` (with `PROVIDER_URL_ERROR` shared by the register and edit paths,
+  so the two cannot drift): plain http on `localhost`, `127.0.0.1` and `[::1]` only.
+  **The case that pins it is `http://10.0.0.5`** - a private LAN address, which looks internal,
+  is **not** loopback, and is still refused. Widening the carve-out to "any http" is the
+  natural way to break this and reads as a tidy simplification, so a probe covers exactly that.
+  Note the player is unaffected either way: the launch URL is built from the provider's own
+  public play origin, which the specification treats as a separate fact from the API host.
 
 **And one live defect the tests found:** the first time a callback secret was stored counted
 as a rotation, stamping `rotatedAt` on a provider that had never rotated anything. It was

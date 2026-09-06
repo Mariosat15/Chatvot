@@ -193,10 +193,10 @@ export async function registerProvider(
   if (!input.displayName?.trim()) {
     return { success: false, error: "A display name is required." };
   }
-  if (!isHttpsUrl(input.baseUrl)) {
+  if (!isAcceptableProviderUrl(input.baseUrl)) {
     // Reason: HTTPS is not optional on a link that carries a signed callback contract and
     // an API key. Refusing here is cheaper than discovering it during an incident.
-    return { success: false, error: "The base URL must be a valid https:// URL." };
+    return { success: false, error: PROVIDER_URL_ERROR };
   }
 
   const existing = await GameProvider.findOne({ providerKey });
@@ -247,8 +247,8 @@ export async function updateProvider(
   const provider = await GameProvider.findOne({ providerKey });
   if (!provider) return { success: false, error: "Provider not found." };
 
-  if (input.baseUrl !== undefined && !isHttpsUrl(input.baseUrl)) {
-    return { success: false, error: "The base URL must be a valid https:// URL." };
+  if (input.baseUrl !== undefined && !isAcceptableProviderUrl(input.baseUrl)) {
+    return { success: false, error: PROVIDER_URL_ERROR };
   }
   if (input.displayName !== undefined && !input.displayName.trim()) {
     return { success: false, error: "A display name is required." };
@@ -495,10 +495,66 @@ function firstNonBlank(...values: (string | undefined)[]): string | undefined {
   return undefined;
 }
 
-function isHttpsUrl(value: string): boolean {
+/**
+ * Hosts whose traffic never reaches a network.
+ *
+ * A `Set` rather than an object or an array of prefixes, because the value tested against it
+ * comes from an operator's form field: `in` and object indexing both walk the prototype
+ * chain, so `"constructor"` would pass a `hostname in HOSTS` check.
+ */
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+
+/**
+ * One message for both call sites.
+ *
+ * Register and update ask the same question, and two copies of the answer is the shape behind
+ * four defects in this codebase already. It also has to name what IS allowed: an operator told
+ * only "must be https" while looking at a working localhost service concludes the screen is
+ * broken.
+ */
+const PROVIDER_URL_ERROR =
+  "The base URL must be an https:// URL, or http:// on localhost for a provider running on this machine.";
+
+/**
+ * Whether a provider base URL is one we are willing to send an API key to.
+ *
+ * HTTPS ALWAYS, WITH A LOOPBACK CARVE-OUT AND NOTHING WIDER
+ * ---------------------------------------------------------
+ * The rule is HTTPS, because this URL carries a bearer API key and an HMAC contract on every
+ * call, and plaintext is not a preference on either.
+ *
+ * The carve-out is loopback, and it is a carve-out rather than a weakening: traffic to
+ * 127.0.0.0/8 or `::1` is handed straight back to the kernel and never crosses a wire, so
+ * there is nothing to intercept. It is the same distinction the web platform itself draws in
+ * treating `localhost` as a secure context, and the same one three other screens in this
+ * codebase already draw (`components/wallet/BankAccountsSection.tsx`,
+ * `components/kyc/KYCVerification.tsx`, `components/trading/DepositModal.tsx`).
+ *
+ * Reason it exists at all: without it a provider running on the same machine cannot be
+ * registered, which is not a theoretical gap. It blocked X4a's end-to-end rehearsal on
+ * 6 Sep 2026 - the review gate the whole programme is sequenced around is an operator
+ * clicking a provider through to a paid round, and there was no way to reach the first step.
+ *
+ * DELIBERATELY NOT THE PRIVATE RANGES. `192.168.x`, `10.x` and `172.16-31.x` are ordinary
+ * network addresses that can be intercepted by anything else on that network, and "it is
+ * only on our internal network" is precisely the argument that ends with a live provider's
+ * API key travelling in clear. A reader tempted to widen this should note that the loopback
+ * set is checkable by inspection and a private-range check is not.
+ */
+function isAcceptableProviderUrl(value: string): boolean {
+  let parsed: URL;
   try {
-    return new URL(value).protocol === "https:";
+    parsed = new URL(value);
   } catch {
     return false;
   }
+
+  if (parsed.protocol === "https:") return true;
+  if (parsed.protocol !== "http:") return false;
+
+  const host = parsed.hostname.toLowerCase();
+  // The literal set covers what an operator types; the prefix test covers the rest of
+  // 127.0.0.0/8, which is loopback for the same reason and would otherwise be refused
+  // inconsistently with 127.0.0.1.
+  return LOOPBACK_HOSTS.has(host) || /^127\.\d+\.\d+\.\d+$/.test(host);
 }

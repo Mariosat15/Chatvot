@@ -156,6 +156,51 @@ module.exports = {
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       kill_timeout: 10000, // Longer timeout to close connections gracefully
     },
+
+    // ============================================
+    // CHARTVOLT GAMES (First-party Game Provider)
+    // Serves the game catalogue, opens rounds, and
+    // serves the board the player's iframe loads.
+    // ============================================
+    //
+    // This is a PROVIDER, not part of the platform. It answers the same signed HTTP contract
+    // an external games company would, which is the whole point of it existing (X4a) - so it
+    // is deployed like a third party would be: its own process, its own database, its own
+    // origin. `deploy/README.md` has the DNS and TLS steps.
+    //
+    // NOTHING FROM THE PLATFORM'S .env IS PASSED IN, AND THAT IS DELIBERATE. The websocket
+    // entry above forwards MONGODB_URI because it reads the platform's data; this one must
+    // not, because a provider with the platform's connection string is no longer a provider.
+    // It reads its own `games-service/.env` via the cwd below, and its config module sets the
+    // database name explicitly so even a mistyped URI cannot land its collections in the
+    // platform's database.
+    {
+      name: 'chartvolt-games',
+      script: 'dist/index.js',
+      cwd: __dirname + '/games-service',
+      env: {
+        NODE_ENV: 'production',
+        // The port only; every secret, the public origin and the frame-ancestors policy come
+        // from games-service/.env. Listed there rather than here so a secret is never in a
+        // file that is committed.
+        PORT: 4010,
+      },
+      instances: 1,
+      // Fork, never cluster. Round creation is idempotent on `roundId` at the database, so
+      // cluster mode would be safe for that - but the callback sweeper is a singleton, and two
+      // copies would race to deliver the same result and double the provider's retry traffic.
+      exec_mode: 'fork',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '512M',
+      error_file: __dirname + '/logs/games-error.log',
+      out_file: __dirname + '/logs/games-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      // 12s, just over the service's own 10s hard shutdown deadline. Reason: an in-flight
+      // request may be a round creation whose response the platform is waiting for, and
+      // killing it mid-write is how a round exists on one side and not the other.
+      kill_timeout: 12000,
+    },
   ],
 
   // ============================================
@@ -177,6 +222,7 @@ module.exports = {
         cd apps/admin && npm install && cd ../.. &&
         cd api-server && npm install && cd .. &&
         cd websocket-server && npm install && npm run build && cd .. &&
+        cd games-service && npm install && npm run build && cd .. &&
         npm run build &&
         npm run build:admin &&
         npm run build:api &&

@@ -73,13 +73,18 @@ export function createApp() {
    * agree on, and its presence beside a `frame-ancestors` directive is a well-known way to have one
    * browser honour the wrong rule.
    *
-   * `GAMES_FRAME_ANCESTORS` is unset by default, which leaves the game embeddable anywhere. That is
-   * the correct default for a service that has not yet been told who its customer is, and it is
-   * also the setting an operator must fill in before production - noted in the README rather than
-   * enforced here, because a service that refused to boot without it could not be smoke-tested.
+   * `GAMES_FRAME_ANCESTORS` is unset by default, which leaves the game embeddable anywhere. That
+   * is the correct default for a service that has not yet been told who its customer is, and it
+   * is enforced at boot in production only - see `requiredInProduction` in `config.ts`. This
+   * comment used to say the check was left to the README "because a service that refused to boot
+   * without it could not be smoke-tested"; the smoke tools do not set `NODE_ENV=production`, so
+   * the two cases are separable and the trade-off was never necessary.
+   *
+   * Read from the config rather than from `process.env` so the value serving requests is the same
+   * one boot validated. Reading the environment again here would let the two diverge.
    */
   app.use((_req, res, next) => {
-    const ancestors = process.env.GAMES_FRAME_ANCESTORS?.trim();
+    const ancestors = config.frameAncestors;
     if (ancestors) {
       res.setHeader("Content-Security-Policy", `frame-ancestors ${ancestors}`);
     }

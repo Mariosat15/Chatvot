@@ -72,6 +72,7 @@ const {
   completeRotation,
   listProviders,
   setTitleEnabled,
+  updateProvider,
   validateProviderKey,
 } = await import(
   "../../apps/admin/lib/services/game-providers/provider-admin.service"
@@ -184,6 +185,101 @@ describe("X6 game providers admin", () => {
       expect(result.success).toBe(false);
       expect(result.error).toMatch(/https/i);
       expect(await GameProvider.countDocuments()).toBe(0);
+    });
+
+    it("accepts http on a loopback host, so a provider on this machine can be registered", async () => {
+      // Reason: loopback traffic never reaches a network, so there is nothing to intercept -
+      // the same carve-out the web platform makes for localhost. Without it X4a's end-to-end
+      // rehearsal cannot begin, because the first step is registering a provider on :4010.
+      for (const [index, baseUrl] of [
+        "http://localhost:4010",
+        "http://127.0.0.1:4010",
+        "http://[::1]:4010",
+      ].entries()) {
+        const result = await registerProvider({
+          providerKey: `local-games-${index}`,
+          displayName: "Local Games",
+          baseUrl,
+        });
+        expect(result.success, `${baseUrl} should be accepted`).toBe(true);
+      }
+
+      expect(await GameProvider.countDocuments()).toBe(3);
+    });
+
+    it("refuses http on a private network address, which is the whole point of the carve-out", async () => {
+      /*
+       * The load-bearing half of the pair. A LAN address is an ordinary network address that
+       * anything else on that network can intercept, and "it is only on our internal network"
+       * is the argument that ends with a live provider's API key travelling in clear.
+       *
+       * Kept as a separate test from the loopback one deliberately: collapsed into a single
+       * assertion, a fix that widened the check to "any http" would leave one test green and
+       * prove the carve-out was narrow when it was not.
+       */
+      for (const baseUrl of [
+        "http://192.168.2.16:4010",
+        "http://10.0.0.5:4010",
+        "http://172.16.4.4:4010",
+        // Not loopback, whatever it looks like. `127.example.com` is a registrable domain.
+        "http://127.example.com",
+      ]) {
+        const result = await registerProvider({
+          providerKey: "acme-games",
+          displayName: "ACME Games",
+          baseUrl,
+        });
+        expect(result.success, `${baseUrl} must be refused`).toBe(false);
+        expect(result.error).toMatch(/https/i);
+      }
+
+      expect(await GameProvider.countDocuments()).toBe(0);
+    });
+
+    it("refuses a non-http protocol on a loopback host", async () => {
+      // The carve-out is about the network hop, not about localhost being trusted. A
+      // `file:` or `ftp:` URL on localhost is not a provider API and never reaches transport.
+      for (const baseUrl of ["ftp://localhost:4010", "file://localhost/games"]) {
+        const result = await registerProvider({
+          providerKey: "acme-games",
+          displayName: "ACME Games",
+          baseUrl,
+        });
+        expect(result.success, `${baseUrl} must be refused`).toBe(false);
+      }
+
+      expect(await GameProvider.countDocuments()).toBe(0);
+    });
+
+    it("applies the same URL rule when the base URL is edited, with the same message", async () => {
+      // Reason: register and update are two call sites for one rule, which is the shape behind
+      // four defects here already. Asserting the messages are identical is what pins them to
+      // one constant rather than two copies that drift.
+      await registerProvider({
+        providerKey: "acme-games",
+        displayName: "ACME Games",
+        baseUrl: "https://api.acme-games.test",
+      });
+
+      const rejected = await updateProvider("acme-games", {
+        baseUrl: "http://api.acme-games.test",
+      });
+      const onRegister = await registerProvider({
+        providerKey: "other-games",
+        displayName: "Other",
+        baseUrl: "http://api.other.test",
+      });
+
+      expect(rejected.success).toBe(false);
+      expect(rejected.error).toBe(onRegister.error);
+
+      const stored = await GameProvider.findOne({ providerKey: "acme-games" });
+      expect(stored?.baseUrl).toBe("https://api.acme-games.test");
+
+      const accepted = await updateProvider("acme-games", {
+        baseUrl: "http://localhost:4010",
+      });
+      expect(accepted.success).toBe(true);
     });
 
     it("refuses a duplicate key rather than overwriting the existing provider", async () => {

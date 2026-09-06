@@ -16,3 +16,9 @@ tools/.smoke*.err
 # Local secrets. The service refuses to boot without them, so there will be a file like this.
 .env
 .env.local
+
+# The template is `env.example`, with NO LEADING DOT, and renaming it to `.env.example` for
+# convention's sake would delete it from the repository without saying so: the root .gitignore
+# ignores `.env*`, so the file would simply stop being committed and the next deployment would
+# have no documentation of the variables it needs. `deploy/env.example` is named the same way,
+# for the same reason.

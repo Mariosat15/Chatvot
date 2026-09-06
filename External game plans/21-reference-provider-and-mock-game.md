@@ -188,8 +188,9 @@ service's own smoke tool, never yet launched from a ChartVolt contest.
 | Spec-ambiguity log | **Built and open.** `games-service/AMBIGUITY-LOG.md`. **Not yet resolved back into `01` and the requirements HTML** |
 | The platform adapter | **Built.** `chartvolt-games` registered in both registry copies, four files under `lib/services/game-providers/adapters/`, mirrored into `apps/admin` and verified byte-identical. 49 tests, 24 probes |
 | **The playable board** | **Built.** `GET /play?t={token}` serves a real game: `public/play/` (4 files, no build step) behind `src/http/play-page.ts`. Dragging with a finger draws paths, the clock runs, a solved board advances, and the round settles into a signed result. Verified by a human-equivalent browser run on both titles. 11 headless tests drive the browser module against the server's verifier; 13 probes |
-| **Provider registration** | **NOT DONE.** `chartvolt-games` has never been registered through the admin screens, and `games-service` has no `.env`, so it has never been started against the platform |
+| **Provider registration** | **NOT DONE through the admin screens.** The service now has a local `.env` and has been started - including **from its production `dist` build**, not only under `tsx` - and answers signed catalogue calls. Registration was attempted in the admin UI on 6 Sep 2026 and **found a live defect**: the base-URL validator required `https://` unconditionally, so a loopback provider could not be registered at all. Fixed (see 4.1b) |
 | **Any end-to-end round** | **NOT DONE.** No round has travelled between the two halves |
+| **Production deployment** | **Prepared, not performed.** PM2 entry `chartvolt-games`, an nginx server block for a `games.` subdomain, `games-service/env.example`, and a runbook in `deploy/README.md` covering DNS, TLS, the four credentials and the admin steps. Nothing has been deployed - see 4.1b for the two boot guards this work added |
 | Mobile support | **Built for the game screen, not yet for the catalogue.** The board is sized from the viewport, uses `100dvh`, and sets `touch-action: none` so a drag does not scroll the page - which is the one CSS rule in the file that decides whether the game works on a phone at all |
 | Content set, localisation, runbook | **NOT STARTED.** Both titles declare `en` only, deliberately: declaring a locale and shipping English strings for it renders confident English copy on a Greek game page with nothing raising an error |
 
@@ -285,6 +286,47 @@ it.
   rather than `resolveEnabledProvider` so an operator can see a catalogue before enabling
   anything; a check there would make the first sync impossible, and the symptom would read as a
   credentials fault.
+
+### 4.1b Preparing the deployment found three more defects - 6 September 2026
+
+The service was made deployable: a PM2 entry, an nginx server block for a `games.` subdomain, an
+annotated `env.example`, and a runbook in `deploy/README.md`. **Nothing was deployed.** But writing
+the runbook meant stating precisely what an operator has to type, and three of the statements
+turned out to be false - which is the same mechanism as R34 one level up. **Writing down what
+somebody must do is a test of whether they can do it.**
+
+- **The admin panel could not register a loopback provider at all.** `isHttpsUrl` required
+  `https://` unconditionally, so `http://127.0.0.1:4010` was refused - and the refusal was
+  correct-looking, because an external provider certainly must be https. What it missed is that
+  the platform and a first-party provider share a machine, so **loopback is the safest possible
+  base URL**, not a relaxed one: the traffic never touches a network. Now `isAcceptableProviderUrl`,
+  permitting plain http **only** on `localhost`, `127.0.0.1` and `[::1]`. A private LAN address is
+  still refused over http, which is the case worth naming: `http://10.0.0.5` looks internal and is
+  not loopback, and a probe pins that distinction because widening the carve-out to "any http" is
+  the natural way to break it. 7 probes.
+- **The play origin defaulted to localhost and nothing would have said so.** `GAMES_PUBLIC_URL`
+  was optional, falling back to `http://localhost:$PORT`, and **launch URLs are built from it** -
+  so a deployment that forgot it would boot cleanly, sync a catalogue, publish a contest, and send
+  every player's iframe to their own machine. No error, no log line; the player sees a blank
+  rectangle. The same shape as the plain-http case, which browsers block as mixed content inside
+  the platform's https page - again in the player's browser, so again invisible server-side.
+- **`GAMES_FRAME_ANCESTORS` was documented rather than enforced**, so the game shipped embeddable
+  by any site. An attacker who can frame a live round can overlay it, and the player cannot tell.
+
+**The generalisable part is how the last two were fixed, because the earlier reasoning for leaving
+them unenforced was sound.** `app.ts` said the check belonged in the README "because a service that
+refused to boot without it could not be smoke-tested" - true of *unconditional* enforcement, and
+the wrong conclusion. The smoke tools and all 167 service tests run without `NODE_ENV=production`,
+so the two cases are separable and the trade-off was never necessary. Both are now boot refusals
+**in production only**, with the play origin additionally required to be non-loopback https.
+
+`tools/test-config.ts` (15 tests, 12 probes) pins **both halves, and the second is not padding**:
+five tests assert that nothing is refused in development. A guard that fired locally would break
+every suite here and be reverted within the day, and a reverted guard protects nobody - so the
+carve-out is probed by widening `isProduction()` to `return true` and checking the development
+tests catch it. Two further probes check the carve-out has not leaked onto the credentials, where
+a production-only secret would restore the exact "absent configuration is permission to proceed"
+class the config module exists to remove.
 
 ---
 

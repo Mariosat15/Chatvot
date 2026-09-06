@@ -114,17 +114,28 @@ secrets and then rejects every call looks identical, in a dashboard, to a servic
 and "absent configuration is permission to proceed" is the exact mistake that once let an
 anonymous caller credit any wallet on the platform itself.
 
+**Two variables are marked "in production" below, and the distinction is the point rather than a
+compromise.** Their defaults are correct for local work and dangerous once real players arrive,
+and both fail *invisibly* at the default: a localhost play origin sends every player's iframe to
+their own machine, and no frame allowlist lets any site embed a live round and overlay it. Neither
+produces an error, a log line, or anything a dashboard can show. Enforcing them unconditionally
+would break the smoke tools and every suite here, all of which legitimately serve plain http on
+loopback - so the check is gated on `NODE_ENV=production` instead. `tools/test-config.ts` pins both
+halves, because a guard that fired in development would be reverted rather than fixed.
+
+See `env.example` for the annotated template to copy onto a server.
+
 | Variable | Required | Purpose |
 |---|---|---|
 | `GAMES_MONGODB_URI` | **yes** | Its own database. A provider that reads the platform's database is not a provider |
 | `GAMES_API_KEY` / `GAMES_API_SECRET` | **yes** | What the platform presents to us. We issue these |
 | `GAMES_CALLBACK_TOKEN` / `GAMES_CALLBACK_SECRET` | **yes** | What we present to the platform when reporting a score |
 | `PORT` | no, 4010 | Must be a **different origin** from the platform, or the iframe origin checks and the CSP question are never exercised |
-| `GAMES_PUBLIC_URL` | no, `http://localhost:$PORT` | The **play** origin, used to build launch URLs. The spec treats this as a separate fact from the API host and its own example puts play on another subdomain |
+| `GAMES_PUBLIC_URL` | **in production** | The **play** origin, used to build launch URLs. The spec treats this as a separate fact from the API host and its own example puts play on another subdomain. Defaults to `http://localhost:$PORT` in development; under `NODE_ENV=production` it is mandatory and must be a non-loopback https origin |
 | `GAMES_DB_NAME` | no, `chartvolt_games` | Kept separate so one mistyped URI cannot land us in the platform's data |
 | `GAMES_API_KEY_PREVIOUS` / `GAMES_API_SECRET_PREVIOUS` | no | The rotation window. Absent is the normal state, so unlike their live counterparts these must not refuse to boot |
 | `GAMES_SANDBOX` | no, `false` | Enables force-score, force-status and suppress-callback. These decide prize money if they are ever reachable in production, so the safe value is the one you get by forgetting to set anything |
-| `GAMES_FRAME_ANCESTORS` | no | The CSP allowlist. Unset leaves the game embeddable anywhere, which is right for a service not yet told who its customer is and **wrong for production** |
+| `GAMES_FRAME_ANCESTORS` | **in production** | The CSP allowlist. Unset leaves the game embeddable anywhere, which is right for a service not yet told who its customer is and wrong once real players arrive, so it is mandatory under `NODE_ENV=production` |
 | `GAMES_CALLBACK_HOST_ALLOWLIST` | no | Hostnames we will POST results to. Unset means any, so set it in production - the primary control is a shared secret, and shared secrets leak |
 | `GAMES_ASSET_BASE_URL` | no, `GAMES_PUBLIC_URL` | Where catalogue artwork is served from, for a CDN in front of the service |
 | `GAMES_SWEEP_MS` | no, 15000 | The sweeper interval. Lowered by the tests so they drive the real timer |

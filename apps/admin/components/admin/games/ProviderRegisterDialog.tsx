@@ -131,7 +131,10 @@ export default function ProviderRegisterDialog({
               onChange={(event) => setBaseUrl(event.target.value)}
               placeholder="https://api.acme-games.com"
             />
-            <p className="text-xs text-white/50">Must be https.</p>
+            <p className="text-xs text-white/50">
+              Must be https, unless the provider runs on this machine, in which case http on
+              localhost is accepted.
+            </p>
           </div>
 
           <div className="space-y-1.5">

@@ -61,6 +61,79 @@ function rotating(name: string): string | undefined {
   return value && value.trim().length > 0 ? value.trim() : undefined;
 }
 
+/**
+ * Read a variable that is optional in development and mandatory in production.
+ *
+ * WHY THE DISTINCTION EXISTS, AND WHY IT IS NOT A WEAKENING
+ * --------------------------------------------------------
+ * Two of this service's variables have a default that is correct locally and dangerous once
+ * real players arrive: the play origin defaults to localhost, and the frame allowlist defaults
+ * to permitting every site. Both were previously documented rather than enforced, on the
+ * reasoning that a service refusing to boot without them could not be smoke-tested. That
+ * reasoning was sound about unconditional enforcement and wrong about the conclusion - the
+ * smoke tools and the whole test suite run without `NODE_ENV=production`, so the two cases can
+ * be separated instead of traded off.
+ *
+ * The failures being prevented are the invisible kind, which is why boot is the right place:
+ * a localhost launch URL sends the player's iframe to their own machine, and a missing frame
+ * allowlist lets any site embed a live round and overlay it. Neither produces an error, a log
+ * line, or anything a dashboard can show. The player sees a blank rectangle.
+ */
+function requiredInProduction(name: string, fallback: string, guidance: string): string {
+  // eslint-disable-next-line security/detect-object-injection
+  const value = process.env[name];
+  if (value && value.trim().length > 0) return value.trim();
+
+  if (isProduction()) {
+    throw new Error(`ChartVolt Games cannot start: ${name} is not set. ${guidance}`);
+  }
+  return fallback;
+}
+
+function isProduction(): boolean {
+  return process.env.NODE_ENV === "production";
+}
+
+/**
+ * Reject a play origin a player's browser could not load the board from.
+ *
+ * Production only, because both refusals are correct locally: development serves plain http on
+ * loopback and that is the whole point of it.
+ *
+ * The https requirement is not belt-and-braces. The platform is served over https, so a
+ * plain-http iframe inside it is blocked as mixed content by every current browser - and the
+ * block happens in the player's browser, so nothing reaches any server log. A loopback origin
+ * fails the same silent way, resolving to the player's own machine.
+ */
+function assertPlayableOrigin(value: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(
+      `ChartVolt Games cannot start: GAMES_PUBLIC_URL is not a valid URL (${value}).`,
+    );
+  }
+
+  if (parsed.protocol !== "https:") {
+    throw new Error(
+      `ChartVolt Games cannot start: GAMES_PUBLIC_URL must be https in production (${value}). ` +
+        `The platform is served over https, so a plain-http game frame is blocked as mixed ` +
+        `content in the player's browser and the board stays blank with nothing in any log.`,
+    );
+  }
+
+  // `[::1]` arrives from `new URL` with its brackets retained.
+  const host = parsed.hostname.toLowerCase();
+  if (host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]") {
+    throw new Error(
+      `ChartVolt Games cannot start: GAMES_PUBLIC_URL is a loopback address (${value}). ` +
+        `Launch URLs are built from it and handed to the player's browser, so a loopback ` +
+        `origin points every player at their own machine. Use the public games domain.`,
+    );
+  }
+}
+
 function integer(name: string, fallback: number): number {
   // eslint-disable-next-line security/detect-object-injection
   const raw = process.env[name];
@@ -81,6 +154,13 @@ export interface ServiceConfig {
    * own example puts play on a different subdomain from the API.
    */
   publicUrl: string;
+  /**
+   * The CSP `frame-ancestors` value - which origins may embed the game.
+   *
+   * `undefined` means no restriction, which is correct for a service not yet told who its
+   * customer is. It is mandatory in production, enforced at boot.
+   */
+  frameAncestors?: string;
   mongoUri: string;
   /** Database name, kept separate so one accidental URI cannot land us in the platform's data. */
   dbName: string;
@@ -114,15 +194,34 @@ export interface ServiceConfig {
 
 let cached: ServiceConfig | null = null;
 
+/** The origin launch URLs are built from. See `assertPlayableOrigin`. */
+function playOrigin(): string {
+  const value = requiredInProduction(
+    "GAMES_PUBLIC_URL",
+    `http://localhost:${integer("PORT", 4010)}`,
+    `It is the address a player's browser loads the game board from, and launch URLs are built ` +
+      `from it. It is a separate fact from the API base URL the platform calls - that one can ` +
+      `be loopback; this one cannot.`,
+  ).replace(/\/+$/, "");
+
+  if (isProduction()) assertPlayableOrigin(value);
+  return value;
+}
+
 export function loadConfig(): ServiceConfig {
   if (cached) return cached;
 
   cached = {
     port: integer("PORT", 4010),
-    publicUrl: optional("GAMES_PUBLIC_URL", `http://localhost:${integer("PORT", 4010)}`).replace(
-      /\/+$/,
-      "",
-    ),
+    publicUrl: playOrigin(),
+    frameAncestors:
+      requiredInProduction(
+        "GAMES_FRAME_ANCESTORS",
+        "",
+        `It is the CSP frame-ancestors allowlist. Unset, any site on the internet can embed a ` +
+          `live round and overlay it. Set it to every origin players arrive on, www included, ` +
+          `space-separated.`,
+      ) || undefined,
     mongoUri: required("GAMES_MONGODB_URI"),
     dbName: optional("GAMES_DB_NAME", "chartvolt_games"),
 

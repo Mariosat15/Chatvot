@@ -55,6 +55,7 @@ Before starting, make sure you have:
 | chartvolt-api       | 4000 | API server (auth, bcrypt)         |
 | chartvolt-websocket | 3003 | WebSocket server (real-time)      |
 | chartvolt-worker    | -    | Background worker (cron jobs)     |
+| chartvolt-games     | 4010 | ChartVolt Games — the first-party game provider. Optional; see [ChartVolt Games](#chartvolt-games) |
 
 ---
 
@@ -326,11 +327,16 @@ Configure these DNS A records at your domain registrar (e.g., Hostinger):
 | A    | @       | YOUR_SERVER_IP | 3600 |
 | A    | www     | YOUR_SERVER_IP | 3600 |
 | A    | admin   | YOUR_SERVER_IP | 3600 |
+| A    | games   | YOUR_SERVER_IP | 3600 |
+
+The `games` record is only needed if you run provider games. See
+[ChartVolt Games](#chartvolt-games).
 
 **Propagation:** DNS changes can take 5 minutes to 48 hours. Check with:
 ```bash
 dig yourdomain.com +short
 dig admin.yourdomain.com +short
+dig games.yourdomain.com +short
 ```
 
 Wait until both return your server's IP before setting up SSL.
@@ -763,6 +769,177 @@ Quick summary of the most important ones:
 | `VERIFF_API_SECRET` | ⚠️ | **Match** | KYC webhook verification |
 | `STRIPE_WEBHOOK_SECRET` | ⚠️ | **Match** | Payment webhook verification |
 | `OPENAI_API_KEY` | Optional | Same | AI features |
+
+The game provider has its own variables in its own file. See
+[ChartVolt Games](#chartvolt-games).
+
+---
+
+## ChartVolt Games
+
+The platform's first-party game provider. It is a **separate service**, not part of either
+Next.js app, and it is deployed the way a third-party games company would be: its own
+process, its own database, its own domain.
+
+**That separation is load-bearing, not stylistic.** The platform integrates external games
+through a signed HTTP contract, and this service answers that same contract. If it shared a
+database or a codebase with the platform, it would stop proving the contract works and start
+proving only that our code agrees with itself.
+
+Everything below is optional. If you do not run provider games, skip it — the platform runs
+exactly as before and the PM2 entry simply has nothing to serve.
+
+### What has to be true before a player can play
+
+Five things, and each one fails in a way that is easy to misread:
+
+| Thing | If it is missing |
+|---|---|
+| The service is running | The admin catalogue sync reports the provider unreachable |
+| `games.yourdomain.com` resolves and has a certificate | The board's iframe is blocked as mixed content and stays **blank with nothing in any log** |
+| `games-service/.env` is filled in | The service refuses to boot and names the variable on the first line of its log |
+| The four credentials match the admin panel | Every result is refused as `signature_invalid`, which looks identical to an attack |
+| The provider and its titles are enabled in the admin panel | Players see no games; the contest wizard offers nothing to schedule |
+
+### Step 1: DNS and the nginx block
+
+Add the `games` A record (see [DNS Setup](#dns-setup)), then:
+
+```bash
+# Fill in the games subdomain in the nginx config
+sed -i 's/GAMES_DOMAIN_PLACEHOLDER/games.yourdomain.com/g' /etc/nginx/sites-available/chartvolt
+
+nginx -t && systemctl reload nginx
+
+# Certificate. Without it the iframe is blocked as mixed content.
+certbot --nginx -d games.yourdomain.com
+```
+
+Read the comment block above the games server block in `deploy/nginx.conf` before changing
+it. It deliberately sets **no `X-Frame-Options`** — the play page exists to be embedded — and
+adds no other headers, because an `add_header` there would replace the service's own
+`Referrer-Policy: no-referrer` and start leaking launch tokens in referrers.
+
+### Step 2: Configure and start the service
+
+```bash
+cd /var/www/chartvolt/games-service
+cp env.example .env
+nano .env
+```
+
+Two entries decide whether this is safe, so do not skim them:
+
+- **`GAMES_MONGODB_URI` is the provider's database, not the platform's.** Pasting the
+  platform's connection string here is the mistake the file warns about at length. The
+  database name is applied explicitly, so even a shared cluster keeps the collections apart —
+  but a separate cluster is better.
+- **`GAMES_FRAME_ANCESTORS` must list every origin players arrive on**, `www` included.
+  Left unset, any site on the internet can embed a live round and overlay it.
+
+Generate each of the four credentials with `openssl rand -hex 32`. Keep them to hand; two of
+them go into the admin panel in the next step.
+
+```bash
+npm install && npm run build
+pm2 start ecosystem.config.js --only chartvolt-games
+pm2 logs chartvolt-games --lines 30
+
+# Expect three lines, and no warning about sandbox mode:
+#   🎮 ChartVolt Games connected to chartvolt_games
+#   🎮 ChartVolt Games listening on https://games.yourdomain.com (port 4010)
+#   🔄 ChartVolt Games sweeper running every 15s
+
+curl -s http://127.0.0.1:4010/health          # {"ok":true,...,"sandbox":false}
+curl -sI https://games.yourdomain.com/play    # 200, and no X-Frame-Options header
+```
+
+If `sandbox` is `true`, stop and fix it. Sandbox mode can force a score, and a forced score
+decides real prize money on a paid contest.
+
+### Step 3: Register it in the admin panel
+
+**Admin → GAMES → Game Providers → Register provider.**
+
+| Field | Value |
+|---|---|
+| Provider key | `chartvolt-games` |
+| Display name | `ChartVolt Games` |
+| API base URL | `http://127.0.0.1:4010` |
+
+The base URL is **loopback on purpose, and it is not a downgrade.** The platform and the
+provider are on the same machine, so API traffic never touches a network — which is safer
+than routing it out through the public subdomain and back. The player's browser still loads
+the board from `https://games.yourdomain.com`, because the launch URL is built from
+`GAMES_PUBLIC_URL`, and the provider specification treats the play origin as a separate fact
+from the API base URL for exactly this reason.
+
+Loopback is the **only** case where `http://` is accepted. A third-party provider must be
+`https://`, and a private LAN address is refused even over http.
+
+### Step 4: Credentials — four values, two directions
+
+**Game Providers → the provider's row → Credentials.** Four boxes in two labelled groups, and
+the grouping is the whole point:
+
+| Group on the dialog | Boxes | From `games-service/.env` |
+|---|---|---|
+| Issued to us by the provider | API key, API secret | `GAMES_API_KEY`, `GAMES_API_SECRET` |
+| Issued by us to the provider | Callback token, callback secret | `GAMES_CALLBACK_TOKEN`, `GAMES_CALLBACK_SECRET` |
+
+The names read backwards until you notice each pair travels one way: the first pair goes
+**out** with every call the platform makes, the second comes **in** with every result the
+provider posts. Swapping them produces a signature error that reads like an attack.
+
+A blank box means **keep the stored value**, not clear it — the dialog can never show you a
+secret, so an operator editing only the environment would otherwise wipe all four.
+
+### Step 5: Sync the catalogue, then enable
+
+1. **Sync games** on the provider's row. Two titles should appear: **Circuit Sprint**
+   (higher score wins) and **Circuit Perfect** (fastest clean solve wins).
+2. **Enable the provider.** It refuses if the callback token or callback secret is missing,
+   and the refusal names which — that is deliberate, because a provider enabled without them
+   accepts rounds and then refuses every result.
+3. **Enable each title.** Two switches per title exist on purpose: the provider says whether a
+   title is available, and we say whether it is live here. A supplier's opinion is an input,
+   never a decision.
+4. Turn on external games platform-wide in **Settings → White Label** if it is still off.
+
+Then create a contest from **Competitions → Create** and pick the game. Publish it, and it is
+playable.
+
+### Updating it later
+
+The standard deploy covers it — `post-deploy` installs and builds `games-service` alongside
+the other services. To do it by hand:
+
+```bash
+cd /var/www/chartvolt/games-service
+npm install && npm run build
+pm2 restart chartvolt-games
+```
+
+### If something is wrong
+
+```bash
+pm2 logs chartvolt-games --lines 100
+
+# Boots and immediately exits: a required variable is missing. The first line names it.
+# The service refuses to start rather than failing every request, because a service that
+# starts and rejects everything looks identical in a dashboard to one under attack.
+
+# Provider unreachable in the admin panel:
+curl -s http://127.0.0.1:4010/health
+
+# Blank iframe, nothing in any log: almost always the certificate or GAMES_FRAME_ANCESTORS.
+curl -sI https://games.yourdomain.com/play
+# Check the browser console for a mixed-content or frame-ancestors refusal.
+
+# Every result refused as signature_invalid: the four credentials do not match the admin
+# panel. Re-enter all four rather than guessing which one drifted — the error is the same
+# whichever it is, by design, because distinguishing them would help an attacker too.
+```
 
 ---
 
