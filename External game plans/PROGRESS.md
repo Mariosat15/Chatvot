@@ -13,9 +13,9 @@
 
 | | |
 |---|---|
-| **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done.** A provider contest can be created, **published from the admin screen** (5 Sep 2026), entered, played and paid - and since 5 Sep 2026 it is paid **correctly**, which it was not before: two P0 defects meant every player tied on a score of zero and split the pool equally, and a lower-is-better game ranked backwards. A stuck round can now be **inspected and ended by an operator** (5 Sep 2026). **The whole lifecycle is now reachable by clicking** - the player round launch screen landed 5 Sep 2026 at `/competitions/[id]/play`, which also fixed a live defect: a provider-contest player was being sent to the forex trading workspace by a button labelled "Start Trading". **No provider selected**, which is what X4 needs |
-| **Player screens** | **R37 closed 6 Sep 2026, and it is the one to read first if a provider board looks odd.** Neither app's `getCompetitionLeaderboard` passed `score` or `scoreDirection` to the ranking engine, so **every provider participant tied on zero and the board rendered in tie-break order** - and a lower-is-better title was *reversed on screen while correct at settlement*, so a player could lead all week and be paid last. **Latent for money, live for players:** settlement resolves both fields itself, so no payout was ever wrong and **nothing was backfilled**. Fixed by moving `resolveScoreDirection` out of settlement into a shared mirrored module used by all three consumers. Same day, `RoundPreflight` stopped offering an enabled **Play** button on a contest that had not started, and **the lobby became game-aware** - `app/(root)/competitions/[id]/page.tsx` now branches to `ProviderContestLobby`, which shows the play window, attempts remaining and what happens if a round never finishes, with a score leaderboard instead of one whose columns are profit and loss. The trading path below the branch is **byte-identical**. See `13` s4.1a and s4.1b for exactly what is and is not built - **the dashboard cards are still trading-shaped** |
-| **Next action** | **Technically: finish X4a** - pull and rebuild on the server, start `chartvolt-games`, register it through the admin screens, and drive one round end to end. **No DNS, nginx or certificate work is needed** since the play surface is proxied through the platform app (owner's choice, 6 Sep 2026). The game is **playable by a human in a browser**, **R34 is closed**, and the service is now **deployable** - PM2 entry, nginx block, `env.example` and a runbook in `deploy/README.md` (all 6 Sep 2026) - so nothing technical stands between the two halves. **Owner decided 6 Sep 2026 to deploy first and rehearse against the live site**, rather than complete the local rehearsal. After X4a: provider **health** (the last of X6's five admin destinations) and the game-aware **contest list and dashboard** (`13` s4/s5), where the remaining trading-shaped player screens live. **Commercially, in parallel: find and assess a provider using `08`** - X4 cannot start without one, and nothing in the programme is blocked on that search |
+| **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done - all five of its admin destinations now exist (provider health, 6 Sep 2026), but analytics by provider and the Game Master creation API do not.** A provider contest can be created, **published from the admin screen** (5 Sep 2026), entered, played and paid - and since 5 Sep 2026 it is paid **correctly**, which it was not before: two P0 defects meant every player tied on a score of zero and split the pool equally, and a lower-is-better game ranked backwards. A stuck round can now be **inspected and ended by an operator** (5 Sep 2026). **The whole lifecycle is now reachable by clicking** - the player round launch screen landed 5 Sep 2026 at `/competitions/[id]/play`, which also fixed a live defect: a provider-contest player was being sent to the forex trading workspace by a button labelled "Start Trading". **No provider selected**, which is what X4 needs |
+| **Player screens** | **R37 closed 6 Sep 2026, and it is the one to read first if a provider board looks odd.** Neither app's `getCompetitionLeaderboard` passed `score` or `scoreDirection` to the ranking engine, so **every provider participant tied on zero and the board rendered in tie-break order** - and a lower-is-better title was *reversed on screen while correct at settlement*, so a player could lead all week and be paid last. **Latent for money, live for players:** settlement resolves both fields itself, so no payout was ever wrong and **nothing was backfilled**. Fixed by moving `resolveScoreDirection` out of settlement into a shared mirrored module used by all three consumers. Same day, `RoundPreflight` stopped offering an enabled **Play** button on a contest that had not started, and **the lobby became game-aware** - `app/(root)/competitions/[id]/page.tsx` now branches to `ProviderContestLobby`, which shows the play window, attempts remaining and what happens if a round never finishes, with a score leaderboard instead of one whose columns are profit and loss. The trading path below the branch is **byte-identical**. Also 6 Sep 2026, **the dashboard contest cards became game-aware** (`13` s5.1a) - and the load-bearing part is that **the plan named the wrong components**: `ActiveCompetitionCard` and `CompetitionsTable` are both orphaned, and the live one is `ContestsSidebar`, which no chapter mentioned. Fixing only what the plan named would have closed the item with the defect still on screen. See `13` s4.1a and s5.1a for exactly what is and is not built - **the trading panels, the per-game summary cards and the mega-action split are still outstanding** |
+| **Next action** | **Technically: finish X4a** - pull and rebuild on the server, start `chartvolt-games`, register it through the admin screens, and drive one round end to end. **No DNS, nginx or certificate work is needed** since the play surface is proxied through the platform app (owner's choice, 6 Sep 2026). The game is **playable by a human in a browser**, **R34 is closed**, and the service is now **deployable** - PM2 entry, nginx block, `env.example` and a runbook in `deploy/README.md` (all 6 Sep 2026) - so nothing technical stands between the two halves. **Owner decided 6 Sep 2026 to deploy first and rehearse against the live site**, rather than complete the local rehearsal. Provider **health** - the last of X6's five admin destinations - **shipped 6 Sep 2026** (`12` s4.2b), so what remains of the player surface is the trading panels themselves and the per-game summary cards. **Commercially, in parallel: find and assess a provider using `08`** - X4 cannot start without one, and nothing in the programme is blocked on that search |
 | **Money defects closed** | **R26 closed 5 Sep 2026** - the admin cron's finalize copy paid **no** Game Master earnings and recorded no `retained_gm_fee` either, so the commission silently stayed with the platform. This one was **actively losing money rather than latent**: both apps run `checkAndFinalizeCompetitions` on an every-minute cron, so payment depended on which cron won the race. **Not retroactive - no backfill**, and past contests cannot be found by querying for retained rows because none were written. Also **R31** (a 0% Game Master rate paid 5%) and the two P0 score defects, same day |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
 | **Phase in progress** | **X4a - STARTED 6 Sep 2026.** `games-service/` (the provider) and the `chartvolt-games` adapter (the platform) are both **code-complete and not yet connected** - no round has travelled between them, and the provider has never been registered through the admin screens. **The game is playable by a human**: the launch URL serves a real board, verified in a browser on both titles, which also fixed a live defect - an unstarted round reported itself as `finished`, so the first screen a paying player saw was a result screen for a round they had not played. It also **found and then closed a defect in the platform's own published auth scheme** (**R34**): there was no `callbackToken` field anywhere, so a provider implementing `Bearer {CALLBACK_TOKEN}` exactly was rejected and logged as a probable attack. Latent throughout, so nothing was backfilled. **Nothing technical now stands between the two halves** - what remains is deploying the service and registering it. It is now **deployable**: a PM2 entry, an nginx block for a `games.` subdomain, `env.example` and a `deploy/README.md` runbook, plus **two production-only boot guards** for the play origin and the frame allowlist, both of which previously failed invisibly. Writing the runbook also found that the admin panel **could not register a loopback provider at all**. See the three 6 Sep work-log entries |
@@ -629,6 +629,75 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 6 Sep 2026 - X6 + `13` s5 - THE DASHBOARD CARDS, AND THE LAST ADMIN DESTINATION
+
+**Shipped:**
+
+1. **Game-aware dashboard contest cards** (`13` s5.1a). `comprehensive-dashboard.actions.ts` now
+   selects `gameType`, `gameKey` and `score`, and `getDashboardRankingValue` dispatches provider
+   contests to the game registry with the direction resolved through the shared
+   `resolveScoreDirection`. `ContestsSidebar` - the component the dashboard actually renders -
+   shows a score with a neutral tone instead of a P&L figure coloured green or red.
+   `ActiveCompetitionCard` and `CompetitionsTable` gained provider branches too, though neither
+   is reachable. 18 tests, 17 probes, all red on the expected test.
+2. **Provider health, the fifth and last of `12` s4's admin destinations** (`12` s4.2b).
+   `apps/admin/lib/services/games/provider-health.service.ts`, a `guardSection`-protected route
+   at `/api/games/provider-health`, and `ProviderHealthSection.tsx` in the GAMES group. The
+   verdict is **derived on request** from rounds and inbound events rather than read from a
+   stored field. 18 tests, 18 probes, all red.
+3. **R38.** `provider_game.lastSuccessfulRoundAt` was declared in X2, read by the contest
+   wizard's pre-flight, and **written by nothing** - so every operator creating or publishing a
+   provider contest saw a stale-sandbox caution that could never clear. Stamped at the single
+   ingestion door, for `completed` only, wrapped so it cannot fail the ingestion. 3 tests.
+
+**Four things that generalise:**
+
+- **The plan named the wrong components, and fixing what it named would have closed the item
+  with the defect still on screen.** `13` s1 deferred this work by naming
+  `ActiveCompetitionCard` and `CompetitionsTable`. Both are **orphaned** - `rg` finds no
+  importer for either. The live component is `ContestsSidebar`, which no chapter mentions. The
+  orphans were fixed anyway, because a future reader restoring one would otherwise restore the
+  defect, but **the fix that matters is the one the plan did not ask for.** This is "count the
+  writers" turned round: **before fixing the component a document names, grep for its importer.**
+- **A field declared, defaulted, read and written by nobody reads as finished on review**, and
+  a clean typecheck says only that the read compiles. R38 was found by grepping for the writer
+  of a field the health panel intended to display - not by analysis and not by any test. The
+  sibling fields were worse: `healthStatus` has the same defect *and* defaults to `"down"`, so
+  the provider list could render a working provider as down.
+- **A poller would have replaced a permanently-stale value with a silently-ageing one.** That is
+  why health is derived rather than stored, against what `12` s4 and `07` describe. A derived
+  verdict cannot go stale because there is nothing to be stale. The two unwritten fields were
+  stripped from the admin DTOs rather than left for a future screen to find and believe.
+- **"No traffic" is its own verdict and must not be either of the other two.** A configured
+  provider that has never run is not healthy - nothing has been proven - and not down either.
+  Calling it healthy is how a launch-day integration passes its own health check untested. For
+  the same reason configuration outranks traffic: a provider an operator has *disabled* has no
+  rounds, which is indistinguishable from broken if you only count rounds.
+
+**Not done, and it is the honest gap in this entry:** the owner's original **"Something went
+wrong"** error page is **still unexplained**. Neither this work nor R37 accounts for it. Two
+candidate mechanisms were checked and both ruled out - the lobby's unguarded `competition.rules.X`
+reads cannot throw for a wizard-created contest, because `Competition.create` applies the
+subdocument defaults at write time, and `prizeDistribution` is stored as `[]` for the same
+reason. What would settle it is the **stack trace from the Next.js process** at the moment it
+happened; a server-component render error prints one. What *is* true is that the lobby branch
+makes the entire trading render unreachable for a provider contest, so if the cause was in that
+~1,200-line path it can no longer be reached - but **that is a reason to stop worrying, not
+evidence the cause is known.**
+
+**Gates:** full suite **954 tests / 52 files green**; both typechecks **byte-identical to
+baseline** by stash-diff (main 15, admin 223 - note the recorded main figure of 16 is stale by
+one); `check:mirrors` clean at 79 mirrored, 0 drifted; lints at the pre-existing warning count
+on every touched file. **35 probes across the two harnesses, every one red on the expected test.**
+
+**Deferred:** the trading panels themselves, the per-game summary cards, the mega-action split
+(R21), and `07`'s `provider_health_check` model, which was deliberately not created.
+
+**Next chat should:** X4a's remaining half - deploy `games-service` to the server, register it
+through the admin screens, and drive one round end to end by clicking.
 
 ---
 

@@ -55,8 +55,13 @@ export interface ProviderSummary {
   logoUrl?: string;
   baseUrl: string;
   enabled: boolean;
-  healthStatus: string;
-  lastHealthCheckAt?: Date;
+  // Reason `healthStatus` and `lastHealthCheckAt` were REMOVED from this shape on 6 Sep
+  // 2026: both are declared on `game_provider`, nothing has ever written to either, and
+  // `healthStatus` defaults to `"down"` - so returning them invited a screen to report a
+  // working provider as permanently down. The fields stay on the schema (removing one is a
+  // mirrored migration for a cosmetic gain, and the `entryBlockThreshold` precedent is to
+  // keep the name and document it as historical) but they leave this service. Health is
+  // DERIVED by `lib/services/games/provider-health.service.ts` from rounds and deliveries.
   lastCatalogueSyncAt?: Date;
   /** False when no code adapter is installed for this key. Blocks enabling. */
   adapterInstalled: boolean;
@@ -152,8 +157,6 @@ export async function listProviders(): Promise<ProviderSummary[]> {
       logoUrl: provider.logoUrl,
       baseUrl: provider.baseUrl,
       enabled: provider.enabled,
-      healthStatus: provider.healthStatus,
-      lastHealthCheckAt: provider.lastHealthCheckAt,
       lastCatalogueSyncAt: provider.lastCatalogueSyncAt,
       adapterInstalled: Boolean(getProviderAdapter(provider.providerKey)),
       // Presence only. Never the values.

@@ -25,6 +25,11 @@ interface CompetitionData {
   prizePool: number;
   currentRank: number;
   totalParticipants: number;
+  // Reason: which game the contest is. Absent means trading (invariant 5). Every trading
+  // field below is meaningless on a provider contest - there are no trades and no capital,
+  // only a single reported score.
+  gameType?: string;
+  score?: number;
   pnl: number;
   pnlPercentage: number;
   openPositions: number;
@@ -110,6 +115,49 @@ function formatPnlPercent(value: number): string {
   if (abs < 0.01) return value.toFixed(3) + "%";
   if (abs < 0.1) return value.toFixed(2) + "%";
   return value.toFixed(1) + "%";
+}
+
+/**
+ * The metric shown on a competition card: its value, its label and how to colour it.
+ *
+ * ONE FUNCTION RATHER THAN THREE PARALLEL SWITCHES, and that is the point of it. The value,
+ * the label and the colour used to be decided by three separate switches on
+ * `rankingMethod`, so making the card game-aware meant remembering all three - and the one
+ * that mattered most was the colour, which had no way to say "neither". A provider score of
+ * 0, or a score that has not arrived yet, took the `else` branch and rendered in RED,
+ * telling a puzzle player they were down money in a game that has no money in it.
+ *
+ * `tone` therefore has a third value. A score is not positive or negative; it is a number.
+ *
+ * Reason for reading `gameType` and not the stricter `isProviderContest`: this is a display
+ * decision. A provider contest whose catalogue keys are missing still has no profit and
+ * loss to show, so it must not be rendered as a trading row - the strict helper is for
+ * deciding whether a round can actually be launched.
+ */
+function describeCompMetric(comp: CompetitionData): {
+  value: string;
+  label: string;
+  tone: "positive" | "negative" | "neutral";
+} {
+  if (comp.gameType === "provider") {
+    return {
+      // Reason: undefined and 0 are different facts. No round of theirs has reported yet
+      // versus they genuinely scored nothing. Rendering the first as "0" is the read-side
+      // form of the `score ?? 0` that R37 turned on.
+      value:
+        comp.score === undefined || comp.score === null
+          ? "–"
+          : comp.score.toLocaleString(),
+      label: "Score",
+      tone: "neutral",
+    };
+  }
+
+  return {
+    value: formatCompMetric(comp),
+    label: getCompMetricLabel(comp.rankingMethod),
+    tone: isCompMetricPositive(comp) ? "positive" : "negative",
+  };
 }
 
 /** Reason: Returns the correct display string based on the competition's ranking method */
@@ -512,7 +560,9 @@ export default function ContestsSidebar({
             </div>
           ) : (
             <div className={fullWidth ? "grid grid-cols-1 md:grid-cols-2 gap-2" : "space-y-2"}>
-            {activeComps.map((comp, i) => (
+            {activeComps.map((comp, i) => {
+              const metric = describeCompMetric(comp);
+              return (
               <Link
                 key={comp.id}
                 href={`/competitions/${comp.id}`}
@@ -544,11 +594,15 @@ export default function ContestsSidebar({
                     </div>
                     <span
                       className={`text-xs font-semibold ${
-                        isCompMetricPositive(comp) ? "text-green-400" : "text-red-400"
+                        metric.tone === "positive"
+                          ? "text-green-400"
+                          : metric.tone === "negative"
+                            ? "text-red-400"
+                            : "text-gray-200"
                       }`}
-                      title={`Ranked by ${getCompMetricLabel(comp.rankingMethod)}`}
+                      title={`Ranked by ${metric.label}`}
                     >
-                      {formatCompMetric(comp)}
+                      {metric.value}
                     </span>
                   </div>
                   <div className="flex items-center justify-between mt-1.5">
@@ -559,7 +613,8 @@ export default function ContestsSidebar({
                   </div>
                 </motion.div>
               </Link>
-            ))}
+              );
+            })}
             </div>
           )}
         </div>

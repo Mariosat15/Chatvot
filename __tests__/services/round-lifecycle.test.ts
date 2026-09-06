@@ -1092,6 +1092,88 @@ describe("Round status transitions", () => {
 // Invariants
 // ─────────────────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────────────────
+// R38 - the catalogue's "this title has actually worked" stamp
+// ─────────────────────────────────────────────────────────────────────────────────────────
+
+describe("R38 - a scored round stamps the title as having succeeded", () => {
+  /**
+   * THE DEFECT THIS CLOSES. `provider_game.lastSuccessfulRoundAt` was declared in X2 and
+   * read from X6 by the contest pre-flight's sandbox-freshness check - on both the create
+   * and the publish path - and written by nothing at all. So it was permanently absent,
+   * the check's `else` branch was unreachable, and every operator creating or publishing
+   * any provider contest was warned "No sandbox round has succeeded for this game and
+   * configuration" however many had.
+   *
+   * The harm is not a blocked contest - it is a warning, not a refusal. It is that a
+   * warning which always fires is a warning nobody reads, which devalues the whole
+   * checklist rather than only this line.
+   */
+  it("stamps lastSuccessfulRoundAt when a result scores", async () => {
+    const contestId = await seedCompetition();
+    const created = await launchRound(contestId);
+
+    const before = await ProviderGame.findOne({ gameKey: GAME_KEY }).lean<{
+      lastSuccessfulRoundAt?: Date;
+    } | null>();
+    // Reason this is asserted rather than assumed: if the fixture already carried a value
+    // the test would pass without the writer existing at all.
+    expect(before?.lastSuccessfulRoundAt).toBeUndefined();
+
+    const outcome = await ingestProviderCallback({
+      providerKey: MOCK_PROVIDER_KEY,
+      ...signedCallback({ roundId: created.roundId, score: 512 }),
+    });
+    expect(outcome.result).toBe("scored");
+
+    const after = await ProviderGame.findOne({ gameKey: GAME_KEY }).lean<{
+      lastSuccessfulRoundAt?: Date;
+    } | null>();
+    expect(after?.lastSuccessfulRoundAt).toBeInstanceOf(Date);
+  });
+
+  it("does not stamp a round that ended without a score", async () => {
+    // Reason it matters which statuses count: `abandoned`, `expired` and `voided` all
+    // arrive through this same function. Stamping any of them would make the pre-flight
+    // report a working sandbox on the strength of a round that produced nothing - the
+    // opposite failure, and the more dangerous one, because it reads as reassurance.
+    const contestId = await seedCompetition();
+    const created = await launchRound(contestId);
+
+    await ingestProviderCallback({
+      providerKey: MOCK_PROVIDER_KEY,
+      ...signedCallback({ roundId: created.roundId, status: "abandoned" }),
+    });
+
+    const title = await ProviderGame.findOne({ gameKey: GAME_KEY }).lean<{
+      lastSuccessfulRoundAt?: Date;
+    } | null>();
+    expect(title?.lastSuccessfulRoundAt).toBeUndefined();
+  });
+
+  it("a failed stamp does not fail the ingestion", async () => {
+    // Reason: the result IS stored by the time this runs, and returning a failure would
+    // make the provider retry - where gate 6 would then ignore the retry as a duplicate.
+    // The provider would keep trying and the score would still be stored. So the stamp is
+    // fire-and-forget, exactly like the participant-score sync above it.
+    const contestId = await seedCompetition();
+    const created = await launchRound(contestId);
+
+    await ProviderGame.deleteMany({ gameKey: GAME_KEY });
+
+    const outcome = await ingestProviderCallback({
+      providerKey: MOCK_PROVIDER_KEY,
+      ...signedCallback({ roundId: created.roundId, score: 300 }),
+    });
+
+    // Gate 10 refuses a score it cannot bound against a missing title, which is correct and
+    // is not what this test is about - what matters is that the round row survived and the
+    // call returned a result object rather than throwing.
+    expect(typeof outcome.accepted).toBe("boolean");
+    expect(await GameRound.countDocuments({ roundId: created.roundId })).toBe(1);
+  });
+});
+
 describe("X3 invariants", () => {
   it("seam 4: the round services never touch TradingPosition", async () => {
     const fs = await import("fs");

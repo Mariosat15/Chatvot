@@ -94,6 +94,23 @@ export default function CompetitionsTable({
           </thead>
           <tbody className="divide-y divide-gray-700/50">
             {competitions.map((comp, _index) => {
+              // Reason: ten of this table's thirteen columns are trading measurements -
+              // capital, P&L, ROI, margin, drawdown, positions, trades, win rate, profit
+              // factor - and none of them exists for a provider game. Left alone they do
+              // not crash: `capitalHealth` divides undefined by undefined and renders
+              // "NaN%", and the margin maths lands on Infinity and paints a green "safe"
+              // shield for a contest with no margin at all. A confident wrong answer.
+              // A provider contest therefore gets one row spanning those columns.
+              if (comp.competition?.gameType === "provider") {
+                return (
+                  <ProviderCompetitionRow
+                    key={comp.competition._id}
+                    competition={comp.competition}
+                    participation={comp.participation}
+                  />
+                );
+              }
+
               const isProfitable = comp.participation.pnl >= 0;
               const capitalHealth =
                 (comp.participation.currentCapital /
@@ -361,5 +378,82 @@ export default function CompetitionsTable({
         </table>
       </div>
     </div>
+  );
+}
+
+/**
+ * One row for a contest played through a game provider.
+ *
+ * Name, rank and score, then a single cell spanning the ten trading columns that say what
+ * the row is instead of filling them with zeroes. Reason: an empty numeric cell reads as a
+ * value of nothing, and a dash in ten columns reads as a broken query - saying "scored by
+ * the game" once is the only version a player can act on.
+ *
+ * The action goes to the contest page, not to `/play`: launching a round consumes an
+ * attempt, and Next.js prefetches link targets on hover.
+ */
+function ProviderCompetitionRow({
+  competition,
+  participation,
+}: {
+  competition: any;
+  participation: any;
+}) {
+  const hoursLeft = Math.floor(
+    (new Date(competition.endTime).getTime() - Date.now()) / (1000 * 60 * 60),
+  );
+  // Reason: undefined and 0 are different facts. No round has reported yet, versus a
+  // genuine score of nothing.
+  const hasScore =
+    participation?.score !== undefined && participation?.score !== null;
+
+  return (
+    <tr className="hover:bg-gray-700/30 transition-colors">
+      <td className="px-2 py-2">
+        <div className="flex items-center gap-1.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+          <div>
+            <p className="text-xs font-semibold text-gray-200">
+              {competition.name}
+            </p>
+            <p className="text-xs text-gray-500">{hoursLeft}h left</p>
+          </div>
+        </div>
+      </td>
+
+      <td className="px-1 py-2 text-center">
+        <div className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-yellow-500/10">
+          <Trophy className="h-2.5 w-2.5 text-yellow-500" />
+          <span className="text-xs font-bold text-yellow-500">
+            #{participation?.currentRank || "–"}
+          </span>
+        </div>
+      </td>
+
+      {/* Reason: 10 columns - risk, capital, P&L, ROI, margin, drawdown, positions,
+          trades, win rate, profit factor - replaced by the one number this game has. */}
+      <td colSpan={10} className="px-2 py-2">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] uppercase tracking-wide text-gray-500">
+            Score
+          </span>
+          <span className="text-xs font-bold text-gray-200">
+            {hasScore ? Number(participation.score).toLocaleString() : "–"}
+          </span>
+          <span className="text-[11px] text-gray-500">
+            {hasScore ? "· scored by the game" : "· no round yet"}
+          </span>
+        </div>
+      </td>
+
+      <td className="px-2 py-2 text-center">
+        <Link
+          href={`/competitions/${competition._id}`}
+          className="inline-flex items-center px-2 py-1 bg-yellow-500 hover:bg-yellow-600 text-gray-900 text-xs font-bold rounded transition-colors"
+        >
+          View
+        </Link>
+      </td>
+    </tr>
   );
 }

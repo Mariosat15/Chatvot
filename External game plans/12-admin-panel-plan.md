@@ -386,7 +386,7 @@ Cross-reference only; the detail is in `09` E5 and `07`.
 | Section | Purpose |
 |---|---|
 | Providers | List, credentials, enable/disable, catalogue sync, SLA notes |
-| Provider health | Availability, callback latency, error rates, `provider_health_check` history |
+| Provider health | Availability, callback latency, error rates, `provider_health_check` history. **Built 6 September 2026 - see s4.2b, and note it derives its verdict rather than reading a stored one** |
 | Games | Per-title enable switch **independent of the provider's own status** |
 | Round inspector | Round status, score, raw inbound event, replay link, resolution history |
 | Manual resolution | Resolve an unresolved round with a **mandatory reason** and an audit entry |
@@ -607,9 +607,74 @@ the manual-deposit and emergency-cancel precedent.
   held by several rounds, and an operator told "settlement unblocked" while three others still
   hold it would stop looking.
 
-**Still not built from the five destinations:** provider **health**. And the inspector lists only
-rounds needing a decision - unresolved, or live and past expiry - because a list including
-completed rounds buries the handful that matter. Completed rounds are reachable by id.
+**Still not built from the five destinations:** nothing, since 6 September 2026 - see s4.2b.
+The inspector lists only rounds needing a decision - unresolved, or live and past expiry -
+because a list including completed rounds buries the handful that matter. Completed rounds are
+reachable by id.
+
+---
+
+### 4.2b Provider health - BUILT 6 September 2026
+
+The fifth and last of s4's destinations. `apps/admin/lib/services/games/provider-health.service.ts`,
+`apps/admin/app/api/games/provider-health/route.ts` and
+`apps/admin/components/admin/games/ProviderHealthSection.tsx`, wired into `AdminDashboard.tsx`'s
+GAMES group. 18 tests in `__tests__/admin/provider-health.test.ts`, 18 probes in
+`tools/probe-provider-health.ps1`, all red on the expected test. **None of it is mirrored** -
+`apps/admin/lib/services/`, `apps/admin/app/api/` and the admin components are admin-only, so
+`check:mirrors` says nothing about any of it.
+
+**The deviation from the plan, and it is the whole design.** This section describes health as
+`provider_health_check` history - a stored record written by something that polls. It is built
+as a **derivation instead**, computed on request from the rounds and the inbound events that
+already exist. The reason is what the stored version already did to this platform:
+`game_provider` has declared `healthStatus` and `lastHealthCheckAt` since X2, **nothing has ever
+written either**, and `healthStatus` defaults to `"down"` - so the provider list was already
+able to render a working first-party provider as down, with no error and no log line. A poller
+would have replaced that with a subtler version of the same failure: a verdict that is correct
+at the moment it is written and silently ageing from then on. **A derived verdict cannot go
+stale, because there is nothing to be stale.** The two unwritten fields were stripped from the
+admin DTOs (`provider-types.ts`, `provider-admin.service.ts`) rather than left for a future
+screen to find and believe; they stay on the model, because a Mongoose field is add-only in
+practice and removing them is a mirrored migration for no gain.
+
+**Five things from building it that generalise.**
+
+- **A field that is declared, read and never written is worse than an absent one, and it reads
+  as finished on review.** `lastSuccessfulRoundAt` was exactly this - declared on `provider_game`,
+  read by the contest pre-flight's sandbox-freshness warning, written by nothing - so **every
+  operator creating or publishing a provider contest saw a stale-sandbox caution that could
+  never clear.** A warning that is always on is a warning nobody reads, which is the same harm
+  as the badge that flags every unresolved round. Recorded as **R38** and fixed in the same
+  piece of work, at gate 11b's sibling in `result-ingestion.service.ts`: the single ingestion
+  door is the only place that knows a round scored. **Before building a screen on a field,
+  grep for its writer** - the fourth time counting writers has changed a design here.
+- **Only a status that scored may stamp a success.** `abandoned`, `expired` and `voided` are all
+  terminal, and stamping them would make the freshness signal mean "a round ended recently",
+  which is true of a provider that is failing every round. The stamp is also wrapped so a
+  failure to write it cannot fail the ingestion - the score is the money-bearing fact and a
+  cosmetic timestamp must never be able to reject it.
+- **Configuration must outrank traffic, or a deliberate switch reads as an outage.** A provider
+  an operator has disabled has no rounds, which is indistinguishable from a provider that is
+  broken if you only count rounds. `not_configured` is therefore checked first and names the
+  missing thing - master switch, provider switch, adapter, or the `callbackToken`/`callbackSecret`
+  pair - because "down" with no reason is the message that made the stored field useless. Same
+  reasoning as refusing to enable a provider with no adapter rather than greying the control out.
+- **Judge unresolved rounds as a share, never as a count.** A flat threshold calls a busy
+  healthy provider sick and a quiet broken one well. And **a duplicate delivery is not a
+  failure** - a retried callback has done nothing wrong, so it is excluded from the error count
+  for the same reason a duplicate contest entry returns idempotent success. **Signature failures
+  are counted separately**, because they are the one class an operator must act on differently:
+  a rotated secret and an attack look identical in a general error total.
+- **"No traffic" is its own verdict and must not be either of the other two.** A configured
+  provider that has simply never run is not healthy - nothing has been proven - and it is not
+  down either. Reporting it as healthy is how a launch-day integration passes its own health
+  check while being completely untested.
+
+**Deliberately not built:** no round list, because the round inspector is that screen and a
+second one drifts from it. `07`'s `provider_health_check` model was **not** created, for the
+staleness reason above - if a stored history is ever wanted it should be an append-only log of
+what the derivation observed, never the current verdict.
 
 ---
 

@@ -26,6 +26,9 @@ import {
   getSymbolConfig,
   getMultipleSymbolConfigs,
 } from "@/lib/services/symbol-config.service";
+import { hasProviderGameLabel } from "@/lib/services/games/contest-config";
+import { resolveScoreDirection } from "@/lib/services/games/score-direction.service";
+import { getGameModuleOrTrading } from "@/lib/games";
 import { getUserLevel } from "@/lib/services/xp-level.service";
 import { calculateXPProgress } from "@/lib/services/xp-config.service";
 import { getUserGlobalRank } from "@/lib/actions/leaderboard/global-leaderboard.actions";
@@ -269,6 +272,15 @@ interface CompetitionData {
   entryFee: number;
   currentRank: number;
   totalParticipants: number;
+  // Reason: which game this contest is. Absent means trading (invariant 5), which is what
+  // every document written before X1 looks like. The card reads this to decide whether the
+  // metric it shows is a profit-and-loss figure or a game score.
+  gameType?: string;
+  gameKey?: string;
+  // Reason: a provider game reports one number and no trading metrics. Undefined and zero
+  // are different facts here - undefined means no round of theirs has reported yet, which
+  // the card renders as "-" rather than as a score of nothing.
+  score?: number;
   pnl: number;
   pnlPercentage: number;
   currentCapital: number;
@@ -366,6 +378,19 @@ interface TradeData {
 /**
  * Get ranking value for dashboard sorting — mirrors competition-ranking.service.ts logic
  * Reason: The dashboard needs to compute user rank inline without importing the full ranking service.
+ *
+ * DELIBERATELY NOT COLLAPSED INTO THE GAME REGISTRY, and the reason is worth keeping because
+ * the collapse looks like an obvious tidy-up. This is a second copy of trading's ranking
+ * switch, which is exactly the "one rule, two copies" shape that has produced several
+ * defects here. Replacing it with `getGameModuleOrTrading(...).getRankingValue` would remove
+ * the duplication and it would ALSO silently break `win_rate` contests: the module reads the
+ * stored `participant.winRate`, this computes it from `winningTrades / totalTrades`, and
+ * `winRate` is not in the `allActiveParticipants` select above - so every player would rank
+ * on zero. Collapsing the two means widening that select first, and the two changes must not
+ * travel in one commit or a green suite stops being evidence that no rank moved.
+ *
+ * The provider branch at the call site does NOT go through here, so a new game inherits the
+ * registry's behaviour rather than this copy's.
  */
 function getDashboardRankingValue(p: any, method: string): number {
   switch (method) {
@@ -426,7 +451,9 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
 
   // Fetch user-scoped data first (no load-all)
   // PERF: .select() on every query to fetch only fields used by dashboard
-  const participantSelect = "competitionId challengeId userId username currentCapital startingCapital pnl pnlPercentage totalTrades winningTrades losingTrades winRate averageWin averageLoss currentRank status unrealizedPnl currentOpenPositions prizeWon isWinner prizeReceived createdAt";
+  // Reason: `score` is the provider-game equivalent of `pnl`. Without it here the card
+  // renders every provider contest at zero - the read-side half of R37, one screen along.
+  const participantSelect = "competitionId challengeId userId username currentCapital startingCapital pnl pnlPercentage totalTrades winningTrades losingTrades winRate averageWin averageLoss currentRank status unrealizedPnl currentOpenPositions prizeWon isWinner prizeReceived createdAt score";
   const tradeSelect = "symbol side entryPrice exitPrice quantity realizedPnl isWinner openedAt closedAt competitionId challengeId";
   // Reason: Challenge model uses challengerName/challengedName (not *Username), entryFee (not stakeAmount), and has no "name" field
   // Reason: Include "rules" to access rules.rankingMethod for correct dashboard metric display
@@ -492,7 +519,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
         .filter(Boolean),
     ),
   ];
-  const competitionSelect = "_id name status startTime endTime prizePool prizePoolCredits entryFee entryFeeCredits currentParticipants startingCapital rules prizeDistribution";
+  const competitionSelect = "_id name status startTime endTime prizePool prizePoolCredits entryFee entryFeeCredits currentParticipants startingCapital rules prizeDistribution gameType gameKey";
   const allCompetitions =
     userCompIds.length > 0
       ? await Competition.find({ _id: { $in: userCompIds } }).select(competitionSelect).lean()
@@ -527,7 +554,7 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
   const allActiveParticipants = await CompetitionParticipant.find({
     competitionId: { $in: activeCompetitionIds },
   })
-    .select("userId competitionId pnl currentCapital startingCapital currentRank totalTrades winningTrades losingTrades status")
+    .select("userId competitionId pnl currentCapital startingCapital currentRank totalTrades winningTrades losingTrades status score")
     .limit(10000)
     .lean();
 
@@ -539,6 +566,20 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       participantsByCompetition.set(compId, []);
     }
     participantsByCompetition.get(compId)!.push(p);
+  }
+
+  // Reason: the ranking direction is a property of the catalogue title, not of the row, so
+  // it is read once per game key and reused. Memoised rather than resolved inside the sort
+  // comparator: a comparator must stay synchronous, and one database read per comparison
+  // would be quadratic in participants.
+  const directionByGameKey = new Map<string, string>();
+  async function scoreDirectionFor(gameKey?: string): Promise<string> {
+    const key = gameKey || "";
+    const cached = directionByGameKey.get(key);
+    if (cached) return cached;
+    const resolved = await resolveScoreDirection(gameKey);
+    directionByGameKey.set(key, resolved);
+    return resolved;
   }
 
   for (const participation of competitionParticipations as any[]) {
@@ -573,18 +614,44 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
     // Reason: participation.currentRank from DB can be stale or 0.
     // Compute rank dynamically by sorting all participants (same as competition leaderboard).
     const rankingMethod = competition.rules?.rankingMethod || "pnl";
+    const isProviderGame = hasProviderGameLabel(competition);
     let computedRank = participation.currentRank || 0;
     // Reason: Compute live rank dynamically using the competition's actual ranking method.
     // The old code only handled "roi" and "capital" (with a typo), leaving 4 methods defaulting to PnL.
     if (competition.status === "active" && competitionParticipants.length > 0) {
+      // Reason: a provider game reports one score and no trades, so BOTH halves of the
+      // trading comparator misfire on it. `getDashboardRankingValue` reads `pnl`, which is
+      // zero for every provider row, and the has-trades pre-sort is a no-op because nobody
+      // has trades - so every comparison returns 0, the sort is a no-op, and the player is
+      // shown a confident rank that is really their position in the query's result order.
+      // No error, no log line. Same shape as R37, one screen along.
+      const direction = isProviderGame
+        ? await scoreDirectionFor(competition.gameKey)
+        : undefined;
+      // Reason: dispatched through the registry rather than by adding a `score` case to
+      // the switch below, so the direction negation exists in exactly one place
+      // (`lib/games/provider/scoring.ts`) and a third game inherits it for free.
+      const providerModule = isProviderGame
+        ? getGameModuleOrTrading(competition.gameType)
+        : undefined;
+      const rankingValue = (p: any): number =>
+        providerModule
+          ? providerModule.getRankingValue(
+              { ...p, scoreDirection: direction },
+              rankingMethod,
+            )
+          : getDashboardRankingValue(p, rankingMethod);
+
       const sorted = [...competitionParticipants]
         .filter((p: any) => (p.status || "active") !== "disqualified")
         .sort((a: any, b: any) => {
-          const aHasTrades = (a.totalTrades || 0) > 0;
-          const bHasTrades = (b.totalTrades || 0) > 0;
-          if (aHasTrades && !bHasTrades) return -1;
-          if (!aHasTrades && bHasTrades) return 1;
-          return getDashboardRankingValue(b, rankingMethod) - getDashboardRankingValue(a, rankingMethod);
+          if (!isProviderGame) {
+            const aHasTrades = (a.totalTrades || 0) > 0;
+            const bHasTrades = (b.totalTrades || 0) > 0;
+            if (aHasTrades && !bHasTrades) return -1;
+            if (!aHasTrades && bHasTrades) return 1;
+          }
+          return rankingValue(b) - rankingValue(a);
         });
       const idx = sorted.findIndex((p: any) => p.userId?.toString() === userId);
       if (idx !== -1) computedRank = idx + 1;
@@ -600,6 +667,11 @@ export async function getComprehensiveDashboardData(): Promise<ComprehensiveDash
       entryFee: competition.entryFee || competition.entryFeeCredits || 0,
       currentRank: computedRank,
       totalParticipants: competition.currentParticipants || 0,
+      gameType: competition.gameType,
+      gameKey: competition.gameKey,
+      // Reason: NOT `|| 0`. An absent score means no round has reported yet, and the card
+      // shows "-" for that rather than claiming the player scored nothing.
+      score: participation.score,
       pnl: participation.pnl || 0,
       pnlPercentage: participation.pnlPercentage || 0,
       currentCapital: participation.currentCapital || 0,

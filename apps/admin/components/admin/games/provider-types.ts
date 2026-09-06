@@ -25,8 +25,12 @@ export interface GameProviderRow {
   logoUrl?: string;
   baseUrl: string;
   enabled: boolean;
-  healthStatus: string;
-  lastHealthCheckAt?: string;
+  // Reason `healthStatus` and `lastHealthCheckAt` are NOT here: both are declared on
+  // `game_provider` and nothing has ever written to either, and `healthStatus` defaults to
+  // `"down"`. Any screen rendering them would report a working provider as permanently
+  // down, so they are deliberately kept off the wire. Health is derived from rounds and
+  // deliveries by `provider-health.service.ts` instead. Same reasoning as deleting a dead
+  // helper rather than leaving it as a one-line invitation to reintroduce the defect.
   lastCatalogueSyncAt?: string;
   adapterInstalled: boolean;
   credentials: ProviderCredentialStatus | null;

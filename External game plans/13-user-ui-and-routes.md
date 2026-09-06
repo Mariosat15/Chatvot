@@ -149,11 +149,10 @@ Three things about it are load-bearing and easy to undo:
   every provider participant tied on zero. See `05` section 2.0b; a document implying the
   provider board has always ranked on score is wrong.
 - **No practice mode.** Needs `supportsPractice` and a free, unranked path.
-- **No game-aware dashboard.** `ActiveCompetitionCard` and `CompetitionsTable` still render PnL,
-  positions and recent trades and label the action "Trade Now". The `/trade` route redirects, so
-  the *destination* is right, but the card is still trading-shaped. Deferred to the dashboard pass
-  in section 5 rather than half-done, because it is a rewrite of components every trading player
-  sees daily.
+- ~~**No game-aware dashboard.**~~ **Built 6 September 2026 - see section 5.1a.** The sentence
+  this replaced named `ActiveCompetitionCard` and `CompetitionsTable` as the screens at fault,
+  and **both are orphaned** - nothing renders either. The live one is `ContestsSidebar`. Correct
+  as a description of what the plan believed, wrong as a description of the platform.
 - **No CSP `frame-src` allowlist.** There is no Content-Security-Policy in `next.config.ts` at all,
   so adding one is a platform-wide change that would also have to account for the Nuvei payment
   flow and the tutorial embeds. There is also **nothing to allowlist yet** - `game_provider` stores
@@ -301,6 +300,56 @@ it as `PROBE BROKEN` in its own colour rather than as a green.
 
 **A player who only plays provider games must never see an empty trading panel.** In the
 external-only scenario this is the majority of new players, not an edge case.
+
+### 5.1a The contest cards, made game-aware - BUILT 6 September 2026
+
+`lib/actions/comprehensive-dashboard.actions.ts`, `components/dashboard/ContestsSidebar.tsx`,
+`components/dashboard/ActiveCompetitionCard.tsx` and `components/dashboard/CompetitionsTable.tsx`.
+18 tests in `__tests__/games/provider-dashboard-cards.test.ts`, 17 probes in
+`tools/probe-dashboard-cards.ps1`, all red on the expected test. **None of it is mirrored.**
+
+**The first thing to get right is that the plan named the wrong components.** Section 1's
+deferral note - and every summary built on it - said the offending screens were
+`ActiveCompetitionCard` and `CompetitionsTable`. Both are **orphaned**: `rg` finds no importer
+for either. The component the dashboard actually renders is **`ContestsSidebar`**, which nothing
+in this chapter mentioned. Fixing only what the plan named would have produced a green suite, a
+closed to-do item and a dashboard still showing "P&L" against a puzzle score. The two orphans
+were made game-aware anyway, because the plan names them and a future reader restoring one would
+otherwise restore the defect - but **the live fix is the one the plan did not ask for.** General
+form, and it is the counting rule in a new shape: **before fixing the component a document names,
+grep for its importer.**
+
+- **The data layer was the real defect; the components could only render what they were given.**
+  `comprehensive-dashboard.actions.ts` selected neither `gameType` nor `score`, so no card could
+  have branched even if it wanted to, and `getDashboardRankingValue` computed a **trading**
+  ranking value for every contest. That is the trading-shaped-service failure again: it returned
+  a number, the sort ran, the page rendered, and provider participants were ordered by a PnL
+  none of them has. Fixed by dispatching to the game registry and resolving the direction through
+  the shared `resolveScoreDirection`, so the dashboard, the contest leaderboard and settlement
+  now answer the direction question from one place.
+- **A score of zero and no score at all must render differently.** The action previously read
+  `participation.score || 0`, which is the read-side twin of the write-side hole behind R37 - a
+  player whose round has not reported yet is shown a hard `0`, indistinguishable from having
+  played and scored nothing. The value is passed through undefined and the card renders `–`.
+- **Three parallel switches on game type is three chances to add a game and update two of them.**
+  `ContestsSidebar` had `formatCompMetric`, `getCompMetricLabel` and `isCompMetricPositive`, each
+  switching separately, so the next game could easily be formatted as a score, labelled "P&L" and
+  coloured red for a good result. Collapsed into one `describeCompMetric` returning value, label
+  and tone together. The tone needed a third state: **a score is neither profit nor loss**, and
+  without a `neutral` case every provider score inherits green-or-red, which reads as a judgement
+  the platform has not made.
+- **The provider card must not link at `/play`.** Launching a round consumes an attempt and
+  Next.js prefetches `<Link>` targets on hover, so a dashboard card pointed at the play route
+  could spend a paying player's only attempt without them clicking. Both provider cards link at
+  the contest page, which is the safe landing - the same reasoning that made the play screen a
+  state machine rather than a redirect.
+- **Type the new component to the fields it actually reads.** The provider card's props are a
+  narrow structural type rather than the outer component's `any`, so a future edit reaching for
+  `pnl` fails to compile. It earned that immediately: the narrow type caught an unguarded
+  `currentRank > 0` comparison that `any` had been hiding.
+
+**Still trading-shaped, and deliberately not touched:** the trading panels themselves, the
+per-game summary cards, and the mega-action split (R21). Those are the rest of this section.
 
 ---
 

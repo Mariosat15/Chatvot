@@ -472,6 +472,35 @@ export async function applyResult(args: {
     );
   }
 
+  // ── GATE 11c: record that this title has produced a real result (R38) ──────────────────
+  //
+  // `provider_game.lastSuccessfulRoundAt` was declared in X2 and READ IN TWO PLACES from
+  // X6 onward - the contest pre-flight's sandbox-freshness check, on both the create and
+  // the publish path - and WRITTEN NOWHERE. So it was permanently absent, the check's
+  // `else` branch was unreachable, and every operator creating or publishing any provider
+  // contest was told "No sandbox round has succeeded for this game and configuration" no
+  // matter how many had. A warning that always fires is a warning nobody reads, which
+  // degrades the whole checklist rather than just this line - and the pre-flight's own
+  // design notes give that as the reason for keeping warnings and refusals separate.
+  //
+  // Written here because this is the single ingestion door: a second writer would be a
+  // second opinion about what "successful" means. Fire-and-forget for the same reason the
+  // score sync does not fail the ingestion - the result IS stored, and a provider that has
+  // done nothing wrong must not be told to retry.
+  if (target === "completed") {
+    try {
+      await ProviderGame.updateOne(
+        { gameKey: round.gameKey },
+        { $set: { lastSuccessfulRoundAt: round.resultReceivedAt } },
+      );
+    } catch (error) {
+      console.warn(
+        `⚠️ Could not stamp lastSuccessfulRoundAt for "${round.gameKey}":`,
+        error,
+      );
+    }
+  }
+
   await record({
     result: "scored",
     roundId: round.roundId,

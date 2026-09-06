@@ -89,6 +89,7 @@ import UsersSection from "@/components/admin/UsersSection";
 import PaymentProvidersSection from "@/components/admin/PaymentProvidersSection";
 import GameProvidersSection from "@/components/admin/games/GameProvidersSection";
 import RoundInspectorSection from "@/components/admin/games/RoundInspectorSection";
+import ProviderHealthSection from "@/components/admin/games/ProviderHealthSection";
 import PendingPaymentsSection from "@/components/admin/PendingPaymentsSection";
 import FailedDepositsSection from "@/components/admin/FailedDepositsSection";
 import FraudMonitoringSection from "@/components/admin/FraudMonitoringSection";
@@ -334,6 +335,16 @@ const menuGroups: MenuGroup[] = [
         id: "round-inspector",
         label: "Round Inspector",
         icon: <Search className="h-5 w-5" />,
+        color: "text-violet-400",
+        bgColor: "bg-violet-500/10 hover:bg-violet-500/20",
+      },
+      // Provider health (X6, chapter 12 section 4's fifth destination). A third separate
+      // grant, and read-only: it answers "which provider should I look at" and takes no
+      // action at all, so it is safe to give to someone who may not resolve rounds.
+      {
+        id: "provider-health",
+        label: "Provider Health",
+        icon: <Activity className="h-5 w-5" />,
         color: "text-violet-400",
         bgColor: "bg-violet-500/10 hover:bg-violet-500/20",
       },
@@ -1146,6 +1157,8 @@ export default function AdminDashboard({
         return <GameProvidersSection key={currentRefreshKey} />;
       case "round-inspector":
         return <RoundInspectorSection key={currentRefreshKey} />;
+      case "provider-health":
+        return <ProviderHealthSection key={currentRefreshKey} />;
       case "server-monitor":
         return <ServerMonitorSection key={currentRefreshKey} />;
       case "server-fleet":

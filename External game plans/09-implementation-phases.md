@@ -349,13 +349,18 @@ correct rather than a gap.
 enable switch (`12` s4.1a), and now contest creation with pre-flight validation (`12` s2.1)
 are code-complete. Taken out of order because E3 cannot start without a signed provider, and
 the owner's "admin first" instruction puts these screens ahead of any player screen. The
-remaining items are held back on purpose: **health** wants the `provider_health_check` time
-series from `04` s3.5, and the **round inspector**, **manual resolution** and the **live
-contest controls** are most useful once E3 has produced real rounds to inspect. Building
-them against the mock now would ship screens whose only content is fixtures.
+remaining item is held back on purpose: the **live contest controls** are most useful once E3
+has produced real contests to control.
+
+**The health paragraph that used to sit here was wrong about the design, not just the date.**
+It said health "wants the `provider_health_check` time series from `04` s3.5". It was built
+on 6 September 2026 with **no time series at all** - the verdict is derived on request from
+the rounds and events that already exist, because the stored version of this idea was already
+in the codebase and already misleading: `game_provider.healthStatus` has never been written
+and defaults to `"down"`. See `12` s4.2b.
 
 - [x] Provider list, enable/disable, catalogue sync
-- [ ] Provider health
+- [x] **Provider health** (6 Sep 2026, `12` s4.2b). **Derived, not stored** - `provider_health_check` was deliberately not created
 - [x] Game list with our own enable switch, independent of the provider's
 - [x] Contest creation with a **settings form generated from `configSchema`**
 - [x] Pre-flight validation from `03` section 4.1, including the sandbox smoke round
@@ -368,8 +373,9 @@ them against the mock now would ship screens whose only content is fixtures.
 without a developer. **Not yet met, and the gap is now narrower and more precisely
 stated:** an operator can register a provider, choose which titles are live, create a
 contest on one with settings drawn from the game's own schema, **publish it so players
-can see and enter it, and inspect and end a round that got stuck.** What remains is
-provider **health**, and the pause/extend/cancel controls on a live contest.
+can see and enter it, inspect and end a round that got stuck, and read a provider's health
+without believing a stored field** (6 Sep 2026). What remains is the pause/extend/cancel
+controls on a live contest.
 
 **What "rescue works" excludes, said explicitly.** Manual resolution **ends** a round - void,
 abandoned or expired - and **cannot enter a score**, because `applyResult` is the single
@@ -423,12 +429,15 @@ provider contest is discovered there among trading ones with no thumbnail and no
 **Three things the play screen deliberately does not do, stated so no summary reads it as
 finished.** There is no live leaderboard during play, so a player sees their standing only when
 they return to the contest page. There is no practice mode, which needs `supportsPractice` and a
-free unranked path. And **the dashboard is still trading-shaped**: `ActiveCompetitionCard` and
-`CompetitionsTable` render PnL, positions and recent trades and link to `/trade`. The trade route
-now redirects a provider contest to `/play`, so the destination is right, but the card's contents
-and its "Trade Now" label are still wrong for a puzzle. Making them game-aware is a rewrite of
-components every trading player sees daily, so it is deferred to the dashboard pass rather than
-half-done here - see `PROGRESS.md`.
+free unranked path. And the dashboard's **trading panels and per-game summary cards** are still
+outstanding, though the **contest cards were made game-aware on 6 September 2026** (`13` s5.1a).
+
+**The sentence this replaced is worth keeping as a lesson rather than deleting.** It said the
+offending screens were `ActiveCompetitionCard` and `CompetitionsTable`, and that making them
+game-aware was "a rewrite of components every trading player sees daily". **Both are orphaned** -
+nothing renders either, so the rewrite everyone was wary of did not exist, and the component
+players actually see, `ContestsSidebar`, was named in no chapter at all. **Before deferring work
+on the grounds that a component is heavily used, grep for its importer.**
 
 ### E7 - Resilience, reconciliation and monitoring
 

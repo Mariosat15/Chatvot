@@ -54,6 +54,7 @@ chapter covers risks to the programme and to the application.
 | R35 | **A provider's `replayUrl` can leak a live contest's content.** Section 8 requires a `replayUrl` on every result and defines nothing about it - not what it serves, who may open it, whether it authenticates, or how long it lives. A contest's boards are **identical for every player** by design, because that is what makes the ranking a fair comparison. So a replay that shows *the puzzle* rather than *the player's own attempt* lets a player who has finished read the content of a contest still being played | Medium | **OPEN, found 6 Sep 2026 by X4a** as ambiguity A14. Latent on our side: `games-service` builds a `replayUrl` and **no route serves it**, so the platform is handed a URL answering `NOT_FOUND` - a promise made inside a signed payload. The risk is a **third party's** replay screen, which we do not control and cannot inspect | Specify it in `01` and the requirements HTML: the player's own submitted attempt, not the content; token-scoped to that round; and no earlier than the contest's `playWindowEnd`. Then either serve it or remove the field |
 | R36 | **A plain-http `NEXT_PUBLIC_BASE_URL` gives the provider a result callback it cannot use.** `round-launch.service.ts:273` builds `resultCallbackUrl` from it, so it is where every score is POSTed. Two consequences, and the second is the one that would be mistaken for a provider fault: the callback token travels unencrypted, and **certbot installs an http → https redirect as a matter of course while the fetch specification converts a POST following a 301 into a GET** - so the result arrives as a GET, is rejected, and the round is written off as unresolved. The visible symptom is players reporting vanished scores days later | Medium | **CLOSED 6 Sep 2026. Found on the owner's live deployment**, which held `http://chartvolt.com/` against an https site - and found by the games setup script's origin check while doing something else entirely, not by analysis. Latent: no provider round has ever launched in production, so **nothing was backfilled and there is nothing to backfill.** The guard already refused an *absent* value while accepting an explicitly-set localhost - **the same failure reached by a value that looks configured** | `publicBaseUrl()` refuses plain http and loopback hosts under `NODE_ENV=production` only, failing closed on anything `URL` cannot parse. Five tests in `__tests__/services/provider-round-launch.test.ts` + `tools/probe-launch-base-url.ps1` (7 probes). **The development carve-out is pinned as firmly as the refusals**, because every local rehearsal serves plain http on loopback and a guard that fires there gets switched off rather than fixed. `resultCallbackUrl` appears at five call sites and **only one constructs it** - verified with `rg`, so the single guard covers all of them |
 | R37 | **The provider leaderboard ranked on nothing.** Both `getCompetitionLeaderboard` copies were written for trading: the main app's projection listed only trading metrics so `score` was never selected, and neither app's `participantData` mapping carried `score` or `scoreDirection`. So every provider participant reached `calculateRankings` with `score` undefined, `getProviderRankingValue` read `score ?? 0`, **the whole field tied on zero, and the board rendered in whatever order the tie-breakers or the documents happened to give.** A lower-is-better title was worse than wrong - it was *reversed on the board and correct at settlement*, so a player could lead a race-time contest all week and be paid last | High | **CLOSED 6 Sep 2026, found by writing a test for something else** - a reproduction of the owner's live error page, which this was not. Latent for payouts: settlement resolves both fields itself (R32/R33), so **no prize has ever been misapplied and nothing was backfilled.** Not latent for players: the board is a live read, so any provider contest entered before this date displayed a meaningless order. **This is R32/R33 one layer out** - the write path was fixed on 5 Sep and the two READ paths were never examined, which is the "count the callers" rule applied to a seam rather than to a writer | `resolveScoreDirection` extracted to `lib/services/games/score-direction.service.ts` (mirrored) and now used by **settlement and both leaderboards**, so the live board and the payout cannot disagree. 11 tests in `__tests__/services/provider-contest-lobby-shape.test.ts`, `tools/probe-leaderboard-score.ps1` (5 probes, all red). **`scoreDirection` is still not stored per row** - `05` s2 forbids it, because per-row storage lets two rows in one board disagree, which is incoherent rather than merely wrong |
+| R38 | **A warning no operator could ever clear.** `provider_game.lastSuccessfulRoundAt` was declared in X2 and **read** by the contest wizard's pre-flight checklist, which warns when a title's sandbox looks stale - but **nothing has ever written it.** So the field was `null` on every title however many rounds had scored, and every operator creating or publishing a provider contest was shown a stale-sandbox caution that no amount of successful play could remove. The harm is not the wording: an advisory that is always on is an advisory nobody reads, so the *next* warning in that list - one that matters - is skipped with it | Low | **CLOSED 6 Sep 2026, found while building the provider health panel** by grepping for the field's writer before displaying it. Latent for money and **live for operators** from the day the wizard shipped. **Nothing was backfilled**: the timestamp is a freshness signal, and inventing one from `game_round` history would assert a fact about a sandbox nobody observed | Stamped at the sibling of gate 11b in `result-ingestion.service.ts`, the single ingestion door, and **only for `completed`** - `abandoned`, `expired` and `voided` are terminal too, so stamping them would make the signal mean "a round ended recently", which is true of a provider failing every round. The write is wrapped so its failure cannot fail the ingestion: the score is money-bearing and a cosmetic timestamp must never be able to reject it. 3 tests in `__tests__/services/round-lifecycle.test.ts`, 2 probes in `tools/probe-provider-health.ps1`. **The sibling fields are worse and were handled differently** - `game_provider.healthStatus` and `lastHealthCheckAt` have the same no-writer defect *and* `healthStatus` defaults to `"down"`, so the provider list could render a working provider as down. They were removed from the admin DTOs rather than given a writer; see `12` s4.2b for why health is derived instead |
 | R24 | Scope creep before anything ships | Medium | **High** | All |
 | R25 | Round write contention under load | Medium | Medium | X12 |
 | X15 | "Challenge any user" harassment surface - no report-user feature exists | Medium | Medium | X10 |
@@ -908,6 +909,57 @@ generic error page after entering a provider contest. The reproduction seeded a 
 and exercised each of the lobby's reads in turn - and the crash was **not** among them. The
 leaderboard test written along the way failed for an entirely different reason. **A reproduction
 that disproves its own hypothesis is still the thing that found the defect.**
+
+---
+
+### R38 - A field declared, read, and written by nobody - **CLOSED, 6 September 2026**
+
+`provider_game.lastSuccessfulRoundAt` was added in X2 and **read** in X6, by the contest wizard's
+pre-flight checklist, which raises an advisory when a title's sandbox has not produced a scoring
+round recently. Nothing ever wrote it. It was therefore `null` on every title, on every
+provider, however many rounds had scored - so **every operator who created or published a
+provider contest was shown a stale-sandbox caution that no amount of successful play could
+clear.**
+
+**The harm is not the wording, and stating it as a cosmetic bug is what would leave it open.**
+An advisory that is always on is an advisory that gets read once. The pre-flight deliberately
+keeps three items advisory rather than blocking - the platform master switch, sandbox freshness,
+and the per-round cost acknowledgement - precisely so an operator scheduling ahead of a launch is
+not forced to switch external games on platform-wide. A permanently-lit item trains that operator
+to skip the list, which is the same failure as a badge that flags every unresolved round: **a
+signal that is right in general is worthless in the case you are looking at.**
+
+**Latent for money, live for operators.** No payout, ranking or entry ever read the field, so
+there is nothing to compensate. **Nothing was backfilled**, and that is a decision rather than an
+omission: the value is a *freshness* signal, and deriving one from historical `game_round` rows
+would assert that somebody observed a sandbox round at a time nobody did. A fabricated freshness
+timestamp is worse than a null one, because the null at least announced itself.
+
+Three things generalise.
+
+- **Before building a screen on a field, grep for its writer.** This was found while building the
+  provider health panel, by checking what populated the fields the panel intended to display -
+  not by analysis, and not by any test. It is the counting rule turned round: after four entry
+  paths, ten finalize sites, six raw inserts and seven subscription writers, here the count was
+  **zero**, and a declared, defaulted, read field with no writer looks completely finished on
+  review. **A clean typecheck is evidence the read compiles, never that the value exists.**
+- **Only a status that scored may stamp a success.** `abandoned`, `expired` and `voided` are
+  terminal as well, and stamping them would quietly redefine the signal as "a round ended
+  recently" - which is true of a provider that is failing every single round, so the check would
+  be greenest exactly when it should be loudest.
+- **A cosmetic write must not be able to reject a money-bearing one.** The stamp sits inside the
+  single ingestion door, which is the only place that knows a round scored, so it has to be
+  wrapped: a failure to record a timestamp cannot be allowed to fail the ingestion of the score
+  itself. Pinned by a test that makes the stamp throw and asserts the ingestion still succeeds.
+
+**The sibling fields are worse, and were deliberately handled the other way.**
+`game_provider.healthStatus` and `lastHealthCheckAt` have the same no-writer defect, and
+`healthStatus` **defaults to `"down"`** - so the provider list could render a fully working
+first-party provider as down, with no error and no log line. They were not given a writer: a
+poller replaces a permanently-stale value with a silently-ageing one. They were removed from the
+admin DTOs and the health verdict is **derived on request** instead. See `12` s4.2b. The fields
+stay on the model, because a Mongoose field is add-only in practice and removing them is a
+mirrored migration for no gain.
 
 ---
 
