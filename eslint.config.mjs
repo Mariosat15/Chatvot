@@ -190,4 +190,33 @@ export default [
       "no-restricted-imports": "off",
     },
   },
+  {
+    // games-service/ is an arm's-length game provider, not part of the platform.
+    //
+    // This is the FIFTH collision of the "**/games/*" wildcard, exactly as the note above
+    // predicts: X4a added `games-service/src/games/`, and the service's own tests importing it
+    // read as an invariant 1 violation. The first four were models, services and two component
+    // folders.
+    //
+    // Exempted as a FILE SCOPE rather than as another negation in the pattern group, and the
+    // distinction is the point. Invariant 1 is a rule about the PLATFORM's contest engine not
+    // bypassing the PLATFORM's game registry. This service has neither: it is a separate
+    // process on a separate origin which may not import from this repository at all, enforced
+    // by `games-service/tools/check-isolation.ts`. A negation in the group would say "this
+    // import is an acceptable exception to our architecture"; a file scope says "our
+    // architecture does not govern this directory", which is the true statement and the one
+    // that will still be true after the next game module is added.
+    //
+    // It also avoids a real hazard: applying the platform's invariants here creates pressure to
+    // restructure a provider's code to satisfy a rule with no meaning there, and the whole value
+    // of X4a rests on this service being shaped by the published specification instead.
+    //
+    // ONLY THIS ONE RULE IS SWITCHED OFF. Everything else still applies, deliberately - the
+    // security rules have caught real defects in this repository, and lint coverage is not code
+    // sharing.
+    files: ["games-service/**"],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
 ];

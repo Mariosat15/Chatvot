@@ -171,6 +171,87 @@ validate against.
 
 ---
 
+## A9 - Which direction the duration tie-break runs `OPEN`
+
+**Where:** Endpoint 3, the `startedAt, completedAt, durationMs` row: "We use duration as a
+tie-break, and ties are common."
+
+It does not say **which way**. For a `higher_is_better` points game, the intended reading is
+surely that the faster of two equal scores wins - but for a `lower_is_better` duration game the
+score *is* the duration, so the tie-break is either meaningless or means something else
+entirely.
+
+**Why a provider cannot ignore this.** It changes what `durationMs` should contain. Every
+Circuit Sprint session lasts exactly the configured clock, so reporting session length would
+give the whole field an identical tie-break and quietly make it useless - no error, no warning,
+just a tie that never breaks. This service reports **time to the last completed board** instead,
+which is only the right answer if lower is better.
+
+**Guessed:** lower duration wins. **Recommendation:** say so, and say what a
+`lower_is_better` title should put in `durationMs`, since for those the tie-break needs a
+different field (Circuit Perfect ties break on boards completed, which the platform cannot see).
+
+---
+
+## A10 - Which subset of JSON Schema is actually supported `OPEN` (gap)
+
+**Where:** Endpoint 1, the `configSchema` row: "Valid JSON Schema describing every setting we
+may send in `config`."
+
+The specification asks for valid JSON Schema and never says which keywords the platform
+understands. That matters because the platform's form generator **fails closed** on keywords it
+cannot render - so a provider writing entirely valid JSON Schema using `pattern`, `oneOf` or
+`allOf` can have a whole title refused, having done exactly what the document asked.
+
+Failing closed is the right behaviour - a partially-understood schema would render a form
+missing half the real constraints and then validate against the half it understood - but it
+turns an unstated assumption into a rejected integration.
+
+**Guessed:** the most conservative subset possible - `type`, `properties`, `integer`, `string`,
+`boolean`, `minimum`, `maximum`, `enum`, `default`, `required`. **Recommendation:** publish the
+supported keyword list in the spec, and say plainly that anything else refuses the title rather
+than being ignored. This is cheap to document and expensive to discover.
+
+Related, and unstated: `configSchema` is described as required, but nothing says whether the
+platform will send settings the schema does not declare, or omit ones it does. This service
+clamps out-of-range values rather than refusing the round - reaching that state means the two
+sides disagree about the schema, and refusing a paid round mid-contest is worse than playing a
+300-second board when 400 was asked for - and reports which settings it had to correct.
+
+---
+
+## A11 - The locale-map option has no defined shape `OPEN` (gap)
+
+**Where:** Endpoint 1, the "Localised" constraint: "Either return a locale map, or honour an
+`Accept-Language` header on this endpoint."
+
+Two options are offered and only one is specified. If a provider chooses the locale map, no
+field name, nesting or fallback rule is given - `"description": {"en": "...", "el": "..."}`
+alongside a flat `"displayName"`? A parallel `"translations"` object? What happens when a
+requested locale is missing from the map?
+
+**Guessed:** honour `Accept-Language` and return flat strings, because that is the option the
+document actually describes.
+
+**Worth noting for the platform side too:** an adapter written against flat strings will not
+consume a locale map at all, so the two options are not interchangeable in practice. Either
+specify the map's shape or remove the choice.
+
+---
+
+## A12 - Nothing says a title may declare fewer locales than the platform serves `OPEN` (minor)
+
+The spec requires text fields to exist "in every locale you declare", which is the right
+constraint and is the one this service is honouring by declaring **only `en`** until real
+translations exist - declaring a locale and shipping English strings for it would render
+confident English copy on a Greek game page with nothing raising an error.
+
+What is unstated is the consequence: is a title that declares only `en` hidden from players in
+other locales, shown with English copy, or refused at catalogue sync? A provider needs to know
+whether declaring fewer locales costs them reach or costs them the integration.
+
+---
+
 ## Not ambiguities - two places the spec is better than expected
 
 Recorded because a log of only complaints misrepresents the document.
