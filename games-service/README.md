@@ -123,7 +123,19 @@ would break the smoke tools and every suite here, all of which legitimately serv
 loopback - so the check is gated on `NODE_ENV=production` instead. `tools/test-config.ts` pins both
 halves, because a guard that fired in development would be reverted rather than fixed.
 
-See `env.example` for the annotated template to copy onto a server.
+**`npm run setup:env` writes the whole file**, generating the four credentials and taking the
+database string and the site address from the platform's `.env` one directory up. Add `--dev` for
+a localhost file. Two things about it are deliberate. It **refuses to overwrite an existing
+`.env`** without `--force`, because the admin panel cannot show a stored secret back, so new
+credentials without a matching panel edit leave every result failing its signature check and the
+old values unrecoverable. And it **applies the production origin rules itself**, so a bad play
+origin is refused where the message can name the fix rather than in a PM2 restart loop.
+
+Reading the platform's `.env` is not an isolation breach and `check:isolation` correctly says
+nothing about it: the script imports no platform code and the running service still knows nothing
+of the platform. A third-party provider would be handed the same two facts by email.
+
+See `env.example` for the annotated template if you would rather edit it by hand.
 
 | Variable | Required | Purpose |
 |---|---|---|

@@ -631,6 +631,49 @@ Newest at the top.
 
 ---
 
+### 6 Sep 2026 - X4a - ONE COMMAND WRITES THE SERVICE'S .env
+
+**Shipped:** `games-service/tools/setup-env.ts` (`npm run setup:env`). It generates the four
+credentials, takes the database string and the site address from the platform's `.env` one
+directory up, writes the file at mode 600, and prints the two credential pairs that have to be
+typed into the admin panel. Proven by running it: three refusals fire with their reasons, both
+happy paths write the right origins, and **the service boots on a fully generated file**.
+
+**Why it exists:** the manual version was four `openssl` runs and eleven hand-edited lines where a
+single typo produces `signature_invalid` on every result - an error that reads like an attack
+rather than like a typo. Every value is either random or already known to the machine, so there
+was nothing for a person to decide.
+
+**Three things that generalise.**
+
+- **A setup script's most important behaviour is what it refuses.** It will not overwrite an
+  existing `.env`, and the reason is asymmetric in a way that is easy to miss: the admin panel
+  **cannot show a stored secret back**, so regenerating leaves the operator with four new values,
+  four unrecoverable old ones, and every result failing its signature check. `--force` exists;
+  the default does not. Same shape as the backfill that refuses to touch a correctly-labelled row.
+- **Validate in the tool, not only at the boot it precedes.** The script applies the same https
+  and non-loopback rules as `assertPlayableOrigin`, duplicated rather than imported because
+  `loadConfig` needs the very file being written. Eight lines buys an error naming the offending
+  value instead of a PM2 restart loop at 3am.
+- **A development carve-out belongs in the artifact, never in the enforcement.** `--dev` writes a
+  loopback origin, which is exactly what the boot guard forbids - and that is safe because the
+  guard still fires under `NODE_ENV=production`, so a `--dev` file copied to a server fails loudly
+  on first start. **A flag that relaxed the guard instead would have been the same feature with
+  none of the safety.**
+
+**One claim verified rather than repeated:** several documents said a shared Atlas cluster is safe
+because the database name is applied explicitly. Checked - `src/store/db.ts` passes
+`dbName: config.dbName` to `mongoose.connect`, which overrides the URI's own path. True, and now
+cited to the line rather than asserted.
+
+**Isolation intact:** 35 source files, no platform imports. Reading the platform's `.env` at setup
+time is not a code dependency and `check:isolation` correctly says nothing about it - stated in
+both READMEs so nobody "fixes" it later.
+
+**Owner tested:** not yet.
+
+---
+
 ### 6 Sep 2026 - X4a - THE PLAY SURFACE IS PROXIED THROUGH THE PLATFORM, ON OWNER'S INSTRUCTION
 
 **Shipped:** three rewrites in `next.config.ts` mounting the game's play surface on the

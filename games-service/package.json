@@ -9,6 +9,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "start:dev": "tsx index.ts",
+    "setup:env": "tsx tools/setup-env.ts",
     "check:isolation": "tsx tools/check-isolation.ts",
     "typecheck": "tsc --noEmit",
     "test:config": "tsx tools/test-config.ts",

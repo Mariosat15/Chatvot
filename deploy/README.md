@@ -893,12 +893,30 @@ cd apps/admin && npm run build && pm2 restart chartvolt-admin && cd ../..
 
 ```bash
 cd /var/www/chartvolt/games-service
-cp env.example .env
-nano .env
+npm install && npm run build
+npm run setup:env
 ```
 
-On the proxy route, set the play origin to **the main site**, and point artwork at the `/play`
-prefix so the catalogue emits URLs the rewrites can resolve:
+`setup:env` writes the whole `.env` and prints the four credentials to paste into the admin
+panel in step 5. **Keep that output** — the admin panel can never show a stored secret back,
+and re-running the script issues new ones.
+
+It derives everything rather than asking: the four credentials are random, the database string
+and the site address come from the platform's own `.env` one directory up. Three refusals are
+worth knowing about, because each one is a production failure caught early:
+
+- **It will not overwrite an existing `.env`.** New credentials without a matching admin-panel
+  edit means every result fails its signature check, and the old values cannot be recovered
+  from the panel. `npm run setup:env -- --force` if you mean it.
+- **It will not write a play origin the service would then refuse to boot on** — plain http, or
+  a loopback address. Same rules as the boot guard, applied where the message can name the fix.
+- **It never prints the database connection string**, which contains a password.
+
+If the platform's `.env` has no `NEXT_PUBLIC_BASE_URL`, pass the site explicitly:
+`npm run setup:env -- --url https://yourdomain.com`.
+
+<details>
+<summary>What it writes, and the two entries worth understanding</summary>
 
 ```
 GAMES_PUBLIC_URL=https://yourdomain.com
@@ -906,20 +924,18 @@ GAMES_ASSET_BASE_URL=https://yourdomain.com/play
 GAMES_FRAME_ANCESTORS=https://yourdomain.com https://www.yourdomain.com
 ```
 
-Two entries decide whether this is safe, so do not skim them:
+- **`GAMES_MONGODB_URI` is copied from the platform, and that is safe here.** `dbName` is
+  passed explicitly to `mongoose.connect` in `src/store/db.ts`, so the collections land in
+  `chartvolt_games` whatever database the URI names — this service cannot read the platform's
+  data even by accident. A separate cluster is still tidier.
+- **`GAMES_FRAME_ANCESTORS` must list every origin players arrive on**, `www` included. Left
+  unset, any site on the internet can embed a live round and overlay it.
 
-- **`GAMES_MONGODB_URI` is the provider's database, not the platform's.** Pasting the
-  platform's connection string here is the mistake the file warns about at length. The
-  database name is applied explicitly, so even a shared cluster keeps the collections apart —
-  but a separate cluster is better.
-- **`GAMES_FRAME_ANCESTORS` must list every origin players arrive on**, `www` included.
-  Left unset, any site on the internet can embed a live round and overlay it.
+To edit it by hand instead, `cp env.example .env` — every variable is annotated there.
 
-Generate each of the four credentials with `openssl rand -hex 32`. Keep them to hand; two of
-them go into the admin panel in the next step.
+</details>
 
 ```bash
-npm install && npm run build
 cd /var/www/chartvolt
 pm2 start ecosystem.config.js --only chartvolt-games
 pm2 save

@@ -381,6 +381,18 @@ change and no DNS record** - the platform stores their address and nothing more.
 block and its runbook section are kept, and `GAMES_PUBLIC_URL` still decides which. Switching
 later is two environment variables and a restart, with no code change.
 
+**And the configuration was collapsed into one command the same day.** `npm run setup:env`
+(`tools/setup-env.ts`) generates the four credentials, derives the play origin, the artwork prefix
+and the frame allowlist from the platform's own `.env`, and prints the two pairs that go into the
+admin panel. Three properties are the point of it rather than conveniences: it **refuses to
+overwrite an existing `.env`** without `--force`, because the admin panel cannot show a stored
+secret back and so the old values would be unrecoverable while every result failed its signature
+check; it **applies the production origin rules itself**, duplicated from `assertPlayableOrigin`
+because `loadConfig` needs the file being written; and `--dev` puts the development carve-out **in
+the artifact, not in the enforcement** - the boot guard still refuses a loopback origin under
+`NODE_ENV=production`, so a dev file copied to a server fails loudly instead of pointing every
+player at their own machine.
+
 ---
 
 ## 5. What this does NOT prove
