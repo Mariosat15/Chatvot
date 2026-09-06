@@ -1,19 +1,19 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { connectToDatabase } from '@/database/mongoose';
-import Challenge from '@/database/models/trading/challenge.model';
-import ChallengeParticipant from '@/database/models/trading/challenge-participant.model';
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { connectToDatabase } from "@/database/mongoose";
+import Challenge from "@/database/models/trading/challenge.model";
+import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
 
 // GET - Get specific challenge details
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await params;
@@ -22,7 +22,10 @@ export async function GET(
     let challenge = await Challenge.findById(id);
 
     if (!challenge) {
-      return NextResponse.json({ error: 'Challenge not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: "Challenge not found" },
+        { status: 404 },
+      );
     }
 
     // Only participants can view
@@ -30,49 +33,50 @@ export async function GET(
       challenge.challengerId !== session.user.id &&
       challenge.challengedId !== session.user.id
     ) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Auto-finalize if challenge is 'active' but has ended and not yet finalized
     if (
-      challenge.status === 'active' &&
+      challenge.status === "active" &&
       challenge.endTime &&
       new Date() >= new Date(challenge.endTime) &&
       !challenge.winnerId // Not yet finalized
     ) {
-      console.log(`🏁 Auto-finalizing challenge ${id} on access...`);
+      console.log("🏁 Auto-finalizing challenge on access:", id);
       try {
-        const { finalizeChallenge } = await import('@/lib/actions/trading/challenge-finalize.actions');
+        const { finalizeChallenge } =
+          await import("@/lib/actions/trading/challenge-finalize.actions");
         await finalizeChallenge(id);
         // Refresh challenge data after finalization
         challenge = await Challenge.findById(id);
-        console.log(`✅ Challenge ${id} auto-finalized successfully`);
+        console.log("✅ Challenge auto-finalized successfully:", id);
       } catch (error) {
-        console.error(`❌ Failed to auto-finalize challenge ${id}:`, error);
+        console.error("❌ Failed to auto-finalize challenge:", id, error);
       }
     }
 
     // Get participants if challenge is active or completed
     let participantDocs: any[] = [];
-    if (['active', 'completed'].includes(challenge.status)) {
+    if (["active", "completed"].includes(challenge.status)) {
       participantDocs = await ChallengeParticipant.find({
         challengeId: id,
       }).lean();
     }
 
     // Return raw participant documents with challenge data
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
-      challenge: challenge.toObject(), 
+      challenge: challenge.toObject(),
       participants: participantDocs,
       challengerId: challenge.challengerId,
       challengedId: challenge.challengedId,
     });
   } catch (error) {
-    console.error('Error fetching challenge:', error);
+    console.error("Error fetching challenge:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch challenge' },
-      { status: 500 }
+      { error: "Failed to fetch challenge" },
+      { status: 500 },
     );
   }
 }

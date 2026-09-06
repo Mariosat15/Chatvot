@@ -1,96 +1,656 @@
-'use server';
+"use server";
 
-import {auth} from "@/lib/better-auth/auth";
-import {inngest} from "@/lib/inngest/client";
-import {headers} from "next/headers";
-import {connectToDatabase} from "@/database/mongoose";
-import { ObjectId } from 'mongodb';
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { connectToDatabase } from "@/database/mongoose";
+import { ObjectId } from "mongodb";
+import { sendWelcomeEmail } from "@/lib/nodemailer";
+import EmailTemplate from "@/database/models/email-template.model";
+import { sendVerificationEmail } from "@/lib/services/email-verification.service";
+import {
+  validateRegistration,
+  validateLogin,
+  recordFailedLogin,
+  clearFailedLogins,
+  getClientIP,
+} from "@/lib/services/registration-security.service";
+import { getFraudSettings } from "@/lib/services/fraud-settings.service";
 
-export const signUpWithEmail = async ({ email, password, fullName, country, address, city, postalCode }: SignUpFormData) => {
+export const signUpWithEmail = async ({
+  email,
+  password,
+  fullName,
+  country,
+  address,
+  city,
+  postalCode,
+  honeypot,
+  referralCode,
+  captchaToken,
+  fingerprint,
+}: SignUpFormData & {
+  honeypot?: string;
+  referralCode?: string;
+  captchaToken?: string;
+  fingerprint?: string;
+}) => {
+  try {
+    // Get client IP for security checks
+    const ip = await getClientIP();
+
+    // SECURITY: Verify request Origin / Referer matches our own domain.
+    // Reason: Server Actions can be invoked via direct POST from external
+    // scripts/bots. Rejecting cross-origin callers blocks automated spam
+    // tools that never hit our signup page in the browser.
     try {
-        // SECURITY: Prevent users from signing up with admin email
-        const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase() || '';
-        if (email.toLowerCase() === adminEmail) {
-            return { 
-                error: 'This email address is not available for registration',
-                success: false 
-            };
-        }
-        
-        const response = await auth.api.signUpEmail({ body: { email, password, name: fullName } })
+      const hdrs = await headers();
+      const origin = hdrs.get("origin") || "";
+      const referer = hdrs.get("referer") || "";
+      const host = hdrs.get("host") || "";
 
-        if(response && response.user) {
-            // Update user with additional profile fields
-            const mongoose = await connectToDatabase();
-            const db = mongoose.connection.db;
-            
-            if (db) {
-                const userId = response.user.id;
-                console.log(`📝 Sign-up: Updating user ${userId} with profile data...`);
-                
-                // Build query to find user by multiple ID formats
-                const queries: any[] = [{ id: userId }];
-                if (ObjectId.isValid(userId)) {
-                    queries.push({ _id: new ObjectId(userId) });
-                }
-                queries.push({ _id: userId });
-                
-                // All new users are traders by default
-                // Admin role can ONLY be assigned through the admin panel
-                const role = 'trader';
-                
-                const updateResult = await db.collection('user').updateOne(
-                    { $or: queries },
-                    { 
-                        $set: { 
-                            country,
-                            address,
-                            city,
-                            postalCode,
-                            role, // All signups are traders - admin role assigned via admin panel only
-                            updatedAt: new Date()
-                        } 
-                    }
-                );
-                
-                console.log(`📝 Sign-up: Update result - matched: ${updateResult.matchedCount}, modified: ${updateResult.modifiedCount}`);
-                
-                if (updateResult.matchedCount === 0) {
-                    console.error(`⚠️ Sign-up: Could not find user to update profile data. userId: ${userId}`);
-                } else {
-                    console.log(`✅ Sign-up: Profile data saved for user ${userId}`, { country, address, city, postalCode });
-                }
-            }
+      const appUrl = (
+        process.env.NEXT_PUBLIC_APP_URL ||
+        process.env.BETTER_AUTH_URL ||
+        ""
+      ).toLowerCase();
 
-            await inngest.send({
-                name: 'app/user.created',
-                data: { email, name: fullName, country }
-            })
+      const allowedHosts = new Set<string>();
+      if (host) allowedHosts.add(host.toLowerCase());
+      try {
+        if (appUrl) allowedHosts.add(new URL(appUrl).host.toLowerCase());
+      } catch {
+        /* ignore invalid URL */
+      }
+
+      // Only enforce when we have at least one allowed host AND the caller
+      // provided an Origin or Referer. Server-to-server calls without these
+      // headers are rare in browser flows; signed-in admin tooling would not
+      // invoke this action.
+      const candidateUrl = origin || referer;
+      if (candidateUrl && allowedHosts.size > 0) {
+        let callerHost = "";
+        try {
+          callerHost = new URL(candidateUrl).host.toLowerCase();
+        } catch {
+          callerHost = "";
         }
 
-        return { success: true, data: response }
-    } catch (e) {
-        console.log('Sign up failed', e)
-        return { success: false, error: 'Sign up failed' }
+        if (!callerHost || !allowedHosts.has(callerHost)) {
+          console.log(
+            `🛡️ Signup blocked: cross-origin request origin="${origin}" referer="${referer}" host="${host}"`,
+          );
+          return {
+            success: false,
+            error: "Registration failed. Please try again.",
+            code: "INVALID_ORIGIN",
+          };
+        }
+      }
+    } catch (originErr) {
+      console.warn("⚠️ Origin check skipped due to error:", originErr);
+      // Fail-open: don't block sign-ups if header access fails
     }
-}
+
+    // SECURITY: Validate registration with comprehensive checks
+    const securityResult = await validateRegistration({
+      email,
+      name: fullName,
+      honeypot,
+      ip,
+      captchaToken,
+      fingerprint,
+    });
+
+    if (!securityResult.allowed) {
+      console.log(
+        `🛡️ Registration blocked: ${securityResult.code} - ${securityResult.reason}`,
+      );
+      return {
+        error:
+          securityResult.reason || "Registration failed. Please try again.",
+        success: false,
+        code: securityResult.code,
+      };
+    }
+
+    // Log high-risk registrations
+    if (securityResult.riskScore && securityResult.riskScore >= 40) {
+      console.log(
+        `⚠️ High-risk registration allowed: email=${email}, ip=${ip}, score=${securityResult.riskScore}`,
+      );
+    }
+
+    // SECURITY: Prevent users from signing up with admin email
+    const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase() || "";
+    if (email.toLowerCase() === adminEmail) {
+      return {
+        error: "This email address is not available for registration",
+        success: false,
+      };
+    }
+
+    const response = await auth.api.signUpEmail({
+      body: { email, password, name: fullName },
+    });
+
+    if (response && response.user) {
+      // Update user with additional profile fields
+      const mongoose = await connectToDatabase();
+      const db = mongoose.connection.db;
+
+      if (db) {
+        const userId = response.user.id;
+        console.log(`📝 Sign-up: Updating user ${userId} with profile data...`);
+
+        // Build query to find user by multiple ID formats
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const queries: any[] = [{ id: userId }];
+        if (ObjectId.isValid(userId)) {
+          queries.push({ _id: new ObjectId(userId) });
+        }
+        queries.push({ _id: userId });
+
+        // All new users are traders by default
+        // Admin role can ONLY be assigned through the admin panel
+        const role = "trader";
+
+        const updateResult = await db.collection("user").updateOne(
+          { $or: queries },
+          {
+            $set: {
+              country,
+              address,
+              city,
+              postalCode,
+              role, // All signups are traders - admin role assigned via admin panel only
+              emailVerified: false, // Must verify email before login
+              updatedAt: new Date(),
+            },
+          },
+        );
+
+        console.log(
+          `📝 Sign-up: Update result - matched: ${updateResult.matchedCount}, modified: ${updateResult.modifiedCount}`,
+        );
+
+        if (updateResult.matchedCount === 0) {
+          console.error(
+            `⚠️ Sign-up: Could not find user to update profile data. userId: ${userId}`,
+          );
+        } else {
+          console.log(`✅ Sign-up: Profile data saved for user ${userId}`, {
+            country,
+            address,
+            city,
+            postalCode,
+          });
+        }
+
+        // Process game master referral if present
+        if (referralCode && referralCode.startsWith("GM")) {
+          try {
+            console.log(`🎮 Processing referral code: ${referralCode}`);
+
+            // Find the game master subscription with this referral code
+            const gmSubscription = await db
+              .collection("gamemastersubscriptions")
+              .findOne({
+                referralCode: referralCode,
+                status: "active",
+              });
+
+            if (gmSubscription) {
+              const referredAt = new Date();
+
+              // STEP 1: Update the user document with referral info
+              // This MUST succeed before we create other records
+              const userUpdateResult = await db.collection("user").updateOne(
+                { $or: queries },
+                {
+                  $set: {
+                    referredByGameMasterId: gmSubscription.userId,
+                    referredByReferralCode: referralCode,
+                    referredAt: referredAt,
+                  },
+                },
+              );
+
+              // CRITICAL: Verify user was actually updated
+              if (userUpdateResult.matchedCount === 0) {
+                console.error(
+                  `❌ Referral: Failed to find user ${userId} to update with referral data`,
+                );
+                throw new Error("User not found for referral update");
+              }
+
+              if (userUpdateResult.modifiedCount === 0) {
+                console.warn(
+                  `⚠️ Referral: User ${userId} already had referral data or update failed`,
+                );
+                // Continue anyway - user might already have the referral set
+              }
+
+              console.log(
+                `✅ Referral: Updated user ${userId} with GM reference`,
+              );
+
+              // STEP 2: Check if UserReferral already exists (prevent duplicates)
+              const existingReferral = await db
+                .collection("userreferrals")
+                .findOne({
+                  userId: userId,
+                  gameMasterId: gmSubscription.userId,
+                });
+
+              if (existingReferral) {
+                console.warn(
+                  `⚠️ Referral: UserReferral already exists for user ${userId} -> GM ${gmSubscription.userId}`,
+                );
+              } else {
+                // STEP 3: Create UserReferral record
+                const referralInsertResult = await db
+                  .collection("userreferrals")
+                  .insertOne({
+                    userId: userId,
+                    userEmail: email,
+                    userName: fullName,
+                    gameMasterId: gmSubscription.userId,
+                    gameMasterEmail: gmSubscription.userEmail,
+                    referralCode: referralCode,
+                    referredAt: referredAt,
+                    signupIP: ip || undefined,
+                    isActive: true,
+                    totalEntryFees: 0,
+                    totalGMEarnings: 0,
+                    competitionsEntered: 0,
+                    challengesEntered: 0,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                  });
+
+                if (!referralInsertResult.insertedId) {
+                  console.error(
+                    `❌ Referral: Failed to create UserReferral record for user ${userId}`,
+                  );
+                  throw new Error("Failed to create UserReferral record");
+                }
+
+                console.log(
+                  `✅ Referral: Created UserReferral record ${referralInsertResult.insertedId}`,
+                );
+
+                // STEP 4: Only increment counter AFTER UserReferral is created
+                const counterUpdateResult = await db
+                  .collection("gamemastersubscriptions")
+                  .updateOne(
+                    { _id: gmSubscription._id },
+                    {
+                      $inc: {
+                        totalReferredUsers: 1,
+                        activeReferredUsers: 1,
+                      },
+                    },
+                  );
+
+                if (counterUpdateResult.modifiedCount === 0) {
+                  console.error(
+                    `❌ Referral: Failed to increment GM counter for ${gmSubscription._id}`,
+                  );
+                  // Don't throw - referral is already created, counter can be fixed via sync
+                } else {
+                  console.log(
+                    `✅ Referral: Incremented GM ${gmSubscription.userId} referral count`,
+                  );
+                }
+              }
+
+              console.log(
+                `✅ User ${userId} successfully linked to Game Master ${gmSubscription.userId} via referral code ${referralCode}`,
+              );
+            } else {
+              console.log(
+                `⚠️ Referral code ${referralCode} not found or game master not active`,
+              );
+            }
+          } catch (referralError) {
+            console.error("⚠️ Failed to process referral:", referralError);
+            // Don't fail registration if referral processing fails
+          }
+        }
+
+        // Send verification email (required before login)
+        try {
+          await sendVerificationEmail({
+            email,
+            name: fullName,
+            userId: userId,
+          });
+          console.log(`✅ Verification email sent to ${email}`);
+        } catch (verificationError) {
+          console.error(
+            "⚠️ Failed to send verification email:",
+            verificationError,
+          );
+          // Don't fail registration, but log it
+        }
+      }
+
+      // Send welcome email (separate from verification)
+      try {
+        const template = (await EmailTemplate.findOne({
+          templateType: "welcome",
+        }).lean()) as { isActive?: boolean; introText?: string } | null;
+        if (template?.isActive !== false) {
+          const introText =
+            template?.introText ||
+            "Thanks for joining! You now have access to our trading competition platform where you can compete against other traders and win real prizes.";
+          await sendWelcomeEmail({ email, name: fullName, intro: introText });
+          console.log(`✅ Welcome email sent to ${email}`);
+        } else {
+          console.log("📧 Welcome email is disabled in settings, skipping...");
+        }
+      } catch (emailError) {
+        console.error("⚠️ Failed to send welcome email:", emailError);
+        // Don't fail registration if email fails
+      }
+
+      // Auto-assign customer to employee (if enabled)
+      try {
+        const baseUrl =
+          process.env.NEXT_PUBLIC_APP_URL ||
+          process.env.VERCEL_URL ||
+          "http://localhost:3000";
+        const newUserId = response.user.id; // Get userId from response (available in this scope)
+        console.log(
+          `🎯 [AutoAssign] Calling auto-assign API at: ${baseUrl}/api/customer-assignment/auto-assign`,
+        );
+        console.log(
+          `🎯 [AutoAssign] Payload: userId=${newUserId}, userEmail=${email}, userName=${fullName}`,
+        );
+
+        const autoAssignResponse = await fetch(
+          `${baseUrl}/api/customer-assignment/auto-assign`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: newUserId,
+              userEmail: email,
+              userName: fullName,
+            }),
+          },
+        );
+
+        console.log(
+          `🎯 [AutoAssign] Response status: ${autoAssignResponse.status}`,
+        );
+
+        if (autoAssignResponse.ok) {
+          const result = await autoAssignResponse.json();
+          console.log(`🎯 [AutoAssign] Response data:`, JSON.stringify(result));
+          if (result.assigned) {
+            console.log(
+              `✅ Customer auto-assigned to ${result.employee?.name}`,
+            );
+          } else {
+            console.log(`📋 Customer not auto-assigned: ${result.reason}`);
+          }
+        } else {
+          const errorText = await autoAssignResponse.text();
+          console.log(`❌ [AutoAssign] Error response: ${errorText}`);
+        }
+      } catch (autoAssignError) {
+        console.error("⚠️ Failed to auto-assign customer:", autoAssignError);
+        // Don't fail registration if auto-assign fails
+      }
+    }
+
+    return { success: true, data: response };
+  } catch (e) {
+    console.log("Sign up failed", e);
+    return { success: false, error: "Sign up failed" };
+  }
+};
 
 export const signInWithEmail = async ({ email, password }: SignInFormData) => {
-    try {
-        const response = await auth.api.signInEmail({ body: { email, password } })
-
-        return { success: true, data: response }
-    } catch (e) {
-        console.log('Sign in failed', e)
-        return { success: false, error: 'Sign in failed' }
+  try {
+    // SECURITY: Reject non-string credentials. Server Actions serialize only
+    // JSON-compatible values, so a crafted client can send `{email: {$gt: ""}}`
+    // which Mongo would interpret as a query operator — classic NoSQL
+    // injection. Reject anything that isn't a plain string before we touch
+    // the database.
+    // Reason: a generic "Invalid credentials" message avoids leaking that
+    // the check rejected a type rather than a wrong password.
+    if (typeof email !== "string" || typeof password !== "string") {
+      // Best-effort security alert — imported lazily to avoid circular deps.
+      try {
+        const { recordSecurityAlert } = await import(
+          "@/lib/services/security/security-alert.service"
+        );
+        await recordSecurityAlert({
+          alertType: "nosql_injection_attempt",
+          severity: "high",
+          source: "signInWithEmail",
+          reason: "Non-string credential rejected at login",
+          metadata: {
+            emailType: typeof email,
+            passwordType: typeof password,
+          },
+        });
+      } catch {
+        // Non-blocking — the rejection itself is the primary defense.
+      }
+      return { success: false, error: "Invalid credentials." };
     }
-}
+
+    const ip = await getClientIP();
+
+    // SECURITY: Check login rate limiting and account lockout
+    const loginCheck = await validateLogin({ email, ip });
+
+    if (!loginCheck.allowed) {
+      console.log(
+        `🔒 Login blocked: ${loginCheck.code} for ${email} from IP ${ip}`,
+      );
+
+      // Calculate remaining time for user-friendly message
+      let errorMessage =
+        loginCheck.reason || "Too many login attempts. Please try again later.";
+      if (loginCheck.lockoutUntil) {
+        const remainingMs = loginCheck.lockoutUntil.getTime() - Date.now();
+        if (remainingMs > 0) {
+          const remainingMinutes = Math.ceil(remainingMs / 60000);
+          errorMessage = `Account temporarily locked. Please try again in ${remainingMinutes} minute${remainingMinutes !== 1 ? "s" : ""}.`;
+        }
+      }
+
+      return {
+        success: false,
+        error: errorMessage,
+        code: loginCheck.code,
+        lockoutUntil: loginCheck.lockoutUntil,
+        remainingMinutes: loginCheck.lockoutUntil
+          ? Math.ceil((loginCheck.lockoutUntil.getTime() - Date.now()) / 60000)
+          : undefined,
+      };
+    }
+
+    // First check if email is verified
+    const mongoose = await connectToDatabase();
+    const db = mongoose.connection.db;
+
+    if (db) {
+      const user = await db.collection("user").findOne({ email });
+
+      // Reason: Deactivated accounts must be blocked from logging in.
+      // The account data is preserved but the user cannot access it.
+      if (user && user.isDeactivated === true) {
+        return {
+          success: false,
+          error:
+            "This account has been deactivated. If you believe this is an error, please contact support.",
+        };
+      }
+
+      // Block if user exists and email is NOT verified
+      // emailVerified can be false, null, or undefined - all mean not verified
+      // This matches the check in app/(root)/layout.tsx
+      if (user && user.emailVerified !== true) {
+        return {
+          success: false,
+          error:
+            "Please verify your email before signing in. Check your inbox for the verification link.",
+          needsVerification: true,
+          email: email,
+        };
+      }
+    }
+
+    // Reason: when the admin has disabled 2FA on login we still want
+    // the withdrawal / password-change step-up gates to work. The
+    // better-auth twoFactor plugin's sign-in hook gates off the single
+    // `user.twoFactorEnabled` boolean, so we temporarily clear it for
+    // the duration of the signInEmail call and restore it afterwards.
+    // Enrolment state (the TOTP secret + backup codes in the `twoFactor`
+    // collection) is never touched, which is what the withdrawal gate
+    // and the /api/user/2fa/status endpoint read.
+    let bypassUserId: ObjectId | null = null;
+    try {
+      if (db) {
+        const fraud = await getFraudSettings().catch(() => null);
+        if (fraud && fraud.requireTwoFactorForLogin === false) {
+          const u = await db
+            .collection("user")
+            .findOne(
+              { email },
+              { projection: { _id: 1, twoFactorEnabled: 1 } },
+            );
+          if (u && u.twoFactorEnabled === true) {
+            bypassUserId = u._id as ObjectId;
+            await db
+              .collection("user")
+              .updateOne(
+                { _id: bypassUserId },
+                { $set: { twoFactorEnabled: false } },
+              );
+          }
+        }
+      }
+    } catch (bypassErr) {
+      console.warn(
+        "⚠️ [signIn] login-2FA bypass preflight failed, continuing with default flow:",
+        bypassErr instanceof Error ? bypassErr.message : bypassErr,
+      );
+      bypassUserId = null;
+    }
+
+    try {
+      const response = await auth.api.signInEmail({
+        body: { email, password },
+      });
+
+      // Reason: When the user has 2FA enabled, better-auth returns a
+      // `twoFactorRedirect: true` payload and sets a short-lived 2FA
+      // cookie (handled automatically by the nextCookies() plugin) that
+      // the verify-2fa endpoints will consume. We must NOT clear failed
+      // logins yet — the login is only complete once TOTP is verified.
+      if (
+        response &&
+        typeof response === "object" &&
+        "twoFactorRedirect" in (response as Record<string, unknown>) &&
+        (response as { twoFactorRedirect?: boolean }).twoFactorRedirect === true
+      ) {
+        const methods =
+          (response as { twoFactorMethods?: string[] }).twoFactorMethods || [
+            "totp",
+          ];
+        return {
+          success: true,
+          twoFactorRequired: true,
+          twoFactorMethods: methods,
+        };
+      }
+
+      // SECURITY: Clear failed login attempts on success
+      await clearFailedLogins({ email, ip });
+
+      return { success: true, data: response };
+    } catch {
+      // SECURITY: Record failed login attempt
+      const failResult = await recordFailedLogin({ email, ip });
+
+      if (failResult.locked) {
+        console.log(`🔒 Account locked after failed attempt: ${email}`);
+
+        // Calculate remaining time for user-friendly message
+        let lockoutMessage =
+          "Account temporarily locked due to too many failed attempts.";
+        let remainingMinutes = 0;
+        if (failResult.lockoutUntil) {
+          const remainingMs = failResult.lockoutUntil.getTime() - Date.now();
+          remainingMinutes = Math.ceil(remainingMs / 60000);
+          if (remainingMinutes > 0) {
+            lockoutMessage = `Account temporarily locked. Please try again in ${remainingMinutes} minute${remainingMinutes !== 1 ? "s" : ""}.`;
+          }
+        }
+
+        return {
+          success: false,
+          error: lockoutMessage,
+          code: "ACCOUNT_LOCKED",
+          lockoutUntil: failResult.lockoutUntil,
+          remainingMinutes,
+        };
+      }
+
+      const remainingMsg =
+        failResult.remainingAttempts > 0
+          ? ` (${failResult.remainingAttempts} attempts remaining)`
+          : "";
+
+      console.log(
+        `⚠️ Failed login for ${email} from IP ${ip}. Remaining: ${failResult.remainingAttempts}`,
+      );
+      return {
+        success: false,
+        error: `Invalid email or password${remainingMsg}`,
+      };
+    } finally {
+      // Reason: always restore the twoFactorEnabled flag we cleared for
+      // the login-2FA bypass. If this update fails (e.g. DB hiccup) the
+      // user is left with `twoFactorEnabled=false`, which only matters
+      // the next time the admin flips `requireTwoFactorForLogin` back
+      // on — at which point better-auth would skip the challenge for
+      // this user. Enrolment (the TOTP secret in the `twoFactor` coll.)
+      // remains intact, so the withdrawal gate still enforces 2FA.
+      if (bypassUserId && db) {
+        try {
+          await db
+            .collection("user")
+            .updateOne(
+              { _id: bypassUserId },
+              { $set: { twoFactorEnabled: true } },
+            );
+        } catch (restoreErr) {
+          console.error(
+            "❌ [signIn] failed to restore twoFactorEnabled after login-2FA bypass:",
+            restoreErr,
+          );
+        }
+      }
+    }
+  } catch (e) {
+    console.log("Sign in failed", e);
+    return { success: false, error: "Invalid email or password" };
+  }
+};
 
 export const signOut = async () => {
-    try {
-        await auth.api.signOut({ headers: await headers() });
-    } catch (e) {
-        console.log('Sign out failed', e)
-        return { success: false, error: 'Sign out failed' }
-    }
-}
+  try {
+    await auth.api.signOut({ headers: await headers() });
+    return { success: true };
+  } catch (e) {
+    console.log("Sign out failed", e);
+    return { success: false, error: "Sign out failed" };
+  }
+};

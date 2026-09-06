@@ -1,0 +1,91 @@
+---
+globs: components/**,app/**/*.tsx,contexts/**,hooks/**
+description: React components, UI, hooks, and context rules for ChartVolt
+---
+
+# React Components & UI — ChartVolt
+
+## 🏗️ Architecture Overview
+
+- **Framework:** Next.js 14+ with App Router.
+- **UI Library:** Radix UI primitives + custom components in `components/ui/`.
+- **Styling:** Tailwind CSS + inline styles for dynamic/animated elements.
+- **State:** React Context API (no Redux) — contexts live in `contexts/`.
+- **Fonts:** `var(--font-geist-mono)` and `var(--font-geist-sans)` — **never** import Google Fonts directly.
+- **Icons:** Lucide React icons — **never** use other icon libraries.
+- **Toasts:** `sonner` library — use `toast.success()`, `toast.error()`, `toast.info()`.
+
+## 📁 File Structure
+
+| Directory | Purpose |
+|---|---|
+| `components/ui/` | Reusable primitives (Button, Dialog, Tabs, etc.) — Radix-based |
+| `components/trading/` | Trading-specific components (charts, order forms, positions) |
+| `components/dashboard/` | Dashboard cards and stats |
+| `components/leaderboard/` | Leaderboard displays |
+| `components/profile/` | User profile sections |
+| `components/landing/` | Public landing page sections |
+| `contexts/` | React Context providers |
+| `hooks/` | Custom React hooks |
+| `app/(root)/` | Authenticated page layouts |
+| `app/(auth)/` | Login/register page layouts |
+| `app/arena/` | Arena/broadcast page |
+
+## 📐 Component Rules
+
+1. **"use client"** — Only add when the component uses hooks, event handlers, browser APIs, or Context. Server Components by default.
+2. **Max 500 lines per file** — Split large components into sub-components or helpers.
+3. **One component per file** — Exception: small tightly-coupled sub-components can live together.
+4. **Props interface** — Always define a TypeScript interface for props.
+5. **Naming:** `PascalCase.tsx` for components, `camelCase.ts` for hooks and utilities.
+
+## 🎨 Styling Rules
+
+- Use **Tailwind classes** for standard layouts and spacing.
+- Use **inline `style={{}}`** for dynamic values (positions, transforms, animations tied to data).
+- Use **CSS keyframes in `app/globals.css`** for reusable animations.
+- Dark theme is primary — design for dark backgrounds first.
+- Use CSS variables from the theme system, not hardcoded colors.
+
+## ⚡ Performance Rules
+
+- **`useMemo`** for expensive computations (sorting, filtering large arrays).
+- **`useCallback`** for functions passed as props to child components.
+- **`useRef`** for values that don't trigger re-renders (chart instances, timers, previous values).
+- **`requestAnimationFrame`** for any DOM manipulation that must sync with canvas/chart rendering (e.g., positioning HTML overlays on a chart).
+- **`next/dynamic`** with `{ ssr: false }` for components that use browser-only APIs (charts, canvas).
+- **Never** put heavy computation inside render — move to `useMemo` or `useEffect`.
+
+## 🔄 Key Contexts
+
+| Context | File | Purpose |
+|---|---|---|
+| `PriceProvider` | `contexts/PriceProvider.tsx` | Real-time price quotes (bid/ask/mid/spread) |
+| `ChartSymbolContext` | `contexts/ChartSymbolContext.tsx` | Currently selected trading symbol |
+| `TradingArsenalContext` | `contexts/TradingArsenalContext.tsx` | Indicators, drawings, chart tools |
+| `AppSettingsContext` | `contexts/AppSettingsContext.tsx` | App-wide settings from WhiteLabel |
+| `PositionEventsProvider` | `contexts/PositionEventsProvider.tsx` | Real-time position update events |
+
+## 🔌 Key Hooks
+
+| Hook | File | Purpose |
+|---|---|---|
+| `useWebSocket` | `hooks/useWebSocket.ts` | WebSocket connection management |
+| `usePositionSync` | `hooks/usePositionSync.ts` | Sync open positions in real-time |
+| `useChartDrawings` | `hooks/useChartDrawings.ts` | Chart drawing tools state |
+| `usePresence` | `hooks/usePresence.ts` | User online presence tracking |
+| `useRiskSettings` | `hooks/useRiskSettings.ts` | Competition risk settings |
+
+## 🖥️ Chart Components
+
+- **`LightweightTradingChart.tsx`** — Main chart component using TradingView's Lightweight Charts library. Heavy file — **never** duplicate, always extend.
+- **`ArenaBroadcastChart`** (in `app/arena/page.tsx`) — Arena variant with trade bubbles and area series.
+- Charts use `next/dynamic` with `{ ssr: false }` — they cannot be server-rendered.
+- Chart overlays (bubbles, flags) use **imperative DOM manipulation** (`el.style.transform`) inside `requestAnimationFrame` for zero-lag sync with the chart canvas.
+
+## ⚠️ Common Pitfalls
+
+- **Server action results:** Always check `result.success` before using `result.data`. Display `result.error` via `toast.error()` if `success` is `false`.
+- **Price keys:** Normalize symbol keys (strip slashes: `"EUR/USD"` → `"EURUSD"`) when comparing with price data.
+- **Memory leaks:** Always clean up intervals, timeouts, event listeners, and ResizeObservers in `useEffect` return functions.
+- **Page Visibility API:** Pause polling/animations when the tab is hidden — resume when visible.

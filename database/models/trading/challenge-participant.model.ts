@@ -1,4 +1,4 @@
-import { Schema, model, models, Document } from 'mongoose';
+import { Schema, model, models, Document } from "mongoose";
 
 // Track participants in 1v1 challenges
 export interface IChallengeParticipant extends Document {
@@ -6,20 +6,26 @@ export interface IChallengeParticipant extends Document {
   userId: string;
   username: string;
   email: string;
-  role: 'challenger' | 'challenged';
-  
+  role: "challenger" | "challenged";
+
+  // Game-agnostic result (X1 foundation)
+  // Reason: see the matching block on CompetitionParticipant. `score` is the one number
+  // the ranking engine reads whatever the game.
+  score: number;
+  gameKey: string; // Denormalised from the challenge for cross-game statistics queries
+
   // Capital & Performance
   startingCapital: number;
   currentCapital: number;
   availableCapital: number;
   usedMargin: number;
-  
+
   // P&L Metrics
   pnl: number;
   pnlPercentage: number;
   realizedPnl: number;
   unrealizedPnl: number;
-  
+
   // Trading Statistics
   totalTrades: number;
   winningTrades: number;
@@ -29,29 +35,29 @@ export interface IChallengeParticipant extends Document {
   averageLoss: number;
   largestWin: number;
   largestLoss: number;
-  
+
   // Position Stats
   currentOpenPositions: number;
   maxDrawdown: number;
   maxDrawdownPercentage: number;
-  
+
   // Status
-  status: 'active' | 'liquidated' | 'completed' | 'disqualified';
+  status: "active" | "liquidated" | "completed" | "disqualified";
   liquidationReason?: string;
   disqualificationReason?: string;
-  
+
   // Risk Management
   marginCallWarnings: number;
   lastMarginCallAt?: Date;
-  
+
   // Result
   isWinner: boolean;
   prizeReceived: number;
-  
+
   // Timing
   joinedAt: Date;
   lastTradeAt?: Date;
-  
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -79,7 +85,19 @@ const ChallengeParticipantSchema = new Schema<IChallengeParticipant>(
     role: {
       type: String,
       required: true,
-      enum: ['challenger', 'challenged'],
+      enum: ["challenger", "challenged"],
+    },
+    // Reason: defaults to 0 so existing rows and every current writer stay valid.
+    score: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    gameKey: {
+      type: String,
+      required: true,
+      default: "trading",
+      index: true,
     },
     startingCapital: {
       type: Number,
@@ -186,8 +204,8 @@ const ChallengeParticipantSchema = new Schema<IChallengeParticipant>(
     status: {
       type: String,
       required: true,
-      enum: ['active', 'liquidated', 'completed', 'disqualified'],
-      default: 'active',
+      enum: ["active", "liquidated", "completed", "disqualified"],
+      default: "active",
     },
     liquidationReason: {
       type: String,
@@ -225,17 +243,26 @@ const ChallengeParticipantSchema = new Schema<IChallengeParticipant>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes
-ChallengeParticipantSchema.index({ challengeId: 1, userId: 1 }, { unique: true });
+ChallengeParticipantSchema.index(
+  { challengeId: 1, userId: 1 },
+  { unique: true },
+);
 ChallengeParticipantSchema.index({ userId: 1, status: 1 });
 ChallengeParticipantSchema.index({ challengeId: 1, pnl: -1 });
+ChallengeParticipantSchema.index({ challengeId: 1, score: -1 }); // Game-agnostic ranking
+ChallengeParticipantSchema.index({ userId: 1, gameKey: 1 }); // Cross-game player statistics
+// PERFORMANCE: Speeds up early-end-check job's participant lookup
+ChallengeParticipantSchema.index({ challengeId: 1, status: 1 });
 
 const ChallengeParticipant =
   models?.ChallengeParticipant ||
-  model<IChallengeParticipant>('ChallengeParticipant', ChallengeParticipantSchema);
+  model<IChallengeParticipant>(
+    "ChallengeParticipant",
+    ChallengeParticipantSchema,
+  );
 
 export default ChallengeParticipant;
-

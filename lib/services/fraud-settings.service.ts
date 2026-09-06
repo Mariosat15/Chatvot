@@ -1,46 +1,53 @@
 /**
  * Fraud Settings Service
- * 
+ *
  * Centralized service to get fraud detection settings
  * with caching for performance
  */
 
-import { connectToDatabase } from '@/database/mongoose';
-import FraudSettings, { DEFAULT_FRAUD_SETTINGS, IFraudSettings } from '@/database/models/fraud/fraud-settings.model';
+import { connectToDatabase } from "@/database/mongoose";
+import FraudSettings, {
+  DEFAULT_FRAUD_SETTINGS,
+  IFraudSettings,
+} from "@/database/models/fraud/fraud-settings.model";
 
-// Cache settings for 5 minutes
+// Cache settings for 30 seconds (reduced from 5 minutes for faster settings updates)
 let cachedSettings: IFraudSettings | null = null;
 let cacheTime: number = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 30 * 1000; // 30 seconds - short cache for near real-time settings updates
 
 /**
  * Get fraud detection settings (with caching)
  */
 export async function getFraudSettings(): Promise<IFraudSettings> {
   const now = Date.now();
-  
+
   // Return cached settings if still valid
-  if (cachedSettings && (now - cacheTime) < CACHE_DURATION) {
+  if (cachedSettings && now - cacheTime < CACHE_DURATION) {
     return cachedSettings;
   }
 
   try {
     await connectToDatabase();
-    
-    let settings = await FraudSettings.findOne().lean();
-    
+
+    let settings =
+      (await FraudSettings.findOne().lean()) as IFraudSettings | null;
+
     // Create default settings if none exist
     if (!settings) {
-      settings = await FraudSettings.create(DEFAULT_FRAUD_SETTINGS);
+      const created = await FraudSettings.create(DEFAULT_FRAUD_SETTINGS);
+      settings = created.toObject() as IFraudSettings;
     }
 
+    // FraudSettings cache refreshed
+
     // Update cache
-    cachedSettings = settings as IFraudSettings;
+    cachedSettings = settings;
     cacheTime = now;
 
     return cachedSettings;
   } catch (error) {
-    console.error('Error fetching fraud settings, using defaults:', error);
+    console.error("Error fetching fraud settings, using defaults:", error);
     return DEFAULT_FRAUD_SETTINGS as IFraudSettings;
   }
 }
@@ -70,20 +77,26 @@ export async function isVPNDetectionEnabled(): Promise<boolean> {
 }
 
 /**
- * Get entry block threshold
+ * Get the score at which an account is escalated for review.
+ *
+ * Reason: named `entryBlockThreshold` in the schema for backward compatibility,
+ * but it no longer blocks anything. See the note on the model field.
  */
 export async function getEntryBlockThreshold(): Promise<number> {
   const settings = await getFraudSettings();
   return settings.entryBlockThreshold;
 }
 
-/**
- * Check if entry should be blocked based on risk score
- */
-export async function shouldBlockEntry(riskScore: number): Promise<boolean> {
-  const settings = await getFraudSettings();
-  return riskScore > settings.entryBlockThreshold;
-}
+// Reason: `shouldBlockEntry(riskScore)` was removed on 2 September 2026. It
+// returned `riskScore > entryBlockThreshold`, encoding the silent, unliftable
+// entry block that locked a real player out of the platform - see the long note
+// in `fraud/entry-fraud-gate.service.ts` section 4. It was already dead code in
+// both apps when removed, which is precisely why it was worth deleting rather
+// than leaving: the next feature needing a risk check would have found a
+// plausibly-named helper and reintroduced the defect.
+//
+// A suspicion score escalates for human review. It does not block. To block an
+// account, create a `UserRestriction`, which is visible and can be lifted.
 
 /**
  * Check if alert should be created based on risk score
@@ -92,4 +105,3 @@ export async function shouldCreateAlert(riskScore: number): Promise<boolean> {
   const settings = await getFraudSettings();
   return riskScore > settings.alertThreshold;
 }
-

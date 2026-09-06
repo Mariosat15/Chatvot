@@ -1,12 +1,12 @@
 /**
  * React Hook for Device Fingerprinting
- * 
+ *
  * Automatically tracks device fingerprint and detects multi-accounting.
  * Use this hook in components where you want to track user devices.
  */
 
-import { useEffect, useState } from 'react';
-import { trackDeviceFingerprint } from '@/lib/services/device-fingerprint.service';
+import { useEffect, useState } from "react";
+import { trackDeviceFingerprint } from "@/lib/services/device-fingerprint.service";
 
 interface DeviceFingerprintResult {
   success: boolean;
@@ -25,7 +25,9 @@ interface UseDeviceFingerprintOptions {
   onSuspicious?: (result: DeviceFingerprintResult) => void;
 }
 
-export function useDeviceFingerprint(options: UseDeviceFingerprintOptions = {}) {
+export function useDeviceFingerprint(
+  options: UseDeviceFingerprintOptions = {},
+) {
   const { auto = true, onTrack, onSuspicious } = options;
   const [tracking, setTracking] = useState(false);
   const [result, setResult] = useState<DeviceFingerprintResult | null>(null);
@@ -48,10 +50,10 @@ export function useDeviceFingerprint(options: UseDeviceFingerprintOptions = {}) 
 
       return trackResult;
     } catch (error) {
-      console.error('Error tracking device fingerprint:', error);
+      console.error("Error tracking device fingerprint:", error);
       const errorResult = {
         success: false,
-        message: 'Failed to track device'
+        message: "Failed to track device",
       };
       setResult(errorResult);
       return errorResult;
@@ -71,7 +73,6 @@ export function useDeviceFingerprint(options: UseDeviceFingerprintOptions = {}) 
     result,
     track,
     isSuspicious: result?.suspicious || false,
-    riskScore: result?.riskScore || 0
+    riskScore: result?.riskScore || 0,
   };
 }
-

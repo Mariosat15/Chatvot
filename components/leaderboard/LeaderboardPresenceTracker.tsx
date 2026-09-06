@@ -1,7 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import usePresence from '@/hooks/usePresence';
+import usePresence from "@/hooks/usePresence";
 
 /**
  * Client component that tracks user presence when viewing the leaderboard
@@ -9,8 +8,7 @@ import usePresence from '@/hooks/usePresence';
  */
 export default function LeaderboardPresenceTracker() {
   // Track presence while on leaderboard page
-  usePresence('/leaderboard');
+  usePresence("/leaderboard");
 
   return null; // This component doesn't render anything
 }
-

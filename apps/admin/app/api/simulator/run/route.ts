@@ -1,0 +1,176 @@
+import { NextRequest, NextResponse } from "next/server";
+import { connectToDatabase } from "../../../../../../database/mongoose";
+import SimulatorRun from "../../../../../../database/models/simulator/simulator-run.model";
+import {
+  startSimulation,
+  stopSimulation,
+  isSimulationRunning,
+  getActiveRunId,
+} from "../../../../../../lib/services/simulator/simulator.service";
+
+/**
+ * GET /api/simulator/run
+ * Get list of simulation runs or check if one is active
+ */
+export async function GET(request: NextRequest) {
+  try {
+    await connectToDatabase();
+
+    const { searchParams } = new URL(request.url);
+    const action = searchParams.get("action");
+
+    if (action === "status") {
+      const isRunning = isSimulationRunning();
+      const activeRunId = getActiveRunId();
+
+      if (activeRunId) {
+        const run = await SimulatorRun.findById(activeRunId);
+        return NextResponse.json({
+          success: true,
+          isRunning,
+          run,
+        });
+      }
+
+      // When no active run in memory, get the most recent run
+      const recentRun = (await SimulatorRun.findOne()
+        .sort({ createdAt: -1 })
+        .lean()) as { _id: unknown; status?: string } | null;
+
+      // Stale "running" run (e.g. server was restarted): mark as cancelled so UI stops showing "running"
+      if (recentRun?.status === "running" && recentRun._id) {
+        await SimulatorRun.findByIdAndUpdate(recentRun._id, {
+          status: "cancelled",
+          endTime: new Date(),
+          "progress.phase": "Cancelled",
+          "progress.message": "Stopped (no active process; server may have restarted)",
+        });
+        const updated = await SimulatorRun.findById(recentRun._id).lean();
+        return NextResponse.json({
+          success: true,
+          isRunning: false,
+          run: updated,
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        isRunning: false,
+        run: recentRun || null,
+      });
+    }
+
+    // Get recent runs
+    const limit = parseInt(searchParams.get("limit") || "10");
+    const runs = await SimulatorRun.find()
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .select("-logs -hardwareMetrics") // Exclude large arrays for listing
+      .lean();
+
+    return NextResponse.json({
+      success: true,
+      runs,
+      isRunning: isSimulationRunning(),
+    });
+  } catch (error) {
+    console.error("Error fetching simulation runs:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to fetch runs" },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * POST /api/simulator/run
+ * Start a new simulation or stop the current one
+ */
+export async function POST(request: NextRequest) {
+  try {
+    await connectToDatabase();
+
+    const body = await request.json();
+    const { action, configId } = body;
+
+    if (action === "start") {
+      if (isSimulationRunning()) {
+        return NextResponse.json(
+          { success: false, error: "A simulation is already running" },
+          { status: 400 },
+        );
+      }
+
+      if (!configId) {
+        return NextResponse.json(
+          { success: false, error: "Configuration ID is required" },
+          { status: 400 },
+        );
+      }
+
+      // Reason: Simulator makes internal HTTP calls to the web app on the same
+      // server. Using the public URL (e.g. https://chartvolt.com) routes traffic
+      // through Cloudflare/NGINX which can fail (SSL, 404, redirects). Always
+      // prefer the internal localhost URL set by PM2 (MAIN_APP_URL).
+      let baseUrl =
+        process.env.MAIN_APP_URL ||
+        "http://localhost:3000";
+
+      // Fix IPv6 resolution issues
+      if (
+        baseUrl.includes("://localhost:") ||
+        baseUrl.includes("://localhost/") ||
+        baseUrl === "http://localhost"
+      ) {
+        baseUrl = baseUrl.replace("://localhost", "://127.0.0.1");
+      }
+
+      console.log(
+        `🧪 [SIMULATOR] Starting simulation with baseUrl: ${baseUrl}`,
+      );
+
+      const { runId } = await startSimulation(configId, baseUrl);
+
+      return NextResponse.json({
+        success: true,
+        message: "Simulation started",
+        runId,
+      });
+    }
+
+    if (action === "stop") {
+      const activeRunId = getActiveRunId();
+      stopSimulation();
+      // Persist cancelled in DB immediately so UI and future status calls see "stopped"
+      if (activeRunId) {
+        await SimulatorRun.findByIdAndUpdate(activeRunId, {
+          status: "cancelled",
+          endTime: new Date(),
+          "progress.phase": "Cancelled",
+          "progress.message": "Stopped by user",
+        });
+      }
+      return NextResponse.json({
+        success: true,
+        message: "Simulation stopped",
+      });
+    }
+
+    return NextResponse.json(
+      { success: false, error: 'Invalid action. Use "start" or "stop"' },
+      { status: 400 },
+    );
+  } catch (error) {
+    console.error("Error controlling simulation:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to control simulation",
+      },
+      { status: 500 },
+    );
+  }
+}

@@ -1,111 +1,467 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Coins, Loader2, CheckCircle2, XCircle, Info, TrendingDown } from 'lucide-react';
-import { initiateWithdrawal } from '@/lib/actions/trading/wallet.actions';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import {
+  Coins,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  TrendingDown,
+  AlertTriangle,
+  Clock,
+  Shield,
+  CreditCard,
+  Building2,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
+import ActionTermsDialog, {
+  ACTION_TERM_SLUGS,
+} from "@/components/ActionTermsDialog";
 
 interface WithdrawalModalProps {
   children: React.ReactNode;
 }
 
+interface WithdrawalMethod {
+  id: string;
+  type: "original_method" | "bank_account";
+  label: string;
+  details: string;
+  cardBrand?: string;
+  cardLast4?: string;
+  bankName?: string;
+  ibanLast4?: string;
+  country?: string;
+  isDefault?: boolean;
+  isComplete?: boolean; // bank account has all fields required for manual payout
+  userPaymentOptionId?: string; // Nuvei UPO ID for card refunds
+}
+
+interface WithdrawalInfo {
+  eligible: boolean;
+  reason: string;
+  warnings: string[];
+  wallet: {
+    balance: number;
+    balanceEUR: number;
+    totalDeposited: number;
+    totalWithdrawn: number;
+    kycVerified: boolean;
+    withdrawalEnabled: boolean;
+  };
+  settings: {
+    minimumWithdrawal: number;
+    maximumWithdrawal: number;
+    dailyLimit: number;
+    monthlyLimit: number;
+    feePercentage: number;
+    feeFixed: number;
+    processingTimeHours: number;
+    allowedMethods: string[];
+    preferredMethod: string;
+    requireKYC: boolean;
+    conversionRate: number;
+  };
+  isSandbox: boolean;
+  originalPaymentMethod: string | null;
+  availableWithdrawalMethods: WithdrawalMethod[];
+  hasWithdrawalMethod: boolean;
+  nuveiEnabled?: boolean; // Whether Nuvei automatic withdrawals are enabled by admin
+  manualPayoutMode?: boolean; // Master switch OFF: admin pays manually, full bank details required
+  bankDetailsRequired?: boolean; // Convenience flag mirroring manualPayoutMode
+}
+
 export default function WithdrawalModal({ children }: WithdrawalModalProps) {
+  const { settings: appSettings } = useAppSettings();
+  const currencySymbol = appSettings?.currency?.symbol || "€";
+  const currencyCode = appSettings?.currency?.code || "EUR";
+
   const [open, setOpen] = useState(false);
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState("");
+  const [selectedMethodId, setSelectedMethodId] = useState("");
+  const [userNote, setUserNote] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
-  const [conversionRate, setConversionRate] = useState(100);
-  const [minWithdrawal, setMinWithdrawal] = useState(20);
-  const [withdrawalFee, setWithdrawalFee] = useState(2);
+  const [fetchingInfo, setFetchingInfo] = useState(true);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState<{
+    message: string;
+    netAmountEUR: number;
+    processingHours: number;
+    isAutoApproved: boolean;
+    isAutomatic?: boolean;
+  } | null>(null);
+  const [withdrawalInfo, setWithdrawalInfo] = useState<WithdrawalInfo | null>(
+    null,
+  );
+  const [showTerms, setShowTerms] = useState(false);
+  // Reason: Track whether the user has already accepted the withdrawal T&C
+  // during this modal session. When 2FA is required, the server responds
+  // with TWO_FACTOR_REQUIRED after the first submit and the user must
+  // re-submit with the TOTP code. Without this flag, the T&C dialog would
+  // reopen on every retry, forcing the user to accept the same terms twice.
+  const [termsAcceptedForFlow, setTermsAcceptedForFlow] = useState(false);
+  // Two-factor step-up state for when the admin has required TOTP on withdrawals.
+  const [twoFactorRequired, setTwoFactorRequired] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState("");
   const router = useRouter();
 
-  // Fetch conversion settings
+  // Fetch withdrawal info when modal opens
   useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const response = await fetch('/api/credit-settings');
-        const data = await response.json();
-        if (data.success) {
-          setConversionRate(data.rate);
-          setMinWithdrawal(data.minimumWithdrawal);
-          setWithdrawalFee(data.withdrawalFeePercentage);
-        }
-      } catch (error) {
-        console.error('Failed to fetch credit settings:', error);
-      }
-    };
-    fetchSettings();
-  }, []);
+    if (open) {
+      fetchWithdrawalInfo();
+    }
+  }, [open]);
 
+  const fetchWithdrawalInfo = async () => {
+    setFetchingInfo(true);
+    setError("");
+    try {
+      const response = await fetch("/api/wallet/withdraw");
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Failed to fetch withdrawal information");
+        return;
+      }
+
+      setWithdrawalInfo(data);
+
+      // Set default method: prefer default bank account, then original method, then first available
+      const methods = data.availableWithdrawalMethods || [];
+      const defaultBankAccount = methods.find(
+        (m: WithdrawalMethod) => m.type === "bank_account" && m.isDefault,
+      );
+      const originalMethod = methods.find(
+        (m: WithdrawalMethod) => m.type === "original_method",
+      );
+
+      if (defaultBankAccount) {
+        setSelectedMethodId(defaultBankAccount.id);
+      } else if (originalMethod) {
+        setSelectedMethodId(originalMethod.id);
+      } else if (methods.length > 0) {
+        setSelectedMethodId(methods[0].id);
+      }
+    } catch (err) {
+      setError("Failed to connect to server");
+      console.error("Failed to fetch withdrawal info:", err);
+    } finally {
+      setFetchingInfo(false);
+    }
+  };
+
+  // Reason: Show terms dialog before proceeding with withdrawal submission.
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
+
+    const amountEUR = parseFloat(amount);
+    if (isNaN(amountEUR) || amountEUR <= 0) {
+      setError("Please enter a valid amount");
+      return;
+    }
+    if (!selectedMethodId) {
+      setError("Please select a withdrawal method");
+      return;
+    }
+
+    // Manual/internal payout mode: the admin transfers the money by hand, so
+    // the user must pick a bank account that has the complete set of details.
+    if (withdrawalInfo?.manualPayoutMode) {
+      const selected = withdrawalInfo.availableWithdrawalMethods?.find(
+        (m) => m.id === selectedMethodId,
+      );
+      if (!selected || selected.type !== "bank_account") {
+        setError(
+          "Withdrawals are processed by bank transfer. Please select a bank account.",
+        );
+        return;
+      }
+      if (selected.isComplete === false) {
+        setError(
+          "This bank account is missing required details (IBAN, BIC/SWIFT, bank name and address). Please complete it in your wallet settings before withdrawing.",
+        );
+        return;
+      }
+    }
+
+    // Reason: Only show the T&C dialog the first time the user submits in
+    // this modal session. If they've already accepted (e.g. they're now
+    // retrying with a 2FA code after a TWO_FACTOR_REQUIRED response), skip
+    // straight to the API call — re-accepting the same terms adds friction
+    // without any compliance benefit.
+    if (termsAcceptedForFlow) {
+      void proceedAfterTerms();
+      return;
+    }
+
+    setShowTerms(true);
+  };
+
+  /** Called after user accepts terms — proceeds with withdrawal */
+  const proceedAfterTerms = async () => {
+    setShowTerms(false);
+    setTermsAcceptedForFlow(true);
     setLoading(true);
 
     try {
-      const creditsAmount = parseFloat(amount);
+      const amountEUR = parseFloat(amount);
 
-      if (isNaN(creditsAmount) || creditsAmount <= 0) {
-        setError('Please enter a valid amount');
+      // Get selected method details
+      const selectedMethod = withdrawalInfo?.availableWithdrawalMethods?.find(
+        (m) => m.id === selectedMethodId,
+      );
+
+      if (!selectedMethod) {
+        setError("Selected withdrawal method not found");
         setLoading(false);
         return;
       }
 
-      const minCredits = minWithdrawal * conversionRate;
-      if (creditsAmount < minCredits) {
-        setError(`Minimum withdrawal is ${minCredits} Credits (€${minWithdrawal})`);
+      // Check if Nuvei automatic withdrawals are enabled by admin
+      const isAutomatic = withdrawalInfo?.nuveiEnabled === true;
+
+      if (isAutomatic) {
+        // AUTOMATIC WITHDRAWAL via Nuvei
+        const withdrawalMethod =
+          selectedMethod.type === "original_method"
+            ? "card_payout"
+            : "bank_transfer";
+
+        // Check if we have required data for automatic processing
+        const canTryAutomatic =
+          withdrawalMethod === "bank_transfer" ||
+          (withdrawalMethod === "card_payout" &&
+            selectedMethod.userPaymentOptionId);
+
+        if (canTryAutomatic) {
+          const requestBody: Record<string, unknown> = {
+            amountEUR,
+            withdrawalMethod,
+            // Reason: include 2FA code on every automatic attempt so a
+            // retry after a TWO_FACTOR_REQUIRED response succeeds. The
+            // server treats it as optional when 2FA is not required.
+            twoFactorCode: twoFactorCode.trim() || undefined,
+          };
+
+          if (withdrawalMethod === "card_payout") {
+            requestBody.userPaymentOptionId =
+              selectedMethod.userPaymentOptionId;
+            requestBody.cardDetails = {
+              cardBrand: selectedMethod.cardBrand,
+              cardLast4: selectedMethod.cardLast4,
+              userPaymentOptionId: selectedMethod.userPaymentOptionId,
+            };
+          } else {
+            requestBody.bankAccountId = selectedMethod.id;
+          }
+
+          try {
+            const response = await fetch("/api/nuvei/withdrawal", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(requestBody),
+            });
+
+            const data = await response.json();
+
+            // Step-up handling for the automatic path — mirror the manual
+            // route's behaviour so the user gets the inline TOTP prompt
+            // instead of a confusing "withdrawal failed" message.
+            if (!response.ok) {
+              if (
+                data?.code === "TWO_FACTOR_REQUIRED" ||
+                data?.code === "TWO_FACTOR_INVALID"
+              ) {
+                setTwoFactorRequired(true);
+                setError(
+                  data.code === "TWO_FACTOR_INVALID"
+                    ? "Invalid or expired code. Please try again."
+                    : "Enter your authenticator code to continue.",
+                );
+                setLoading(false);
+                return;
+              }
+              if (data?.code === "TWO_FACTOR_NOT_ENABLED") {
+                setError(
+                  data.error ||
+                    "Two-factor authentication is required. Please enable it in your profile.",
+                );
+                setLoading(false);
+                return;
+              }
+            }
+
+            if (response.ok) {
+              // Automatic withdrawal succeeded
+              setSuccess({
+                message: data.message || "Withdrawal submitted for processing",
+                netAmountEUR: data.netAmountEUR,
+                processingHours: withdrawalMethod === "card_payout" ? 72 : 48,
+                isAutoApproved: true,
+                isAutomatic: true,
+              });
+
+              setTimeout(() => {
+                router.refresh();
+                setOpen(false);
+                resetModal();
+              }, 4000);
+              return;
+            } else {
+              // Automatic failed - show error (credits already refunded by the API)
+              // DO NOT fall back to manual as that creates duplicate withdrawal requests
+              const errorMsg = data.error || "Automatic withdrawal failed";
+              setError(
+                `${errorMsg}\n\nYour credits have been refunded. Please contact support if you need assistance.`,
+              );
+              setLoading(false);
+              return;
+            }
+          } catch (err) {
+            console.error("Automatic withdrawal error:", err);
+            setError(
+              "Automatic withdrawal failed. Your credits have been refunded. Please try again or contact support.",
+            );
+            setLoading(false);
+            return;
+          }
+        } else {
+          // Can't try automatic (e.g., no UPO for card refund) - show helpful error
+          if (
+            withdrawalMethod === "card_payout" &&
+            !selectedMethod.userPaymentOptionId
+          ) {
+            setError(
+              "Card refund requires a saved card from a previous deposit. Please make a deposit first or choose bank transfer.",
+            );
+          } else {
+            setError(
+              "Automatic withdrawal is not available for this method. Please contact support.",
+            );
+          }
+          setLoading(false);
+          return;
+        }
+      }
+
+      // MANUAL WITHDRAWAL - Nuvei automatic is disabled by admin
+      const response = await fetch("/api/wallet/withdraw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amountEUR,
+          withdrawalMethodId: selectedMethodId,
+          userNote: userNote.trim() || undefined,
+          // Include 2FA code when the user has entered one (ignored by
+          // the server when 2FA is not required for this withdrawal).
+          twoFactorCode: twoFactorCode.trim() || undefined,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Step-up handling — surface the TOTP input without wiping the form.
+        if (
+          data?.code === "TWO_FACTOR_REQUIRED" ||
+          data?.code === "TWO_FACTOR_INVALID"
+        ) {
+          setTwoFactorRequired(true);
+          setError(
+            data.code === "TWO_FACTOR_INVALID"
+              ? "Invalid or expired code. Please try again."
+              : "Enter your authenticator code to continue.",
+          );
+          setLoading(false);
+          return;
+        }
+        if (data?.code === "TWO_FACTOR_NOT_ENABLED") {
+          setError(
+            data.error ||
+              "Two-factor authentication is required for this withdrawal. Please enable it in your profile.",
+          );
+          setLoading(false);
+          return;
+        }
+        setError(data.error || "Withdrawal request failed");
         setLoading(false);
         return;
       }
 
-      // Initiate withdrawal (now works with credits)
-      const result = await initiateWithdrawal(creditsAmount);
+      setSuccess({
+        message: data.message,
+        netAmountEUR: data.withdrawalRequest.netAmountEUR,
+        processingHours: data.withdrawalRequest.estimatedProcessingHours,
+        isAutoApproved: data.withdrawalRequest.isAutoApproved,
+      });
 
-      if (result.success) {
-        setSuccess(true);
-        setTimeout(() => {
-          router.refresh();
-          setOpen(false);
-          resetModal();
-        }, 3000);
-      }
+      setTimeout(() => {
+        router.refresh();
+        setOpen(false);
+        resetModal();
+      }, 4000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Withdrawal request failed');
+      setError(
+        err instanceof Error ? err.message : "Withdrawal request failed",
+      );
       setLoading(false);
     }
   };
 
   // Calculate withdrawal breakdown
   const calculateWithdrawal = () => {
-    const creditsAmount = parseFloat(amount) || 0;
-    const eurGross = creditsAmount / conversionRate;
-    const feeAmount = eurGross * (withdrawalFee / 100);
-    const eurNet = eurGross - feeAmount;
-    const feeInCredits = Math.ceil(feeAmount * conversionRate);
-    const totalCreditsDeducted = creditsAmount + feeInCredits;
+    const eurAmount = parseFloat(amount) || 0;
+    if (!withdrawalInfo) return null;
+
+    const { feePercentage, feeFixed, conversionRate } = withdrawalInfo.settings;
+    const platformFee = (eurAmount * feePercentage) / 100 + feeFixed;
+    const netAmount = eurAmount - platformFee;
+    const creditsRequired = eurAmount * conversionRate;
 
     return {
-      creditsAmount,
-      eurGross,
-      feePercentage: withdrawalFee,
-      feeAmount,
-      feeInCredits,
-      eurNet,
-      totalCreditsDeducted,
+      eurAmount,
+      platformFee,
+      netAmount,
+      creditsRequired,
     };
   };
 
   const withdrawal = calculateWithdrawal();
 
   const resetModal = () => {
-    setAmount('');
-    setError('');
-    setSuccess(false);
+    setAmount("");
+    setSelectedMethodId("");
+    setUserNote("");
+    setError("");
+    setTwoFactorRequired(false);
+    setTwoFactorCode("");
+    // Reason: Clear the "terms accepted" flag so a brand-new withdrawal
+    // attempt (after a success, or after closing and reopening the modal)
+    // re-prompts the user as expected.
+    setTermsAcceptedForFlow(false);
+    setSuccess(null);
     setLoading(false);
   };
 
@@ -119,77 +475,193 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
     >
       <DialogTrigger asChild>{children}</DialogTrigger>
 
-      <DialogContent className="sm:max-w-[500px] bg-gray-900 border-gray-700">
+      <DialogContent
+        className="bg-gray-900 border-gray-700 max-sm:border-0"
+        fullScreenMobile
+        size="default"
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-gray-100">
             <Coins className="h-5 w-5 text-yellow-500" />
-            Withdraw Credits
+            Withdraw Funds
           </DialogTitle>
           <DialogDescription className="text-gray-400">
-            Convert your credits to EUR and withdraw to your bank account
+            Request a withdrawal of your credits to {currencyCode}
           </DialogDescription>
         </DialogHeader>
 
-        {success ? (
+        {fetchingInfo ? (
+          <div className="py-8 flex items-center justify-center">
+            <Loader2 className="h-8 w-8 text-yellow-500 animate-spin" />
+          </div>
+        ) : success ? (
           // Success State
           <div className="py-8 text-center space-y-4">
             <div className="mx-auto w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center">
               <CheckCircle2 className="h-8 w-8 text-green-500" />
             </div>
             <div>
-              <h3 className="text-xl font-semibold text-gray-100">Withdrawal Requested!</h3>
-              <p className="text-sm text-gray-400 mt-2">
-                Your withdrawal request has been submitted. We'll process it within 1-3 business days.
+              <h3 className="text-xl font-semibold text-gray-100">
+                🎉 Withdrawal Submitted!
+              </h3>
+              <p className="text-sm text-gray-400 mt-2">{success.message}</p>
+              <div className="mt-4 bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+                <p className="text-green-400 font-bold text-lg">
+                  {currencySymbol}{success.netAmountEUR.toFixed(2)} will be sent
+                  to you
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Typically arrives in 3-5 business days
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : !withdrawalInfo?.eligible ? (
+          // Not Eligible State
+          <div className="py-8 text-center space-y-4">
+            <div className="mx-auto w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
+              <XCircle className="h-8 w-8 text-red-500" />
+            </div>
+            <div>
+              <h3 className="text-xl font-semibold text-gray-100">
+                Cannot Withdraw
+              </h3>
+              <p className="text-sm text-red-400 mt-2">
+                {withdrawalInfo?.reason}
               </p>
-              <p className="text-xs text-gray-500 mt-4">
-                You'll receive an email confirmation shortly.
-              </p>
+              {withdrawalInfo?.settings?.requireKYC &&
+                !withdrawalInfo?.wallet?.kycVerified && (
+                  <Button
+                    className="mt-4 bg-blue-600 hover:bg-blue-700"
+                    onClick={() => {
+                      setOpen(false);
+                      router.push("/profile?tab=verification");
+                    }}
+                  >
+                    <Shield className="h-4 w-4 mr-2" />
+                    Complete KYC Verification
+                  </Button>
+                )}
             </div>
           </div>
         ) : (
           // Withdrawal Form
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Info Banner */}
-            <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-4 space-y-2">
-              <div className="flex items-start gap-2">
-                <Info className="h-4 w-4 text-blue-400 mt-0.5 shrink-0" />
-                <div className="space-y-1 text-xs text-blue-300">
-                  <p>• Minimum withdrawal: {minWithdrawal * conversionRate} Credits (€{minWithdrawal})</p>
-                  <p>• Withdrawal fee: {withdrawalFee}% (platform fee)</p>
-                  <p>• Processing time: 1-3 business days</p>
-                  <p>• Funds sent to your registered bank account</p>
-                  <p>• KYC verification required</p>
-                </div>
+            {/* Status Badges */}
+            <div className="flex flex-wrap gap-2">
+              {withdrawalInfo.isSandbox && (
+                <Badge className="bg-purple-500/20 text-purple-300">
+                  SANDBOX MODE
+                </Badge>
+              )}
+              {withdrawalInfo.wallet.kycVerified && (
+                <Badge className="bg-green-500/20 text-green-300">
+                  <Shield className="h-3 w-3 mr-1" />
+                  KYC Verified
+                </Badge>
+              )}
+              {withdrawalInfo.originalPaymentMethod && (
+                <Badge className="bg-blue-500/20 text-blue-300">
+                  <CreditCard className="h-3 w-3 mr-1" />
+                  {withdrawalInfo.originalPaymentMethod}
+                </Badge>
+              )}
+            </div>
+
+            {/* Warnings */}
+            {withdrawalInfo.warnings && withdrawalInfo.warnings.length > 0 && (
+              <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3 space-y-1">
+                {withdrawalInfo.warnings.map((warning, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" />
+                    <p className="text-xs text-amber-300">{warning}</p>
+                  </div>
+                ))}
               </div>
+            )}
+
+            {/* Balance Info */}
+            <div className="rounded-lg bg-gray-800 border border-gray-700 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 text-sm">Available Balance</span>
+                <span
+                  className="text-yellow-400 font-bold text-lg"
+                  suppressHydrationWarning
+                >
+                  {withdrawalInfo.wallet.balance.toLocaleString()} Credits
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                ≈ {currencySymbol}
+                {withdrawalInfo.wallet.balanceEUR.toFixed(2)} {currencyCode}
+              </p>
             </div>
 
             {/* Amount Input */}
             <div className="space-y-2">
-              <Label htmlFor="withdrawal-amount" className="text-gray-300 flex items-center gap-2">
-                <Coins className="h-4 w-4 text-yellow-500" />
-                Amount (Credits)
+              <Label htmlFor="withdrawal-amount" className="text-gray-300">
+                Amount ({currencyCode})
               </Label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-yellow-500 font-semibold">C</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">
+                  {currencySymbol}
+                </span>
                 <Input
                   id="withdrawal-amount"
                   type="number"
-                  step="1"
-                  min={minWithdrawal * conversionRate}
+                  step="0.01"
+                  min={withdrawalInfo.settings.minimumWithdrawal}
+                  max={Math.min(
+                    withdrawalInfo.settings.maximumWithdrawal,
+                    withdrawalInfo.wallet.balanceEUR,
+                  )}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   className="pl-8 bg-gray-800 border-gray-700 text-gray-100"
-                  placeholder={(minWithdrawal * conversionRate).toString()}
+                  placeholder={withdrawalInfo.settings.minimumWithdrawal.toString()}
                   required
                   disabled={loading}
                 />
               </div>
-              <p className="text-xs text-gray-500">Minimum: {minWithdrawal * conversionRate} Credits</p>
+              <p className="text-xs text-gray-500">
+                Min: {currencySymbol}
+                {withdrawalInfo.settings.minimumWithdrawal.toFixed(2)} | Max:{" "}
+                {currencySymbol}
+                {Math.min(
+                  withdrawalInfo.settings.maximumWithdrawal,
+                  withdrawalInfo.wallet.balanceEUR,
+                ).toFixed(2)}
+                {withdrawalInfo.wallet.balanceEUR <
+                  withdrawalInfo.settings.maximumWithdrawal && (
+                  <span className="text-gray-600"> (limited by balance)</span>
+                )}
+              </p>
             </div>
 
             {/* Quick Amount Buttons */}
             <div className="grid grid-cols-4 gap-2">
-              {[1000, 2500, 5000, 10000].map((preset) => (
+              {(() => {
+                const maxEUR = Math.floor(withdrawalInfo.wallet.balanceEUR);
+                const minEUR = withdrawalInfo.settings.minimumWithdrawal;
+                // Generate smart presets based on balance
+                const presets: number[] = [];
+                if (minEUR <= maxEUR) presets.push(minEUR);
+                if (minEUR * 2 <= maxEUR && minEUR * 2 > minEUR)
+                  presets.push(minEUR * 2);
+                if (minEUR * 5 <= maxEUR && !presets.includes(minEUR * 5))
+                  presets.push(minEUR * 5);
+                if (maxEUR > 0 && !presets.includes(maxEUR))
+                  presets.push(maxEUR);
+                // Fill remaining slots
+                const suggestions = [10, 25, 50, 100, 200, 500].filter(
+                  (v) => v >= minEUR && v <= maxEUR && !presets.includes(v),
+                );
+                while (presets.length < 4 && suggestions.length > 0) {
+                  presets.push(suggestions.shift()!);
+                }
+                // Sort and take up to 4
+                return presets.sort((a, b) => a - b).slice(0, 4);
+              })().map((preset) => (
                 <Button
                   key={preset}
                   type="button"
@@ -197,69 +669,250 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                   size="sm"
                   onClick={() => setAmount(preset.toString())}
                   disabled={loading}
-                  className="bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-100"
+                  className={`bg-gray-800 border-gray-700 hover:bg-gray-700 text-gray-100 ${
+                    preset === Math.floor(withdrawalInfo.wallet.balanceEUR)
+                      ? "border-yellow-500/50 text-yellow-400"
+                      : ""
+                  }`}
                 >
-                  {preset} C
+                  {preset === Math.floor(withdrawalInfo.wallet.balanceEUR)
+                    ? "All"
+                    : `${currencySymbol}${preset}`}
                 </Button>
               ))}
             </div>
 
+            {/* Manual payout mode notice — bank transfer with full details only */}
+            {withdrawalInfo.manualPayoutMode && (
+              <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-3 flex items-start gap-2">
+                <Building2 className="h-4 w-4 text-blue-400 mt-0.5 shrink-0" />
+                <p className="text-xs text-blue-300">
+                  Withdrawals are sent by bank transfer. Make sure your bank
+                  account includes your full details (IBAN, BIC/SWIFT, bank name
+                  and bank address) so we know where to send your money.
+                </p>
+              </div>
+            )}
+
+            {/* Withdrawal Method Selection */}
+            <div className="space-y-2">
+              <Label className="text-gray-300">Where to Send Funds</Label>
+              {withdrawalInfo.availableWithdrawalMethods &&
+              withdrawalInfo.availableWithdrawalMethods.length > 0 ? (
+                <Select
+                  value={selectedMethodId}
+                  onValueChange={setSelectedMethodId}
+                  disabled={loading}
+                >
+                  <SelectTrigger className="bg-gray-800 border-gray-700">
+                    <SelectValue placeholder="Select withdrawal method" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-700">
+                    {withdrawalInfo.availableWithdrawalMethods.map((method) => (
+                      <SelectItem key={method.id} value={method.id}>
+                        <div className="flex items-center gap-2">
+                          {method.type === "original_method" ? (
+                            <CreditCard className="h-4 w-4 text-blue-400" />
+                          ) : (
+                            <Building2 className="h-4 w-4 text-green-400" />
+                          )}
+                          <div className="flex flex-col">
+                            <span className="text-gray-100">
+                              {method.label}
+                            </span>
+                            <span className="text-xs text-gray-400">
+                              {method.details}
+                            </span>
+                          </div>
+                          {method.isDefault && (
+                            <Badge
+                              variant="secondary"
+                              className="text-xs bg-green-500/20 text-green-300 ml-2"
+                            >
+                              Default
+                            </Badge>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-400 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-sm text-amber-300 font-medium">
+                        No withdrawal method available
+                      </p>
+                      <p className="text-xs text-amber-200/70 mt-1">
+                        Please add a bank account in your wallet settings or
+                        make a deposit first.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Show selected method details */}
+              {selectedMethodId &&
+                withdrawalInfo.availableWithdrawalMethods && (
+                  <div className="mt-2 p-3 bg-gray-800/50 border border-gray-700 rounded-lg">
+                    {(() => {
+                      const selected =
+                        withdrawalInfo.availableWithdrawalMethods.find(
+                          (m) => m.id === selectedMethodId,
+                        );
+                      if (!selected) return null;
+
+                      if (selected.type === "original_method") {
+                        return (
+                          <div className="flex items-center gap-2 text-sm">
+                            <CreditCard className="h-4 w-4 text-blue-400" />
+                            <span className="text-gray-400">
+                              Refund to card:
+                            </span>
+                            <span className="text-white font-medium">
+                              {selected.cardBrand} •••• {selected.cardLast4}
+                            </span>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm">
+                              <Building2 className="h-4 w-4 text-green-400" />
+                              <span className="text-gray-400">
+                                Bank transfer to:
+                              </span>
+                              <span className="text-white font-medium">
+                                {selected.bankName
+                                  ? `${selected.bankName} `
+                                  : ""}
+                                ****{selected.ibanLast4}
+                              </span>
+                            </div>
+                            {withdrawalInfo.manualPayoutMode &&
+                              selected.isComplete === false && (
+                                <p className="text-xs text-amber-400 flex items-start gap-1">
+                                  <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                                  This account is missing details required for a
+                                  bank transfer. Add your BIC/SWIFT, bank name
+                                  and bank address in wallet settings before
+                                  withdrawing.
+                                </p>
+                              )}
+                          </div>
+                        );
+                      }
+                    })()}
+                  </div>
+                )}
+            </div>
+
             {/* Withdrawal Breakdown */}
-            {amount && !isNaN(parseFloat(amount)) && parseFloat(amount) > 0 && (
+            {withdrawal && withdrawal.eurAmount > 0 && (
               <div className="rounded-lg bg-gradient-to-br from-yellow-900/20 to-orange-900/20 border border-yellow-500/30 p-4 space-y-3">
                 <div className="flex items-center gap-2 mb-2">
                   <TrendingDown className="h-4 w-4 text-yellow-500" />
-                  <span className="text-sm font-semibold text-white">Withdrawal Breakdown</span>
+                  <span className="text-sm font-semibold text-white">
+                    Withdrawal Breakdown
+                  </span>
                 </div>
 
                 <div className="space-y-2 text-sm">
-                  {/* Credits to Withdraw */}
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-400">Credits to Withdraw:</span>
-                    <span className="font-semibold text-white tabular-nums">
-                      {withdrawal.creditsAmount.toLocaleString()} C
+                    <span className="text-gray-400">Withdrawal Amount:</span>
+                    <span className="font-semibold text-white">
+                      {currencySymbol}{withdrawal.eurAmount.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400">
+                      Platform Fee ({withdrawalInfo.settings.feePercentage}%
+                      {withdrawalInfo.settings.feeFixed > 0 &&
+                        ` + ${currencySymbol}${withdrawalInfo.settings.feeFixed}`}
+                      ):
+                    </span>
+                    <span className="font-semibold text-red-400">
+                      -{currencySymbol}{withdrawal.platformFee.toFixed(2)}
                     </span>
                   </div>
 
-                  {/* Withdrawal Fee */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-400">Withdrawal Fee ({withdrawalFee}%):</span>
-                    <span className="font-semibold text-red-400 tabular-nums">
-                      -{withdrawal.feeInCredits.toLocaleString()} C
-                    </span>
-                  </div>
+                  <div className="border-t border-yellow-500/30 pt-2"></div>
 
-                  <div className="border-t border-gray-700 pt-2"></div>
-
-                  {/* Total Deducted */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-300 font-semibold">Total Deducted from Wallet:</span>
-                    <span className="font-bold text-red-400 tabular-nums">
-                      -{withdrawal.totalCreditsDeducted.toLocaleString()} C
-                    </span>
-                  </div>
-
-                  <div className="border-t border-yellow-500/30 pt-2 mt-2"></div>
-
-                  {/* EUR You Receive */}
                   <div className="flex items-center justify-between bg-green-500/10 p-3 rounded-lg">
-                    <span className="text-green-300 font-semibold">💶 You Will Receive:</span>
-                    <span className="font-bold text-green-400 text-lg tabular-nums">
-                      €{withdrawal.eurNet.toFixed(2)}
+                    <span className="text-green-300 font-semibold">
+                      💰 You Will Receive:
+                    </span>
+                    <span className="font-bold text-green-400 text-lg">
+                      {currencySymbol}{withdrawal.netAmount.toFixed(2)}
                     </span>
                   </div>
 
-                  <p className="text-xs text-gray-500 text-center mt-2">
-                    Gross: €{withdrawal.eurGross.toFixed(2)} - Fee: €{withdrawal.feeAmount.toFixed(2)} = Net: €{withdrawal.eurNet.toFixed(2)}
-                  </p>
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>Credits Deducted:</span>
+                    <span suppressHydrationWarning>
+                      {withdrawal.creditsRequired.toLocaleString()} Credits
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
+
+            {/* Optional Note */}
+            <div className="space-y-2">
+              <Label className="text-gray-300">Note (optional)</Label>
+              <Textarea
+                value={userNote}
+                onChange={(e) => setUserNote(e.target.value)}
+                placeholder="Any additional information..."
+                className="bg-gray-800 border-gray-700 text-gray-100 min-h-[60px]"
+                disabled={loading}
+              />
+            </div>
+
+            {/* Processing Info */}
+            <div className="rounded-lg p-4 space-y-2 bg-blue-500/10 border border-blue-500/20">
+              <div className="flex items-start gap-2">
+                <Clock className="h-4 w-4 text-blue-400 mt-0.5 shrink-0" />
+                <div className="space-y-1 text-xs text-blue-300">
+                  <p>• Card refunds typically arrive in 3-5 business days</p>
+                  <p>• Bank transfers typically arrive in 3-5 business days</p>
+                  <p className="text-blue-400/70 italic mt-2">
+                    Note: Processing times may vary depending on your bank, card
+                    issuer, or public holidays.
+                  </p>
+                </div>
+              </div>
+            </div>
 
             {error && (
               <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3 flex items-start gap-2">
                 <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
                 <p className="text-xs text-red-400">{error}</p>
+              </div>
+            )}
+
+            {twoFactorRequired && (
+              <div className="rounded-lg bg-yellow-500/5 border border-yellow-500/30 p-3 space-y-2">
+                <div className="flex items-center gap-2 text-yellow-300 text-xs font-medium">
+                  <Shield className="h-4 w-4" />
+                  Two-factor verification required
+                </div>
+                <p className="text-xs text-gray-400">
+                  Enter the 6-digit code from your authenticator app to
+                  confirm this withdrawal.
+                </p>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={twoFactorCode}
+                  onChange={(e) => setTwoFactorCode(e.target.value)}
+                  placeholder="123456"
+                  className="bg-gray-900/60 border-gray-700 text-white text-center tracking-widest"
+                />
               </div>
             )}
 
@@ -276,8 +929,20 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
               </Button>
               <Button
                 type="submit"
-                disabled={loading}
-                className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold"
+                disabled={
+                  loading ||
+                  !withdrawal ||
+                  withdrawal.eurAmount <
+                    withdrawalInfo.settings.minimumWithdrawal ||
+                  !selectedMethodId ||
+                  !withdrawalInfo.hasWithdrawalMethod ||
+                  // Block when manual mode requires complete bank details
+                  (withdrawalInfo.manualPayoutMode === true &&
+                    withdrawalInfo.availableWithdrawalMethods?.find(
+                      (m) => m.id === selectedMethodId,
+                    )?.isComplete === false)
+                }
+                className="flex-1 font-semibold bg-yellow-500 hover:bg-yellow-600 text-gray-900"
               >
                 {loading ? (
                   <>
@@ -285,18 +950,21 @@ export default function WithdrawalModal({ children }: WithdrawalModalProps) {
                     Processing...
                   </>
                 ) : (
-                  'Request Withdrawal'
+                  "Submit Withdrawal"
                 )}
               </Button>
             </div>
-
-            <p className="text-xs text-center text-gray-500">
-              Withdrawals are processed manually. You'll be notified once approved.
-            </p>
           </form>
         )}
       </DialogContent>
+
+      {/* Action Terms Dialog — shown before proceeding with withdrawal */}
+      <ActionTermsDialog
+        slug={ACTION_TERM_SLUGS.WITHDRAWAL}
+        open={showTerms}
+        onAccept={proceedAfterTerms}
+        onDecline={() => setShowTerms(false)}
+      />
     </Dialog>
   );
 }
-

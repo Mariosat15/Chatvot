@@ -1,17 +1,28 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { Bell, Check, CheckCheck, Trash2, ChevronRight, X, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { useState, useEffect, useCallback } from "react";
+import {
+  Bell,
+  Check,
+  CheckCheck,
+  Trash2,
+  ChevronRight,
+  RefreshCw,
+  UserPlus,
+  Users,
+  MessageCircle,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import Link from 'next/link';
-import { formatDistanceToNow } from 'date-fns';
+} from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import Link from "next/link";
+import { formatDistanceToNow } from "date-fns";
+import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
 
 interface Notification {
   _id: string;
@@ -20,7 +31,7 @@ interface Notification {
   icon: string;
   category: string;
   type: string;
-  priority: 'low' | 'normal' | 'high' | 'urgent';
+  priority: "low" | "normal" | "high" | "urgent";
   color: string;
   isRead: boolean;
   actionUrl?: string;
@@ -29,20 +40,34 @@ interface Notification {
 }
 
 const PRIORITY_STYLES: Record<string, string> = {
-  low: 'border-l-gray-500',
-  normal: 'border-l-blue-500',
-  high: 'border-l-orange-500',
-  urgent: 'border-l-red-500 bg-red-500/5',
+  low: "border-l-gray-500",
+  normal: "border-l-blue-500",
+  high: "border-l-orange-500",
+  urgent: "border-l-red-500 bg-red-500/5",
 };
 
+// Reason: Some older notifications stored Lucide icon names as strings instead of emojis.
+// This map converts them to actual React components so they render as icons, not text.
+const LUCIDE_ICON_MAP: Record<string, React.ReactNode> = {
+  "user-plus": <UserPlus className="h-5 w-5" />,
+  "users": <Users className="h-5 w-5" />,
+  "message-circle": <MessageCircle className="h-5 w-5" />,
+  "bell": <Bell className="h-5 w-5" />,
+};
+
+function renderNotificationIcon(icon: string): React.ReactNode {
+  if (LUCIDE_ICON_MAP[icon]) return LUCIDE_ICON_MAP[icon];
+  return icon;
+}
+
 const CATEGORY_COLORS: Record<string, string> = {
-  purchase: 'bg-blue-500/20 text-blue-400',
-  competition: 'bg-yellow-500/20 text-yellow-400',
-  trading: 'bg-green-500/20 text-green-400',
-  achievement: 'bg-purple-500/20 text-purple-400',
-  system: 'bg-gray-500/20 text-gray-400',
-  admin: 'bg-orange-500/20 text-orange-400',
-  security: 'bg-red-500/20 text-red-400',
+  purchase: "bg-blue-500/20 text-blue-400",
+  competition: "bg-yellow-500/20 text-yellow-400",
+  trading: "bg-green-500/20 text-green-400",
+  achievement: "bg-purple-500/20 text-purple-400",
+  system: "bg-gray-500/20 text-gray-400",
+  admin: "bg-orange-500/20 text-orange-400",
+  security: "bg-red-500/20 text-red-400",
 };
 
 export default function NotificationDropdown() {
@@ -53,14 +78,14 @@ export default function NotificationDropdown() {
 
   const fetchNotifications = useCallback(async () => {
     try {
-      const response = await fetch('/api/notifications?limit=20');
+      const response = await fetch("/api/notifications?limit=20");
       if (response.ok) {
         const data = await response.json();
         setNotifications(data.notifications || []);
         setUnreadCount(data.unreadCount || 0);
       }
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      console.error("Error fetching notifications:", error);
     } finally {
       setLoading(false);
     }
@@ -71,28 +96,48 @@ export default function NotificationDropdown() {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  // Poll for new notifications every 30 seconds
+  // Poll for new notifications - optimized with visibility + dropdown awareness
   useEffect(() => {
-    const pollInterval = setInterval(async () => {
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
+
+    const pollNotifications = async () => {
+      // Skip if tab is hidden
+      if (document.hidden) return;
+
       try {
-        const response = await fetch('/api/notifications?action=count');
+        const response = await fetch("/api/notifications?action=count");
         if (response.ok) {
           const data = await response.json();
           if (data.count !== unreadCount) {
             setUnreadCount(data.count);
-            // If new notifications, refresh the list
-            if (data.count > unreadCount) {
+            // If new notifications and dropdown is open, refresh the list
+            if (data.count > unreadCount && open) {
               fetchNotifications();
             }
           }
         }
-      } catch (error) {
+      } catch {
         // Silent fail for polling
       }
-    }, 30000);
+    };
 
-    return () => clearInterval(pollInterval);
-  }, [unreadCount, fetchNotifications]);
+    // Poll faster when dropdown is open (15s), slower when closed (60s)
+    const interval = open ? 15000 : PERFORMANCE_INTERVALS.NOTIFICATION_POLL;
+    pollInterval = setInterval(pollNotifications, interval);
+
+    // Refresh when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        pollNotifications();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [unreadCount, fetchNotifications, open]);
 
   // Refresh when opening
   useEffect(() => {
@@ -103,55 +148,61 @@ export default function NotificationDropdown() {
 
   const handleMarkAsRead = async (notificationId: string) => {
     try {
-      const response = await fetch('/api/notifications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'mark_read', notificationId }),
+      const response = await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "mark_read", notificationId }),
       });
 
       if (response.ok) {
-        setNotifications(prev =>
-          prev.map(n => (n._id === notificationId ? { ...n, isRead: true } : n))
+        setNotifications((prev) =>
+          prev.map((n) =>
+            n._id === notificationId ? { ...n, isRead: true } : n,
+          ),
         );
-        setUnreadCount(prev => Math.max(0, prev - 1));
+        setUnreadCount((prev) => Math.max(0, prev - 1));
       }
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      console.error("Error marking notification as read:", error);
     }
   };
 
   const handleMarkAllAsRead = async () => {
     try {
-      const response = await fetch('/api/notifications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'mark_read' }),
+      const response = await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "mark_read" }),
       });
 
       if (response.ok) {
-        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
         setUnreadCount(0);
       }
     } catch (error) {
-      console.error('Error marking all as read:', error);
+      console.error("Error marking all as read:", error);
     }
   };
 
   const handleDelete = async (notificationId: string) => {
     try {
       const response = await fetch(`/api/notifications?id=${notificationId}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
 
       if (response.ok) {
-        const deletedNotification = notifications.find(n => n._id === notificationId);
-        setNotifications(prev => prev.filter(n => n._id !== notificationId));
+        const deletedNotification = notifications.find(
+          (n) => n._id === notificationId,
+        );
+        setNotifications((prev) =>
+          prev.filter((n) => n._id !== notificationId),
+        );
         if (deletedNotification && !deletedNotification.isRead) {
-          setUnreadCount(prev => Math.max(0, prev - 1));
+          setUnreadCount((prev) => Math.max(0, prev - 1));
         }
       }
     } catch (error) {
-      console.error('Error deleting notification:', error);
+      console.error("Error deleting notification:", error);
     }
   };
 
@@ -170,6 +221,7 @@ export default function NotificationDropdown() {
         <Button
           variant="ghost"
           size="icon"
+          aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
           className="relative text-gray-400 hover:text-white hover:bg-gray-800"
         >
           <Bell className="h-5 w-5" />
@@ -177,7 +229,7 @@ export default function NotificationDropdown() {
             <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-400 opacity-75" />
               <span className="relative inline-flex h-4 w-4 items-center justify-center rounded-full bg-yellow-500 text-[10px] font-bold text-black">
-                {unreadCount > 9 ? '9+' : unreadCount}
+                {unreadCount > 9 ? "9+" : unreadCount}
               </span>
             </span>
           )}
@@ -206,7 +258,9 @@ export default function NotificationDropdown() {
               onClick={fetchNotifications}
               className="h-8 w-8 p-0 text-gray-400 hover:text-white"
             >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+              />
             </Button>
             {unreadCount > 0 && (
               <Button
@@ -235,12 +289,12 @@ export default function NotificationDropdown() {
             </div>
           ) : (
             <div className="divide-y divide-gray-800/50">
-              {notifications.map(notification => (
+              {notifications.map((notification) => (
                 <div
                   key={notification._id}
                   className={`relative px-4 py-3 hover:bg-gray-800/50 transition-colors border-l-2 ${
                     PRIORITY_STYLES[notification.priority]
-                  } ${!notification.isRead ? 'bg-gray-800/30' : ''}`}
+                  } ${!notification.isRead ? "bg-gray-800/30" : ""}`}
                 >
                   {/* Unread indicator */}
                   {!notification.isRead && (
@@ -249,15 +303,21 @@ export default function NotificationDropdown() {
 
                   <div className="flex gap-3 pl-3">
                     {/* Icon */}
-                    <div className="flex-shrink-0 text-xl">{notification.icon}</div>
+                    <div className="flex-shrink-0 text-xl">
+                      {renderNotificationIcon(notification.icon)}
+                    </div>
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
-                          <p className={`text-sm font-medium ${
-                            notification.isRead ? 'text-gray-300' : 'text-white'
-                          }`}>
+                          <p
+                            className={`text-sm font-medium ${
+                              notification.isRead
+                                ? "text-gray-300"
+                                : "text-white"
+                            }`}
+                          >
                             {notification.title}
                           </p>
                           <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
@@ -271,6 +331,7 @@ export default function NotificationDropdown() {
                             <Button
                               variant="ghost"
                               size="sm"
+                              aria-label="Mark as read"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleMarkAsRead(notification._id);
@@ -283,6 +344,7 @@ export default function NotificationDropdown() {
                           <Button
                             variant="ghost"
                             size="sm"
+                            aria-label="Delete notification"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDelete(notification._id);
@@ -296,11 +358,16 @@ export default function NotificationDropdown() {
 
                       {/* Meta */}
                       <div className="flex items-center gap-2 mt-2">
-                        <Badge className={`text-[10px] px-1.5 py-0 ${CATEGORY_COLORS[notification.category]}`}>
+                        <Badge
+                          className={`text-[10px] px-1.5 py-0 ${CATEGORY_COLORS[notification.category]}`}
+                        >
                           {notification.category}
                         </Badge>
                         <span className="text-[10px] text-gray-600">
-                          {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                          {formatDistanceToNow(
+                            new Date(notification.createdAt),
+                            { addSuffix: true },
+                          )}
                         </span>
                       </div>
 
@@ -311,7 +378,7 @@ export default function NotificationDropdown() {
                           onClick={() => handleNotificationClick(notification)}
                           className="inline-flex items-center gap-1 mt-2 text-xs text-yellow-400 hover:text-yellow-300"
                         >
-                          {notification.actionText || 'View'}
+                          {notification.actionText || "View"}
                           <ChevronRight className="h-3 w-3" />
                         </Link>
                       )}
@@ -340,4 +407,3 @@ export default function NotificationDropdown() {
     </Popover>
   );
 }
-

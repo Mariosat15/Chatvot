@@ -1,0 +1,309 @@
+"use client";
+
+import { motion, AnimatePresence } from "framer-motion";
+import { X, Star, Lock, Sparkles, Target } from "lucide-react";
+import { GameIcon } from "@/components/ui/GameIcon";
+import type { GameIconName } from "@/lib/constants/game-icons";
+import type { Badge } from "@/lib/constants/badges";
+import { getBadgeRequirement, getBadgeXP, getRarityDescription } from "@/lib/utils/badge-descriptions";
+
+interface BadgeDetailCardProps {
+  badge: Badge & { earned: boolean; earnedAt?: Date };
+  open: boolean;
+  onClose: () => void;
+  userLevel?: number;
+}
+
+const RARITY_CONFIG = {
+  common: {
+    border: "border-gray-600",
+    headerBg: "from-gray-500 to-gray-600",
+    cardBg: "from-gray-800 to-gray-900",
+    textColor: "text-gray-300",
+    accentColor: "text-gray-400",
+    tagBg: "bg-gray-700 text-gray-400",
+    shimmer: false,
+    starCount: 1,
+  },
+  rare: {
+    border: "border-blue-400",
+    headerBg: "from-blue-400 to-cyan-500",
+    cardBg: "from-blue-900 to-cyan-900",
+    textColor: "text-blue-400",
+    accentColor: "text-blue-400",
+    tagBg: "bg-blue-500/20 text-blue-400",
+    shimmer: false,
+    starCount: 2,
+  },
+  epic: {
+    border: "border-purple-400",
+    headerBg: "from-purple-500 to-pink-500",
+    cardBg: "from-purple-900 to-pink-900",
+    textColor: "text-purple-400",
+    accentColor: "text-purple-400",
+    tagBg: "bg-purple-500/20 text-purple-400",
+    shimmer: true,
+    starCount: 3,
+  },
+  legendary: {
+    border: "border-yellow-400",
+    headerBg: "from-yellow-400 via-orange-400 to-red-500",
+    cardBg: "from-yellow-900 via-orange-900 to-red-900",
+    textColor: "text-amber-400",
+    accentColor: "text-amber-400",
+    tagBg: "bg-amber-500/20 text-amber-400",
+    shimmer: true,
+    starCount: 4,
+  },
+};
+
+const RARITY_DEFAULT_MIN_LEVEL: Record<string, number> = {
+  common: 0,
+  rare: 0,
+  epic: 5,
+  legendary: 8,
+};
+
+export default function BadgeDetailCard({
+  badge,
+  open,
+  onClose,
+  userLevel = 1,
+}: BadgeDetailCardProps) {
+  const config = RARITY_CONFIG[badge.rarity] || RARITY_CONFIG.common;
+  const requirement = getBadgeRequirement(badge);
+  const xpReward = getBadgeXP(badge.rarity);
+  const rarityDesc = getRarityDescription(badge.rarity);
+  const requiredLevel = badge.minLevel || RARITY_DEFAULT_MIN_LEVEL[badge.rarity] || 0;
+  const isLevelLocked = requiredLevel > 0 && userLevel < requiredLevel;
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          {/* Scrollable Backdrop */}
+          <motion.div
+            className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 overflow-y-auto overscroll-contain"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+          >
+          <div className="min-h-full flex items-start justify-center py-8 px-4">
+          {/* Pokemon-style Card */}
+          <motion.div
+            className="w-full max-w-[360px]"
+            initial={{ opacity: 0, scale: 0.7, rotateY: -20 }}
+            animate={{ opacity: 1, scale: 1, rotateY: 0 }}
+            exit={{ opacity: 0, scale: 0.7, rotateY: 20 }}
+            transition={{ type: "spring", damping: 18, stiffness: 250 }}
+            style={{ perspective: "1000px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className={`relative border-[6px] ${config.border} rounded-[18px] overflow-hidden shadow-2xl`}
+              style={{ background: "linear-gradient(135deg, #1a1d2e 0%, #131722 100%)" }}
+            >
+              {/* Holographic shimmer for epic/legendary */}
+              {config.shimmer && (
+                <motion.div
+                  className="absolute inset-0 pointer-events-none z-30 opacity-20"
+                  style={{
+                    background: "linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.4) 45%, transparent 50%)",
+                    backgroundSize: "200% 200%",
+                  }}
+                  animate={{ backgroundPosition: ["200% 0%", "-200% 0%"] }}
+                  transition={{ duration: 3, repeat: Infinity, repeatDelay: 1.5, ease: "linear" }}
+                />
+              )}
+
+              {/* Close button */}
+              <button
+                onClick={onClose}
+                className="absolute top-2 right-2 p-1.5 rounded-full bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-colors z-40"
+              >
+                <X className="h-4 w-4 text-white" />
+              </button>
+
+              {/* === TOP BAR: Stage + Name + XP === */}
+              <div className="px-4 pt-3 pb-1">
+                {/* Rarity stage label */}
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-[11px] font-bold uppercase px-2 py-0.5 rounded ${config.tagBg}`}>
+                      {badge.rarity}
+                    </span>
+                    <span className="text-[11px] text-gray-400 italic">{badge.category}</span>
+                  </div>
+                  {badge.earned && (
+                    <span className="text-[11px] font-bold text-green-400 bg-green-500/20 px-2 py-0.5 rounded">
+                      EARNED
+                    </span>
+                  )}
+                </div>
+
+                {/* Name + XP (like Pokemon Name + HP) */}
+                <div className="flex items-center justify-between">
+                  <h2 className={`text-lg font-extrabold ${config.textColor} leading-tight`}>{badge.name}</h2>
+                  <div className="flex items-center gap-1">
+                    <span className="text-lg font-extrabold text-amber-400">{xpReward}</span>
+                    <span className="text-[11px] font-bold text-amber-400 uppercase">XP</span>
+                    <Star className="h-4 w-4 text-amber-500 fill-amber-400" />
+                  </div>
+                </div>
+              </div>
+
+              {/* === CHARACTER ART FRAME === */}
+              <div className="mx-3 mb-2">
+                <div className={`relative rounded-lg border-2 ${config.border} overflow-hidden bg-gradient-to-br ${config.headerBg} p-6`}>
+                  {/* Background energy pattern */}
+                  <div className="absolute inset-0 opacity-15">
+                    <div className="absolute inset-0" style={{
+                      backgroundImage: "radial-gradient(circle at 30% 30%, white 2px, transparent 2px), radial-gradient(circle at 70% 70%, white 1px, transparent 1px)",
+                      backgroundSize: "24px 24px",
+                    }} />
+                  </div>
+
+                  {/* Badge icon centered */}
+                  <motion.div
+                    className={`relative z-10 flex justify-center ${badge.earned ? "" : "opacity-40 grayscale"}`}
+                    initial={{ scale: 0.5, opacity: 0 }}
+                    animate={{ scale: 1, opacity: badge.earned ? 1 : 0.4 }}
+                    transition={{ delay: 0.15, type: "spring", damping: 15 }}
+                  >
+                    <div className="w-28 h-28 flex items-center justify-center drop-shadow-lg">
+                      <GameIcon name={badge.icon as GameIconName} size={96} />
+                    </div>
+                  </motion.div>
+
+                  {/* Level lock overlay */}
+                  {isLevelLocked && !badge.earned && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg z-20">
+                      <div className="flex flex-col items-center gap-1">
+                        <Lock className="h-8 w-8 text-purple-300" />
+                        <span className="text-xs font-bold text-purple-200 bg-purple-900/60 px-2 py-0.5 rounded-full">
+                          Lv.{requiredLevel} Required
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* === FLAVOR TEXT (Description) === */}
+              <div className="mx-4 mb-2">
+                <p className="text-[11px] text-gray-400 italic text-center leading-snug">{badge.description}. {rarityDesc}.</p>
+              </div>
+
+              {/* === ATTACK / POWER SECTION (How to Earn) === */}
+              <div className="mx-3 mb-2">
+                <div className="bg-gray-800/60 border border-gray-700 rounded-lg overflow-hidden">
+                  {/* Attack header */}
+                  <div className="flex items-center gap-2 px-3 py-2 bg-gray-800/80 border-b border-gray-700">
+                    <Target className={`h-4 w-4 ${config.accentColor}`} />
+                    <span className={`text-xs font-bold uppercase tracking-wide ${config.accentColor}`}>
+                      Requirement
+                    </span>
+                    {/* Damage value (target) */}
+                    <span className={`ml-auto text-lg font-black ${config.textColor}`}>
+                      {requirement.targetValue}
+                    </span>
+                  </div>
+
+                  {/* Attack description */}
+                  <div className="px-3 py-2">
+                    <p className="text-sm font-semibold text-gray-200 mb-1">{requirement.requirement}</p>
+                    <div className="flex items-center justify-between text-[11px] text-gray-400">
+                      <span>{requirement.statLabel}</span>
+                    </div>
+
+                    {/* Extra requirements */}
+                    {requirement.extras.length > 0 && (
+                      <div className="mt-2 space-y-0.5">
+                        {requirement.extras.map((extra, i) => (
+                          <div key={i} className="flex items-center gap-1.5 text-[11px] text-gray-400">
+                            <div className="w-1 h-1 rounded-full bg-gray-500" />
+                            <span>{extra}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Tip */}
+                    {requirement.tip && (
+                      <div className="mt-2 flex items-start gap-1.5 bg-amber-500/10 border border-amber-500/30 rounded px-2 py-1.5">
+                        <Sparkles className="h-3 w-3 text-amber-400 mt-0.5 shrink-0" />
+                        <span className="text-[11px] text-amber-400">{requirement.tip}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* === BOTTOM STATS BAR (like Weakness/Resistance/Retreat) === */}
+              <div className="mx-3 mb-2 flex items-stretch divide-x divide-gray-700 bg-gray-800/50 border border-gray-700 rounded-lg overflow-hidden text-center">
+                <div className="flex-1 py-2 px-1">
+                  <p className="text-[11px] text-gray-400 uppercase font-semibold">Category</p>
+                  <p className={`text-xs font-bold ${config.textColor} mt-0.5`}>{badge.category}</p>
+                </div>
+                <div className="flex-1 py-2 px-1">
+                  <p className="text-[11px] text-gray-400 uppercase font-semibold">Rarity</p>
+                  <div className="flex items-center justify-center gap-0.5 mt-0.5">
+                    {Array.from({ length: config.starCount }).map((_, i) => (
+                      <Star key={i} className={`h-3 w-3 ${badge.earned ? "text-amber-500" : "text-gray-400"} fill-current`} />
+                    ))}
+                  </div>
+                </div>
+                <div className="flex-1 py-2 px-1">
+                  <p className="text-[11px] text-gray-400 uppercase font-semibold">XP</p>
+                  <p className="text-xs font-bold text-amber-400 mt-0.5">+{xpReward}</p>
+                </div>
+              </div>
+
+              {/* === CARD FOOTER === */}
+              <div className="mx-3 mb-3">
+                {/* Earned date */}
+                {badge.earned && badge.earnedAt && (
+                  <p className="text-[11px] text-gray-400 text-center italic mb-2">
+                    Earned on {new Date(badge.earnedAt).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </p>
+                )}
+
+                {/* Action button */}
+                <button
+                  onClick={onClose}
+                  className={`w-full py-2.5 rounded-lg font-bold text-sm transition-all ${
+                    badge.earned
+                        ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/30 hover:brightness-110"
+                      : isLevelLocked
+                        ? "bg-gray-700 text-gray-500 cursor-default"
+                        : `bg-gradient-to-r ${config.headerBg} text-white shadow-lg hover:brightness-110`
+                  }`}
+                >
+                  {badge.earned
+                    ? "Badge Collected!"
+                    : isLevelLocked
+                      ? `Unlock at Level ${requiredLevel}`
+                      : "Keep Trading to Earn!"
+                  }
+                </button>
+              </div>
+
+              {/* Card ID at bottom */}
+              <div className="px-4 pb-2 flex items-center justify-between">
+                <span className="text-[10px] text-gray-500">Chartvolt Trading Badge</span>
+                <span className="text-[10px] text-gray-500 font-mono">{badge.id}</span>
+              </div>
+            </div>
+          </motion.div>
+          </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}

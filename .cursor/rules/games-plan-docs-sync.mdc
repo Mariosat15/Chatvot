@@ -1,0 +1,1487 @@
+---
+description: Keep the games-platform plan documents in sync with reality once implementation starts
+alwaysApply: true
+---
+
+# Games Plan Documents — Sync Rule
+
+Two planning projects exist as documentation only. When implementation begins, or when
+any new information changes an assumption, **the documents must be updated in the same
+piece of work as the code.**
+
+| Folder | Covers |
+|---|---|
+| `New games plan/` | Stage 0 defect fixes, then the in-house game-module architecture |
+| `External game plans/` | Integrating games from a third-party skill-game provider |
+
+## THE SCENARIO IS DECIDED - EXTERNAL-FIRST (owner, 2 September 2026, amended 5 September)
+
+**Provider games are the route. The active programme is `External game plans/` and its
+X0-X12 phases**, now including **X4a**. Read `External game plans/PROGRESS.md` first.
+
+**This heading used to read EXTERNAL-ONLY and say "no in-house game is built". That sentence
+is now false**, and the amendment is recorded here rather than by rewriting the 2 September
+decision, because a reversed direction is exactly the fact a new chat needs. On **5 September
+2026** the owner answered open question 10 yes: the platform **is** building one game of its
+own, as phase **X4a** (`21`), where it doubles as the reference implementation that proves the
+provider seam. What survives of the original decision is the important part - the programme is
+still external-**first**, and `New games plan` P2's in-house Trivia game is still not being
+built. **The precise distinction, because it is load-bearing:** there is no in-house game
+*module*, because X4a is a provider game that happens to be ours and arrives through the seam
+that already exists. So "no in-house game module" is right; "no in-house game" is wrong.
+
+| Scenario | Meaning | Chapters | Programme | Status |
+|---|---|---|---|---|
+| **External-first** | Provider games are the route. **One in-house game is built as a hedge** (X4a, 5 Sep 2026), speaking the provider protocol rather than as a game module | `01`-`09` **and** `10`-`21` | X0-X12 incl. **X4a**, **26.5-35 weeks** | **CHOSEN** |
+| **Add-on** | The `New games plan` is delivered too. External games are an addition | `01`-`09` | E1-E9, 7.5-8 weeks on top of the foundation | **Not pursued.** Kept only so E-phase references resolve |
+
+Chapters `10`-`20` exist because `01`-`09` delegated the foundation and every
+platform-wide change (admin, navigation, wording, flags, catalogue, risks, rollout) to the
+`New games plan`. That plan is not being delivered, so the dependency did not disappear -
+it moved into `External game plans/`, and `10`-`20` own it.
+
+**What the decision does to the `New games plan` folder**, because "superseded" is too
+blunt: **Stage 0 / `00a` is fully active and unchanged** - it is X0, a prerequisite in
+every scenario, and the work currently awaiting owner test. **P1 survives as X1**, same
+seams, delivered from `External game plans/11`. **P2, the in-house Trivia game, is not
+being built.** **P3-P7 are delivered as X6-X11.** The chapters remain valuable as analysis
+of the live codebase, and `15-platform-transformation-and-gaps.md` is still the record of
+the games-first direction.
+
+**The finding to keep repeating, because the intuition is wrong:** external-only is **not
+cheaper**, it is broader. Dropping an in-house game saves ~3.5 weeks; a correct provider
+integration costs ~7; all the platform work is identical. The prize is a catalogue and no
+content burden, not a saving. Do not let a summary anywhere imply otherwise.
+
+**The consequence of the decision that must stay visible:** there is now **no in-house
+game to fall back on**. If the provider search or the pricing fails, the platform will
+have funded the whole foundation, admin and player programme and still have one game. That
+is risk **X8**, and it is why open question 10 - a small in-house hedge game - moved
+*forward* to before X4 rather than away.
+
+### Two owner instructions that came with the decision
+
+Both change the order rather than the contents, and both are load-bearing.
+
+- **Admin first.** An operator must be able to register a provider, sync a catalogue and
+  create a non-trading contest before any player screen has something real to render. The
+  admin app is also a separate process with no player traffic, so it is the safe place to
+  be wrong. **It does not mean X6 moves in front of X1-X5** - a contest must exist before
+  it can be administered. In practice it means X6 and X6.5 complete *before* X7 begins.
+- **One step at a time, without breaking the running app.** Every phase additive and
+  flag-gated, trading pinned by the regression test in `11`, and the rule that **no phase
+  may require a simultaneous change to trading in order to be correct.** If one appears
+  to, the seam in `11` is wrong and that is the thing to fix.
+
+### What the owner's 2 September brief added, and what only looked new
+
+Most of the brief was already designed. Four things were not, and the distinction is the
+useful part - a plan that claims to cover everything is the one that surprises you.
+
+| Genuinely new | Already designed - cross-reference, do not rewrite |
+|---|---|
+| **Smart onboarding and interest matchmaking** - nothing at all in `01`-`19`. New chapter `20`, phase **X11.5**, 2-3 weeks | Admin nav grouping with a TRADING group (`12` s1), provider registration and credentials (`04` s3.1, `12` s4), catalogue as editable content (`16` s1), cross-game scoring in three layers (`05`), financials by game and provider (`12` s5), game pages and filtered browsing (`16`, `13` s4), terminology token layer (`14`) |
+| **"Challenge any user"** - `03` designed the challenge *mechanics* then said the opponent was "invited or matched" and stopped. X10 grew 0.5-1 week to 1-1.5 | Picking the *game* for a challenge was fully designed |
+| **A player profile specification** - it existed only as "terminology pass 6, profile tabs", treating a structural change as a labelling one. `13` s7.2 | Dashboard, leaderboard and `UserGameStats` |
+| **The admin wording pass was in the wrong phase** - it sat in X8, *after* the player UI, which would have had operators running a multi-game platform through screens labelled "trading" for two phases. Split into **X6.5** (admin) and X8 (player); `14` total unchanged at ~10 days | The token dictionary, the passes themselves, the never-rename list |
+
+**Net: 23-30 weeks, up from 20-26, and 26.5-35 since X4a was approved on 5 September 2026.** Each increase is real scope, never a re-estimate. Do not let
+a summary present it as the same programme.
+
+### Five findings from that pass that generalise
+
+- **A trading-shaped service does not fail when a second game arrives - it keeps working
+  and keeps being wrong.** `lib/services/matchmaking.service.ts` and
+  `GET /api/matchmaking` already exist and rank opponents by *trading* skill. Add a second
+  game and it returns matches happily, all of them trading matches, with no error, no
+  empty state and no log line. Same shape as the mirror-drift and `canEnterChallenges`
+  defects: **the system reports success while doing the wrong thing.** The rule:
+  **change the service, do not call it from a new place**, and prove it with a test that
+  fails first. Risk **X13**. The same trap sits in
+  `components/dashboard/GettingStartedCard.tsx`, whose steps tell every new player to
+  "place your first trade".
+- **"Like payment providers" was right about the UX and wrong about the storage.** The
+  owner asked for games to be added the way payment providers are, and
+  `PaymentProvidersSection.tsx` is indeed the right interaction model. But
+  `payment-provider.model.ts` embeds `credentials[]` in the document every screen reads and
+  carries a `saveToEnv` flag with a `regenerate-env` route that writes secrets to `.env`.
+  `04` s3.1 deliberately keeps game credentials **out** of `game_provider`. Copying the
+  pattern wholesale would have undone that on consistency grounds. **Copy the UX, not the
+  persistence** - `12` s4.1.
+- **A menu group is not a tab.** `12` s1 already grouped the trading sections, but the
+  owner asked for one destination with tabs inside. Two things must survive the collapse:
+  **deep links** (tab state must be addressable, not `useState`, or every bookmark and
+  wiki screenshot breaks), and **RBAC** (`ADMIN_SECTIONS` grants per *section*, so merging
+  six into one is a silent privilege widening that looks completely correct on review).
+  **Keep the six IDs and gate the tabs.** `12` s1.1.
+- **No aggregate may silently mean "trading only".** Now a binding rule in `05` s10: every
+  performance or money figure is either generalised across games, explicitly scoped and
+  labelled to one game, or removed from the platform-wide view. There is no third option.
+  **"Total PnL" is the clearest casualty** - a chess puzzle has no profit and loss, so it
+  moves inside the trading card or becomes something genuinely cross-game. The failure mode
+  is not a crash: a trading-only total keeps computing and keeps rendering.
+- **Inference is not consent.** Paying to enter a competition says a player will *play* a
+  game; it does not say they want 1v1 invitations from strangers. `20` s3.2 keeps them
+  separate - inferred interest drives **suggestions**, an explicit opt-in drives
+  **invitations**. Conflating them turns matchmaking into spam. Risk **X14**. The same
+  distinction made `canEnterChallenges` a live defect: **a stored value and an absent one
+  are different facts.**
+
+**Stage 0 is a prerequisite in both scenarios.** It fixes live defects under the money
+layer, and nothing changes that.
+
+**Stage 0 started on 1 September 2026** and is tracked in `New games plan/PROGRESS.md`,
+which is the file to read before touching any of this. Three things from it are easy to
+get wrong and are worth stating here:
+
+- **Prerequisite A already shipped** (commit `d5d3a328`): the `/api/simulator/*` routes
+  accepted a plain `X-Simulator-Mode: true` header as authentication in production, so an
+  unauthenticated caller could credit any wallet. Recorded as **R27** in
+  `External game plans/17-risk-register.md` because the provider callback specified in
+  `01`/`06` can repeat the same mistake. Two rules follow: **an authentication helper must
+  never accept a request because configuration is missing**, and **test the route, not just
+  the helper.**
+- **The finalize-time prize-pool safeguard does not mask the join-path defect.** It only
+ fires when the pool is too *high*. An under-counted pool is under-distributed silently.
+ Several documents used to claim the opposite; if you find that claim, it is stale.
+- **Model mirror drift is a WRITE-side defect, with one read-side trap.** Measured against
+ a real MongoDB on 1 Sep 2026 (`__tests__/helpers/mirror-drift-behaviour.test.ts`, 8
+ tests). An ordinary `save()` does **not** strip fields the schema lacks, and `.lean()` /
+ `toObject()` do **not** hide them — several documents used to claim both, and both are
+ stale. What actually happens: a **missing enum value rejects the whole write**, and the
+ app with the narrower copy **cannot write the field at all**, silently, while reporting
+ success. **The exception, and the subtlest part: ordinary `doc.field` access returns
+ `undefined`**, because Mongoose defines getters only for declared paths — so the field
+ survives a debug dump while the code beside it reads nothing and takes the wrong branch.
+ Two rules follow: **compare enum values, not just field names**, and **never cite a read
+ as evidence that two copies agree.**
+- **Defect 2 is built** (1 Sep 2026, awaiting owner test): the guard in
+ `tools/model-mirror/`, all 11 drifted pairs synced, 20 tests, and the
+ `mongodb-memory-server` replica-set harness the money tests need. It found **three** live
+ production bugs on the way — failed withdrawals recording no time or reason, six
+ landing-page sections that could not be edited at all, and hero/branding images that
+ could never be restored after a redeploy. The third was found by **diffing the typecheck
+ against a pre-sync baseline** (admin app 229 → 225 errors); errors that *disappear* after
+ a sync mark code that was already reaching for a field its schema denied it. Worth
+ repeating whenever models are synced.
+- **The order is Defect 2 before Defect 1**, so the mirror guard exists before Defect 1
+ edits the admin copy of the entry path.
+- **Three owner decisions were taken on 1 Sep 2026** and must not be quietly reversed:
+ the test database is **`mongodb-memory-server` as a single-node replica set** (built and
+ proven with a real transaction); the orphaned declaration files are **deleted**; and
+ **joining a competition is allowed outside market hours — only trading itself is gated.**
+ That last one changes the Defect 1 design: the unified `contest-entry.service.ts` takes
+ the union of the *security* checks from both gates and deliberately does **not** carry
+ Gate B's market-hours check, because doing so would block weekend sign-ups for Monday
+ contests. Locked in by Defect 1 test 12, which fails both a fix that blocks the join and
+ one that lets the order through.
+- **`apps/admin` has its own `node_modules/mongoose`.** Admin models therefore run on a
+ **separate Mongoose instance** which a test's `mongoose.connect` does not touch. The
+ symptom is `Operation "x.insertOne()" buffering timed out after 10000ms`, which reads like
+ a slow database rather than an unconnected one. Connect it via **`Model.base`**, not a
+ guessed path — that is the instance the model registered on, and it survives npm hoisting.
+ Second rule from the same area: **never import both copies of one model into a single
+ test.** Both register under the same name via `models.X || model(...)`, so the second
+ import silently returns the first and the test examines the wrong schema while looking
+ correct. **Superseded for vitest since 5 Sep 2026, and only for vitest:** `vitest.config.ts`
+ sets `resolve.dedupe: ["mongoose"]`, so there is one instance and `Model.base` is moot in
+ tests. That change is what made admin **actions** testable at all rather than only greppable,
+ and it is required rather than convenient — a session belongs to a `MongoClient`, so
+ connecting the second instance to the same URI still could not share one transaction. The
+ bullet above remains true of the running apps, and do not remove the dedupe to "clean up"
+ the config: the symptom returns as a 10-second buffering timeout that reads like a slow
+ database.
+- **A synced schema is not a working feature — the `brandingFiles` bug proved it twice.**
+ Found and **fixed** 1 Sep 2026. The upload routes key the map by filename and **Mongoose
+ refuses map keys containing a dot**. The sync changed the failure mode without removing it:
+ before, the undeclared field meant a plain JavaScript `Map` accepted the key and the write
+ was silently discarded; after, `default: new Map()` hands the route a `MongooseMap` that
+ validates and throws, and the route catches it and warns while still reporting success.
+ **No entry had ever been stored, so there was nothing to migrate.** Fixed by
+ `lib/utils/branding-file-key.ts` (mirrored into `apps/admin`), encoding `.` as `__DOT__`,
+ wired through **two writers, four readers and one delete** across both apps. Two rules
+ follow: **the mirror guard proves two copies agree, not that either one works** — follow a
+ drift fix with a test that round-trips real data; and **assert the round trip through the
+ real helper, never a hard-coded encoded string**, or a reader that forgot to encode still
+ passes.
+- **Every test that recorded a defect was flipped to prove its fix, not deleted** (1 Sep
+ 2026, three bugs). Keep doing this. The comment that explained why the defect was reachable
+ is the most valuable part of the test, and deleting it loses the reason the guard exists.
+ Rename the test, invert the assertion, keep the history in the `// Reason:` block.
+- **Two fixes deliberately stopped short, and both are recorded rather than silently
+ scoped.** `cancelCompetitionAndRefund`'s lock is `status !== "cancelled"`, so a **completed**
+ competition is still refundable — entry fees returned on top of prizes already paid. And
+ `error instanceof Error ? error.message` in a route response appears **166 times across 119
+ API route files**; only the proven one was changed. In both cases the wider change is a
+ policy decision or an unreviewable diff, so it belongs with the unified service. **Do not
+ let a summary imply either is closed.**
+- **Setting the final status up front IS the lock.** The double-refund fix needed no new enum
+ value: `findOneAndUpdate({ _id, status: { $ne: "cancelled" } }, { $set: { status:
+ "cancelled", ... } })` claims and completes in one instruction, and a transaction abort rolls
+ it back for a retry. An intermediate `cancelling` state would have meant a schema change in
+ both apps for no gain. Also: **a duplicate money request should return success with a zero
+ count**, not an error — a retried cron delivery has done nothing wrong, and a failure invites
+ a third attempt.
+- **Finalization recomputes participant stats from trades before ranking.** Seeding `pnl` on a
+ `CompetitionParticipant` does nothing; it is overwritten with zero, every player ties at rank
+ 1, and the resulting equal payout **reads as a prize-distribution bug in production**. To
+ rank participants, seed a **closed `TradingPosition` and a matching `TradeHistory` row** —
+ the realized amount is read from the history by `positionId`, not derived from the position.
+ Use **USD-quoted symbols** or finalization fetches conversion rates over the network, and
+ satisfy the **whole** competition schema (`createdBy`, `registrationDeadline`, `description`),
+ because finalization saves the document even though those fields play no part in a payout.
+- **The challenge accept route was missing the restriction and fraud guards** (proven and
+ then **fixed** 1 Sep 2026, `__tests__/services/challenge-accept-guards.test.ts`,
+ sub-defect 1b). It checked seven other guards. The challenge **create** route checks both,
+ so only accept was affected — which is why reading one route would never have found it. A
+ challenge is the easiest shape for coordinated entry, being exactly two players with the
+ pot returning to the pair minus the platform fee, so the fraud gap mattered here at least
+ as much as on a competition. See the fix note below.
+- **Classify concurrency failures, never merely count them.** Asserting that the artifact
+ and unknown buckets are *empty* is what stops test-server noise inflating a finding. And
+ note the trap in the other direction: a genuine write conflict reads `Write conflict during
+ plan execution **and yielding is disabled**`, so matching "yielding is disabled" as an
+ infrastructure marker files every real failure as noise and makes the defect vanish.
+- **`ensureCollections()` alone is not enough — indexes are a catalog change too.**
+ Mongoose builds a model's indexes on first use, which produces the same `due to catalog
+ changes` failure inside a transaction. That residue made the sequential control test pass
+ alone and fail about **one full-suite run in three**. `settleIndexes()` awaits
+ `Model.init()` for every registered model and `ensureCollections()` calls it. A test that
+ fails only when the suite is busy teaches the team to rerun rather than to read.
+- **Before writing any concurrency test, call `ensureCollections()`** from
+ `__tests__/helpers/mongo-test-server.ts` with every collection the code under test writes.
+ MongoDB **cannot create a collection inside a transaction**, so the first test to touch a
+ new collection fails with `due to catalog changes` — which is indistinguishable at a glance
+ from a contention failure. This nearly put a false finding on record: a 20-way join test
+ reported 1 success in 20, and most of the failures were this artifact. Measured after that
+ artifact was removed, Gate A admitted **1 concurrent join in 20** because it had no retry
+ while Gate B retried five times; **since the unified service gave both gates the retry, the
+ same test measures 20 in 20.** The ratio is not a production prediction either way, because
+ a single-node in-memory replica set has tighter lock timeouts. Assert against the *observed*
+ success count, never against the attempt count, so the test survives the fix.
+- **Test fixtures must use ObjectId-shaped user ids** (24 hex chars), not readable labels.
+ Better Auth uses the MongoDB adapter so real ids are ObjectId strings; most models type
+ `userId` as `String` and would accept anything, but the fraud models declare
+ `Schema.Types.ObjectId` and throw a `CastError` that the entry path catches and logs. The
+ test then passes while a whole branch of the code under test never runs — coverage that
+ only looks like coverage.
+- **Testing a server action needs `__tests__/helpers/server-action-context.ts`**, which
+ supplies the session, headers, restriction and fraud outcomes that ambient request state
+ would normally provide. Two things will waste your time otherwise. Server actions
+ **return** `{ success: false, error }` rather than throwing, so assert on the result, not
+ with `rejects.toThrow`. And they re-throw only errors whose **`digest` starts with
+ `NEXT_`** — a `redirect()` mock without a digest is swallowed into a result object, the
+ redirect appears never to fire, and **the production code looks broken when it is
+ correct.** Every guard test must assert the refusal left **no participant, no debit and no
+ prize-pool change**, not merely the right message.
+- **Defect 1's entry-fee ledger defect was proven, not inferred, and is now fixed** (1 Sep
+ 2026, `__tests__/services/entry-fee-ledger.test.ts`). Gate A wrote `referenceId`, which the
+ `WalletTransaction` schema does not declare, and never set `competitionId`, which it
+ does — so **every competition entry fee was unattributable to its competition.** Two
+ things to state accurately: the harm was a **broken audit trail, not a wrong balance**
+ (nothing computes money from that field — checked), and because *both* copies wrote
+ `referenceId` identically this was **one bug duplicated, not mirror drift**, so the guard
+ does not catch it and cannot. The unified service writes `competitionId`; historical rows
+ stay unattributable, so **do not describe the audit trail as repaired retroactively.**
+- **The same defect existed on the challenge side, wider, and was fixed 1 Sep 2026.**
+ `challengeId` was declared on **neither** `WalletTransaction` copy while **nine** writers
+ passed it — challenge entry (×2), the decline refund, and six finalization payouts across
+ both apps — so **the entire challenge money trail was unattributable**, not just entry.
+ Same harm statement as its sibling: audit trail, not balance; nothing queries
+ `wallettransactions` by it; nothing to backfill, because the value never reached the
+ database. Declared add-only in both copies with a matching index, proven by
+ `__tests__/services/challenge-accept-guards.test.ts` and probed by un-declaring it again.
+ **This is the third "one bug duplicated, not drift" case**, after `referenceId` and
+ `failedReason`, so carry the general rule rather than the three instances: **the mirror
+ guard proves the two apps agree with each other, never that either agrees with the code
+ writing to them.** A green `check:mirrors` is not evidence that a field is stored.
+- **Verify the throwaway sentence, not just the claim you set out to test.** That bug was
+ found only because a passing remark inside a paragraph about something else — asserting
+ that `challengeId` *was* declared, and that `competitionId` was an ObjectId, both false —
+ was checked before being left on record. Documentation written during implementation is a
+ defect-finding instrument; an unverified aside in it deserves the same suspicion as an
+ unverified claim in code.
+- **Defect 1 is built** (1 Sep 2026, awaiting owner test): `lib/services/contest-entry.service.ts`
+ holds the transaction, with the result shapes, the pre-transaction guards and the
+ post-commit work in `lib/services/contest-entry/` (`types.ts`, `guards.ts`,
+ `side-effects.ts`) to keep every file under the 500-line limit. `enterCompetition` and
+ `POST /api/competitions/[id]/join` are now thin wrappers over it, and the service re-exports
+ the types so importers only ever need the one path.
+ **The first thing to get right is that there were four
+ writers, not the two the plan described** — the two known gates, a simulator batch route,
+ and a dead admin copy. Each was resolved differently and the reasoning matters: the
+ **dead admin copy was deleted** (nothing imported it, and it carried weaker guards that a
+ future feature would have inherited); the **batch route was fixed in place** rather than
+ routed through the service, because its bulk insert is the point of it. **Count the writers
+ before unifying anything** — a plan that says "two paths" is an assumption until grep says so.
+- **The batch route silently dropped six participant fields**, because it built seats with
+ names the `CompetitionParticipant` schema does not declare (`pnlPercent` for
+ `pnlPercentage`, `joinedAt` for `enteredAt`, and four more). Two rules: **extract an
+ inline object builder into a named function before testing it** — the seat shape is now
+ `lib/services/simulator/simulator-participant.ts` and a test compares its keys against
+ `Model.schema.paths`, which no assertion on the saved document could do, since strict mode
+ has already discarded the evidence by then. And **prove a field-name test fails** by
+ injecting a bad name and watching it go red; a test that only ever passes proves nothing.
+- **A duplicate entry is idempotent success, not an error** (owner decision, 1 Sep 2026):
+ return the existing seat and take no second fee. That covers a double-click and a retried
+ request. It needs handling in **two** places, and missing either leaves the hole open — the
+ pre-flight participant check, *and* the **E11000 duplicate-key error** from the unique index
+ when two requests pass the check in the same instant. Treat E11000 on that index as success.
+- **`SuspicionScore` had two independent races, both now fixed** (1 Sep 2026,
+ `__tests__/services/suspicion-score-race.test.ts`). It surfaced only once the entry path
+ stopped serialising itself, which is the general lesson: **removing a bottleneck exposes
+ every race the bottleneck was hiding** — the old path admitted 1 concurrent join in 20, so
+ the losers never reached the fraud services at all. Five call sites, not the three first
+ counted, each read-then-created its own document against a unique index; **17 of 20**
+ concurrent detectors threw `E11000` and their contributions were discarded silently,
+ because every caller is fire-and-forget. Fixed by making `getOrCreateScore` an atomic
+ upsert and routing all five through it.
+ **The second race is the more instructive one, and the upsert did not fix it.** `save()`
+ writes only the paths one caller modified, so two detectors using *different* methods each
+ persisted their own breakdown entry while `totalScore` — a whole-document field both
+ computed from a stale copy — was last-write-wins. The document then **contradicted its own
+ breakdown**: 40 and 25 stored correctly, total 40, so `riskLevel` sat at medium when 65
+ crosses "high" and the account was never auto-restricted. Two rules follow: **a derived
+ total is not safe just because its inputs are on separate paths**, and the fix is to
+ recompute it **server-side from the persisted document** with a `$set` aggregation-pipeline
+ update, which is order-independent and therefore converges no matter how the callers
+ interleave. Two remaining read-then-create sites in `scripts/` are deliberately left —
+ they are hand-run and single-threaded.
+- **Sub-defect 1b is fixed** (1 Sep 2026): challenge accept now calls
+ `checkAccountStanding` from `lib/services/contest-entry/guards.ts`, shared with the
+ unified entry service so the two paid entry paths cannot drift apart again. Two things to
+ keep right. It must pass **`enterChallenge`, never `enterCompetition`** — the flags differ
+ on purpose, since `canEnterChallenges` blocks only on an explicit `false` so that
+ restrictions predating the field stay allowed, and swapping them would quietly refuse every
+ legacy-restricted account. And the guard runs **before any wallet read**, so a refusal
+ cannot leave one of the two debits applied. Pinned by a test that asserts *which* action
+ the route asks about, not merely that it refused — the refusal alone passes either way.
+ Swept the sibling routes: challenge **create** already had both, **decline** and the admin
+ challenge route only ever credit, so there is nothing else to fix.
+- **Prerequisite B is fixed** (2 Sep 2026, awaiting owner test), and it exists because the
+ owner reported a live incident rather than because anything in the plan predicted it: a
+ player was locked out of paid entry by their **suspicion score alone**. The rule that comes
+ out of it is short and load-bearing — **scores raise alerts, restrictions block.** The entry
+ gate used to return `RISK_SCORE_BLOCKED` above `entryBlockThreshold`, which created no
+ `UserRestriction`, so it appeared on no admin screen, notified nobody, could not be lifted,
+ and **read `entryBlockThreshold` while never looking at `autoSuspendEnabled`** — automatic
+ lockouts while the admin had automatic suspension switched off. The subtlest part is why it
+ was unreportable: the dashboard's account-status card renders only while an alert is
+ *pending or investigating*, so **dismissing the alert deleted the last explanation while
+ the block stayed.** `entryBlockThreshold` is now a **Review** threshold (name kept in the
+ schema, documented as historical — renaming it is a mirrored migration for a cosmetic gain),
+ the dead `shouldBlockEntry` helper is deleted in both apps, and elevate-to-investigation now
+ offers the full suspension options with the player notified either way. **Do not reintroduce
+ a refusal inside the gate.** If automatic action is wanted, raise a restriction, so it stays
+ reversible.
+- **Five more live defects were found under Prerequisite B, and two generalise.** The
+ first: `app/api/fraud/suspicion-score/route.ts` in the **player** app let any signed-in user
+ read the high-risk list, **raise a rival's score to lock them out of a paid competition**,
+ or clear their own — all three handlers commented "admin only", none checking anything but
+ that a session existed. Deleted, since nothing called it and the admin app's copy is
+ guarded. **That is the third time a comment has claimed an authorization check the code
+ never performed**, after Prerequisite A and the internal-secret fallbacks, so carry it as a
+ class: **a comment asserting authorization is not evidence one runs, and a route nothing
+ calls is still reachable over HTTP.** The second generalisable one: auto-suspension set
+ `suspensionEndsAt`, which `UserRestriction` does not declare, so strict mode discarded it
+ and an unset `expiresAt` means **permanent** on this model — every auto-suspension was
+ permanent while its reason text and history entry both promised seven days. **Same failure
+ mode as mirror drift, from a different direction — one writer disagreeing with the schema
+ rather than two copies disagreeing with each other — and `check:mirrors` cannot catch it.**
+ The other three: **Auto-Suspend was near-unreachable at its default**, because it ran only
+ on a risk-*band* change (bands 30/50/70) while `autoSuspendThreshold` defaults to 90, so a
+ score entering critical at 72 was correctly refused for being under 90 and never examined
+ again however high it climbed; **suspended and banned accounts could still accept paid 1v1
+ challenges**, since `canEnterChallenges` was the only permission flag defaulting to
+ *allowed* and 10 of 11 restriction writers never set it; and **`resetScore()` recorded every
+ delta as `-0`**, computing `-this.totalScore` after zeroing the total.
+- **Fix a wrong default at the schema, not across the call sites — but check for the one
+ caller that meant it.** `canEnterChallenges` was wrong in 10 of 11 writers, so flipping the
+ default fixed ten places with one line. The eleventh, the duplicate-KYC path driven by
+ `duplicateKYCBlockChallenges`, sets the flag deliberately, and it is the reason the
+ migration in `tools/fraud/fix-entry-blocked-users.ts --close-challenge-hole` filters on
+ `reason: { $ne: "kyc_fraud" }`. Two rules follow. **A schema default fixes future rows
+ only** — Mongoose already persisted the old value, so existing documents hold a real stored
+ `true` indistinguishable from intent; the migration is not optional. And **a test that pins
+ the new default must be accompanied by one pinning the explicit override**, or the two
+ behaviours collapse into one assertion: probing this turned exactly 1 test red while the
+ explicit-intent test stayed green, which is what proved they were independent.
+- **A dead helper is an invitation, so delete it with the defect.** `shouldBlockEntry()`
+ existed in both `fraud-settings.service.ts` copies, was called by nothing after the gate fix,
+ and did exactly the thing that had just been removed. Leaving it would have made
+ reintroducing the defect a one-line change that reads like using an existing API. Same
+ reasoning as deleting the unprotected route rather than guarding it.
+
+### Plug and play runs in both directions, and only one direction was designed
+
+The owner's requirement, restated 2 September 2026 before X1: a new game must enter every
+stat, ranking and calculation **with no additional coding**, and **the same must be true
+when a game is removed.** The adding half was already designed. The removing half was
+described nowhere — a search for it returned one unrelated hit about retiring a *metric*.
+Design in `05` section 11, risk **R29**, invariants 8 and 9 in `11` section 5. Note it is
+an **R-series** risk, not X-series — it applies whoever supplies the games, including
+trading itself, so nothing about it depends on a third party. **Check the next free number
+before adding a risk**: this one was written as X19, then R28, before landing on R29 —
+R1–R28 were all taken, and `rg -o "R\d+"` over the register is the check.
+
+- **Auto-inclusion and auto-exclusion are the same mechanism, and the second one corrupts
+  earned data.** If cross-game totals are summed over *currently-enabled* games, then
+  disabling a game **retroactively subtracts everything earned in it** — a player who
+  reached level 12 partly through a provider game drops to level 9 because an operator
+  switched it off. No error, no log, no notification. **Rate this High likelihood, not
+  Medium:** summing the enabled set is the *natural* implementation, it reads correctly,
+  it passes review, and it is only wrong on the day someone toggles a flag — months after
+  the code ships and far from the author. The rule: **totals accumulate on settlement,
+  never recompute on read**, and `getEnabledGameTypes()` gates creation, discovery and
+  entry but **never a stats or leaderboard read path.** Disable affects discoverability
+  and new entry, never history; a disabled game's rows are **retired, not deleted**, which
+  is the second and stronger reason `gameKey` is immutable.
+- **"No additional coding" is three different claims, and only one of them is free.** A
+  new **title** from an existing provider is data-only — already an acceptance criterion in
+  `12` s4. A new **provider** needs an adapter. A new in-house **game type** needs a
+  module. `12` s4.2 already carries this as "the limit of no developer needed", so do not
+  let a summary promise more than the architecture delivers.
+- **Auto-inclusion is a property to preserve, not a feature to build.** There is exactly
+  one way to lose it: **an aggregate that enumerates game types.** Any `switch` on game
+  type, `if (gameType === "trading")`, or hard-coded game list is a place the next game
+  silently fails to appear while the query runs and the page renders. Same failure shape as
+  the trading-shaped services in `matchmaking.service.ts`.
+- **Check the issued provider spec before assuming a restatement needs it changed.** The
+  owner's description of the split — provider reports results, engine owns fees, winners,
+  payouts, credits, stats and levelling — already matches section 1 of
+  `ChartVolt-Game-API-Requirements.html` **verbatim**, which also already names
+  one-against-one challenges and cross-game progression. **No re-issue, no version bump.**
+  Verifying that cost one search and prevented a pointless version bump on a document
+  providers may already be building against.
+
+### The first X-phase code shipped 2 September 2026, and four things from it generalise
+
+The admin navigation restructure (`12` s1/s1.1, built and recorded in **s1.1a**) separated
+contest administration from trading and collapsed the six trading screens into one
+collapsible **Trading** destination inside a **GAMES** group. It is a slice of **X6 taken
+deliberately before X1 and before Stage 0 sign-off**, on the grounds that it is the only
+part of X6 with no dependency on the foundation — it reorganises existing screens and adds
+no field, model, service, route or server action — and that the admin app carries no player
+traffic. **That reasoning does not extend to anything which writes data.**
+
+- **A restatement can be wrong while its source is right, and that is the direction nobody
+ checks.** `12` restated `New games plan/07`'s admin grouping and introduced two errors:
+ an **Arsenal** tab that is not an admin section at all (`TradingArsenalContext.tsx` is
+ chart tooling with no `menuGroups` entry and no `ADMIN_SECTIONS` id), and a **missing
+ `market-data`**, which is real. `07` had both right. The paired-document table is written
+ as though drift flows source → restatement; it flows both ways, so **verifying the source
+ is not verifying the chapter you are building from.** Concretely: **a plan's list of
+ screens is a hypothesis until checked against `menuGroups` and `ADMIN_SECTIONS`
+ together** — presence in one but not the other is the interesting case, because the
+ section can then either not be granted or not be reached.
+- **Before building a mechanism a plan demands, check whether the codebase already has
+ it.** Both of `12`'s hard cautions — tab state must be addressable, RBAC must stay
+ per-section — were **already satisfied**. Sections are driven by `?activeTab=<sectionId>`,
+ so reusing section ids as tab ids preserved every deep link with no new code; and
+ `filteredMenuGroups` already reveals a parent only when `children.some(hasAccess)` and
+ filters the children individually, which *is* per-tab gating, already proven by `settings`
+ and `dev-zone-menu`. The `useState` trap the plan warned about is only reachable by adding
+ a **second** state beside the one that exists. **The caution was right and the remedy was
+ to reuse, not to build.**
+- **A menu parent that renders nothing must not be a permission.** `trading-menu` is
+ deliberately absent from `ADMIN_SECTIONS`. A grant that maps to no screen is exactly where
+ privilege widening starts, and it reviews as harmless. Related and load-bearing:
+ `ADMIN_SECTIONS` is a **Mongoose enum** on `allowedSections` and `customPermissions`, so
+ it is **add-only** — removing a value orphans every employee document storing it. Note
+ `admin-employee.model.ts` lives **only** in `apps/admin` and is *not* mirrored, so
+ `check:mirrors` says nothing about it.
+- **Classify a screen by the component it renders, never by the group it is filed under.**
+ `analytics` sat in the "Trading" group and renders `CompetitionAnalytics` — contest
+ analytics, which belongs to every game. When the group's name is the thing being
+ corrected, that name is the least reliable evidence available. Same trap as the
+ trading-shaped services in `matchmaking.service.ts`: **the label agrees with the old world
+ and keeps agreeing after it ends.**
+
+Pinned by `__tests__/admin/trading-section-nav.test.ts` (9 tests), **both halves probed by
+reintroducing the defect** — restoring `trading-risk` under Settings turned exactly 1 red,
+dropping a tab from the shared list turned 2 red. Verified by a full admin `next build` and
+a `tsc --noEmit` matching the **225-error baseline exactly**, with none in the changed files
+and, equally important, **none disappearing**. Still deferred: sidebar clicks do not write
+the URL (pre-existing, affects all ~60 sections, belongs with X6.5), and the
+`tradingEnabled` conditional that hides the destination waits on X1 — **"built" does not
+include it.**
+
+### Four things from X1 step 6 (4 September 2026) that generalise
+
+The three guards - the game label on raw inserts (R7), the ESLint import boundary
+(invariant 1), and the market-hours capability scope - are built, probed and closed.
+
+- **"Count the writers" is now a rule with three instances, not an anecdote.** Defect 1's
+ plan said two competition entry paths and there were **four**. Seam 3's plan said five
+ finalization entry points and there were **ten**. R7 named **one** raw-driver insert and
+ there were **six**. Every time, the plan's number was an assumption nobody had run `rg`
+ against. **Before fixing the writer a document names, count them.** The two extra R7
+ writers were admin **test harnesses**, which is the part that would have been shrugged
+ off: the end-logic harness drives finalization, so seeding contests unlabelled meant it
+ exercised the absent-label fallback rather than the path production takes - **a harness
+ quietly testing something adjacent to the real thing.**
+- **A risk entry can overstate its own severity, and an overstated risk is still a wrong
+ fact.** `17` and `11` both claimed an unlabelled contest "gets settled by trading code and
+ pays the wrong players". It does not: invariant 5 resolves an absent label to trading,
+ which is correct for all six writers. R7 was never a live payout bug. The real harm is
+ later and quieter - an aggregate that **groups by `gameKey`** silently drops the row, long
+ after the commit, and **`gameKey` is immutable so it cannot be corrected in place.** Both
+ documents and the internal HTML now say so. **Correcting a risk downward is as much a
+ documentation duty as raising one**, because a risk register nobody believes is worse than
+ a short one.
+- **`no-restricted-imports` matches the import STRING, not the resolved path** - and write
+ the probe before trusting the pattern. `**/lib/games/*` caught three violation forms and
+ **missed `../games/trading`**, which has no `lib/` segment. A probe file with four
+ violations and four legal imports showed 3 of 4 firing; reasoning about the glob would not
+ have. Write the rule **blocked-by-default with the public surface negated**, never as a
+ list of game folders: the list version leaves every future game unprotected until somebody
+ remembers, and forgetting is silent.
+- **Two more traps from adding invariant 2 the same day, and both produce a rule that looks
+ right and does nothing.** First, **scope one level below the obvious one**:
+ `lib/games/*/**` matches a module folder but not the layer's own public files, because
+ `lib/games/index.ts` legitimately reads `WhiteLabel` for `getEnabledGameTypes()` - written
+ as `lib/games/**` the rule bans that and reviews as correct. Second, **flat config is
+ last-one-wins per rule**, so a block placed before an exemption that switches the same rule
+ off is **silently dead**, and a dead config block still parses and still reads correctly.
+ Pin the ordering with a test comparing the two blocks' indices. Related: ban **every**
+ model rather than an allow-list of contest models - a module needing any document is
+ already the design going wrong, and a list silently permits the next model added.
+- **Scoping a gate to a property of the thing it guards can force the gate to MOVE.** The
+ challenge-accept market check ran *before* the challenge was loaded, so it could not know
+ the game - there is no way to make it conditional without first reading the document that
+ carries the label. Two rules from placing it again: it must sit **before any wallet read**,
+ the same ordering as `checkAccountStanding` in sub-defect 1b, so a refusal cannot leave one
+ of two debits applied; and moving a guard **changes which error a bad request gets** - a
+ missing challenge now returns 404 rather than a market-closed 400, which is an improvement
+ but is a behaviour change and belongs in the work log either way.
+
+**Two related rules for any capability gate.** It must **fail closed** on an unknown
+value - wrongly applying a gate refuses something visibly and someone complains, wrongly
+skipping it lets real money trade against a closed market. And it must **never take the
+deciding value from caller input**: a client- or operator-supplied game type is a way to
+skip the market gate on a trading contest by claiming to be a different game. Derive it from
+the same helper that stamps the stored label, so the gate and the label cannot disagree.
+
+**Owner decision, 4 September 2026: the weekend competition-create block is removed**, and
+the reasoning generalises. **Capability-scoping is not always the right tool for a gate that
+is wrongly applied.** The admin action refused an operator creating a *trading* competition
+while the forex market was closed; scoping it to `needsMarketHours` would have fixed it for
+provider games and **left it wrong for trading**. The question to ask first is not "which
+games does this gate apply to" but **"is this gate about playing, or about scheduling?"** -
+creating a contest is scheduling it, and order placement still refuses trades against a
+closed market, so nothing was weakened. Do not reintroduce it. `assertForexMarketOpenForCreate()`
+was deleted with it, on the `shouldBlockEntry` precedent. Related and worth noticing: **the
+main app never had the check**, so the apps now agree rather than differing by accident - an
+asymmetry a reviewer could otherwise "fix" in the wrong direction.
+
+### Four things from X1 step 7, the backfill (4 September 2026)
+
+`tools/games/backfill-game-labels.ts` covers backfills 1 and 3. **It has not been run
+against production**; it is report-only until `--apply`.
+
+- **The most important property of a backfill is what it refuses to touch.** `gameKey` is
+ immutable because it is the join key for every historical stat, so a script that *can*
+ rewrite it can destroy history silently. **"It only sets missing fields" is an assertion
+ about a query filter**, and query filters are exactly the thing people get wrong. Pin it
+ with a test that seeds a row already correctly labelled and asserts it survives untouched.
+- **"Missing" has three shapes and only one is obvious**: absent, `null`, and `""`. A filter
+ matching only `$exists: false` leaves the other two behind, **and those are the two that
+ look correct in a document dump.** Probe each clause separately. Related: filter each
+ field independently rather than as one `$or` over several - a half-labelled row is exactly
+ what an interrupted earlier run leaves behind, and a combined filter either skips it or
+ rewrites the field that was already right.
+- **A schema default is not a stored value, and `.lean()` is where the difference shows.**
+ Mongoose applies defaults when it *hydrates*, so an ordinary read of a pre-migration
+ document returns the default with nothing stored - but `.lean()` skips hydration and
+ returns the raw document, missing key and all. Much of this codebase reads with `.lean()`.
+ **Never cite an ordinary read as evidence that a field is populated.**
+- **Never let a migration carry its own copy of a constant.** Import it, and assert in a
+ test that what the migration writes equals what the application writes. With its own
+ literal, a later change to the app's default relabels history to a value nothing else
+ uses - and **every row looks correctly labelled.**
+
+**And a lesson about probing itself, which cost a false result here.** A multi-line
+PowerShell replacement pattern with CRLF line endings did not match an LF file, so nothing
+was modified and the test stayed green - reported as "the test is not doing its job" when
+the test was fine. **A probe that fails to apply is indistinguishable from a test that does
+not work.** Confirm the replacement actually changed the file before believing either
+outcome; prefer single-line patterns.
+
+**Deferring a planned migration is a documentation duty, not a silent omission.** Backfill 2
+(`score` on participants) was **not** written, because trading ranks on its own metrics and
+never reads `score`, and seam 2 - which would keep it current - is not built. Writing it
+would produce a number nothing maintains and nothing reads, stale immediately and
+authoritative-looking. Recorded in `18` section 1 with the reasoning, so the next reader does
+not "fix" the gap.
+
+**Say "code-complete", never "done", and say what it excludes.** X1 is code-complete; the
+replay script has never been run and the backfill has not been applied. And the sentence that
+must accompany any X1 completion claim: **finishing X1 does not mean external games work** -
+a provider game does not plug in until **X4** and **X5**.
+
+### Five things from X2, the provider abstraction (4 September 2026)
+
+X2 is code-complete: `game_provider` and `provider_game` in both apps, three `WhiteLabel`
+settings fields, and `lib/services/game-providers/` (contract, registry, mock adapter,
+catalogue sync) mirrored into the admin app. **Nothing is player-visible** -
+`externalGamesEnabled` defaults to false.
+
+- **When a guard and a plan disagree about where code belongs, the guard usually wins.**
+ `11` s3 put the provider code in a game module folder; invariant 2 bans model imports
+ there, and the registry reads settings while the catalogue service writes `provider_game`.
+ The rule is not the problem - the plan had not noticed the constraint. Result:
+ **`lib/services/game-providers/` does I/O, `lib/games/provider/` stays pure.**
+- **A blocked-by-default wildcard will eventually collide with a directory that merely
+ shares a name.** `**/games/*` from invariant 1 began rejecting
+ `@/database/models/games/provider-game.model` the moment X2 created that folder, and the
+ rejection is indistinguishable from a real violation. Negate the specific collision
+ (`!**/models/games/**`) rather than narrowing the rule, and expect this class of failure
+ again whenever a new `games/` directory appears.
+- **A glob written inside a JSDoc comment can truncate the file.** `lib/games/*/**` in prose
+ contains `*/`, which closes the comment; the rest of the file then parses as garbage. The
+ symptom is the trap: the typecheck **fell from 18 errors to 16**, reading as an
+ improvement. **A file that fails to parse reports FEWER errors** - so treat an unexplained
+ *drop* with the same suspicion as a rise, and note ESLint caught this where `tsc` did not.
+- **`readonly field = SOME_CONST` infers the literal type and silently blocks subclassing.**
+ It fails with TS2416 only when someone writes the second implementation - which for an
+ adapter interface is the moment the whole abstraction is first tested. Annotate `: string`
+ to match the interface.
+- **Two switches per title, never one.** `providerStatus` is what the provider says;
+ `chartvoltEnabled` is what we say, defaulting to false. One flag would let a third party
+ put an untested game in front of paying players by editing their own database. The same
+ shape as `enabled` on the provider and `externalGamesEnabled` globally: **a supplier's
+ opinion is an input, never a decision.**
+
+**Two rules for any catalogue or import sync**, both learned here and both about invisible
+failure. Write a **named allow-list of the fields the remote system owns**, never a spread
+of its payload - a spread overwrites operator edits on the next run and nobody notices until
+someone's wording reverts. And **report missing rows, never delete them**: a row with
+history cannot be removed without orphaning the stats joined to its key, and an item absent
+from one response is as likely to be a partial failure upstream as a genuine withdrawal.
+
+**Probing lesson, third instance, now with a fix.** Two X2 probes reported false passes: one
+was aimed at the create path when the assertion covered the update path, and others failed
+to match because a multi-line PowerShell pattern with CRLF met an LF file, or because an
+emoji in the anchor did not survive the shell. **A probe aimed at the wrong code path is
+indistinguishable from a test that does not work.** Use a helper that escapes the pattern
+then relaxes every newline to `\r?\n`, keep anchors ASCII, and confirm the file actually
+changed before believing either outcome.
+
+### Six things from X3, rounds and result ingestion (4 September 2026)
+
+X3 is code-complete: `game_round` and `provider_event` in both apps, `RoundService`, the
+signed callback route, `ResultIngestionService` with chapter 06's eleven gates, and the
+four-stage reconciliation net. **Rehearsals 1-6 of `07` s9 are green against the mock**, six
+guards probed. Nothing player-visible.
+
+- **"Enforced in the database" is a claim about a named index, and this one enforced
+ something else.** `07` s4 credited `{ contestId, userId, attemptNumber }` with "one live
+ round per player per contest". It does not: attempt 1 `launched` beside attempt 2
+ `launched` satisfies that index perfectly, which is exactly the abandon-and-peek the rule
+ exists to stop. Closed with a **partial unique index** on `{ contestId, userId }` filtered
+ to the live statuses. Two traps inside the fix: scope it with `contestId: { $type:
+ "objectId" }` or every practice round collides with the player's previous one, and it must
+ be `$type` because **MongoDB forbids `$ne` in a `partialFilterExpression`** - the obvious
+ spelling fails at index-build time with an error that never mentions the restriction.
+ Same shape as the R7 correction: **a document asserting a protection is not evidence one
+ exists.**
+- **For a late result the dangerous window is `finalizing`, not `completed`** - and the
+ obvious check misses it entirely. During `finalizing`, ranking is being computed from
+ participant scores, so a score written then may or may not be counted **depending purely
+ on timing**. That is worse than a genuinely late result, which is at least consistently
+ excluded and alerted; this one is a coin flip that leaves no trace. Both contest models
+ carry the state and both are treated as closed, along with `cancelled` and
+ `emergency_ended`.
+- **Two correct rules can force an awkward implementation, and the tidy-looking option is
+ the wrong one.** An attempt must be consumed **on creation** (`03` s1.3) or a player
+ abandons a bad round and retries free forever; a provider 5xx must consume **nothing**
+ (`01` s6a). Since `{ contestId, userId, attemptNumber }` is unique, **a surviving row of
+ any status permanently burns that attempt number** - so the rollback has to *delete* the
+ pending round. Marking it `voided` reads like the careful choice and silently costs the
+ player an attempt.
+- **A backoff with no cap silently disables the stage it belongs to.** Poll backoff doubles
+ from 30s; uncapped it eventually exceeds the grace window, so the round sits un-polled
+ until the final sweep and stage 2 has effectively been switched off - no error, no log
+ line. Related: **reaching the give-up stage is always critical**, even under `score_zero`
+ where the contest settles on time, because it means the provider never reported and all
+ three earlier stages failed. And the player is **always** told: a round silently scored
+ zero is indistinguishable, from the player's seat, from being cheated.
+- **Name an obligation you are deferring, in a field, so the next phase cannot miss it.**
+ The `exclude` unresolved policy owes a refund, but paying it in the reconciliation service
+ would put a second money writer beside settlement - and removing a player changes the
+ prize pool, so the refund and the re-split are one transaction. It returns
+ `refundOwed: true` instead. Same reasoning kept contest round fields
+ (`attemptsPolicy`, `unresolvedRoundPolicy`, `playWindowEnd`) as a passed-in config rather
+ than six new mirrored fields for a path nothing calls yet. **Do not let a summary imply
+ `exclude` is fully implemented.**
+- **The `**/games/*` ESLint wildcard collided for the second time**, now with
+ `lib/services/games` after `database/models/games` in X2. Negated again - and the wildcard
+ is **kept deliberately** now the cost is known. Anchoring it to `**/lib/games/*` would end
+ the collisions, but the rule matches the **import string**, so a nested file writing
+ `../../games/trading` would stop being caught. **That trade is the wrong way round for a
+ guard:** a false positive is noisy and fixed in a minute, a missed violation is silent and
+ is the whole point of the rule. Expect one negation per new `games/` directory.
+
+**And the fixture lesson, recurring for the third time: a fixture trimmed to the fields the
+test reads will fail everything at once for one unrelated reason.** The `Competition` fixture
+omitted `slug`, `startTime`, `endTime` and `startingCapital` - none of which a round
+touches - and **34 tests failed on a single validation error**. Mongoose validates the
+document, not the subset you care about. It keeps recurring because trimming a fixture always
+feels like tidying.
+
+### Five things from the X6 provider-admin slice (4 September 2026)
+
+Provider registration, credentials and the per-title enable switch are code-complete
+(`12` s4.1a). Two of `12` s4's five destinations; health, round inspector and manual
+resolution deliberately left. (**The inspector and manual resolution were built the next
+day** — `12` s4.2a. Health is still outstanding.)
+
+- **A structural test that greps source code must strip comments first, and the failure
+ teaches the wrong lesson if you skip it.** The assertion "no route mentions
+ `requireAdminAuth`" went red on a *comment* in the route explaining why `requireAdminAuth`
+ is the wrong helper. **A test that reads prose fails in both directions**: it flags a
+ correct file that discusses the anti-pattern, and it passes a broken one whose only mention
+ of the right helper is in a comment. Strip block and line comments, then match. This is the
+ same class as the aside-verification rule - documentation written beside code is an
+ instrument, and here it was being read *as* the code.
+- **`requireAdminAuth` is not an authorization check, and it is the natural thing to reach
+ for.** It asks only whether the caller is an admin at all, so an employee granted one
+ unrelated section passes it; `requireSectionAccess(id)` is the grant. **Fourth instance of
+ the class** after Prerequisite A, the internal-secret fallbacks and the unprotected
+ suspicion-score route, so carry the rule not the instances. And pin it with **two** tests:
+ one for the helper, one that **counts exported handlers and counts guards**, because a file
+ whose `GET` is guarded and whose `PATCH` is not passes the first check while leaving the
+ mutation wide open.
+- **When a UI can never display a stored secret, a blank field must mean "keep".** The
+ alternative is silent: an operator editing only the environment submits every secret box
+ empty, and if empty meant "clear" that harmless edit breaks every inbound callback with no
+ error raised anywhere. Offer removal explicitly instead. The general form: **the safe
+ reading of an empty input depends on whether the user can see what is already there**, and
+ write-only fields invert the usual answer.
+- **A switch that cannot work must refuse, with the reason, rather than merely being
+ disabled.** Enabling a provider with no installed adapter would leave
+ `resolveEnabledProvider` refusing every round with a message no operator can act on - a
+ control that appears to work and silently does nothing, the same shape as the
+ trading-shaped services in `matchmaking.service.ts`. Same for a missing callback secret,
+ where every result then fails signature verification and **looks identical to an attack in
+ the logs.** Greying out the control is not enough; the card has to say which of the two is
+ missing.
+- **Do not offer delete on anything joined to history.** A provider that has run a contest is
+ reached by `providerKey`, and `gameKey` is immutable, so deleting the row orphans the stats
+ while every screen still renders a key it cannot resolve. Disable is the reversible
+ operation. Same reasoning as the catalogue sync reporting missing titles rather than
+ removing them, and as retiring a disabled game's rows rather than deleting them (R29).
+
+**Two more, both about how a defect was found rather than what it was.** The live bug in this
+slice - the first-ever credential save being recorded as a rotation - was caught only because
+the test asserted the **whole** credential object rather than the three fields it cared
+about; the extra `rotatedAt` was the evidence. **Assert the whole object when the object is
+small enough**, because a field you did not ask about is the only way to notice one you did
+not expect. And **probe with a helper that relaxes newlines and confirms the file changed**:
+setting `$ErrorActionPreference = 'Stop'` in a probe script made `npx`'s harmless
+`ExperimentalWarning` on stderr abort the run, which printed nothing and looked exactly like
+six passing probes.
+
+**One more ESLint wildcard collision, the third, exactly as predicted.** `**/games/*` began
+rejecting `@/components/admin/games/GameProvidersSection` the moment that folder existed,
+after `database/models/games` in X2 and `lib/services/games` in X3. Negated again; the
+wildcard stays, for the reason already recorded. **Three collisions is now enough to state
+the expectation plainly: any new directory named `games/` anywhere in the tree will trip
+this rule on its first import, and the fix is one negation, not a narrower rule.**
+
+### Five things from the X6 contest wizard (4 September 2026)
+
+The provider contest wizard, its `configSchema`-generated settings form and the `03` s4.1
+pre-flight checklist are code-complete, 49 tests, all 15 guards probed. It creates a
+**draft**; nothing publishes or settles it.
+
+- **A hand-written input interface is where an invented field survives a typecheck.** The
+ pre-flight checklist takes its facts as arguments rather than importing the model - which
+ is right, because it keeps the checks pure and cheap to test - but it also means the
+ compiler has nothing to disagree with. The first draft read `title.billsPerRound`, **a
+ field `provider_game` does not have**, and that warning would have been permanently
+ unreachable. **A checklist item gated on a field nobody populates is an item that never
+ runs.** Checking the model's real field list also turned up `lastSuccessfulRoundAt`, which
+ *does* exist and is what the sandbox-freshness check now reads. Same class as the R7
+ correction and the `challengeId` aside: **an unverified field name in a plan or an
+ interface is a claim, not a fact.**
+- **Narrowing a `required` field is a change to the OTHER game's contract.** Making
+ `startingCapital` conditional reads as "provider games don't need it". What it does is
+ move a guarantee trading relies on out of the schema and into a predicate - and the
+ `?? "trading"` in it is load-bearing, not defensive, because **invariant 5 resolves an
+ absent label to trading.** Written `this.gameType === "trading"`, an unlabelled trading
+ contest saves with no capital and every downstream calculation divides by it. Pin it in
+ **both** copies: a conditional requirement that differs between the apps is a validation
+ rule whose outcome depends on which process saved the document, and `check:mirrors`
+ compares field paths and enum values - **not predicate bodies.**
+- **A "no additional coding" claim has exactly one failure mode: something that enumerates
+ games.** For a schema-driven form that means a `switch` on game code. The renderer branches
+ on the declared field *type* and a test asserts the file contains no `gameCode`, `gameKey`
+ or `providerKey` at all. Without it the first title needing a special case makes the
+ acceptance criterion quietly false while every existing test still passes. Same shape as
+ invariant 9 and the trading-shaped services in `matchmaking.service.ts`.
+- **A schema parser must fail closed, and permissiveness here is worse than refusing.**
+ Unsupported keywords (`allOf`, `pattern`, `oneOf`) refuse the whole schema rather than
+ being skipped. Skipping renders a form missing half the real constraints and then validates
+ against the half it understood - **reporting success while accepting settings the provider
+ rejects at play time.** The same instinct that makes the market-hours gate fail closed on
+ an unknown game. Related, from the checklist: **keep warnings and refusals separate**, or
+ the whole thing gets bypassed. Three items are advisory - the platform master switch being
+ off (scheduling ahead of a launch is legitimate), a stale sandbox round, and the per-round
+ cost acknowledgement - and turning any into a refusal pushes an operator to switch external
+ games on platform-wide just to draft a contest. Conversely the hard refusals **accumulate
+ rather than stopping at the first**: an operator fixing one per submission gives up.
+- **Refuse a contest missing its round settings; never default them.** Falling back to
+ single-attempt with a grace period is the tidy-looking option and it is wrong - the contest
+ runs, players play, and the settings governing their money are ones no operator chose. This
+ is what closes X3's `RoundContestConfig` deferral, and the general rule is the same one
+ behind the `entryBlockThreshold` fix: **a stored value and an absent one are different
+ facts.**
+
+**A deviation worth the precedent, because the instinct is to absorb it.** `12` s2 describes
+**one** wizard whose fourth step becomes dynamic; **two** were built, with a game picker
+routing to either. That section sets two acceptance criteria - *no trading field in a
+provider contest* and *trading creation unchanged* - which one wizard satisfies only after
+refactoring the 2,892-line form live trading contests depend on. Two paths satisfy both
+immediately, and merging later becomes a UI refactor against a green suite rather than the
+first thing attempted. **Recorded in `12` s2.1 rather than quietly rewriting the plan to
+match** - and the picker **redirects straight to trading when no provider game exists**,
+because a "choose your game" screen with one choice is friction on the path operators use
+daily, and friction there is how a new screen gets worked around.
+
+**Probing lesson, fourth instance, and this time the harness lied twice.** One probe
+reported `PROBE DID NOT APPLY` (4-space indent in the pattern, 2 in the file) and **every**
+probe reported "OTHER test", because `Out-String` wraps at the console width and a long test
+name arrived split across two lines, so the literal match silently missed it. Both outcomes
+look exactly like a broken test. Fixes are in `tools/probe-contest-wizard.ps1`: **collapse
+all whitespace in captured output before matching**, and **assert the file actually changed
+before believing any outcome**. **A probe harness needs its own probe.**
+
+### Five things from X5's first half - publish, entry and ranking (4 September 2026)
+
+A provider contest can now be published, entered and ranked. **Nobody can play one and
+nobody is paid**; settlement and the `exclude` refund remain.
+
+- **"Additive only" does not make a model general - it only stops it breaking.** X1 added
+  `score` and `gameKey` to `CompetitionParticipant` and removed nothing, which was right.
+  But three trading-capital fields were still `required: true` **with no default**, so a
+  provider participant **could not be saved at all**. The generalisation was purely
+  additive and the model stayed trading-only. **When you add a field for a new case, check
+  what the old fields still DEMAND** - the interesting requirement is the one nobody
+  touched. Same shape as the R7 correction: the absent thing, not the changed thing.
+- **A schema default fires before validation, so the obvious test of a `|| "trading"`
+  fallback proves nothing.** Deleting `gameKey` and expecting the predicate to see
+  `undefined` fails: Mongoose fills the default first. The test passed with and without the
+  `||`. An **empty string** does reach the predicate, because defaults fill `undefined`
+  only - and "" is a genuine missing-value shape, the same one the label backfill exists
+  for. **When a probe stays green, decide whether the test is weak or the CLAIM is wrong
+  before assuming the first** - here it was the test; one probe later it was the claim.
+- **A guard that changes no answer should say so rather than claim a fix.** The `isAtRisk`
+  NaN guard could not be probed red, because `NaN < 60` is false exactly as the guard's
+  explicit `false` is. It was kept - the accident holds only for `<`, and an "is healthy"
+  check written with `>` would silently be wrong - but the comment now records that it is
+  clarity, not a bug fix. **An overstated comment is a wrong fact**, the same duty as
+  correcting R7 downward.
+- **One module per GAME CATEGORY, never one per title or per provider - and the thing that
+  varies must travel on the data.** Direction is a property of the title (a puzzle scores
+  upward, a time trial downward), so a module-level constant would force one module per
+  title. It rides on `RankableParticipant.scoreDirection` instead, threaded in at
+  finalization. Two rules fall out: **store the RAW score** (a persisted `-92.4` shows a
+  race time as negative on every screen and poisons cross-game totals), and **negate only
+  at comparison**, so the engine keeps performing exactly one descending sort for every
+  game and no game reaches in to change how sorting works. The registry tripwire now
+  asserts `["trading", "provider"]` and says that a third entry means the engine has
+  learned something game-specific.
+- **A setting that a game cannot honour must not be offered.** The provider module ignores
+  `rankingMethod` completely, pinned by a test asserting all six methods return the same
+  value. Trading's six methods are six questions you can ask of a trading account; a
+  provider game reports one number. Six labels for one behaviour is a control that appears
+  to work and does nothing - the same failure as enabling a provider with no adapter, and
+  as the trading-shaped services in `matchmaking.service.ts`.
+
+**And two rules for anything that publishes.** Re-run the checklist against the **stored**
+record, not the caller's input and not the validation done on creation day - a draft can
+outlive the switches that made it valid, and reading the saved document also asks the
+question creation could not, which is whether the settings actually persisted. And
+**there is deliberately no unpublish**: a visible contest can be paid into, so hiding it
+strands paid entrants. Cancel-with-refund is the reversible operation, the same reasoning
+that gives providers a disable switch and no delete.
+
+**One more invented field caught by the schema, the fifth instance.** `publishedAt` was
+written into the publish update and removed: `Competition` does not declare it, so strict
+mode would have discarded it while the function reported success. It was dropped rather
+than declared, because `updatedAt` already carries the timestamp and the audit log already
+carries who did it - **add a mirrored field only when something will read it.**
+
+### Six things from X5's second half - round launch and settlement (4 September 2026)
+
+A provider contest can now be **published, entered, played and paid**. Only the `exclude`
+refund remains. The settlement stages live in `lib/services/settlement/`, mirrored, and
+`competition-end.actions.ts` went from **1,885 to 1,174 lines**.
+
+- **Extraction versus reimplementation is a claim about what your GREEN TESTS MEAN, not
+  about tidiness.** The five trading payout tests and the golden ranking regression staying
+  green is the only evidence that no payout moved - and it is only evidence if nothing else
+  changed in the same commit. That is why a **known one-character defect was preserved
+  verbatim**: the Game Master fee reads `limits.referralFeePercentage || 5`, so a package
+  configured at 0% falls through to 5%. Fixing it there would have bought one line and cost
+  the proof for 900. **Carry the general form: while extracting, a behaviour change is not a
+  small addition, it is the destruction of the only guarantee the extraction offers.**
+- **Generalising code is a better bug-finding instrument than looking for bugs.** Four
+  defects surfaced and **three were pre-existing TRADING defects**: `finalLeaderboard`
+  declared only trading's numeric fields, so `isTied`, `qualificationStatus` and
+  `disqualificationReason` were computed and **silently discarded on every finalization ever
+  run**; `split_weighted` tie distribution divided by tied participants' summed capital with
+  no guard, so a tie between wiped-out accounts paid `NaN`; and the early-end worker logged
+  `finalizeResult?.message` where failures carry `error`, recording every failure as the
+  bare string "Failed to finalize". None was reachable by reading the trading path alone.
+- **When a probe stays green, ask whether the TEST is weak before assuming the claim is
+  wrong - the answer differs, and it differed twice on one day.** In X5's first half the
+  claim was wrong (the `isAtRisk` guard changes no answer). Here the test was weak: deleting
+  the pre-lock game gate left the suite green, because the post-lock gate refuses too and
+  the contest lands back on `active` either way. The gates are **not** redundant - only the
+  pre-lock one never *claims* the contest, so a crash between claim and release cannot
+  strand it in `finalizing` - but that is a difference in **writes, not in state.** The fix
+  was to assert `updatedAt` never moved. **A guard whose whole value is "no write happened"
+  needs a test that can observe a write.**
+- **A refusal code the UI must branch on is not an implementation detail to collapse.** The
+  first `LaunchRefusal` folded "attempts exhausted", "a round is already live" and "the
+  provider is down" into `contest_not_open`, which **lied** - the contest is open, the
+  player simply cannot start another round. The three need three different affordances
+  (disable, offer to resume, offer to retry). Pass the lifecycle refusals through unchanged;
+  a generic code forces the UI to guess and it will guess wrong.
+- **Two disagreeing copies of one rule prove one of them is a bug, and that is the cheapest
+  proof available.** The GM `||` looked like a possible judgement call until
+  `challenge-finalize.actions.ts:994` and `:1000` turned up doing the same lookup with `??`.
+  One stored configuration, two answers. **When you find a suspicious operator in duplicated
+  logic, read the sibling copy before deciding whether it is deliberate** - and note this is
+  the fourth "one rule, two copies" finding, after `referenceId`, `failedReason` and
+  `challengeId`, none of which `check:mirrors` can see, because it compares models.
+- **Chase a typecheck count that FALLS, with the same suspicion as one that rises - but
+  expect the boring explanation too.** Admin went 225 -> 223. Six errors had merely **moved
+  line numbers** because the file shrank by 711 lines, which a count cannot show; only two
+  genuinely vanished, and those marked the worker logging bug above - real code reaching for
+  a field its own type denied it. **Diff the error lists, never the counts**, and the
+  reliable way to get the baseline is `git stash push --include-untracked`, because untracked
+  new files stay in the program and report their own errors otherwise.
+
+**And the accuracy rule that nearly got broken writing this up.** "A provider contest can be
+published and paid" was about to be recorded without checking that an operator can *do* it.
+Nothing under `apps/admin/components/` fetched the publish route, and no player screen calls
+the launch route - the whole lifecycle was reachable **by API and by test, not by clicking.**
+**Before writing that a capability exists, grep for its caller**, or a demo discovers the gap
+instead. (**Both halves were closed 5 Sep 2026** - the publish button, then the player play
+screen - so the whole lifecycle is now clickable. Correct as history, stale as a present fact.)
+Same class as the paired-document drift rule: the restatement was going to be wrong
+while every underlying fact was right.
+
+### Five things from X5's third piece - the unresolved-round policies (4 September 2026)
+
+X5 is code-complete. All three of chapter `07`'s answers to a round that never reports are
+honoured: `lib/services/settlement/unresolved-rounds.ts` reads the state,
+`exclusion-refund.ts` moves the money, both mirrored.
+
+- **An obligation recorded in four places is no more likely to be complete than one
+ recorded nowhere.** Every document tracked the `exclude` refund as X5's last item.
+ Nothing consumed `blocksSettlement` either, so a `hold_and_alert` contest **settled on
+ time and paid out** while the policy promised it would be held - invisible purely because
+ it had never been written down. This is the counting rule in a new shape: after "count the
+ writers" (four entry paths, ten finalize sites, six raw inserts), now **count the
+ siblings of the obligation you are closing.** A to-do list is evidence of what somebody
+ wrote down, never of what is outstanding.
+- **A cross-process seam can only ever be a persisted fact.** `reconcileRound` returns
+ `refundOwed` and `blocksSettlement`, and four documents implied settlement would consume
+ them - but they are return values in a worker that has exited long before a contest
+ settles, and nothing persists them. Settlement re-derives both from
+ `round.status = "unresolved"`, the one thing stage 4 writes. The bonus, and the reason to
+ prefer this even where a parameter would work: a contest finalized by a path the net never
+ drove - the lazy auto-finalize, a manual admin trigger - honours the policy without
+ knowing it exists. **A flag passed in makes every other caller silently skip the rule.**
+- **A `catch` block is not a refusal handler, and this file's own warning applied to
+ itself.** `provider-finalize.ts` was written with the lock release called out as "easy to
+ leave out and impossible to notice in a test that only checks the happy path" - and it
+ then committed a `success: false` return and left the contest at `finalizing` for ever,
+ unclaimable by any caller, cron or human, with nobody paid. Latent only because nothing
+ returned a refusal yet. **Any function that both holds a lock and calls something
+ returning a result object needs the release on the returned-refusal path, not just the
+ thrown one.**
+- **A status field that reads as authoritative removes nobody.** `exclude` did not merely
+ fail to refund: `calculateRankings` reads participant `status` only for the liquidation
+ rule, so a player marked `refunded` stayed ranked and could be **paid a prize as well as
+ being owed their fee back**. Exclusion has to be a filter on the list handed to ranking.
+ Before trusting a status to gate anything, **grep for who reads it** - the same lesson as
+ grepping for a capability's caller before writing that it exists.
+- **When a probe stays green, the three causes need three different responses, and only
+ running it separates them.** All three appeared on one day. *Weak test:* deleting the pool
+ reduction passed, because the integrity cap recomputes the same figure from the
+ already-reduced participant count - fixed by a new test seeding a pool **below** the fees
+ collected, where the cap has headroom and cannot cover for it. *Unreachable test:* the
+ lock release and the in-transaction hold gate are caught by the pre-lock gate in every
+ ordinary path, so they needed a mocked race answering differently with and without a
+ session. *Wrong claim:* `contestId` as a plain string passed because **Mongoose casts it
+ when the query executes** - the comment asserting a silent miss was false and was
+ corrected. Note the near-miss inside that one: the raw MongoDB driver does **not** cast,
+ so the test helper genuinely needs a real ObjectId, and conflating the two halves is what
+ produced the wrong comment in the first place.
+
+**And a documentation duty that comes with shipping a deferral: an operator-facing warning
+that has become false is worse than no warning.** The pre-flight checklist told operators
+the `exclude` refund was "not yet automatic". Left alone, an operator either avoids a policy
+that now works or pays a second refund by hand on top of the automatic one. **The test
+pinning it was flipped, not deleted** - same rule as every defect test, since the comment
+explaining why the caution existed is the most valuable part. The warning itself was kept
+and rewritten, because removing a paid entrant and shrinking the pot is consequential
+whether or not it is automated.
+
+### Five things from R31, the configured 0% referral rate (5 September 2026)
+
+R31 is closed: a Game Master rate configured at 0% now means 0% wherever it is stored, read
+or shown. `lib/services/gamemaster/subscription-limits.ts` (mirrored) is the single writer of
+a subscription's cached limits, `calculate.ts`'s three fallbacks became one helper, 14 tests,
+8 probes, and `tools/gamemaster/report-stale-subscription-limits.ts` is report-only.
+
+- **A risk register entry is a claim about the code, not a fact about it — and this one named
+ the wrong branch.** R31 said a 0% *package* was paid 5%. It was not: the current-package
+ read already tested `!== undefined`, so 0 returned 0. The `||` sites were the **fallbacks
+ onto the cached `subscription.limits`**, reachable only when the package has been deleted or
+ the subscription has no `packageId`. **A fix aimed at the register's sentence would have
+ changed the one branch that was already right.** Second instance after R7, so carry the
+ class rather than the two cases: **check a risk against the code before fixing it, and
+ correcting it downward is the same documentation duty as raising one.** The register, the
+ chapter, `11`, PROGRESS and the internal HTML were all corrected together.
+- **`||` was wrong about 0 and accidentally right about `NaN`, so the one-character fix is
+ wrong.** These values arrive from `parseFloat` on an admin form, so `NaN` is one keystroke
+ away, and `??` passes it straight onto a required `Number` path — where every multiplication
+ downstream silently becomes `NaN` and nothing checks. The general form: **when replacing a
+ truthy check, enumerate everything it was catching**, because a falsy guard usually catches
+ more than the one value that motivated the change. `Number.isFinite`, not `??`.
+- **The tracked half was the read; the untracked half was the write, and the write was
+ worse.** Six routes copied a package's config onto a subscription with
+ `config.referralFeePercentage || 5`, so **buying a 0% package stored 5%** — durable, and a
+ stored 5 is indistinguishable from a deliberate 5. It also reached the **challenge** path
+ *through the data*: that path resolves with `??` and was correct, and faithfully paid the
+ wrong number it had been given. **When two code paths disagree, check whether one of them is
+ merely reading what the other wrote** before concluding which is buggy. And **count the
+ writers**, again: one file named, seven found.
+- **A control that advertises a value and then refuses it is why nobody had hit the bug.**
+ The admin editor declared the fee input `min={0}`, rendered a stored 0 as **5**, and wrote
+ `parseFloat(e.target.value) || 5`, so **typing 0 was rewritten to 5 on the keystroke** — a
+ 0% package could only be created by calling the API directly. That is what makes R31
+ **latent rather than an active loss**, and saying which is the difference between a register
+ entry that is believed and one that is not. Same shape as enabling a provider with no
+ adapter, and as a `rankingMethod` a provider game ignores.
+- **Two sources must disagree before a test can prove which one was read.** A probe removing
+ the `!== undefined` check stayed green because the test seeded the package at 0% *and* the
+ cache at 0%: the wrong branch produced the right answer. Seeding the cache at 5 turned it
+ red. This is the precedence-test form of the same trap that made the pre-lock hold gate
+ unprovable by end status alone — **when a probe stays green, ask whether the fixture can
+ distinguish the branches at all**, before concluding the test is weak or the claim is wrong.
+
+**And a verification note that saved a false finding twice in one pass.** The admin typecheck
+and the lint output both appeared to gain entries. Every one was a **line shift** — three
+`fix-purchases` errors moved by one line because of an added import, and a pre-existing
+unescaped apostrophe moved 12 lines because of an added comment. **Diff the lists and compare
+the message text, not the counts and not the line numbers**, or a comment looks like a
+regression.
+
+### Five things from the X6 publish control (5 September 2026)
+
+An operator can now publish a draft provider contest by clicking. `PublishContestButton.tsx`,
+`lib/admin/contest-game-label.ts`, a game-aware `CompetitionsListSection`, 21 tests, 21
+probes all red. **No player screen starts a round**, so the play step is still API-only.
+
+- **A trading-shaped SCREEN fails exactly like a trading-shaped service, and this one had
+  been failing for a day before anybody looked.** `GET /api/competitions` applies no filter,
+  so provider drafts were already rendering in the admin list - and the component's
+  `Competition` interface did not admit `"draft"`, so it fell through `getStatusColor`'s
+  default into **the same grey the screen uses for a completed contest.** An unpublished
+  contest looked finished. No error, no log line. The rule: **when a type denies a state the
+  screen is already being handed, the screen is not type-safe, it is uninformed** - and the
+  `default:` arm of a status switch is where the new state goes to die quietly.
+- **A helper's NAME is part of its contract, and reusing an existing one is the natural
+  mistake.** `isProviderContest` already existed and answers a **stricter** question - label
+  *and* provider key *and* game code, because a labelled contest with no keys cannot launch a
+  round. A screen asks *what kind of row is this*, and a half-built provider contest is still
+  one for badging and for keeping out of the trading editor. Importing the strict helper would
+  have compiled, reviewed correctly, and rendered a keyless provider contest as a **trading**
+  one, Edit button and all. **When two questions differ, give them two names** - and the
+  general form: before writing `=== "provider"` inline, check which of the two questions you
+  are actually asking.
+- **A control that would corrupt data must be withheld with its reason stated, not greyed
+  out.** `/competitions/edit/[id]` renders the trading editor and `PUT
+  /api/competitions/[id]` does a blind `Object.assign` of that form's body, so the Edit link
+  is a **corruption path** on a provider contest rather than a confusing screen. Third
+  instance of this shape after a provider with no adapter and a `rankingMethod` a provider
+  game ignores, so carry it as a class: **a disabled control teaches nothing; a refusal that
+  names the missing thing is the feature.**
+- **A summary that counts by status is an aggregate that enumerates its cases.** The list's
+  four cards counted active, upcoming and completed, so a draft landed in `Total` and in none
+  of the others - the same failure as an aggregate that enumerates game types, one field
+  along. **Adding a status means auditing every place that switches on status**, and the
+  count cards are the one nobody thinks of.
+- **A probe that stays green has a THIRD cause, and it appeared here: the test does not
+  exist.** After "weak test" and "wrong claim", this one was **a missing test** - blanking the
+  game badge's condition left the suite green because the probe had been aimed at a test
+  asserting the strict helper is not *imported*, a different claim which the other two call
+  sites keep satisfying. **A probe aimed at the wrong test is indistinguishable from a test
+  that does not work**, so name the expected failing test in the probe and check that the red
+  one is the one you meant.
+
+**And two rules for structural tests specifically, both learned by getting them wrong here.**
+**Strip comments before matching** - these files explain the anti-patterns in prose, so a test
+that reads prose flags a correct file for discussing the mistake and passes a broken one whose
+only mention of the right thing is in a comment. And **never scan a fixed number of characters
+to find a guard**: the first Edit-guard test looked 300 characters back, began mid-identifier,
+and reported a guard missing that was present. Assert **position within the construct**
+instead - condition, then branch separator, then the guarded thing - and count the occurrences
+so a second unguarded one cannot hide behind the first.
+
+### Five things from R32 and R33, the missing score seam (5 September 2026)
+
+Both closed. `lib/services/games/participant-score.service.ts` carries a round's score up to
+`participant.score` from **gate 11b** of the single ingestion function, and
+`resolveContestScoreDirection` reads the ranking direction from the catalogue title once per
+contest. Found while mapping the code for the round inspector, **a day after X5 was called
+code-complete**, and both would have paid the wrong players.
+
+- **"Code-complete" is not "correct", and the gap between them is exactly where a green suite
+  is most dangerous.** X5 shipped with no code path writing `participant.score` at all, so
+  every provider participant would have settled on zero, tied at rank 1, and split the pool
+  equally however well they played - and with `scoreDirection` read from a field neither
+  participant copy declares, so every lower-is-better game paid the slowest player first.
+  Neither raises an error. **Say what a completion claim excludes**, and never let it imply
+  the path has been exercised end to end.
+- **A fixture that supplies the value under test has tested the consumer, not the producer.**
+  The settlement suites seed `score: 900 / 500 / 100` and rank them, which proves ranking works
+  *given* scores and is structurally silent on whether one ever arrives. Second instance after
+  trading finalization's `pnl`, so carry the rule: **when a value crosses a seam, one test must
+  start on the far side of it.**
+- **A raw-driver fixture can prove anything, because it is not bound by the schema the
+  application writes through.** `db.collection(...).insertMany` bypasses Mongoose strict mode
+  entirely, so the settlement test stored `scoreDirection` on participants - a field no
+  production path could ever write - and then read it back green. Two corollaries: seed through
+  the model or seed the thing production actually reads, and **check the collection name**,
+  because these schemas set explicit ones (`provider_game`, `game_round`) and writing to a
+  guessed pluralised collection has the same symptom as writing the wrong value.
+- **An explicitly-typed `.lean<{...}>()` is a place a field that does not exist looks real.**
+  The compiler checks the hand-written generic, not the schema, which is why neither typecheck
+  ever objected to the direction read and the usual "errors that *disappear* after a model
+  sync" signal never appeared. **Do not treat a clean typecheck as evidence that a read matches
+  its schema.**
+- **When the code and a chapter disagree, check which one is wrong before making them agree -
+  the drift runs both ways.** The first fix declared `scoreDirection` on both participant
+  copies, which is the smaller diff and satisfies the read that already existed. `05` s2 rules
+  it out, and the failure it prevents is worse than the one it costs: per-row storage lets two
+  rows in **one** leaderboard disagree, so half the board negates and half does not. A
+  uniformly wrong direction is coherent and visibly wrong; an incoherent one looks plausible
+  and cannot be explained to a player. **Here the chapter was right and the code was wrong**,
+  the opposite of the paired-document drift the table below is written for.
+
+**And the general form of why both defects were invisible, which is now the fourth instance:
+an aside in a comment is a claim, not a fact.** `provider-settlement.service.ts` opened by
+asserting that ingestion already wrote `participant.score`. After `challengeId`, the R7
+severity and `billsPerRound`, carry the class rather than the cases - and **leave the
+correction visible in the file** rather than quietly fixing the tense, because the next reader
+needs to know the sentence was once believed.
+
+### Five things from the X6 round inspector and manual resolution (5 September 2026)
+
+An operator can now list the rounds needing a decision, read the raw provider deliveries and
+**end** one with a mandatory reason. `12` s4.2a, 21 tests, 12 probes red. **It cannot enter a
+score, deliberately**, and that scoping is the load-bearing part: `applyResult` is the single
+ingestion door and it lives in the **main app only**, so a score box in admin would build the
+second door `02` s10 rule 3 forbids, in the app with the widest privileges and the least
+traffic. Ending a round is sufficient because `assessUnresolvedRounds` derives both its answers
+from `round.status === "unresolved"`.
+
+- **A probe harness can destroy the file it is probing and report success — and the tell is the
+  failure COUNT, not the failure.** Next.js dynamic routes contain `[roundId]`, which
+  **PowerShell parses as a wildcard character class**, so `Get-Content $File` matched nothing
+  and returned `$null` while `Set-Content -LiteralPath` wrote it back happily. The route was
+  emptied, then "restored" to nothing. Every probe went red **on the expected test**, for
+  entirely the wrong reason. **5–7 tests red for a one-line change is the signal**; the honest
+  number is 1 or 2. Two rules: `-LiteralPath` on the **read** as well as the write, and refuse
+  to write when the read came back empty. Fifth probing instance, so carry the general form: **a
+  probe that reports more damage than it caused is not reporting on your guard.**
+- **An import is not a use, and it defeated three assertions in one file.**
+  `toContain("canTransitionRound")` stayed true when the call was replaced by a hand-rolled
+  status check, because the name is still in the import line; `toContain("MIN_REASON_LENGTH")`
+  stayed true when the check became `if (false)`, because the constant is still named in the
+  error *message*; and `indexOf("resolveRoundManually")` found the **import on line 8** and
+  ordered against that. **Match the call with its arguments, and assert the operator, not the
+  operand** — `/reason\.length\s*<\s*MIN_REASON_LENGTH/`, not the constant's name.
+- **A shared list beats a duplicated one even when the duplication has a good excuse.** The
+  action ids and their operator-facing consequences were first written twice, because the
+  service imports Mongoose models and a client component must not pull those into the browser.
+  Real constraint, wrong answer — this is the **"one rule, two copies"** shape behind four
+  defects here already (`referenceId`, `failedReason`, `challengeId`, the GM `||`), none of
+  which `check:mirrors` can see. A **model-free** module both sides import is the fix, and note
+  the drift it prevents is not cosmetic: a button offering an id the server has renamed fails
+  with a 400 that reads like a permissions problem.
+- **An object lookup on a request-supplied key is not safe because it is guarded.** Both `in`
+  and object indexing walk the prototype chain, so `"toString"` and `"__proto__"` pass the
+  check — and `ACTIONS["__proto__"]` returns `Object.prototype`, which is **truthy**, survives a
+  `!target` test, and only fails later on a missing `.status`. **Safe by accident is not safe.**
+  A `Map` has no prototype chain, so the lookup is total and the validator is the same object
+  the server switches on.
+- **A badge that appears on everything cannot be trusted where it matters.** Only
+  `hold_and_alert` actually stops a contest settling, so only those rounds are badged as holding
+  settlement; the other two policies settle on time. Same reasoning makes the dialog report
+  whether settlement was **actually** released rather than announcing it: a contest can be held
+  by several rounds, and an operator told "settlement unblocked" while three others still hold
+  it stops believing the message. Same class as **no aggregate may silently mean "trading
+  only"** — a label that is right in general and wrong in the case you are looking at.
+
+### Five things from the player play screen (5 September 2026)
+
+The provider lifecycle is no longer API-only anywhere: a player can start, play and see the result
+of a round by clicking. `13` s1.1a, 42 tests, 20 probes red on the expected test. It also closed a
+**live** defect — no player screen read `gameType`, so a provider contest rendered the trading lobby
+with a **"Start Trading"** button opening the forex workspace for a puzzle.
+
+- **A GET must never consume an attempt, and a server component IS a GET.** An attempt is spent
+ when a round is *created*, deliberately, so launching from a page's render burns a paying player's
+ only attempt **because Next.js prefetches `<Link>` targets on hover**. No error, no log line, and
+ the player never even clicked. This is why the play screen is a state machine rather than a
+ redirect through the launch API — a later "simplification" back to launch-on-load reintroduces it,
+ which is why the reason is in the file and not only in a test. The general form: **before putting
+ a side effect in a server component, ask who else issues that GET** — browsers, prefetchers,
+ pollers and crawlers all do.
+- **Removing a field is stronger than remembering not to read it.** A `postMessage` is
+ attacker-controlled by construction — the player has a developer console — so the frame message
+ type has **no score field at all**, and a `finished` carrying `score`, `rawScore`, `points`,
+ `prize` and `rank` parses to an object with two keys. Prove it **behaviourally** and assert the
+ **whole** object: a field you did not think to check is the only way to notice one you did not
+ expect, which is how the admin credential-rotation bug surfaced.
+- **The same identifier appearing twice defeats a structural test, and the copies do different
+ jobs.** `!expectedOrigin` guards the message listener in one place and the render in another. A
+ probe that killed the **render** guard left the suite green, because the listener's copy satisfied
+ a bare `/if \(!expectedOrigin\)/`. Fourth instance of the class after the fixed-character Edit
+ guard, `canTransitionRound` and `MIN_REASON_LENGTH`: **count the occurrences and assert position
+ within the construct**, never a bare identifier.
+- **When two chapters disagree about a URL, check which one owns the subject before making them
+ agree.** `09` E6 said `/play/[contestId]`; `13` s1 said `/competitions/[id]/play`. `13` is the
+ routing chapter and was right. **The drift ran source → owner, the opposite direction to the one
+ the paired-document table is written for** — so verifying the source is not verifying the chapter
+ that owns the fact. Getting this wrong costs either a renamed live URL or two play routes for
+ ever, and checking cost one search.
+- **Two routes that redirect into each other must have conditions that are exact complements, and
+ the failure is not a wrong screen.** `/trade` bounces a provider contest to `/play`; `/play`
+ bounces a non-provider contest to `/trade`. Both derive from `isProviderContest`, so no loop is
+ possible — but an added refusal that also redirects (a seatless player, say) gives an **infinite
+ redirect**, which surfaces as a blank page or a browser error naming nothing. Pin it with a test
+ that asserts the play route redirects on **exactly one** refusal.
+
+**And the fourth collision of the `**/games/*` ESLint wildcard, on `components/games`**, after
+`database/models/games`, `lib/services/games` and `components/admin/games`. One negation, exactly as
+predicted. Written as its own exception rather than a blanket `!**/components/**`: a components
+folder is precisely where somebody would eventually put a game module's own logic "to keep it near
+the screen", and a blanket exemption lets that through silently.
+
+**A deferral worth stating because a summary would round it up.** There is still **no CSP
+`frame-src` allowlist**, and it is not an oversight — `next.config.ts` has no
+Content-Security-Policy at all, so adding one is a platform-wide change that must also account for
+the Nuvei payment flow and the tutorial embeds. More to the point **there is nothing to allowlist
+yet**: `game_provider` stores `baseUrl`, the provider's *API* host, and the spec's own example puts
+play on a different subdomain, so the play domain is a fact X4 collects from a real provider. Until
+then the message origin is derived from the launch URL actually loaded, together with
+`event.source === frame.contentWindow`, which no unrelated window can satisfy.
+
+### Five things from R26, the admin cron that paid no Game Masters (5 September 2026)
+
+R26 is closed: `apps/admin`'s `finalizeCompetition` calls `settleFeesAndGameMasters`, the same
+shared stage the main app calls, and books the platform fee **net** of the commission. Pinned by
+`__tests__/services/admin-finalize-gamemaster-parity.test.ts` (5 tests) and
+`tools/probe-admin-gm-parity.ps1` (5 probes). **The fix is not retroactive and no backfill was
+written.**
+
+- **Distinguish a defect that is LOSING money from one that is merely reachable, because it
+  changes what you build next.** Almost every finding in this programme has been latent — a
+  provider contest that has never settled, a 0% package the admin UI would not let you create.
+  This one was live: both apps register `checkAndFinalizeCompetitions` on an every-minute cron,
+  so whether a referrer was paid depended on **which cron claimed the contest first**. There is
+  no flag, no error and no log line on either branch. **Before scheduling a money defect, check
+  whether anything actually reaches the broken path today** — and when it does, say so in the
+  register, because "already occurred" and "would occur" get triaged differently.
+- **When a payout is carved OUT of a fee, adding the payout means changing the fee's RECORD in
+  the same edit.** The Game Masters' share comes out of the platform fee, so the figure booked as
+  platform income must be net of it. Paying the referrer while still recording the gross fee
+  counts the same credits twice in two different books — and it reviews as a correct fix, since
+  the referral row that was missing is now there. The parity suite therefore asserts the **net**
+  figure explicitly, not just the earnings row. General form: **a new money row is an incomplete
+  fix until you have asked which existing row it was taken from.**
+- **A probe that stays green is a question with three answers, and the third one appeared here:
+  the guard is real but UNREACHABLE on this path.** After "weak test" and "wrong claim", this was
+  a correct check in `distribute.ts` that a second finalize never reaches, because the admin path
+  refuses at `status !== "active"` long before the referral stage runs. That is the X1 finding
+  again — **the four finalize functions are not four copies of one function**; this one has no
+  retry wrapper and no optimistic lock, so its idempotency lives somewhere different from the main
+  app's. The probe was re-aimed at the guard that actually holds the property, and **the test's
+  comment, which had asserted the wrong mechanism, was corrected rather than quietly deleted.**
+- **Extracting shared code HIDES divergence from a size comparison, which is how this defect was
+  found in the first place.** R26 was spotted because `competition-end.actions.ts` was 72 KB in
+  the main app against 38 KB in admin, and a 34 KB gap between two supposed copies is worth
+  reading. It is now **45 KB against 37 KB** — not because admin gained the logic, but because the
+  main app shed ~27 KB into shared services. **The same heuristic applied to the same pair today
+  raises nothing.** The identical shape is still unexamined in `challenge-finalize.actions.ts`
+  (70 KB against 42 KB, its own copy of all three stages in each app). This argues for parity
+  tests, not against extraction — and note `check:mirrors` compares **models**, so it has never
+  had an opinion about either file.
+- **Say that a fix is not retroactive, and say why the damage cannot be queried for.** Contests
+  already finalized by the admin cron paid nothing and wrote **no `retained_gm_fee` row either**,
+  so the affected set cannot be found by searching the ledger for retained rows — only by
+  reconciling referred players' entry fees against earnings per contest. No backfill was written,
+  deliberately: which contests to compensate is an owner decision, and a script that credits
+  wallets from inferred history is an unreviewed money writer. **"Fixed" without "not
+  retroactive" is the kind of summary that makes somebody stop looking.**
+
+**And a fifth instance of the aside-verification rule, this time in three files at once.** The
+`walletMap` passed from the prize stage to the fee stage was documented in both apps as mattering
+"for correctness, not just query count" — supposedly so a Game Master who also won a prize had
+their commission's `balanceBefore` computed after the prize. The concern is real; **the map is not
+what answers it.** Both stages read the post-credit balance back from
+`findOneAndUpdate({ new: true })`, and neither reads a balance out of the map at all — it decides
+only whether a wallet must be created. A **control probe** passing an empty map moves identical
+money and must stay green. Comments corrected in both copies, with the correction left visible.
+
+**Two harness lessons, both of which had already produced a false result.** `Get-Content -Raw`
+and `[File]::ReadAllText` disagree on Windows: PowerShell 5.1 decodes with the system ANSI
+codepage, so **every emoji in the touched services came back as mojibake and was written back that
+way** — probes passed, files were quietly mangled, and it surfaced two steps later as unexplained
+typecheck errors. Pin UTF-8 **without a BOM** on the read *and* the write, and assert a lossless
+round trip before probing. Separately, the harness judged probes by searching whole-suite output
+for the expected test's **name**, which vitest prints for a passing test as readily as a failing
+one, so every probe reported RED beside "failing tests: 0". Run the expected test alone with `-t`
+and read the summary counts; run the suite again only to measure blast radius.
+
+**And one self-inflicted lesson that cost ten minutes and looked exactly like a hang.** Piping the
+harness to `Select-String` showed nothing for eleven minutes, and it was killed as hung. The script
+reports through `Write-Host`, which writes to the **host, not the pipeline**, so the filter was
+reading a nearly empty stream while the probes ran normally — they finish in about two minutes.
+Redirect a child PowerShell process's output to a file and poll that. **Silence from a filtered
+pipeline is not evidence of a stalled process**, and killing a probe harness mid-run is how an
+injected defect gets committed.
+
+## The rule
+
+**Documentation is part of the deliverable, not a follow-up task.** A phase is not
+finished until the documents match what was actually built.
+
+On every change during implementation:
+
+1. **Update `PROGRESS.md`** in the relevant folder — status table, work log entry,
+   decisions, open questions. This is the file a new chat reads first.
+2. **Update the affected chapter(s).** If the data model changed, `04-data-model.md`
+   changes. If a flow changed, the flow document changes.
+3. **Update the HTML versions**, which are generated from the same content and drift
+   silently otherwise:
+   - `New games plan/ChartVolt-New-Games-Plan.html` — internal
+   - `New games plan/ChartVolt-New-Games-Plan-Partners.html` — partner-facing
+   - `External game plans/ChartVolt-External-Games-Plan.html` — internal
+   - `External game plans/ChartVolt-Game-API-Requirements.html` — sent to providers
+4. **Record deviations explicitly.** If the build differed from the plan, say so in the
+   work log with the reason. Never silently rewrite the plan to match the code.
+5. **Check whether docs outside these folders are affected** — `README.md`,
+   `.cursor/rules/*.mdc`, `deploy/README.md`, the admin wiki
+   (`apps/admin/components/admin/AdminWikiSection.tsx`), and
+   `legal/ChartVolt-Regulatory-Defence-Pack.html` if anything touches the
+   skill-versus-chance argument or the money flow.
+
+## Paired documents that must never drift
+
+| Pair | Constraint |
+|---|---|
+| `01-provider-contract-specification.md` and `ChartVolt-Game-API-Requirements.html` | Same requirements, different audience. A provider building against a stale spec is worse than no spec. The HTML carries a **version number and a document-history table** — bump both whenever `01` changes, since providers may already be building against the issued version |
+| `External game plans/10-external-only-programme.md` section 3, `PROGRESS.md`'s X-phase table, and section 16 of `ChartVolt-External-Games-Plan.html` | The X0–X12 phase list, the effort figures and the **23–30 week** total appear in all three, plus `00-README.md`. Changing one means changing all four. Any figure of 20–26 is stale (it predates the owner's 2 Sep 2026 brief), as is 18–24, which was never right. **The internal HTML's diagram 10 is drawn to scale — rescale the bars, not just the labels**, and keep the two pale blue platform-work bars identical, because their being equal is the entire argument of the figure |
+| `External game plans/11`–`20` and their `New games plan` sources (`01`, `02`, `07`, `08`, `09`, `11`, `12`, `13`, `15`) | The external chapters restate load-bearing facts — line numbers, the five finalization entry points, the eight missing RBAC IDs — rather than duplicating whole chapters. **If a fact changes in the source, change it in the restatement too**, or the two plans will disagree about the codebase |
+| The scenario decision, wherever it appears | `External game plans` `PROGRESS.md`, `00-README.md`, `10` s1, `17` (risk X8), `ChartVolt-External-Games-Plan.html` s14 and s16; `New games plan` `PROGRESS.md`, `00-README.md`, `14-implementation-phases.md`, and both New-Games-Plan HTMLs. **Ten places.** Any document still presenting add-on versus external-only as an *open* question is stale; as a description of what the plan started from it is correct, so **say which** |
+| `New games plan/ChartVolt-New-Games-Plan-Partners.html` sections 11 and 15 | **Known stale, deliberately not rewritten.** Section 11 describes Trivia as a game we build; section 15's roadmap is drawn around the in-house build order. The hero facts were corrected on 2 Sep 2026 and an internal HTML comment in the file records exactly what remains. **How much to tell partners about licensing rather than building is a commercial decision — get the owner's answer before rewriting either section** |
+| `14-implementation-phases.md`, `00-README.md`, `PROGRESS.md` and the roadmap sections of both New-Games-Plan HTMLs | Phase list, effort estimates and totals appear in five places. Changing one means changing all five. **P1–P7 and their 14–19 week total are superseded** by the X-phases — all four `.md`/HTML entry points now carry that notice, and the live figure is **23–30 weeks**. **Stage 0 (6–9 days) is unchanged and still active.** The partner HTML's timeline SVG is drawn to scale — rescale the bars, not just the labels. Note the partner HTML must not carry the Stage 0 figure at all |
+| The mirror-drift counts, wherever they appear | `New games plan` `00-README.md`, `12-risk-register.md`, `00a`, `03-data-model-changes.md`; `External game plans` `17-risk-register.md`, `18-migration-testing-rollout.md`; both internal HTMLs. Measured 1 Sep 2026 by the guard itself: **75 mirrored model pairs, 11 drifted** (all now synced), plus 19 action and 51 service files. Earlier documents said "~21 files, 3 drifted", or "10 drifted" — both are stale, as is any figure of "31" for the stale `.d.ts` files, which was 112 (see the row below). Do not hand-count these; run `npm run check:mirrors:list` |
+| `External game plans/19-game-masters.md`, `New games plan/15` section 5, and the Game Master sections of the internal HTMLs | The Game Master system is the same system in both scenarios. `19` sections 1–4 are the authoritative analysis; `New games plan/15` section 5 restates it. **A fact corrected in one must be corrected in the other** |
+| The admin navigation structure, wherever it appears | `External game plans/12` s1 (grouping table), s1.1 (tab list) and s1.1a (what was built); `New games plan/07` "Target structure" and its BUILT notice; `External game plans/PROGRESS.md` X6 row and work log. **The live structure is `apps/admin/components/admin/AdminDashboard.tsx`'s `menuGroups` plus `apps/admin/lib/admin/game-sections.ts`** — read those, not the prose, and remember `07` was the accurate chapter and `12` the drifted one. There is **no top-level TRADING group**; trading is a destination inside GAMES, and since 4 Sep 2026 **Game Providers sits beside it in the same group** — a provider supplies games, it is not a game, so it must not be nested under one. Any document describing a top-level TRADING group is stale |
+| The competition entry paths, wherever they appear | `New games plan` `00a`, `01-current-state-audit.md`, `05-prizes-money-layer.md`, `12-risk-register.md`, `PROGRESS.md`; `External game plans` `PROGRESS.md` and `17-risk-register.md`; `ChartVolt-New-Games-Plan.html`. There were **four** writers, now **two** — `lib/services/contest-entry.service.ts` behind both gates, plus the batch route fixed in place and the admin copy deleted. Any document still saying "two duplicate join paths" as a *present* fact is stale; as a description of what Stage 0 started from it is correct, so **say which** |
+| The publish control and the competitions list, wherever they appear | `External game plans/12` s3.1a (what was built) and s2.1's draft note, `09` E5 checklist and its "still not built after E4" note, `PROGRESS.md` X6 row, the status block and the work log, `ChartVolt-External-Games-Plan.html` E5 row. **The live code is `apps/admin/components/admin/games/PublishContestButton.tsx`, `apps/admin/lib/admin/contest-game-label.ts` and `CompetitionsListSection.tsx`** — read those, not the prose. Four facts drift easily: the list helper is **`hasProviderGameLabel`**, which asks about the **label alone** and is deliberately *not* the stricter `isProviderContest` in `contest-config.ts`, so a document conflating them is describing a bug; **`contest-game-label.ts` is admin-only and not mirrored**, so `check:mirrors` says nothing about it; **Edit is withheld from provider contests on purpose**, because `PUT /api/competitions/[id]` blind-assigns the trading form's body, and a document calling that a cosmetic gap is wrong; and there is **no unpublish and no game filter**, the first deliberately and permanently, the second only until there is more than one provider game |
+| The game-provider admin surface, wherever it appears | `External game plans/12` s4 (the five destinations), s4.1 (copy the UX not the persistence) and s4.1a (what was built); `09` E5 checklist; `PROGRESS.md` X6 row and work log; `ChartVolt-External-Games-Plan.html` E5 row. **All five destinations now exist** — Providers, the per-title Games list, the round inspector and manual resolution (`12` s4.2a, 5 Sep 2026), and provider **health** (`12` s4.2b, 6 Sep 2026). Any document saying the inspector, manual resolution or health is outstanding is stale as a present fact though correct as history — **say which**. **Health is DERIVED, not stored, and that is a deliberate deviation from `12` s4 and `07`** — `apps/admin/lib/services/games/provider-health.service.ts` computes the verdict on request from `game_round` and `provider_event`, and `07`'s `provider_health_check` model was **not** created. A document describing a poller, a stored verdict or a health-check history table is describing the plan, not the build. Two facts about the fields it replaced: `game_provider.healthStatus` and `lastHealthCheckAt` are **declared and written by nothing**, and `healthStatus` **defaults to `"down"`**, so they were removed from the admin DTOs (`provider-types.ts`, `provider-admin.service.ts`) and must not be put back — a document treating either as a readable fact is wrong. The route is `/api/games/provider-health`, **not** under `/api/games/providers/`, because a provider keyed `health` would otherwise be unreachable through the dynamic segment. And the sibling defect closed with it is **R38**: `provider_game.lastSuccessfulRoundAt` was declared in X2, read by the contest pre-flight, and written by nothing, so every operator saw a stale-sandbox warning that could never clear; it is now stamped at the single ingestion door **for `completed` only**, so a document saying every terminal status stamps it is wrong. Any document implying E5 is finished is stale, and any implying the whole of X6 is done is more so: X6 also carries analytics by provider and the Game Master creation API. **Credentials live only in `WhiteLabel.gameProviderCredentials` behind `select: false`** — a document describing them on `game_provider` is describing the payment-provider pattern that was deliberately not copied. Since 6 Sep 2026 there are **four** of them in two labelled groups, and the enable gate demands a `callbackToken` as well as a `callbackSecret`; see the callback-credentials row. Also since 6 Sep 2026 the base-URL rule is **`isAcceptableProviderUrl`, not `isHttpsUrl`** — plain http is accepted on `localhost` / `127.0.0.1` / `[::1]` and refused everywhere else, including private LAN addresses. A document saying the base URL must be https unconditionally is stale, and one calling the loopback carve-out a relaxation has it backwards: the platform and a first-party provider share a machine, so loopback never touches a network |
+| The player play screen, wherever it appears | `External game plans/13-user-ui-and-routes.md` s1 (the target routing) and **s1.1a** (what was built), `09` E6's checklist and its route-correction note, `PROGRESS.md` status block, X5 row and work log, `ChartVolt-External-Games-Plan.html` E6 row. **The live code is `app/(root)/competitions/[id]/play/page.tsx`, `components/games/*`, `lib/services/games/round-status.service.ts` and the `GET` on `app/api/competitions/[id]/rounds/route.ts`** — read those, not the prose. Five facts drift easily: the route is **`/competitions/[id]/play`**, not `/play/[contestId]`, and any document saying otherwise is stale — `09` E6 was the drifted one and `13` the accurate one; **only the provider branch of the dispatcher exists**, so `/trade` redirects **outwards** to `/play` and not yet inwards, and a document describing the finished dispatcher is describing the target, so **say which**; **nothing here is mirrored** — `round-status.service.ts` and `components/games/` are main-app only, so `check:mirrors` says nothing about them; **`components/games/play-state.ts` is a deliberate second copy** of the service's `PlayState`, because the service imports Mongoose models, and a test pins the two field lists together, so a document calling it duplication to remove is wrong; and the **dashboard is still trading-shaped** — `ActiveCompetitionCard` and `CompetitionsTable` render PnL and say "Trade Now" for every game, which is deferred, not done. Since 6 Sep 2026 the pre-flight also reads **`contestStatus`** (`13` s1.1b), so it no longer offers an enabled Play button on a contest that has not started; two things about that are load-bearing — **`blocked` must stay independent of `resuming`**, because the launch service's status gate runs before the idempotent resume path, and **a not-yet-started contest must not be rendered in the red refusal panel**, which is for a rejected action rather than for the normal state of a contest a player has just joined. And the **LOBBY became game-aware on 6 Sep 2026** (`13` **s4.1b**), so a document saying it renders trading panels for a provider contest is stale as a present fact though correct as history — **say which**. `13` **s4.1a** is the authoritative built/not-built split. The **dashboard contest cards became game-aware on 6 Sep 2026** (`13` **s5.1a**), so a document saying they show PnL and say "Trade Now" for every game is stale as a present fact though correct as history — **say which** — but a document implying the player surface is *finished* is still wrong: the trading panels, the per-game summary cards and the mega-action split (R21) are outstanding. **Three facts about that slice drift easily.** `13` s1's deferral note named `ActiveCompetitionCard` and `CompetitionsTable`, and **both are orphaned** — the live component is **`ContestsSidebar`**, which no chapter mentioned, so a document naming only the first two is naming dead code. The real defect was in **`lib/actions/comprehensive-dashboard.actions.ts`**, which selected neither `gameType` nor `score` and computed a *trading* ranking value for every contest — read that, not the components. And the provider cards link at **`/competitions/[id]`, never `/play`**, because launching consumes an attempt and Next.js prefetches `<Link>` targets; a document calling that link indirection cosmetic is describing a way to spend a paying player's only attempt on hover. **The live code is `components/games/ProviderContestLobby.tsx`, `components/games/ProviderLeaderboard.tsx`, `lib/utils/registration-deadline.ts` and the branch near the top of `app/(root)/competitions/[id]/page.tsx`** — read those, not the prose, and none of them is mirrored. Six facts drift easily. The branch tests **`hasProviderGameLabel`** (label only), deliberately **not** the stricter `isProviderContest` — a keyless provider contest cannot launch a round but is still not a trading contest, so the strict helper would render it the trading lobby with an Enter Terminal button; a document conflating the two is describing a bug, and a test asserts the two helpers **disagree** on that case. The branch must sit **above** `getDifficultyData()`, and the test asserts its **position**, not its presence. **`ProviderLeaderboard` is a separate component, not a restyled `CompetitionLeaderboard`** — the latter's row type declares `currentCapital`, `pnl` and the trade counts and its props demand a `prizeDistribution` and a `minimumTrades`, so a document calling the split cosmetic is wrong. **An absent score renders as `-`, never `0`** — the read-side form of the `score ?? 0` behind R37. **The board must never sort or negate**, because the direction is resolved once in `calculateRankings`. And **`isRegistrationClosed` was extracted rather than copied**: its clamp against `startTime` exists for documents an old bug wrote with a deadline an hour *before* the start, and a second copy forgetting it silently refuses entry to them. **BOTH LOBBIES WERE REBUILT ON ONE DESIGN KIT later on 6 Sep 2026** (`13` **s4.1d**, with **s4.1e** on what replaced the byte-identical guarantee), which **superseded s4.1c of the same morning** — so a document citing s4.1c's rules as current is stale, though it is correct as history and **says which**. Three of its rules are now inverted: `components/games/lobby-ui.tsx` **no longer exists**, the **3D `GameIcon` set and rank medals are used on neither lobby**, and **the trading page is no longer byte-identical**. **The live code is `components/neon/` (`tokens.ts`, `Cards.tsx`, `Hero.tsx`, `Buttons.tsx`, `Accordion.tsx`, `LeaderboardRow.tsx`, `banners.ts`), `components/games/ProviderContestLobby.tsx` and `ProviderLeaderboard.tsx`, and `components/trading/lobby/` (`TradingLobbyHero.tsx`, `TradingLobbySidebar.tsx`, `trading-lobby-accordions.tsx`, `TradingPrizeTable.tsx`)** — read those, not the prose. **None of it is mirrored**, so `check:mirrors` says nothing about any of it. **Eight facts about that slice drift easily.** The reference is the **owner's component sheet, not the trading lobby** — the direction reversed, so a document saying the game lobby matches the trading lobby has the dependency backwards. **`components/neon/` is not `components/arena/`**, which holds the unrelated Live Arena broadcast dashboard; a document naming `components/arena/` for any of this is pointing at a different feature. The consistency guard is **one definition and no screen has chrome of its own** — the kit's literals must appear in `tokens.ts`/`Cards.tsx` and in **no** consumer — and a document describing it as class strings compared between two files is describing the superseded guard, which could not survive the sheet's seven screens. **The negative assertion is the load-bearing half:** importing the kit is trivially satisfiable by a file that also hand-rolls a panel. **The trading page is no longer byte-identical, and that cost was paid knowingly** — so the prize calculation was extracted whole into `TradingPrizeTable.tsx` with four expressions asserted character for character. A document treating that duplication-free extraction as ordinary refactoring is missing why the assertions exist; a document still claiming the trading path is byte-identical is simply wrong. The trading sidebar is **four open items and six accordions**, and *which* stayed open (entry, countdown, schedule, prize table) is pinned by a test, because burying a decision is the same class of error as an aggregate that quietly means trading only. **`NeonCountPill` shares the appearance and not the wording** — a game has **players**, a trading contest has **traders** — so a document calling the two labels an inconsistency to unify is describing a regression. **`components/neon/Accordion.tsx` is the ONLY `"use client"` file in the kit and therefore the only server/client boundary on either lobby, and every prop it takes must be data or already-rendered output** — it took `icon: LucideIcon` for a few minutes on 6 Sep 2026 and **the trading lobby was unavailable in production** for every trading contest (**R39**), because a React component is a function and a function cannot cross that boundary. A document describing the accordion as taking an icon component is describing the outage. Three facts about it drift easily: a green `next build` **is not evidence a dynamic page renders**, so do not cite one; **no type here means “serialisable”**, so the typecheck cannot be cited either; and the obvious guards — `typeof !== "function"`, or “has `$typeof`” — are **both satisfied by a lucide icon**, since a `forwardRef` is an object carrying `Symbol.for("react.forward_ref")`, so a test asserting either is green on the bug. `isValidElement` is the check. **The banner files live in `public/assets/neon/`, not `public/assets/arena/`** — they were committed to the latter once, which no typecheck and no build could notice, so a test exhausts llNeonBanners() and asserts every file exists. **Hero banners are resolved by `banners.ts` from the game code, not from a `provider_game` field**, deliberately: artwork per title is catalogue content and belongs with the game pages, and a URL nothing maintains in front of players is worse than a visibly generic trophy. **Seven reference images plus a `README.md` that labels each one mock or capture** are committed to **`External game plans/design-reference/`**, and the README exists because `trading-lobby-as-built.png` was a **mock mislabelled as a capture** — proven when it turned out byte-identical to the file the owner re-supplied as the target. **Five items are not built and must not be summarised as done:** a rules surface for a provider title (so the sheet's **View Rules** button is a link to `/help/competitions`), the sheet's styling of the equity chart, the announcements panel and Share Event button (not features), and the four `future-*.png` screens — dashboard, competitions hub, game arena, global rankings — which are **missing data rather than styling**, since credits, arena level, XP, badges and a cross-game total have no source in the codebase. **Never verified by eye** — both pages are behind sign-in and the automated browser has no session, so a document claiming visual sign-off is wrong until the owner reviews it |
+| The round inspector and manual resolution, wherever they appear | `External game plans/12` s4.2a (what was built), `09` E5 checklist, `PROGRESS.md` X6 row, status block and work log, `ChartVolt-External-Games-Plan.html` E5 row. **The live code is `apps/admin/lib/admin/round-resolution-actions.ts`, `apps/admin/lib/services/games/round-resolution.service.ts`, `apps/admin/app/api/games/rounds/**` and `apps/admin/components/admin/games/Round*.tsx`** — read those, not the prose. Three facts drift easily: resolution **ends** a round (`voided` / `abandoned` / `expired`) and **cannot enter a score**, so any document describing manual scoring is describing a second ingestion door that `02` s10 rule 3 forbids; the action list lives in **one model-free module imported by both the service and the dialog**, so a document showing it in either file alone is describing the duplication that was deliberately removed; and **none of these files is mirrored** — `apps/admin/lib/admin/` and the admin API routes are admin-only, so `check:mirrors` says nothing about them. **Nothing in this slice is mirrored at all** — `admin-employee.model.ts`, which gained the `round-inspector` section id, also exists only in `apps/admin`. That id is a Mongoose enum value and therefore **add-only**: removing it orphans every employee document storing it |
+| `ChartVolt-New-Games-Plan.html` and `-Partners.html` | The partner version must **never** mention Stage 0, the duplicate join paths, the admin mirror drift, or any current defect |
+| The contest-entry participant row, wherever it appears | `External game plans/11` seam 2 (and its build note), `09` E4, `PROGRESS.md` X5 row and work log. The row is built by **`lib/services/contest-entry/participant-seat.ts`**, not inline in the service - read that, not the prose. Two facts are load-bearing: the three virtual-capital fields are **conditional on `(this.gameKey \|\| "trading") === "trading"`** in both model copies, and `gameKey` is **copied from the contest, never defaulted**. Any document saying a participant always carries `startingCapital` is stale |
+| The unresolved-round policies, wherever they appear | `External game plans/07` s2.3 (the three policies) and **s2.3a** (what was built), `09` E2's deferral note and the **E4 third-half** notes, `11` seam 3, `PROGRESS.md` X5 row and work log, `ChartVolt-External-Games-Plan.html` E4 row. **The live code is `lib/services/settlement/unresolved-rounds.ts` and `exclusion-refund.ts`**, mirrored. Three facts drift easily: settlement does **not** consume `refundOwed` or `blocksSettlement` — it re-derives both from `round.status = "unresolved"`, so any document saying settlement reads those flags is wrong; the policies apply to **provider** settlement only, since trading has no rounds; and the `hold_and_alert` gate sits **before** the optimistic lock, with a second gate inside the transaction that is reachable only by the mocked race in `provider-settlement-late-hold.test.ts`. Any document listing the `exclude` refund as outstanding is stale as a present fact, though correct as history — **say which** |
+| The settlement stages, wherever they appear | `External game plans/11` seam 3 (design, the BUILT note and the COMPLETE note), `09` E4 second-half notes, `05` s9.1, `17` (R3 **closed**, R26 **still open**, R31 **new**), `19` s1 and s6, `New games plan/15` s5; `PROGRESS.md` X5 row and work log. **The live code is `lib/services/settlement/`, mirrored into `apps/admin`** — prize payout, fees plus Game Master share, and completion, with `provider-settlement.service.ts` and `provider-finalize.ts` composing them for provider contests. Read those, not the prose. Four facts drift easily: `competition-end.actions.ts` is **1,174 lines** (it was ~1,500 in the chapters and 1,885 before the extraction) and the sweep is at **`:1126`, not `:1807`**; there are **ten** finalize call sites in the main app, not five, and any document saying five is stale; the **challenge path was NOT extracted** and still holds its own copy of all three stages, so a document implying settlement is unified everywhere is wrong; and **the whole lifecycle became clickable on 5 Sep 2026** — an admin button publishes and a player screen plays (`13` s1.1a). Any document saying nothing publishes, or that the player half is API-only, is stale as a present fact though correct as history — **say which** |
+| The provider score seam, wherever it appears | `External game plans/05` s2.0a (the write half), **s2.0b (the read half)** and s2 (the direction bullet), `17` R32/R33, **R37** and the summary table, `PROGRESS.md` status block, X5 row and work log, `ChartVolt-External-Games-Plan.html` E4 row. **The live code is `lib/services/games/participant-score.service.ts`, called from gate 11b of `result-ingestion.service.ts`, plus `resolveScoreDirection` in `lib/services/games/score-direction.service.ts`** (mirrored) — read those, not the prose. **Six facts drift easily.** The seam **did not exist** until 5 Sep 2026 despite several documents asserting it did, so a document implying X5 shipped a correct payout is wrong. The **READ path was still broken for a further day** (R37): neither app's `getCompetitionLeaderboard` passed `score` or `scoreDirection` to the ranking engine, so every provider participant tied on zero — a document implying the provider leaderboard has always ranked on score is stale. The direction resolver is **`resolveScoreDirection`, shared and mirrored, used by settlement AND both leaderboards** — any document naming `resolveContestScoreDirection`, or describing it as private to settlement, is stale as a present fact though correct as history, so **say which**; keeping it private is precisely why the leaderboards had no direction. **`scoreDirection` is NOT stored on the participant** and a document saying it is describes a reverted first attempt — per-row storage lets two rows in one board disagree, which is incoherent rather than merely wrong. Aggregation by `attemptsPolicy` happens **in the sync, not at settlement**. And the harm statements differ between the three defects: R32 and R33 were **latent for money and never occurred** (no provider contest has ever settled), while **R37 was latent for money but LIVE for players** — a board is a read, so any contest entered before 6 Sep displayed a meaningless order. **Nothing was backfilled for any of the three.** `participant-score.service.ts` is **not mirrored**, deliberately: mirroring it would create the second door for scores that `02` s10 rule 3 forbids |
+| The Game Master referral percentage, wherever it appears | `External game plans/19-game-masters.md` s1 (the "Percentage source" row and the row beneath it), `17-risk-register.md` R31 and the summary table, `11` seam 3's extraction note, `PROGRESS.md` work log; the internal HTML s15. **The live code is `resolveFeePercentage` in `lib/services/settlement/game-master-fees/calculate.ts` and `buildSubscriptionLimits` in `lib/services/gamemaster/subscription-limits.ts`**, both mirrored — read those, not the prose. Three facts drift easily: the **current package is the normal read** and `subscription.limits` is only a fallback for a deleted package, so any document implying the cached rate is what gets paid is wrong; **a configured 0% means 0%** since 5 Sep 2026, and any document saying a 0% package is paid 5% is stale as a present fact though correct as history — **say which**; and the fix is **not retroactive**, so subscriptions written before that date still hold whatever `\|\| 5` produced. `New games plan/15` s5 does **not** restate the percentage mechanics — checked, so do not add it there on consistency grounds |
+| **The in-house hedge game and phase X4a, wherever they appear** | `External game plans/21-reference-provider-and-mock-game.md` (the chapter, and s8 for the scope decision), `10` s3 phase table + s3's effort paragraph + the hard-ordering diagram + s4's shortest-path note, `17` risk **X8** and its summary row, `PROGRESS.md` status block + X-phase table + decision log + **open question 10** + documents list, `00-README.md` (route table, the effort paragraph, "the consequence that must stay visible", and two honest-assessment rows), and the internal HTML's **diagram 10 + figcaption**, s16's shortest-path paragraph and the "How long?" FAQ row. **Six facts drift easily.** The total is **26.5-35 weeks**, and **23-30, 20-26 and 18-24 are all stale** - the HTML's FAQ row still said 20-26 on 5 Sep 2026, two revisions behind, so **check that row specifically**. Diagram 10 is **drawn to scale**: the axis was extended from 28 to 32 weeks and **every bar in both routes recomputed**, so rescale rather than relabel, and keep the two pale blue platform bars identical because their being equal is the entire argument of the figure. **X4a is deliberately drawn in the same mid-blue as the in-house route's game segment** - the external-only route now contains the thing it was defined by not containing, and that is the honest reading, not an error. The provider row must represent **ChartVolt as first-party, never a placeholder company**, because a provider joined to contest history can never be deleted or renamed away from it. **Risk X8 stays OPEN until the game ships** - approving a mitigation is not applying one. And **X4a shrinks X4 without replacing it**: it cannot rehearse a real partner's authentication, error shapes, latency or pricing, and it says nothing at all about **X3**, the per-round cost floor |
+| **The provider result callback URL, wherever it appears** | `External game plans/17-risk-register.md` **R36** and the summary table, `PROGRESS.md`'s 6 Sep R36 work-log entry. **The live code is `publicBaseUrl()` in `lib/services/games/round-launch.service.ts`, which is the ONLY constructor of `resultCallbackUrl`** — the other four call sites pass it through, verified with `rg`, so read that one function and not the prose. **Four facts drift easily.** It is built from **`NEXT_PUBLIC_BASE_URL`**, so a plain-http value hands the provider an address that cannot work: the token travels unencrypted, and **certbot's http → https redirect plus the fetch spec's POST → GET conversion on a 301** means the result is rejected and the round written off as unresolved. The guard is **production-only** (`NODE_ENV`), and the development carve-out is as load-bearing as the refusal — every local rehearsal serves plain http on loopback, so a document describing the check as unconditional is wrong. It **fails closed** on anything `URL` cannot parse. And R36 was **latent** — no provider round has ever launched in production, **nothing was backfilled**. The file is **not mirrored**; `apps/admin` has no copy. |
+| **The provider callback credentials, wherever they appear** | `External game plans/04-data-model.md` s2.3, `12` s4.1a's bullets, `17` **R34**, `21` s4.1a, `PROGRESS.md` status block + the 6 Sep R34 work-log entry, `01` s2.2 and `ChartVolt-Game-API-Requirements.html` s10. **The live code is `gameProviderCredentials` on both `whitelabel.model.ts` copies, `loadProviderSecrets` in `lib/services/games/callback-verification.ts`, and gate 3 of `result-ingestion.service.ts`** — read those, not the prose. **Five facts drift easily.** There are **four** credentials in **two pairs**, and the pairing is the whole point: `apiKey`/`apiSecret` are the provider's and go **outbound**, `callbackToken`/`callbackSecret` are ours and come **inbound**. Any document saying three credentials, or three inputs on the dialog, is stale as a present fact though correct before 6 Sep 2026 — **say which**. `loadProviderSecrets` reads **`callbackToken \|\| apiKey`**, and the `apiKey` half is a fenced compatibility path, not the design: `setProviderEnabled` demands the explicit field, so a document describing the fallback as normal is wrong. **`||` is deliberate and must not be "modernised" to `??`** — `safeEqual("", "")` is true, so an empty token would authenticate a request with no `Authorization` header at all. **Gates 3 and 5 both return `signature_invalid`**, so any test or triage note distinguishing them must read the error text, not the result code. And R34 was **latent throughout** — no provider ever existed, nothing was refused in production, **nothing was backfilled** |
+| **What ChartVolt Games actually does yet, wherever it appears** | `External game plans/21-reference-provider-and-mock-game.md` **s4.1a** (the built/not-built table, which is the authoritative one), `PROGRESS.md` status block + X4a row + the two 6 Sep work-log entries, `17` **R34** and **R35**, the internal HTML s16's two X4a paragraphs, and `games-service/README.md`. **The live code is `games-service/`** — read it, not the prose. **Seven facts drift easily.** The service and the platform adapter are **code-complete and have never spoken to each other**, so any document implying a working provider game is describing the plan. The **game is playable by a human** since 6 Sep 2026 — `GET /play?t={token}` serves a real board, verified in a browser on both titles — so a document saying the launch URL serves no board is stale as a present fact though correct as history, and **say which**. The same is true of `.env`: the service **now has one locally and has been started, including from its production `dist` build**, so any document saying it has no `.env` and has never run is correct as history only. It has still **never been started against the platform**, and "code-complete" means its own **167 tests** (152 before the config suite) pass in-process against `mongodb-memory-server` — any figure of 152 is stale. It is **deployable but not deployed**: PM2 entry `chartvolt-games`, `games-service/env.example` (**no leading dot** — the root `.gitignore` ignores `.env*`, so renaming it silently uncommits it), a runbook in `deploy/README.md`, and **`npm run setup:env`, which writes the whole `.env` in one command** — so a document describing four hand-run `openssl` calls is stale. Three facts about that script are load-bearing: it **refuses to overwrite an existing `.env`** without `--force`, because the admin panel cannot show a stored secret back and regenerating leaves every result failing its signature check with the old values unrecoverable; it **duplicates the production origin rules** from `assertPlayableOrigin` deliberately, since `loadConfig` needs the file being written; and **`--dev` is a carve-out in the artifact, never in the enforcement** — the boot guard still refuses a loopback origin under `NODE_ENV=production`. Reading the platform's `.env` at setup time is **not** an isolation breach and `check:isolation` correctly says nothing about it. There are **two exposure routes and the default is the proxy** — three rewrites in `next.config.ts` mount the play surface on the platform's own origin at `/play` (owner's choice, 6 Sep 2026, on deployment risk), with the `games.` subdomain and its nginx block kept as the alternative. Any document presenting the subdomain as required is stale. **The proxy makes the game frame same-origin, and that cost must not be glossed** — the protocol is unaffected, but the play screen's `event.origin` check passes trivially and `frame-ancestors` is not what permits the embed, so the cross-origin rehearsal moves to X4 (`21` s4.1c). Three facts about the rewrites drift easily: artwork is at **`/play/assets/`, never `/assets/`**, because the platform owns `public/assets`; the rules are returned as a **bare array** so Next.js treats them as `afterFiles` and real routes always win, which is the safety property rather than a shorthand; and **order is behaviour** — `/play/:path*` before the artwork rule swallows it while both rules still read correctly. And the reassurance that belongs beside all of it: **an external provider needs no rewrite, no nginx change and no DNS record** — this is a one-time cost of being our own provider. **`GAMES_PUBLIC_URL` and `GAMES_FRAME_ANCESTORS` are mandatory under `NODE_ENV=production` only**, and the development carve-out is as load-bearing as the refusal — a document describing either as unenforced, or as enforced everywhere, is wrong. The adapter's tests run against a **stubbed `fetch`**, which proves our half of the protocol and not that the two sides agree. **`games-service/` shares no code with this repository** and `check:mirrors` says nothing about any of it — the one rule of the phase, enforced by `npm run check:isolation`, and a `paths` mapping added "for consistency with `api-server/`" silently destroys the guarantee the whole phase rests on. And the point of the phase is **`AMBIGUITY-LOG.md`**, now **14 entries, all `OPEN`** — nothing there is closed by this service choosing a behaviour, only by `01` and the requirements HTML being amended with a version bump |
+| **The "no in-house game" claim, wherever it appears** | **It is FALSE as of 5 September 2026** and this is the second time the scenario decision has moved, so treat every restatement as suspect. The owner answered open question 10 yes, so the platform is building one game of its own (X4a, `21`). What survives of the 2 Sep external-only decision is that the programme is still external-**first** and that `New games plan` P2's in-house Trivia game is **not** being built - so a document saying "no in-house game is built" is wrong, while one saying "no in-house game module" or "Trivia is not being built" is right. The distinction is load-bearing: **X4a is a provider game that happens to be ours**, arriving through the seam that already exists, which is why it costs none of P1/P2's module architecture. Recorded in the `PROGRESS.md` decision log rather than by editing the 2 Sep entry - **do not quietly rewrite that entry to match**, because the change of direction is the fact worth keeping |
+| Who pays Game Master earnings at settlement, wherever it appears | `External game plans/19-game-masters.md` s1 (the "Where it happens" row), s6's defect table and s7's acceptance list; `17-risk-register.md` R26, the summary table, the R3 note and the X1 acceptance list; `11` seam 3's "three things this did NOT cover"; `PROGRESS.md` status block and work log; the internal HTML's "two live defects" table. **The live code is `settleFeesAndGameMasters` in `lib/services/settlement/fees.service.ts` and `lib/services/settlement/game-master-fees/`, mirrored, called by `finalizeCompetition` in BOTH apps** — read those, not the prose. Four facts drift easily: the admin app **does** pay Game Masters since 5 Sep 2026 (R26), so any document saying it pays none is stale as a present fact though correct as history — **say which**; the fix is **not retroactive and nothing was backfilled**, and the affected contests **cannot be found by querying the ledger** because the missing rows were never written; the platform fee is booked **net** of the commission, so a document describing the gross fee as platform income is wrong; and the **challenge** path still holds its own inline copy in both apps with **the same divergence unchecked**, which is X10. `New games plan/15` s5 does **not** restate any of this — checked, so do not add it there on consistency grounds |
+| Any model change | Exists twice: `database/models/` and `apps/admin/database/models/`. Update both in the same commit. **`npm run check:mirrors` now enforces this** in CI and on `git push`, comparing field paths *and* enum values. It does **not** compare `required` predicate bodies, so a conditional requirement that differs between the apps is a validation rule whose outcome depends on which process saved the document, and the guard stays green. Do not "fix" a failure by deleting an enum value to make two sides agree — that orphans every document already storing it. Add to the side that lacks it. Deliberate differences go in `tools/model-mirror/allowlist.ts` **with a reason** |
+| Committed compiled `.js` files under `database/` and `lib/` | **All 113 deleted 1 Sep 2026** (57 `.js` + 56 `.js.map`), owner approved. A *separate, earlier* accident from the `.d.ts` one — emitted 22 Dec 2025, same 57 modules, and **six to seven months stale**. Critically, **these were NOT inert**: vitest resolved the stale `.js` in preference to the `.ts`, which made every model and every money-critical service **unimportable in tests** and blocked the whole of Defect 1. `tsx`, esbuild and `next build` all resolve the `.ts` correctly, so production was never affected — which is why it survived unnoticed. Two rules follow: **when deleting emitted output, look for the other half of the emit** (a `tsc` run that produced `.d.ts` produced `.js` too — the first cleanup removed one half and left the harmful one), and **prove which file a resolver picks rather than reasoning about it** — a missing export makes a perfect probe. The `.gitignore` rule is scoped to `/database/**` and `/lib/**`, never a blanket `*.js`, because `ecosystem.config.js`, `scripts/*.js`, `worker/build.mjs` and the `api-server` build are hand-written |
+| Committed `.d.ts` files | **All 112 deleted 1 Sep 2026** (57 `.d.ts` + 55 `.d.ts.map`), owner approved, with a `.gitignore` rule. They were orphaned February 2026 build output, stale, and **inert** — TypeScript resolves the sibling `.ts` first; proven by identical typechecks before and after (16 main, 225 admin). Earlier documents said "two", then "31 + 31" — the 31 counted only `database/` and missed 26 files under `lib/`. **Never treat a `.d.ts` as a third copy of a model to maintain.** Two files are deliberately kept and must stay tracked: `types/global.d.ts` (hand-written, no sibling `.ts`) and `websocket-server/dist/index.d.ts` (separate build). The rule for any future cleanup: delete a `.d.ts` only if a sibling `.ts` exists and it is not under `dist/` |
+
+## Direction of travel (owner, 30 Aug 2026)
+
+The platform is becoming **games-first**: players browse games, open a game page with
+its description and rules, and join a competition from there. Trading becomes one game
+among several — **demoted in navigation, not degraded in function.**
+
+Recorded in `New games plan/15-platform-transformation-and-gaps.md`, which also holds
+the three things chapters `01`–`14` did not cover: the games catalogue as admin-managed
+content, the per-game marketplace, and Game Master residuals.
+
+## Hard constraints recorded in the plans
+
+Do not quietly reverse these; they are load-bearing. If one must change, update the
+decision log in the relevant `PROGRESS.md` and say why.
+
+- An external provider **never touches money** — no wallet access, no balances, no payouts.
+- Only **skill-based** games are in scope. Chance-determined outcomes invert the
+  regulatory position in `legal/ChartVolt-Regulatory-Defence-Pack.html`.
+- **Stage 0 first.** `New games plan/00a-STAGE-0-prerequisite-fixes-DO-FIRST.md` is a
+  prerequisite with its own owner sign-off, before any games work starts.
+- `gameKey` is **immutable** once written — it is the join key for all historical stats.
+- Scores enter the system through **exactly one** ingestion function.
+- **Nothing in the marketplace may improve a player's score or ranking in a paid
+  contest.** Cosmetics, titles, entry-fee vouchers and extra *practice* are fine;
+  extra time, retries, hints, skips and easier content are not. Fairness, the
+  regulatory position and chargeback exposure each independently require this.
+- **No random or mystery packs**, even cosmetic ones — paying for a randomised reward
+  introduces the chance element the regulatory defence depends on being absent.
+- The **game module registry (code)** and the **game catalogue entry (content)** are
+  separate concepts. One module may back several catalogue entries.
+- Build the games catalogue and games-first navigation **after** the first real second
+  game exists. An almost-empty catalogue is worse than none. It is **P7**, last.
+- **Page content per game is contractual for external providers** — tagline,
+  description, rules summary, how-to-play, thumbnail and banner, localised into every
+  locale they declare, with no provider branding in the copy. Each provider title gets
+  its own game page; a provider who will not supply content is transferring their
+  content cost to us per title, forever.
+- `/competitions` is **retained** alongside `/games`. Some players browse by game,
+  others by what starts soonest or has the biggest pot. Do not replace one with the other.
+- **No paid format is ever single-player.** A **competition** is two or more players,
+  usually many, with winners sharing the pool. A **challenge** is exactly two. Practice is
+  the only one-player mode and it is free, unranked and prize-less. `minParticipants`
+  defaults to 2 and auto-cancels with full refunds below it — that behaviour already exists
+  and must not be weakened.
+- **"Independent play" describes gameplay, not contest size**, and the earlier name
+  "solo-scored" was replaced because it was read as the latter. Trading is itself an
+  independent-play game: every trader plays their own account and all are ranked together.
+  If a document implies an independent-play game means a solo contest, that is a bug.
+- Use **"challenge"**, never "duel". The codebase has a `Challenge` model, `/challenges`
+  routes, `challengesEnabled`, and `challenge_entry` / `challenge_refund` ledger values.
+  The provider-facing capability flag is `supportsOneVsOne`.
+- **Game Masters must work identically on every game** — create contests, refer players,
+  earn a share of referred players' entry fees. They are **~2.5 weeks of work, not four
+  days**; any document saying otherwise is stale. Two facts that are easy to get wrong:
+  a Game Master earns from **referred players' entry fees in any contest**, not from
+  contests they created; and the Game Master competition route **inserts with the raw
+  MongoDB driver and sets no game label**, which makes stamping it a **gate** in the
+  foundation phase rather than a task.
+- **A Game Master may not create external-provider contests until the revenue share is
+  computed on net platform fee after provider cost.** `limits.allowedGameTypes` defaults
+  to `["trading"]`. They still *earn* from provider contests from day one. Reason: the
+  share is a percentage of the entry fee taken before provider cost exists, and the
+  existing cap is against **gross** platform fee, so a low-fee contest can be net
+  loss-making while still paying out. `External game plans/19-game-masters.md` section 5.

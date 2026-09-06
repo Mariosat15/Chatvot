@@ -1,34 +1,52 @@
-'use server';
+"use server";
 
-import { revalidatePath, unstable_noStore as noStore } from 'next/cache';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { redirect } from 'next/navigation';
-import { connectToDatabase } from '@/database/mongoose';
-import TradingPosition from '@/database/models/trading/trading-position.model';
-import TradingOrder from '@/database/models/trading/trading-order.model';
-import TradeHistory from '@/database/models/trading/trade-history.model';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import ChallengeParticipant from '@/database/models/trading/challenge-participant.model';
-import mongoose from 'mongoose';
-import { getParticipant, ContestType } from './contest-utils';
+import { revalidatePath, unstable_noStore as noStore } from "next/cache";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { connectToDatabase } from "@/database/mongoose";
+import TradingPosition from "@/database/models/trading/trading-position.model";
+import TradingOrder from "@/database/models/trading/trading-order.model";
+import TradeHistory from "@/database/models/trading/trade-history.model";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
+import mongoose from "mongoose";
+import { getParticipant, ContestType } from "./contest-utils";
 import {
   calculateUnrealizedPnL,
   calculatePnLPercentage,
   ForexSymbol,
-} from '@/lib/services/pnl-calculator.service';
-import { getRealPrice, isForexMarketOpen, getMarketStatus } from '@/lib/services/real-forex-prices.service';
-import { getMarginStatus } from '@/lib/services/risk-manager.service';
+  getQuoteToUsdRate,
+  getConversionPairSymbols,
+} from "@/lib/services/pnl-calculator.service";
+import {
+  getRealPrice,
+  fetchRealForexPrices,
+  getMarketStatus,
+} from "@/lib/services/real-forex-prices.service";
+import {
+  getSymbolConfig,
+  getMultipleSymbolConfigs,
+} from "@/lib/services/symbol-config.service";
+import { isMarketOpen } from "@/lib/services/market-hours.service";
+import { getMarginStatus } from "@/lib/services/risk-manager.service";
+import PriceLog from "@/database/models/trading/price-log.model";
+import { invalidateRankingCache } from "@/lib/caches/ranking-cache";
 
 /**
  * Check if market is open and throw error if closed
- * Used for all user-initiated trading actions
+ * Uses admin-configured market hours and holidays
  */
 async function ensureMarketOpen(): Promise<void> {
-  const isOpen = await isForexMarketOpen();
-  if (!isOpen) {
-    const status = getMarketStatus();
-    throw new Error(`Market is currently closed. ${status}. Trading is not available until market opens.`);
+  const marketStatus = await isMarketOpen("forex");
+  if (!marketStatus.isOpen) {
+    const reason = marketStatus.reason || getMarketStatus();
+    const holidayInfo = marketStatus.isHoliday
+      ? ` (Holiday: ${marketStatus.holidayName})`
+      : "";
+    throw new Error(
+      `Market is currently closed${holidayInfo}. ${reason}. Trading is not available until market opens.`,
+    );
   }
 }
 
@@ -36,38 +54,62 @@ async function ensureMarketOpen(): Promise<void> {
 export const getUserPositions = async (competitionId: string) => {
   // Disable caching to always fetch fresh position data (including TP/SL)
   noStore();
-  
+
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) redirect('/sign-in');
+    if (!session?.user) redirect("/sign-in");
 
     await connectToDatabase();
 
     const positions = await TradingPosition.find({
       competitionId,
       userId: session.user.id,
-      status: 'open',
+      status: "open",
     })
       .sort({ openedAt: -1 })
       .lean();
 
-    // Update P&L for each position with current REAL prices
-    const positionsWithCurrentPnL = await Promise.all(positions.map(async (position: any) => {
-      const currentPrice = await getRealPrice(position.symbol as ForexSymbol);
+    // OPTIMIZATION: Fetch all prices at once (single batch request)
+    const uniqueSymbols = [
+      ...new Set(positions.map((p) => p.symbol)),
+    ] as ForexSymbol[];
+    const convSyms = getConversionPairSymbols(uniqueSymbols);
+    const allFetchSymbols = [
+      ...new Set([...uniqueSymbols, ...convSyms]),
+    ] as ForexSymbol[];
+    const pricesMap =
+      allFetchSymbols.length > 0
+        ? await fetchRealForexPrices(allFetchSymbols)
+        : new Map();
+
+    const symConfigs = await getMultipleSymbolConfigs(uniqueSymbols);
+
+    // Update P&L for each position with current REAL prices (instant - from batch)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const positionsWithCurrentPnL = positions.map((position: any) => {
+      const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
       if (currentPrice) {
-        const marketPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
+        const symbolCfg = symConfigs.get(position.symbol)!;
+        const marketPrice =
+          position.side === "long" ? currentPrice.bid : currentPrice.ask;
+        const rate = getQuoteToUsdRate(
+          position.symbol as ForexSymbol,
+          pricesMap as Map<string, { bid: number; ask: number }>,
+        );
         const pnl = calculateUnrealizedPnL(
           position.side,
           position.entryPrice,
           marketPrice,
           position.quantity,
-          position.symbol as ForexSymbol
+          position.symbol as ForexSymbol,
+          rate,
+          symbolCfg,
         );
         const pnlPercentage = calculatePnLPercentage(pnl, position.marginUsed);
 
         return {
           ...position,
-          orderType: position.orderType || 'market', // Default to 'market' for old positions
+          orderType: position.orderType || "market", // Default to 'market' for old positions
           limitPrice: position.limitPrice,
           takeProfit: position.takeProfit,
           stopLoss: position.stopLoss,
@@ -78,29 +120,17 @@ export const getUserPositions = async (competitionId: string) => {
       }
       return {
         ...position,
-        orderType: position.orderType || 'market', // Default to 'market' for old positions
+        orderType: position.orderType || "market", // Default to 'market' for old positions
         limitPrice: position.limitPrice,
         takeProfit: position.takeProfit,
         stopLoss: position.stopLoss,
       };
-    }));
-
-    // Debug: Log TP/SL data being returned
-    console.log(`📊 Fetched ${positionsWithCurrentPnL.length} positions with TP/SL:`, 
-      positionsWithCurrentPnL.map(p => ({
-        id: p._id,
-        symbol: p.symbol,
-        hasTP: !!p.takeProfit,
-        hasSL: !!p.stopLoss,
-        tp: p.takeProfit,
-        sl: p.stopLoss
-      }))
-    );
+    });
 
     return JSON.parse(JSON.stringify(positionsWithCurrentPnL));
   } catch (error) {
-    console.error('Error getting positions:', error);
-    throw new Error('Failed to get positions');
+    console.error("Error getting positions:", error);
+    throw new Error("Failed to get positions");
   }
 };
 
@@ -108,11 +138,11 @@ export const getUserPositions = async (competitionId: string) => {
 export const updatePositionTPSL = async (
   positionId: string,
   takeProfit: number | null,
-  stopLoss: number | null
+  stopLoss: number | null,
 ) => {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) redirect('/sign-in');
+    if (!session?.user) redirect("/sign-in");
 
     // ⏰ Check if market is open
     console.log(`⏰ Checking market status for TP/SL modification...`);
@@ -121,23 +151,33 @@ export const updatePositionTPSL = async (
       console.log(`   ✅ Market is open`);
     } catch (marketError) {
       console.log(`   ❌ Market is closed - modification blocked`);
-      return { 
-        success: false, 
-        error: marketError instanceof Error ? marketError.message : 'Market is closed' 
+      return {
+        success: false,
+        error:
+          marketError instanceof Error
+            ? marketError.message
+            : "Market is closed",
       };
     }
 
     // Check if user is restricted from trading
-    console.log(`🔐 Checking trading restrictions for user ${session.user.id} (modify TP/SL)`);
-    const { canUserPerformAction } = await import('@/lib/services/user-restriction.service');
-    const restrictionCheck = await canUserPerformAction(session.user.id, 'trade');
+    console.log(
+      `🔐 Checking trading restrictions for user ${session.user.id} (modify TP/SL)`,
+    );
+    const { canUserPerformAction } =
+      await import("@/lib/services/user-restriction.service");
+    const restrictionCheck = await canUserPerformAction(
+      session.user.id,
+      "trade",
+    );
     console.log(`   Restriction check result:`, restrictionCheck);
 
     if (!restrictionCheck.allowed) {
       console.log(`   ❌ Modification blocked due to restrictions`);
-      return { 
-        success: false, 
-        error: restrictionCheck.reason || 'You are not allowed to modify trades' 
+      return {
+        success: false,
+        error:
+          restrictionCheck.reason || "You are not allowed to modify trades",
       };
     }
     console.log(`   ✅ User allowed to modify position`);
@@ -147,11 +187,11 @@ export const updatePositionTPSL = async (
     const position = await TradingPosition.findOne({
       _id: positionId,
       userId: session.user.id,
-      status: 'open',
+      status: "open",
     });
 
     if (!position) {
-      return { success: false, error: 'Position not found or already closed' };
+      return { success: false, error: "Position not found or already closed" };
     }
 
     // Update TP/SL
@@ -159,11 +199,30 @@ export const updatePositionTPSL = async (
     position.stopLoss = stopLoss || undefined;
     await position.save();
 
-    revalidatePath('/');
+    // ⚡ Update real-time TP/SL cache for instant triggering
+    try {
+      const { updatePositionInCache } =
+        await import("@/lib/services/tpsl-realtime.service");
+      updatePositionInCache(
+        position._id.toString(),
+        position.symbol,
+        position.side,
+        takeProfit,
+        stopLoss,
+        position.entryPrice,
+        position.quantity,
+        position.userId.toString(),
+        position.competitionId.toString(),
+      );
+    } catch {
+      // Cache update is optional, don't fail the operation
+    }
+
+    revalidatePath("/");
 
     return {
       success: true,
-      message: 'TP/SL updated successfully',
+      message: "TP/SL updated successfully",
       position: {
         _id: position._id.toString(),
         takeProfit: position.takeProfit,
@@ -171,19 +230,23 @@ export const updatePositionTPSL = async (
       },
     };
   } catch (error) {
-    console.error('Error updating TP/SL:', error);
+    console.error("Error updating TP/SL:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to update TP/SL',
+      error: error instanceof Error ? error.message : "Failed to update TP/SL",
     };
   }
 };
 
 // Close a position manually
-export const closePosition = async (positionId: string) => {
+// requestedPrice: Optional locked price from frontend (what user saw when they clicked close)
+export const closePosition = async (
+  positionId: string,
+  requestedPrice?: { bid: number; ask: number; timestamp: number },
+) => {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-    if (!session?.user) redirect('/sign-in');
+    if (!session?.user) redirect("/sign-in");
 
     // ⏰ Check if market is open
     console.log(`⏰ Checking market status for closing position...`);
@@ -191,14 +254,22 @@ export const closePosition = async (positionId: string) => {
     console.log(`   ✅ Market is open`);
 
     // Check if user is restricted from trading
-    console.log(`🔐 Checking trading restrictions for user ${session.user.id} (close position)`);
-    const { canUserPerformAction } = await import('@/lib/services/user-restriction.service');
-    const restrictionCheck = await canUserPerformAction(session.user.id, 'trade');
+    console.log(
+      `🔐 Checking trading restrictions for user ${session.user.id} (close position)`,
+    );
+    const { canUserPerformAction } =
+      await import("@/lib/services/user-restriction.service");
+    const restrictionCheck = await canUserPerformAction(
+      session.user.id,
+      "trade",
+    );
     console.log(`   Restriction check result:`, restrictionCheck);
 
     if (!restrictionCheck.allowed) {
       console.log(`   ❌ Close position blocked due to restrictions`);
-      throw new Error(restrictionCheck.reason || 'You are not allowed to close trades');
+      throw new Error(
+        restrictionCheck.reason || "You are not allowed to close trades",
+      );
     }
     console.log(`   ✅ User allowed to close position`);
 
@@ -207,26 +278,130 @@ export const closePosition = async (positionId: string) => {
     const position = await TradingPosition.findOne({
       _id: positionId,
       userId: session.user.id,
-      status: 'open',
+      status: "open",
     });
 
     if (!position) {
-      throw new Error('Position not found or already closed');
+      throw new Error("Position not found or already closed");
     }
 
-    // Get current REAL market price
-    const currentPrice = await getRealPrice(position.symbol as ForexSymbol);
-    if (!currentPrice) {
-      throw new Error('Unable to get current market price. Market may be closed or API unavailable.');
+    const symbolCfg = await getSymbolConfig(position.symbol);
+
+    // 🚨 Check if competition is PAUSED (risk mitigation)
+    // Users cannot close positions manually during pause - positions are frozen
+    const Competition = (
+      await import("@/database/models/trading/competition.model")
+    ).default;
+    const competition = await Competition.findById(
+      position.competitionId,
+    ).select("isPaused pauseReason status");
+    if (competition?.isPaused) {
+      const pauseReason = competition.pauseReason || "Technical issues";
+      throw new Error(
+        `⏸️ Competition is PAUSED: ${pauseReason}\n\nAll positions are frozen. You cannot close trades until the competition resumes.`,
+      );
+    }
+    if (competition?.status === "emergency_ended") {
+      throw new Error(
+        `Competition was emergency ended. Trading is not available.`,
+      );
     }
 
-    const exitPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
+    // Determine exit price - use locked price from frontend if provided and fresh
+    let exitPrice: number;
+    let currentPrice: {
+      bid: number;
+      ask: number;
+      mid: number;
+      spread: number;
+      timestamp: number;
+    };
+
+    const MAX_PRICE_AGE_MS = 2000; // Max 2 seconds old for locked price
+    const MAX_SLIPPAGE_PIPS = 5; // Max 5 pips slippage allowed
+    const pipSize = position.symbol.includes("JPY") ? 0.01 : 0.0001;
+
+    if (
+      requestedPrice &&
+      Date.now() - requestedPrice.timestamp < MAX_PRICE_AGE_MS
+    ) {
+      // User provided a locked price that's still fresh - USE IT
+      console.log(
+        `🔒 [EXIT] Using LOCKED price from frontend (age: ${Date.now() - requestedPrice.timestamp}ms)`,
+      );
+      console.log(`   Locked BID: ${requestedPrice.bid.toFixed(5)}`);
+      console.log(`   Locked ASK: ${requestedPrice.ask.toFixed(5)}`);
+
+      exitPrice =
+        position.side === "long" ? requestedPrice.bid : requestedPrice.ask;
+      currentPrice = {
+        bid: requestedPrice.bid,
+        ask: requestedPrice.ask,
+        mid: (requestedPrice.bid + requestedPrice.ask) / 2,
+        spread: requestedPrice.ask - requestedPrice.bid,
+        timestamp: requestedPrice.timestamp,
+      };
+
+      console.log(
+        `   Exit Price: ${exitPrice.toFixed(5)} (${position.side === "long" ? "BID" : "ASK"}) ✅ LOCKED`,
+      );
+    } else {
+      // No locked price or too old - fetch fresh price
+      console.log(
+        `🔄 [EXIT] Fetching fresh price (no locked price or expired)`,
+      );
+      const freshPrice = await getRealPrice(position.symbol as ForexSymbol);
+      if (!freshPrice) {
+        throw new Error(
+          "Unable to get current market price. Market may be closed or API unavailable.",
+        );
+      }
+
+      currentPrice = freshPrice;
+      exitPrice = position.side === "long" ? freshPrice.bid : freshPrice.ask;
+
+      console.log(`   Fresh BID: ${freshPrice.bid.toFixed(5)}`);
+      console.log(`   Fresh ASK: ${freshPrice.ask.toFixed(5)}`);
+      console.log(
+        `   Exit Price: ${exitPrice.toFixed(5)} (${position.side === "long" ? "BID" : "ASK"})`,
+      );
+
+      // If user provided a price but it's stale, warn about slippage
+      if (requestedPrice) {
+        const expectedExit =
+          position.side === "long" ? requestedPrice.bid : requestedPrice.ask;
+        const slippagePips = Math.abs(exitPrice - expectedExit) / pipSize;
+        console.log(
+          `   ⚠️ Locked price expired (age: ${Date.now() - requestedPrice.timestamp}ms)`,
+        );
+        console.log(
+          `   Slippage: ${slippagePips.toFixed(2)} pips from expected ${expectedExit.toFixed(5)}`,
+        );
+      }
+    }
 
     // Calculate spread costs
     const entrySpread = position.entryPrice * 0.0001; // Approximate entry spread (we don't store it)
     const exitSpread = currentPrice.spread; // Current spread at exit
     const spreadCostInPips = (entrySpread + exitSpread) / 0.0001; // Total spread in pips
-    const spreadCostInUSD = (entrySpread + exitSpread) * position.quantity * 100000; // Spread cost in USD
+
+    // Fetch USD conversion rate for non-USD-quoted pairs
+    const posConvSyms = getConversionPairSymbols([
+      position.symbol as ForexSymbol,
+    ]);
+    let posConvPrices: Map<string, { bid: number; ask: number }> = new Map();
+    if (posConvSyms.length > 0) {
+      const m = await fetchRealForexPrices(posConvSyms);
+      posConvPrices = m as Map<string, { bid: number; ask: number }>;
+    }
+    const posRate = getQuoteToUsdRate(
+      position.symbol as ForexSymbol,
+      posConvPrices,
+    );
+
+    const spreadCostInUSD =
+      ((entrySpread + exitSpread) * position.quantity * symbolCfg.contractSize) /
+      (posRate > 0 ? posRate : 1);
 
     // Calculate final P&L
     const realizedPnl = calculateUnrealizedPnL(
@@ -234,9 +409,14 @@ export const closePosition = async (positionId: string) => {
       position.entryPrice,
       exitPrice,
       position.quantity,
-      position.symbol as ForexSymbol
+      position.symbol as ForexSymbol,
+      posRate,
+      symbolCfg,
     );
-    const realizedPnlPercentage = calculatePnLPercentage(realizedPnl, position.marginUsed);
+    const realizedPnlPercentage = calculatePnLPercentage(
+      realizedPnl,
+      position.marginUsed,
+    );
 
     // Start MongoDB transaction
     const mongoSession = await mongoose.startSession();
@@ -244,12 +424,13 @@ export const closePosition = async (positionId: string) => {
 
     try {
       // Update position
-      position.status = 'closed';
-      position.closeReason = 'user';
+      position.status = "closed";
+      position.closeReason = "user";
+      position.exitPrice = exitPrice; // Actual closing price (for accurate PNL history)
       position.currentPrice = exitPrice;
       position.closedAt = new Date();
       position.holdingTimeSeconds = Math.floor(
-        (position.closedAt.getTime() - position.openedAt.getTime()) / 1000
+        (position.closedAt.getTime() - position.openedAt.getTime()) / 1000,
       );
       await position.save({ session: mongoSession });
 
@@ -261,25 +442,31 @@ export const closePosition = async (positionId: string) => {
             userId: position.userId,
             participantId: position.participantId,
             symbol: position.symbol,
-            side: position.side === 'long' ? 'sell' : 'buy',
-            orderType: 'market',
+            side: position.side === "long" ? "sell" : "buy",
+            orderType: "market",
             quantity: position.quantity,
             executedPrice: exitPrice,
             leverage: position.leverage,
             marginRequired: 0,
-            status: 'filled',
+            status: "filled",
             filledQuantity: position.quantity,
             remainingQuantity: 0,
             placedAt: new Date(),
             executedAt: new Date(),
-            orderSource: 'web',
+            orderSource: "web",
             positionId: position._id.toString(),
           },
         ],
-        { session: mongoSession }
+        { session: mongoSession },
       );
 
-      position.closeOrderId = closeOrder[0]._id.toString();
+      // Reason: Mongoose create() returns array; destructure + guard for safety
+      const createdCloseOrder = closeOrder[0];
+      if (!createdCloseOrder) {
+        throw new Error("Failed to create close order record");
+      }
+
+      position.closeOrderId = createdCloseOrder._id.toString();
       await position.save({ session: mongoSession });
 
       // Create trade history
@@ -292,12 +479,13 @@ export const closePosition = async (positionId: string) => {
             symbol: position.symbol,
             side: position.side,
             quantity: position.quantity,
-            orderType: position.orderType || 'market',
+            orderType: position.orderType || "market",
             limitPrice: position.limitPrice,
             entryPrice: position.entryPrice,
             exitPrice: exitPrice,
             priceChange: exitPrice - position.entryPrice,
-            priceChangePercentage: ((exitPrice - position.entryPrice) / position.entryPrice) * 100,
+            priceChangePercentage:
+              ((exitPrice - position.entryPrice) / position.entryPrice) * 100,
             realizedPnl,
             realizedPnlPercentage,
             entrySpread: entrySpread,
@@ -309,7 +497,7 @@ export const closePosition = async (positionId: string) => {
             openedAt: position.openedAt,
             closedAt: position.closedAt,
             holdingTimeSeconds: position.holdingTimeSeconds,
-            closeReason: 'user',
+            closeReason: "user",
             leverage: position.leverage,
             marginUsed: position.marginUsed,
             hadStopLoss: !!position.stopLoss,
@@ -317,169 +505,308 @@ export const closePosition = async (positionId: string) => {
             hadTakeProfit: !!position.takeProfit,
             takeProfitPrice: position.takeProfit,
             openOrderId: position.openOrderId,
-            closeOrderId: closeOrder[0]._id.toString(),
+            closeOrderId: createdCloseOrder._id.toString(),
             positionId: position._id.toString(),
             isWinner: realizedPnl > 0,
           },
         ],
-        { session: mongoSession }
+        { session: mongoSession },
       );
 
-      position.tradeHistoryId = tradeHistory[0]._id.toString();
+      // Reason: Mongoose create() returns array; destructure + guard for safety
+      const createdTradeHistory = tradeHistory[0];
+      if (!createdTradeHistory) {
+        throw new Error("Failed to create trade history record");
+      }
+
+      position.tradeHistoryId = createdTradeHistory._id.toString();
       await position.save({ session: mongoSession });
 
-      // Detect contest type and get participant
-      const contestInfo = await getParticipant(position.competitionId, position.userId);
-      const contestType: ContestType = contestInfo?.type || 'competition';
-      const ParticipantModel = contestType === 'competition' ? CompetitionParticipant : ChallengeParticipant;
-      
-      // Update participant
-      const participant = await ParticipantModel.findById(position.participantId).session(
-        mongoSession
-      );
-      if (!participant) throw new Error('Participant not found');
+      // Check if this is a simulator position (skip participant updates for simulator)
+      const isSimulatorPosition = position.metadata?.simulatorMode === true;
 
-      const newCapital = participant.currentCapital + realizedPnl;
-      const newAvailableCapital = participant.availableCapital + position.marginUsed + realizedPnl;
-      const newRealizedPnl = participant.realizedPnl + realizedPnl;
-      const newPnl = participant.pnl + realizedPnl;
-      const newPnlPercentage = ((newCapital - participant.startingCapital) / participant.startingCapital) * 100;
+      // Detect contest type and get participant
+      const contestInfo = await getParticipant(
+        position.competitionId,
+        position.userId,
+      );
+      const contestType: ContestType = contestInfo?.type || "competition";
+      const ParticipantModel =
+        contestType === "competition"
+          ? CompetitionParticipant
+          : ChallengeParticipant;
+
+      // Update participant (skip for simulator positions - they have fake participantIds)
+      const participant = isSimulatorPosition
+        ? null
+        : await ParticipantModel.findById(position.participantId).session(
+            mongoSession,
+          );
+
+      if (!participant && !isSimulatorPosition) {
+        throw new Error("Participant not found");
+      }
+
+      // 📝 Log price snapshot for trade validation/auditing (NON-BLOCKING)
+      const expectedExitPrice =
+        position.side === "long" ? currentPrice.bid : currentPrice.ask;
+      const pipSize = position.symbol.includes("JPY") ? 0.01 : 0.0001;
+      const exitSlippagePips =
+        Math.abs(exitPrice - expectedExitPrice) / pipSize;
+
+      // Don't await - this is non-critical and shouldn't block the response
+      PriceLog.create({
+        symbol: position.symbol,
+        bid: currentPrice.bid,
+        ask: currentPrice.ask,
+        mid: currentPrice.mid,
+        spread: currentPrice.spread,
+        timestamp: new Date(),
+        tradeId: position._id.toString(),
+        tradeType: "exit",
+        tradeSide: position.side,
+        executionPrice: exitPrice,
+        expectedPrice: expectedExitPrice,
+        priceMatchesExpected: exitSlippagePips < 0.5,
+        slippagePips: exitSlippagePips,
+        priceSource: "rest",
+      }).catch((logError) => {
+        console.warn(
+          "⚠️ Failed to create exit price log (non-critical):",
+          logError,
+        );
+      });
 
       // Log trade details for transparency
-      console.log('💰 POSITION CLOSED:');
+      console.log("💰 POSITION CLOSED:");
       console.log(`   Symbol: ${position.symbol}`);
       console.log(`   Side: ${position.side.toUpperCase()}`);
       console.log(`   Quantity: ${position.quantity} lots`);
       console.log(`   Entry Price: ${position.entryPrice.toFixed(5)}`);
       console.log(`   Exit Price: ${exitPrice.toFixed(5)}`);
-      console.log(`   📊 Spread Costs:`);
-      console.log(`      Entry Spread: ${(entrySpread * 10000).toFixed(1)} pips`);
-      console.log(`      Exit Spread: ${(exitSpread * 10000).toFixed(1)} pips`);
-      console.log(`      Total Spread Cost: ${spreadCostInPips.toFixed(1)} pips ($${spreadCostInUSD.toFixed(2)})`);
-      console.log(`   Realized P&L: ${realizedPnl >= 0 ? '+' : ''}$${realizedPnl.toFixed(2)} (${realizedPnlPercentage.toFixed(2)}%)`);
-      console.log(`   Note: P&L already includes spread costs (you bought at ASK, sold at BID)`);
-      console.log(`   Margin Released: $${position.marginUsed.toFixed(2)}`);
-      console.log(`   Previous Available Capital: $${participant.availableCapital.toFixed(2)}`);
-      console.log(`   New Available Capital: $${newAvailableCapital.toFixed(2)} (${realizedPnl >= 0 ? 'PROFIT ADDED ✅' : 'LOSS DEDUCTED ❌'})`);
-
-      const isWinner = realizedPnl > 0;
-      const winningTrades = participant.winningTrades + (isWinner ? 1 : 0);
-      const losingTrades = participant.losingTrades + (isWinner ? 0 : 1);
-      const totalTrades = participant.totalTrades + 1; // INCREMENT total trades!
-      const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
-
-      // Update averages
-      const averageWin = winningTrades > 0
-        ? (participant.averageWin * participant.winningTrades + (isWinner ? realizedPnl : 0)) / winningTrades
-        : 0;
-      const averageLoss = losingTrades > 0
-        ? (participant.averageLoss * participant.losingTrades + (!isWinner ? Math.abs(realizedPnl) : 0)) / losingTrades
-        : 0;
-
-      await ParticipantModel.findByIdAndUpdate(
-        participant._id,
-        {
-          $inc: {
-            currentOpenPositions: -1,
-            totalTrades: 1, // INCREMENT total trades!
-            winningTrades: isWinner ? 1 : 0,
-            losingTrades: isWinner ? 0 : 1,
-          },
-          $set: {
-            currentCapital: newCapital,
-            availableCapital: newAvailableCapital,
-            usedMargin: participant.usedMargin - position.marginUsed,
-            realizedPnl: newRealizedPnl,
-            pnl: newPnl,
-            pnlPercentage: newPnlPercentage,
-            winRate: winRate,
-            averageWin: averageWin,
-            averageLoss: averageLoss,
-            largestWin: Math.max(participant.largestWin, realizedPnl),
-            largestLoss: Math.min(participant.largestLoss, realizedPnl),
-          },
-        },
-        { session: mongoSession }
+      console.log(
+        `   Bid/Ask at Exit: ${currentPrice.bid.toFixed(5)} / ${currentPrice.ask.toFixed(5)}`,
       );
+      console.log(`   Exit Slippage: ${exitSlippagePips.toFixed(2)} pips`);
+      console.log(`   📊 Spread Costs:`);
+      console.log(
+        `      Entry Spread: ${(entrySpread * 10000).toFixed(1)} pips`,
+      );
+      console.log(`      Exit Spread: ${(exitSpread * 10000).toFixed(1)} pips`);
+      console.log(
+        `      Total Spread Cost: ${spreadCostInPips.toFixed(1)} pips ($${spreadCostInUSD.toFixed(2)})`,
+      );
+      console.log(
+        `   Realized P&L: ${realizedPnl >= 0 ? "+" : ""}$${realizedPnl.toFixed(2)} (${realizedPnlPercentage.toFixed(2)}%)`,
+      );
+      console.log(
+        `   Note: P&L already includes spread costs (you bought at ASK, sold at BID)`,
+      );
+      console.log(`   Margin Released: $${position.marginUsed.toFixed(2)}`);
+
+      // Only update participant stats for real positions (not simulator)
+      if (participant && !isSimulatorPosition) {
+        const newCapital = participant.currentCapital + realizedPnl;
+        const newAvailableCapital =
+          participant.availableCapital + position.marginUsed + realizedPnl;
+        const newRealizedPnl = participant.realizedPnl + realizedPnl;
+        const newPnl = participant.pnl + realizedPnl;
+        const newPnlPercentage =
+          ((newCapital - participant.startingCapital) /
+            participant.startingCapital) *
+          100;
+
+        console.log(
+          `   Previous Available Capital: $${participant.availableCapital.toFixed(2)}`,
+        );
+        console.log(
+          `   New Available Capital: $${newAvailableCapital.toFixed(2)} (${realizedPnl >= 0 ? "PROFIT ADDED ✅" : "LOSS DEDUCTED ❌"})`,
+        );
+
+        const isWinner = realizedPnl > 0;
+        const isLoser = realizedPnl < 0;
+        // Reason: Breakeven trades (PnL === 0) should NOT count as losses.
+        // Only increment winningTrades for profit, losingTrades for loss.
+        const winningTrades = participant.winningTrades + (isWinner ? 1 : 0);
+        const losingTrades = participant.losingTrades + (isLoser ? 1 : 0);
+        // Note: totalTrades was already incremented when position was opened
+        const totalTrades = participant.totalTrades;
+        const winRate =
+          totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+
+        // Update averages
+        const averageWin =
+          winningTrades > 0
+            ? (participant.averageWin * participant.winningTrades +
+                (isWinner ? realizedPnl : 0)) /
+              winningTrades
+            : 0;
+        const averageLoss =
+          losingTrades > 0
+            ? (participant.averageLoss * participant.losingTrades +
+                (!isWinner ? Math.abs(realizedPnl) : 0)) /
+              losingTrades
+            : 0;
+
+        await ParticipantModel.findByIdAndUpdate(
+          participant._id,
+          {
+            $inc: {
+              currentOpenPositions: -1,
+              // totalTrades already counted on position open
+              winningTrades: isWinner ? 1 : 0,
+              losingTrades: isLoser ? 1 : 0,
+            },
+            $set: {
+              currentCapital: newCapital,
+              availableCapital: newAvailableCapital,
+              usedMargin: Math.max(0, participant.usedMargin - position.marginUsed), // Clamp to 0 — IEEE 754 can produce tiny negatives
+              realizedPnl: newRealizedPnl,
+              pnl: newPnl,
+              pnlPercentage: newPnlPercentage,
+              winRate: winRate,
+              averageWin: averageWin,
+              averageLoss: averageLoss,
+              largestWin: Math.max(participant.largestWin, realizedPnl),
+              largestLoss: Math.min(participant.largestLoss, realizedPnl),
+            },
+          },
+          { session: mongoSession },
+        );
+      } else if (isSimulatorPosition) {
+        console.log(`   🧪 Simulator position - skipping participant update`);
+      }
 
       await mongoSession.commitTransaction();
+      mongoSession.endSession(); // End session immediately after commit
 
-      console.log(`✅ Position closed: ${position.symbol}, P&L: $${realizedPnl.toFixed(2)}`);
+      // Reason: Invalidate the live-ranking cache so the next API poll
+      // returns fresh data (updated win rate, PnL, etc.) immediately.
+      if (position.competitionId) {
+        invalidateRankingCache(position.competitionId);
+      }
 
-      // Evaluate badges for the user (fire and forget - don't wait)
+      console.log(
+        `✅ Position closed: ${position.symbol}, P&L: $${realizedPnl.toFixed(2)}`,
+      );
+
+      // Award activity XP for trade completion (fire and forget)
       try {
-        const { evaluateUserBadges } = await import('@/lib/services/badge-evaluation.service');
-        evaluateUserBadges(session.user.id).then(result => {
-          if (result.newBadges.length > 0) {
-            console.log(`🏅 User earned ${result.newBadges.length} new badges after closing position`);
-          }
-        }).catch(err => console.error('Error evaluating badges:', err));
+        const { awardActivityXP } = await import("@/lib/services/xp-level.service");
+        const isWin = realizedPnl > 0;
+        // Award base trade XP + bonus for winning trade
+        awardActivityXP(session.user.id, "trade_completed").catch(() => {});
+        if (isWin) {
+          awardActivityXP(session.user.id, "winning_trade").catch(() => {});
+        }
       } catch (error) {
-        console.error('Error importing badge service:', error);
+        console.error("Error awarding activity XP:", error);
+      }
+
+      // Evaluate badges for the user (fire and forget - only trading-related categories)
+      try {
+        const { evaluateUserBadges } =
+          await import("@/lib/services/badge-evaluation.service");
+        evaluateUserBadges(session.user.id, ["Trading", "Profit", "Risk", "Speed", "Consistency", "Strategy"])
+          .then((result) => {
+            if (result.newBadges.length > 0) {
+              console.log(
+                `🏅 User earned ${result.newBadges.length} new badges after closing position`,
+              );
+            }
+          })
+          .catch((err) => console.error("Error evaluating badges:", err));
+      } catch (error) {
+        console.error("Error importing badge service:", error);
       }
 
       // Update behavioral trading profile and check for mirror trading + similarity (fire and forget)
       try {
-        const { BehavioralAnalysisService } = await import('@/lib/services/fraud/behavioral-analysis.service');
-        const { MirrorTradingService } = await import('@/lib/services/fraud/mirror-trading.service');
-        const { SimilarityDetectionService } = await import('@/lib/services/fraud/similarity-detection.service');
-        
+        const { BehavioralAnalysisService } =
+          await import("@/lib/services/fraud/behavioral-analysis.service");
+        const { MirrorTradingService } =
+          await import("@/lib/services/fraud/mirror-trading.service");
+        const { SimilarityDetectionService } =
+          await import("@/lib/services/fraud/similarity-detection.service");
+
         const tradeData = {
-          tradeId: tradeHistory[0]._id.toString(),
+          tradeId: createdTradeHistory._id.toString(),
           pair: position.symbol,
-          direction: position.side === 'long' ? 'buy' as const : 'sell' as const,
+          direction:
+            position.side === "long" ? ("buy" as const) : ("sell" as const),
           openTime: position.openedAt,
           closeTime: position.closedAt,
           lotSize: position.quantity,
           pnl: realizedPnl,
-          pips: position.side === 'long' 
-            ? (exitPrice - position.entryPrice) * 10000 
-            : (position.entryPrice - exitPrice) * 10000,
+          pips:
+            position.side === "long"
+              ? (exitPrice - position.entryPrice) * 10000
+              : (position.entryPrice - exitPrice) * 10000,
           stopLoss: position.stopLoss,
-          takeProfit: position.takeProfit
+          takeProfit: position.takeProfit,
         };
-        
+
         // Update trading behavior profile
-        BehavioralAnalysisService.updateProfileOnTrade(session.user.id, tradeData)
+        BehavioralAnalysisService.updateProfileOnTrade(
+          session.user.id,
+          tradeData,
+        )
           .then(async () => {
-            console.log('📊 Trading behavior profile updated');
-            
+            console.log("📊 Trading behavior profile updated");
+
             // After updating profile, check similarity with other users who traded same pair
             try {
-              const TradingBehaviorProfile = (await import('@/database/models/fraud/trading-behavior-profile.model')).default;
+              const TradingBehaviorProfile = (
+                await import("@/database/models/fraud/trading-behavior-profile.model")
+              ).default;
               const otherProfiles = await TradingBehaviorProfile.find({
                 userId: { $ne: session.user.id },
-                'patterns.preferredPairs': position.symbol
-              }).limit(20).select('userId');
-              
-              console.log(`📊 Found ${otherProfiles.length} other users who trade ${position.symbol}`);
-              
+                "patterns.preferredPairs": position.symbol,
+              })
+                .limit(20)
+                .select("userId");
+
+              console.log(
+                `📊 Found ${otherProfiles.length} other users who trade ${position.symbol}`,
+              );
+
               for (const other of otherProfiles) {
                 SimilarityDetectionService.calculateSimilarity(
-                  session.user.id, 
-                  other.userId.toString()
-                ).then(result => {
-                  if (result.similarityScore >= 0.7) {
-                    console.log(`📊 HIGH SIMILARITY: ${(result.similarityScore * 100).toFixed(1)}% with ${other.userId.toString().substring(0, 8)}...`);
-                  }
-                }).catch(err => console.error('Error calculating similarity:', err));
+                  session.user.id,
+                  other.userId.toString(),
+                )
+                  .then((result) => {
+                    if (result.similarityScore >= 0.7) {
+                      console.log(
+                        `📊 HIGH SIMILARITY: ${(result.similarityScore * 100).toFixed(1)}% with ${other.userId.toString().substring(0, 8)}...`,
+                      );
+                    }
+                  })
+                  .catch((err) =>
+                    console.error("Error calculating similarity:", err),
+                  );
               }
             } catch (err) {
-              console.error('Error in similarity check:', err);
+              console.error("Error in similarity check:", err);
             }
           })
-          .catch(err => console.error('Error updating trading profile:', err));
-        
+          .catch((err) =>
+            console.error("Error updating trading profile:", err),
+          );
+
         // Real-time mirror trading check
-        MirrorTradingService.checkRealTimeMirrorTrading(session.user.id, tradeData)
-          .then(() => console.log('🪞 Mirror trading check completed'))
-          .catch(err => console.error('Error checking mirror trading:', err));
+        MirrorTradingService.checkRealTimeMirrorTrading(
+          session.user.id,
+          tradeData,
+        )
+          .then(() => console.log("🪞 Mirror trading check completed"))
+          .catch((err) => console.error("Error checking mirror trading:", err));
       } catch (error) {
-        console.error('Error in behavioral analysis:', error);
+        console.error("Error in behavioral analysis:", error);
       }
 
       // Revalidate appropriate paths based on contest type
-      if (contestType === 'competition') {
+      if (contestType === "competition") {
         revalidatePath(`/competitions/${position.competitionId}/trade`);
         revalidatePath(`/competitions/${position.competitionId}`);
       } else {
@@ -487,47 +814,108 @@ export const closePosition = async (positionId: string) => {
         revalidatePath(`/challenges/${position.competitionId}`);
       }
 
+      // ⚡ Emit real-time SSE event for instant UI update (manual close)
+      try {
+        const PositionEvent = (
+          await import("@/database/models/position-event.model")
+        ).default;
+        await PositionEvent.create({
+          userId: position.userId,
+          competitionId: position.competitionId,
+          contestType: contestType,
+          positionId: position._id.toString(),
+          symbol: position.symbol,
+          side: position.side,
+          eventType: "closed",
+          closeReason: "user",
+          realizedPnl: realizedPnl,
+          exitPrice: exitPrice,
+          createdAt: new Date(),
+        });
+        console.log(`⚡ [SSE] Manual close event emitted: ${position.symbol}`);
+      } catch (sseError) {
+        console.error("Error emitting SSE event:", sseError);
+      }
+
       return {
         success: true,
         realizedPnl,
-        message: `Position closed. ${realizedPnl >= 0 ? 'Profit' : 'Loss'}: $${Math.abs(realizedPnl).toFixed(2)}`,
+        message: `Position closed. ${realizedPnl >= 0 ? "Profit" : "Loss"}: $${Math.abs(realizedPnl).toFixed(2)}`,
       };
     } catch (error) {
-      await mongoSession.abortTransaction();
-      throw error;
-    } finally {
+      // Only abort if session is still in a transaction (not yet committed)
+      if (mongoSession.inTransaction()) {
+        await mongoSession.abortTransaction();
+      }
       mongoSession.endSession();
+      throw error;
     }
   } catch (error) {
-    console.error('Error closing position:', error);
-    throw new Error(error instanceof Error ? error.message : 'Failed to close position');
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "digest" in error &&
+      typeof (error as { digest: string }).digest === "string" &&
+      (error as { digest: string }).digest.startsWith("NEXT_")
+    ) {
+      throw error;
+    }
+    const msg =
+      error instanceof Error ? error.message : "Failed to close position";
+    console.error("Error closing position:", msg);
+    return { success: false as const, error: msg };
   }
 };
 
 // Update all positions P&L (called periodically)
-export const updateAllPositionsPnL = async (competitionId: string, userId: string) => {
+export const updateAllPositionsPnL = async (
+  competitionId: string,
+  userId: string,
+) => {
   try {
     await connectToDatabase();
 
     const positions = await TradingPosition.find({
       competitionId,
       userId,
-      status: 'open',
+      status: "open",
     });
+
+    if (positions.length === 0) return { success: true, unrealizedPnl: 0 };
+
+    // OPTIMIZATION: Fetch all prices at once (single batch) + conversion pairs
+    const uniqueSymbols = [
+      ...new Set(positions.map((p) => p.symbol)),
+    ] as ForexSymbol[];
+    const convSymsB = getConversionPairSymbols(uniqueSymbols);
+    const allSymsB = [
+      ...new Set([...uniqueSymbols, ...convSymsB]),
+    ] as ForexSymbol[];
+    const pricesMap = await fetchRealForexPrices(allSymsB);
+
+    const symConfigsBatch = await getMultipleSymbolConfigs(uniqueSymbols);
 
     let totalUnrealizedPnl = 0;
 
     for (const position of positions) {
-      const currentPrice = await getRealPrice(position.symbol as ForexSymbol);
+      const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
       if (!currentPrice) continue;
 
-      const marketPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
+      const symbolCfg = symConfigsBatch.get(position.symbol)!;
+      const marketPrice =
+        position.side === "long" ? currentPrice.bid : currentPrice.ask;
+      const rate = getQuoteToUsdRate(
+        position.symbol as ForexSymbol,
+        pricesMap as Map<string, { bid: number; ask: number }>,
+      );
       const pnl = calculateUnrealizedPnL(
         position.side,
         position.entryPrice,
         marketPrice,
         position.quantity,
-        position.symbol as ForexSymbol
+        position.symbol as ForexSymbol,
+        rate,
+        symbolCfg,
       );
       const pnlPercentage = calculatePnLPercentage(pnl, position.marginUsed);
 
@@ -557,7 +945,9 @@ export const updateAllPositionsPnL = async (competitionId: string, userId: strin
     if (participant) {
       const newPnl = participant.realizedPnl + totalUnrealizedPnl;
       const newPnlPercentage =
-        ((participant.currentCapital + totalUnrealizedPnl - participant.startingCapital) /
+        ((participant.currentCapital +
+          totalUnrealizedPnl -
+          participant.startingCapital) /
           participant.startingCapital) *
         100;
 
@@ -569,7 +959,7 @@ export const updateAllPositionsPnL = async (competitionId: string, userId: strin
 
     return { success: true, totalUnrealizedPnl };
   } catch (error) {
-    console.error('Error updating positions P&L:', error);
+    console.error("Error updating positions P&L:", error);
     return { success: false, totalUnrealizedPnl: 0 };
   }
 };
@@ -579,86 +969,160 @@ export const checkStopLossTakeProfit = async (competitionId: string) => {
   try {
     await connectToDatabase();
 
+    // PERF: .lean() - positions are read-only here (only checking SL/TP values)
     const positions = await TradingPosition.find({
       competitionId,
-      status: 'open',
-      $or: [{ stopLoss: { $exists: true, $ne: null } }, { takeProfit: { $exists: true, $ne: null } }],
-    });
+      status: "open",
+      $or: [
+        { stopLoss: { $exists: true, $ne: null } },
+        { takeProfit: { $exists: true, $ne: null } },
+      ],
+    }).lean() as any[];
+
+    if (positions.length === 0) return;
+
+    // OPTIMIZATION: Fetch all prices at once (single batch)
+    const uniqueSymbols = [
+      ...new Set(positions.map((p) => p.symbol)),
+    ] as ForexSymbol[];
+    const pricesMap = await fetchRealForexPrices(uniqueSymbols);
+
+    const now = Date.now();
+    const MAX_PRICE_AGE_MS = 60000; // 60 seconds
 
     for (const position of positions) {
-      const currentPrice = await getRealPrice(position.symbol as ForexSymbol);
+      // Get price from batch (instant!)
+      const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
       if (!currentPrice) continue;
 
-      const marketPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
+      // ⚠️ SAFETY CHECK: Skip if using fallback/stale prices
+      if (currentPrice.isFallback || currentPrice.isStale) {
+        console.warn(
+          `⚠️ Skipping SL/TP check for ${position.symbol} - using fallback/stale price`,
+        );
+        continue;
+      }
+
+      // Check if price is too old
+      const priceAge = now - currentPrice.timestamp;
+      if (priceAge > MAX_PRICE_AGE_MS) {
+        console.warn(
+          `⚠️ Skipping SL/TP check for ${position.symbol} - price is ${Math.round(priceAge / 1000)}s old`,
+        );
+        continue;
+      }
+
+      const marketPrice =
+        position.side === "long" ? currentPrice.bid : currentPrice.ask;
 
       let shouldClose = false;
-      let closeReason: 'stop_loss' | 'take_profit' | undefined;
+      let closeReason: "stop_loss" | "take_profit" | undefined;
 
       // Check stop loss
       if (position.stopLoss) {
-        if (position.side === 'long' && marketPrice <= position.stopLoss) {
+        if (position.side === "long" && marketPrice <= position.stopLoss) {
           shouldClose = true;
-          closeReason = 'stop_loss';
-        } else if (position.side === 'short' && marketPrice >= position.stopLoss) {
+          closeReason = "stop_loss";
+        } else if (
+          position.side === "short" &&
+          marketPrice >= position.stopLoss
+        ) {
           shouldClose = true;
-          closeReason = 'stop_loss';
+          closeReason = "stop_loss";
         }
       }
 
       // Check take profit
       if (!shouldClose && position.takeProfit) {
-        if (position.side === 'long' && marketPrice >= position.takeProfit) {
+        if (position.side === "long" && marketPrice >= position.takeProfit) {
           shouldClose = true;
-          closeReason = 'take_profit';
-        } else if (position.side === 'short' && marketPrice <= position.takeProfit) {
+          closeReason = "take_profit";
+        } else if (
+          position.side === "short" &&
+          marketPrice <= position.takeProfit
+        ) {
           shouldClose = true;
-          closeReason = 'take_profit';
+          closeReason = "take_profit";
         }
       }
 
       if (shouldClose && closeReason) {
         // Close position automatically
-        await closePositionAutomatic(position._id.toString(), marketPrice, closeReason);
-        console.log(`✅ Auto-closed position: ${position.symbol}, reason: ${closeReason}`);
+        await closePositionAutomatic(
+          position._id.toString(),
+          marketPrice,
+          closeReason,
+        );
+        console.log(
+          `✅ Auto-closed position: ${position.symbol}, reason: ${closeReason}`,
+        );
       }
     }
   } catch (error) {
-    console.error('Error checking SL/TP:', error);
+    console.error("Error checking SL/TP:", error);
   }
 };
 
-// Close position automatically (SL/TP/Liquidation)
+// Close position automatically (SL/TP/Liquidation) with retry logic for WriteConflict
 export async function closePositionAutomatic(
   positionId: string,
   exitPrice: number,
-  closeReason: 'stop_loss' | 'take_profit' | 'margin_call'
-) {
+  closeReason: "stop_loss" | "take_profit" | "margin_call",
+  retryCount = 0,
+): Promise<void> {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 100; // 100ms, 200ms, 400ms (exponential backoff)
+
   const mongoSession = await mongoose.startSession();
   mongoSession.startTransaction();
 
   try {
-    const position = await TradingPosition.findById(positionId).session(mongoSession);
-    if (!position || position.status !== 'open') {
+    const position =
+      await TradingPosition.findById(positionId).session(mongoSession);
+    if (!position || position.status !== "open") {
       await mongoSession.abortTransaction();
-      return;
+      await mongoSession.endSession();
+      return; // Position already closed or doesn't exist - this is fine
     }
+
+    const symbolCfg = await getSymbolConfig(position.symbol);
+
+    // Fetch conversion rate for non-USD-quoted pairs
+    const autoConvSyms = getConversionPairSymbols([
+      position.symbol as ForexSymbol,
+    ]);
+    let autoConvPrices: Map<string, { bid: number; ask: number }> = new Map();
+    if (autoConvSyms.length > 0) {
+      const m = await fetchRealForexPrices(autoConvSyms);
+      autoConvPrices = m as Map<string, { bid: number; ask: number }>;
+    }
+    const autoRate = getQuoteToUsdRate(
+      position.symbol as ForexSymbol,
+      autoConvPrices,
+    );
 
     const realizedPnl = calculateUnrealizedPnL(
       position.side,
       position.entryPrice,
       exitPrice,
       position.quantity,
-      position.symbol as ForexSymbol
+      position.symbol as ForexSymbol,
+      autoRate,
+      symbolCfg,
     );
-    const realizedPnlPercentage = calculatePnLPercentage(realizedPnl, position.marginUsed);
+    const realizedPnlPercentage = calculatePnLPercentage(
+      realizedPnl,
+      position.marginUsed,
+    );
 
     // Update position
-    position.status = closeReason === 'margin_call' ? 'liquidated' : 'closed';
+    position.status = closeReason === "margin_call" ? "liquidated" : "closed";
     position.closeReason = closeReason;
+    position.exitPrice = exitPrice; // Actual closing price (for accurate PNL history)
     position.currentPrice = exitPrice;
     position.closedAt = new Date();
     position.holdingTimeSeconds = Math.floor(
-      (position.closedAt.getTime() - position.openedAt.getTime()) / 1000
+      (position.closedAt.getTime() - position.openedAt.getTime()) / 1000,
     );
     await position.save({ session: mongoSession });
 
@@ -670,25 +1134,31 @@ export async function closePositionAutomatic(
           userId: position.userId,
           participantId: position.participantId,
           symbol: position.symbol,
-          side: position.side === 'long' ? 'sell' : 'buy',
-          orderType: 'market',
+          side: position.side === "long" ? "sell" : "buy",
+          orderType: "market",
           quantity: position.quantity,
           executedPrice: exitPrice,
           leverage: position.leverage,
           marginRequired: 0,
-          status: 'filled',
+          status: "filled",
           filledQuantity: position.quantity,
           remainingQuantity: 0,
           placedAt: new Date(),
           executedAt: new Date(),
-          orderSource: 'system',
+          orderSource: "system",
           positionId: position._id.toString(),
         },
       ],
-      { session: mongoSession }
+      { session: mongoSession },
     );
 
-    position.closeOrderId = closeOrder[0]._id.toString();
+    // Reason: Mongoose create() returns array; destructure + guard for safety
+    const createdCloseOrder = closeOrder[0];
+    if (!createdCloseOrder) {
+      throw new Error("Failed to create close order record (automatic)");
+    }
+
+    position.closeOrderId = createdCloseOrder._id.toString();
     await position.save({ session: mongoSession });
 
     // Create trade history
@@ -704,7 +1174,8 @@ export async function closePositionAutomatic(
           entryPrice: position.entryPrice,
           exitPrice: exitPrice,
           priceChange: exitPrice - position.entryPrice,
-          priceChangePercentage: ((exitPrice - position.entryPrice) / position.entryPrice) * 100,
+          priceChangePercentage:
+            ((exitPrice - position.entryPrice) / position.entryPrice) * 100,
           realizedPnl,
           realizedPnlPercentage,
           openedAt: position.openedAt,
@@ -718,118 +1189,233 @@ export async function closePositionAutomatic(
           hadTakeProfit: !!position.takeProfit,
           takeProfitPrice: position.takeProfit,
           openOrderId: position.openOrderId,
-          closeOrderId: closeOrder[0]._id.toString(),
+          closeOrderId: createdCloseOrder._id.toString(),
           positionId: position._id.toString(),
           isWinner: realizedPnl > 0,
         },
       ],
-      { session: mongoSession }
+      { session: mongoSession },
     );
 
-    position.tradeHistoryId = tradeHistory[0]._id.toString();
+    // Reason: Mongoose create() returns array; destructure + guard for safety
+    const createdHistory = tradeHistory[0];
+    if (!createdHistory) {
+      throw new Error("Failed to create trade history record (automatic)");
+    }
+
+    position.tradeHistoryId = createdHistory._id.toString();
     await position.save({ session: mongoSession });
 
+    // Check if this is a simulator position (skip participant updates for simulator)
+    const isSimulatorPositionSLTP = position.metadata?.simulatorMode === true;
+
     // Detect contest type and use correct participant model
-    const contestInfoForSLTP = await getParticipant(position.competitionId, position.userId);
-    const contestTypeForSLTP: ContestType = contestInfoForSLTP?.type || 'competition';
-    const ParticipantModelForSLTP = contestTypeForSLTP === 'competition' ? CompetitionParticipant : ChallengeParticipant;
-    
-    // Update participant
-    const participant = await ParticipantModelForSLTP.findById(position.participantId).session(
-      mongoSession
+    const contestInfoForSLTP = await getParticipant(
+      position.competitionId,
+      position.userId,
     );
-    if (!participant) throw new Error('Participant not found');
+    const contestTypeForSLTP: ContestType =
+      contestInfoForSLTP?.type || "competition";
+    const ParticipantModelForSLTP =
+      contestTypeForSLTP === "competition"
+        ? CompetitionParticipant
+        : ChallengeParticipant;
 
-    const newCapital = participant.currentCapital + realizedPnl;
-    const newAvailableCapital = participant.availableCapital + position.marginUsed + realizedPnl;
-    const newRealizedPnl = participant.realizedPnl + realizedPnl;
-    const newPnl = participant.pnl + realizedPnl;
-    const newPnlPercentage =
-      ((newCapital - participant.startingCapital) / participant.startingCapital) * 100;
+    // Update participant (skip for simulator positions - they have fake participantIds)
+    const participant = isSimulatorPositionSLTP
+      ? null
+      : await ParticipantModelForSLTP.findById(position.participantId).session(
+          mongoSession,
+        );
 
-    const isWinner = realizedPnl > 0;
-    const winningTrades = participant.winningTrades + (isWinner ? 1 : 0);
-    const losingTrades = participant.losingTrades + (isWinner ? 0 : 1);
-    const totalTrades = participant.totalTrades + 1; // INCREMENT total trades!
-    const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+    // Reason: Orphaned position — the parent participant no longer exists
+    // (e.g. the competition/challenge or participant record was deleted while
+    // the position stayed open). Previously this threw, which aborted the
+    // transaction and left the position status "open", so the realtime TP/SL
+    // service re-triggered it on every 30s cache refresh forever (log spam +
+    // wasted transactions). There is no participant left to credit, so we
+    // settle the position as closed and fall through to commit. This lets the
+    // position leave the "open" set permanently and stops the loop.
+    if (!participant && !isSimulatorPositionSLTP) {
+      console.warn(
+        `⚠️ [REALTIME TP/SL] Orphaned position ${position._id.toString()} — participant ${position.participantId?.toString()} not found. Settling as closed without participant update.`,
+      );
+    }
 
-    const averageWin =
-      winningTrades > 0
-        ? (participant.averageWin * participant.winningTrades + (isWinner ? realizedPnl : 0)) / winningTrades
-        : 0;
-    const averageLoss =
-      losingTrades > 0
-        ? (participant.averageLoss * participant.losingTrades + (!isWinner ? Math.abs(realizedPnl) : 0)) /
-          losingTrades
-        : 0;
+    // Only update participant stats for real positions (not simulator) when
+    // the participant still exists. Orphaned positions skip this and commit.
+    if (participant && !isSimulatorPositionSLTP) {
+      const newCapital = participant.currentCapital + realizedPnl;
+      const newAvailableCapital =
+        participant.availableCapital + position.marginUsed + realizedPnl;
+      const newRealizedPnl = participant.realizedPnl + realizedPnl;
+      const newPnl = participant.pnl + realizedPnl;
+      const newPnlPercentage =
+        ((newCapital - participant.startingCapital) /
+          participant.startingCapital) *
+        100;
 
-    await ParticipantModelForSLTP.findByIdAndUpdate(
-      participant._id,
-      {
-        $inc: {
-          currentOpenPositions: -1,
-          totalTrades: 1, // INCREMENT total trades!
-          winningTrades: isWinner ? 1 : 0,
-          losingTrades: isWinner ? 0 : 1,
-          marginCallWarnings: closeReason === 'margin_call' ? 1 : 0,
+      const isWinner = realizedPnl > 0;
+      // Reason: breakeven (realizedPnl === 0) must count as neither win nor loss —
+      // consistent with the manual close path and TradeHistory (win = pnl>0,
+      // loss = pnl<0). `isWinner ? 0 : 1` wrongly booked breakevens as losses.
+      const isLoser = realizedPnl < 0;
+      const winningTrades = participant.winningTrades + (isWinner ? 1 : 0);
+      const losingTrades = participant.losingTrades + (isLoser ? 1 : 0);
+      // Note: totalTrades was already incremented when position was opened
+      const totalTrades = participant.totalTrades;
+      const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+
+      const averageWin =
+        winningTrades > 0
+          ? (participant.averageWin * participant.winningTrades +
+              (isWinner ? realizedPnl : 0)) /
+            winningTrades
+          : 0;
+      const averageLoss =
+        losingTrades > 0
+          ? (participant.averageLoss * participant.losingTrades +
+              (!isWinner ? Math.abs(realizedPnl) : 0)) /
+            losingTrades
+          : 0;
+
+      await ParticipantModelForSLTP.findByIdAndUpdate(
+        participant._id,
+        {
+          $inc: {
+            currentOpenPositions: -1,
+            // totalTrades already counted on position open
+            winningTrades: isWinner ? 1 : 0,
+            losingTrades: isLoser ? 1 : 0,
+            marginCallWarnings: closeReason === "margin_call" ? 1 : 0,
+          },
+          $set: {
+            currentCapital: newCapital,
+            availableCapital: newAvailableCapital,
+            usedMargin: Math.max(0, participant.usedMargin - position.marginUsed), // Clamp to 0 — IEEE 754 can produce tiny negatives
+            realizedPnl: newRealizedPnl,
+            pnl: newPnl,
+            pnlPercentage: newPnlPercentage,
+            winRate: winRate,
+            averageWin: averageWin,
+            averageLoss: averageLoss,
+            largestWin: Math.max(participant.largestWin, realizedPnl),
+            largestLoss: Math.min(participant.largestLoss, realizedPnl),
+            status:
+              closeReason === "margin_call" && newCapital <= 0
+                ? "liquidated"
+                : participant.status,
+            liquidationReason:
+              closeReason === "margin_call" && newCapital <= 0
+                ? "Margin call"
+                : undefined,
+            lastMarginCallAt:
+              closeReason === "margin_call"
+                ? new Date()
+                : participant.lastMarginCallAt,
+          },
         },
-        $set: {
-          currentCapital: newCapital,
-          availableCapital: newAvailableCapital,
-          usedMargin: participant.usedMargin - position.marginUsed,
-          realizedPnl: newRealizedPnl,
-          pnl: newPnl,
-          pnlPercentage: newPnlPercentage,
-          winRate: winRate,
-          averageWin: averageWin,
-          averageLoss: averageLoss,
-          largestWin: Math.max(participant.largestWin, realizedPnl),
-          largestLoss: Math.min(participant.largestLoss, realizedPnl),
-          status: closeReason === 'margin_call' && newCapital <= 0 ? 'liquidated' : participant.status,
-          liquidationReason: closeReason === 'margin_call' && newCapital <= 0 ? 'Margin call' : undefined,
-          lastMarginCallAt: closeReason === 'margin_call' ? new Date() : participant.lastMarginCallAt,
-        },
-      },
-      { session: mongoSession }
-    );
+        { session: mongoSession },
+      );
+    } else if (isSimulatorPositionSLTP) {
+      console.log(
+        `   🧪 Simulator position - skipping participant update (TP/SL close)`,
+      );
+    }
 
     await mongoSession.commitTransaction();
-    
+    await mongoSession.endSession(); // End session after successful commit
+
     // Send notifications based on close reason
     try {
-      const { notificationService } = await import('@/lib/services/notification.service');
-      
-      if (closeReason === 'stop_loss') {
+      const { notificationService } =
+        await import("@/lib/services/notification.service");
+
+      if (closeReason === "stop_loss") {
         await notificationService.notifyStopLossTriggered(
           position.userId,
           position.symbol,
           exitPrice,
-          realizedPnl
+          realizedPnl,
         );
-      } else if (closeReason === 'take_profit') {
+      } else if (closeReason === "take_profit") {
         await notificationService.notifyTakeProfitTriggered(
           position.userId,
           position.symbol,
           exitPrice,
-          realizedPnl
+          realizedPnl,
         );
       }
-      
+
       // Also send position closed notification
       await notificationService.notifyPositionClosed(
         position.userId,
         position.symbol,
         realizedPnl,
-        realizedPnlPercentage
+        realizedPnlPercentage,
       );
     } catch (notifError) {
-      console.error('Error sending position close notification:', notifError);
+      console.error("Error sending position close notification:", notifError);
+    }
+
+    // ⚡ Emit real-time SSE event for instant UI update
+    try {
+      const PositionEvent = (
+        await import("@/database/models/position-event.model")
+      ).default;
+      await PositionEvent.create({
+        userId: position.userId,
+        competitionId: position.competitionId,
+        contestType: contestTypeForSLTP,
+        positionId: position._id.toString(),
+        symbol: position.symbol,
+        side: position.side,
+        eventType: "closed",
+        closeReason: closeReason,
+        realizedPnl: realizedPnl,
+        exitPrice: exitPrice,
+        createdAt: new Date(),
+      });
+      console.log(
+        `⚡ [SSE] Position closed event emitted: ${position.symbol} ${closeReason}`,
+      );
+    } catch (sseError) {
+      console.error("Error emitting SSE event:", sseError);
     }
   } catch (error) {
     await mongoSession.abortTransaction();
+    await mongoSession.endSession();
+
+    // Handle WriteConflict with retry
+    const isWriteConflict =
+      error instanceof Error &&
+      (error.message.includes("WriteConflict") ||
+        error.message.includes("Write conflict") ||
+        (error as { code?: number }).code === 112);
+
+    if (isWriteConflict && retryCount < MAX_RETRIES) {
+      const delay = RETRY_DELAY_MS * Math.pow(2, retryCount); // Exponential backoff
+      console.log(
+        `⚠️ [TP/SL] WriteConflict on position ${positionId}, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return closePositionAutomatic(
+        positionId,
+        exitPrice,
+        closeReason,
+        retryCount + 1,
+      );
+    }
+
+    // If it's a WriteConflict after all retries, the position was likely closed by another process
+    if (isWriteConflict) {
+      console.log(
+        `ℹ️ [TP/SL] Position ${positionId} likely already closed by another process (WriteConflict after ${MAX_RETRIES} retries)`,
+      );
+      return; // Don't throw - position is handled
+    }
+
     throw error;
-  } finally {
-    mongoSession.endSession();
   }
 }
 
@@ -839,9 +1425,10 @@ export const checkMarginCalls = async (competitionId: string) => {
     await connectToDatabase();
 
     // Load admin-configured thresholds
-    const { getMarginThresholds } = await import('@/lib/actions/trading/risk-settings.actions');
+    const { getMarginThresholds } =
+      await import("@/lib/actions/trading/risk-settings.actions");
     const adminThresholds = await getMarginThresholds();
-    
+
     const thresholds = {
       liquidation: adminThresholds.LIQUIDATION,
       marginCall: adminThresholds.MARGIN_CALL,
@@ -855,111 +1442,296 @@ export const checkMarginCalls = async (competitionId: string) => {
     // First, get ALL participants to see what we have (try competition, then challenge)
     let allParticipants = await CompetitionParticipant.find({
       competitionId,
-    }).select('username status currentOpenPositions currentCapital unrealizedPnl usedMargin');
-    
+    }).select(
+      "username status currentOpenPositions currentCapital unrealizedPnl usedMargin",
+    ).lean() as any[];
+
     let isChallenge = false;
     if (allParticipants.length === 0) {
       allParticipants = await ChallengeParticipant.find({
         challengeId: competitionId,
-      }).select('username status currentOpenPositions currentCapital unrealizedPnl usedMargin');
+      }).select(
+        "username status currentOpenPositions currentCapital unrealizedPnl usedMargin",
+      ).lean() as any[];
       isChallenge = true;
     }
 
     console.log(`\n📋 All Participants (${allParticipants.length}):`);
     for (const p of allParticipants) {
-      console.log(`   - ${p.username}: Status=${p.status}, OpenPositions=${p.currentOpenPositions}, Capital=$${p.currentCapital.toFixed(2)}, UsedMargin=$${p.usedMargin.toFixed(2)}`);
+      console.log(
+        `   - ${p.username}: Status=${p.status}, OpenPositions=${p.currentOpenPositions}, Capital=$${p.currentCapital.toFixed(2)}, UsedMargin=$${p.usedMargin.toFixed(2)}`,
+      );
     }
 
-    const ParticipantModel = isChallenge ? ChallengeParticipant : CompetitionParticipant;
-    const idField = isChallenge ? { challengeId: competitionId } : { competitionId };
-    
+    const ParticipantModel = isChallenge
+      ? ChallengeParticipant
+      : CompetitionParticipant;
+    const idField = isChallenge
+      ? { challengeId: competitionId }
+      : { competitionId };
+
     const participants = await ParticipantModel.find({
       ...idField,
-      status: 'active',
+      status: "active",
       currentOpenPositions: { $gt: 0 },
-    });
+    })
+      .select("_id userId username currentCapital usedMargin currentOpenPositions status marginCallWarnings unrealizedPnl competitionId challengeId")
+      .lean() as any[];
 
-    console.log(`\n✅ Active participants with open positions: ${participants.length}`);
+    console.log(
+      `\n✅ Active participants with open positions: ${participants.length}`,
+    );
+
+    // OPTIMIZATION: Get ALL open positions for ALL participants at once
+    const allOpenPositions = await TradingPosition.find({
+      participantId: { $in: participants.map((p: any) => p._id) },
+      status: "open",
+    })
+      .select("_id participantId symbol side entryPrice quantity leverage takeProfit stopLoss")
+      .lean() as any[];
+
+    // Batch fetch ALL prices at once (single request for all symbols!) + conversion pairs
+    const allSymbols = [
+      ...new Set(allOpenPositions.map((p) => p.symbol)),
+    ] as ForexSymbol[];
+    const marginConvSyms = getConversionPairSymbols(allSymbols);
+    const allSymsWithConv = [
+      ...new Set([...allSymbols, ...marginConvSyms]),
+    ] as ForexSymbol[];
+    const pricesMap =
+      allSymsWithConv.length > 0
+        ? await fetchRealForexPrices(allSymsWithConv)
+        : new Map();
+    console.log(`📊 Fetched ${pricesMap.size} prices for margin check`);
+
+    const symConfigsMargin = await getMultipleSymbolConfigs(allSymbols);
+
+    // Group positions by participant for processing
+    const positionsByParticipant = new Map<string, typeof allOpenPositions>();
+    for (const position of allOpenPositions) {
+      const participantId = position.participantId.toString();
+      if (!positionsByParticipant.has(participantId)) {
+        positionsByParticipant.set(participantId, []);
+      }
+      positionsByParticipant.get(participantId)!.push(position);
+    }
 
     for (const participant of participants) {
       console.log(`\n👤 Checking: ${participant.username}`);
-      console.log(`   💰 Current Capital (DB): $${participant.currentCapital.toFixed(2)}`);
-      console.log(`   📈 Unrealized P&L (DB): $${participant.unrealizedPnl.toFixed(2)}`);
-      console.log(`   🔒 Used Margin (DB): $${participant.usedMargin.toFixed(2)}`);
-      
-      // RECALCULATE unrealized P&L from actual open positions (real-time)
-      const openPositions = await TradingPosition.find({
-        participantId: participant._id,
-        status: 'open',
-      });
-      
+      console.log(
+        `   💰 Current Capital (DB): $${participant.currentCapital.toFixed(2)}`,
+      );
+      console.log(
+        `   📈 Unrealized P&L (DB): $${participant.unrealizedPnl.toFixed(2)}`,
+      );
+      console.log(
+        `   🔒 Used Margin (DB): $${participant.usedMargin.toFixed(2)}`,
+      );
+
+      // Get positions for this participant from our pre-fetched list
+      const openPositions =
+        positionsByParticipant.get(participant._id.toString()) || [];
+
       console.log(`   📊 Found ${openPositions.length} open positions`);
-      
+
       let totalUnrealizedPnl = 0;
       for (const position of openPositions) {
-        const currentPrice = await getRealPrice(position.symbol as ForexSymbol);
+        const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
         if (!currentPrice) continue;
-        
-        const marketPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
+
+        const symbolCfg = symConfigsMargin.get(position.symbol)!;
+        const marketPrice =
+          position.side === "long" ? currentPrice.bid : currentPrice.ask;
+        const mRate = getQuoteToUsdRate(
+          position.symbol as ForexSymbol,
+          pricesMap as Map<string, { bid: number; ask: number }>,
+        );
         const unrealizedPnl = calculateUnrealizedPnL(
           position.side,
           position.entryPrice,
           marketPrice,
           position.quantity,
-          position.symbol as ForexSymbol
+          position.symbol as ForexSymbol,
+          mRate,
+          symbolCfg,
         );
-        
+
         totalUnrealizedPnl += unrealizedPnl;
       }
-      
-      console.log(`   🔄 REAL-TIME Unrealized P&L: $${totalUnrealizedPnl.toFixed(2)}`);
-      
+
+      console.log(
+        `   🔄 REAL-TIME Unrealized P&L: $${totalUnrealizedPnl.toFixed(2)}`,
+      );
+
       const equity = participant.currentCapital + totalUnrealizedPnl;
-      const calculatedMarginLevel = participant.usedMargin > 0 
-        ? (equity / participant.usedMargin) * 100 
-        : Infinity;
-      
+      const calculatedMarginLevel =
+        participant.usedMargin > 0
+          ? (equity / participant.usedMargin) * 100
+          : Infinity;
+
       console.log(`   💎 Equity (Real-time): $${equity.toFixed(2)}`);
-      console.log(`   📊 Calculated Margin Level (Real-time): ${calculatedMarginLevel.toFixed(2)}%`);
-      
+      console.log(
+        `   📊 Calculated Margin Level (Real-time): ${calculatedMarginLevel.toFixed(2)}%`,
+      );
+
       // Use REAL-TIME P&L for margin status check
       const marginStatus = getMarginStatus(
         participant.currentCapital,
         totalUnrealizedPnl, // Use real-time P&L, not stale DB value
         participant.usedMargin,
-        thresholds
+        thresholds,
       );
 
       console.log(`   ⚠️  Status: ${marginStatus.status}`);
-      console.log(`   🎯 Threshold Check: ${marginStatus.marginLevel.toFixed(2)}% < ${thresholds.liquidation}% ? ${marginStatus.marginLevel < thresholds.liquidation}`);
+      console.log(
+        `   🎯 Threshold Check: ${marginStatus.marginLevel.toFixed(2)}% < ${thresholds.liquidation}% ? ${marginStatus.marginLevel < thresholds.liquidation}`,
+      );
 
-      if (marginStatus.status === 'liquidation') {
-        // Liquidate all positions
-        const positions = await TradingPosition.find({
-          participantId: participant._id,
-          status: 'open',
-        });
+      if (marginStatus.status === "liquidation") {
+        // ⚠️ CRITICAL SAFETY CHECK: NEVER liquidate with fallback/stale prices!
+        // This prevents catastrophic losses from bad price data
+        let hasFallbackPrices = false;
+        let hasStalePrices = false;
+        const MAX_PRICE_AGE_MS = 60000; // 60 seconds
+        const now = Date.now();
 
-        console.log(`🚨 LIQUIDATING ${positions.length} positions for ${participant.username} (Margin: ${marginStatus.marginLevel.toFixed(2)}%)`);
+        for (const position of openPositions) {
+          const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
+          if (!currentPrice) {
+            console.error(
+              `🚨 BLOCKED: No price available for ${position.symbol}`,
+            );
+            hasFallbackPrices = true;
+            break;
+          }
 
-        for (const position of positions) {
-          const currentPrice = await getRealPrice(position.symbol as ForexSymbol);
-          if (!currentPrice) continue;
+          // Check if price is marked as fallback
+          if (currentPrice.isFallback) {
+            console.error(
+              `🚨 BLOCKED LIQUIDATION: ${position.symbol} is using FALLBACK price ${currentPrice.mid.toFixed(5)} - REFUSING to liquidate!`,
+            );
+            hasFallbackPrices = true;
+            break;
+          }
 
-          const marketPrice = position.side === 'long' ? currentPrice.bid : currentPrice.ask;
-          await closePositionAutomatic(position._id.toString(), marketPrice, 'margin_call');
+          // Check if price is stale (older than 60 seconds)
+          const priceAge = now - currentPrice.timestamp;
+          if (priceAge > MAX_PRICE_AGE_MS || currentPrice.isStale) {
+            console.error(
+              `🚨 BLOCKED LIQUIDATION: ${position.symbol} price is STALE (${Math.round(priceAge / 1000)}s old) - REFUSING to liquidate!`,
+            );
+            hasStalePrices = true;
+            break;
+          }
+
+          // Check for suspicious price difference from entry (> 10% is very suspicious for forex)
+          const priceDiff =
+            Math.abs(currentPrice.mid - position.entryPrice) /
+            position.entryPrice;
+          if (priceDiff > 0.1) {
+            // > 10% difference = definitely bad data
+            console.error(
+              `🚨 BLOCKED LIQUIDATION: ${position.symbol} price ${currentPrice.mid.toFixed(5)} differs ${(priceDiff * 100).toFixed(2)}% from entry ${position.entryPrice.toFixed(5)} - likely BAD DATA!`,
+            );
+            hasFallbackPrices = true;
+            break;
+          }
         }
 
-        console.log(`   ⚠️ ✅ Liquidated all ${positions.length} positions for: ${participant.username}`);
+        if (hasFallbackPrices || hasStalePrices) {
+          console.log(
+            `⚠️ SKIPPING liquidation for ${participant.username} due to unreliable price data`,
+          );
+          console.log(
+            `   This is a SAFETY FEATURE to prevent liquidation at wrong prices!`,
+          );
+          continue; // Skip this participant entirely
+        }
+
+        console.log(
+          `🚨 LIQUIDATING ${openPositions.length} positions for ${participant.username} (Margin: ${marginStatus.marginLevel.toFixed(2)}%)`,
+        );
+        console.log(`   ✅ All prices verified as REAL and FRESH`);
+
+        for (const position of openPositions) {
+          // Get price from batch (instant!)
+          const currentPrice = pricesMap.get(position.symbol as ForexSymbol);
+          if (!currentPrice) continue;
+
+          const marketPrice =
+            position.side === "long" ? currentPrice.bid : currentPrice.ask;
+          await closePositionAutomatic(
+            position._id.toString(),
+            marketPrice,
+            "margin_call",
+          );
+        }
+
+        // CRITICAL: After ALL positions are liquidated, mark participant as 'liquidated'
+        // This is needed for disqualifyOnLiquidation rule to work correctly at competition end
+        // Use the correct model (CompetitionParticipant or ChallengeParticipant)
+        await ParticipantModel.findByIdAndUpdate(participant._id, {
+          $set: {
+            status: "liquidated",
+            liquidationReason: `Margin call at ${marginStatus.marginLevel.toFixed(2)}%`,
+            currentOpenPositions: 0,
+          },
+        });
+
+        console.log(
+          `   ⚠️ ✅ Liquidated all ${openPositions.length} positions for: ${participant.username}`,
+        );
+        console.log(
+          `   📝 Participant status set to 'liquidated' for disqualification tracking`,
+        );
+
+        // Send disqualification notification if competition/challenge has disqualifyOnLiquidation enabled
+        try {
+          const contestId = isChallenge ? participant.challengeId : participant.competitionId;
+          let contestDoc: { name?: string; rules?: { disqualifyOnLiquidation?: boolean } } | null = null;
+
+          if (isChallenge) {
+            const Challenge = (await import("@/database/models/trading/challenge.model")).default;
+            contestDoc = await Challenge.findById(contestId).select("name rules").lean() as any;
+          } else {
+            const Competition = (await import("@/database/models/trading/competition.model")).default;
+            contestDoc = await Competition.findById(contestId).select("name rules").lean() as any;
+          }
+
+          if (contestDoc?.rules?.disqualifyOnLiquidation) {
+            const { sendNotification } =
+              await import("@/lib/services/notification.service");
+
+            // Send disqualification notification
+            await sendNotification({
+              userId: participant.userId,
+              type: "competition_disqualified",
+              metadata: {
+                competitionId: contestId,
+                competitionName: contestDoc.name,
+                reason: `Liquidated (margin level dropped to ${marginStatus.marginLevel.toFixed(2)}%)`,
+              },
+            });
+            console.log(
+              `   🔔 Sent disqualification notification to ${participant.username}`,
+            );
+          }
+        } catch (notifError) {
+          console.error(
+            `   ❌ Failed to send disqualification notification:`,
+            notifError,
+          );
+        }
       } else {
-        console.log(`   ✅ No liquidation needed (Status: ${marginStatus.status})`);
+        console.log(
+          `   ✅ No liquidation needed (Status: ${marginStatus.status})`,
+        );
       }
     }
-    
+
     console.log(`\n🔍 ========== MARGIN CHECK END ==========\n`);
   } catch (error) {
-    console.error('❌ Error checking margin calls:', error);
-    console.error('❌ Stack:', error instanceof Error ? error.stack : error);
+    console.error("❌ Error checking margin calls:", error);
+    console.error("❌ Stack:", error instanceof Error ? error.stack : error);
   }
 };
-

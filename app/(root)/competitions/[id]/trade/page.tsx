@@ -1,33 +1,43 @@
-import { redirect } from 'next/navigation';
-import { unstable_noStore as noStore } from 'next/cache';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { getCompetitionById } from '@/lib/actions/trading/competition.actions';
-import { getUserPositions } from '@/lib/actions/trading/position.actions';
-import { getWalletBalance } from '@/lib/actions/trading/wallet.actions';
-import { getMarginThresholds } from '@/lib/actions/trading/risk-settings.actions';
-import { getCompetitionTradeHistory } from '@/lib/actions/trading/trade-history.actions';
-import { getUserOrders } from '@/lib/actions/trading/order.actions';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import { connectToDatabase } from '@/database/mongoose';
-import TradingInterface, { TradingModeProvider } from '@/components/trading/TradingInterface';
-import ChartWrapper from '@/components/trading/ChartWrapper';
-import PositionsTable from '@/components/trading/PositionsTable';
-import TradeHistory from '@/components/trading/TradeHistory';
-import MarketStatusBanner from '@/components/trading/MarketStatusBanner';
-import InteractiveTPSL from '@/components/trading/InteractiveTPSL';
-import PendingOrders from '@/components/trading/PendingOrders';
-import { LiveAccountInfo } from '@/components/trading/LiveAccountInfo';
-import { PriceProvider } from '@/contexts/PriceProvider';
-import { ChartSymbolProvider } from '@/contexts/ChartSymbolContext';
-import { TradingArsenalProvider } from '@/contexts/TradingArsenalContext';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CompetitionInfoHeader } from '@/components/trading/CompetitionInfoHeader';
-import CompetitionStatusMonitor from '@/components/trading/CompetitionStatusMonitor';
-import TradingArsenalPanel from '@/components/trading/TradingArsenalPanel';
-import { ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
-import { cn } from '@/lib/utils';
+import { redirect } from "next/navigation";
+import { unstable_noStore as noStore } from "next/cache";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { getCompetitionById } from "@/lib/actions/trading/competition.actions";
+import { getUserPositions } from "@/lib/actions/trading/position.actions";
+import { getWalletBalance } from "@/lib/actions/trading/wallet.actions";
+import { getMarginThresholds } from "@/lib/actions/trading/risk-settings.actions";
+import { getCompetitionTradeHistory } from "@/lib/actions/trading/trade-history.actions";
+import { getUserOrders } from "@/lib/actions/trading/order.actions";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import { connectToDatabase } from "@/database/mongoose";
+import { isProviderContest } from "@/lib/services/games/contest-config";
+import TradingInterface, {
+  TradingModeProvider,
+} from "@/components/trading/TradingInterface";
+import ChartWrapper from "@/components/trading/ChartWrapper";
+import PositionsTable from "@/components/trading/PositionsTable";
+import TradeHistory from "@/components/trading/TradeHistory";
+import MarketStatusBanner from "@/components/trading/MarketStatusBanner";
+import InteractiveTPSL from "@/components/trading/InteractiveTPSL";
+import PendingOrders from "@/components/trading/PendingOrders";
+import { LiveAccountInfo } from "@/components/trading/LiveAccountInfo";
+import { PriceProvider } from "@/contexts/PriceProvider";
+import { SymbolConfigProvider } from "@/contexts/SymbolConfigContext";
+import { ChartSymbolProvider } from "@/contexts/ChartSymbolContext";
+import { TradingArsenalProvider } from "@/contexts/TradingArsenalContext";
+import { PositionEventsProvider } from "@/contexts/PositionEventsProvider";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CompetitionInfoHeader } from "@/components/trading/CompetitionInfoHeader";
+import CompetitionStatusMonitor from "@/components/trading/CompetitionStatusMonitor";
+import ParticipantStatusMonitor from "@/components/trading/ParticipantStatusMonitor";
+import LastManStandingListener from "@/components/trading/LastManStandingListener";
+import TradingArsenalPanel from "@/components/trading/TradingArsenalPanel";
+import TradingPageContent from "@/components/trading/TradingPageContent";
+import { ArrowLeft } from "lucide-react";
+import { GameIcon } from "@/components/ui/GameIcon";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 interface TradingPageProps {
   params: Promise<{ id: string }>;
@@ -37,33 +47,61 @@ interface TradingPageProps {
 const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
   // Disable caching to ensure fresh position data (including TP/SL)
   noStore();
-  
+
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) redirect('/sign-in');
+  if (!session?.user) redirect("/sign-in");
 
   const { id: competitionId } = await params;
   const { viewOnly } = await searchParams;
-  const isViewOnly = viewOnly === 'true';
+  const isViewOnly = viewOnly === "true";
 
   // Get competition details
   const competition = await getCompetitionById(competitionId);
   if (!competition) {
-    redirect('/competitions');
+    redirect("/competitions");
+  }
+
+  /**
+   * A provider-game contest is not traded, so it must never render this workspace.
+   *
+   * This page is charts, an order form, positions and margin - all of which are meaningless for
+   * a puzzle or a quiz, and none of which would ERROR. Before this guard a player who joined a
+   * provider contest and followed a bookmark, a dashboard card or a stale link arrived at a
+   * forex terminal for a game with no market, and the screen worked perfectly while being
+   * entirely wrong. The button that used to send them here now sends them to `/play`, but a URL
+   * outlives a button, so the destination has to refuse as well.
+   *
+   * Reason it redirects rather than 404s: the player is a legitimate entrant who wants to play.
+   *
+   * NO LOOP IS POSSIBLE, and it is worth stating because the play route redirects back here. The
+   * two guards are exact complements of the same predicate: this one bounces a contest when
+   * `isProviderContest` is true, and `/play` bounces one only when `getPlayState` answers
+   * `not_provider_contest`, which is that same predicate being false. Pinned by a test, because a
+   * later change to either condition that made them overlap would produce an infinite redirect
+   * rather than a wrong screen.
+   *
+   * Chapter 13 section 1 makes this redirect permanent and eventually reverses its direction, once
+   * the trading gameplay moves into the dispatcher at `/play`. Until then it points outwards.
+   */
+  if (isProviderContest(competition)) {
+    redirect(`/competitions/${competitionId}/play`);
   }
 
   // Check if competition is active OR if user is viewing results of completed competition
-  const isCompleted = competition.status === 'completed';
-  const isCancelled = competition.status === 'cancelled';
-  
+  const isCompleted = competition.status === "completed";
+  const isCancelled = competition.status === "cancelled";
+  const isPaused = competition.isPaused === true;
+  const pauseReason = competition.pauseReason || "Technical issues";
+
   // Redirect if competition is cancelled
   if (isCancelled) {
     redirect(`/competitions/${competitionId}`);
   }
-  
-  if (competition.status !== 'active' && !isCompleted) {
+
+  if (competition.status !== "active" && !isCompleted) {
     redirect(`/competitions/${competitionId}`);
   }
-  
+
   // If competition is completed and not in view-only mode, redirect to results
   if (isCompleted && !isViewOnly) {
     redirect(`/competitions/${competitionId}/results`);
@@ -81,361 +119,702 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
   }
 
   // Type assertion for proper TypeScript inference
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const participant = participantDoc as any;
 
-  // Get user's positions
-  const positions = await getUserPositions(competitionId);
+  // Check if participant is disqualified (liquidated or disqualified status)
+  const isDisqualified =
+    participant.status === "liquidated" ||
+    participant.status === "disqualified";
+  const participantStatus = participant.status;
 
-  // Get trade history
-  const tradeHistoryResult = await getCompetitionTradeHistory(competitionId);
-  const tradeHistory = tradeHistoryResult.success ? tradeHistoryResult.trades : [];
+  // PERF: Fetch all independent data in parallel instead of sequentially
+  const { getTradingRiskSettings } =
+    await import("@/lib/actions/trading/risk-settings.actions");
 
-  // Get pending orders
-  const pendingOrders = await getUserOrders(competitionId, 'pending');
+  const [positions, tradeHistoryResult, pendingOrders, _walletBalance, marginThresholdsResult, riskSettingsResult] =
+    await Promise.all([
+      getUserPositions(competitionId),
+      getCompetitionTradeHistory(competitionId),
+      getUserOrders(competitionId, "pending"),
+      getWalletBalance(),
+      getMarginThresholds().catch(() => undefined),
+      getTradingRiskSettings().catch(() => ({ defaultLeverage: 10 })),
+    ]);
 
-  // Get wallet balance
-  const walletBalance = await getWalletBalance();
-
-  // Load admin risk settings (fail gracefully to defaults)
-  let marginThresholds;
-  let defaultLeverage = 10; // Fallback default
-  try {
-    marginThresholds = await getMarginThresholds();
-    const { getTradingRiskSettings } = await import('@/lib/actions/trading/risk-settings.actions');
-    const riskSettings = await getTradingRiskSettings();
-    defaultLeverage = riskSettings?.defaultLeverage || 10;
-  } catch (error) {
-    console.error('⚠️ Failed to load admin risk settings, using defaults:', error);
-    marginThresholds = undefined; // Will use DEFAULT_MARGIN_THRESHOLDS in components
-  }
+  const tradeHistory = tradeHistoryResult.success
+    ? tradeHistoryResult.trades
+    : [];
+  const marginThresholds = marginThresholdsResult;
+  // Reason: Use competition-specific leverage when set by admin/GM,
+  // falling back to platform-wide default leverage if not configured.
+  const defaultLeverage = competition.leverage?.max || riskSettingsResult?.defaultLeverage || 10;
 
   // Calculate stats
   const equity = participant.currentCapital + participant.unrealizedPnl;
-  const marginLevel = participant.usedMargin > 0 
-    ? (equity / participant.usedMargin) * 100 
-    : Infinity;
+  const marginLevel =
+    participant.usedMargin > 0
+      ? (equity / participant.usedMargin) * 100
+      : Infinity;
 
   // Calculate daily realized P&L (from today's closed trades)
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
-  const dailyRealizedPnl = tradeHistory
-    .filter((trade: any) => trade.closedAt && new Date(trade.closedAt) >= today)
-    .reduce((sum: number, trade: any) => sum + (trade.pnl || 0), 0);
+  // Reason for the local type rather than `any`: the `eslint-disable` that used to sit here
+  // covered only the next line and so suppressed nothing, which the linter itself reported as an
+  // unused directive. Naming the three fields this calculation reads is both accurate and
+  // narrower than `any`, and it changes no behaviour - `?? 0` still covers an absent number.
+  type ClosedTradeRow = {
+    closedAt?: Date | string | null;
+    pnl?: number | null;
+    realizedPnl?: number | null;
+  };
+
+  const dailyRealizedPnl = (tradeHistory as ClosedTradeRow[])
+    .filter((trade) => trade.closedAt && new Date(trade.closedAt) >= today)
+    .reduce(
+      (sum: number, trade) => sum + (trade.pnl ?? trade.realizedPnl ?? 0),
+      0,
+    );
 
   return (
     <PriceProvider>
+      <SymbolConfigProvider>
       <ChartSymbolProvider>
         <TradingArsenalProvider>
-        <TradingModeProvider>
-        {/* Monitor competition status and redirect when it ends - ONLY when not in view-only mode */}
-        {!isViewOnly && (
-          <CompetitionStatusMonitor 
-            competitionId={competitionId} 
-            initialStatus={competition.status}
-          />
-        )}
-        
-        <div className="min-h-screen bg-gradient-to-br from-dark-100 via-dark-100 to-dark-200">
-        {/* View-Only Banner for Completed Competitions */}
-        {isViewOnly && (
-          <div className="bg-gradient-to-r from-purple-500/20 via-purple-500/10 to-purple-500/20 border-b border-purple-500/30">
-            <div className="container-custom py-3">
-              <div className="flex items-center justify-center gap-3 text-purple-300">
-                <span className="text-xl">📊</span>
-                <span className="font-medium">Viewing completed competition results — Trading is disabled</span>
-                <Link 
-                  href={`/competitions/${competitionId}/results`}
-                  className="ml-4 px-3 py-1 bg-purple-500/30 hover:bg-purple-500/40 rounded-lg text-sm font-medium transition-colors"
-                >
-                  View Full Results
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Professional Header with Gradient */}
-        <div className="relative bg-gradient-to-r from-dark-200 via-dark-200/95 to-dark-300/90 border-b border-dark-400/50 shadow-lg">
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent pointer-events-none" />
-          
-          <div className="container-custom py-4 md:py-6 relative z-10">
-            <div className="flex flex-col gap-5 md:gap-6">
-              {/* Back & Title with Better Spacing */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <Link 
-                    href={isViewOnly ? `/competitions/${competitionId}/results` : `/competitions/${competitionId}`}
-                    className="group flex items-center gap-2 px-3 py-2 rounded-lg bg-dark-300/50 hover:bg-dark-300 border border-dark-400/30 hover:border-dark-400 transition-all duration-200"
-                  >
-                    <ArrowLeft className="size-4 group-hover:-translate-x-0.5 transition-transform" />
-                    <span className="text-sm font-medium text-light-900">{isViewOnly ? 'Back to Results' : 'Back'}</span>
-                  </Link>
-                  <div className="border-l border-dark-400/30 pl-4 h-10 flex flex-col justify-center">
-                    <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-light-900 tracking-tight">
-                      {competition.name}
-                    </h1>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      {isViewOnly ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-400">
-                          <span className="size-1.5 bg-purple-400 rounded-full" />
-                          Viewing Results
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-green-400">
-                          <span className="size-1.5 bg-green-400 rounded-full animate-pulse" />
-                          Live Trading
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Competition Info Header */}
-              <CompetitionInfoHeader
-                endTime={competition.endTime}
-                currentParticipants={competition.currentParticipants}
-                prizePool={competition.prizePool}
-              />
-            </div>
-
-            {/* Enhanced Margin Level Warning with Gradient - Only show for active trading */}
-            {!isViewOnly && marginLevel < 150 && marginLevel !== Infinity && (
-              <div className={cn(
-                "mt-5 p-4 rounded-xl border backdrop-blur-sm relative overflow-hidden shadow-lg",
-                marginLevel < 50 ? "bg-red-500/10 border-red-500/50" : 
-                marginLevel < 100 ? "bg-orange-500/10 border-orange-500/50" : 
-                "bg-yellow-500/10 border-yellow-500/50"
-              )}>
-                <div className={cn(
-                  "absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite]",
-                  marginLevel < 50 ? "opacity-100" : "opacity-50"
-                )} />
-                <div className="relative flex items-center gap-3">
-                  <div className={cn(
-                    "size-10 rounded-lg flex items-center justify-center flex-shrink-0",
-                    marginLevel < 50 ? "bg-red-500/20" : 
-                    marginLevel < 100 ? "bg-orange-500/20" : 
-                    "bg-yellow-500/20"
-                  )}>
-                    <span className="text-2xl">
-                      {marginLevel < 50 ? '⚠️' : marginLevel < 100 ? '🚨' : '⚠️'}
-                    </span>
-                  </div>
-                  <div>
-                    <p className={cn(
-                      "text-sm md:text-base font-bold mb-0.5",
-                      marginLevel < 50 ? "text-red-400" : 
-                      marginLevel < 100 ? "text-orange-400" : 
-                      "text-yellow-400"
-                    )}>
-                      {marginLevel < 50 ? 'LIQUIDATION WARNING' : 
-                       marginLevel < 100 ? 'MARGIN CALL ALERT' : 
-                       'LOW MARGIN WARNING'}
-                    </p>
-                    <p className="text-xs md:text-sm text-light-900/80">
-                      Margin level at <span className="font-bold">{Number.isFinite(marginLevel) ? marginLevel.toFixed(1) : '∞'}%</span>
-                      {marginLevel < 50 ? ' — Your positions may be liquidated!' : 
-                       marginLevel < 100 ? ' — Add capital or close positions!' : 
-                       ' — Consider reducing risk.'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Professional Main Content */}
-        <div className="container-custom py-5 md:py-8">
-          {/* Market Status Banner with Better Styling */}
-          <MarketStatusBanner className="mb-5 md:mb-7 shadow-lg" />
-          
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 md:gap-7">
-            {/* Left Column: Chart + Account Info + Positions */}
-            <div className="lg:col-span-2 space-y-5 md:space-y-7">
-              {/* Professional Chart Container */}
-              <div className="group relative bg-gradient-to-br from-dark-200 to-dark-300/50 rounded-2xl p-3 md:p-5 border border-dark-400/30 shadow-2xl hover:shadow-primary/10 transition-all duration-300">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl pointer-events-none" />
-                <div className="relative">
-                  <ChartWrapper competitionId={competitionId} positions={positions} pendingOrders={pendingOrders} />
-                </div>
-              </div>
-
-              {/* Professional Positions & Trade History Tabs - MOVED ABOVE TRADE STATS */}
-              <div className="bg-gradient-to-br from-dark-200 to-dark-300/50 rounded-2xl p-4 md:p-6 border border-dark-400/30 shadow-2xl">
-                <Tabs defaultValue="positions" className="w-full">
-                  <TabsList className="bg-dark-300/80 border border-dark-400/50 mb-5 p-1 rounded-xl backdrop-blur-sm shadow-lg">
-                    <TabsTrigger 
-                      value="positions" 
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-emerald-500/50 rounded-lg font-semibold transition-all duration-200"
-                    >
-                      <span className="flex items-center gap-2">
-                        Open Positions 
-                        <span className="inline-flex items-center justify-center size-5 rounded-full bg-emerald-500/20 text-xs font-bold">
-                          {positions.length}
-                        </span>
-                      </span>
-                    </TabsTrigger>
-                    <TabsTrigger 
-                      value="pending"
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-blue-500/50 rounded-lg font-semibold transition-all duration-200"
-                    >
-                      <span className="flex items-center gap-2">
-                        Pending Orders 
-                        <span className="inline-flex items-center justify-center size-5 rounded-full bg-blue-500/20 text-xs font-bold">
-                          {pendingOrders.length}
-                        </span>
-                      </span>
-                    </TabsTrigger>
-                    <TabsTrigger 
-                      value="history"
-                      className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-purple-500/50 rounded-lg font-semibold transition-all duration-200"
-                    >
-                      <span className="flex items-center gap-2">
-                        History 
-                        <span className="inline-flex items-center justify-center size-5 rounded-full bg-purple-500/20 text-xs font-bold">
-                          {tradeHistory.length}
-                        </span>
-                      </span>
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="positions" className="mt-0">
-                    <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
-                      <PositionsTable 
-                        positions={positions} 
-                        competitionId={competitionId}
-                      />
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="pending" className="mt-0">
-                    <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
-                      <PendingOrders orders={pendingOrders} />
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="history" className="mt-0">
-                    <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
-                      <TradeHistory trades={tradeHistory} />
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </div>
-
-              {/* Live Account Info - Enhanced Card - NOW BELOW TABS */}
-              <div className="relative">
-                <LiveAccountInfo
+          <PositionEventsProvider
+            competitionId={competitionId}
+            contestType="competition"
+          >
+            <TradingModeProvider>
+              {/* Monitor competition status and redirect when it ends - ONLY when not in view-only mode */}
+              {!isViewOnly && (
+                <CompetitionStatusMonitor
                   competitionId={competitionId}
-                  initialBalance={participant.currentCapital}
-                  initialEquity={equity}
-                  initialUnrealizedPnl={participant.unrealizedPnl}
-                  initialUsedMargin={participant.usedMargin}
-                  initialAvailableCapital={participant.availableCapital}
-                  positions={positions}
-                  marginThresholds={marginThresholds}
-                  startingCapital={competition.startingCapital}
-                  dailyRealizedPnl={dailyRealizedPnl}
+                  initialStatus={competition.status}
+                  startTime={competition.startTime}
+                  userId={session.user.id}
                 />
-              </div>
-            </div>
-
-            {/* Right Column: Professional Trading Interface */}
-            <div className="lg:col-span-1">
-              {isViewOnly ? (
-                /* View-Only Mode - Show Summary Instead of Trading Interface */
-                <div className="bg-gradient-to-br from-purple-500/10 to-dark-300/50 rounded-2xl p-4 md:p-6 border border-purple-500/30 shadow-2xl lg:sticky lg:top-6 backdrop-blur-sm">
-                  <div className="flex items-center justify-between mb-5">
-                    <h2 className="text-lg md:text-xl font-bold text-light-900 tracking-tight">
-                      📊 Competition Ended
-                    </h2>
-                    <span className="px-2 py-1 bg-purple-500/20 text-purple-400 text-xs font-bold rounded">
-                      COMPLETED
-                    </span>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="p-4 bg-dark-300/50 rounded-xl border border-dark-400/30">
-                      <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Final Capital</p>
-                      <p className="text-2xl font-bold text-gray-100">${participant.currentCapital.toLocaleString()}</p>
-                    </div>
-                    
-                    <div className="p-4 bg-dark-300/50 rounded-xl border border-dark-400/30">
-                      <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Total P&L</p>
-                      <p className={`text-2xl font-bold ${participant.pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                        {participant.pnl >= 0 ? '+' : ''}${participant.pnl?.toFixed(2) || '0.00'}
-                      </p>
-                    </div>
-                    
-                    <div className="p-4 bg-dark-300/50 rounded-xl border border-dark-400/30">
-                      <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Total Trades</p>
-                      <p className="text-2xl font-bold text-blue-400">{tradeHistory.length}</p>
-                    </div>
-
-                    <div className="mt-4 p-4 bg-purple-500/10 border border-purple-500/30 rounded-xl">
-                      <p className="text-sm text-purple-300 text-center mb-3">
-                        Trading is disabled for completed competitions
-                      </p>
-                      <Link href={`/competitions/${competitionId}/results`} className="block">
-                        <button className="w-full py-3 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-xl transition-colors">
-                          View Full Results
-                        </button>
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                /* Active Competition - Show Trading Interface */
-                <div className="space-y-4 lg:sticky lg:top-6">
-                  {/* Trading Arsenal Panel */}
-                  <TradingArsenalPanel
-                    contestType="competition"
-                    contestId={competitionId}
-                    participantId={participant._id?.toString() || ''}
-                  />
-                  
-                  {/* Manual Trading Interface */}
-                  <div className="bg-gradient-to-br from-dark-200 to-dark-300/50 rounded-2xl p-4 md:p-6 border border-dark-400/30 shadow-2xl backdrop-blur-sm">
-                    <div className="flex items-center justify-between mb-5">
-                      <h2 className="text-lg md:text-xl font-bold text-light-900 tracking-tight">
-                        Place Order
-                      </h2>
-                      <div className="size-2 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50" />
-                    </div>
-                      <TradingInterface
-                      competitionId={competitionId}
-                      availableCapital={participant.availableCapital}
-                      defaultLeverage={defaultLeverage}
-                      openPositionsCount={participant.currentOpenPositions}
-                      maxPositions={10}
-                      currentEquity={equity}
-                      existingUsedMargin={participant.usedMargin}
-                      currentBalance={participant.currentCapital}
-                      marginThresholds={marginThresholds}
-                    />
-                  </div>
-                </div>
               )}
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Interactive TP/SL Handler - Manages position refreshing and editing - Only for active trading */}
-      {!isViewOnly && (
-        <InteractiveTPSL 
-          positions={positions}
-          competitionId={competitionId}
-        />
-      )}
-      
-      </TradingModeProvider>
+
+              {/* Monitor participant status for live disqualification alerts - ONLY when not in view-only mode */}
+              {!isViewOnly && (
+                <ParticipantStatusMonitor
+                  competitionId={competitionId}
+                  initialParticipantStatus={participantStatus}
+                  userId={session.user.id}
+                />
+              )}
+
+              {/* Last Man Standing popup — shown when all other players are eliminated */}
+              {!isViewOnly && (
+                <LastManStandingListener competitionId={competitionId} />
+              )}
+
+              <TradingPageContent
+                competition={{
+                  _id: competitionId,
+                  name: competition.name,
+                  endTime: competition.endTime,
+                  currentParticipants: competition.currentParticipants,
+                  prizePool: competition.prizePool,
+                }}
+                participant={{
+                  currentCapital: participant.currentCapital,
+                  availableCapital: participant.availableCapital,
+                  unrealizedPnl: participant.unrealizedPnl,
+                  usedMargin: participant.usedMargin,
+                  currentOpenPositions: participant.currentOpenPositions,
+                }}
+                positions={positions}
+                competitionId={competitionId}
+                defaultLeverage={defaultLeverage}
+                startingCapital={competition.startingCapital}
+                isDisqualified={isDisqualified}
+                marginThresholds={marginThresholds}
+                userId={session.user.id}
+              >
+                <div className="min-h-screen bg-gradient-to-br from-dark-100 via-dark-100 to-dark-200">
+                  {/* Competition Paused Banner */}
+                  {isPaused && !isViewOnly && (
+                    <div className="bg-gradient-to-r from-yellow-500/20 via-orange-500/20 to-yellow-500/20 border-b border-yellow-500/40">
+                      <div className="container-custom py-4">
+                        <div className="flex items-center justify-center gap-3">
+                          <div className="flex items-center gap-2 text-yellow-300">
+                            <span className="text-2xl animate-pulse">⏸️</span>
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                              <span className="font-bold text-lg">
+                                Competition Paused
+                              </span>
+                              <span className="text-yellow-400/80 text-sm">
+                                Trading is temporarily suspended
+                              </span>
+                            </div>
+                          </div>
+                          <div className="hidden md:block mx-4 w-px h-8 bg-yellow-500/30" />
+                          <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
+                            <span className="text-yellow-400 text-sm font-medium">
+                              Reason:
+                            </span>
+                            <span className="text-yellow-300 text-sm">
+                              {pauseReason}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-center text-yellow-400/70 text-xs mt-2">
+                          Please wait for the competition to resume. You will be
+                          notified when trading resumes.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* View-Only Banner for Completed Competitions */}
+                  {isViewOnly && (
+                    <div className="bg-gradient-to-r from-purple-500/20 via-purple-500/10 to-purple-500/20 border-b border-purple-500/30">
+                      <div className="container-custom py-3">
+                        <div className="flex items-center justify-center gap-3 text-purple-300">
+                          <GameIcon name="trophy" size={24} />
+                          <span className="font-medium">
+                            Viewing completed competition results — Trading is
+                            disabled
+                          </span>
+                          <Link
+                            href={`/competitions/${competitionId}/results`}
+                            className="ml-4 px-3 py-1 bg-purple-500/30 hover:bg-purple-500/40 rounded-lg text-sm font-medium transition-colors"
+                          >
+                            View Full Results
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Professional Header with Gradient */}
+                  <div className="relative bg-gradient-to-r from-dark-200 via-dark-200/95 to-dark-300/90 border-b border-dark-400/50 shadow-lg">
+                    <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent pointer-events-none" />
+
+                    <div className="container-custom py-3 sm:py-4 md:py-6 relative z-10">
+                      <div className="flex flex-col gap-3 sm:gap-5 md:gap-6">
+                        {/* Back & Title with Better Spacing */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+                          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+                            <Link
+                              href={
+                                isViewOnly
+                                  ? `/competitions/${competitionId}/results`
+                                  : `/competitions/${competitionId}`
+                              }
+                              className="group flex items-center gap-2 px-3 py-2 rounded-lg bg-dark-300/50 hover:bg-dark-300 border border-dark-400/30 hover:border-dark-400 transition-all duration-200 min-h-[44px] flex-shrink-0"
+                            >
+                              <ArrowLeft className="size-4 group-hover:-translate-x-0.5 transition-transform" />
+                              <span className="text-sm font-medium text-light-900">
+                                {isViewOnly ? "Back" : "Back"}
+                              </span>
+                            </Link>
+                            <div className="hidden sm:flex border-l border-dark-400/30 pl-4 flex-col justify-center min-w-0">
+                              <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-light-900 tracking-tight break-words">
+                                {competition.name}
+                              </h1>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                {isViewOnly ? (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium text-purple-400">
+                                    <span className="size-1.5 bg-purple-400 rounded-full" />
+                                    Viewing Results
+                                  </span>
+                                ) : isPaused ? (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-400">
+                                    <span className="size-1.5 bg-yellow-400 rounded-full animate-pulse" />
+                                    Paused - Trading Suspended
+                                  </span>
+                                ) : isDisqualified ? (
+                                  <span
+                                    className={cn(
+                                      "inline-flex items-center gap-1 text-xs font-medium",
+                                      participantStatus === "liquidated"
+                                        ? "text-red-400"
+                                        : "text-orange-400",
+                                    )}
+                                  >
+                                    {participantStatus === "liquidated" ? (
+                                      <>
+                                        <GameIcon name="skull" size={14} />
+                                        Liquidated - Trading Disabled
+                                      </>
+                                    ) : (
+                                      <>
+                                        <GameIcon name="warning" size={14} />
+                                        Disqualified - Trading Disabled
+                                      </>
+                                    )}
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium text-green-400">
+                                    <span className="size-1.5 bg-green-400 rounded-full animate-pulse" />
+                                    Live Trading
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {/* Mobile title - inline with back button */}
+                            <div className="sm:hidden min-w-0 flex-1">
+                              <h1 className="text-base font-bold text-light-900 tracking-tight truncate">
+                                {competition.name}
+                              </h1>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                {isViewOnly ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-purple-400">
+                                    <span className="size-1.5 bg-purple-400 rounded-full" />
+                                    Results
+                                  </span>
+                                ) : isPaused ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-yellow-400">
+                                    <span className="size-1.5 bg-yellow-400 rounded-full animate-pulse" />
+                                    Paused
+                                  </span>
+                                ) : isDisqualified ? (
+                                  <span className={cn("inline-flex items-center gap-1 text-[11px] font-medium", participantStatus === "liquidated" ? "text-red-400" : "text-orange-400")}>
+                                    {participantStatus === "liquidated" ? "Liquidated" : "Disqualified"}
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-400">
+                                    <span className="size-1.5 bg-green-400 rounded-full animate-pulse" />
+                                    Live
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Competition Info Header */}
+                        <CompetitionInfoHeader
+                          endTime={competition.endTime}
+                          currentParticipants={competition.currentParticipants}
+                          prizePool={competition.prizePool}
+                        />
+                      </div>
+
+                      {/* Enhanced Margin Level Warning with Gradient - Only show for active trading */}
+                      {!isViewOnly &&
+                        marginLevel < 150 &&
+                        marginLevel !== Infinity && (
+                          <div
+                            className={cn(
+                              "mt-5 p-4 rounded-xl border backdrop-blur-sm relative overflow-hidden shadow-lg",
+                              marginLevel < 50
+                                ? "bg-red-500/10 border-red-500/50"
+                                : marginLevel < 100
+                                  ? "bg-orange-500/10 border-orange-500/50"
+                                  : "bg-yellow-500/10 border-yellow-500/50",
+                            )}
+                          >
+                            <div
+                              className={cn(
+                                "absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite]",
+                                marginLevel < 50 ? "opacity-100" : "opacity-50",
+                              )}
+                            />
+                            <div className="relative flex items-center gap-3">
+                              <div
+                                className={cn(
+                                  "size-10 rounded-lg flex items-center justify-center flex-shrink-0",
+                                  marginLevel < 50
+                                    ? "bg-red-500/20"
+                                    : marginLevel < 100
+                                      ? "bg-orange-500/20"
+                                      : "bg-yellow-500/20",
+                                )}
+                              >
+                                <span className="text-2xl">
+                                  {marginLevel < 50
+                                    ? "⚠️"
+                                    : marginLevel < 100
+                                      ? "🚨"
+                                      : "⚠️"}
+                                </span>
+                              </div>
+                              <div>
+                                <p
+                                  className={cn(
+                                    "text-sm md:text-base font-bold mb-0.5",
+                                    marginLevel < 50
+                                      ? "text-red-400"
+                                      : marginLevel < 100
+                                        ? "text-orange-400"
+                                        : "text-yellow-400",
+                                  )}
+                                >
+                                  {marginLevel < 50
+                                    ? "LIQUIDATION WARNING"
+                                    : marginLevel < 100
+                                      ? "MARGIN CALL ALERT"
+                                      : "LOW MARGIN WARNING"}
+                                </p>
+                                <p className="text-xs md:text-sm text-light-900/80">
+                                  Margin level at{" "}
+                                  <span className="font-bold">
+                                    {Number.isFinite(marginLevel)
+                                      ? marginLevel.toFixed(1)
+                                      : "∞"}
+                                    %
+                                  </span>
+                                  {marginLevel < 50
+                                    ? " — Your positions may be liquidated!"
+                                    : marginLevel < 100
+                                      ? " — Add capital or close positions!"
+                                      : " — Consider reducing risk."}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                    </div>
+                  </div>
+
+                  {/* Professional Main Content */}
+                  <div className="container-custom py-3 sm:py-5 md:py-8">
+                    {/* Market Status Banner with Better Styling */}
+                    <MarketStatusBanner className="mb-3 sm:mb-5 md:mb-7 shadow-lg" />
+
+                    <div className="grid grid-cols-1 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-5">
+                      {/* Left Column: Chart + Account Info + Positions - Takes 3 of 5 columns on XL */}
+                      <div className="xl:col-span-3 space-y-3 sm:space-y-4 md:space-y-5">
+                        {/* Professional Chart Container */}
+                        <div className="group relative bg-gradient-to-br from-dark-200 to-dark-300/50 rounded-2xl p-3 md:p-5 border border-dark-400/30 shadow-2xl hover:shadow-primary/10 transition-all duration-300">
+                          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl pointer-events-none" />
+                          <div className="relative">
+                            <ChartWrapper
+                              competitionId={competitionId}
+                              positions={positions}
+                              pendingOrders={pendingOrders}
+                              tradingProps={{
+                                availableCapital: participant.availableCapital,
+                                defaultLeverage,
+                                openPositionsCount:
+                                  participant.currentOpenPositions,
+                                maxPositions: 10,
+                                currentEquity: equity,
+                                existingUsedMargin: participant.usedMargin,
+                                currentBalance: participant.currentCapital,
+                                marginThresholds,
+                                startingCapital: competition.startingCapital,
+                                dailyRealizedPnl,
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Professional Positions & Trade History Tabs - MOVED ABOVE TRADE STATS */}
+                        <div className="bg-gradient-to-br from-dark-200 to-dark-300/50 rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 border border-dark-400/30 shadow-2xl">
+                          <Tabs defaultValue="positions" className="w-full">
+                            <TabsList className="bg-dark-300/80 border border-dark-400/50 mb-3 sm:mb-5 p-1 rounded-xl backdrop-blur-sm shadow-lg w-full overflow-x-auto flex-nowrap">
+                              <TabsTrigger
+                                value="positions"
+                                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-emerald-500/50 rounded-lg font-semibold transition-all duration-200"
+                              >
+                                <span className="flex items-center gap-2">
+                                  Open Positions
+                                  <span className="inline-flex items-center justify-center size-5 rounded-full bg-emerald-500/20 text-xs font-bold">
+                                    {positions.length}
+                                  </span>
+                                </span>
+                              </TabsTrigger>
+                              <TabsTrigger
+                                value="pending"
+                                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-blue-500/50 rounded-lg font-semibold transition-all duration-200"
+                              >
+                                <span className="flex items-center gap-2">
+                                  Pending Orders
+                                  <span className="inline-flex items-center justify-center size-5 rounded-full bg-blue-500/20 text-xs font-bold">
+                                    {pendingOrders.length}
+                                  </span>
+                                </span>
+                              </TabsTrigger>
+                              <TabsTrigger
+                                value="history"
+                                className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-purple-500/50 rounded-lg font-semibold transition-all duration-200"
+                              >
+                                <span className="flex items-center gap-2">
+                                  History
+                                  <span className="inline-flex items-center justify-center size-5 rounded-full bg-purple-500/20 text-xs font-bold">
+                                    {tradeHistory.length}
+                                  </span>
+                                </span>
+                              </TabsTrigger>
+                            </TabsList>
+
+                            <TabsContent value="positions" className="mt-0">
+                              <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
+                                <PositionsTable
+                                  positions={positions}
+                                  competitionId={competitionId}
+                                />
+                              </div>
+                            </TabsContent>
+
+                            <TabsContent value="pending" className="mt-0">
+                              <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
+                                <PendingOrders orders={pendingOrders} />
+                              </div>
+                            </TabsContent>
+
+                            <TabsContent value="history" className="mt-0">
+                              <div className="overflow-x-auto -mx-4 md:mx-0 px-4 md:px-0">
+                                <TradeHistory trades={tradeHistory} />
+                              </div>
+                            </TabsContent>
+                          </Tabs>
+                        </div>
+
+                        {/* Live Account Info - Enhanced Card - NOW BELOW TABS */}
+                        <div className="relative">
+                          <LiveAccountInfo
+                            competitionId={competitionId}
+                            initialBalance={participant.currentCapital}
+                            initialEquity={equity}
+                            initialUnrealizedPnl={participant.unrealizedPnl}
+                            initialUsedMargin={participant.usedMargin}
+                            initialAvailableCapital={
+                              participant.availableCapital
+                            }
+                            positions={positions}
+                            marginThresholds={marginThresholds}
+                            startingCapital={competition.startingCapital}
+                            dailyRealizedPnl={dailyRealizedPnl}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Right Column: Professional Trading Interface - Takes 2 of 5 columns on XL */}
+                      <div className="xl:col-span-2">
+                        {isViewOnly ? (
+                          /* View-Only Mode - Show Summary Instead of Trading Interface */
+                          <div className="bg-gradient-to-br from-purple-500/10 to-dark-300/50 rounded-2xl p-4 md:p-6 border border-purple-500/30 shadow-2xl lg:sticky lg:top-6 backdrop-blur-sm">
+                            <div className="flex items-center justify-between mb-5">
+                              <h2 className="text-lg md:text-xl font-bold text-light-900 tracking-tight flex items-center gap-2">
+                                <GameIcon name="trophy" size={24} /> Competition Ended
+                              </h2>
+                              <span className="px-2 py-1 bg-purple-500/20 text-purple-400 text-xs font-bold rounded">
+                                COMPLETED
+                              </span>
+                            </div>
+
+                            <div className="space-y-4">
+                              <div className="p-4 bg-dark-300/50 rounded-xl border border-dark-400/30">
+                                <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                                  Final Capital
+                                </p>
+                                <p className="text-2xl font-bold text-gray-100">
+                                  ${participant.currentCapital.toLocaleString()}
+                                </p>
+                              </div>
+
+                              <div className="p-4 bg-dark-300/50 rounded-xl border border-dark-400/30">
+                                <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                                  Total P&L
+                                </p>
+                                <p
+                                  className={`text-2xl font-bold ${participant.pnl >= 0 ? "text-green-500" : "text-red-500"}`}
+                                >
+                                  {participant.pnl >= 0 ? "+" : ""}$
+                                  {participant.pnl?.toFixed(2) || "0.00"}
+                                </p>
+                              </div>
+
+                              <div className="p-4 bg-dark-300/50 rounded-xl border border-dark-400/30">
+                                <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                                  Total Trades
+                                </p>
+                                <p className="text-2xl font-bold text-blue-400">
+                                  {tradeHistory.length}
+                                </p>
+                              </div>
+
+                              <div className="mt-4 p-4 bg-purple-500/10 border border-purple-500/30 rounded-xl">
+                                <p className="text-sm text-purple-300 text-center mb-3">
+                                  Trading is disabled for completed competitions
+                                </p>
+                                <Link
+                                  href={`/competitions/${competitionId}/results`}
+                                  className="block"
+                                >
+                                  <button className="w-full py-3 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-xl transition-colors">
+                                    View Full Results
+                                  </button>
+                                </Link>
+                              </div>
+                            </div>
+                          </div>
+                        ) : isDisqualified ? (
+                          /* Disqualified Mode - Show disqualification message */
+                          <div className="bg-gradient-to-br from-red-500/10 to-dark-300/50 rounded-2xl p-4 md:p-6 border border-red-500/30 shadow-2xl lg:sticky lg:top-6 backdrop-blur-sm">
+                            <div className="flex items-center justify-between mb-5">
+                              <h2 className="text-lg md:text-xl font-bold text-light-900 tracking-tight flex items-center gap-2">
+                                {participantStatus === "liquidated" ? (
+                                  <>
+                                    <GameIcon name="skull" size={24} />
+                                    Account Liquidated
+                                  </>
+                                ) : (
+                                  <>
+                                    <GameIcon name="warning" size={24} />
+                                    Disqualified
+                                  </>
+                                )}
+                              </h2>
+                              <span
+                                className={cn(
+                                  "px-2 py-1 text-xs font-bold rounded",
+                                  participantStatus === "liquidated"
+                                    ? "bg-red-500/20 text-red-400"
+                                    : "bg-orange-500/20 text-orange-400",
+                                )}
+                              >
+                                {participantStatus === "liquidated"
+                                  ? "LIQUIDATED"
+                                  : "DISQUALIFIED"}
+                              </span>
+                            </div>
+
+                            <div className="space-y-4">
+                              {/* Disqualification Alert */}
+                              <div
+                                className={cn(
+                                  "p-4 rounded-xl border",
+                                  participantStatus === "liquidated"
+                                    ? "bg-red-500/10 border-red-500/30"
+                                    : "bg-orange-500/10 border-orange-500/30",
+                                )}
+                              >
+                                <p
+                                  className={cn(
+                                    "text-sm font-medium mb-2",
+                                    participantStatus === "liquidated"
+                                      ? "text-red-300"
+                                      : "text-orange-300",
+                                  )}
+                                >
+                                  {participantStatus === "liquidated"
+                                    ? "💀 Your account was liquidated due to margin call."
+                                    : "🚫 You have been disqualified from this competition."}
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  You are no longer eligible for prizes in this
+                                  competition. You can still view your trade
+                                  history.
+                                </p>
+                              </div>
+
+                              <div className="p-4 bg-dark-300/50 rounded-xl border border-dark-400/30">
+                                <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                                  Final Capital
+                                </p>
+                                <p className="text-2xl font-bold text-gray-100">
+                                  ${participant.currentCapital.toLocaleString()}
+                                </p>
+                              </div>
+
+                              <div className="p-4 bg-dark-300/50 rounded-xl border border-dark-400/30">
+                                <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                                  Total P&L
+                                </p>
+                                <p
+                                  className={`text-2xl font-bold ${participant.pnl >= 0 ? "text-green-500" : "text-red-500"}`}
+                                >
+                                  {participant.pnl >= 0 ? "+" : ""}$
+                                  {participant.pnl?.toFixed(2) || "0.00"}
+                                </p>
+                              </div>
+
+                              <div className="p-4 bg-dark-300/50 rounded-xl border border-dark-400/30">
+                                <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                                  Total Trades
+                                </p>
+                                <p className="text-2xl font-bold text-blue-400">
+                                  {tradeHistory.length}
+                                </p>
+                              </div>
+
+                              <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
+                                <p className="text-sm text-red-300 text-center mb-3">
+                                  Trading is disabled — You are disqualified
+                                </p>
+                                <Link
+                                  href={`/competitions/${competitionId}`}
+                                  className="block"
+                                >
+                                  <Button className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold gap-2">
+                                    <GameIcon name="trophy" size={16} />
+                                    Back to Competition
+                                  </Button>
+                                </Link>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          /* Active Competition - Show Trading Interface */
+                          <div className="space-y-4 lg:sticky lg:top-6">
+                            {/* Trading Arsenal Panel */}
+                            <TradingArsenalPanel
+                              contestType="competition"
+                              contestId={competitionId}
+                              participantId={participant._id?.toString() || ""}
+                            />
+
+                            {/* Manual Trading Interface */}
+                            <div className="bg-gradient-to-br from-dark-200 to-dark-300/50 rounded-2xl p-4 md:p-6 border border-dark-400/30 shadow-2xl backdrop-blur-sm">
+                              <div className="flex items-center justify-between mb-5">
+                                <h2 className="text-lg md:text-xl font-bold text-light-900 tracking-tight">
+                                  Place Order
+                                </h2>
+                                <div className="size-2 bg-green-400 rounded-full animate-pulse shadow-lg shadow-green-400/50" />
+                              </div>
+                              <TradingInterface
+                                competitionId={competitionId}
+                                availableCapital={participant.availableCapital}
+                                defaultLeverage={defaultLeverage}
+                                openPositionsCount={
+                                  participant.currentOpenPositions
+                                }
+                                maxPositions={10}
+                                currentEquity={equity}
+                                existingUsedMargin={participant.usedMargin}
+                                currentBalance={participant.currentCapital}
+                                marginThresholds={marginThresholds}
+                                disabled={isDisqualified || isPaused}
+                                disabledReason={
+                                  isPaused
+                                    ? `⏸️ Competition is paused: ${pauseReason}. Please wait for trading to resume.`
+                                    : participantStatus === "liquidated"
+                                      ? "💀 Your account was liquidated. You cannot place new trades."
+                                      : "🚫 You are disqualified. You cannot place new trades."
+                                }
+                                userId={session.user.id}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Interactive TP/SL Handler - Manages position refreshing and editing - Only for active trading */}
+                {!isViewOnly && (
+                  <InteractiveTPSL
+                    positions={positions}
+                    competitionId={competitionId}
+                  />
+                )}
+              </TradingPageContent>
+            </TradingModeProvider>
+          </PositionEventsProvider>
         </TradingArsenalProvider>
       </ChartSymbolProvider>
+      </SymbolConfigProvider>
     </PriceProvider>
   );
 };
 
 export default TradingPage;
-

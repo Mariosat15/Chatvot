@@ -1,0 +1,1966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ChartVolt &mdash; New Games Plan</title>
+<style>
+  :root{
+    --navy:#0d2338; --navy2:#143a5c; --navy3:#1d4d75;
+    --gold:#c9a23f; --gold-lt:#f0dda6; --gold-bg:#fdf8ec;
+    --ink:#1b2733; --body:#3a4a5a; --muted:#6b7d8f;
+    --line:#dde4ec; --line2:#eef2f7;
+    --bg:#f6f8fb; --card:#ffffff;
+    --green:#1a6e49; --green-bg:#eaf6ef; --green-line:#b6ddc6;
+    --red:#a02a38; --red-bg:#fdedef; --red-line:#f0c3c9;
+    --amber:#8a6209; --amber-bg:#fdf5e3; --amber-line:#ecd9a6;
+    --blue:#1c5788; --blue-bg:#ecf3fa; --blue-line:#c2d8ec;
+    --radius:10px;
+    --mono:"Cascadia Code",Consolas,"SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--body);
+    font-size:15.5px; line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- hero ---------- */
+  .hero{
+    background:linear-gradient(150deg,var(--navy) 0%,var(--navy2) 55%,var(--navy3) 100%);
+    color:#fff; padding:54px 32px 46px;
+    border-bottom:4px solid var(--gold);
+  }
+  .hero-in{max-width:1180px;margin:0 auto}
+  .eyebrow{
+    font-size:11.5px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--gold-lt);font-weight:700;margin-bottom:14px;
+  }
+  .hero h1{font-size:40px;line-height:1.14;font-weight:700;letter-spacing:-.6px;margin-bottom:14px}
+  .hero .lede{font-size:17.5px;color:#cfdcea;max-width:860px;line-height:1.55}
+  .hero-meta{
+    margin-top:26px;padding-top:20px;border-top:1px solid rgba(255,255,255,.16);
+    display:flex;flex-wrap:wrap;gap:30px;font-size:13px;
+  }
+  .hero-meta b{display:block;color:var(--gold-lt);font-size:10.5px;letter-spacing:.14em;
+    text-transform:uppercase;margin-bottom:4px;font-weight:700}
+  .hero-meta span{color:#e4ecf4}
+  .stamp{
+    display:inline-block;margin-top:22px;background:rgba(201,162,63,.16);
+    border:1px solid var(--gold);color:var(--gold-lt);
+    padding:7px 16px;border-radius:100px;font-size:12.5px;font-weight:700;
+    letter-spacing:.08em;text-transform:uppercase;
+  }
+
+  /* ---------- layout ---------- */
+  .shell{max-width:1180px;margin:0 auto;padding:0 32px;display:grid;
+    grid-template-columns:236px 1fr;gap:44px;align-items:start}
+  nav.toc{position:sticky;top:22px;padding:26px 0;max-height:calc(100vh - 44px);overflow-y:auto}
+  nav.toc h4{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
+    margin:0 0 12px;font-weight:700}
+  nav.toc a{display:block;padding:5px 10px;font-size:13.2px;color:var(--body);
+    text-decoration:none;border-left:2px solid var(--line);line-height:1.4}
+  nav.toc a:hover{color:var(--navy2);background:#eef3f9;border-left-color:var(--gold)}
+  nav.toc a.on{color:var(--navy2);font-weight:700;border-left-color:var(--gold);background:#eef3f9}
+  nav.toc a.gate{color:var(--red);font-weight:700}
+  nav.toc .sep{height:1px;background:var(--line);margin:12px 0}
+  main{padding:34px 0 80px;min-width:0}
+
+  /* ---------- sections ---------- */
+  section{margin-bottom:46px;scroll-margin-top:20px}
+  .sec-h{display:flex;align-items:baseline;gap:13px;margin-bottom:8px}
+  .sec-n{
+    flex:none;width:31px;height:31px;border-radius:7px;background:var(--navy);color:#fff;
+    font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center
+  }
+  h2{font-size:25px;color:var(--navy);font-weight:700;letter-spacing:-.3px;line-height:1.24}
+  .sec-sub{color:var(--muted);font-size:14.5px;margin:0 0 22px 44px}
+  h3{font-size:17.5px;color:var(--navy2);font-weight:700;margin:28px 0 11px}
+  h4{font-size:14.5px;color:var(--navy2);font-weight:700;margin:20px 0 8px}
+  p{margin-bottom:13px}
+  ul,ol{margin:0 0 14px 21px}
+  li{margin-bottom:6px}
+  strong,b{color:var(--ink);font-weight:600}
+  a{color:var(--blue)}
+  code{font-family:var(--mono);font-size:.885em;background:#eef2f7;color:var(--navy2);
+    padding:1.5px 5px;border-radius:4px;border:1px solid var(--line)}
+
+  /* ---------- cards & callouts ---------- */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px 22px;margin-bottom:16px}
+  .grid{display:grid;gap:14px;margin-bottom:16px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g4{grid-template-columns:repeat(4,1fr)}
+
+  .cal{border-left:4px solid;border-radius:0 var(--radius) var(--radius) 0;
+    padding:16px 20px;margin:16px 0}
+  .cal .t{font-weight:700;font-size:13px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px}
+  .cal p:last-child{margin-bottom:0}
+  .plain{background:var(--gold-bg);border-color:var(--gold)}
+  .plain .t{color:var(--amber)}
+  .good{background:var(--green-bg);border-color:var(--green)}
+  .good .t{color:var(--green)}
+  .bad{background:var(--red-bg);border-color:var(--red)}
+  .bad .t{color:var(--red)}
+  .info{background:var(--blue-bg);border-color:var(--blue)}
+  .info .t{color:var(--blue)}
+
+  /* ---------- verdict ---------- */
+  .verdict{background:var(--navy);color:#fff;border-radius:var(--radius);
+    padding:28px 30px;margin-bottom:34px;border-left:5px solid var(--gold)}
+  .verdict .q{font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--gold-lt);font-weight:700;margin-bottom:11px}
+  .verdict .a{font-size:20px;line-height:1.45;color:#fff;font-weight:600}
+  .verdict .n{margin-top:14px;font-size:14px;color:#bccfe0;line-height:1.55}
+
+  /* ---------- gate banner ---------- */
+  .gate-wrap{border:2px solid var(--red);border-radius:12px;overflow:hidden;margin-bottom:36px;
+    background:#fff}
+  .gate-head{background:var(--red);color:#fff;padding:20px 26px}
+  .gate-head .k{font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+    opacity:.9;font-weight:700;margin-bottom:6px}
+  .gate-head h2{color:#fff;font-size:23px}
+  .gate-head p{color:#ffdfe3;font-size:14.5px;margin:8px 0 0}
+  .gate-body{padding:24px 26px}
+
+  /* ---------- tables ---------- */
+  .tw{overflow-x:auto;margin-bottom:16px;border:1px solid var(--line);border-radius:var(--radius)}
+  table{width:100%;border-collapse:collapse;background:#fff;font-size:13.6px}
+  th{background:var(--navy2);color:#fff;text-align:left;padding:10px 13px;
+    font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;
+    white-space:nowrap}
+  td{padding:9px 13px;border-bottom:1px solid var(--line2);vertical-align:top;line-height:1.5}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:nth-child(even){background:#fafcfe}
+  td code{font-size:.85em}
+
+  /* ---------- badges ---------- */
+  .b{display:inline-block;padding:2px 9px;border-radius:100px;font-size:11px;
+    font-weight:700;letter-spacing:.04em;white-space:nowrap;border:1px solid}
+  .b.crit{background:var(--red-bg);color:var(--red);border-color:var(--red-line)}
+  .b.high{background:var(--amber-bg);color:var(--amber);border-color:var(--amber-line)}
+  .b.med{background:var(--blue-bg);color:var(--blue);border-color:var(--blue-line)}
+  .b.low{background:#f1f4f7;color:var(--muted);border-color:var(--line)}
+  .b.ok{background:var(--green-bg);color:var(--green);border-color:var(--green-line)}
+  .b.now{background:var(--red);color:#fff;border-color:var(--red)}
+
+  /* ---------- diagrams ---------- */
+  figure{margin:22px 0;background:#fff;border:1px solid var(--line);
+    border-radius:var(--radius);padding:22px 20px 16px}
+  figure svg{display:block;width:100%;height:auto}
+  figcaption{margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);
+    font-size:13px;color:var(--muted);line-height:1.55}
+  figcaption b{color:var(--navy2)}
+  .fig-t{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);
+    font-weight:700;margin-bottom:14px}
+
+  /* ---------- checklist ---------- */
+  .chk{background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+    padding:6px 4px;margin-bottom:16px}
+  .chk div{display:flex;gap:11px;padding:9px 15px;border-bottom:1px solid var(--line2);
+    font-size:14px;line-height:1.5}
+  .chk div:last-child{border-bottom:none}
+  .box{flex:none;width:15px;height:15px;border:2px solid var(--navy3);border-radius:3px;
+    margin-top:3px}
+  /* Already satisfied - shown ticked so the remaining work is obvious at a glance. */
+  .box.done{background:var(--green);border-color:var(--green);position:relative}
+  .box.done::after{content:"";position:absolute;left:3px;top:0;width:5px;height:9px;
+    border-right:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(40deg)}
+
+  /* ---------- key-value strip ---------- */
+  .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;
+    background:var(--line);border:1px solid var(--line);border-radius:var(--radius);
+    overflow:hidden;margin-bottom:18px}
+  .kv > div{background:#fff;padding:14px 16px}
+  .kv b{display:block;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--muted);margin-bottom:5px;font-weight:700}
+  .kv span{font-size:17px;font-weight:700;color:var(--navy)}
+  .kv em{font-style:normal;font-size:12.5px;color:var(--body);display:block;margin-top:2px}
+
+  /* ---------- phase list ---------- */
+  .ph{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin-bottom:18px}
+  .ph-row{display:grid;grid-template-columns:82px 1fr 116px;gap:0;background:#fff;
+    border-bottom:1px solid var(--line2)}
+  .ph-row:last-child{border-bottom:none}
+  .ph-row.s0{background:var(--red-bg)}
+  .ph-id{padding:14px 12px;font-weight:700;color:var(--navy);font-size:13.5px;
+    background:#f7f9fc;border-right:1px solid var(--line2);display:flex;align-items:center}
+  .ph-row.s0 .ph-id{background:#fbdde1;color:var(--red)}
+  .ph-b{padding:13px 16px;font-size:13.8px;line-height:1.52}
+  .ph-b b{display:block;color:var(--navy2);margin-bottom:2px}
+  .ph-e{padding:14px 14px;font-size:13px;font-weight:700;color:var(--navy2);
+    border-left:1px solid var(--line2);display:flex;align-items:center}
+
+  hr.d{border:none;border-top:1px solid var(--line);margin:34px 0}
+  .foot{max-width:1180px;margin:0 auto;padding:26px 32px 46px;border-top:1px solid var(--line);
+    color:var(--muted);font-size:12.8px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+
+  @media (max-width:1000px){
+    .shell{grid-template-columns:1fr;gap:0;padding:0 20px}
+    nav.toc{display:none}
+    .g2,.g3,.g4{grid-template-columns:1fr}
+    .hero h1{font-size:30px}
+    .hero{padding:38px 20px 34px}
+    .ph-row{grid-template-columns:1fr}
+    .ph-id,.ph-e{border:none}
+  }
+  @media print{
+    nav.toc{display:none}
+    .shell{grid-template-columns:1fr;padding:0}
+    body{font-size:10.5pt;background:#fff}
+    section{page-break-inside:avoid}
+    figure{page-break-inside:avoid}
+    .hero{background:var(--navy) !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+</head>
+<body>
+
+<!-- Shared arrowhead, referenced by every diagram below -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,1 L7,4.5 L0,8 Z" fill="#6b7d8f"/>
+    </marker>
+  </defs>
+</svg>
+
+<!-- ================= HERO ================= -->
+<header class="hero">
+  <div class="hero-in">
+    <div class="eyebrow">ChartVolt &middot; Platform Strategy &amp; Technical Plan</div>
+    <h1>From a Trading App to a Games Platform</h1>
+    <p class="lede">How ChartVolt can run many kinds of paid skill competitions &mdash; trading as one game among several &mdash; using the contest engine and money system that already exist. Written in plain language, with the pre-existing defects that must be fixed and verified first.</p>
+    <div class="hero-meta">
+      <div><b>Status</b><span>Stage 0 built &middot; games route decided 2 Sep 2026</span></div>
+      <div><b>Date</b><span>17 Aug 2026 &middot; rev 2 Sep 2026</span></div>
+      <div><b>Based on</b><span>Six full audits of the live codebase</span></div>
+      <div><b>New games</b><span>Bought in, not built &mdash; see the notice below</span></div>
+      <div><b>Effort</b><span>Stage 0: 6&ndash;9 days &middot; Games: 26.5&ndash;35 weeks</span></div>
+    </div>
+    <div class="stamp">Read Stage 0 first &mdash; it is a separate job</div>
+  </div>
+</header>
+
+<div class="shell">
+
+<!-- ================= TOC ================= -->
+<nav class="toc">
+  <h4>Contents</h4>
+  <a href="#verdict">The short answer</a>
+  <a href="#gate" class="gate">&#9888; Stage 0 &mdash; fix first</a>
+  <a href="#prereqA" class="gate">&nbsp;&nbsp;Already fixed: the open door</a>
+  <a href="#defect1" class="gate">&nbsp;&nbsp;Defect 1: two doors</a>
+  <a href="#defect2" class="gate">&nbsp;&nbsp;Defect 2: two blueprints</a>
+  <a href="#signoff" class="gate">&nbsp;&nbsp;Your sign-off list</a>
+  <div class="sep"></div>
+  <h4>The Games Plan</h4>
+  <a href="#today">1 &middot; How it works today</a>
+  <a href="#seams">2 &middot; The four weld points</a>
+  <a href="#target">3 &middot; The new design</a>
+  <a href="#data">4 &middot; Database changes</a>
+  <a href="#points">5 &middot; Points &amp; leaderboards</a>
+  <a href="#money">6 &middot; Money &amp; prizes</a>
+  <a href="#gamify">7 &middot; Levels, badges, journey</a>
+  <a href="#admin">8 &middot; Admin panel</a>
+  <a href="#ui">9 &middot; What players see</a>
+  <a href="#words">10 &middot; Wording</a>
+  <a href="#trivia">11 &middot; The Trivia game</a>
+  <a href="#infra">12 &middot; Switches &amp; background jobs</a>
+  <a href="#risks">13 &middot; What could break</a>
+  <a href="#rollout">14 &middot; Testing &amp; rollout</a>
+  <a href="#catalogue">15 &middot; Games-first navigation</a>
+  <a href="#roadmap">16 &middot; The roadmap</a>
+</nav>
+
+<main>
+
+<!-- ================= VERDICT ================= -->
+<section id="verdict">
+
+  <div class="cal plain">
+    <div class="t">Notice &mdash; the games route was decided on 2 September 2026</div>
+    <p><b>The new games will be bought in from an external provider, not built in house.</b> That means the answer below, the four weld points, the database changes, the points system, the money flow, the admin work and the wording work are all <b>still exactly right</b> &mdash; they are platform work, and they do not care who supplies the gameplay.</p>
+    <p>Three things in this document are now out of date, and it is worth being precise about which:</p>
+    <ul>
+      <li><b>Section 11, the Trivia game, is not being built.</b> It is the one part of this plan the decision removes. Read it as an illustration of what a game module looks like, not as a commitment.</li>
+      <li><b>Section 15, the roadmap, has been replaced.</b> The live plan is the X0&ndash;X12 programme in the <i>External game plans</i> folder, and it runs <b>admin first</b> at the owner's instruction &mdash; an operator must be able to add a game and run a contest before any player screen is built against it.</li>
+      <li><b>The total is longer, not shorter.</b> 26.5&ndash;35 weeks rather than 14&ndash;19. Dropping the in-house game saves about three and a half weeks; integrating a provider properly costs about seven, and everything else is identical either way. <b>If anyone tells you buying the games was the cheaper choice, they have it backwards.</b></li>
+    </ul>
+    <p><b>Stage 0 is untouched by all of this.</b> It fixes live defects underneath the money layer, it is a prerequisite whichever route is taken, and it is the work currently waiting on your test.</p>
+  </div>
+
+  <div class="verdict">
+    <div class="q">The question: can we actually add more games without breaking the app?</div>
+    <div class="a">Yes. The contest engine and the money system already do not care what the game is &mdash; the work is adding a game label and four small adapter points, not rebuilding anything.</div>
+    <div class="n">The reason it is achievable: ChartVolt already contains a complete, working machine for &ldquo;take an entry fee, run a contest, rank the players, pay the winners, refund if cancelled.&rdquo; That machine never asks what the players were doing. Only four narrow places in the code assume the activity was trading. Those four are what we change.</div>
+  </div>
+
+  <div class="kv">
+    <div><b>Already reusable</b><span>~80%</span><em>Contest shell, wallet, prizes, refunds, fraud checks</em></div>
+    <div><b>Needs adapting</b><span>4 seams</span><em>Ranking, scoring record, settlement, gameplay writes</em></div>
+    <div><b>Must be deleted</b><span>Nothing</span><em>Trading is switched off, never removed</em></div>
+    <div><b>Breaking DB changes</b><span>Zero</span><em>Every change is additive</em></div>
+  </div>
+</section>
+
+<!-- ================= STAGE 0 GATE ================= -->
+<section id="gate">
+  <div class="gate-wrap">
+    <div class="gate-head">
+      <div class="k">Stage 0 &middot; Separate job &middot; Do this first</div>
+      <h2>Existing defects to fix and verify before any games work</h2>
+      <p>These are already in the app today. They are not caused by adding games, and they would be worth fixing even if no new game were ever added.</p>
+    </div>
+    <div class="gate-body">
+
+      <div class="cal plain">
+        <div class="t">In plain words</div>
+        <p>Before building anything new on the foundations, we repair two cracks that are already there. One is about <b>prize money not always being recorded</b>. The other is about the <b>admin app and the player app having drifted out of sync</b>. You test both, you confirm they work, and only then does the games work begin.</p>
+      </div>
+
+      <figure>
+        <div class="fig-t">Diagram 1 &mdash; The delivery order</div>
+        <svg viewBox="0 0 900 150" role="img" aria-label="Stage 0 is built, deployed, tested by owner, signed off, then phases 1 to 6 begin">
+          <!-- stage 0 block -->
+          <rect x="6" y="26" width="330" height="72" rx="8" fill="#fdedef" stroke="#a02a38" stroke-width="2"/>
+          <text x="24" y="50" font-family="Segoe UI" font-size="13" font-weight="700" fill="#a02a38">STAGE 0 &mdash; separate job</text>
+          <text x="24" y="70" font-family="Segoe UI" font-size="12" fill="#3a4a5a">Fix the two defects + add a permanent</text>
+          <text x="24" y="86" font-family="Segoe UI" font-size="12" fill="#3a4a5a">automatic guard &middot; 6&ndash;9 days</text>
+          <!-- arrow -->
+          <line x1="342" y1="62" x2="386" y2="62" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+          <!-- gate -->
+          <rect x="392" y="20" width="150" height="84" rx="8" fill="#fdf8ec" stroke="#c9a23f" stroke-width="2"/>
+          <text x="467" y="46" text-anchor="middle" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#8a6209">YOU TEST IT</text>
+          <text x="467" y="65" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">then you sign off</text>
+          <text x="467" y="86" text-anchor="middle" font-family="Segoe UI" font-size="20" fill="#c9a23f">&#10003;</text>
+          <line x1="548" y1="62" x2="592" y2="62" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+          <!-- games -->
+          <rect x="598" y="26" width="296" height="72" rx="8" fill="#eaf6ef" stroke="#1a6e49" stroke-width="2"/>
+          <text x="616" y="50" font-family="Segoe UI" font-size="13" font-weight="700" fill="#1a6e49">NEW GAMES PLAN</text>
+          <text x="616" y="70" font-family="Segoe UI" font-size="12" fill="#3a4a5a">Phases 1&ndash;7 &middot; 14&ndash;19 weeks</text>
+          <text x="616" y="86" font-family="Segoe UI" font-size="12" fill="#3a4a5a">Starts only after your sign-off</text>
+          <text x="450" y="132" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#6b7d8f" font-style="italic">Two separate deliveries, two separate approvals, each can be rolled back on its own</text>
+        </svg>
+        <figcaption><b>Why separate?</b> Bundling bug fixes inside a feature release makes both harder to review and harder to undo. Kept apart, each can be tested, approved and reversed independently.</figcaption>
+      </figure>
+
+      <!-- ---------- PREREQUISITE A ---------- -->
+      <h3 id="prereqA">Already fixed &mdash; a way in that should never have existed</h3>
+
+      <div class="cal bad">
+        <div class="t">Found 1 September 2026 &middot; fixed and pushed the same day</div>
+        <p>This was not in the plan. It was found while re-reading the code for Defect 1, and it had to be fixed immediately, so it is recorded here rather than hidden.</p>
+      </div>
+
+      <div class="cal plain">
+        <div class="t">In plain words</div>
+        <p>The app contains a set of testing endpoints used by the simulator. They can add credits to a wallet, open trades and ban accounts &mdash; on behalf of <b>any</b> user, named by id. The lock on that door was a single line of code, and it was written the wrong way round: instead of demanding a password, it accepted <b>anyone who simply claimed to be the simulator</b> by adding a label to their request. Nothing else stood in the way. So an outsider who knew the address could have credited any account with money the platform never received &mdash; and because the same code also increased the &ldquo;total deposited&rdquo; figure, that balance would have looked like a genuine card payment to every check further down the line, including the one that decides whether a withdrawal is allowed.</p>
+      </div>
+
+      <p>Ten endpoints had no password check at all. Two <b>money</b> endpoints &mdash; joining a competition and creating a challenge &mdash; read the same label and would act as whichever user was named. One of them accepted the user id <i>without even</i> the label.</p>
+
+      <div class="cal good">
+        <div class="t">What was done &mdash; commit d5d3a328, 20 files</div>
+        <p>The lock now <b>fails shut</b> instead of open: outside a developer's own machine a request needs the label, an explicit switch turned on, <i>and</i> a matching secret. If the secret is missing or too short, the door refuses everyone rather than admitting everyone. All ten endpoints now share one guard. Three other internal endpoints had the same weakness, falling back to guessable defaults, and were fixed too. Twenty-five tests were added, and ten of them call the real endpoints and confirm they now answer &ldquo;forbidden&rdquo; &mdash; proving the doors use the lock, not merely that the lock works.</p>
+      </div>
+
+      <div class="cal info">
+        <div class="t">Two things for you to do</div>
+        <p><b>1.</b> Deploy it. Until then the door is still open. <b>2.</b> Check whether it was ever used: look in the wallet transactions for entries described as a simulator deposit, and compare the total deposited figures against what the card providers actually processed. A real abuse would show a funded wallet with no matching payment behind it.</p>
+        <p>One side effect, deliberate: the simulator is now <b>switched off in production by default</b>. If you want to run simulations against the live server, an environment switch has to be turned on &mdash; in both the player app and the admin app, because they run as separate processes.</p>
+      </div>
+
+      <div class="cal plain">
+        <div class="t">Why it belongs in this document</div>
+        <p>The lesson generalises to the games work. Every new game brings a new endpoint that reports scores, and a score decides who gets prize money. The same three mistakes are available there: a lock that opens when its configuration is missing, a lock that is never actually attached to the door, and a convenient bypass left in for development. The rule taken from this: <b>never let a security check pass a request because a setting was not filled in</b>, and <b>test the door, not just the lock.</b></p>
+      </div>
+
+      <!-- ---------- DEFECT 1 ---------- -->
+      <h3 id="defect1">Defect 1 &mdash; Two entrance doors that behave differently <span class="b ok">Built &mdash; awaiting your test</span></h3>
+
+      <div class="cal plain">
+        <div class="t">In plain words</div>
+        <p>Imagine a stadium with two entrance gates. At <b>Gate A</b> the staff check your ticket, your ID and your eligibility, and they drop your entry fee into the prize money jar. At <b>Gate B</b> they check almost nothing &mdash; and <b>they forget to put your fee in the jar.</b> Both gates took your money. Only one recorded it in the prize pot.</p>
+        <p style="margin-bottom:0"><b>There is now one gate.</b> Built on 1 September 2026: a single entrance that performs every check from both doors and always puts the fee in the jar. The description below is kept in the past tense on purpose &mdash; it is the record of what was wrong and why, which is what the next person adding a game needs to read before adding a new way in.</p>
+      </div>
+
+      <figure>
+        <div class="fig-t">Diagram 2 &mdash; The two join paths, <i>as they were before the fix</i></div>
+        <svg viewBox="0 0 900 420" role="img" aria-label="Gate A performs four checks and adds the fee to the prize pool; Gate B skips the checks and does not add to the prize pool">
+          <!-- player -->
+          <circle cx="60" cy="200" r="26" fill="#143a5c"/>
+          <text x="60" y="206" text-anchor="middle" font-family="Segoe UI" font-size="20" fill="#fff">&#9823;</text>
+          <text x="60" y="248" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">Player</text>
+          <text x="60" y="263" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">joins</text>
+
+          <path d="M90 188 C 130 150, 150 120, 190 120" fill="none" stroke="#1a6e49" stroke-width="2"/>
+          <path d="M90 212 C 130 250, 150 285, 190 285" fill="none" stroke="#a02a38" stroke-width="2"/>
+
+          <!-- GATE A -->
+          <rect x="190" y="52" width="330" height="140" rx="9" fill="#eaf6ef" stroke="#1a6e49" stroke-width="2"/>
+          <text x="206" y="76" font-family="Segoe UI" font-size="13.5" font-weight="700" fill="#1a6e49">GATE A &mdash; the website</text>
+          <text x="206" y="94" font-family="Consolas, monospace" font-size="10.5" fill="#6b7d8f">enterCompetition()</text>
+          <text x="206" y="118" font-family="Segoe UI" font-size="12" fill="#1a6e49">&#10003; email verified</text>
+          <text x="206" y="136" font-family="Segoe UI" font-size="12" fill="#1a6e49">&#10003; account not restricted</text>
+          <text x="366" y="118" font-family="Segoe UI" font-size="12" fill="#1a6e49">&#10003; fraud checks</text>
+          <text x="366" y="136" font-family="Segoe UI" font-size="12" fill="#1a6e49">&#10003; level requirement</text>
+          <text x="206" y="170" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#1a6e49">&#10003; ADDS FEE TO PRIZE POOL</text>
+
+          <!-- GATE B -->
+          <rect x="190" y="218" width="330" height="140" rx="9" fill="#fdedef" stroke="#a02a38" stroke-width="2"/>
+          <text x="206" y="242" font-family="Segoe UI" font-size="13.5" font-weight="700" fill="#a02a38">GATE B &mdash; the API route</text>
+          <text x="206" y="260" font-family="Consolas, monospace" font-size="10.5" fill="#6b7d8f">/api/competitions/[id]/join</text>
+          <text x="206" y="284" font-family="Segoe UI" font-size="12" fill="#a02a38">&#10007; email verified</text>
+          <text x="206" y="302" font-family="Segoe UI" font-size="12" fill="#a02a38">&#10007; account not restricted</text>
+          <text x="366" y="284" font-family="Segoe UI" font-size="12" fill="#a02a38">&#10007; fraud checks</text>
+          <text x="366" y="302" font-family="Segoe UI" font-size="12" fill="#a02a38">&#10007; level requirement</text>
+          <text x="206" y="336" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#a02a38">&#10007; DOES NOT ADD TO PRIZE POOL</text>
+
+          <!-- money always taken -->
+          <path d="M520 122 L 600 122" fill="none" stroke="#1a6e49" stroke-width="2" marker-end="url(#ar)"/>
+          <path d="M520 288 L 600 288" fill="none" stroke="#a02a38" stroke-width="2" marker-end="url(#ar)"/>
+          <rect x="604" y="96" width="128" height="52" rx="7" fill="#fff" stroke="#dde4ec"/>
+          <text x="668" y="118" text-anchor="middle" font-family="Segoe UI" font-size="12" fill="#3a4a5a">Wallet charged</text>
+          <text x="668" y="136" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#1a6e49">yes</text>
+          <rect x="604" y="262" width="128" height="52" rx="7" fill="#fff" stroke="#dde4ec"/>
+          <text x="668" y="284" text-anchor="middle" font-family="Segoe UI" font-size="12" fill="#3a4a5a">Wallet charged</text>
+          <text x="668" y="302" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#a02a38">yes</text>
+
+          <!-- jar -->
+          <path d="M736 122 L 792 160" fill="none" stroke="#1a6e49" stroke-width="2" marker-end="url(#ar)"/>
+          <path d="M736 288 L 792 232" fill="none" stroke="#a02a38" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+          <rect x="798" y="150" width="96" height="92" rx="8" fill="#fdf8ec" stroke="#c9a23f" stroke-width="2"/>
+          <text x="846" y="176" text-anchor="middle" font-family="Segoe UI" font-size="24" fill="#c9a23f">&#127942;</text>
+          <text x="846" y="200" text-anchor="middle" font-family="Segoe UI" font-size="11.5" font-weight="700" fill="#8a6209">PRIZE</text>
+          <text x="846" y="215" text-anchor="middle" font-family="Segoe UI" font-size="11.5" font-weight="700" fill="#8a6209">POOL</text>
+          <text x="846" y="233" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#a02a38">short!</text>
+
+          <text x="450" y="396" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#6b7d8f" font-style="italic">Both doors take the money. Only Gate A records it in the prize pot &mdash; so the pot ends up smaller than the fees collected.</text>
+        </svg>
+        <figcaption><b>Verified in the code, and now fixed.</b> The website path increased both the player count and the prize pool; the API path increased only the player count. Re-checked on 1 September 2026, and one earlier claim in this document was wrong: a safeguard at the end of a competition caps the pool to <code>players &times; entry fee</code>, but <b>only when the pool is too high</b>. An under-counted pool &mdash; exactly what Gate B produced &mdash; was not corrected, not capped and not logged. It was simply under-distributed. Worse than previously described, not better. <b>That safeguard has not been changed</b>, so the same blind spot would apply to any future entrance that forgot the prize pool; it is on the list of adjacent items. The reason this never showed up as a complaint is separate: <b>Gate B was only ever reached by the simulator</b>, so no paying customer used it &mdash; which is also why the fix needed no data migration.</figcaption>
+      </figure>
+
+      <h4>What it caused &mdash; all three now fixed</h4>
+      <ul>
+        <li>Competitions joined through the API path built up <b>no prize pool</b>, so the pot was smaller than the fees actually taken.</li>
+        <li>Players could enter through that path while <b>unverified, restricted, or flagged by the fraud system</b>.</li>
+        <li>The same event was recorded in the ledger under two different field names &mdash; and worse, the name the website used <b>does not exist</b> in the database's definition, so it was discarded entirely. Every entry fee taken before this fix cannot be traced to the competition that charged it, and it cannot be repaired after the fact, because the value was never written down.</li>
+      </ul>
+
+      <div class="cal plain">
+        <div class="t">Two more money defects found while writing the tests &mdash; both now fixed</div>
+        <p><b>Cancelling a competition twice refunded every player twice.</b> The refund never checked whether the competition had already been cancelled, so it found the same players a second time and paid every entry fee out again. The database transaction did not help: it made each pass atomic, not unique. Measured on three players who each paid a 25-credit fee &mdash; after two cancellations each held 25 credits nobody had ever paid, with a ledger that agreed.</p>
+        <p>This was not theoretical. A scheduled job cancels competitions that never filled, an admin can cancel one on demand, and a third check cancels during page rendering. A retried scheduled delivery, or an admin clicking cancel while the sweep ran, paid twice. <b>Fixed by claiming the competition in the same instruction that marks it cancelled</b>, in both applications, so a second caller finds nothing to do and reports success rather than an error &mdash; a retried job has done nothing wrong, and refusing it would only invite a third attempt.</p>
+        <p><b>A busy competition looked like an outage.</b> When simultaneous joins collided more than five times, the API answered with a server-error code and passed the database's own internal message straight back to the caller. Two things were wrong: the error code tells a browser not to try again and can make the load balancer take the server out of service, and the message itself named the storage engine and its settings to anyone who asked. <b>Both fixed</b> &mdash; it now returns the code that means "you lost a race, please try again" along with a message a player can act on, and the technical detail stays in the server log.</p>
+        <p style="margin-bottom:0">The second one led to a wider finding worth recording. That habit of returning the raw internal message appears <b>166 times across 119 API files</b>. It was deliberately <b>not</b> changed everywhere at once: a change that size could not be reviewed properly, and most of those messages are legitimate text intended for the user. The harm is specific to messages that come from the database or the framework rather than from our own code. It is now a known piece of debt with a recommended approach, rather than something waiting to be rediscovered.</p>
+      </div>
+
+      <h4>The fix &mdash; built on 1 September 2026</h4>
+      <ol>
+        <li><b>Write the money tests first</b>, against today's behaviour, so any unintended change is caught immediately. <b>Done</b>, and it paid for itself several times over: writing the tests before the fix is what found the double refund, the busy-competition outage, the lost fraud scores, the missing challenge checks and the discarded challenge payment stamps &mdash; <b>five live faults, none of which were in this plan.</b></li>
+        <li><b>Build one single entrance</b> that does <i>all</i> the checks from both doors and <i>always</i> adds the fee to the prize pool, in the same database transaction as the charge. <b>Done.</b></li>
+        <li><b>Point both existing doors at it</b>, so nothing else in the app has to change. <b>Done</b> &mdash; the two doors shrank from 379 and 361 lines to 76 and 141.</li>
+        <li><b>Keep the retry logic</b> from the API path &mdash; it exists because simultaneous joins genuinely collide. <b>Done</b>, and see below: this turned out to matter far more than expected.</li>
+        <li><b>Unify the ledger field</b> so one event is recorded one way. <b>Done.</b></li>
+      </ol>
+
+      <div class="cal plain">
+        <div class="t">Two doors were actually four, and they were not all dealt with the same way</div>
+        <p>Mapping the code before building the single entrance found <b>four</b> places that took an entry fee and seated a player, not two. Two had never been written down anywhere.</p>
+        <p>The third was a bulk route used to seed thousands of test players at once. It repeated the prize-pool defect exactly, and it also wrote six player fields under names the database does not recognise &mdash; which the database discards in silence. <b>It was fixed where it stands rather than folded into the single entrance</b>, because its whole purpose is to insert thousands of rows in one operation and routing it through a one-player-at-a-time service would defeat that. Worth being precise about the six fields: they did <b>no visible harm</b>, because every discarded value happened to match the default the database would have used anyway. A trap waiting for the first meaningful value, not a live fault.</p>
+        <p style="margin-bottom:0">The fourth was a copy inside the admin application that <b>nothing called at all</b>. It was <b>deleted</b>, and being unused is exactly why: it was missing two of the security checks and it crashed the page instead of returning an error, so the next admin feature that needed to enter a player would have found it, used it, and inherited both faults. Dead code with weaker rules is a liability, not a spare part.</p>
+      </div>
+
+      <div class="cal plain">
+        <div class="t">An unexpected result: nineteen out of twenty players were being turned away</div>
+        <p>The API door retried when two joins collided; the website door did not. Sharing one implementation gave the website door the retry, and the effect was much larger than anyone was looking for. With twenty players joining at the same instant, the website door previously admitted <b>one</b>. It now admits <b>twenty</b>.</p>
+        <p style="margin-bottom:0">Those nineteen players were being refused entry to a competition that had room for them. Nobody had reported it, because a busy moment looks like bad luck rather than a bug &mdash; which is the general lesson: this was found by <i>measuring</i> the old behaviour before changing it, not by reading the code.</p>
+      </div>
+
+      <div class="cal plain">
+        <div class="t">A fault neither door had ever handled</div>
+        <p>Both doors checked "is this player already in?" and then added them &mdash; two separate steps. Two simultaneous joins by the <i>same</i> player can both pass that check. What actually stops the second seat is a uniqueness rule in the database, and it reports a <b>different</b> kind of error from the one both doors knew how to retry. So whichever request lost was told the server had failed, with no way to tell whether it had been charged.</p>
+        <p style="margin-bottom:0">It is now treated the same way as the check itself: the player is in, and nothing extra was taken. One detail is worth recording because it nearly went unnoticed &mdash; the obvious test, racing two joins against each other, <b>never actually triggered this path</b>; the simple check won every time. It had to be forced deliberately. A test that passes is not proof that the thing it was written for ever ran.</p>
+      </div>
+
+      <div class="cal plain">
+        <div class="t">The other paid door &mdash; head-to-head challenges &mdash; and a bug found by proof-reading</div>
+        <p>A <b>challenge</b> is the two-player version of a contest, and accepting one charges <i>both</i> players. It was checking a player's ticket and balance but <b>not</b> whether the account was suspended or flagged for fraud &mdash; so an account barred from every competition could still be entered into a paid challenge. Reading the challenge <i>creation</i> code would never have shown this, because that one checks properly; only the accept step was missing them. <b>Fixed</b> by giving it the same two checks the single entrance uses, run before either wallet is touched, so a refusal can never leave one of the two players charged.</p>
+        <p>Then, while writing that paragraph down, a sentence in it turned out to be wrong &mdash; and checking it found a further live fault. Every challenge payment record was being stamped with the challenge it belonged to, but the database had <b>never been told that field existed</b>, so it discarded the stamp every time. <b>Nine</b> different places did this: both entry charges, the refund when a challenge is declined, and all six prize payouts. <b>The entire history of challenge money was unattributable to the challenges that generated it.</b></p>
+        <p>Said precisely, because overstating it would be wrong: <b>nobody was paid the wrong amount.</b> No balance is calculated from that stamp, so this is a record-keeping fault, not a financial one &mdash; it matters for disputes, refunds and audits rather than for anyone's wallet. It is <b>fixed</b>, though the records already written cannot be repaired, because the information never reached the database to begin with.</p>
+        <p style="margin-bottom:0">Two things about this are worth more than the bug. First, <b>the automatic blueprint guard could not have caught it</b> &mdash; both applications were wrong in exactly the same way, so they agreed with each other perfectly. The guard proves the two apps match; it cannot prove either one matches the code writing to it. Second, this is now the <b>third</b> fault of that shape found in Stage 0, and the only reason this one surfaced is that a claim written in passing, in a paragraph about something else, was verified instead of assumed.</p>
+      </div>
+
+      <div class="cal plain">
+        <div class="t">A player locked out by a number nobody could see &mdash; reported, not predicted</div>
+        <p>This one came from you, from a real player, and none of the audit work would have found it. A player was refused entry to a paid head-to-head challenge. Nobody had suspended them &mdash; an alert had been raised to "investigation" and nothing more. The player was told nothing. Dismissing the investigation released nothing. And there was <b>no unblock button anywhere</b>, because the account was not on the restricted list; there was no suspension to lift. Automatic suspension was switched <b>off</b> the entire time.</p>
+        <p>The cause was that <b>two different things could block a player, and only one of them was visible.</b> A suspension is deliberate: it shows on the restricted list, the player is told, and you can lift it. The other is a fraud <i>score</i>, raised automatically by the detection system &mdash; and the entrance was refusing anyone whose score passed a threshold. That refusal appeared on no screen, sent no message, and <b>could not be undone by anything in the admin area</b>: the only score control that existed was a recalculate, which can only push a score up. Worse, it read its own threshold and <b>never once checked whether you had turned automatic suspension on</b>. Your decision to leave it off was being overruled by a mechanism you could not see.</p>
+        <p>The cruellest detail is the sequence you actually hit. The player's dashboard explains an account problem only while an alert is <i>open</i>. So <b>dismissing the alert deleted the last remaining explanation while the block stayed put</b> &mdash; the one action that should have released them made the situation less explicable instead.</p>
+        <p>The rule now is one line: <b>scores raise alerts; only suspensions block.</b> A score can no longer refuse anyone by itself. The threshold has been renamed to what it now does &mdash; escalate an account for a human to look at. Raising an alert to investigation now <b>asks you whether to restrict the accounts</b>, with the same options a suspension has; decline, and the player stays fully active. Either way <b>the player is told their account is under review</b>, and told again when a review closes with no action. And dismissing now genuinely clears the score &mdash; it always claimed to, in its own history entry, while only ever clearing a different one.</p>
+        <p style="margin-bottom:0">Digging into it turned up <b>five more live faults</b>, none of them what was being looked for. The two worth your attention: a page in the player app let <b>any logged-in player raise another player's fraud score</b> &mdash; enough to lock a rival out of a competition they were about to lose &mdash; or wipe their own; all three of its functions were labelled "admin only" in the code and none of them checked. And automatic suspension, when switched on, was <b>permanent</b> while telling everyone it was seven days, because it wrote the end date into a field the database had never been told about. The other three: automatic suspension almost never fired at its default setting; suspended and banned accounts <b>could still accept paid head-to-head challenges</b>; and clearing a score never recorded how much it had removed. All five are fixed.</p>
+      </div>
+
+      <div class="cal info">
+        <div class="t">Why this had to happen before the games work</div>
+        <p>The games project adds <b>more ways to join a contest</b>. Building new doors on top of doors that already disagreed about money and security would have multiplied the bug instead of fixing it. That is the road to double charges and unpaid winners. There is now a single entrance for every future game to join through, which was the whole point of doing this first.</p>
+        <p style="margin-bottom:0">The fraud fault above matters here for a different reason. A new game will be <b>cheaper and quicker to enter than a trading contest</b>, so it will trip the fraud detection far more often &mdash; which means the difference between a block you can see and lift and one you cannot is about to matter a great deal more than it did.</p>
+      </div>
+
+      <!-- ---------- DEFECT 2 ---------- -->
+      <h3 id="defect2">Defect 2 &mdash; Two blueprints that have drifted apart <span class="b now">Already happened</span></h3>
+
+      <div class="cal plain">
+        <div class="t">In plain words</div>
+        <p>ChartVolt is really <b>two applications</b> &mdash; the player app and the admin app &mdash; sharing one database. But each keeps its <b>own separate copy of the blueprint</b> describing what a competition is, what a payment is, and so on. There are <b>75 of these duplicated blueprints</b> &mdash; counted on 1 September 2026, up from the &ldquo;about 21&rdquo; this document first claimed &mdash; and <b>11 of them were out of step</b>. If someone updates one copy and forgets the other, the second app <b>cannot write</b> that piece of information. Not &ldquo;writes it wrongly&rdquo; &mdash; the write is thrown away, in silence, and the screen reports success.</p>
+        <p style="margin-bottom:0"><b>Fixed on 1 September 2026.</b> All 11 were brought back into line, and an automatic check now blocks any push that lets them drift again.</p>
+      </div>
+
+      <figure>
+        <div class="fig-t">Diagram 3 &mdash; One database, two blueprints, already out of step</div>
+        <svg viewBox="0 0 900 400" role="img" aria-label="Player app blueprint has all fields, admin app blueprint is missing several fields, both read the same database">
+          <!-- player app -->
+          <rect x="20" y="30" width="250" height="216" rx="9" fill="#eaf6ef" stroke="#1a6e49" stroke-width="2"/>
+          <text x="145" y="56" text-anchor="middle" font-family="Segoe UI" font-size="13.5" font-weight="700" fill="#1a6e49">PLAYER APP blueprint</text>
+          <text x="145" y="73" text-anchor="middle" font-family="Consolas, monospace" font-size="10" fill="#6b7d8f">database/models/&hellip;</text>
+          <g font-family="Segoe UI" font-size="11.5" fill="#1b2733">
+            <text x="42" y="100">&#10003; name, entry fee, dates</text>
+            <text x="42" y="122">&#10003; prize pool, status</text>
+            <text x="42" y="144">&#10003; gameMasterId</text>
+            <text x="42" y="166">&#10003; gameMasterName</text>
+            <text x="42" y="188">&#10003; provider</text>
+            <text x="42" y="210">&#10003; providerTransactionId</text>
+            <text x="42" y="232">&#10003; brandingFiles</text>
+          </g>
+
+          <!-- admin app -->
+          <rect x="630" y="30" width="250" height="216" rx="9" fill="#fdedef" stroke="#a02a38" stroke-width="2"/>
+          <text x="755" y="56" text-anchor="middle" font-family="Segoe UI" font-size="13.5" font-weight="700" fill="#a02a38">ADMIN APP blueprint</text>
+          <text x="755" y="73" text-anchor="middle" font-family="Consolas, monospace" font-size="10" fill="#6b7d8f">apps/admin/database/models/&hellip;</text>
+          <g font-family="Segoe UI" font-size="11.5">
+            <text x="652" y="100" fill="#1b2733">&#10003; name, entry fee, dates</text>
+            <text x="652" y="122" fill="#1b2733">&#10003; prize pool, status</text>
+            <text x="652" y="144" fill="#a02a38">&#10007; gameMasterId</text>
+            <text x="652" y="166" fill="#a02a38">&#10007; gameMasterName</text>
+            <text x="652" y="188" fill="#a02a38">&#10007; provider</text>
+            <text x="652" y="210" fill="#a02a38">&#10007; providerTransactionId</text>
+            <text x="652" y="232" fill="#a02a38">&#10007; brandingFiles</text>
+          </g>
+          <text x="755" y="264" text-anchor="middle" font-family="Segoe UI" font-size="11" font-weight="700" fill="#a02a38">5 fields it cannot see</text>
+
+          <!-- database -->
+          <ellipse cx="450" cy="316" rx="86" ry="20" fill="#143a5c"/>
+          <rect x="364" y="296" width="172" height="40" fill="#143a5c"/>
+          <ellipse cx="450" cy="296" rx="86" ry="20" fill="#1d4d75"/>
+          <text x="450" y="302" text-anchor="middle" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#fff">ONE DATABASE</text>
+          <text x="450" y="368" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#6b7d8f" font-style="italic">Same data, two different ideas of what it contains</text>
+
+          <path d="M145 250 C 145 290, 300 300, 366 306" fill="none" stroke="#1a6e49" stroke-width="2"/>
+          <path d="M755 250 C 755 290, 600 300, 534 306" fill="none" stroke="#a02a38" stroke-width="2" stroke-dasharray="6 4"/>
+
+          <!-- warning -->
+          <rect x="286" y="126" width="328" height="86" rx="8" fill="#fdf8ec" stroke="#c9a23f" stroke-width="1.6"/>
+          <text x="450" y="150" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#8a6209">The risk for the games project</text>
+          <text x="450" y="170" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">If the admin blueprint lacks the new</text>
+          <text x="450" y="186" text-anchor="middle" font-family="Consolas, monospace" font-size="11" fill="#a02a38">gameType</text>
+          <text x="450" y="202" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">field, a quiz can be mistaken for a trade</text>
+        </svg>
+        <figcaption><b>This is confirmed, not predicted.</b> All 75 blueprint pairs were compared automatically on 1 September 2026. Eleven had real differences &mdash; fields or permitted values absent from one side's type definition <i>and</i> its database schema.</figcaption>
+      </figure>
+
+      <div class="tw"><table>
+        <thead><tr><th>Blueprint</th><th>What was out of step</th></tr></thead>
+        <tbody>
+          <tr><td><code>platform-financials.model.ts</code></td><td><b>Both directions</b>, including two permitted values the player app rejected &mdash; the case that refuses the write</td></tr>
+          <tr><td><code>hero-settings.model.ts</code></td><td><b>42 fields</b>, making six landing-page sections un-editable</td></tr>
+          <tr><td><code>withdrawal-request.model.ts</code></td><td>Failure time, failure reason and method &mdash; missing from the <b>player</b> app. A live bug</td></tr>
+          <tr><td><code>competition.model.ts</code></td><td><code>gameMasterId</code>, <code>gameMasterName</code></td></tr>
+          <tr><td><code>wallet-transaction.model.ts</code></td><td><code>provider</code>, <code>providerTransactionId</code></td></tr>
+          <tr><td><code>whitelabel.model.ts</code></td><td><code>brandingFiles</code></td></tr>
+          <tr><td><code>user-bank-account.model.ts</code></td><td>5 payout-account fields</td></tr>
+          <tr><td><code>user-notification-preferences.model.ts</code></td><td>Challenge, social and messaging mute settings &mdash; so the admin app ignored a player's choice</td></tr>
+          <tr><td><code>challenge-settings.model.ts</code></td><td><code>tiePrizeDistribution</code> &mdash; how a tied challenge splits the prize</td></tr>
+          <tr><td><code>trading-position.model.ts</code></td><td><code>metadata</code></td></tr>
+          <tr><td><code>admin.model.ts</code></td><td>26 staff fields &mdash; <b>deliberate</b>, and the one allowed exception</td></tr>
+          <tr><td><code>competition-participant.model.ts</code></td><td>Content differs; field names still match</td></tr>
+        </tbody>
+      </table></div>
+
+      <h4>What it causes &mdash; measured, not assumed</h4>
+
+      <div class="cal plain">
+        <div class="t">This document used to say something different, and it was wrong</div>
+        <p style="margin-bottom:0">It previously said the harm was that &ldquo;the admin app cannot see the field&rdquo;, and that saving a record would strip it. Both claims were tested against a real database on 1 September 2026 and <b>both were wrong</b>. Reading works fine. An ordinary save keeps everything. The real harm is on <b>writing</b>, and in one respect it is worse than the old description.</p>
+      </div>
+
+      <div class="grid g2">
+        <div class="card">
+          <h4 style="margin-top:0">Worst: the write is refused outright</h4>
+          <p style="margin-bottom:0">If the two copies disagree about the <b>list of permitted values</b> for a field &mdash; not the field itself, just its allowed values &mdash; the database <b>rejects the whole record</b>. Nothing is saved. This had really happened: two kinds of money movement recorded by the admin app would have failed validation in the player app. <b>A check that only compares field names cannot see this at all</b>, which is why the guard compares values too.</p>
+        </div>
+        <div class="card">
+          <h4 style="margin-top:0">Nearly as bad: the write vanishes</h4>
+          <p style="margin-bottom:0">The app with the older copy <b>cannot save that field</b>. It does not fail, warn, or log &mdash; it reports success and stores nothing. A feature built on it looks like it works and does nothing at all. That is not hypothetical: see the withdrawal finding below.</p>
+        </div>
+      </div>
+
+      <div class="cal bad">
+        <div class="t">A live bug this uncovered &mdash; nobody was looking for it</div>
+        <p style="margin-bottom:0">When a withdrawal fails, the player app records <b>when</b> it failed and <b>why the processor declined it</b>. Its blueprint declared neither field, and the reason field was missing from <i>both</i> copies. So for as long as this code has been live, <b>every failed withdrawal has been stored with no time and no reason</b>, and the admin screens meant to show them had nothing to show. Both fields have been added to both copies. This is the strongest argument for the guard: it found a real defect that no one had reported.</p>
+      </div>
+
+      <div class="cal plain">
+        <div class="t">And six landing-page sections could not be edited at all</div>
+        <p style="margin-bottom:0">The admin copy of the landing-page blueprint was missing <b>42 fields</b> &mdash; the Game Master showcase, the competition types, the marketplace preview, the journey and badges section, the trust badges and the enterprise case studies. The admin panel is where that content is <i>supposed</i> to be edited. An administrator changing any of it got a success message and no change whatsoever.</p>
+      </div>
+
+      <div class="cal bad">
+        <div class="t">Why this becomes serious the moment games are added</div>
+        <p>The games plan introduces <code>gameType</code> &mdash; the label saying whether a contest is trading or trivia. It is exactly the kind of field that drifts. If the admin blueprint lacks it, the admin app <b>cannot set the label at all</b>, so a quiz contest created or edited through that path ends up unlabelled. An unlabelled contest is treated as a trading contest, so the system tries to close trading positions that do not exist, gives every player a score of zero, ranks them all equal, and <b>pays prize money to the wrong players &mdash; with no error message and nothing in the logs.</b> This is the single worst failure in the whole project, and this defect is its most likely cause.</p>
+      </div>
+
+      <h4>The fix &mdash; built on 1 September 2026</h4>
+      <ol>
+        <li><b>An automatic guard</b> that compares all 75 blueprint pairs and <b>refuses to build</b> when they differ, naming the file, the field and which side is missing it. It runs in the shared build pipeline and blocks any <code>git push</code>. It compares <b>lists of allowed values</b> as well as field names &mdash; without that it would have missed the worst case entirely.</li>
+        <li><b>A short list of differences that are deliberate.</b> The admin blueprint genuinely has 26 extra fields about staff permissions and profiles, and a guard that complains about those would soon be switched off. In the end that list needed <b>exactly one entry</b> &mdash; every other difference turned out to be a real defect, which was not the expectation going in.</li>
+        <li><b>All 11 out-of-step pairs brought back into line</b>, by <b>adding</b> only. Deleting a permitted value to make two copies agree would orphan every record already using it.</li>
+        <li><b>20 tests.</b> Twelve prove the guard actually catches drift &mdash; and, just as important, that it stays quiet about harmless differences like reordered lists, changed comments or different default values. A guard that blocks work for cosmetic reasons gets bypassed, and then it protects nothing. The other eight are the measurements that corrected this document.</li>
+        <li><b>A review checklist item</b>: &ldquo;blueprint changed &mdash; was the mirror updated?&rdquo;</li>
+      </ol>
+
+      <div class="cal good">
+        <div class="t">Best value in the whole programme &mdash; and it proved it immediately</div>
+        <p style="margin-bottom:0">This guard was roughly half a day of work and it <b>permanently eliminates an entire category of bug</b> that has already caught this project at least three times. Before it was even finished it had found <b>three live defects nobody had reported</b>. It keeps paying for itself long after the games work is finished.</p>
+      </div>
+
+      <div class="cal bad">
+        <div class="t">The three live defects it found on the way &mdash; all now fixed</div>
+        <ol style="margin-bottom:0">
+          <li><b>Failed withdrawals recorded neither the time nor the reason.</b> The payment provider was reporting why a payout failed and the platform was discarding it, so the admin screen had nothing to show and nobody could tell a customer what had gone wrong.</li>
+          <li><b>Six landing-page sections could not be edited at all.</b> Game Master, competition types, the marketplace, journey and badges, trust badges and the enterprise case studies. Saving a change returned a success message and changed nothing.</li>
+          <li><b>Hero and branding images could never be recovered after a deployment.</b> The platform keeps a copy of every uploaded image in the database precisely so images survive a redeploy onto fresh disks &mdash; and the code that reads that copy could not see it, so the images simply stayed missing. Deleting an image was the mirror image of the same fault: the file went, the database copy stayed forever.</li>
+        </ol>
+      </div>
+
+      <div class="cal plain">
+        <div class="t">A fourth defect underneath the third &mdash; now fixed</div>
+        <p>The image-recovery fault above was <b>not fixed by matching the blueprints.</b> Matching them was necessary and it was not sufficient, which is worth stating plainly: a matched blueprint proves two copies agree, not that either one works.</p>
+        <p>The backup copy is filed under the image's filename, and the database <b>refuses a key containing a dot</b> &mdash; which every filename has. So the backup had never been written once, and matching the blueprints only changed how it failed: before, the field did not exist and the write was quietly thrown away; afterwards the field existed and the write was rejected outright. The upload code caught that rejection, wrote a line to the log, and still reported success, because the image did reach the disk. Nothing looked wrong until a deployment, by which point the image was gone and there was no copy to restore.</p>
+        <p><b>Fixed 1 September 2026.</b> A single shared helper now encodes the dot on the way in and restores it on the way out, wired through all seven places that touch these keys &mdash; two that write, four that read and one that deletes &mdash; in both applications. The encoding keeps the stored names readable, which matters for a field whose entire purpose is recovering from a disaster: someone inspecting the database during an incident should be able to see which image is which.</p>
+        <p style="margin-bottom:0"><b>There was nothing to migrate</b>, because no backup had ever been stored.</p>
+      </div>
+
+      <div class="cal plain">
+        <div class="t">Why nobody spotted these</div>
+        <p style="margin-bottom:0">Worth understanding, because it explains why a guard was needed rather than more careful review. When a field is missing from one blueprint, that side <b>still reads the value correctly</b> in most contexts &mdash; it shows up in logs and debug output exactly as expected. But the ordinary way code reads a field returns <b>nothing at all</b>, so the program quietly takes the wrong branch. The evidence and the code disagree, and the evidence looks fine. That is the whole reason this survived unnoticed for months, and why the check has to be automatic.</p>
+      </div>
+
+      <div class="cal plain">
+        <div class="t">The leftover files were two problems, not one &mdash; and the second was real</div>
+        <p>After deleting the first batch, building the test harness failed immediately and pointed at a file nobody had looked for: a <b>second set of 113 leftover files</b> from a <i>different</i> command run, six weeks earlier, in December. Same modules. The first clean-up had removed one half of what that command produces and left the other half sitting there.</p>
+        <p><b>The first batch was harmless. This one was not.</b> The test runner was loading these <i>six-month-old</i> copies instead of the real code. We proved it rather than guessing: one of the stale copies is missing four functions the real file has, so we simply asked the test runner whether one of them existed. It did not.</p>
+        <p>The consequence was serious for this stage: <b>every database blueprint and every money-handling service was impossible to test.</b> The money tests this whole defect exists to enable could not have been written at all &mdash; blocked by files everyone assumed were junk.</p>
+        <p style="margin-bottom:0"><b>The reassuring part:</b> we checked all four toolchains, and the live website, the background worker and the production build all correctly use the real code. Only the test runner was affected, which is exactly why this went unnoticed for seven months. All 113 are now deleted, with verification after the fact: identical type-checking results, all 188 tests passing, the worker builds, and the production build compiles cleanly.</p>
+      </div>
+
+      <div class="cal good">
+        <div class="t">Leftover files &mdash; you approved deletion, and they are gone</div>
+        <p>There were <b>112 leftover files</b> in the codebase from a one-off command run in February. They were automatically generated copies of the blueprints, all out of date, and nothing read them &mdash; proven by removing them and confirming the code compiles <i>identically</i>, error for error. Keeping them would have meant maintaining a <i>third</i> copy of every blueprint, which is the very problem this defect is about. All deleted, with a rule added so they cannot come back.</p>
+        <p style="margin-bottom:0"><b>Worth flagging, because it is the same mistake twice:</b> we first reported this as 62 files. That count only looked in the folder we happened to be working in. Searching the whole project found 112 &mdash; the rest were sitting in a different folder the whole time. It is the identical error the blueprint audit made when it reported &ldquo;21 files&rdquo; and the truth was 75. <b>Counts scoped to where you are standing are not totals</b>, and that is now a standing rule for this project. Two files were kept deliberately, because they are genuine hand-written definitions rather than generated copies.</p>
+      </div>
+
+      <div class="cal info">
+        <div class="t">Your decision on market hours, and why it mattered</div>
+        <p>Fixing the two entry doors forced a question we could not answer for you. One door blocks people from joining a competition when the financial markets are closed; the other does not. Merging them by simply applying every check from both sides would have adopted the stricter behaviour &mdash; and <b>stopped players signing up on a Saturday for a contest starting Monday.</b></p>
+        <p style="margin-bottom:0">That would have been lost revenue caused by a bug fix, which is the sort of thing that goes unnoticed for months. <b>Your decision: joining is allowed at any time; only the trading itself waits for the markets to open.</b> That is the right call &mdash; joining just moves credits into a prize pot, so a closed market makes nothing unsafe. It is now locked down by a test that fails if anyone ever blocks the join <i>or</i> lets trading through early.</p>
+      </div>
+
+      <!-- ---------- OPTIONAL ---------- -->
+      <h3>Optional extras (not part of your sign-off)</h3>
+      <p>Four smaller issues were found in the same areas. They can ride along if convenient, but they must <b>not</b> delay your approval of the two defects above.</p>
+      <div class="tw"><table>
+        <thead><tr><th style="width:26%">Item</th><th>What it is</th></tr></thead>
+        <tbody>
+          <tr><td>Dormant duplicate schedulers</td><td>An old set of scheduled jobs still exists in the code but is deliberately switched off. If anyone switches them back on, two schedulers would finish competitions at the same time &mdash; a double-payout risk. Delete or clearly fence them.</td></tr>
+          <tr><td>Unused refund type</td><td>A refund category exists in the ledger that no code ever writes. Either implement it or mark it reserved, so nobody assumes it works.</td></tr>
+          <tr><td>Missing refund notice</td><td>When a competition is cancelled automatically for too few players, the refund notification is only sent from the admin app &mdash; so some refunded players may never be told.</td></tr>
+          <tr><td>Silent pool correction</td><td>The safeguard only covers the case where the pool is too <i>high</i>, and even then it corrects silently. Once Defect 1 is fixed, make it log a warning instead, and add the missing branch for a pool that is too <i>low</i>, so drift is visible in both directions.</td></tr>
+        </tbody>
+      </table></div>
+
+      <!-- ---------- SIGN OFF ---------- -->
+      <h3 id="signoff">Your sign-off checklist</h3>
+      <p>You can run all of these yourself. Nothing below needs a developer to interpret it.</p>
+
+      <h4>Already fixed &mdash; the open door</h4>
+      <div class="chk">
+        <div><span class="box"></span><span><b>Deploy commit d5d3a328.</b> Until it is on the server, the door is still open.</span></div>
+        <div><span class="box"></span><span>Ask the developer to show the endpoint answering <b>&ldquo;forbidden&rdquo;</b> when called with only the label and no secret.</span></div>
+        <div><span class="box"></span><span>Decide whether the simulator should run on the live server. If yes, the environment switch must be turned on in <b>both</b> apps; if no, leave it off &mdash; that is now the default.</span></div>
+        <div><span class="box"></span><span>Check the live data for signs it was ever used: wallet entries described as a simulator deposit, and total-deposited figures that do not match what the card providers processed.</span></div>
+      </div>
+
+      <h4>Defect 1 &mdash; the two doors</h4>
+      <p style="margin:0 0 10px"><b>This list was nine items and is now three.</b> Six are now covered by automated tests that run on every change, which is a better guarantee than a one-off manual check. The three that remain are the ones a test genuinely cannot do &mdash; all three are about the <i>browser</i> reaching the code, and every automated test skips the browser by calling the code directly.</p>
+      <div class="chk">
+        <div><span class="box"></span><span>Join a paid competition <b>through the website</b>. In admin, confirm the prize pool went up by exactly the entry fee. <b>Worth doing by hand</b> &mdash; nothing yet proves the <i>button</i> still reaches the rewritten code.</span></div>
+        <div><span class="box"></span><span>Open an entry-fee transaction in admin. Confirm it <b>names the competition</b> it paid for. The value is now stored and searchable; what is untested is whether the admin screen displays it.</span></div>
+        <div><span class="box"></span><span>Confirm the <b>full production build succeeds</b>. The entry code moved out of one file into a shared one, which is the kind of change that only fails at build time.</span></div>
+        <div><span class="box done"></span><span>Prize pool rises by the fee through <b>both</b> doors, and on a mixed field of players using both. <i>Automated.</i></span></div>
+        <div><span class="box done"></span><span><b>Unverified email, restricted account and fraud flag</b> all refused through both doors &mdash; with no seat given and no fee taken. <i>Automated.</i></span></div>
+        <div><span class="box done"></span><span>Prizes paid + platform fee equals the prize pool exactly, including tied and uneven splits. <i>Automated.</i></span></div>
+        <div><span class="box done"></span><span>Cancelling a competition refunds everyone, <b>once</b>, even if it is cancelled twice. <i>Automated.</i></span></div>
+        <div><span class="box done"></span><span>The bulk seeding route funds the pool and records which competition each fee belongs to. <i>Automated.</i></span></div>
+        <div><span class="box"></span><span><b>Still not fixed, and not to be ticked here.</b> Accepting a challenge with a restricted or fraud-flagged account is <i>still allowed</i>. It is proven by a test and awaits your decision on whether it is fixed inside this stage or after it.</span></div>
+      </div>
+
+      <div class="cal plain">
+        <div class="t">One new problem found, not fixed, and it needs your decision</div>
+        <p style="margin-bottom:0">Three parts of the fraud system record a player's suspicion score by first looking for an existing record and then creating one. If two suspicious events land at the same moment, both look, both find nothing, both try to create &mdash; and one is rejected, so <b>that fraud signal is silently thrown away</b>. It is the same shape as the seat problem described earlier, in the code that decides whether someone is cheating. It came to light only because a fraud check that previously ran on one door now runs on both. The fix is small, but it is untested code in a sensitive area, so it is being put to you rather than bundled in quietly.</p>
+      </div>
+
+      <h4>Defect 2 &mdash; the two blueprints</h4>
+      <div class="chk">
+        <div><span class="box"></span><span>Open a Game-Master competition in admin. Confirm the <b>Game Master is shown correctly</b>.</span></div>
+        <div><span class="box"></span><span>Open a card deposit in admin transactions. Confirm the <b>payment provider is shown</b>.</span></div>
+        <div><span class="box"></span><span>Edit a competition in admin, save, reopen it. Confirm <b>nothing was lost</b>.</span></div>
+        <div><span class="box"></span><span>Ask the developer to <b>demonstrate the build failing</b> when a field is added to only one blueprint. This proves the guard actually guards.</span></div>
+        <div><span class="box"></span><span>Ask for the same demonstration with an <b>allowed value</b> added to one side only &mdash; that case rejects the write outright rather than just hiding a field.</span></div>
+        <div><span class="box"></span><span>Ask to see the build <b>passing</b> for the staff-permissions blueprint, which is meant to differ. This proves the guard will not cry wolf.</span></div>
+      </div>
+
+      <h4>Automated gate</h4>
+      <div class="chk">
+        <div><span class="box"></span><span>All 11 money tests pass.</span></div>
+        <div><span class="box done"></span><span>All <b>20</b> blueprint tests pass. <span class="b ok">Done 1 Sep</span></span></div>
+        <div><span class="box done"></span><span>The blueprint guard runs on every build and blocks pushes when things drift. <span class="b ok">Done 1 Sep</span></span></div>
+        <div><span class="box"></span><span>The full production build succeeds &mdash; not just the development server. <b>Currently blocked by the environment, not by this work:</b> the code compiles cleanly, but the build cannot finish on the development machine because it needs to reach the live database and cannot. Worth resolving before Defect 1, which needs the same check.</span></div>
+        <div><span class="box"></span><span>The 25 tests from the security fix still pass.</span></div>
+      </div>
+
+      <div class="kv">
+        <div><b>Effort</b><span>6&ndash;9 days</span><em>Roughly half is writing tests</em></div>
+        <div><b>Visible change</b><span>None</span><em>This is correctness work</em></div>
+        <div><b>Rollback</b><span>Independent</span><em>Each fix reverts on its own</em></div>
+        <div><b>Value if games never happen</b><span>Still worth it</span><em>Closes a money defect and 4 bypassed security checks</em></div>
+      </div>
+
+      <div class="cal good">
+        <div class="t">On sign-off</div>
+        <p>Once you confirm both fixes work in production, the games work begins at <b>Phase 1 &mdash; Foundation</b>.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<hr class="d" />
+
+<!-- ================= 1 TODAY ================= -->
+<section id="today">
+  <div class="sec-h"><div class="sec-n">1</div><h2>How the app works today</h2></div>
+  <p class="sec-sub">And why roughly four-fifths of it can be reused as-is.</p>
+
+  <div class="cal plain">
+    <div class="t">In plain words</div>
+    <p>ChartVolt already contains a complete machine for running a paid contest: <b>take an entry fee &rarr; run the event &rarr; rank the players &rarr; pay the winners &rarr; refund if it is cancelled.</b> That machine never asks what the players actually <i>did</i>. That is why adding games is realistic rather than a rewrite.</p>
+  </div>
+
+  <h3>Already reusable, needs no structural change</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="width:32%">What it does</th><th>Why it works for any game</th></tr></thead>
+    <tbody>
+      <tr><td><b>Contest shell</b></td><td>Name, description, entry fee, minimum and maximum players, start and end times, registration deadline, status, prize pool, platform fee, prize split by position, pause, tags &mdash; none of it mentions trading.</td></tr>
+      <tr><td><b>Status flow</b></td><td><code>draft &rarr; upcoming &rarr; active &rarr; finalizing &rarr; completed</code>, plus cancelled and emergency-ended. Works for a quiz exactly as it does for trading.</td></tr>
+      <tr><td><b>Credits wallet</b></td><td>Adding and subtracting credits is activity-neutral.</td></tr>
+      <tr><td><b>Ledger</b></td><td>Full audit trail with balance before and after every movement.</td></tr>
+      <tr><td><b>Prize maths</b></td><td>Takes positions and percentages only. Handles ties and unfilled positions. Knows nothing about trading.</td></tr>
+      <tr><td><b>Platform fee &amp; unclaimed pots</b></td><td>Driven by outcome, not by activity.</td></tr>
+      <tr><td><b>Refunds</b></td><td>Reverses the entry fee per player.</td></tr>
+      <tr><td><b>Entry checks</b></td><td>Login, email verification, restrictions, IP risk, device fingerprint, suspicion score &mdash; all activity-neutral.</td></tr>
+      <tr><td><b>Game Master revenue</b></td><td>A share of <b>entry fees</b> from referred players &mdash; works for any paid contest.</td></tr>
+      <tr><td><b>Badges &amp; XP machinery</b></td><td>The award pipeline, rarity tiers and XP ledger are generic. Only the <i>conditions</i> and <i>titles</i> are trading-flavoured.</td></tr>
+      <tr><td><b>Wallet, messaging, KYC, notifications</b></td><td>Already game-neutral.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal good">
+    <div class="t">The important conclusion</div>
+    <p>The contest engine and the money engine are <b>sound</b>. We are adding a dimension to them, not replacing them. Nothing in this plan requires deleting working code.</p>
+  </div>
+
+  <h3>Things that are safer than they look</h3>
+  <p>Worth recording, because fear of these could distort the plan:</p>
+  <div class="tw"><table>
+    <thead><tr><th style="width:42%">The worry</th><th>The reality</th></tr></thead>
+    <tbody>
+      <tr><td>&ldquo;The background jobs will break&rdquo;</td><td>They already check for themselves and do nothing when there are no active contests.</td></tr>
+      <tr><td>&ldquo;Turning off trading will break the app&rdquo;</td><td>The live price feed is already limited to the two trading screens; the admin app already skips it; secondary servers already run in a reduced mode.</td></tr>
+      <tr><td>&ldquo;The wording is 5,000 items&rdquo;</td><td>The genuinely visible shared wording is roughly 150&ndash;250 items. The rest is internal names, logs, or content that <i>should</i> stay trading-flavoured.</td></tr>
+      <tr><td>&ldquo;The money system needs rewriting&rdquo;</td><td>It is already position-based and game-neutral. It needs tidying, not redesign.</td></tr>
+      <tr><td>&ldquo;The journey maps need rebuilding&rdquo;</td><td>Already stored in the database with an admin editor. The old trading versions in code are not even used.</td></tr>
+      <tr><td>&ldquo;We need a new server for Trivia&rdquo;</td><td>Database and web pages only. No new service, port or dependency.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ================= 2 SEAMS ================= -->
+<section id="seams">
+  <div class="sec-h"><div class="sec-n">2</div><h2>The four places where trading is welded in</h2></div>
+  <p class="sec-sub">The entire project is about cutting these four joints cleanly.</p>
+
+  <figure>
+    <div class="fig-t">Diagram 4 &mdash; The weld map</div>
+    <svg viewBox="0 0 900 470" role="img" aria-label="Map showing reusable layers in green and four trading weld points in red">
+      <!-- reusable top -->
+      <rect x="30" y="24" width="840" height="60" rx="8" fill="#eaf6ef" stroke="#1a6e49" stroke-width="1.8"/>
+      <text x="48" y="48" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#1a6e49">REUSABLE &mdash; Contest shell</text>
+      <text x="48" y="68" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">name &middot; entry fee &middot; dates &middot; status &middot; prize pool &middot; prize split &middot; min/max players &middot; pause &middot; cancel</text>
+
+      <!-- seams band -->
+      <rect x="30" y="98" width="840" height="200" rx="8" fill="#fff" stroke="#dde4ec" stroke-width="1.5" stroke-dasharray="0"/>
+      <text x="450" y="120" text-anchor="middle" font-family="Segoe UI" font-size="11" letter-spacing="1.6" font-weight="700" fill="#a02a38">THE FOUR WELD POINTS &mdash; ALL THE WORK IS HERE</text>
+
+      <g>
+        <rect x="48" y="134" width="192" height="146" rx="7" fill="#fdedef" stroke="#a02a38" stroke-width="1.8"/>
+        <circle cx="72" cy="158" r="13" fill="#a02a38"/>
+        <text x="72" y="163" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#fff">1</text>
+        <text x="94" y="163" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#a02a38">Ranking</text>
+        <text x="62" y="188" font-family="Segoe UI" font-size="11" fill="#3a4a5a">One small function that</text>
+        <text x="62" y="203" font-family="Segoe UI" font-size="11" fill="#3a4a5a">only knows six trading</text>
+        <text x="62" y="218" font-family="Segoe UI" font-size="11" fill="#3a4a5a">measurements.</text>
+        <text x="62" y="243" font-family="Consolas, monospace" font-size="9.5" fill="#6b7d8f">competition-ranking</text>
+        <text x="62" y="256" font-family="Consolas, monospace" font-size="9.5" fill="#6b7d8f">.service.ts:64</text>
+        <text x="62" y="273" font-family="Segoe UI" font-size="10.5" font-weight="700" fill="#1a6e49">Cheapest fix &mdash; best value</text>
+      </g>
+      <g>
+        <rect x="252" y="134" width="192" height="146" rx="7" fill="#fdedef" stroke="#a02a38" stroke-width="1.8"/>
+        <circle cx="276" cy="158" r="13" fill="#a02a38"/>
+        <text x="276" y="163" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#fff">2</text>
+        <text x="298" y="163" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#a02a38">Player record</text>
+        <text x="266" y="188" font-family="Segoe UI" font-size="11" fill="#3a4a5a">Stores trading capital,</text>
+        <text x="266" y="203" font-family="Segoe UI" font-size="11" fill="#3a4a5a">profit and margin &mdash; but</text>
+        <text x="266" y="218" font-family="Segoe UI" font-size="11" fill="#3a4a5a">has no general</text>
+        <text x="266" y="233" font-family="Segoe UI" font-size="11" fill="#3a4a5a">&ldquo;score&rdquo; at all.</text>
+        <text x="266" y="258" font-family="Segoe UI" font-size="10.5" font-weight="700" fill="#1a6e49">Fix: add a score field</text>
+      </g>
+      <g>
+        <rect x="456" y="134" width="192" height="146" rx="7" fill="#fdedef" stroke="#a02a38" stroke-width="1.8"/>
+        <circle cx="480" cy="158" r="13" fill="#a02a38"/>
+        <text x="480" y="163" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#fff">3</text>
+        <text x="502" y="163" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#a02a38">Settlement</text>
+        <text x="470" y="188" font-family="Segoe UI" font-size="11" fill="#3a4a5a">Closes trading positions</text>
+        <text x="470" y="203" font-family="Segoe UI" font-size="11" fill="#3a4a5a">at live prices before</text>
+        <text x="470" y="218" font-family="Segoe UI" font-size="11" fill="#3a4a5a">ranking anyone.</text>
+        <text x="470" y="243" font-family="Segoe UI" font-size="10.5" font-weight="700" fill="#a02a38">MOST DANGEROUS</text>
+        <text x="470" y="258" font-family="Segoe UI" font-size="10.5" fill="#3a4a5a">if pointed at a quiz</text>
+      </g>
+      <g>
+        <rect x="660" y="134" width="192" height="146" rx="7" fill="#fdedef" stroke="#a02a38" stroke-width="1.8"/>
+        <circle cx="684" cy="158" r="13" fill="#a02a38"/>
+        <text x="684" y="163" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#fff">4</text>
+        <text x="706" y="163" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#a02a38">Gameplay</text>
+        <text x="674" y="188" font-family="Segoe UI" font-size="11" fill="#3a4a5a">Orders, positions,</text>
+        <text x="674" y="203" font-family="Segoe UI" font-size="11" fill="#3a4a5a">liquidation, margin &mdash;</text>
+        <text x="674" y="218" font-family="Segoe UI" font-size="11" fill="#3a4a5a">all trading-only.</text>
+        <text x="674" y="243" font-family="Segoe UI" font-size="10.5" font-weight="700" fill="#1a6e49">Stays untouched, becomes</text>
+        <text x="674" y="258" font-family="Segoe UI" font-size="10.5" font-weight="700" fill="#1a6e49">the trading module</text>
+      </g>
+
+      <!-- reusable bottom -->
+      <rect x="30" y="312" width="840" height="60" rx="8" fill="#eaf6ef" stroke="#1a6e49" stroke-width="1.8"/>
+      <text x="48" y="336" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#1a6e49">REUSABLE &mdash; Money layer</text>
+      <text x="48" y="356" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">credits wallet &middot; ledger &middot; entry fee &middot; prize maths &middot; platform fee &middot; unclaimed pots &middot; refunds &middot; Game Master share</text>
+
+      <rect x="30" y="386" width="840" height="52" rx="8" fill="#ecf3fa" stroke="#1c5788" stroke-width="1.8"/>
+      <text x="48" y="408" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#1c5788">SWITCHED OFF, NEVER DELETED &mdash; live price feed, market data, background trading jobs</text>
+      <text x="48" y="426" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">Starts itself automatically today. We add one condition. Removing it is the most dangerous thing we could do.</text>
+    </svg>
+    <figcaption>Green layers pass straight through unchanged. Red is the whole engineering project. Blue is infrastructure we <b>gate</b> rather than remove &mdash; it starts itself implicitly on server boot, so pulling it out would break charts, price history and emergency settlement in non-obvious ways.</figcaption>
+  </figure>
+
+  <div class="cal bad">
+    <div class="t">The one to watch: weld point 3</div>
+    <p>The settlement step closes trading positions and works out profit, <i>then</i> ranks players. If a quiz contest ever reaches that code unchanged, it finds no positions, gives <b>everyone a score of zero</b>, ranks them all equal, and pays the prize money out by tie-break rule. <b>No error. No log line.</b> Real money to the wrong people. Five different places in the app can trigger settlement, so all five must be checked &mdash; including one hidden inside a page-load function.</p>
+  </div>
+</section>
+
+<!-- ================= 3 TARGET ================= -->
+<section id="target">
+  <div class="sec-h"><div class="sec-n">3</div><h2>The new design</h2></div>
+  <p class="sec-sub">One contest engine, one money system, many plug-in games.</p>
+
+  <div class="cal plain">
+    <div class="t">In plain words</div>
+    <p>We give every contest a <b>label</b> saying which game it is. Then each game gets its own small <b>plug-in</b> that knows how to set that game up, how to score it, and how to finish it. The shared engine stops caring what a game is &mdash; it only knows that players have a <b>score</b>, scores make <b>positions</b>, and positions get <b>prizes</b>.</p>
+  </div>
+
+  <figure>
+    <div class="fig-t">Diagram 5 &mdash; Before and after</div>
+    <svg viewBox="0 0 900 500" role="img" aria-label="Before: engine hardwired to trading. After: engine calls a registry which dispatches to trading, trivia and future game modules">
+      <text x="30" y="26" font-family="Segoe UI" font-size="11.5" letter-spacing="1.6" font-weight="700" fill="#a02a38">BEFORE &mdash; hardwired</text>
+      <rect x="30" y="38" width="230" height="52" rx="7" fill="#fff" stroke="#dde4ec" stroke-width="1.5"/>
+      <text x="145" y="60" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#0d2338">Competition</text>
+      <text x="145" y="78" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#6b7d8f">trading settings built in</text>
+      <line x1="145" y1="92" x2="145" y2="116" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+      <rect x="30" y="120" width="230" height="76" rx="7" fill="#fdedef" stroke="#a02a38" stroke-width="1.8"/>
+      <text x="145" y="144" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#a02a38">Finish the contest</text>
+      <text x="145" y="163" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">closes trading positions</text>
+      <text x="145" y="180" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">ranks by trading profit</text>
+      <line x1="145" y1="198" x2="145" y2="222" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+      <rect x="60" y="226" width="170" height="42" rx="7" fill="#ecf3fa" stroke="#1c5788" stroke-width="1.5"/>
+      <text x="145" y="252" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#1c5788">Trading positions only</text>
+      <text x="145" y="296" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#a02a38" font-style="italic">One game possible. Adding a</text>
+      <text x="145" y="312" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#a02a38" font-style="italic">second means forking everything.</text>
+
+      <!-- divider -->
+      <line x1="300" y1="30" x2="300" y2="470" stroke="#dde4ec" stroke-width="1.5" stroke-dasharray="5 5"/>
+
+      <text x="340" y="26" font-family="Segoe UI" font-size="11.5" letter-spacing="1.6" font-weight="700" fill="#1a6e49">AFTER &mdash; plug-in games</text>
+      <rect x="340" y="38" width="520" height="52" rx="7" fill="#fff" stroke="#c9a23f" stroke-width="1.8"/>
+      <text x="600" y="60" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#0d2338">Competition &nbsp;+&nbsp; game label &nbsp;+&nbsp; game settings</text>
+      <text x="600" y="78" text-anchor="middle" font-family="Consolas, monospace" font-size="10.5" fill="#8a6209">gameType &middot; gameConfig</text>
+      <line x1="600" y1="92" x2="600" y2="112" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <rect x="340" y="116" width="520" height="92" rx="7" fill="#eaf6ef" stroke="#1a6e49" stroke-width="2"/>
+      <text x="600" y="140" text-anchor="middle" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#1a6e49">SHARED CONTEST ENGINE &mdash; unchanged</text>
+      <text x="600" y="160" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">lock &middot; rank &middot; split prizes &middot; pay winners &middot; platform fee &middot; refunds &middot; notify</text>
+      <text x="600" y="182" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">It only knows: players have a score, scores make positions,</text>
+      <text x="600" y="198" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">positions get prizes.</text>
+      <line x1="600" y1="210" x2="600" y2="234" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <rect x="452" y="238" width="296" height="46" rx="7" fill="#fdf8ec" stroke="#c9a23f" stroke-width="1.8"/>
+      <text x="600" y="266" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#8a6209">GAME REGISTRY &mdash; &ldquo;which plug-in?&rdquo;</text>
+
+      <line x1="520" y1="286" x2="440" y2="322" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <line x1="600" y1="286" x2="600" y2="322" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <line x1="680" y1="286" x2="760" y2="322" stroke="#6b7d8f" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#ar)"/>
+
+      <rect x="352" y="326" width="152" height="104" rx="7" fill="#ecf3fa" stroke="#1c5788" stroke-width="1.8"/>
+      <text x="428" y="348" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#1c5788">TRADING</text>
+      <text x="428" y="368" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#3a4a5a">positions, profit,</text>
+      <text x="428" y="383" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#3a4a5a">margin, price feed</text>
+      <text x="428" y="406" text-anchor="middle" font-family="Segoe UI" font-size="10.5" font-weight="700" fill="#1a6e49">exactly as today</text>
+      <text x="428" y="421" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#6b7d8f">nothing deleted</text>
+
+      <rect x="524" y="326" width="152" height="104" rx="7" fill="#eaf6ef" stroke="#1a6e49" stroke-width="1.8"/>
+      <text x="600" y="348" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#1a6e49">TRIVIA</text>
+      <text x="600" y="368" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#3a4a5a">questions, answers,</text>
+      <text x="600" y="383" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#3a4a5a">score, speed bonus</text>
+      <text x="600" y="406" text-anchor="middle" font-family="Segoe UI" font-size="10.5" font-weight="700" fill="#1a6e49">the new game</text>
+      <text x="600" y="421" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#6b7d8f">no price feed at all</text>
+
+      <rect x="696" y="326" width="152" height="104" rx="7" fill="#f7f9fc" stroke="#a9b8c6" stroke-width="1.6" stroke-dasharray="5 4"/>
+      <text x="772" y="348" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#6b7d8f">FUTURE GAME</text>
+      <text x="772" y="368" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#6b7d8f">chess, puzzles,</text>
+      <text x="772" y="383" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#6b7d8f">esports&hellip;</text>
+      <text x="772" y="406" text-anchor="middle" font-family="Segoe UI" font-size="10.5" font-weight="700" fill="#6b7d8f">one folder</text>
+      <text x="772" y="421" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#6b7d8f">+ one registry line</text>
+
+      <text x="600" y="462" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#6b7d8f" font-style="italic">Adding game number three touches no shared code at all &mdash; that is the test of whether this was really architecture.</text>
+    </svg>
+    <figcaption><b>The rule we hold ourselves to:</b> adding a game must mean adding one folder plus one registry entry. If a new game forces changes elsewhere, the design is incomplete and we fix the design &mdash; we do not special-case the game.</figcaption>
+  </figure>
+
+  <h3>What each game plug-in must provide</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="width:24%">Responsibility</th><th>What it means</th></tr></thead>
+    <tbody>
+      <tr><td><b>Capabilities</b></td><td>Does it need the live price feed? Should market opening hours apply? Can players be knocked out mid-contest? Does it support one-against-one challenges?</td></tr>
+      <tr><td><b>Settings + validation</b></td><td>Its own settings, and a check that an admin's choices actually make sense before the contest is created.</td></tr>
+      <tr><td><b>Player setup</b></td><td>What a player starts with when they join.</td></tr>
+      <tr><td><b>Scoring</b></td><td>The ways this game can be ranked, and one single score number for cross-game comparison.</td></tr>
+      <tr><td><b>Finishing</b></td><td>How to settle and produce final scores. Must be safe to run twice.</td></tr>
+      <tr><td><b>Presentation</b></td><td>Which page players use, which stats to show, and its own wording.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Two independent things, never to be confused</h3>
+  <div class="grid g2">
+    <div class="card">
+      <h4 style="margin-top:0">Contest kind</h4>
+      <p style="margin-bottom:0"><b>Competition</b> (two or more players, usually many) or <b>challenge</b> (exactly two). This is about structure &mdash; how many players and how prizes split.</p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">Game type</h4>
+      <p style="margin-bottom:0"><b>Trading</b>, <b>trivia</b>, and so on. This is about what the players actually do.</p>
+    </div>
+  </div>
+  <p>Today there are two kinds and one game. The target is two kinds and many games, which gives a grid. Not every square has to be filled &mdash; a game can declare that one-against-one challenges do not make sense for it.</p>
+
+  <h3>Approaches considered and rejected</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="width:30%">Alternative</th><th>Why not</th></tr></thead>
+    <tbody>
+      <tr><td>Separate database tables per game</td><td>Would split the global leaderboard, the wallet history, the admin contest lists, Game Master revenue, refunds, notifications and the financial reports &mdash; every one of which currently reads a single table. By far the most expensive option.</td></tr>
+      <tr><td>Built-in database inheritance</td><td>Attractive on paper, but parts of the code read these records raw, bypassing the mechanism. Easy to create records that then fail to load. A plain label plus a plug-in is more robust here.</td></tr>
+      <tr><td>A second copy of the app per game</td><td>Doubles the running costs, splits the wallet, and destroys the single-account idea that makes this a platform at all.</td></tr>
+      <tr><td>Delete trading, build games</td><td>Trading is the highest-revenue activity, and its price infrastructure is the most dangerous code to remove.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ================= 4 DATA ================= -->
+<section id="data">
+  <div class="sec-h"><div class="sec-n">4</div><h2>Database changes</h2></div>
+  <p class="sec-sub">Everything is added. Nothing is removed or changed type. Zero breaking changes.</p>
+
+  <div class="cal good">
+    <div class="t">Why this is low risk</div>
+    <p>Every existing record stays valid. Because we only <b>add</b> fields, going back simply means reverting the code &mdash; the new fields sit there unused and harmless. There is no risky one-way data conversion anywhere in this plan.</p>
+  </div>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:22%">Record type</th><th>What we add</th><th style="width:12%">Breaking?</th></tr></thead>
+    <tbody>
+      <tr><td><b>Competition</b></td><td>Game label, game settings; allow scoring methods beyond the six trading ones; one new index</td><td><span class="b ok">No</span></td></tr>
+      <tr><td><b>Player entry</b></td><td><b>Score</b>, score breakdown, normalised points, game state, game label, completion time, a new &ldquo;gave up&rdquo; status, two indexes</td><td><span class="b ok">No</span></td></tr>
+      <tr><td><b>Challenge + challenge entry</b></td><td>Same as above</td><td><span class="b ok">No</span></td></tr>
+      <tr><td><b>Challenge settings</b></td><td>Per-game defaults; which games allow challenges</td><td><span class="b ok">No</span></td></tr>
+      <tr><td><b>Platform settings</b></td><td><code>tradingEnabled</code>, list of enabled games, wording overrides</td><td><span class="b ok">No</span></td></tr>
+      <tr><td><b>Badges</b></td><td>Which games a badge applies to; two new categories</td><td><span class="b ok">No</span></td></tr>
+      <tr><td><b>Player level</b></td><td>Per-game levels alongside the overall account level</td><td><span class="b ok">No</span></td></tr>
+      <tr><td><b>Ledger</b></td><td>Game label as reporting information <b>only</b></td><td><span class="b ok">No</span></td></tr>
+      <tr><td><b>Notifications</b></td><td>Optional per-game versions of a message</td><td><span class="b ok">No</span></td></tr>
+      <tr><td><b>New</b></td><td>Four trivia tables: questions, categories, the locked question set per contest, and answers</td><td><span class="b ok">No</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal bad">
+    <div class="t">Do not rename the ledger categories</div>
+    <p>The payment history uses fixed labels like &ldquo;competition entry&rdquo; and &ldquo;competition win&rdquo;. These are written into <b>historical records</b> and are used by the financial dashboard, reconciliation, refunds and exports. Renaming them would need a conversion of the one table where a mistake is unrecoverable for accounting and possibly for audit or tax. They also remain <i>accurate</i> &mdash; a trivia competition is still a competition. We add the game label as a separate field instead.</p>
+  </div>
+
+  <h3>The mirror rule</h3>
+  <p>Because of Defect 2, every single database change in this plan is written down <b>twice</b> &mdash; once for the player app, once for the admin app &mdash; and both must be changed in the same commit. After Stage 0, the automatic guard enforces this.</p>
+</section>
+
+<!-- ================= 5 POINTS ================= -->
+<section id="points">
+  <div class="sec-h"><div class="sec-n">5</div><h2>Points, scoring and leaderboards</h2></div>
+  <p class="sec-sub">The hardest idea in the project: making different games comparable and fair.</p>
+
+  <div class="cal plain">
+    <div class="t">In plain words &mdash; the problem</div>
+    <p>A trader might finish with a profit of <b>+4,382</b>. A quiz player might finish with a score of <b>87</b>. You cannot put those in the same league table &mdash; the trader would always look better, which is meaningless. So we need a <b>fair conversion</b>.</p>
+  </div>
+
+  <figure>
+    <div class="fig-t">Diagram 6 &mdash; Turning different games into one fair currency</div>
+    <svg viewBox="0 0 900 330" role="img" aria-label="Raw scores from different games are converted into normalised points using finishing position, field size and stake">
+      <text x="30" y="24" font-family="Segoe UI" font-size="11" letter-spacing="1.4" font-weight="700" fill="#a02a38">RAW SCORES &mdash; NOT COMPARABLE</text>
+      <rect x="30" y="36" width="188" height="60" rx="7" fill="#ecf3fa" stroke="#1c5788" stroke-width="1.6"/>
+      <text x="124" y="58" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#1c5788">Trading profit</text>
+      <text x="124" y="82" text-anchor="middle" font-family="Segoe UI" font-size="17" font-weight="700" fill="#0d2338">+4,382</text>
+      <rect x="30" y="106" width="188" height="60" rx="7" fill="#eaf6ef" stroke="#1a6e49" stroke-width="1.6"/>
+      <text x="124" y="128" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#1a6e49">Quiz score</text>
+      <text x="124" y="152" text-anchor="middle" font-family="Segoe UI" font-size="17" font-weight="700" fill="#0d2338">87</text>
+      <text x="124" y="196" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#a02a38" font-style="italic">Different units. Adding them</text>
+      <text x="124" y="211" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#a02a38" font-style="italic">together would be nonsense.</text>
+
+      <line x1="228" y1="100" x2="272" y2="100" stroke="#6b7d8f" stroke-width="1.8" marker-end="url(#ar)"/>
+
+      <!-- converter -->
+      <rect x="278" y="30" width="288" height="200" rx="9" fill="#fdf8ec" stroke="#c9a23f" stroke-width="2"/>
+      <text x="422" y="54" text-anchor="middle" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#8a6209">THE FAIR CONVERTER</text>
+      <text x="422" y="72" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#6b7d8f">uses position, not raw score</text>
+      <g font-family="Segoe UI" font-size="11.5" fill="#1b2733">
+        <text x="298" y="102">1. Where did you finish?</text>
+        <text x="312" y="118" font-size="10.5" fill="#6b7d8f">1st of 100 beats 1st of 3</text>
+        <text x="298" y="146">2. How many players?</text>
+        <text x="312" y="162" font-size="10.5" fill="#6b7d8f">bigger field, more credit</text>
+        <text x="298" y="190">3. How big was the stake?</text>
+        <text x="312" y="206" font-size="10.5" fill="#6b7d8f">counts, but only mildly</text>
+      </g>
+
+      <line x1="576" y1="130" x2="620" y2="130" stroke="#6b7d8f" stroke-width="1.8" marker-end="url(#ar)"/>
+
+      <rect x="626" y="70" width="244" height="120" rx="9" fill="#0d2338"/>
+      <text x="748" y="98" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#f0dda6">ONE SHARED CURRENCY</text>
+      <text x="748" y="132" text-anchor="middle" font-family="Segoe UI" font-size="26" font-weight="700" fill="#fff">0 &ndash; 1000</text>
+      <text x="748" y="156" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#bccfe0">points per contest</text>
+      <text x="748" y="176" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#8fa8bf">works for every game, now and future</text>
+
+      <text x="450" y="264" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">Because it only looks at <tspan font-weight="700">finishing position</tspan>, the converter never needs changing when a new game is added.</text>
+      <text x="450" y="290" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">It also blocks the obvious cheat: you cannot farm points by running tiny private contests against friends.</text>
+      <text x="450" y="314" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#6b7d8f" font-style="italic">One contest can never be worth more than about 2,250 points, so no single event can dominate a season.</text>
+    </svg>
+    <figcaption>Three separate ideas are kept apart: the <b>raw score</b> decides who wins <i>this</i> contest; the <b>normalised points</b> compare across games; the <b>rating</b> measures lasting skill. Conflating the first two is what makes multi-game leaderboards unfair.</figcaption>
+  </figure>
+
+  <h3>Three separate ideas</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="width:20%">Idea</th><th style="width:24%">Scope</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><b>Raw score</b></td><td>One contest, one game</td><td>Decides who wins <i>this</i> contest. In its own units.</td></tr>
+      <tr><td><b>Normalised points</b></td><td>Comparable across all games</td><td>Feeds cross-game league tables and progression.</td></tr>
+      <tr><td><b>Rating</b></td><td>Lifetime, per game</td><td>Measures skill rather than volume. Shown as &ldquo;Trading 1840 &middot; Trivia 1610&rdquo;.</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal info">
+    <div class="t">Why both points and rating</div>
+    <p><b>Points reward playing a lot. Rating rewards playing well.</b> A table that only shows points can be climbed just by entering constantly. Showing both tells an honest story: points for the season and prizes, rating for genuine skill. ChartVolt has no rating system today &mdash; this is the chance to add the thing that makes a multi-game platform feel like one product.</p>
+  </div>
+
+  <h3>Fixing the league table</h3>
+  <p>Today the global table is <b>rebuilt from scratch every time it is read</b> &mdash; around seven seconds of work &mdash; then cached separately on each server, so different servers disagree, and it is capped at 5,000 players. Its score formula is a fixed weighted sum in which five of nine ingredients are trading measurements.</p>
+  <p>The fix is to keep a <b>running summary per player per game</b>, updated when a contest finishes. Reading the table then becomes an indexed lookup: milliseconds instead of seconds, properly paginated, no cap. This is a genuine performance improvement and the main justification for touching this code at all.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:22%">Table</th><th>Answers</th></tr></thead>
+    <tbody>
+      <tr><td><b>Per game</b></td><td>&ldquo;Best quiz players&rdquo;, &ldquo;best traders&rdquo;</td></tr>
+      <tr><td><b>Overall</b></td><td>&ldquo;Best players on ChartVolt&rdquo;</td></tr>
+      <tr><td><b>Per contest</b></td><td>&ldquo;Who is winning this event right now&rdquo;</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Cheating routes we design against</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="width:38%">The exploit</th><th>How we block it</th></tr></thead>
+    <tbody>
+      <tr><td>Tiny private contests farmed for points</td><td>Field-size factor, plus a minimum number of players before points count at all</td></tr>
+      <tr><td>Free contests farmed for points</td><td>Stake factor, or a separate casual table</td></tr>
+      <tr><td>Two friends trading wins back and forth in challenges</td><td>Cap the points from repeated challenges against the same opponent; extend the existing collusion detection to all games</td></tr>
+      <tr><td>Multiple accounts</td><td>Existing fraud checks, device fingerprinting and hourly entry limits &mdash; extended to count <i>all</i> game types</td></tr>
+      <tr><td>Sharing quiz answers</td><td>Each player gets the options in a different order, so &ldquo;the answer is B&rdquo; is useless; tight per-question timer</td></tr>
+      <tr><td>Faking a fast answer by changing the clock</td><td>Timing is measured on the server only, never trusted from the player's device</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ================= 6 MONEY ================= -->
+<section id="money">
+  <div class="sec-h"><div class="sec-n">6</div><h2>Money and prizes</h2></div>
+  <p class="sec-sub">The best news in the plan: this layer barely changes.</p>
+
+  <div class="cal good">
+    <div class="t">In plain words</div>
+    <p><b>Nothing about a quiz contest changes how money moves.</b> A player pays 10 credits to enter, the pot becomes 10 &times; the number of players, the platform takes its percentage, the top positions get their shares, and anything left over is redistributed or recorded as unclaimed. Exactly as it works for trading today.</p>
+  </div>
+
+  <figure>
+    <div class="fig-t">Diagram 7 &mdash; The money path is identical for every game</div>
+    <svg viewBox="0 0 900 220" role="img" aria-label="Entry fees form a pool, platform fee is deducted, prizes are paid by finishing position, leftovers redistributed">
+      <rect x="14" y="60" width="132" height="66" rx="7" fill="#fff" stroke="#dde4ec" stroke-width="1.5"/>
+      <text x="80" y="86" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">Players pay</text>
+      <text x="80" y="106" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#0d2338">entry fee</text>
+      <line x1="150" y1="93" x2="184" y2="93" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <rect x="190" y="60" width="132" height="66" rx="7" fill="#fdf8ec" stroke="#c9a23f" stroke-width="1.8"/>
+      <text x="256" y="86" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#8a6209">Prize pool</text>
+      <text x="256" y="106" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#0d2338">fees &times; players</text>
+      <line x1="326" y1="93" x2="360" y2="93" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <rect x="366" y="60" width="132" height="66" rx="7" fill="#ecf3fa" stroke="#1c5788" stroke-width="1.6"/>
+      <text x="432" y="86" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#1c5788">Platform fee</text>
+      <text x="432" y="106" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#0d2338">deducted</text>
+      <line x1="502" y1="93" x2="536" y2="93" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <rect x="542" y="46" width="150" height="94" rx="7" fill="#eaf6ef" stroke="#1a6e49" stroke-width="1.8"/>
+      <text x="617" y="70" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#1a6e49">Paid by position</text>
+      <text x="617" y="92" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">1st &middot; 2nd &middot; 3rd&hellip;</text>
+      <text x="617" y="112" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">fixed percentages</text>
+      <text x="617" y="130" text-anchor="middle" font-family="Segoe UI" font-size="10.5" font-weight="700" fill="#1a6e49">never tied to a market</text>
+      <line x1="696" y1="93" x2="730" y2="93" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <rect x="736" y="60" width="150" height="66" rx="7" fill="#fff" stroke="#dde4ec" stroke-width="1.5"/>
+      <text x="811" y="82" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">Leftovers redistributed</text>
+      <text x="811" y="100" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">or recorded as</text>
+      <text x="811" y="116" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">unclaimed</text>
+
+      <text x="450" y="176" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">This chain already knows nothing about trading. It works unchanged for trivia, chess or anything else.</text>
+      <text x="450" y="200" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#6b7d8f" font-style="italic">Keeping this shape identical across games also strengthens the regulatory position: performance &rarr; score &rarr; position &rarr; fixed prize.</text>
+    </svg>
+    <figcaption>The prize calculation takes positions and percentages only. Once ranking is game-aware, <b>prize distribution needs no change at all.</b></figcaption>
+  </figure>
+
+  <h3>Two points specific to quizzes</h3>
+  <div class="grid g2">
+    <div class="card">
+      <h4 style="margin-top:0">Ties will be common</h4>
+      <p style="margin-bottom:0">On a ten-question quiz, many players will score the same. &ldquo;Split equally&rdquo; should be the default, and the admin should be warned if &ldquo;winner takes all&rdquo; is chosen for a game where ties are likely. A ten-way tie for first with winner-takes-all is an arbitrary payout and a support incident.</p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">A minimum effort rule</h4>
+      <p style="margin-bottom:0">Trading requires a minimum number of trades so nobody enters and does nothing. The quiz version is a minimum number of questions answered. Players below it are excluded from prizes, exactly as disqualified traders are today.</p>
+    </div>
+  </div>
+
+  <h3>Reporting by game &mdash; a real business gain</h3>
+  <p>Once contests carry a game label, the financial dashboard can break down <b>entry-fee volume, fee revenue, average pot, fill rate and payout ratio by game</b>. That answers the question the strategic review said was unanswered: <i>is this game actually profitable, or is it just cheap customer acquisition?</i></p>
+
+  <div class="cal info">
+    <div class="t">Regulatory note</div>
+    <p>The money shape must stay identical across games: <b>fixed entry fee &rarr; pooled prize &rarr; position-based fixed prize</b>. Adding more games with the same structure <i>strengthens</i> the defence position, because it shows the platform monetises competitive skill in general rather than market exposure. What must <b>not</b> be introduced is any payout that varies with a continuous measure &mdash; &ldquo;score above X and win double your stake&rdquo; would be a materially different legal object. Also, skill has to be assessed <b>per game</b>: trivia is defensible on knowledge, but any game with a significant element of chance needs its own legal review before launch.</p>
+  </div>
+</section>
+
+<!-- ================= 7 GAMIFY ================= -->
+<section id="gamify">
+  <div class="sec-h"><div class="sec-n">7</div><h2>Levels, badges, achievements and the journey</h2></div>
+  <p class="sec-sub">The machinery is good. Only the content is trading-only.</p>
+
+  <div class="cal plain">
+    <div class="t">In plain words</div>
+    <p>The systems that award XP, hand out badges and track the player journey are <b>already well built and stored in the database with an admin editor</b>. Most of the work here is <b>typing new content into the admin panel</b>, not writing code. The code part is teaching the system a few new things it can measure.</p>
+  </div>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:20%">System</th><th style="width:34%">Machinery</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td><b>XP and levels</b></td><td>Good, with database overrides</td><td>Keep. Replace the 20 titles, which currently run &ldquo;Novice Trader&rdquo; to &ldquo;Trading God&rdquo;.</td></tr>
+      <tr><td><b>Badges</b></td><td>Good &mdash; database-driven with rarity tiers</td><td>Keep. Label existing badges as trading-only, then add quiz badges.</td></tr>
+      <tr><td><b>Achievement engine</b></td><td>One large checker of ~40 trading conditions</td><td>Turn it around so each game supplies its own conditions, instead of one ever-growing list.</td></tr>
+      <tr><td><b>Journey maps</b></td><td>Already database-driven with a full admin editor</td><td>Keep. Add a neutral starting map plus per-game branches.</td></tr>
+      <tr><td><b>Rating</b></td><td>Does not exist</td><td>New &mdash; see section 5.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Free wins available immediately</h3>
+  <p>Some existing badges are <b>already game-neutral in substance</b> &mdash; contest counts, wins, podium finishes, deposits, verification, social badges. Simply re-labelling those as &ldquo;all games&rdquo; gives quiz players a meaningful badge set on day one at <b>zero content cost</b>. A good example of the design paying for itself.</p>
+
+  <div class="cal bad">
+    <div class="t">Two traps to avoid</div>
+    <p><b>1. Do not show trading badges to quiz-only players.</b> An achievement list you can never complete is worse than no list at all &mdash; it actively demotivates.</p>
+    <p style="margin-bottom:0"><b>2. Never rename a badge or milestone identifier.</b> These are the keys to players' saved progress. Changing one silently deletes their achievements. Labels can change freely; identifiers cannot &mdash; the same rule as the ledger categories.</p>
+  </div>
+
+  <h3>Suggested neutral level titles</h3>
+  <p>Because the titles are already overridable from the database, this is a <b>data change with no deployment</b> &mdash; and therefore reversible in minutes.</p>
+  <div class="tw"><table>
+    <thead><tr><th style="width:16%">Tier</th><th style="width:14%">Levels</th><th>Titles</th></tr></thead>
+    <tbody>
+      <tr><td>Beginner</td><td>1&ndash;5</td><td>Rookie &middot; Challenger &middot; Contender &middot; Competitor &middot; Rising Star</td></tr>
+      <tr><td>Intermediate</td><td>6&ndash;10</td><td>Skilled Player &middot; Specialist &middot; Veteran &middot; Strategist &middot; Elite Competitor</td></tr>
+      <tr><td>Advanced</td><td>11&ndash;15</td><td>Master &middot; Grandmaster &middot; Champion &middot; Prodigy &middot; Virtuoso</td></tr>
+      <tr><td>Elite</td><td>16&ndash;20</td><td>Legend &middot; Titan &middot; Icon &middot; Immortal &middot; ChartVolt Legend</td></tr>
+    </tbody>
+  </table></div>
+  <p>Per-game flavour can be kept alongside &mdash; &ldquo;Trivia Grandmaster&rdquo;, &ldquo;Trading Master&rdquo; &mdash; while the account title stays neutral. That gives back the fun of &ldquo;Trading God&rdquo; without tying the platform to one activity.</p>
+
+  <div class="cal info">
+    <div class="t">Why this comes late in the schedule</div>
+    <p>Badge and milestone thresholds need <b>real player data</b> to be set sensibly &mdash; you cannot decide what counts as &ldquo;good accuracy&rdquo; before seeing what real players actually score. None of it blocks a playable, payable contest. One exception: the &ldquo;which games does this badge apply to&rdquo; field should be added early, in Phase 1, to avoid a second pass over badge data later.</p>
+  </div>
+</section>
+
+<!-- ================= 8 ADMIN ================= -->
+<section id="admin">
+  <div class="sec-h"><div class="sec-n">8</div><h2>The admin panel</h2></div>
+  <p class="sec-sub">Around 60 screens today, driven from one menu configuration &mdash; which makes adding sections easy.</p>
+
+  <h3>Menu restructure</h3>
+  <p>Today there is a menu group literally called <b>&ldquo;Trading&rdquo;</b> containing Competitions, Challenges, Trading History, Analytics, Market Hours, Symbols and Market Data. Once quizzes exist, Competitions no longer belongs under &ldquo;Trading&rdquo;.</p>
+
+  <div class="grid g3">
+    <div class="card">
+      <h4 style="margin-top:0">COMPETITIONS</h4>
+      <p style="margin-bottom:0;font-size:14px">All contests regardless of game, with a game filter. Plus a new <b>Game Types</b> screen to switch games on and off.</p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">TRADING</h4>
+      <p style="margin-bottom:0;font-size:14px">Trading-only tools: history, market hours, symbols, market data, risk settings, price feed health. <b>Hidden entirely when trading is off.</b></p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">TRIVIA</h4>
+      <p style="margin-bottom:0;font-size:14px">Question bank, categories, quiz settings. <b>Appears only when trivia is enabled.</b></p>
+    </div>
+  </div>
+
+  <h3>Creating a contest</h3>
+  <p>The current seven-step wizard has a step 4 that is entirely trading (asset classes, leverage, risk limits) and a step 6 offering only the six trading ranking methods. The change is to <b>add a game picker as step 1</b> and make those two steps <b>adapt to the chosen game</b>.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:16%">Step</th><th>Change</th></tr></thead>
+    <tbody>
+      <tr><td><b>1. Game</b></td><td><span class="b ok">NEW</span> Pick the game. Locked once the contest has players &mdash; changing it later is meaningless and dangerous.</td></tr>
+      <tr><td>2&ndash;4. Basics, money, schedule</td><td>Unchanged</td></tr>
+      <tr><td><b>5. Game settings</b></td><td><span class="b med">DYNAMIC</span> Trading shows today's screen exactly. Trivia shows category, question count, seconds per question, difficulty mix.</td></tr>
+      <tr><td>6. Prizes</td><td>Unchanged</td></tr>
+      <tr><td><b>7. Rules</b></td><td>Ranking methods come from the chosen game rather than a fixed list.</td></tr>
+      <tr><td>8. Launch</td><td>Review, showing the game prominently</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal bad">
+    <div class="t">Three admin traps found during the audit</div>
+    <p><b>1. Permissions registry gaps.</b> Eight existing menu screens are missing from the permissions list, so staff cannot be granted them &mdash; only super admins see them. Every new game screen must be added, or we repeat the bug. Worth fixing the existing eight at the same time.</p>
+    <p><b>2. Holiday settings would block quizzes.</b> The &ldquo;block competitions on holidays&rdquo; setting currently works through <i>trading market</i> checks. Left alone, quizzes become unjoinable on a forex holiday &mdash; a baffling bug that looks like a broken feature.</p>
+    <p style="margin-bottom:0"><b>3. The edit form shows fewer fields than the create form.</b> Risk limits, rules and ranking method cannot be edited after creation. That inconsistency should be resolved rather than copied into the new game settings.</p>
+  </div>
+
+  <h3>The Trivia question bank</h3>
+  <p>This is the largest new admin screen and the one that determines whether the game feels fair:</p>
+  <ul>
+    <li><b>Bulk import</b> is essential &mdash; typing thousands of questions into a form is not viable.</li>
+    <li><b>Duplicate detection</b>, so the same question cannot appear twice in one contest.</li>
+    <li><b>Per-question statistics.</b> A question answered correctly 99% of the time tells you nothing about skill and should be retired; one at 5% is probably mis-keyed. This is the quality loop that keeps the game honest.</li>
+    <li><b>An approval queue for AI-generated questions.</b> The platform already has AI generation for other content, so drafting questions is natural reuse &mdash; but every one must be human-approved, because a wrong answer key in a paid contest is a refund and a trust problem.</li>
+  </ul>
+
+  <div class="kv">
+    <div><b>Admin effort</b><span>~28 days</span><em>Across phases 3 and 4</em></div>
+    <div><b>Biggest single item</b><span>Question bank</span><em>~5 days</em></div>
+    <div><b>Screens to add</b><span>4</span><em>Game Types, Questions, Categories, Quiz Settings</em></div>
+  </div>
+</section>
+
+<!-- ================= 9 UI ================= -->
+<section id="ui">
+  <div class="sec-h"><div class="sec-n">9</div><h2>What players see</h2></div>
+  <p class="sec-sub">37 pages today, with the trading machinery already correctly limited to two of them.</p>
+
+  <div class="cal good">
+    <div class="t">A lucky break in the existing design</div>
+    <p>All six trading data providers &mdash; live prices, chart symbols, positions and so on &mdash; are already loaded <b>only on the two trading screens</b>, not across the whole app. That is why this part is far more tractable than the raw numbers suggest, and it must be preserved: if they were ever moved into a shared layout, every quiz player would start polling live market prices every two seconds for no reason.</p>
+  </div>
+
+  <figure>
+    <div class="fig-t">Diagram 8 &mdash; One shared journey, different gameplay screens</div>
+    <svg viewBox="0 0 900 300" role="img" aria-label="Shared browse, lobby and results screens, with a dispatcher choosing trading or trivia gameplay">
+      <rect x="20" y="52" width="140" height="60" rx="7" fill="#eaf6ef" stroke="#1a6e49" stroke-width="1.7"/>
+      <text x="90" y="76" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#1a6e49">Browse</text>
+      <text x="90" y="95" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#3a4a5a">game badges + filter</text>
+      <line x1="164" y1="82" x2="192" y2="82" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <rect x="198" y="52" width="140" height="60" rx="7" fill="#eaf6ef" stroke="#1a6e49" stroke-width="1.7"/>
+      <text x="268" y="76" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#1a6e49">Lobby</text>
+      <text x="268" y="95" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#3a4a5a">rules, how to play, join</text>
+      <line x1="342" y1="82" x2="370" y2="82" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <rect x="376" y="44" width="146" height="76" rx="7" fill="#fdf8ec" stroke="#c9a23f" stroke-width="2"/>
+      <text x="449" y="70" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#8a6209">Which game?</text>
+      <text x="449" y="90" text-anchor="middle" font-family="Consolas, monospace" font-size="10" fill="#6b7d8f">/play</text>
+      <text x="449" y="108" text-anchor="middle" font-family="Segoe UI" font-size="10" fill="#6b7d8f">new dispatcher page</text>
+
+      <line x1="526" y1="66" x2="566" y2="42" stroke="#1c5788" stroke-width="1.6" marker-end="url(#ar)"/>
+      <line x1="526" y1="98" x2="566" y2="122" stroke="#1a6e49" stroke-width="1.6" marker-end="url(#ar)"/>
+
+      <rect x="572" y="14" width="164" height="60" rx="7" fill="#ecf3fa" stroke="#1c5788" stroke-width="1.7"/>
+      <text x="654" y="36" text-anchor="middle" font-family="Segoe UI" font-size="11.5" font-weight="700" fill="#1c5788">Trading terminal</text>
+      <text x="654" y="54" text-anchor="middle" font-family="Segoe UI" font-size="10" fill="#3a4a5a">charts + live prices load here</text>
+      <text x="654" y="68" text-anchor="middle" font-family="Segoe UI" font-size="9.5" fill="#6b7d8f">exactly as today</text>
+
+      <rect x="572" y="96" width="164" height="60" rx="7" fill="#eaf6ef" stroke="#1a6e49" stroke-width="1.7"/>
+      <text x="654" y="118" text-anchor="middle" font-family="Segoe UI" font-size="11.5" font-weight="700" fill="#1a6e49">Quiz screen</text>
+      <text x="654" y="136" text-anchor="middle" font-family="Segoe UI" font-size="10" fill="#3a4a5a">question, timer, options</text>
+      <text x="654" y="150" text-anchor="middle" font-family="Segoe UI" font-size="9.5" fill="#6b7d8f">no price feed loaded</text>
+
+      <line x1="740" y1="44" x2="770" y2="76" stroke="#6b7d8f" stroke-width="1.5"/>
+      <line x1="740" y1="126" x2="770" y2="96" stroke="#6b7d8f" stroke-width="1.5"/>
+      <rect x="776" y="52" width="110" height="60" rx="7" fill="#eaf6ef" stroke="#1a6e49" stroke-width="1.7"/>
+      <text x="831" y="76" text-anchor="middle" font-family="Segoe UI" font-size="12" font-weight="700" fill="#1a6e49">Results</text>
+      <text x="831" y="95" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#3a4a5a">+ prizes</text>
+
+      <rect x="20" y="196" width="866" height="42" rx="7" fill="#0d2338"/>
+      <text x="453" y="222" text-anchor="middle" font-family="Segoe UI" font-size="12" fill="#f0dda6">Shared throughout: wallet &middot; credits &middot; leaderboard &middot; profile &middot; levels &middot; badges &middot; journey &middot; messages &middot; notifications</text>
+
+      <text x="453" y="270" text-anchor="middle" font-family="Segoe UI" font-size="11.5" fill="#3a4a5a">Green screens are shared by every game. Only the middle step differs.</text>
+      <text x="453" y="290" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#6b7d8f" font-style="italic">The old /trade address stays alive as a redirect &mdash; it is linked from emails, notifications and bookmarks.</text>
+    </svg>
+    <figcaption>Roughly 20 of the 63 components in the trading folder are actually shared contest furniture &mdash; cards, leaderboards, countdowns, entry buttons, wallet dialogs. Those move to a neutral folder. The other 40 are genuinely chart-and-order specific and stay exactly where they are.</figcaption>
+  </figure>
+
+  <h3>The dashboard rule</h3>
+  <p>The dashboard currently hard-codes six trading tiles: total capital, profit, open positions, trades, win rate, profit factor. A quiz-only player would see six empty or meaningless boxes.</p>
+  <div class="cal bad">
+    <div class="t">The rule that keeps this honest</div>
+    <p>A player who has never traded sees <b>no trading section at all</b> &mdash; not an empty one. Empty trading tiles on a quiz player's dashboard are the most visible symptom of a half-finished job.</p>
+  </div>
+  <p>Instead: a shared header (credits, total points, rating, active contests), then <b>one section per game the player has actually played</b>, with tiles that game declares itself.</p>
+
+  <h3>Help pages &mdash; restructure, do not rewrite</h3>
+  <p>The help centre is around <b>10,700 lines</b> of hard-written content. The approach is to <b>split</b> it into a shared core (account, wallet, deposits, withdrawals, verification, levels, badges, fair play, support) plus per-game guides &mdash; and keep the existing trading content <b>word for word</b> as the trading guide. It is good content; rewriting it would risk errors for no player benefit. Only the small shared core needs de-trading.</p>
+
+  <h3>The Live Arena</h3>
+  <p>The Arena is a spectator broadcast of live trading. The recommendation is to <b>leave it trading-only for now</b> and simply hide it when trading is off. A quiz broadcast &mdash; live question, answer distribution, score race &mdash; is a genuinely good product idea, but it is entirely new work with no dependency on this plan. Scope discipline matters more here than completeness.</p>
+
+  <div class="cal info">
+    <div class="t">Superseded in part &mdash; see chapter 15</div>
+    <p>This chapter describes keeping one competitions list with a game filter. The direction has since moved further: players will browse <b>games first</b>, through a games page and a page per game. Everything described above still gets built &mdash; <a href="#catalogue">chapter 15</a> adds the browsing layer on top of it, and explains why that layer is built last.</p>
+  </div>
+</section>
+
+<!-- ================= 10 WORDS ================= -->
+<section id="words">
+  <div class="sec-h"><div class="sec-n">10</div><h2>Wording</h2></div>
+  <p class="sec-sub">The task most likely to be done badly &mdash; because the obvious method would break the app.</p>
+
+  <div class="cal bad">
+    <div class="t">Never do a global find-and-replace</div>
+    <p>Searching for &ldquo;trading&rdquo; returns around 5,000 matches, but they are four completely different things that look identical to a search tool. Replacing them all would rename database values, web addresses, internal names and styling classes along with the labels. Some breakages would be caught immediately; <b>database values and web addresses would fail only later, in production, in the payment and ranking paths.</b></p>
+  </div>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:26%">Category</th><th style="width:34%">Example</th><th>Safe to change?</th></tr></thead>
+    <tbody>
+      <tr><td><b>Visible label</b></td><td>&ldquo;Total Trades&rdquo; on a screen</td><td><span class="b ok">Yes &mdash; this is the target</span></td></tr>
+      <tr><td><b>Internal name / address</b></td><td>web addresses, database categories, permission keys</td><td><span class="b crit">No &mdash; breaks the app</span></td></tr>
+      <tr><td><b>Log message</b></td><td>&ldquo;Trading positions closed&rdquo; in a server log</td><td><span class="b low">Pointless to change</span></td></tr>
+      <tr><td><b>Styling name</b></td><td><code>trading-panel</code></td><td><span class="b low">No player impact</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal good">
+    <div class="t">The reassuring maths</div>
+    <p>Of those ~5,000 matches, the genuinely player-visible wording in the <b>shared parts of the app</b> is roughly <b>150 to 250 items</b>. Everything else is internal, or belongs to trading screens that <i>should</i> keep trading language. Framed that way, an intimidating problem becomes a manageable one: about <b>9 days of work</b>, and nearly half of it is admin data entry that needs no developer.</p>
+  </div>
+
+  <h3>How it is done instead</h3>
+  <p>A small <b>dictionary of terms</b> with database overrides, resolved in three steps:</p>
+  <p style="text-align:center;font-family:var(--mono);font-size:13px;background:#f7f9fc;border:1px solid var(--line);border-radius:8px;padding:14px">the game's own wording &nbsp;&rarr;&nbsp; admin override &nbsp;&rarr;&nbsp; neutral default</p>
+  <p>This lets the trading screens keep saying &ldquo;Trader&rdquo; and &ldquo;P&amp;L&rdquo; inside their own pages, while the shared shell says &ldquo;Player&rdquo; and &ldquo;Score&rdquo;. Both games feel native without splitting the app. The app already delivers currency and credit naming this way, so the pattern exists &mdash; we extend it rather than inventing something.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:36%">Where</th><th style="width:26%">Now</th><th>Proposed</th></tr></thead>
+    <tbody>
+      <tr><td>Sidebar section heading</td><td>&ldquo;Trading&rdquo;</td><td>&ldquo;Compete&rdquo;</td></tr>
+      <tr><td>Default player name</td><td>&ldquo;Trader&rdquo;</td><td>&ldquo;Player&rdquo;</td></tr>
+      <tr><td>The 20 level titles</td><td>&ldquo;Novice Trader&rdquo; &hellip; &ldquo;Trading God&rdquo;</td><td>Neutral ladder (section 7)</td></tr>
+      <tr><td>Landing statistics</td><td>&ldquo;Active Traders&rdquo;</td><td>&ldquo;Active Players&rdquo;</td></tr>
+      <tr><td>Help headings</td><td>&ldquo;Trader's Journey&rdquo;, &ldquo;Trader Levels&rdquo;</td><td>&ldquo;Your Journey&rdquo;, &ldquo;Levels&rdquo;</td></tr>
+      <tr><td>Page title</td><td>&ldquo;Live Market competition Trading Platform&rdquo;</td><td>Platform-level description</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>What deliberately keeps trading language</h3>
+  <p>Stated explicitly so nobody &ldquo;finishes the job&rdquo; later by neutralising these: the trading terminal and its charts, the trading help guide, the financial glossary, trading-specific alerts such as margin warnings, the admin trading section, trading badges, and the Arena broadcast.</p>
+  <div class="cal info">
+    <div class="t">The acceptance test for this whole workstream</div>
+    <p><b>A trader should not notice this project happened.</b></p>
+  </div>
+
+  <h3>Two things that need legal review, not editing</h3>
+  <p>The Terms of Service and risk disclaimer describe a &ldquo;trading competition platform&rdquo;. These are <b>contractual documents</b> tied to the regulatory position. They go through a legal track that runs in parallel from Phase 1 &mdash; a content editor must not &ldquo;tidy them up&rdquo;.</p>
+</section>
+
+<!-- ================= 11 TRIVIA ================= -->
+<section id="trivia">
+  <div class="sec-h"><div class="sec-n">11</div><h2>The Trivia game</h2></div>
+  <p class="sec-sub">The first new game, and deliberately the proof that the design works.</p>
+
+  <div class="cal plain">
+    <div class="t">In plain words</div>
+    <p>A timed quiz competition. Players pay to enter, answer a fixed set of multiple-choice questions, and are ranked by score. The top positions share the prize pot using <b>exactly the same percentage table</b> trading competitions already use. Scoring rewards being <b>right</b>, being <b>fast</b>, and being <b>consistent</b>.</p>
+  </div>
+
+  <div class="kv">
+    <div><b>Play mode (v1)</b><span>Own pace</span><em>Play any time inside the contest window</em></div>
+    <div><b>Deferred to v2</b><span>Live rounds</span><em>Everyone answers together &mdash; better show, much harder</em></div>
+    <div><b>New infrastructure</b><span>None</span><em>Database and web pages only</em></div>
+    <div><b>Effort</b><span>~24 days</span><em>Plus ~7 days admin screens</em></div>
+  </div>
+
+  <h3>Scoring</h3>
+  <div class="card">
+    <p style="margin-bottom:8px"><b>For each question:</b></p>
+    <ul style="margin-bottom:0">
+      <li>Wrong or out of time &rarr; <b>0 points</b></li>
+      <li>Correct &rarr; <b>base points</b> + <b>speed bonus</b> (more for answering sooner) + <b>streak bonus</b> (for consecutive correct answers, capped)</li>
+    </ul>
+  </div>
+  <p>Total score is the sum. Total time taken is the tie-breaker &mdash; which matters, because ties on a ten-question quiz are common.</p>
+
+  <div class="cal bad">
+    <div class="t">The single most important technical rule</div>
+    <p><b>All timing is measured on the server.</b> The moment a question was shown and the moment the answer arrived are both server clocks. If the player's device were trusted to report &ldquo;I answered in 0.4 seconds&rdquo;, the speed bonus would be trivially forgeable. This is the same principle as never trusting a price sent from a browser in the trading engine.</p>
+  </div>
+
+  <h3>Fairness by design</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="width:34%">The worry</th><th>The answer</th></tr></thead>
+    <tbody>
+      <tr><td>&ldquo;Players will look up answers&rdquo;</td><td>A tight per-question timer, and a speed bonus that rewards instant recall over searching</td></tr>
+      <tr><td>&ldquo;Players will share answers&rdquo;</td><td>Everyone gets the <b>same questions</b> but in a <b>different option order</b>, so &ldquo;the answer is B&rdquo; is useless</td></tr>
+      <tr><td>&ldquo;Someone will submit twice&rdquo;</td><td>A database rule makes each answer physically unique &mdash; a double click or a retry can only ever count once</td></tr>
+      <tr><td>&ldquo;Bots will play&rdquo;</td><td>Device fingerprinting, a minimum believable answer time, and flagging impossible accuracy-plus-speed combinations for review</td></tr>
+      <tr><td>&ldquo;The same questions will keep coming up&rdquo;</td><td>Questions rotate by how often they have been used. Operational rule: keep at least <b>ten times</b> as many questions as any single contest uses</td></tr>
+      <tr><td>&ldquo;My connection dropped mid-question&rdquo;</td><td>Reloading returns the same question with the correct remaining time. Losing a question to a dropped connection in a paid contest is a refund request</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal info">
+    <div class="t">Two design details that prevent later pain</div>
+    <p><b>1. The question set is locked when the contest starts.</b> This means every player gets the same set, the result can be recalculated exactly if disputed, and settlement can safely be re-run. Picking questions on the fly per player would make all three impossible.</p>
+    <p style="margin-bottom:0"><b>2. Question availability is checked when the contest is created</b>, not when it starts. Discovering at kick-off that there are only 12 questions available for a 20-question quiz would mean cancelling and refunding &mdash; a terrible first impression.</p>
+  </div>
+
+  <h3>What &ldquo;done&rdquo; looks like</h3>
+  <div class="chk">
+    <div><span class="box"></span><span>An admin creates a quiz competition with an entry fee and prize positions, and launches it.</span></div>
+    <div><span class="box"></span><span>Players join through the <b>same</b> entrance, wallet charge and ledger record as a trading competition.</span></div>
+    <div><span class="box"></span><span>Scores update live; the leaderboard ranks by score with time as the tie-break.</span></div>
+    <div><span class="box"></span><span>At the end: unanswered questions score zero, non-qualifiers are excluded, positions are worked out, prizes are paid, the platform fee is recorded, notifications go out, XP and points are awarded.</span></div>
+    <div><span class="box"></span><span>Cancelling before the start refunds everyone.</span></div>
+    <div><span class="box"></span><span>Running the finisher twice pays winners <b>once</b>.</span></div>
+    <div><span class="box"></span><span><b>No trading code runs at any point, and no price request is made.</b></span></div>
+    <div><span class="box"></span><span>Turning trading off entirely leaves the whole flow working.</span></div>
+  </div>
+</section>
+
+<!-- ================= 12 INFRA ================= -->
+<section id="infra">
+  <div class="sec-h"><div class="sec-n">12</div><h2>Switches and background jobs</h2></div>
+  <p class="sec-sub">How trading becomes optional without stranding anyone.</p>
+
+  <h3>The master switch</h3>
+  <p>A single <code>tradingEnabled</code> setting, built by copying an existing switch (<code>arenaEnabled</code>) that already works and touches only eight files. When off, it hides the trading navigation, blocks new trading contests, refuses new orders, hides trading dashboard sections, and stops the live price feed from starting.</p>
+
+  <div class="cal bad">
+    <div class="t">The trap that would cost real money</div>
+    <p>If the switch simply killed the price feed while trading competitions were <b>still running</b>, those open positions could not be priced or closed. Players could not exit and the contest could not settle correctly. A well-intentioned kill switch would become a money-losing bug.</p>
+    <p style="margin-bottom:0"><b>The rule:</b> the price feed runs if trading is enabled <b>or</b> at least one trading contest is still active. Better still, the admin should <b>refuse to switch trading off</b> while trading contests are live, offering &ldquo;switch off once current contests finish&rdquo; instead. That turns a subtle technical condition into clear, visible product behaviour.</p>
+  </div>
+
+  <h3>Why we gate the price feed instead of removing it</h3>
+  <p>The price feed <b>starts itself automatically</b> as a side effect of the server loading a file &mdash; its startup is implicit rather than an explicit &ldquo;start trading&rdquo; command. Removing that chain would break chart history, price snapshots used for emergency settlement, the price health monitor and the admin price screen, in ways that only appear at runtime. Adding one condition is a one-line change; removing the system is a project with a long tail of surprises. It already skips itself on the admin app and the worker, so <b>conditional startup is an established pattern here</b> &mdash; we simply add one more condition.</p>
+
+  <h3>Background jobs</h3>
+  <div class="cal good">
+    <div class="t">Better than expected</div>
+    <p>Every trading job <b>already checks for itself</b> and does nothing when there are no active contests. So switching trading off needs no job changes for safety &mdash; only for efficiency.</p>
+  </div>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:26%">Job</th><th>Change needed</th></tr></thead>
+    <tbody>
+      <tr><td><b>Finish competitions</b></td><td><span class="b crit">Critical</span> Must check the game label <b>first</b>. This is the job that would otherwise run trading settlement on a quiz.</td></tr>
+      <tr><td><b>Finish challenges</b></td><td><span class="b crit">Critical</span> Same.</td></tr>
+      <tr><td>Early-finish check</td><td>Only for games where players can be knocked out</td></tr>
+      <tr><td>Margin checks, order queue</td><td>Filter to trading only; skip entirely when trading is off</td></tr>
+      <tr><td>Badge evaluation</td><td>Extend to all games, or quiz players never get badges from the hourly sweep</td></tr>
+      <tr><td>Market data cleanup</td><td>Skip when trading is off and nothing is running</td></tr>
+      <tr><td>Verification, refunds, withdrawals, subscriptions</td><td>No change &mdash; already game-neutral</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal bad">
+    <div class="t">A loaded gun found during the audit</div>
+    <p>An old set of scheduled jobs still exists in the code but is deliberately <b>switched off</b>, with a comment explaining that scheduling moved elsewhere to stop duplicate database load. If a well-meaning developer &ldquo;fixes&rdquo; the apparently missing schedule by switching them back on, <b>two schedulers would finish the same competitions at the same time</b> &mdash; a double-payout. These should be deleted, or fenced with a comment and a test.</p>
+  </div>
+
+  <h3>Monitoring to add before launch, not after</h3>
+  <ul>
+    <li>Contest settlement outcome <b>by game</b> &mdash; catches the silent-failure class of bug</li>
+    <li><b>Prizes paid versus prize pool, per contest</b> &mdash; the single best money-integrity check, and worth a hard alert</li>
+    <li>Answer submission rates and rejection reasons &mdash; detects cheating attempts and client bugs</li>
+    <li>Price feed state (running / idle, and why) &mdash; confirms the gating works</li>
+    <li>Alert if any contest sits in &ldquo;finalizing&rdquo; for more than ten minutes</li>
+  </ul>
+</section>
+
+<!-- ================= 13 RISKS ================= -->
+<section id="risks">
+  <div class="sec-h"><div class="sec-n">13</div><h2>What could break</h2></div>
+  <p class="sec-sub">25 risks were identified. These are the ones that matter most.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:4%">#</th><th style="width:28%">Risk</th><th style="width:11%">Severity</th><th style="width:13%">Likelihood</th><th>Handled in</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Money paths changed before tests exist</td><td><span class="b crit">Critical</span></td><td>High</td><td><b>Stage 0</b></td></tr>
+      <tr><td>2</td><td>Admin and player blueprints out of sync</td><td><span class="b crit">Critical</span></td><td><span class="b now">Already happened</span></td><td><b>Stage 0</b></td></tr>
+      <tr><td>3</td><td>Trading settlement runs on a quiz contest</td><td><span class="b crit">Critical</span></td><td>High</td><td>Phase 1&ndash;2</td></tr>
+      <tr><td>4</td><td>Contest finished twice, winners paid twice</td><td><span class="b crit">Critical</span></td><td>Medium</td><td>Stage 0 / Phase 1</td></tr>
+      <tr><td>5</td><td>Dormant duplicate schedulers switched back on</td><td><span class="b crit">Critical</span></td><td>Low</td><td>Stage 0 / Phase 1</td></tr>
+      <tr><td>6</td><td>Game Master route bypasses defaults, creating unlabelled contests</td><td><span class="b high">High</span></td><td>High</td><td>Phase 1</td></tr>
+      <tr><td>7</td><td>Fraud entry limits blind to new games</td><td><span class="b high">High</span></td><td>High</td><td>Phase 2</td></tr>
+      <tr><td>8</td><td>Global find-and-replace on wording</td><td><span class="b high">High</span></td><td>Medium</td><td>Phase 5</td></tr>
+      <tr><td>9</td><td>Legal terms edited without review</td><td><span class="b high">High</span></td><td>Medium</td><td>Legal track</td></tr>
+      <tr><td>10</td><td>Badge identifiers renamed, wiping player progress</td><td><span class="b high">High</span></td><td>Medium</td><td>Phase 4</td></tr>
+      <tr><td>11</td><td>Switching trading off strands live contests</td><td><span class="b high">High</span></td><td>Medium</td><td>Phase 5</td></tr>
+      <tr><td>12</td><td>Holiday settings block quizzes</td><td><span class="b med">Medium</span></td><td>High</td><td>Phase 1</td></tr>
+      <tr><td>13</td><td>Quiz scoring exploitable via client timing or replay</td><td><span class="b high">High</span></td><td>High</td><td>Phase 2</td></tr>
+      <tr><td>14</td><td>Not enough questions when a contest starts</td><td><span class="b med">Medium</span></td><td>High</td><td>Phase 2</td></tr>
+      <tr><td>15</td><td>League table changes upset players</td><td><span class="b med">Medium</span></td><td>High</td><td>Phase 4</td></tr>
+      <tr><td>16</td><td>Price providers accidentally loaded for everyone</td><td><span class="b med">Medium</span></td><td>Medium</td><td>Phase 2</td></tr>
+      <tr><td>17</td><td>New admin screens invisible to staff (permissions)</td><td><span class="b low">Low</span></td><td>High</td><td>Phase 3</td></tr>
+      <tr><td>18</td><td>Notification links point to the trading page for a quiz</td><td><span class="b med">Medium</span></td><td>High</td><td>Phase 3</td></tr>
+      <tr><td>19</td><td>Scope creep into chess and esports before trivia ships</td><td><span class="b med">Medium</span></td><td>High</td><td>Throughout</td></tr>
+      <tr><td>20</td><td>Load: many players answering at once</td><td><span class="b med">Medium</span></td><td>Medium</td><td>Phase 2</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>The one to understand properly</h3>
+  <div class="cal bad">
+    <div class="t">Risk 3 &mdash; silent wrong payouts</div>
+    <p>If a quiz contest reaches the trading settlement code, it finds no positions, gives everyone zero, ranks them all equal, and pays out by tie-break rule. <b>No error, no alert, nothing in the logs.</b> Money goes to the wrong players and nobody is told.</p>
+    <p style="margin-bottom:0"><b>How we prevent it:</b> check the game label at the very top of the finisher, before any trading work. Then add a second, independent safety net &mdash; the trading settlement refuses to run and logs an error if the contest is not a trading contest. Belt and braces, on the one path where a silent failure costs real money. And crucially: <b>all five</b> places that can trigger settlement must be checked, including one hidden inside a page-load function that is easy to miss.</p>
+  </div>
+
+  <h3>Scope discipline</h3>
+  <p>The strategy work lists chess, trivia, esports, fantasy sports and coding contests. The temptation is to design for all of them at once.</p>
+  <div class="cal info">
+    <div class="t">The rule</div>
+    <p>Build the design with <b>exactly two</b> games: trading and trivia. <b>Two is the minimum number that forces a real abstraction.</b> More than two before either is live means designing against imagined requirements. Ship trivia, learn from real players, then add the third &mdash; which is also the honest test of whether the design actually works.</p>
+  </div>
+</section>
+
+<!-- ================= 14 ROLLOUT ================= -->
+<section id="rollout">
+  <div class="sec-h"><div class="sec-n">14</div><h2>Testing and rollout</h2></div>
+  <p class="sec-sub">Every step reversible, nothing visible to players until we choose.</p>
+
+  <h3>The single most important test</h3>
+  <div class="card">
+    <p style="margin-bottom:8px"><b>The trading regression proof:</b></p>
+    <p style="margin-bottom:0">Take a batch of past, completed competitions. Recalculate their rankings through the <b>new</b> game-aware system. Confirm the resulting leaderboard is <b>identical</b> to the one that was actually stored at the time.</p>
+  </div>
+  <p>If that passes across all six ranking methods, the change is proven not to have altered trading behaviour. It converts <i>&ldquo;we think we did not break trading&rdquo;</i> into <b>evidence</b>. This is why the trading plug-in is built by <b>moving</b> the existing code rather than rewriting it &mdash; a pure move can be proven identical.</p>
+
+  <h3>Rollout order</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="width:6%">#</th><th>Step</th><th style="width:16%">Players see?</th></tr></thead>
+    <tbody>
+      <tr style="background:#fdedef"><td><b>0</b></td><td><b>Stage 0 deployed. You test it. You sign off. Nothing below starts before this.</b></td><td>No</td></tr>
+      <tr><td>1</td><td>Database fields added and backfilled. Unused for now.</td><td>No</td></tr>
+      <tr><td>2</td><td>Game registry plus trading plug-in. Regression proof must pass.</td><td>No</td></tr>
+      <tr><td>3</td><td>Trivia built, admin screens built &mdash; but trivia still switched off.</td><td>No</td></tr>
+      <tr><td>4</td><td>Question bank filled. Trivia enabled for <b>internal accounts only</b>.</td><td>No</td></tr>
+      <tr><td>5</td><td><b>Internal quiz contests with real, small entry fees.</b> Money verified end to end.</td><td>No</td></tr>
+      <tr><td>6</td><td>Trivia opened to everyone, starting with a free or very low entry fee.</td><td><b>Yes</b></td></tr>
+      <tr><td>7</td><td>New league table built and compared against the old one before switching.</td><td>No</td></tr>
+      <tr><td>8</td><td>League table switched over; new points and rating explained to players.</td><td><b>Yes</b></td></tr>
+      <tr><td>9</td><td>Wording and interface updates.</td><td><b>Yes</b></td></tr>
+      <tr><td>10</td><td>Trading master switch shipped, still on. Toggle rehearsed in staging.</td><td>No</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal bad">
+    <div class="t">Do not skip step 5</div>
+    <p>A quiz contest with real money that has <b>never been run with real money</b> is an untested payment path. Small internal contests with genuine (tiny) fees are the cheapest possible way to find out that something in the chain is wrong.</p>
+  </div>
+
+  <h3>Data conversion</h3>
+  <p>Because every change is additive, there is <b>no risky one-way conversion</b>. The only substantial job is building the running player summaries for the new league table, and that is an offline script that can be safely re-run as many times as needed while the points settings are tuned.</p>
+
+  <div class="cal good">
+    <div class="t">A nice property of the wording design</div>
+    <p>Because wording is stored in the database, <b>the wording can be adjusted live without a deployment.</b> Wording is the change most likely to attract subjective opinions &mdash; being able to tweak it instantly removes that pressure from the release.</p>
+  </div>
+
+  <h3>Definition of done</h3>
+  <div class="chk">
+    <div><span class="box"></span><span>An admin can create, run and finish a quiz competition without touching a single trading field.</span></div>
+    <div><span class="box"></span><span>A player pays credits, plays, is ranked and is paid through the <b>same</b> money code as trading.</span></div>
+    <div><span class="box"></span><span>A trading player's experience is <b>unchanged</b> &mdash; proven by the regression test, not by opinion.</span></div>
+    <div><span class="box"></span><span>With trading switched off, the platform is coherent: no dead links, no empty tiles, no stranded contests.</span></div>
+    <div><span class="box"></span><span>Leaderboards, points, rating, XP, badges and journey all work for a quiz-only player.</span></div>
+    <div><span class="box"></span><span>Admin can report revenue and payout ratio <b>by game</b>.</span></div>
+    <div><span class="box"></span><span><b>Adding a third game needs one folder, one registry line, and content &mdash; no changes to the shared engine.</b></span></div>
+  </div>
+  <p style="color:var(--muted);font-size:14px">That last point is the real test of whether this was architecture or just a feature.</p>
+</section>
+
+<!-- ================= 15 GAMES-FIRST NAVIGATION ================= -->
+<section id="catalogue">
+  <div class="sec-h"><div class="sec-n">15</div><h2>Games-first navigation</h2></div>
+  <p class="sec-sub">Added 30 August 2026, after the rest of this plan was written. The direction changed: games become the way players navigate, not a filter on a list.</p>
+
+  <div class="cal info">
+    <div class="t">What changed since the chapters above</div>
+    <p>The plan originally kept a single competitions list with a game filter and a game badge on each card. The direction now is that <b>players browse games first</b>: a games page, then a page for the game they picked showing its description and rules along with the competitions they can enter, then the competition itself. Everything else in this document still stands &mdash; this is an addition, not a correction.</p>
+  </div>
+
+  <figure>
+    <div class="fig-t">Diagram &mdash; how players will find a contest</div>
+    <svg viewBox="0 0 920 300" role="img" aria-label="Today a flat competitions list, in future a games catalogue then a game page">
+      <rect x="8" y="8" width="904" height="118" rx="9" fill="#f1f4f7" stroke="#dde4ec"/>
+      <text x="26" y="30" font-family="Segoe UI" font-size="10.5" font-weight="700" fill="#6b7d8f" letter-spacing="1.4">AS PLANNED ORIGINALLY</text>
+      <rect x="26" y="42" width="300" height="66" rx="7" fill="#fff" stroke="#dde4ec"/>
+      <text x="176" y="68" text-anchor="middle" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#143a5c">One competitions list</text>
+      <text x="176" y="88" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#6b7d8f">all games mixed, with a filter</text>
+      <line x1="332" y1="75" x2="360" y2="75" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <rect x="366" y="42" width="240" height="66" rx="7" fill="#fff" stroke="#dde4ec"/>
+      <text x="486" y="68" text-anchor="middle" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#143a5c">Competition page</text>
+      <text x="486" y="88" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#6b7d8f">details and prize table</text>
+      <line x1="612" y1="75" x2="640" y2="75" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <rect x="646" y="42" width="240" height="66" rx="7" fill="#fff" stroke="#dde4ec"/>
+      <text x="766" y="68" text-anchor="middle" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#143a5c">Join</text>
+      <text x="766" y="88" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#6b7d8f">pay the entry fee</text>
+
+      <rect x="8" y="140" width="904" height="152" rx="9" fill="#eaf6ef" stroke="#b6ddc6"/>
+      <text x="26" y="162" font-family="Segoe UI" font-size="10.5" font-weight="700" fill="#1a6e49" letter-spacing="1.4">THE NEW DIRECTION</text>
+      <rect x="26" y="174" width="196" height="100" rx="7" fill="#fff" stroke="#b6ddc6"/>
+      <text x="124" y="200" text-anchor="middle" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#1a6e49">Games page</text>
+      <text x="124" y="222" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">every game the admin</text>
+      <text x="124" y="238" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">has listed, with artwork</text>
+      <text x="124" y="260" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#6b7d8f" font-style="italic">NEW PAGE</text>
+      <line x1="228" y1="224" x2="256" y2="224" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <rect x="262" y="174" width="230" height="100" rx="7" fill="#fff" stroke="#b6ddc6"/>
+      <text x="377" y="200" text-anchor="middle" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#1a6e49">Game page</text>
+      <text x="377" y="222" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">description, rules, how to</text>
+      <text x="377" y="238" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">play, and ITS competitions</text>
+      <text x="377" y="260" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#6b7d8f" font-style="italic">NEW PAGE</text>
+      <line x1="498" y1="224" x2="526" y2="224" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <rect x="532" y="174" width="176" height="100" rx="7" fill="#fff" stroke="#dde4ec"/>
+      <text x="620" y="200" text-anchor="middle" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#143a5c">Competition</text>
+      <text x="620" y="222" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">details and prizes</text>
+      <text x="620" y="260" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#1a6e49" font-style="italic">unchanged</text>
+      <line x1="714" y1="224" x2="742" y2="224" stroke="#6b7d8f" stroke-width="1.5" marker-end="url(#ar)"/>
+      <rect x="748" y="174" width="138" height="100" rx="7" fill="#fff" stroke="#dde4ec"/>
+      <text x="817" y="200" text-anchor="middle" font-family="Segoe UI" font-size="12.5" font-weight="700" fill="#143a5c">Join</text>
+      <text x="817" y="222" text-anchor="middle" font-family="Segoe UI" font-size="11" fill="#3a4a5a">pay the entry fee</text>
+      <text x="817" y="260" text-anchor="middle" font-family="Segoe UI" font-size="10.5" fill="#1a6e49" font-style="italic">unchanged</text>
+    </svg>
+    <figcaption><b>Only the first two boxes are new.</b> Joining, paying, competing, ranking and prizes are the same machinery described throughout this document. The flat competitions list is <b>kept as well</b>, because some players browse by game while others browse by what starts soonest or has the biggest pot.</figcaption>
+  </figure>
+
+  <h3>A game becomes content, not just code</h3>
+  <p>This is the part that needs care. Until now a game was a <b>code module</b> with a label. To have its own page with a description, rules, artwork and merchandising, a game also needs to be <b>content the admin can edit</b>. Those are two different things and should not be merged.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:190px">Concept</th><th>What it is</th><th style="width:150px">Who changes it</th></tr></thead>
+    <tbody>
+      <tr><td><b>Game module</b></td><td>Code. The rules of play, the scoring, the settlement</td><td>Developers, via release</td></tr>
+      <tr><td><b>Catalogue entry</b></td><td>Content. The page a player reads before deciding to enter &mdash; description, rules text, how to play, artwork, ordering, featured flag</td><td>Admin, live, no release</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal good">
+    <div class="t">The benefit of keeping them separate</div>
+    <p><b>One game module can back several catalogue entries.</b> "Trivia: Sport" and "Trivia: Film" can be two entries on the same Trivia code, each with its own page, artwork and default settings. That flexibility costs nothing if the split is made now, and is expensive to retrofit if a catalogue entry is assumed to be the same thing as a module.</p>
+  </div>
+
+  <h3>What gets built</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="width:250px">Item</th><th>Detail</th></tr></thead>
+    <tbody>
+      <tr><td>New catalogue table</td><td>Slug, game, name, tagline, description, rules, how-to-play, artwork, category, default settings, sort order, featured, visible, coming-soon, search metadata</td></tr>
+      <tr><td><code>/games</code></td><td>The catalogue. Cards, categories, featured games, coming-soon entries</td></tr>
+      <tr><td><code>/games/[slug]</code></td><td>The game page: description, how to play, rules, <b>live and upcoming competitions for this game</b>, this game's league table, and the player's own record in it</td></tr>
+      <tr><td><code>/competitions</code></td><td><b>Kept.</b> Still the best view of everything open right now</td></tr>
+      <tr><td>New admin section</td><td>Full editing of catalogue entries with live preview, artwork upload, drag to reorder, feature, hide, mark coming soon. Separate from the technical Game Types screen in chapter 8</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>The states that must be designed, not discovered</h3>
+  <div class="tw"><table>
+    <thead><tr><th style="width:290px">Situation</th><th>What must happen</th></tr></thead>
+    <tbody>
+      <tr><td>A game page with <b>no competitions running</b></td><td>Never an empty page. Show what is coming, offer a practice option, offer "notify me", and show the game's league table. <b>This will be the normal state early on</b></td></tr>
+      <tr><td>A game hidden while its competitions are live</td><td>Running competitions keep working and stay reachable by direct link. Hiding removes it from <b>discovery</b> only &mdash; it cancels nothing</td></tr>
+      <tr><td>A game switched off in code but still listed</td><td>The listing must follow the code automatically, or players click into something they cannot play</td></tr>
+      <tr><td>A coming-soon game</td><td>Cannot be joined, and must not leak into the flat competitions list</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="kv">
+    <div><b>Effort</b><span>~2 weeks</span><em>Table and admin 5 days, the two pages 4 days, merchandising 2 days</em></div>
+    <div><b>Risk</b><span>Low</span><em>New pages alongside existing ones</em></div>
+    <div><b>When</b><span>After Phase 2</span><em>Needs a real second game to list</em></div>
+  </div>
+
+  <div class="cal plain">
+    <div class="t">Why this is built late, not first</div>
+    <p>It is tempting to start here, because it is the visible part. That is the wrong order. <b>A games page containing one non-trading game looks worse than no games page at all</b> &mdash; it advertises an empty platform. It is also the cheapest part to add later and carries the least technical risk, while the expensive and dangerous work sits underneath it in Phases 1 and 2.</p>
+  </div>
+
+  <hr class="d" />
+
+  <h3>The marketplace, and one rule to set before anything is built</h3>
+  <p>Today's marketplace is the Trading Arsenal &mdash; indicators and bots. Making it work for other games means scoping every item to a game, keeping ownership per game, and giving admin a game selector. About two weeks, and best kept off the critical path since it earns nothing until several games have a population playing them.</p>
+
+  <div class="cal bad">
+    <div class="t">Nothing sold may improve a score or ranking in a paid contest</div>
+    <p>Three separate reasons, and any one of them is enough on its own. <b>Fairness:</b> pay-to-win in a real-money contest destroys trust in a way refunds cannot repair. <b>Regulation:</b> the defence position rests on outcomes being decided by <b>skill</b> &mdash; if money measurably improves results, outcomes are partly decided by spending. <b>Payments:</b> "I paid for the advantage and still lost" is a chargeback story, and chargeback ratios are what put a merchant account at risk.</p>
+  </div>
+
+  <div class="grid g2">
+    <div class="card" style="border-color:#b6ddc6;background:#eaf6ef">
+      <h4 style="color:#1a6e49;margin-top:0">Safe to sell</h4>
+      <ul style="margin-bottom:0">
+        <li>Cosmetics &mdash; avatars, frames, name colours, themes</li>
+        <li>Titles and display badges with no scoring effect</li>
+        <li>Entry-fee vouchers and discounts</li>
+        <li>Extra <b>practice</b> rounds, outside ranked play</li>
+        <li>Cosmetic profile statistics and deeper history</li>
+      </ul>
+    </div>
+    <div class="card" style="border-color:#f0c3c9;background:#fdedef">
+      <h4 style="color:#a02a38;margin-top:0">Never sell</h4>
+      <ul style="margin-bottom:0">
+        <li>Anything adding points or score</li>
+        <li>Extra time, extra lives, retries, hints, skips</li>
+        <li>Extra attempts in a one-attempt contest</li>
+        <li>Easier content inside a ranked contest</li>
+        <li><b>Random or mystery packs, even cosmetic ones</b></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="cal bad">
+    <div class="t">Why random packs specifically</div>
+    <p>Paying money for a randomised reward is exactly the <b>element of chance</b> that the platform's regulatory position depends on being absent. It makes no difference that the reward is only cosmetic &mdash; the structure of the transaction is the problem. If packs are commercially attractive, sell <b>known contents at a known price</b>.</p>
+  </div>
+
+  <div class="cal info">
+    <div class="t">One nuance about the existing trading items</div>
+    <p>Indicators and bots are defensible today because they are analytical tools rather than score modifiers, and because everyone can buy them. <b>Do not treat that as a precedent</b> for score-affecting items in new games, and do not extend the reasoning without thinking it through again.</p>
+  </div>
+
+  <hr class="d" />
+
+  <h3>Game Masters &mdash; bigger than this chapter first said</h3>
+
+      <div class="cal plain">
+        <div class="t">An estimate corrected upward, 30 August 2026</div>
+    <p>This section previously called Game Masters &ldquo;four smaller items, roughly three to four days&rdquo;. Read properly against the code, that was wrong by an order of magnitude. The real system is <b>three dedicated collections, twenty-eight API routes, three subscription tiers, a referral chain, a daily renewal job and two separate earning paths</b>.</p>
+    <p style="margin-bottom:0"><b>The real figure is about two and a half weeks</b>, and Game Masters are <b>no longer a deferred item</b> &mdash; one piece of the work is a gate inside Phase 1.</p>
+  </div>
+
+  <h4>How a Game Master actually earns</h4>
+  <p>The single fact most likely to be assumed wrongly. <b>A Game Master earns from the entry fees of players they referred, in any contest those players enter</b> &mdash; not from contests the Game Master created. Creating competitions is how they attract and keep referred players; it is not itself the revenue event.</p>
+
+  <div class="cal good">
+    <div class="t">The convenient consequence</div>
+    <p style="margin-bottom:0">Because the share is a percentage of the entry fee, capped at the platform fee, and neither calculation knows what a game is, <b>a Game Master earns correctly from a Trivia contest the moment such a contest can be settled at all</b> &mdash; with no Game Master-specific work. The revenue share is already game-agnostic. So are subscriptions, tiers, renewal, referral attribution, the ledger entries and both dashboards.</p>
+  </div>
+
+  <h4>The gate</h4>
+  <div class="cal bad">
+    <div class="t">The Game Master competition route stamps no game label</div>
+    <p>It writes competitions with the <b>raw database driver</b> rather than through the schema layer, so it will not pick up a default. An unlabelled competition <b>reads as a trading competition and is settled by trading code</b> &mdash; which pays the wrong players. It also requires a starting capital and writes leverage, symbols and profit-based ranking, none of which mean anything to a quiz.</p>
+    <p style="margin-bottom:0">This is a <b>gate inside Phase 1, not a later task</b>, and it applies to the admin copy of the same route as well.</p>
+  </div>
+
+  <h4>A live defect found while checking this</h4>
+  <p>Not caused by this project, and worth fixing while the area is open. The main application has roughly <b>five hundred lines of Game Master earnings logic</b> that runs when a competition settles. <b>The admin application's copy of that same file has none of it.</b> A competition settled through the admin panel therefore pays the Game Master <b>nothing</b>, and records no entry on the platform ledger explaining where the money went. Invisible until a Game Master asks why their earnings do not match the contests their referred players entered.</p>
+
+  <h4>What genuinely remains</h4>
+  <ul>
+    <li>A <b>per-tier permission list</b> of which games a Game Master may run, defaulting to trading only, so nobody silently gains the ability to create contests for a game they have never seen.</li>
+    <li>The <b>Game Master competition creator</b> needs the same game picker and dynamic settings step as the admin one &mdash; <b>reusing those components</b>, not growing a parallel version of them.</li>
+    <li><b>Earnings shown split by game</b>, for the Game Master and for the admin, for the same reason the platform tracks revenue that way.</li>
+    <li>An admin control on the management screen that <b>calls an action the API never implemented</b> &mdash; either build it or remove it.</li>
+    <li><b>Tier wording</b>: &ldquo;trading community&rdquo;, &ldquo;trading battles&rdquo;, &ldquo;scalp battles&rdquo;. This is database content, editable without a deployment &mdash; the cheapest item here.</li>
+  </ul>
+  <p style="margin-bottom:0">Distributed across Phase 1, Phase 4 and Phase 5 rather than being a phase of its own.</p>
+</section>
+
+<!-- ================= 16 ROADMAP ================= -->
+<section id="roadmap">
+  <div class="sec-h"><div class="sec-n">16</div><h2>The roadmap</h2></div>
+  <p class="sec-sub">Two deliveries, one approval gate between them.</p>
+
+  <div class="ph">
+    <div class="ph-row s0">
+      <div class="ph-id">STAGE 0</div>
+      <div class="ph-b"><b>Prerequisite fixes &mdash; SEPARATE JOB, YOUR SIGN-OFF</b>One entrance instead of four, prize-pool defect fixed, missing checks added to challenge entry, blueprints synced, permanent automatic guard added, money tests written. The invisible fraud block removed, so only a real suspension stops a player. Almost no visible change, except that raising an alert to investigation now asks you whether to restrict. The simulator security fix is already done.</div>
+      <div class="ph-e">6&ndash;9 days</div>
+    </div>
+    <div class="ph-row">
+      <div class="ph-id">GATE</div>
+      <div class="ph-b"><b>You test it and approve it</b>Nothing below begins until both fixes are confirmed working in production.</div>
+      <div class="ph-e">&mdash;</div>
+    </div>
+    <div class="ph-row">
+      <div class="ph-id">PHASE 1</div>
+      <div class="ph-b"><b>Foundation</b>Game label and settings, the score field, the game registry, the ranking seam, and the trading plug-in wrapping today's behaviour exactly. Proven by the regression test. <b>Includes the Game Master game-label gate from chapter 15.</b></div>
+      <div class="ph-e">2.5&ndash;3.5 weeks</div>
+    </div>
+    <div class="ph-row">
+      <div class="ph-id">PHASE 2</div>
+      <div class="ph-b"><b>The Trivia game</b>Question bank tables, gameplay, scoring, settlement, quiz screens, the game dispatcher page.</div>
+      <div class="ph-e">2&ndash;3 weeks</div>
+    </div>
+    <div class="ph-row">
+      <div class="ph-id">PHASE 3</div>
+      <div class="ph-b"><b>Admin</b>Menu restructure, game picker, dynamic settings step, question bank, categories, quiz settings, reporting by game.</div>
+      <div class="ph-e">1.5&ndash;2 weeks</div>
+    </div>
+    <div class="ph-row">
+      <div class="ph-id">PHASE 4</div>
+      <div class="ph-b"><b>Points, leaderboards, gamification</b>Player summaries, normalised points, per-game rating, tabbed league tables, per-game dashboard sections, badges, XP, journey. <b>Plus the Game Master creation API and per-game earnings analytics.</b></div>
+      <div class="ph-e">3&ndash;4 weeks</div>
+    </div>
+    <div class="ph-row">
+      <div class="ph-id">PHASE 5</div>
+      <div class="ph-b"><b>Wording and the trading switch</b>Terminology dictionary, shared-shell wording, help restructure, master switch, price feed gating, job filters. <b>Plus the Game Master wizard and tier wording.</b></div>
+      <div class="ph-e">2&ndash;2.5 weeks</div>
+    </div>
+    <div class="ph-row">
+      <div class="ph-id">PHASE 6</div>
+      <div class="ph-b"><b>Hardening and launch</b>Load testing, monitoring, rollback rehearsal, internal paid contests, public launch, documentation.</div>
+      <div class="ph-e">1 week</div>
+    </div>
+    <div class="ph-row">
+      <div class="ph-id">PHASE 7</div>
+      <div class="ph-b"><b>Games-first navigation</b>The catalogue table and its admin editor, the games page, the individual game pages, merchandising controls. Chapter 15. Deliberately last &mdash; it needs real games to list.</div>
+      <div class="ph-e">~2 weeks</div>
+    </div>
+    <div class="ph-row">
+      <div class="ph-id">LATER</div>
+      <div class="ph-b"><b>Not scheduled &mdash; decide when there is demand</b>Per-game marketplace (~2 weeks, under the no-pay-to-win rule). It blocks nothing else. <b>Game Master work is no longer here</b> &mdash; it moved into Phases 1, 4 and 5 once it was sized properly.</div>
+      <div class="ph-e">&mdash;</div>
+    </div>
+  </div>
+
+  <div class="kv">
+    <div><b>Stage 0</b><span>6&ndash;9 days</span><em>Separate delivery and approval</em></div>
+    <div><b>Games plan</b><span>14&ndash;19 weeks</span><em>Phases 1&ndash;7, Game Master work included</em></div>
+    <div><b>Shortest useful path</b><span>8&ndash;10 weeks</span><em>Phases 1&ndash;3: a quiz that can be played and paid</em></div>
+    <div><b>Assumption</b><span>1 developer</span><em>Experienced with this codebase, testing included</em></div>
+  </div>
+
+  <div class="cal plain">
+    <div class="t">Be honest about the total</div>
+    <p>Stage 0, then Phases 1 to 7, then the deferred marketplace is close to <b>six months of one developer's time</b>. That is the real number for the full games-first platform. It does not all have to be committed at once &mdash; Phases 1 to 3 deliver a second game that can be played and paid for, and that is a legitimate place to stop, look at whether players actually play it, and decide about the rest afterwards. <b>Scope, not technical difficulty, is the main risk to this programme.</b></p>
+  </div>
+
+  <h3>What can run in parallel</h3>
+  <ul>
+    <li><b>The legal review</b> should start at Phase 1 and run alongside everything.</li>
+    <li><b>Question bank content</b> can be written as soon as Phase 2 creates the tables &mdash; by someone who is not a developer.</li>
+    <li><b>Badge and journey content</b> likewise, during Phase 4.</li>
+  </ul>
+
+  <h3>Hard order</h3>
+  <p style="text-align:center;font-family:var(--mono);font-size:13.5px;background:#f7f9fc;border:1px solid var(--line);border-radius:8px;padding:14px">Stage 0 (approved) &nbsp;&rarr;&nbsp; Phase 1 &nbsp;&rarr;&nbsp; Phase 2</p>
+  <p>Nothing else is order-critical. Phase 3 can overlap Phase 2 once the design is stable, and Phases 4 and 5 can overlap each other.</p>
+
+  <div class="cal info">
+    <div class="t">One thing not to do</div>
+    <p>Do not start the league-table migration before trivia has produced <b>real contest data</b>. The points settings need real numbers to be tuned against, and migrating the league table twice is wasted effort.</p>
+  </div>
+</section>
+
+</main>
+</div>
+
+<footer class="foot">
+  <span><b>ChartVolt</b> &mdash; New Games Plan &middot; Plan only, no code changed &middot; Based on six audits of the live codebase</span>
+      <span>17 August 2026 &middot; v1.5, revised 2 September 2026 (Stage 0 code complete &mdash; Defects 1 and 2 built, four entry paths resolved, and the invisible fraud block removed; twelve live defects found and fixed)</span>
+</footer>
+
+<script>
+(function(){
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  var targets = links.map(function(a){
+    var id = a.getAttribute('href').slice(1);
+    return document.getElementById(id);
+  });
+  function onScroll(){
+    var best = -1, bestTop = -Infinity, y = window.scrollY + 130;
+    for (var i = 0; i < targets.length; i++){
+      var el = targets[i];
+      if (!el) continue;
+      var top = el.getBoundingClientRect().top + window.scrollY;
+      if (top <= y && top > bestTop){ bestTop = top; best = i; }
+    }
+    links.forEach(function(a){ a.classList.remove('on'); });
+    if (best >= 0) links[best].classList.add('on');
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll);
+  onScroll();
+})();
+</script>
+
+</body>
+</html>

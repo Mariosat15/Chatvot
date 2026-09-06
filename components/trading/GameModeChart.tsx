@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import GameChart from './GameChart';
+import GameChart from "./GameChart";
 
 interface Position {
   _id: string;
   symbol: string;
-  side: 'long' | 'short';
+  side: "long" | "short";
   entryPrice: number;
   quantity: number;
   unrealizedPnl: number;
@@ -19,7 +19,10 @@ interface GameModeChartProps {
   positions?: Position[];
 }
 
-export default function GameModeChart({ competitionId, positions = [] }: GameModeChartProps) {
+export default function GameModeChart({
+  competitionId,
+  positions = [],
+}: GameModeChartProps) {
   return (
     <div className="relative">
       {/* Fun Gaming Chart */}
@@ -27,4 +30,3 @@ export default function GameModeChart({ competitionId, positions = [] }: GameMod
     </div>
   );
 }
-

@@ -1,69 +1,77 @@
-import { Schema, model, models, Document } from 'mongoose';
+import { Schema, model, models, Document } from "mongoose";
 
 // Closed trades for historical analysis
 export interface ITradeHistory extends Document {
   competitionId: string;
   userId: string;
   participantId: string; // Reference to CompetitionParticipant
-  
+
   // Trade Details
   symbol: string; // EUR/USD, GBP/USD, etc.
-  side: 'long' | 'short';
+  side: "long" | "short";
   quantity: number; // Lot size
-  orderType: 'market' | 'limit'; // How order was placed
+  orderType: "market" | "limit"; // How order was placed
   limitPrice?: number; // Requested limit price (if orderType is limit)
-  
+
   // Entry & Exit
   entryPrice: number; // Actual execution price
   exitPrice: number;
   priceChange: number; // Exit - Entry
   priceChangePercentage: number;
-  
+
   // P&L
   realizedPnl: number; // Actual profit/loss
   realizedPnlPercentage: number; // ROI %
-  
+
   // Timing
   openedAt: Date;
   closedAt: Date;
   holdingTimeSeconds: number; // Duration
-  
+
   // How Trade Closed
-  closeReason: 'user' | 'stop_loss' | 'take_profit' | 'margin_call' | 'competition_end' | 'challenge_end';
-  
+  closeReason:
+    | "user"
+    | "stop_loss"
+    | "take_profit"
+    | "margin_call"
+    | "competition_end"
+    | "challenge_end"
+    | "competition_cancelled"
+    | "emergency_cancel";
+
   // Leverage & Margin
   leverage: number;
   marginUsed: number;
-  
+
   // Stop Loss / Take Profit
   hadStopLoss: boolean;
   stopLossPrice?: number;
   hadTakeProfit: boolean;
   takeProfitPrice?: number;
-  
+
   // Related Records
   openOrderId: string;
   closeOrderId: string;
   positionId: string;
-  
+
   // Trade Quality Metrics
   isWinner: boolean; // Profitable or not
   riskRewardRatio?: number; // Potential reward / potential risk
-  
+
   // Market Conditions at Entry
   entrySpread?: number; // Bid-ask spread
   entryVolatility?: number; // Market volatility
-  
+
   // Market Conditions at Exit
   exitSpread?: number;
   exitVolatility?: number;
-  
+
   // Fees & Costs
   commission?: number;
   swap?: number; // Overnight holding cost
   totalCosts?: number;
   netPnl?: number; // P&L after costs
-  
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -90,7 +98,7 @@ const TradeHistorySchema = new Schema<ITradeHistory>(
     side: {
       type: String,
       required: true,
-      enum: ['long', 'short'],
+      enum: ["long", "short"],
     },
     quantity: {
       type: Number,
@@ -100,8 +108,8 @@ const TradeHistorySchema = new Schema<ITradeHistory>(
     orderType: {
       type: String,
       required: true,
-      enum: ['market', 'limit'],
-      default: 'market',
+      enum: ["market", "limit"],
+      default: "market",
     },
     limitPrice: {
       type: Number,
@@ -149,7 +157,16 @@ const TradeHistorySchema = new Schema<ITradeHistory>(
     closeReason: {
       type: String,
       required: true,
-      enum: ['user', 'stop_loss', 'take_profit', 'margin_call', 'competition_end', 'challenge_end'],
+      enum: [
+        "user",
+        "stop_loss",
+        "take_profit",
+        "margin_call",
+        "competition_end",
+        "challenge_end",
+        "competition_cancelled",
+        "emergency_cancel",
+      ],
     },
     leverage: {
       type: Number,
@@ -235,7 +252,7 @@ const TradeHistorySchema = new Schema<ITradeHistory>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes for fast queries
@@ -245,29 +262,33 @@ TradeHistorySchema.index({ participantId: 1, closedAt: -1 });
 TradeHistorySchema.index({ symbol: 1, closedAt: -1 });
 TradeHistorySchema.index({ competitionId: 1, isWinner: 1 });
 TradeHistorySchema.index({ userId: 1, isWinner: 1 });
+// PERFORMANCE: Additional indexes for analytics and reporting
+TradeHistorySchema.index({ userId: 1, competitionId: 1, closedAt: -1 }); // User's trades in competition
+TradeHistorySchema.index({ competitionId: 1, realizedPnl: -1 }); // Top trades leaderboard
+TradeHistorySchema.index({ closeReason: 1, closedAt: -1 }); // Analyzing close reasons
 
 // Virtual for trade duration (human readable)
-TradeHistorySchema.virtual('holdingTimeDuration').get(function () {
+TradeHistorySchema.virtual("holdingTimeDuration").get(function () {
   const seconds = this.holdingTimeSeconds;
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
-  
+
   if (hours > 0) return `${hours}h ${minutes}m`;
   return `${minutes}m`;
 });
 
 // Virtual for was stopped out
-TradeHistorySchema.virtual('wasStoppedOut').get(function () {
-  return this.closeReason === 'stop_loss';
+TradeHistorySchema.virtual("wasStoppedOut").get(function () {
+  return this.closeReason === "stop_loss";
 });
 
 // Virtual for hit take profit
-TradeHistorySchema.virtual('hitTakeProfit').get(function () {
-  return this.closeReason === 'take_profit';
+TradeHistorySchema.virtual("hitTakeProfit").get(function () {
+  return this.closeReason === "take_profit";
 });
 
 const TradeHistory =
-  models?.TradeHistory || model<ITradeHistory>('TradeHistory', TradeHistorySchema);
+  models?.TradeHistory ||
+  model<ITradeHistory>("TradeHistory", TradeHistorySchema);
 
 export default TradeHistory;
-

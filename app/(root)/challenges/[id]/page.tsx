@@ -1,40 +1,70 @@
-import { Trophy, Users, DollarSign, Clock, Calendar, TrendingUp, ArrowLeft, Target, Shield, AlertTriangle, Zap, Info, Skull, Swords, Crown } from 'lucide-react';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { connectToDatabase } from '@/database/mongoose';
-import Challenge from '@/database/models/trading/challenge.model';
-import ChallengeParticipant from '@/database/models/trading/challenge-participant.model';
-import { getTradingRiskSettings } from '@/lib/actions/trading/risk-settings.actions';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import UTCClock from '@/components/trading/UTCClock';
-import InlineCountdown from '@/components/trading/InlineCountdown';
-import LiveCountdown from '@/components/trading/LiveCountdown';
-import ChallengeStatusMonitor from '@/components/trading/ChallengeStatusMonitor';
-import ChallengeEntryActions from '@/components/trading/ChallengeEntryActions';
-import { notFound, redirect } from 'next/navigation';
-import { unstable_noStore as noStore } from 'next/cache';
+import {
+  Trophy,
+  DollarSign,
+  Calendar,
+  TrendingUp,
+  ArrowLeft,
+  Target,
+  Shield,
+  AlertTriangle,
+  Info,
+  Skull,
+  Swords,
+} from "lucide-react";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { connectToDatabase } from "@/database/mongoose";
+import Challenge, { type IChallenge } from "@/database/models/trading/challenge.model";
+import ChallengeParticipant from "@/database/models/trading/challenge-participant.model";
+import { getTradingRiskSettings } from "@/lib/actions/trading/risk-settings.actions";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import UTCClock from "@/components/trading/UTCClock";
+import InlineCountdown from "@/components/trading/InlineCountdown";
+import LiveCountdown from "@/components/trading/LiveCountdown";
+import ChallengeStatusMonitor from "@/components/trading/ChallengeStatusMonitor";
+import ChallengeEntryActions from "@/components/trading/ChallengeEntryActions";
+import { notFound, redirect } from "next/navigation";
+import { unstable_noStore as noStore } from "next/cache";
 
 interface ChallengePageProps {
   params: Promise<{ id: string }>;
 }
 
 const RANKING_LABELS: Record<string, string> = {
-  pnl: 'Highest P&L',
-  roi: 'Highest ROI %',
-  total_capital: 'Highest Capital',
-  win_rate: 'Highest Win Rate',
-  total_wins: 'Most Winning Trades',
-  profit_factor: 'Best Profit Factor',
+  pnl: "Highest P&L",
+  roi: "Highest ROI %",
+  total_capital: "Highest Capital",
+  win_rate: "Highest Win Rate",
+  total_wins: "Most Winning Trades",
+  profit_factor: "Best Profit Factor",
+};
+
+const RANKING_DESCRIPTIONS: Record<string, string> = {
+  pnl: "Winner is determined by total profit & loss (realized + unrealized).",
+  roi: "Winner is determined by the highest return on investment percentage.",
+  total_capital: "Winner has the highest account balance at the end.",
+  win_rate: "Winner has the highest percentage of winning trades.",
+  total_wins: "Winner has the most profitable trades closed.",
+  profit_factor: "Winner has the best ratio of winning to losing trades.",
 };
 
 const TIEBREAKER_LABELS: Record<string, string> = {
-  trades_count: 'Most Trades',
-  win_rate: 'Higher Win Rate',
-  total_capital: 'Higher Capital',
-  roi: 'Higher ROI',
-  join_time: 'First to Join',
-  split_prize: 'Split Prize',
+  trades_count: "Most Trades",
+  win_rate: "Higher Win Rate",
+  total_capital: "Higher Capital",
+  roi: "Higher ROI",
+  join_time: "First to Join",
+  split_prize: "Split Prize",
+};
+
+const TIEBREAKER_DESCRIPTIONS: Record<string, string> = {
+  trades_count: "The trader with more completed trades wins.",
+  win_rate: "The trader with a higher win rate wins.",
+  total_capital: "The trader with more capital wins.",
+  roi: "The trader with a higher return on investment wins.",
+  join_time: "The trader who accepted the challenge first wins.",
+  split_prize: "The prize is split equally between tied players.",
 };
 
 export default async function ChallengePage({ params }: ChallengePageProps) {
@@ -45,89 +75,111 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
 
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) {
-    redirect('/sign-in');
+    redirect("/sign-in");
   }
 
   try {
     await connectToDatabase();
 
     // Fetch challenge with potential auto-finalization
-    let challenge = await Challenge.findById(id);
+    let challenge = await Challenge.findById(id).lean() as (IChallenge & { _id: string }) | null;
 
     if (!challenge) {
       notFound();
     }
 
     // Only participants can view
-    if (challenge.challengerId !== session.user.id && challenge.challengedId !== session.user.id) {
+    if (
+      challenge.challengerId !== session.user.id &&
+      challenge.challengedId !== session.user.id
+    ) {
       notFound();
     }
 
     // Auto-finalize if challenge is 'active' but has ended
     if (
-      challenge.status === 'active' &&
+      challenge.status === "active" &&
       challenge.endTime &&
       new Date() >= new Date(challenge.endTime) &&
       !challenge.winnerId
     ) {
       try {
-        const { finalizeChallenge } = await import('@/lib/actions/trading/challenge-finalize.actions');
+        const { finalizeChallenge } =
+          await import("@/lib/actions/trading/challenge-finalize.actions");
         await finalizeChallenge(id);
-        challenge = await Challenge.findById(id);
+        challenge = await Challenge.findById(id).lean() as (IChallenge & { _id: string }) | null;
       } catch (error) {
         console.error(`Failed to auto-finalize challenge ${id}:`, error);
       }
     }
 
-    // Get participants
-    const participants = await ChallengeParticipant.find({ challengeId: id }).lean();
-    const riskSettings = await getTradingRiskSettings();
+    if (!challenge) {
+      notFound();
+    }
+
+    // Get participants and risk settings in parallel (both independent after challenge validation)
+    const [_participants, _riskSettings] = await Promise.all([
+      ChallengeParticipant.find({ challengeId: id }).lean(),
+      getTradingRiskSettings(),
+    ]);
 
     const isChallenger = challenge.challengerId === session.user.id;
     const isChallenged = challenge.challengedId === session.user.id;
-    const opponentName = isChallenger ? challenge.challengedName : challenge.challengerName;
+    const opponentName = isChallenger
+      ? challenge.challengedName
+      : challenge.challengerName;
     const isWinner = challenge.winnerId === session.user.id;
     const isLoser = challenge.loserId === session.user.id;
-    const myStats = isChallenger ? challenge.challengerFinalStats : challenge.challengedFinalStats;
-    const opponentStats = isChallenger ? challenge.challengedFinalStats : challenge.challengerFinalStats;
+    const isNoWinner = challenge.noWinner === true;
+    const myStats = isChallenger
+      ? challenge.challengerFinalStats
+      : challenge.challengedFinalStats;
+    const opponentStats = isChallenger
+      ? challenge.challengedFinalStats
+      : challenge.challengerFinalStats;
 
-    const isActive = challenge.status === 'active';
-    const isPending = challenge.status === 'pending';
-    const isCompleted = challenge.status === 'completed';
-    const isDeclined = challenge.status === 'declined';
-    const isExpired = challenge.status === 'expired';
-    const isCancelled = challenge.status === 'cancelled';
+    const isActive = challenge.status === "active";
+    const isPending = challenge.status === "pending";
+    const isCompleted = challenge.status === "completed";
+    const isDeclined = challenge.status === "declined";
+    const isExpired = challenge.status === "expired";
+    const isCancelled = challenge.status === "cancelled";
 
     const formatUTCDate = (date: Date) => {
       const year = date.getUTCFullYear();
-      const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
-      const day = date.getUTCDate().toString().padStart(2, '0');
-      const hours = date.getUTCHours().toString().padStart(2, '0');
-      const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+      const month = (date.getUTCMonth() + 1).toString().padStart(2, "0");
+      const day = date.getUTCDate().toString().padStart(2, "0");
+      const hours = date.getUTCHours().toString().padStart(2, "0");
+      const minutes = date.getUTCMinutes().toString().padStart(2, "0");
       return `${year}-${month}-${day} ${hours}:${minutes} UTC`;
     };
 
     return (
-      <div className="flex min-h-screen flex-col gap-8 p-4 md:p-8">
+      <div className="flex min-h-screen flex-col gap-4 sm:gap-6 lg:gap-8 p-3 sm:p-4 md:p-8 overflow-x-hidden">
         {/* Auto-refresh when challenge status changes */}
-        <ChallengeStatusMonitor 
-          challengeId={id} 
-          initialStatus={challenge.status} 
+        <ChallengeStatusMonitor
+          challengeId={id}
+          initialStatus={challenge.status}
+          userId={session.user.id}
         />
 
         {/* Header with Back Button and UTC Clock */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center justify-between flex-wrap gap-2 sm:gap-4">
           <Link href="/challenges">
-            <Button variant="ghost" className="w-fit gap-2 text-gray-400 hover:text-gray-100">
+            <Button
+              variant="ghost"
+              className="w-fit gap-2 text-gray-400 hover:text-gray-100 min-h-[44px]"
+            >
               <ArrowLeft className="h-4 w-4" />
-              Back to Challenges
+              <span className="hidden sm:inline">Back to Challenges</span>
+              <span className="sm:hidden">Back</span>
             </Button>
           </Link>
           <UTCClock />
         </div>
 
         {/* Header */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500/20 via-gray-800 to-gray-900 p-8 shadow-xl border border-orange-500/20">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500/20 via-gray-800 to-gray-900 p-4 sm:p-6 md:p-8 shadow-xl border border-orange-500/20">
           <div className="absolute top-0 right-0 opacity-10">
             <Swords className="h-48 w-48 text-orange-500" />
           </div>
@@ -136,13 +188,17 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
             {/* Status Badge */}
             {isCompleted && (
               <div className="mb-4">
-                {isWinner ? (
-                  <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-600 text-white text-lg font-bold">
-                    🏆 YOU WON!
+                {isNoWinner ? (
+                  <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-600 text-white text-lg font-bold">
+                    ⚠️ NO WINNER — All Players Disqualified
                   </span>
                 ) : challenge.isTie ? (
                   <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-600 text-white text-lg font-bold">
                     🤝 TIE
+                  </span>
+                ) : isWinner ? (
+                  <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-600 text-white text-lg font-bold">
+                    🏆 YOU WON!
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-600 text-white text-lg font-bold">
@@ -170,49 +226,73 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
               </span>
             )}
 
-            <h1 className="text-4xl font-bold text-gray-100 mb-2 flex items-center gap-3">
-              <Swords className="h-10 w-10 text-orange-500" />
-              Challenge vs {opponentName}
+            <h1 className="text-xl sm:text-2xl md:text-4xl font-bold text-gray-100 mb-2 flex items-center gap-2 sm:gap-3">
+              <Swords className="h-6 w-6 sm:h-8 sm:w-8 md:h-10 md:w-10 text-orange-500 flex-shrink-0" />
+              <span className="truncate">Challenge vs {opponentName}</span>
             </h1>
             <p className="text-gray-400 mb-6">
-              {isChallenger ? 'You challenged' : 'Challenged you'} • {challenge.duration} minute battle
+              {isChallenger ? "You challenged" : "Challenged you"} •{" "}
+              {challenge.duration} minute battle
             </p>
 
             {/* Key Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">Winner Prize</p>
-                <p className="text-3xl font-bold text-yellow-500">
+                <p className="text-xs text-gray-500 uppercase tracking-wider">
+                  Winner Prize
+                </p>
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-yellow-500">
                   {challenge.winnerPrize?.toFixed(0) || 0} ⚡
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">Entry Fee</p>
-                <p className="text-3xl font-bold text-gray-100">
+                <p className="text-[11px] sm:text-xs text-gray-500 uppercase tracking-wider">
+                  Entry Fee
+                </p>
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-100">
                   {challenge.entryFee} ⚡
                 </p>
-                <p className="text-xs text-gray-500">each player</p>
+                <p className="text-[11px] sm:text-xs text-gray-500">each player</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">Platform Fee</p>
-                <p className="text-3xl font-bold text-gray-100">
+                <p className="text-[11px] sm:text-xs text-gray-500 uppercase tracking-wider">
+                  Platform Fee
+                </p>
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-100">
                   {challenge.platformFeePercentage || 0}%
                 </p>
-                <p className="text-xs text-gray-500">{challenge.platformFeeAmount?.toFixed(2) || 0} ⚡</p>
+                <p className="text-xs text-gray-500">
+                  {challenge.platformFeeAmount?.toFixed(2) || 0} ⚡
+                </p>
               </div>
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wider">
-                  {isActive ? 'Time Remaining' : isPending ? 'Accept By' : 'Status'}
+                  {isActive
+                    ? "Time Remaining"
+                    : isPending
+                      ? "Accept By"
+                      : "Status"}
                 </p>
-                <div className="text-3xl font-bold text-gray-100">
+                <div className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-100">
                   {isCompleted || isDeclined || isExpired || isCancelled ? (
-                    <span className={isCompleted && isWinner ? 'text-green-500' : isCompleted && isLoser ? 'text-red-500' : 'text-gray-500'}>
-                      {challenge.status.charAt(0).toUpperCase() + challenge.status.slice(1)}
+                    <span
+                      className={
+                        isCompleted && isWinner
+                          ? "text-green-500"
+                          : isCompleted && isLoser
+                            ? "text-red-500"
+                            : "text-gray-500"
+                      }
+                    >
+                      {challenge.status.charAt(0).toUpperCase() +
+                        challenge.status.slice(1)}
                     </span>
                   ) : (
                     <InlineCountdown
-                      targetDate={isActive ? challenge.endTime : challenge.acceptDeadline}
-                      type={isActive ? 'end' : 'start'}
+                      targetDate={
+                        (isActive ? challenge.endTime?.toISOString() : challenge.acceptDeadline?.toISOString()) ?? new Date().toISOString()
+                      }
+                      type={isActive ? "end" : "start"}
                     />
                   )}
                 </div>
@@ -221,7 +301,7 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Your Results Card (if completed) */}
@@ -234,37 +314,75 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
 
                 <div className="grid md:grid-cols-2 gap-4">
                   {/* Your Stats */}
-                  <div className={`p-4 rounded-xl border ${isWinner ? 'bg-green-500/10 border-green-500/30' : isLoser ? 'bg-red-500/10 border-red-500/30' : 'bg-gray-800/50 border-gray-700'}`}>
+                  <div
+                    className={`p-4 rounded-xl border ${isWinner ? "bg-green-500/10 border-green-500/30" : isLoser ? "bg-red-500/10 border-red-500/30" : "bg-gray-800/50 border-gray-700"}`}
+                  >
                     <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-semibold text-gray-300">You</span>
-                      {isWinner && <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs font-bold rounded">WINNER</span>}
-                      {isLoser && <span className="px-2 py-1 bg-red-500/20 text-red-400 text-xs font-bold rounded">LOST</span>}
+                      <span className="text-sm font-semibold text-gray-300">
+                        You
+                      </span>
+                      {isNoWinner && (
+                        <span className="px-2 py-1 bg-gray-500/20 text-gray-400 text-xs font-bold rounded">
+                          DISQUALIFIED
+                        </span>
+                      )}
+                      {!isNoWinner && challenge.isTie && (
+                        <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-bold rounded">
+                          TIE
+                        </span>
+                      )}
+                      {!isNoWinner && !challenge.isTie && isWinner && (
+                        <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs font-bold rounded">
+                          WINNER
+                        </span>
+                      )}
+                      {!isNoWinner && !challenge.isTie && isLoser && (
+                        <span className="px-2 py-1 bg-red-500/20 text-red-400 text-xs font-bold rounded">
+                          LOST
+                        </span>
+                      )}
                     </div>
                     {myStats && (
                       <div className="space-y-2">
                         <div className="flex justify-between">
-                          <span className="text-xs text-gray-500">Final Capital</span>
-                          <span className="text-sm font-bold text-white">${myStats.finalCapital?.toFixed(2) || 0}</span>
+                          <span className="text-xs text-gray-500">
+                            Final Capital
+                          </span>
+                          <span className="text-sm font-bold text-white">
+                            ${myStats.finalCapital?.toFixed(2) || 0}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-xs text-gray-500">P&L</span>
-                          <span className={`text-sm font-bold ${(myStats.pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {(myStats.pnl || 0) >= 0 ? '+' : ''}{myStats.pnl?.toFixed(2) || 0}
+                          <span
+                            className={`text-sm font-bold ${(myStats.pnl || 0) >= 0 ? "text-green-400" : "text-red-400"}`}
+                          >
+                            {(myStats.pnl || 0) >= 0 ? "+" : ""}
+                            {myStats.pnl?.toFixed(2) || 0}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-xs text-gray-500">ROI</span>
-                          <span className={`text-sm font-bold ${(myStats.pnlPercentage || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {(myStats.pnlPercentage || 0) >= 0 ? '+' : ''}{myStats.pnlPercentage?.toFixed(2) || 0}%
+                          <span
+                            className={`text-sm font-bold ${(myStats.pnlPercentage || 0) >= 0 ? "text-green-400" : "text-red-400"}`}
+                          >
+                            {(myStats.pnlPercentage || 0) >= 0 ? "+" : ""}
+                            {myStats.pnlPercentage?.toFixed(2) || 0}%
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-xs text-gray-500">Trades</span>
-                          <span className="text-sm font-bold text-white">{myStats.totalTrades || 0}</span>
+                          <span className="text-sm font-bold text-white">
+                            {myStats.totalTrades || 0}
+                          </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-xs text-gray-500">Win Rate</span>
-                          <span className="text-sm font-bold text-white">{myStats.winRate?.toFixed(1) || 0}%</span>
+                          <span className="text-xs text-gray-500">
+                            Win Rate
+                          </span>
+                          <span className="text-sm font-bold text-white">
+                            {myStats.winRate?.toFixed(1) || 0}%
+                          </span>
                         </div>
                         {myStats.isDisqualified && (
                           <div className="mt-2 p-2 bg-red-500/20 border border-red-500/30 rounded text-xs text-red-400">
@@ -276,46 +394,98 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
                   </div>
 
                   {/* Opponent Stats */}
-                  <div className={`p-4 rounded-xl border ${!isWinner && !challenge.isTie ? 'bg-green-500/10 border-green-500/30' : 'bg-gray-800/50 border-gray-700'}`}>
+                  <div
+                    className={`p-4 rounded-xl border ${!isNoWinner && !challenge.isTie && !isWinner ? "bg-green-500/10 border-green-500/30" : "bg-gray-800/50 border-gray-700"}`}
+                  >
                     <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-semibold text-gray-300">{opponentName}</span>
-                      {!isWinner && !challenge.isTie && <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs font-bold rounded">WINNER</span>}
+                      <span className="text-sm font-semibold text-gray-300">
+                        {opponentName}
+                      </span>
+                      {isNoWinner && (
+                        <span className="px-2 py-1 bg-gray-500/20 text-gray-400 text-xs font-bold rounded">
+                          DISQUALIFIED
+                        </span>
+                      )}
+                      {!isNoWinner && challenge.isTie && (
+                        <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-bold rounded">
+                          TIE
+                        </span>
+                      )}
+                      {!isNoWinner && !challenge.isTie && !isWinner && (
+                        <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs font-bold rounded">
+                          WINNER
+                        </span>
+                      )}
+                      {!isNoWinner && !challenge.isTie && isWinner && (
+                        <span className="px-2 py-1 bg-red-500/20 text-red-400 text-xs font-bold rounded">
+                          LOST
+                        </span>
+                      )}
                     </div>
                     {opponentStats && (
                       <div className="space-y-2">
                         <div className="flex justify-between">
-                          <span className="text-xs text-gray-500">Final Capital</span>
-                          <span className="text-sm font-bold text-white">${opponentStats.finalCapital?.toFixed(2) || 0}</span>
+                          <span className="text-xs text-gray-500">
+                            Final Capital
+                          </span>
+                          <span className="text-sm font-bold text-white">
+                            ${opponentStats.finalCapital?.toFixed(2) || 0}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-xs text-gray-500">P&L</span>
-                          <span className={`text-sm font-bold ${(opponentStats.pnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {(opponentStats.pnl || 0) >= 0 ? '+' : ''}{opponentStats.pnl?.toFixed(2) || 0}
+                          <span
+                            className={`text-sm font-bold ${(opponentStats.pnl || 0) >= 0 ? "text-green-400" : "text-red-400"}`}
+                          >
+                            {(opponentStats.pnl || 0) >= 0 ? "+" : ""}
+                            {opponentStats.pnl?.toFixed(2) || 0}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-xs text-gray-500">ROI</span>
-                          <span className={`text-sm font-bold ${(opponentStats.pnlPercentage || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {(opponentStats.pnlPercentage || 0) >= 0 ? '+' : ''}{opponentStats.pnlPercentage?.toFixed(2) || 0}%
+                          <span
+                            className={`text-sm font-bold ${(opponentStats.pnlPercentage || 0) >= 0 ? "text-green-400" : "text-red-400"}`}
+                          >
+                            {(opponentStats.pnlPercentage || 0) >= 0 ? "+" : ""}
+                            {opponentStats.pnlPercentage?.toFixed(2) || 0}%
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-xs text-gray-500">Trades</span>
-                          <span className="text-sm font-bold text-white">{opponentStats.totalTrades || 0}</span>
+                          <span className="text-sm font-bold text-white">
+                            {opponentStats.totalTrades || 0}
+                          </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-xs text-gray-500">Win Rate</span>
-                          <span className="text-sm font-bold text-white">{opponentStats.winRate?.toFixed(1) || 0}%</span>
+                          <span className="text-xs text-gray-500">
+                            Win Rate
+                          </span>
+                          <span className="text-sm font-bold text-white">
+                            {opponentStats.winRate?.toFixed(1) || 0}%
+                          </span>
                         </div>
                         {opponentStats.isDisqualified && (
                           <div className="mt-2 p-2 bg-red-500/20 border border-red-500/30 rounded text-xs text-red-400">
-                            ⚠️ Disqualified: {opponentStats.disqualificationReason}
+                            ⚠️ Disqualified:{" "}
+                            {opponentStats.disqualificationReason}
                           </div>
                         )}
                       </div>
                     )}
                   </div>
                 </div>
+
+                {/* View Trade History button */}
+                {(isChallenger || isChallenged) && (
+                  <div className="mt-4 flex justify-center">
+                    <Link href={`/challenges/${id}/trade?viewOnly=true`}>
+                      <Button variant="outline" className="gap-2 border-orange-500/30 hover:bg-orange-500/10 text-orange-400">
+                        <TrendingUp className="h-4 w-4" />
+                        Review Charts & Trades
+                      </Button>
+                    </Link>
+                  </div>
+                )}
               </div>
             )}
 
@@ -325,32 +495,68 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
                 🏆 Challenge Rules
               </h3>
               <div className="space-y-3 text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-400">Ranking Method:</span>
-                  <span className="font-semibold text-blue-400">
-                    {RANKING_LABELS[challenge.rules?.rankingMethod] || 'Highest P&L'}
-                  </span>
+                {/* Ranking Method */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400">Ranking Method:</span>
+                    <span className="font-semibold text-blue-400">
+                      {/* eslint-disable-next-line security/detect-object-injection */}
+                      {RANKING_LABELS[challenge.rules?.rankingMethod] ||
+                        "Highest P&L"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    {/* eslint-disable-next-line security/detect-object-injection */}
+                    {RANKING_DESCRIPTIONS[challenge.rules?.rankingMethod] ||
+                      "Winner is determined by total profit & loss."}
+                  </p>
                 </div>
+
+                {/* Tie Breaker 1 */}
                 {challenge.rules?.tieBreaker1 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-400">Tie Breaker 1:</span>
-                    <span className="font-semibold text-purple-400">
-                      {TIEBREAKER_LABELS[challenge.rules.tieBreaker1] || challenge.rules.tieBreaker1}
-                    </span>
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400">Tie Breaker 1:</span>
+                      <span className="font-semibold text-purple-400">
+                        {/* eslint-disable-next-line security/detect-object-injection */}
+                        {TIEBREAKER_LABELS[challenge.rules.tieBreaker1] ||
+                          challenge.rules.tieBreaker1}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      {/* eslint-disable-next-line security/detect-object-injection */}
+                      If tied, {(TIEBREAKER_DESCRIPTIONS[challenge.rules.tieBreaker1] ||
+                        "used to break ties in the ranking.").toLowerCase()}
+                    </p>
                   </div>
                 )}
+
+                {/* Tie Breaker 2 */}
                 {challenge.rules?.tieBreaker2 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-400">Tie Breaker 2:</span>
-                    <span className="font-semibold text-purple-400">
-                      {TIEBREAKER_LABELS[challenge.rules.tieBreaker2] || challenge.rules.tieBreaker2}
-                    </span>
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400">Tie Breaker 2:</span>
+                      <span className="font-semibold text-purple-400">
+                        {/* eslint-disable-next-line security/detect-object-injection */}
+                        {TIEBREAKER_LABELS[challenge.rules.tieBreaker2] ||
+                          challenge.rules.tieBreaker2}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      {/* eslint-disable-next-line security/detect-object-injection */}
+                      If still tied, {(TIEBREAKER_DESCRIPTIONS[challenge.rules.tieBreaker2] ||
+                        "used as a secondary tie breaker.").toLowerCase()}
+                    </p>
                   </div>
                 )}
+
+                {/* Min Trades */}
                 {challenge.rules?.minimumTrades > 0 && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between">
                     <span className="text-gray-400">Minimum Trades:</span>
-                    <span className="font-semibold text-amber-400">{challenge.rules.minimumTrades} trades</span>
+                    <span className="font-semibold text-amber-400">
+                      {challenge.rules.minimumTrades} trades
+                    </span>
                   </div>
                 )}
               </div>
@@ -361,15 +567,21 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
               <div className="rounded-xl bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/30 p-6">
                 <div className="flex items-center gap-2 mb-3">
                   <AlertTriangle className="h-5 w-5 text-orange-400" />
-                  <h3 className="text-lg font-semibold text-gray-100">Minimum Trades Requirement</h3>
+                  <h3 className="text-lg font-semibold text-gray-100">
+                    Minimum Trades Requirement
+                  </h3>
                 </div>
                 <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
                   <p className="text-sm text-red-400 flex items-start gap-2">
                     <Skull className="h-4 w-4 shrink-0 mt-0.5" />
                     <span>
-                      <strong>⚠️ Disqualification Warning:</strong> Players must complete at least 
-                      <span className="font-black text-red-300 mx-1">{challenge.rules.minimumTrades}</span> 
-                      trades. Failure to meet this requirement results in disqualification.
+                      <strong>⚠️ Disqualification Warning:</strong> Players must
+                      complete at least
+                      <span className="font-black text-red-300 mx-1">
+                        {challenge.rules.minimumTrades}
+                      </span>
+                      trades. Failure to meet this requirement results in
+                      disqualification.
                     </span>
                   </p>
                 </div>
@@ -398,7 +610,7 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
             )}
             {isActive && (
               <LiveCountdown
-                targetDate={new Date(challenge.endTime)}
+                targetDate={challenge.endTime ? new Date(challenge.endTime) : new Date()}
                 label="⏱️ Time Remaining"
                 type="end"
                 status="active"
@@ -406,42 +618,50 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
             )}
 
             {/* Schedule */}
-            <div className="rounded-xl bg-gradient-to-br from-orange-500/20 to-amber-500/10 border border-orange-500/30 p-6">
-              <div className="flex items-center gap-2 mb-4">
+            <div className="rounded-xl bg-gradient-to-br from-orange-500/20 to-amber-500/10 border border-orange-500/30 p-4 sm:p-6">
+              <div className="flex items-center gap-2 mb-3 sm:mb-4">
                 <Calendar className="h-5 w-5 text-orange-400" />
-                <h3 className="text-lg font-semibold text-gray-100">Schedule (UTC)</h3>
+                <h3 className="text-base sm:text-lg font-semibold text-gray-100">
+                  Schedule (UTC)
+                </h3>
               </div>
-              
-              <div className="space-y-4">
-                <div className="p-4 bg-gray-900/50 rounded-xl border border-gray-700">
+
+              <div className="space-y-3 sm:space-y-4">
+                <div className="p-3 sm:p-4 bg-gray-900/50 rounded-xl border border-gray-700">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                    <span className="text-sm font-semibold text-yellow-400">CREATED</span>
+                    <span className="text-sm font-semibold text-yellow-400">
+                      CREATED
+                    </span>
                   </div>
-                  <p className="text-xl font-black text-white">
+                  <p className="text-sm sm:text-lg md:text-xl font-black text-white break-all sm:break-normal">
                     {formatUTCDate(new Date(challenge.createdAt))}
                   </p>
                 </div>
 
                 {challenge.startTime && (
-                  <div className="p-4 bg-gray-900/50 rounded-xl border border-gray-700">
+                  <div className="p-3 sm:p-4 bg-gray-900/50 rounded-xl border border-gray-700">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                      <span className="text-sm font-semibold text-green-400">START TIME</span>
+                      <span className="text-xs sm:text-sm font-semibold text-green-400">
+                        START TIME
+                      </span>
                     </div>
-                    <p className="text-xl font-black text-white">
+                    <p className="text-sm sm:text-lg md:text-xl font-black text-white break-all sm:break-normal">
                       {formatUTCDate(new Date(challenge.startTime))}
                     </p>
                   </div>
                 )}
 
                 {challenge.endTime && (
-                  <div className="p-4 bg-gray-900/50 rounded-xl border border-gray-700">
+                  <div className="p-3 sm:p-4 bg-gray-900/50 rounded-xl border border-gray-700">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                      <span className="text-sm font-semibold text-red-400">END TIME</span>
+                      <span className="text-xs sm:text-sm font-semibold text-red-400">
+                        END TIME
+                      </span>
                     </div>
-                    <p className="text-xl font-black text-white">
+                    <p className="text-sm sm:text-lg md:text-xl font-black text-white break-all sm:break-normal">
                       {formatUTCDate(new Date(challenge.endTime))}
                     </p>
                   </div>
@@ -450,8 +670,8 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
             </div>
 
             {/* Challenge Details */}
-            <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-6">
-              <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
+            <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-100 mb-3 sm:mb-4 flex items-center gap-2">
                 <Info className="h-5 w-5 text-blue-400" />
                 Trading Settings
               </h3>
@@ -460,7 +680,9 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
                 <div className="flex items-start gap-3">
                   <DollarSign className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-gray-300">Starting Capital</p>
+                    <p className="text-sm font-medium text-gray-300">
+                      Starting Capital
+                    </p>
                     <p className="text-lg font-bold text-green-400">
                       ${(challenge.startingCapital || 10000).toLocaleString()}
                     </p>
@@ -470,9 +692,12 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
                 <div className="flex items-start gap-3">
                   <TrendingUp className="h-5 w-5 text-purple-500 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-gray-300">Leverage Range</p>
+                    <p className="text-sm font-medium text-gray-300">
+                      Leverage Range
+                    </p>
                     <p className="text-lg font-bold text-purple-400">
-                      1:{challenge.leverage?.min || 1} to 1:{challenge.leverage?.max || 100}
+                      1:{challenge.leverage?.min || 1} to 1:
+                      {challenge.leverage?.max || 100}
                     </p>
                   </div>
                 </div>
@@ -480,19 +705,23 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
                 <div className="flex items-start gap-3">
                   <Target className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-gray-300">Asset Classes</p>
+                    <p className="text-sm font-medium text-gray-300">
+                      Asset Classes
+                    </p>
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {(challenge.assetClasses || ['forex']).map((asset: string) => (
-                        <span
-                          key={asset}
-                          className="px-3 py-1 rounded-lg bg-blue-500/20 text-sm font-semibold text-blue-400 uppercase"
-                        >
-                          {asset === 'forex' && '💱 '}
-                          {asset === 'crypto' && '₿ '}
-                          {asset === 'stocks' && '📈 '}
-                          {asset}
-                        </span>
-                      ))}
+                      {(challenge.assetClasses || ["forex"]).map(
+                        (asset: string) => (
+                          <span
+                            key={asset}
+                            className="px-3 py-1 rounded-lg bg-blue-500/20 text-sm font-semibold text-blue-400 uppercase"
+                          >
+                            {asset === "forex" && "💱 "}
+                            {asset === "crypto" && "₿ "}
+                            {asset === "stocks" && "📈 "}
+                            {asset}
+                          </span>
+                        ),
+                      )}
                     </div>
                   </div>
                 </div>
@@ -500,15 +729,21 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
                 <div className="flex items-start gap-3">
                   <Shield className="h-5 w-5 text-cyan-500 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-gray-300">Position Limits</p>
+                    <p className="text-sm font-medium text-gray-300">
+                      Position Limits
+                    </p>
                     <div className="grid grid-cols-2 gap-2 mt-2">
                       <div className="p-2 bg-gray-900/50 rounded-lg text-center">
                         <p className="text-xs text-gray-500">Max Open</p>
-                        <p className="text-lg font-bold text-cyan-400">{challenge.maxOpenPositions || 10}</p>
+                        <p className="text-lg font-bold text-cyan-400">
+                          {challenge.maxOpenPositions || 10}
+                        </p>
                       </div>
                       <div className="p-2 bg-gray-900/50 rounded-lg text-center">
                         <p className="text-xs text-gray-500">Max Size</p>
-                        <p className="text-lg font-bold text-cyan-400">{challenge.maxPositionSize || 100}%</p>
+                        <p className="text-lg font-bold text-cyan-400">
+                          {challenge.maxPositionSize || 100}%
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -517,19 +752,27 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
             </div>
 
             {/* Trading Restrictions */}
-            <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-6">
-              <div className="flex items-center gap-2 mb-4">
+            <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4 sm:p-6">
+              <div className="flex items-center gap-2 mb-3 sm:mb-4">
                 <Shield className="h-5 w-5 text-blue-400" />
-                <h3 className="text-lg font-semibold text-gray-100">Trading Restrictions</h3>
+                <h3 className="text-base sm:text-lg font-semibold text-gray-100">
+                  Trading Restrictions
+                </h3>
               </div>
-              
+
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
                   <span className="text-sm text-gray-300">Short Selling</span>
-                  <span className={`px-3 py-1 rounded-lg text-sm font-bold ${
-                    challenge.allowShortSelling ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                  }`}>
-                    {challenge.allowShortSelling ? '✅ Allowed' : '❌ Not Allowed'}
+                  <span
+                    className={`px-3 py-1 rounded-lg text-sm font-bold ${
+                      challenge.allowShortSelling
+                        ? "bg-green-500/20 text-green-400"
+                        : "bg-red-500/20 text-red-400"
+                    }`}
+                  >
+                    {challenge.allowShortSelling
+                      ? "✅ Allowed"
+                      : "❌ Not Allowed"}
                   </span>
                 </div>
 
@@ -545,8 +788,8 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
             </div>
 
             {/* Prize Pool */}
-            <div className="rounded-xl bg-gradient-to-br from-yellow-500/10 to-gray-800/50 border border-yellow-500/30 p-6">
-              <h3 className="text-lg font-semibold text-gray-100 flex items-center gap-2 mb-4">
+            <div className="rounded-xl bg-gradient-to-br from-yellow-500/10 to-gray-800/50 border border-yellow-500/30 p-4 sm:p-6">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-100 flex items-center gap-2 mb-3 sm:mb-4">
                 <Trophy className="h-5 w-5 text-yellow-500" />
                 Prize Breakdown
               </h3>
@@ -554,15 +797,25 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
               <div className="space-y-3">
                 <div className="flex justify-between items-center p-3 bg-gray-900/50 rounded-lg">
                   <span className="text-sm text-gray-400">Total Pool</span>
-                  <span className="text-lg font-bold text-gray-100">{challenge.prizePool || 0} ⚡</span>
+                  <span className="text-lg font-bold text-gray-100">
+                    {challenge.prizePool || 0} ⚡
+                  </span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-gray-900/50 rounded-lg">
-                  <span className="text-sm text-gray-400">Platform Fee ({challenge.platformFeePercentage || 0}%)</span>
-                  <span className="text-lg font-bold text-red-400">-{challenge.platformFeeAmount?.toFixed(2) || 0} ⚡</span>
+                  <span className="text-sm text-gray-400">
+                    Platform Fee ({challenge.platformFeePercentage || 0}%)
+                  </span>
+                  <span className="text-lg font-bold text-red-400">
+                    -{challenge.platformFeeAmount?.toFixed(2) || 0} ⚡
+                  </span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-gradient-to-r from-yellow-500/10 to-amber-500/10 rounded-lg border border-yellow-500/30">
-                  <span className="text-sm font-semibold text-yellow-400">Winner Takes</span>
-                  <span className="text-2xl font-black text-yellow-400">{challenge.winnerPrize?.toFixed(0) || 0} ⚡</span>
+                  <span className="text-sm font-semibold text-yellow-400">
+                    Winner Takes
+                  </span>
+                  <span className="text-2xl font-black text-yellow-400">
+                    {challenge.winnerPrize?.toFixed(0) || 0} ⚡
+                  </span>
                 </div>
               </div>
             </div>
@@ -571,7 +824,7 @@ export default async function ChallengePage({ params }: ChallengePageProps) {
       </div>
     );
   } catch (error) {
-    console.error('Error loading challenge:', error);
+    console.error("Error loading challenge:", error);
     notFound();
   }
 }

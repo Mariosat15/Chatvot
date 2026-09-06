@@ -1,0 +1,658 @@
+"use client";
+
+import { useState, useEffect, useRef, useCallback } from "react";
+import { motion } from "framer-motion";
+import Link from "next/link";
+import {
+  Trophy,
+  Swords,
+  TrendingUp,
+  TrendingDown,
+  ChevronRight,
+  ChevronDown,
+  Crown,
+  Target,
+} from "lucide-react";
+import { PERFORMANCE_INTERVALS } from "@/lib/utils/performance";
+import MatchmakingCards from "@/components/leaderboard/MatchmakingCards";
+
+interface CompetitionData {
+  id: string;
+  name: string;
+  status: string;
+  startTime: Date;
+  endTime: Date;
+  prizePool: number;
+  currentRank: number;
+  totalParticipants: number;
+  // Reason: which game the contest is. Absent means trading (invariant 5). Every trading
+  // field below is meaningless on a provider contest - there are no trades and no capital,
+  // only a single reported score.
+  gameType?: string;
+  score?: number;
+  pnl: number;
+  pnlPercentage: number;
+  openPositions: number;
+  // Reason: Ranking method determines which metric to display in the dashboard card
+  rankingMethod?: string;
+  // Needed for non-PnL ranking methods
+  currentCapital?: number;
+  startingCapital?: number;
+  totalTrades?: number;
+  winningTrades?: number;
+  losingTrades?: number;
+  winRate?: number;
+}
+
+interface ChallengeData {
+  id: string;
+  name: string;
+  status: string;
+  startTime: Date;
+  endTime: Date;
+  stakeAmount: number;
+  // Reason: rankingMethod determines which metric to display in the challenge card
+  rankingMethod?: string;
+  opponent: {
+    name: string;
+    pnl: number;
+    pnlPercentage: number;
+    currentCapital?: number;
+    winRate?: number;
+    winningTrades?: number;
+    losingTrades?: number;
+    totalTrades?: number;
+  } | null;
+  userPnL: number;
+  userPnLPercentage: number;
+  // Additional stats for non-PnL ranking methods
+  userCurrentCapital?: number;
+  userWinRate?: number;
+  userWinningTrades?: number;
+  userLosingTrades?: number;
+  userTotalTrades?: number;
+  userStartingCapital?: number;
+  isLeading: boolean;
+  isWinner?: boolean;
+  prizeWon?: number;
+}
+
+interface ContestsSidebarProps {
+  competitions: {
+    active: CompetitionData[];
+    upcoming: CompetitionData[];
+    stats: {
+      total: number;
+      won: number;
+      topThreeFinishes: number;
+      averageRank: number;
+    };
+  };
+  challenges: {
+    active: ChallengeData[];
+    pending: ChallengeData[];
+    stats: {
+      total: number;
+      wins: number;
+      losses: number;
+      winRate: number;
+      totalWon: number;
+    };
+  };
+  // Reason: When rendered in the dedicated Contests tab, the component gets full
+  // page width instead of 1/3 sidebar. Competition cards use a 2-col grid layout.
+  fullWidth?: boolean;
+}
+
+/**
+ * Reason: .toFixed(1) rounds small values like 0.01% to "0.0%".
+ * This formatter adapts precision based on the absolute value so
+ * small but meaningful percentages are still visible (e.g. +0.013%).
+ */
+function formatPnlPercent(value: number): string {
+  const abs = Math.abs(value);
+  if (abs === 0) return "0.00%";
+  if (abs < 0.01) return value.toFixed(3) + "%";
+  if (abs < 0.1) return value.toFixed(2) + "%";
+  return value.toFixed(1) + "%";
+}
+
+/**
+ * The metric shown on a competition card: its value, its label and how to colour it.
+ *
+ * ONE FUNCTION RATHER THAN THREE PARALLEL SWITCHES, and that is the point of it. The value,
+ * the label and the colour used to be decided by three separate switches on
+ * `rankingMethod`, so making the card game-aware meant remembering all three - and the one
+ * that mattered most was the colour, which had no way to say "neither". A provider score of
+ * 0, or a score that has not arrived yet, took the `else` branch and rendered in RED,
+ * telling a puzzle player they were down money in a game that has no money in it.
+ *
+ * `tone` therefore has a third value. A score is not positive or negative; it is a number.
+ *
+ * Reason for reading `gameType` and not the stricter `isProviderContest`: this is a display
+ * decision. A provider contest whose catalogue keys are missing still has no profit and
+ * loss to show, so it must not be rendered as a trading row - the strict helper is for
+ * deciding whether a round can actually be launched.
+ */
+function describeCompMetric(comp: CompetitionData): {
+  value: string;
+  label: string;
+  tone: "positive" | "negative" | "neutral";
+} {
+  if (comp.gameType === "provider") {
+    return {
+      // Reason: undefined and 0 are different facts. No round of theirs has reported yet
+      // versus they genuinely scored nothing. Rendering the first as "0" is the read-side
+      // form of the `score ?? 0` that R37 turned on.
+      value:
+        comp.score === undefined || comp.score === null
+          ? "–"
+          : comp.score.toLocaleString(),
+      label: "Score",
+      tone: "neutral",
+    };
+  }
+
+  return {
+    value: formatCompMetric(comp),
+    label: getCompMetricLabel(comp.rankingMethod),
+    tone: isCompMetricPositive(comp) ? "positive" : "negative",
+  };
+}
+
+/** Reason: Returns the correct display string based on the competition's ranking method */
+function formatCompMetric(comp: CompetitionData): string {
+  const method = comp.rankingMethod || "pnl";
+  switch (method) {
+    case "pnl":
+      return `${comp.pnl >= 0 ? "+" : ""}$${Math.abs(comp.pnl).toFixed(2)}`;
+    case "roi":
+      return `${comp.pnlPercentage >= 0 ? "+" : ""}${formatPnlPercent(comp.pnlPercentage)}`;
+    case "total_capital":
+      return `$${(comp.currentCapital || 0).toLocaleString()}`;
+    case "win_rate":
+      return `${(comp.winRate || 0).toFixed(1)}%`;
+    case "total_wins":
+      return `${comp.winningTrades || 0} wins`;
+    case "profit_factor": {
+      const wins = comp.winningTrades || 0;
+      const losses = comp.losingTrades || 0;
+      const pf = losses === 0 ? (wins > 0 ? Infinity : 0) : wins / losses;
+      return pf === Infinity ? "∞" : pf.toFixed(2);
+    }
+    default:
+      return `${comp.pnl >= 0 ? "+" : ""}${formatPnlPercent(comp.pnlPercentage)}`;
+  }
+}
+
+/** Reason: Format the challenge metric based on the challenge's ranking method */
+function formatChallengeMetric(ch: ChallengeData): string {
+  const method = ch.rankingMethod || "pnl";
+  switch (method) {
+    case "pnl":
+      return `${ch.userPnL >= 0 ? "+" : ""}$${Math.abs(ch.userPnL).toFixed(2)}`;
+    case "roi":
+      return `${ch.userPnLPercentage >= 0 ? "+" : ""}${formatPnlPercent(ch.userPnLPercentage)}`;
+    case "total_capital":
+      return `$${(ch.userCurrentCapital || 0).toLocaleString()}`;
+    case "win_rate":
+      return `${(ch.userWinRate || 0).toFixed(1)}%`;
+    case "total_wins":
+      return `${ch.userWinningTrades || 0} wins`;
+    case "profit_factor": {
+      const wins = ch.userWinningTrades || 0;
+      const losses = ch.userLosingTrades || 0;
+      const pf = losses === 0 ? (wins > 0 ? Infinity : 0) : wins / losses;
+      return pf === Infinity ? "∞" : pf.toFixed(2);
+    }
+    default:
+      return `${ch.userPnLPercentage >= 0 ? "+" : ""}${formatPnlPercent(ch.userPnLPercentage)}`;
+  }
+}
+
+/** Reason: Determine if the challenge metric is positive for coloring */
+function isChallengeMetricPositive(ch: ChallengeData): boolean {
+  const method = ch.rankingMethod || "pnl";
+  switch (method) {
+    case "pnl": return ch.userPnL >= 0;
+    case "roi": return ch.userPnLPercentage >= 0;
+    case "total_capital":
+      return (ch.userCurrentCapital || 0) >= (ch.userStartingCapital || 10000);
+    case "win_rate": return (ch.userWinRate || 0) > 50;
+    case "total_wins": return (ch.userWinningTrades || 0) > 0;
+    case "profit_factor": return (ch.userWinningTrades || 0) > (ch.userLosingTrades || 0);
+    default: return ch.userPnL >= 0;
+  }
+}
+
+/** Reason: Returns the metric label suffix shown on the comp card */
+function getCompMetricLabel(method?: string): string {
+  switch (method) {
+    case "pnl": return "P&L";
+    case "roi": return "ROI";
+    case "total_capital": return "Capital";
+    case "win_rate": return "Win %";
+    case "total_wins": return "Wins";
+    case "profit_factor": return "PF";
+    default: return "P&L";
+  }
+}
+
+/** Reason: Determine if the metric value is positive for coloring */
+function isCompMetricPositive(comp: CompetitionData): boolean {
+  const method = comp.rankingMethod || "pnl";
+  switch (method) {
+    case "pnl": return comp.pnl >= 0;
+    case "roi": return comp.pnlPercentage >= 0;
+    case "total_capital":
+      return (comp.currentCapital || 0) >= (comp.startingCapital || 10000);
+    case "win_rate": return (comp.winRate || 0) > 50;
+    case "total_wins": return (comp.winningTrades || 0) > 0;
+    case "profit_factor": return (comp.winningTrades || 0) > (comp.losingTrades || 0);
+    default: return comp.pnl >= 0;
+  }
+}
+
+function TimeLeft({ endTime }: { endTime: Date }) {
+  const ms = new Date(endTime).getTime() - Date.now();
+  if (ms <= 0) return <span className="text-red-400 text-[11px]">Ended</span>;
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  if (h > 24) {
+    const d = Math.floor(h / 24);
+    return (
+      <span className="text-gray-400 text-[11px]">{d}d left</span>
+    );
+  }
+  return (
+    <span className="text-yellow-400 text-[11px]">
+      {h}h {m}m left
+    </span>
+  );
+}
+
+/**
+ * Reason: Separate component to encapsulate the vertical scrollable challenges list.
+ * Shows up to ~5 items with a scroll arrow indicator when more are available.
+ */
+function ChallengesList({ challenges }: { challenges: ChallengeData[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showScrollArrow, setShowScrollArrow] = useState(false);
+
+  // Reason: Detect whether the list is scrollable (has overflow)
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const check = () => {
+      const hasOverflow = el.scrollHeight > el.clientHeight + 4;
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 4;
+      setShowScrollArrow(hasOverflow && !atBottom);
+    };
+
+    check();
+    el.addEventListener("scroll", check);
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+
+    return () => {
+      el.removeEventListener("scroll", check);
+      ro.disconnect();
+    };
+  }, [challenges.length]);
+
+  const handleScrollDown = () => {
+    scrollRef.current?.scrollBy({ top: 120, behavior: "smooth" });
+  };
+
+  return (
+    <div className="relative">
+      <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1.5 px-0.5">
+        Active Challenges ({challenges.length})
+      </p>
+      {/* Reason: max-h-[340px] shows roughly 5 compact cards before scrolling */}
+      <div
+        ref={scrollRef}
+        className="space-y-2 overflow-y-auto hide-scrollbar"
+        style={{ maxHeight: 340, WebkitOverflowScrolling: "touch" }}
+      >
+        {challenges.map((ch, i) => (
+          <Link
+            key={ch.id}
+            href={`/challenges/${ch.id}`}
+            className="block"
+          >
+            <motion.div
+              className="rounded-lg border border-gray-700/30 bg-gray-800/40 p-2.5 hover:border-purple-500/30 transition-all cursor-pointer group"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 * i }}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-white truncate group-hover:text-purple-400">
+                  {ch.name}
+                </span>
+                {ch.isLeading ? (
+                  <TrendingUp className="w-3 h-3 text-green-400" />
+                ) : (
+                  <TrendingDown className="w-3 h-3 text-red-400" />
+                )}
+              </div>
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-gray-400 truncate">
+                  vs {ch.opponent?.name || "Waiting..."}
+                </span>
+                <span
+                  className={
+                    isChallengeMetricPositive(ch)
+                      ? "text-green-400"
+                      : "text-red-400"
+                  }
+                  title={`Ranked by ${getCompMetricLabel(ch.rankingMethod)}`}
+                >
+                  {formatChallengeMetric(ch)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between mt-0.5">
+                <span className="text-[11px] text-gray-500">
+                  ⚔️ ${ch.stakeAmount.toLocaleString()}
+                </span>
+                <TimeLeft endTime={ch.endTime} />
+              </div>
+            </motion.div>
+          </Link>
+        ))}
+      </div>
+
+      {/* Scroll arrow indicator */}
+      {showScrollArrow && (
+        <button
+          onClick={handleScrollDown}
+          className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 z-10 flex items-center justify-center w-9 h-9 rounded-full bg-purple-500/80 hover:bg-purple-500 text-white shadow-lg transition-all animate-bounce cursor-pointer"
+          aria-label="Scroll down for more challenges"
+        >
+          <ChevronDown className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+export default function ContestsSidebar({
+  competitions,
+  challenges,
+  fullWidth = false,
+}: ContestsSidebarProps) {
+  // Reason: Default to challenges tab per user request — challenges and
+  // matchmaking are the primary engagement feature on the dashboard.
+  const [tab, setTab] = useState<"competitions" | "challenges">("challenges");
+
+  const activeComps = competitions.active;
+
+  // Reason: Live challenge data from polling replaces static server-side data
+  const [liveChallenges, setLiveChallenges] = useState<ChallengeData[]>(
+    challenges.active,
+  );
+  const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
+
+  // Reason: Poll the lightweight dashboard-live endpoint for real-time PnL updates
+  const fetchLiveChallengeData = useCallback(async () => {
+    if (!isMountedRef.current) return;
+
+    try {
+      const res = await fetch("/api/challenges/dashboard-live");
+      if (!res.ok) return;
+
+      const data = await res.json();
+      if (data.challenges && Array.isArray(data.challenges)) {
+        setLiveChallenges((prev) => {
+          // Merge live data into existing challenges, preserving any that aren't active
+          const liveMap = new Map<string, ChallengeData>(
+            data.challenges.map((c: ChallengeData) => [c.id, c]),
+          );
+
+          // Update active challenges with live data; keep non-active ones untouched
+          const updated = prev.map((ch) => {
+            const liveVersion = liveMap.get(ch.id);
+            return liveVersion || ch;
+          });
+
+          // Add any new active challenges from live data that weren't in the original list
+          for (const liveItem of data.challenges) {
+            if (!updated.find((u) => u.id === liveItem.id)) {
+              updated.push(liveItem);
+            }
+          }
+
+          return updated;
+        });
+      }
+    } catch {
+      // Fail silently — live data is a nice-to-have enhancement
+    }
+  }, []);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    // Only poll when there are active challenges and we're on the challenges tab
+    const hasActiveChallenges = challenges.active.length > 0;
+
+    if (!hasActiveChallenges) {
+      setLiveChallenges(challenges.active);
+      return;
+    }
+
+    // Immediate fetch on mount
+    fetchLiveChallengeData();
+
+    const scheduleNextPoll = () => {
+      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = setTimeout(async () => {
+        await fetchLiveChallengeData();
+        if (isMountedRef.current) scheduleNextPoll();
+      }, PERFORMANCE_INTERVALS.CHALLENGE_LIVE_DATA);
+    };
+
+    scheduleNextPoll();
+
+    // Pause/resume polling based on tab visibility
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchLiveChallengeData();
+        scheduleNextPoll();
+      } else {
+        if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      isMountedRef.current = false;
+      if (pollTimeoutRef.current) clearTimeout(pollTimeoutRef.current);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [challenges.active, fetchLiveChallengeData]);
+
+  // Use live data for display
+  const activeChallenges = liveChallenges;
+
+  return (
+    <motion.div
+      className="rounded-xl border border-gray-700/50 bg-gradient-to-br from-gray-800/60 to-gray-900/60 p-4 sm:p-5"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.5 }}
+    >
+      {/* Tabs */}
+      <div className="flex items-center gap-1 mb-4 bg-gray-700/30 rounded-lg p-0.5">
+        <button
+          onClick={() => setTab("competitions")}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 min-h-[44px] text-xs font-medium rounded-md transition-all cursor-pointer ${
+            tab === "competitions"
+              ? "bg-yellow-500/15 text-yellow-400 border border-yellow-500/20"
+              : "text-gray-400 hover:text-white"
+          }`}
+        >
+          <Trophy className="w-3.5 h-3.5" />
+          Competitions
+          {activeComps.length > 0 && (
+            <span className="w-5 h-5 rounded-full bg-yellow-500/20 text-yellow-400 text-[11px] flex items-center justify-center">
+              {activeComps.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setTab("challenges")}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 min-h-[44px] text-xs font-medium rounded-md transition-all cursor-pointer ${
+            tab === "challenges"
+              ? "bg-purple-500/15 text-purple-400 border border-purple-500/20"
+              : "text-gray-400 hover:text-white"
+          }`}
+        >
+          <Swords className="w-3.5 h-3.5" />
+          Challenges
+          {activeChallenges.length > 0 && (
+            <span className="w-5 h-5 rounded-full bg-purple-500/20 text-purple-400 text-[11px] flex items-center justify-center">
+              {activeChallenges.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Content */}
+      {tab === "competitions" ? (
+        <div className="space-y-2.5">
+          {/* Stats bar */}
+          <div className="flex items-center justify-around text-center py-2 bg-gray-700/20 rounded-lg">
+            <div>
+              <div className="text-lg font-bold text-white">
+                {competitions.stats.total}
+              </div>
+              <div className="text-[11px] text-gray-500">Entered</div>
+            </div>
+            <div>
+              <div className="text-lg font-bold text-yellow-400">
+                {competitions.stats.won}
+              </div>
+              <div className="text-[11px] text-gray-500">Won</div>
+            </div>
+            <div>
+              <div className="text-lg font-bold text-blue-400">
+                #{competitions.stats.averageRank.toFixed(0) || "–"}
+              </div>
+              <div className="text-[11px] text-gray-500">Avg Rank</div>
+            </div>
+          </div>
+
+          {/* Active competitions */}
+          {activeComps.length === 0 ? (
+            <div className="text-center py-6">
+              <Trophy className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+              <p className="text-xs text-gray-500">No active competitions</p>
+              <Link
+                href="/competitions"
+                className="text-xs text-yellow-500 hover:text-yellow-400 mt-1 inline-block"
+              >
+                Browse competitions →
+              </Link>
+            </div>
+          ) : (
+            <div className={fullWidth ? "grid grid-cols-1 md:grid-cols-2 gap-2" : "space-y-2"}>
+            {activeComps.map((comp, i) => {
+              const metric = describeCompMetric(comp);
+              return (
+              <Link
+                key={comp.id}
+                href={`/competitions/${comp.id}`}
+                className="block"
+              >
+                <motion.div
+                  className="rounded-lg border border-gray-700/30 bg-gray-800/40 p-3 hover:border-yellow-500/30 transition-all cursor-pointer group"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.1 * i }}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-white truncate group-hover:text-yellow-400 transition-colors">
+                      {comp.name}
+                    </span>
+                    <ChevronRight className="w-3.5 h-3.5 text-gray-500 group-hover:text-yellow-400" />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {comp.currentRank > 0 && comp.currentRank <= 3 ? (
+                        <Crown className="w-3.5 h-3.5 text-yellow-400" />
+                      ) : (
+                        <Target className="w-3.5 h-3.5 text-gray-400" />
+                      )}
+                      <span className="text-xs text-gray-300 font-[var(--font-geist-mono)]">
+                        Rank #{comp.currentRank || "–"}/
+                        {comp.totalParticipants}
+                      </span>
+                    </div>
+                    <span
+                      className={`text-xs font-semibold ${
+                        metric.tone === "positive"
+                          ? "text-green-400"
+                          : metric.tone === "negative"
+                            ? "text-red-400"
+                            : "text-gray-200"
+                      }`}
+                      title={`Ranked by ${metric.label}`}
+                    >
+                      {metric.value}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between mt-1.5">
+                    <span className="text-[11px] text-gray-500">
+                      🏆 ${comp.prizePool.toLocaleString()}
+                    </span>
+                    <TimeLeft endTime={comp.endTime} />
+                  </div>
+                </motion.div>
+              </Link>
+              );
+            })}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {/* Compact challenge stats bar */}
+          <div className="flex items-center justify-around text-center py-1.5 bg-gray-700/20 rounded-lg">
+            <div>
+              <div className="text-base font-bold text-green-400">
+                {challenges.stats.wins}
+              </div>
+              <div className="text-[11px] text-gray-500">Wins</div>
+            </div>
+            <div>
+              <div className="text-base font-bold text-red-400">
+                {challenges.stats.losses}
+              </div>
+              <div className="text-[11px] text-gray-500">Losses</div>
+            </div>
+            <div>
+              <div className="text-base font-bold text-yellow-400">
+                ${challenges.stats.totalWon.toFixed(0)}
+              </div>
+              <div className="text-[11px] text-gray-500">Won</div>
+            </div>
+          </div>
+
+          {/* Active challenges — vertical list with scroll */}
+          {activeChallenges.length > 0 && (
+            <ChallengesList challenges={activeChallenges} />
+          )}
+
+          {/* Matchmaking Cards — reuse existing component */}
+          <div className="mt-4 border-t border-gray-700/30 pt-4">
+            <MatchmakingCards />
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+}

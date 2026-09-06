@@ -1,0 +1,706 @@
+{
+  "description": "Frozen output of the trading ranking and prize functions, captured before the X1 game-module extraction. Regenerate only when award behaviour is deliberately changed.",
+  "capturedAt": "2026-09-04",
+  "scenarioCount": 18,
+  "results": [
+    {
+      "name": "ranking method: pnl",
+      "rankings": [
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa1",
+          "rank": 1,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa2",
+          "rank": 2,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa3",
+          "rank": 3,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa4",
+          "rank": 4,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        }
+      ],
+      "payouts": [
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa1",
+          "prizeAmount": 540,
+          "rank": 1,
+          "isTied": false
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa2",
+          "prizeAmount": 270,
+          "rank": 2,
+          "isTied": false
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa3",
+          "prizeAmount": 90,
+          "rank": 3,
+          "isTied": false
+        }
+      ],
+      "totalPaid": 900
+    },
+    {
+      "name": "ranking method: roi",
+      "rankings": [
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa2",
+          "rank": 1,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa1",
+          "rank": 2,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa3",
+          "rank": 3,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa4",
+          "rank": 4,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        }
+      ],
+      "payouts": [
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa2",
+          "prizeAmount": 540,
+          "rank": 1,
+          "isTied": false
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa1",
+          "prizeAmount": 270,
+          "rank": 2,
+          "isTied": false
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa3",
+          "prizeAmount": 90,
+          "rank": 3,
+          "isTied": false
+        }
+      ],
+      "totalPaid": 900
+    },
+    {
+      "name": "ranking method: total_capital",
+      "rankings": [
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa3",
+          "rank": 1,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa1",
+          "rank": 2,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa4",
+          "rank": 3,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa2",
+          "rank": 4,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        }
+      ],
+      "payouts": [
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa3",
+          "prizeAmount": 540,
+          "rank": 1,
+          "isTied": false
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa1",
+          "prizeAmount": 270,
+          "rank": 2,
+          "isTied": false
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa4",
+          "prizeAmount": 90,
+          "rank": 3,
+          "isTied": false
+        }
+      ],
+      "totalPaid": 900
+    },
+    {
+      "name": "ranking method: win_rate",
+      "rankings": [
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa4",
+          "rank": 1,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa2",
+          "rank": 2,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa3",
+          "rank": 3,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa1",
+          "rank": 4,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        }
+      ],
+      "payouts": [
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa4",
+          "prizeAmount": 540,
+          "rank": 1,
+          "isTied": false
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa2",
+          "prizeAmount": 270,
+          "rank": 2,
+          "isTied": false
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa3",
+          "prizeAmount": 90,
+          "rank": 3,
+          "isTied": false
+        }
+      ],
+      "totalPaid": 900
+    },
+    {
+      "name": "ranking method: total_wins",
+      "rankings": [
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa1",
+          "rank": 1,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa3",
+          "rank": 2,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa2",
+          "rank": 3,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa4",
+          "rank": 4,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        }
+      ],
+      "payouts": [
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa1",
+          "prizeAmount": 540,
+          "rank": 1,
+          "isTied": false
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa3",
+          "prizeAmount": 270,
+          "rank": 2,
+          "isTied": false
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa2",
+          "prizeAmount": 90,
+          "rank": 3,
+          "isTied": false
+        }
+      ],
+      "totalPaid": 900
+    },
+    {
+      "name": "ranking method: profit_factor",
+      "rankings": [
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa4",
+          "rank": 1,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa2",
+          "rank": 2,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa3",
+          "rank": 3,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa1",
+          "rank": 4,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        }
+      ],
+      "payouts": [
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa4",
+          "prizeAmount": 540,
+          "rank": 1,
+          "isTied": false
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa2",
+          "prizeAmount": 270,
+          "rank": 2,
+          "isTied": false
+        },
+        {
+          "userId": "aaaaaaaaaaaaaaaaaaaaaaa3",
+          "prizeAmount": 90,
+          "rank": 3,
+          "isTied": false
+        }
+      ],
+      "totalPaid": 900
+    },
+    {
+      "name": "tie on pnl, resolved by trades_count",
+      "rankings": [
+        {
+          "userId": "bbbbbbbbbbbbbbbbbbbbbbb2",
+          "rank": 1,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "bbbbbbbbbbbbbbbbbbbbbbb3",
+          "rank": 2,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "bbbbbbbbbbbbbbbbbbbbbbb1",
+          "rank": 3,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        }
+      ],
+      "payouts": [
+        {
+          "userId": "bbbbbbbbbbbbbbbbbbbbbbb2",
+          "prizeAmount": 540,
+          "rank": 1,
+          "isTied": false
+        },
+        {
+          "userId": "bbbbbbbbbbbbbbbbbbbbbbb3",
+          "prizeAmount": 270,
+          "rank": 2,
+          "isTied": false
+        },
+        {
+          "userId": "bbbbbbbbbbbbbbbbbbbbbbb1",
+          "prizeAmount": 90,
+          "rank": 3,
+          "isTied": false
+        }
+      ],
+      "totalPaid": 900
+    },
+    {
+      "name": "tie through trades_count, resolved by join_time",
+      "rankings": [
+        {
+          "userId": "ccccccccccccccccccccccc2",
+          "rank": 1,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "ccccccccccccccccccccccc1",
+          "rank": 2,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        }
+      ],
+      "payouts": [
+        {
+          "userId": "ccccccccccccccccccccccc2",
+          "prizeAmount": 308.75,
+          "rank": 1,
+          "isTied": false
+        },
+        {
+          "userId": "ccccccccccccccccccccccc1",
+          "prizeAmount": 166.25,
+          "rank": 2,
+          "isTied": false
+        }
+      ],
+      "totalPaid": 475
+    },
+    {
+      "name": "true tie across all criteria splits the prize",
+      "rankings": [
+        {
+          "userId": "ddddddddddddddddddddddd1",
+          "rank": 1,
+          "isTied": true,
+          "tiedWith": [
+            "ddddddddddddddddddddddd2"
+          ],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "ddddddddddddddddddddddd2",
+          "rank": 1,
+          "isTied": true,
+          "tiedWith": [
+            "ddddddddddddddddddddddd1"
+          ],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "ddddddddddddddddddddddd3",
+          "rank": 3,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        }
+      ],
+      "payouts": [
+        {
+          "userId": "ddddddddddddddddddddddd1",
+          "prizeAmount": 400,
+          "rank": 1,
+          "isTied": true
+        },
+        {
+          "userId": "ddddddddddddddddddddddd2",
+          "prizeAmount": 400,
+          "rank": 1,
+          "isTied": true
+        },
+        {
+          "userId": "ddddddddddddddddddddddd3",
+          "prizeAmount": 200,
+          "rank": 3,
+          "isTied": false
+        }
+      ],
+      "totalPaid": 1000
+    },
+    {
+      "name": "liquidated participant is disqualified",
+      "rankings": [
+        {
+          "userId": "eeeeeeeeeeeeeeeeeeeeeee2",
+          "rank": 1,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "eeeeeeeeeeeeeeeeeeeeeee1",
+          "rank": 2,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "disqualified",
+          "disqualificationReason": "Liquidated"
+        }
+      ],
+      "payouts": [
+        {
+          "userId": "eeeeeeeeeeeeeeeeeeeeeee2",
+          "prizeAmount": 400,
+          "rank": 1,
+          "isTied": false
+        }
+      ],
+      "totalPaid": 400
+    },
+    {
+      "name": "minimum trades enforced when completed",
+      "rankings": [
+        {
+          "userId": "fffffffffffffffffffffff2",
+          "rank": 1,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "fffffffffffffffffffffff1",
+          "rank": 2,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "disqualified",
+          "disqualificationReason": "Insufficient trades (2/10)"
+        }
+      ],
+      "payouts": [
+        {
+          "userId": "fffffffffffffffffffffff2",
+          "prizeAmount": 600,
+          "rank": 1,
+          "isTied": false
+        }
+      ],
+      "totalPaid": 600
+    },
+    {
+      "name": "minimum trades NOT enforced while active",
+      "rankings": [
+        {
+          "userId": "fffffffffffffffffffffff1",
+          "rank": 1,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "fffffffffffffffffffffff2",
+          "rank": 2,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        }
+      ],
+      "payouts": [
+        {
+          "userId": "fffffffffffffffffffffff1",
+          "prizeAmount": 390,
+          "rank": 1,
+          "isTied": false
+        },
+        {
+          "userId": "fffffffffffffffffffffff2",
+          "prizeAmount": 210,
+          "rank": 2,
+          "isTied": false
+        }
+      ],
+      "totalPaid": 600
+    },
+    {
+      "name": "minimum win rate disqualifies",
+      "rankings": [
+        {
+          "userId": "ggggggggggggggggggggggg2",
+          "rank": 1,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "ggggggggggggggggggggggg1",
+          "rank": 2,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "disqualified",
+          "disqualificationReason": "Win rate too low (20.0% < 50%)"
+        }
+      ],
+      "payouts": [
+        {
+          "userId": "ggggggggggggggggggggggg2",
+          "prizeAmount": 300,
+          "rank": 1,
+          "isTied": false
+        }
+      ],
+      "totalPaid": 300
+    },
+    {
+      "name": "sub-epsilon pnl difference counts as a tie",
+      "rankings": [
+        {
+          "userId": "hhhhhhhhhhhhhhhhhhhhhhh2",
+          "rank": 1,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "hhhhhhhhhhhhhhhhhhhhhhh1",
+          "rank": 2,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        }
+      ],
+      "payouts": [
+        {
+          "userId": "hhhhhhhhhhhhhhhhhhhhhhh2",
+          "prizeAmount": 455,
+          "rank": 1,
+          "isTied": false
+        },
+        {
+          "userId": "hhhhhhhhhhhhhhhhhhhhhhh1",
+          "prizeAmount": 245,
+          "rank": 2,
+          "isTied": false
+        }
+      ],
+      "totalPaid": 700
+    },
+    {
+      "name": "unclaimed prize positions are redistributed",
+      "rankings": [
+        {
+          "userId": "iiiiiiiiiiiiiiiiiiiiiii1",
+          "rank": 1,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "qualified"
+        }
+      ],
+      "payouts": [
+        {
+          "userId": "iiiiiiiiiiiiiiiiiiiiiii1",
+          "prizeAmount": 800,
+          "rank": 1,
+          "isTied": false
+        }
+      ],
+      "totalPaid": 800
+    },
+    {
+      "name": "split_prize tiebreaker",
+      "rankings": [
+        {
+          "userId": "jjjjjjjjjjjjjjjjjjjjjjj1",
+          "rank": 1,
+          "isTied": true,
+          "tiedWith": [
+            "jjjjjjjjjjjjjjjjjjjjjjj2"
+          ],
+          "qualificationStatus": "qualified"
+        },
+        {
+          "userId": "jjjjjjjjjjjjjjjjjjjjjjj2",
+          "rank": 1,
+          "isTied": true,
+          "tiedWith": [
+            "jjjjjjjjjjjjjjjjjjjjjjj1"
+          ],
+          "qualificationStatus": "qualified"
+        }
+      ],
+      "payouts": [
+        {
+          "userId": "jjjjjjjjjjjjjjjjjjjjjjj1",
+          "prizeAmount": 400,
+          "rank": 1,
+          "isTied": true
+        },
+        {
+          "userId": "jjjjjjjjjjjjjjjjjjjjjjj2",
+          "prizeAmount": 400,
+          "rank": 1,
+          "isTied": true
+        }
+      ],
+      "totalPaid": 800
+    },
+    {
+      "name": "all participants disqualified",
+      "rankings": [
+        {
+          "userId": "kkkkkkkkkkkkkkkkkkkkkkk1",
+          "rank": 1,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "disqualified",
+          "disqualificationReason": "Liquidated"
+        },
+        {
+          "userId": "kkkkkkkkkkkkkkkkkkkkkkk2",
+          "rank": 2,
+          "isTied": false,
+          "tiedWith": [],
+          "qualificationStatus": "disqualified",
+          "disqualificationReason": "Liquidated"
+        }
+      ],
+      "payouts": [],
+      "totalPaid": 0
+    },
+    {
+      "name": "no participants",
+      "rankings": [],
+      "payouts": [],
+      "totalPaid": 0
+    }
+  ]
+}

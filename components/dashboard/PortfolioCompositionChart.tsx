@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { PieChart as PieChartIcon } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { PieChart as PieChartIcon } from "lucide-react";
 
 interface PortfolioCompositionChartProps {
   positions: Array<{
@@ -11,14 +11,25 @@ interface PortfolioCompositionChartProps {
   }>;
 }
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+const COLORS = [
+  "#3b82f6",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+  "#ec4899",
+  "#06b6d4",
+  "#84cc16",
+];
 
-export default function PortfolioCompositionChart({ positions }: PortfolioCompositionChartProps) {
+export default function PortfolioCompositionChart({
+  positions,
+}: PortfolioCompositionChartProps) {
   const data = positions.map((pos, index) => ({
     name: pos.symbol,
     value: pos.value,
     pnl: pos.pnl,
-    color: COLORS[index % COLORS.length]
+    color: COLORS[index % COLORS.length],
   }));
 
   const totalValue = positions.reduce((sum, pos) => sum + pos.value, 0);
@@ -32,15 +43,26 @@ export default function PortfolioCompositionChart({ positions }: PortfolioCompos
           </p>
           <div className="space-y-1">
             <p className="text-sm font-semibold text-gray-200">
-              Value: <span className="text-blue-400">${payload[0].value.toFixed(2)}</span>
+              Value:{" "}
+              <span className="text-blue-400">
+                ${payload[0].value.toFixed(2)}
+              </span>
             </p>
             <p className="text-sm font-semibold text-gray-200">
-              Share: <span className="text-yellow-400">
+              Share:{" "}
+              <span className="text-yellow-400">
                 {((payload[0].value / totalValue) * 100).toFixed(1)}%
               </span>
             </p>
             <p className="text-sm font-semibold text-gray-200">
-              P&L: <span className={payload[0].payload.pnl >= 0 ? 'text-green-400' : 'text-red-400'}>
+              P&L:{" "}
+              <span
+                className={
+                  payload[0].payload.pnl >= 0
+                    ? "text-green-400"
+                    : "text-red-400"
+                }
+              >
                 ${payload[0].payload.pnl.toFixed(2)}
               </span>
             </p>
@@ -59,7 +81,9 @@ export default function PortfolioCompositionChart({ positions }: PortfolioCompos
             <PieChartIcon className="h-5 w-5 text-blue-500" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-gray-100">Portfolio Composition</h3>
+            <h3 className="text-lg font-bold text-gray-100">
+              Portfolio Composition
+            </h3>
             <p className="text-xs text-gray-400">Position Distribution</p>
           </div>
         </div>
@@ -77,11 +101,13 @@ export default function PortfolioCompositionChart({ positions }: PortfolioCompos
           <PieChartIcon className="h-5 w-5 text-blue-500" />
         </div>
         <div>
-          <h3 className="text-lg font-bold text-gray-100">Portfolio Composition</h3>
+          <h3 className="text-lg font-bold text-gray-100">
+            Portfolio Composition
+          </h3>
           <p className="text-xs text-gray-400">Position Distribution</p>
         </div>
       </div>
-      
+
       <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
         {/* Chart */}
         <div className="w-full lg:w-1/2">
@@ -92,7 +118,9 @@ export default function PortfolioCompositionChart({ positions }: PortfolioCompos
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                label={({ name, percent }) =>
+                  `${name} ${((percent || 0) * 100).toFixed(0)}%`
+                }
                 outerRadius={80}
                 innerRadius={50}
                 fill="#8884d8"
@@ -113,17 +141,19 @@ export default function PortfolioCompositionChart({ positions }: PortfolioCompos
         <div className="w-full lg:w-1/2">
           <div className="space-y-2 max-h-64 overflow-y-auto scrollbar-hide">
             {positions.map((pos, index) => (
-              <div 
+              <div
                 key={`${pos.symbol}-${index}`}
                 className="bg-gray-900/50 rounded-lg p-3 border border-gray-700/50 hover:border-gray-600/50 transition-colors"
               >
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
-                    <div 
+                    <div
                       className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: COLORS[index % COLORS.length] }}
                     />
-                    <span className="text-sm font-bold text-gray-200">{pos.symbol}</span>
+                    <span className="text-sm font-bold text-gray-200">
+                      {pos.symbol}
+                    </span>
                   </div>
                   <span className="text-xs font-semibold text-gray-400">
                     {((pos.value / totalValue) * 100).toFixed(1)}%
@@ -131,11 +161,15 @@ export default function PortfolioCompositionChart({ positions }: PortfolioCompos
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-gray-400">Value:</span>
-                  <span className="font-semibold text-blue-400">${pos.value.toFixed(2)}</span>
+                  <span className="font-semibold text-blue-400">
+                    ${pos.value.toFixed(2)}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-gray-400">P&L:</span>
-                  <span className={`font-semibold ${pos.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  <span
+                    className={`font-semibold ${pos.pnl >= 0 ? "text-green-400" : "text-red-400"}`}
+                  >
                     ${pos.pnl.toFixed(2)}
                   </span>
                 </div>
@@ -147,4 +181,3 @@ export default function PortfolioCompositionChart({ positions }: PortfolioCompos
     </div>
   );
 }
-

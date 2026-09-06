@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
+import mongoose, { Schema, Document, Model } from "mongoose";
 
 export interface IBadgeConfig extends Document {
   id: string;
@@ -6,14 +6,19 @@ export interface IBadgeConfig extends Document {
   description: string;
   category: string;
   icon: string;
-  rarity: 'common' | 'rare' | 'epic' | 'legendary';
+  rarity: "common" | "rare" | "epic" | "legendary";
   condition: {
     type: string;
     value?: number;
     minValue?: number;
     maxValue?: number;
     comparison?: string;
+    minTrades?: number;
+    minCompletedCompetitions?: number;
   };
+  minLevel: number; // Badge visible but locked until user reaches this level (0 = no requirement)
+  /** Which games this badge can be earned in. Backfill 3, chapter 18 section 1. */
+  gameTypes: string[];
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -39,27 +44,27 @@ const BadgeConfigSchema = new Schema<IBadgeConfig>(
       type: String,
       required: true,
       enum: [
-        'Competition',
-        'Volume',
-        'Profit',
-        'Risk',
-        'Speed',
-        'Consistency',
-        'Strategy',
-        'Social',
-        'Legendary',
+        "Competition",
+        "Trading",
+        "Profit",
+        "Risk",
+        "Speed",
+        "Consistency",
+        "Strategy",
+        "Social",
+        "Legendary",
       ],
     },
     icon: {
       type: String,
       required: true,
-      default: '🏆',
+      default: "🏆",
     },
     rarity: {
       type: String,
       required: true,
-      enum: ['common', 'rare', 'epic', 'legendary'],
-      default: 'common',
+      enum: ["common", "rare", "epic", "legendary"],
+      default: "common",
     },
     condition: {
       type: {
@@ -70,6 +75,30 @@ const BadgeConfigSchema = new Schema<IBadgeConfig>(
       minValue: Number,
       maxValue: Number,
       comparison: String,
+      // These were previously missing -- badge-specific minimums were lost on seed
+      minTrades: Number,
+      minCompletedCompetitions: Number,
+    },
+    // Level-gated badge visibility: badge is visible but locked until user reaches this level
+    minLevel: {
+      type: Number,
+      default: 0, // 0 = no level requirement
+      min: 0,
+      max: 20,
+    },
+    // Which games this badge can be earned in (X1 backfill 3, chapter 18 section 1).
+    //
+    // Reason: this is NOT the game-type enumeration invariant 8 forbids. Invariant 8 bans
+    // the ENGINE from branching on game type; scoping an individual badge to the games it
+    // makes sense in is content, set per badge by an operator. "100 trades" genuinely
+    // cannot be earned at chess.
+    //
+    // Defaults to trading so every badge that exists today keeps its current meaning, and
+    // an empty array is read as "every game" rather than "no game" - a misconfiguration
+    // that silently makes a badge unearnable is worse than one that makes it broad.
+    gameTypes: {
+      type: [String],
+      default: ["trading"],
     },
     isActive: {
       type: Boolean,
@@ -78,12 +107,12 @@ const BadgeConfigSchema = new Schema<IBadgeConfig>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Create or get the model
 const BadgeConfig: Model<IBadgeConfig> =
-  mongoose.models.BadgeConfig || mongoose.model<IBadgeConfig>('BadgeConfig', BadgeConfigSchema);
+  mongoose.models.BadgeConfig ||
+  mongoose.model<IBadgeConfig>("BadgeConfig", BadgeConfigSchema);
 
 export default BadgeConfig;
-

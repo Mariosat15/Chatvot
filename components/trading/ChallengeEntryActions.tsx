@@ -1,11 +1,14 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Swords, Check, X, RefreshCw, Clock, Trophy } from 'lucide-react';
-import { toast } from 'sonner';
-import Link from 'next/link';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Swords, Check, X, RefreshCw, Clock, Trophy } from "lucide-react";
+import { toast } from "sonner";
+import Link from "next/link";
+import ActionTermsDialog, {
+  ACTION_TERM_SLUGS,
+} from "@/components/ActionTermsDialog";
 
 interface ChallengeEntryActionsProps {
   challengeId: string;
@@ -21,24 +24,34 @@ export default function ChallengeEntryActions({
   isChallenged,
 }: ChallengeEntryActionsProps) {
   const [responding, setResponding] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const router = useRouter();
 
+  // Reason: Show terms dialog before accepting a challenge
   const handleAccept = async () => {
+    setShowTerms(true);
+  };
+
+  /** Called after user accepts terms — proceeds with challenge acceptance */
+  const proceedAfterTerms = async () => {
+    setShowTerms(false);
     setResponding(true);
     try {
       const res = await fetch(`/api/challenges/${challengeId}/accept`, {
-        method: 'POST',
+        method: "POST",
       });
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to accept');
+        throw new Error(data.error || "Failed to accept");
       }
 
-      toast.success('Challenge accepted! The battle begins NOW!');
+      toast.success("Challenge accepted! The battle begins NOW!");
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to accept challenge');
+      toast.error(
+        error instanceof Error ? error.message : "Failed to accept challenge",
+      );
     } finally {
       setResponding(false);
     }
@@ -48,64 +61,77 @@ export default function ChallengeEntryActions({
     setResponding(true);
     try {
       const res = await fetch(`/api/challenges/${challengeId}/decline`, {
-        method: 'POST',
+        method: "POST",
       });
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to decline');
+        throw new Error(data.error || "Failed to decline");
       }
 
-      toast.success('Challenge declined');
-      router.push('/challenges');
+      toast.success("Challenge declined");
+      router.push("/challenges");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to decline challenge');
+      toast.error(
+        error instanceof Error ? error.message : "Failed to decline challenge",
+      );
     } finally {
       setResponding(false);
     }
   };
 
   // Pending - show accept/decline for challenged user
-  if (status === 'pending' && isChallenged) {
+  if (status === "pending" && isChallenged) {
     return (
-      <div className="rounded-xl bg-gradient-to-br from-yellow-500/20 to-amber-500/10 border border-yellow-500/30 p-6">
-        <h3 className="text-lg font-semibold text-yellow-400 mb-4 flex items-center gap-2">
-          ⚔️ Challenge Received!
-        </h3>
-        <p className="text-sm text-gray-400 mb-4">
-          You've been challenged to a 1v1 trading battle. Accept to start trading immediately!
-        </p>
-        <div className="flex gap-2">
-          <Button
-            onClick={handleAccept}
-            disabled={responding}
-            className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-6"
-          >
-            {responding ? (
-              <RefreshCw className="h-5 w-5 animate-spin" />
-            ) : (
-              <>
-                <Check className="h-5 w-5 mr-2" />
-                Accept Challenge
-              </>
-            )}
-          </Button>
-          <Button
-            onClick={handleDecline}
-            disabled={responding}
-            variant="outline"
-            className="flex-1 border-2 border-red-600 text-red-400 hover:bg-red-500 hover:text-white font-bold py-6"
-          >
-            <X className="h-5 w-5 mr-2" />
-            Decline
-          </Button>
+      <>
+        <div className="rounded-xl bg-gradient-to-br from-yellow-500/20 to-amber-500/10 border border-yellow-500/30 p-6">
+          <h3 className="text-lg font-semibold text-yellow-400 mb-4 flex items-center gap-2">
+            ⚔️ Challenge Received!
+          </h3>
+          <p className="text-sm text-gray-400 mb-4">
+            You&apos;ve been challenged to a 1v1 trading battle. Accept to start
+            trading immediately!
+          </p>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleAccept}
+              disabled={responding}
+              className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-6"
+            >
+              {responding ? (
+                <RefreshCw className="h-5 w-5 animate-spin" />
+              ) : (
+                <>
+                  <Check className="h-5 w-5 mr-2" />
+                  Accept Challenge
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={handleDecline}
+              disabled={responding}
+              variant="outline"
+              className="flex-1 border-2 border-red-600 text-red-400 hover:bg-red-500 hover:text-white font-bold py-6"
+            >
+              <X className="h-5 w-5 mr-2" />
+              Decline
+            </Button>
+          </div>
         </div>
-      </div>
+
+        {/* Action Terms Dialog — shown before accepting a challenge */}
+        <ActionTermsDialog
+          slug={ACTION_TERM_SLUGS.CHALLENGE}
+          open={showTerms}
+          onAccept={proceedAfterTerms}
+          onDecline={() => setShowTerms(false)}
+        />
+      </>
     );
   }
 
   // Pending - show waiting message for challenger
-  if (status === 'pending' && isChallenger) {
+  if (status === "pending" && isChallenger) {
     return (
       <div className="rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/10 border border-blue-500/30 p-6">
         <h3 className="text-lg font-semibold text-blue-400 mb-4 flex items-center gap-2">
@@ -127,7 +153,7 @@ export default function ChallengeEntryActions({
   }
 
   // Active - show trade button
-  if (status === 'active') {
+  if (status === "active") {
     return (
       <div className="rounded-xl bg-gradient-to-br from-green-500/20 to-emerald-500/10 border border-green-500/30 p-6">
         <h3 className="text-lg font-semibold text-green-400 mb-4 flex items-center gap-2">
@@ -148,7 +174,7 @@ export default function ChallengeEntryActions({
   }
 
   // Completed - show view results
-  if (status === 'completed') {
+  if (status === "completed") {
     return (
       <div className="rounded-xl bg-gradient-to-br from-purple-500/20 to-violet-500/10 border border-purple-500/30 p-6">
         <h3 className="text-lg font-semibold text-purple-400 mb-4 flex items-center gap-2">
@@ -156,10 +182,14 @@ export default function ChallengeEntryActions({
           Challenge Complete
         </h3>
         <p className="text-sm text-gray-400 mb-4">
-          This challenge has ended. View your trading history and final results above.
+          This challenge has ended. View your trading history and final results
+          above.
         </p>
         <Link href="/challenges">
-          <Button variant="outline" className="w-full border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white font-bold py-6">
+          <Button
+            variant="outline"
+            className="w-full border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white font-bold py-6"
+          >
             <Swords className="h-5 w-5 mr-2" />
             Back to Challenges
           </Button>
@@ -178,11 +208,13 @@ export default function ChallengeEntryActions({
         This challenge is no longer active.
       </p>
       <Link href="/challenges">
-        <Button variant="outline" className="w-full border-gray-600 text-gray-400 hover:bg-gray-700 font-bold py-6">
+        <Button
+          variant="outline"
+          className="w-full border-gray-600 text-gray-400 hover:bg-gray-700 font-bold py-6"
+        >
           Back to Challenges
         </Button>
       </Link>
     </div>
   );
 }
-

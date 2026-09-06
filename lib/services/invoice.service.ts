@@ -1,27 +1,41 @@
-import { connectToDatabase } from '@/database/mongoose';
-import Invoice, { IInvoice, IInvoiceLineItem } from '@/database/models/invoice.model';
-import InvoiceSettings from '@/database/models/invoice-settings.model';
-import CompanySettings, { isEUCountry, COUNTRY_NAMES } from '@/database/models/company-settings.model';
-import { WhiteLabel } from '@/database/models/whitelabel.model';
+import { connectToDatabase } from "@/database/mongoose";
+import Invoice, {
+  IInvoice,
+  IInvoiceLineItem,
+} from "@/database/models/invoice.model";
+import InvoiceSettings from "@/database/models/invoice-settings.model";
+import CompanySettings, {
+  isEUCountry,
+  COUNTRY_NAMES,
+} from "@/database/models/company-settings.model";
+import { WhiteLabel } from "@/database/models/whitelabel.model";
 
 /**
  * Format disclaimer text - convert markdown bold to HTML and replace placeholders
  */
-function formatDisclaimer(disclaimer: string, variables: { companyName: string; companyEmail: string; vatNumber: string }): string {
+function formatDisclaimer(
+  disclaimer: string,
+  variables: { companyName: string; companyEmail: string; vatNumber: string },
+): string {
   let formatted = disclaimer;
-  
+
   // Replace variables
   formatted = formatted.replace(/\{\{companyName\}\}/g, variables.companyName);
-  formatted = formatted.replace(/\{\{companyEmail\}\}/g, variables.companyEmail);
+  formatted = formatted.replace(
+    /\{\{companyEmail\}\}/g,
+    variables.companyEmail,
+  );
   formatted = formatted.replace(/\{\{vatNumber\}\}/g, variables.vatNumber);
-  
+
   // Convert markdown bold (**text**) to HTML strong
-  formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  
+  formatted = formatted.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+
   // Convert double newlines to paragraph breaks
   const paragraphs = formatted.split(/\n\n+/);
-  formatted = paragraphs.map(p => `<p style="margin: 0 0 8px 0;">${p.trim()}</p>`).join('\n        ');
-  
+  formatted = paragraphs
+    .map((p) => `<p style="margin: 0 0 8px 0;">${p.trim()}</p>`)
+    .join("\n        ");
+
   return formatted;
 }
 
@@ -38,7 +52,7 @@ export interface CreateInvoiceParams {
     country?: string;
   };
   transactionId: string;
-  transactionType: 'deposit' | 'purchase' | 'subscription';
+  transactionType: "deposit" | "purchase" | "subscription";
   paymentMethod?: string;
   paymentId?: string;
   lineItems: {
@@ -67,48 +81,57 @@ export const InvoiceService = {
   /**
    * Create a new invoice for a transaction
    */
-  createInvoice: async (params: CreateInvoiceParams): Promise<GeneratedInvoice> => {
+  createInvoice: async (
+    params: CreateInvoiceParams,
+  ): Promise<GeneratedInvoice> => {
     await connectToDatabase();
-    
+
     // Get settings
-    const [invoiceSettings, companySettings, whiteLabelSettings] = await Promise.all([
-      InvoiceSettings.getSingleton(),
-      CompanySettings.getSingleton(),
-      WhiteLabel.findOne(),
-    ]);
-    
+    const [invoiceSettings, companySettings, whiteLabelSettings] =
+      await Promise.all([
+        InvoiceSettings.getSingleton(),
+        CompanySettings.getSingleton(),
+        WhiteLabel.findOne().lean(),
+      ]);
+
     // Get next invoice number
     const invoiceNumber = await InvoiceSettings.getNextInvoiceNumber();
-    
+
     // Determine if VAT applies
     const companyInEU = isEUCountry(companySettings.country);
     const applyVat = companyInEU && invoiceSettings.vatEnabled;
     const vatRate = applyVat ? invoiceSettings.vatPercentage : 0;
-    
+
     // Calculate line items
-    const lineItems: IInvoiceLineItem[] = params.lineItems.map(item => ({
+    const lineItems: IInvoiceLineItem[] = params.lineItems.map((item) => ({
       description: item.description,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       total: item.quantity * item.unitPrice,
     }));
-    
+
     // Calculate totals
     const subtotal = lineItems.reduce((sum, item) => sum + item.total, 0);
     // Use actual VAT amount if provided (for cases where VAT only applies to some items)
     // Otherwise calculate from subtotal
-    const vatAmount = params.actualVatAmount !== undefined 
-      ? params.actualVatAmount 
-      : (applyVat ? (subtotal * vatRate) / 100 : 0);
+    const vatAmount =
+      params.actualVatAmount !== undefined
+        ? params.actualVatAmount
+        : applyVat
+          ? (subtotal * vatRate) / 100
+          : 0;
     const total = subtotal + vatAmount;
-    
+
     // Get logo URL
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    let logoUrl = companySettings.logoUrl || whiteLabelSettings?.appLogo || '/assets/images/logo.png';
-    if (!logoUrl.startsWith('http')) {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    let logoUrl =
+      companySettings.logoUrl ||
+      whiteLabelSettings?.appLogo ||
+      "/assets/images/logo.png";
+    if (!logoUrl.startsWith("http")) {
       logoUrl = `${baseUrl}${logoUrl}`;
     }
-    
+
     // Create invoice document
     const invoice = await Invoice.create({
       invoiceNumber,
@@ -116,7 +139,7 @@ export const InvoiceService = {
       customerName: params.customerName,
       customerEmail: params.customerEmail,
       customerAddress: params.customerAddress,
-      
+
       companyName: companySettings.companyName,
       companyAddress: {
         line1: companySettings.addressLine1,
@@ -131,50 +154,60 @@ export const InvoiceService = {
       companyEmail: companySettings.email,
       companyPhone: companySettings.phone,
       companyLogoUrl: logoUrl,
-      
+
       subtotal,
       vatRate,
       vatAmount,
       total,
-      currency: params.currency || 'EUR',
-      
+      currency: params.currency || "EUR",
+
       lineItems,
-      
+
       transactionId: params.transactionId,
       transactionType: params.transactionType,
       paymentMethod: params.paymentMethod,
       paymentId: params.paymentId,
-      
-      status: 'paid', // Since this is triggered after successful payment
+
+      status: "paid", // Since this is triggered after successful payment
       invoiceDate: new Date(),
       paidAt: new Date(),
-      
+
       notes: params.notes,
     });
-    
+
     // Generate HTML
-    const html = await InvoiceService.generateInvoiceHTML(invoice, invoiceSettings, companySettings);
-    
-    console.log(`📄 Invoice ${invoiceNumber} created for ${params.customerEmail}`);
-    console.log(`   Subtotal: €${subtotal.toFixed(2)}, VAT (${vatRate}%): €${vatAmount.toFixed(2)}, Total: €${total.toFixed(2)}`);
-    
+    const html = await InvoiceService.generateInvoiceHTML(
+      invoice,
+      invoiceSettings,
+      companySettings,
+    );
+
+    console.log(
+      `📄 Invoice ${invoiceNumber} created for ${params.customerEmail}`,
+    );
+    console.log(
+      `   Subtotal: €${subtotal.toFixed(2)}, VAT (${vatRate}%): €${vatAmount.toFixed(2)}, Total: €${total.toFixed(2)}`,
+    );
+
     return {
       invoice,
       html,
       shouldSendEmail: invoiceSettings.sendInvoiceOnPurchase,
     };
   },
-  
+
   /**
    * Generate HTML for an invoice
    */
   generateInvoiceHTML: async (
     invoice: IInvoice,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     invoiceSettings?: any,
-    companySettings?: any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    companySettings?: any,
   ): Promise<string> => {
     await connectToDatabase();
-    
+
     // Get settings if not provided
     if (!invoiceSettings) {
       invoiceSettings = await InvoiceSettings.getSingleton();
@@ -182,25 +215,27 @@ export const InvoiceService = {
     if (!companySettings) {
       companySettings = await CompanySettings.getSingleton();
     }
-    
+
     const formatCurrency = (amount: number) => {
-      const symbol = invoiceSettings.currencySymbol || '€';
+      const symbol = invoiceSettings.currencySymbol || "€";
       const formatted = amount.toFixed(2);
-      return invoiceSettings.currencyPosition === 'after' 
-        ? `${formatted}${symbol}` 
+      return invoiceSettings.currencyPosition === "after"
+        ? `${formatted}${symbol}`
         : `${symbol}${formatted}`;
     };
-    
+
     const formatDate = (date: Date) => {
-      return new Date(date).toLocaleDateString('en-GB', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
+      return new Date(date).toLocaleDateString("en-GB", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
       });
     };
-    
-    const companyCountryName = COUNTRY_NAMES[invoice.companyAddress.country] || invoice.companyAddress.country;
-    
+
+    const companyCountryName =
+      COUNTRY_NAMES[invoice.companyAddress.country] ||
+      invoice.companyAddress.country;
+
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -224,7 +259,7 @@ export const InvoiceService = {
       overflow: hidden;
     }
     .header {
-      background: ${invoiceSettings.accentColor || '#141414'};
+      background: ${invoiceSettings.accentColor || "#141414"};
       color: #fff;
       padding: 40px;
       display: flex;
@@ -245,7 +280,7 @@ export const InvoiceService = {
     .invoice-title {
       font-size: 32px;
       font-weight: 700;
-      color: ${invoiceSettings.primaryColor || '#FDD458'};
+      color: ${invoiceSettings.primaryColor || "#FDD458"};
       margin-bottom: 8px;
     }
     .invoice-number {
@@ -334,7 +369,7 @@ export const InvoiceService = {
     .total-row.grand-total {
       font-size: 18px;
       font-weight: 700;
-      border-top: 2px solid ${invoiceSettings.primaryColor || '#FDD458'};
+      border-top: 2px solid ${invoiceSettings.primaryColor || "#FDD458"};
       padding-top: 16px;
       margin-top: 8px;
     }
@@ -374,7 +409,7 @@ export const InvoiceService = {
     .thank-you {
       text-align: center;
       padding: 20px;
-      color: ${invoiceSettings.primaryColor || '#FDD458'};
+      color: ${invoiceSettings.primaryColor || "#FDD458"};
       font-size: 16px;
       font-weight: 500;
     }
@@ -395,10 +430,10 @@ export const InvoiceService = {
   <div class="invoice-container">
     <div class="header">
       <div class="header-left">
-        ${invoiceSettings.showLogo && invoice.companyLogoUrl ? `<img src="${invoice.companyLogoUrl}" alt="${invoice.companyName}" class="logo">` : ''}
+        ${invoiceSettings.showLogo && invoice.companyLogoUrl ? `<img src="${invoice.companyLogoUrl}" alt="${invoice.companyName}" class="logo">` : ""}
       </div>
       <div class="header-right">
-        <div class="invoice-title">${invoiceSettings.invoiceTitle || 'INVOICE'}</div>
+        <div class="invoice-title">${invoiceSettings.invoiceTitle || "INVOICE"}</div>
         <div class="invoice-number">${invoice.invoiceNumber}</div>
         <div class="invoice-date">${formatDate(invoice.invoiceDate)}</div>
         <div class="status-badge">PAID</div>
@@ -410,32 +445,40 @@ export const InvoiceService = {
         <div class="address-block">
           <div class="address-label">From</div>
           <div class="address-name">${invoice.companyName}</div>
-          ${invoiceSettings.showCompanyAddress ? `
+          ${
+            invoiceSettings.showCompanyAddress
+              ? `
           <div class="address-line">
             ${invoice.companyAddress.line1}<br>
-            ${invoice.companyAddress.line2 ? invoice.companyAddress.line2 + '<br>' : ''}
+            ${invoice.companyAddress.line2 ? invoice.companyAddress.line2 + "<br>" : ""}
             ${invoice.companyAddress.city}, ${invoice.companyAddress.postalCode}<br>
             ${companyCountryName}
           </div>
-          ` : ''}
+          `
+              : ""
+          }
           <div class="company-details">
             ${invoice.companyEmail}<br>
-            ${invoice.companyPhone ? invoice.companyPhone + '<br>' : ''}
-            ${invoiceSettings.showVatNumber && invoice.companyVatNumber ? `VAT: ${invoice.companyVatNumber}<br>` : ''}
-            ${invoiceSettings.showRegistrationNumber && invoice.companyRegistrationNumber ? `Reg: ${invoice.companyRegistrationNumber}` : ''}
+            ${invoice.companyPhone ? invoice.companyPhone + "<br>" : ""}
+            ${invoiceSettings.showVatNumber && invoice.companyVatNumber ? `VAT: ${invoice.companyVatNumber}<br>` : ""}
+            ${invoiceSettings.showRegistrationNumber && invoice.companyRegistrationNumber ? `Reg: ${invoice.companyRegistrationNumber}` : ""}
           </div>
         </div>
         <div class="address-block" style="text-align: right;">
           <div class="address-label">Bill To</div>
           <div class="address-name">${invoice.customerName}</div>
           <div class="address-line">${invoice.customerEmail}</div>
-          ${invoice.customerAddress ? `
+          ${
+            invoice.customerAddress
+              ? `
           <div class="address-line">
-            ${invoice.customerAddress.line1 ? invoice.customerAddress.line1 + '<br>' : ''}
-            ${invoice.customerAddress.city ? invoice.customerAddress.city + ', ' : ''}${invoice.customerAddress.postalCode || ''}
-            ${invoice.customerAddress.country ? '<br>' + (COUNTRY_NAMES[invoice.customerAddress.country] || invoice.customerAddress.country) : ''}
+            ${invoice.customerAddress.line1 ? invoice.customerAddress.line1 + "<br>" : ""}
+            ${invoice.customerAddress.city ? invoice.customerAddress.city + ", " : ""}${invoice.customerAddress.postalCode || ""}
+            ${invoice.customerAddress.country ? "<br>" + (COUNTRY_NAMES[invoice.customerAddress.country] || invoice.customerAddress.country) : ""}
           </div>
-          ` : ''}
+          `
+              : ""
+          }
         </div>
       </div>
       
@@ -449,14 +492,18 @@ export const InvoiceService = {
           </tr>
         </thead>
         <tbody>
-          ${invoice.lineItems.map(item => `
+          ${invoice.lineItems
+            .map(
+              (item) => `
           <tr>
             <td>${item.description}</td>
             <td class="amount">${item.quantity}</td>
             <td class="amount">${formatCurrency(item.unitPrice)}</td>
             <td class="amount">${formatCurrency(item.total)}</td>
           </tr>
-          `).join('')}
+          `,
+            )
+            .join("")}
         </tbody>
       </table>
       
@@ -465,12 +512,16 @@ export const InvoiceService = {
           <span>Subtotal</span>
           <span>${formatCurrency(invoice.subtotal)}</span>
         </div>
-        ${invoice.vatRate > 0 ? `
+        ${
+          invoice.vatRate > 0
+            ? `
         <div class="total-row vat">
-          <span>${invoiceSettings.vatLabel || 'VAT'} (${invoice.vatRate}%)</span>
+          <span>${invoiceSettings.vatLabel || "VAT"} (${invoice.vatRate}%)</span>
           <span>${formatCurrency(invoice.vatAmount)}</span>
         </div>
-        ` : ''}
+        `
+            : ""
+        }
         <div class="total-row grand-total">
           <span>Total</span>
           <span>${formatCurrency(invoice.total)}</span>
@@ -479,37 +530,56 @@ export const InvoiceService = {
     </div>
     
     <div class="footer">
-      ${invoiceSettings.paymentTerms ? `
+      ${
+        invoiceSettings.paymentTerms
+          ? `
       <div class="footer-section">
         <div class="footer-label">Payment Information</div>
         <div class="footer-text">${invoiceSettings.paymentTerms}</div>
       </div>
-      ` : ''}
+      `
+          : ""
+      }
       
-      ${invoiceSettings.showBankDetails && (companySettings.bankName || companySettings.bankIban) ? `
+      ${
+        invoiceSettings.showBankDetails &&
+        (companySettings.bankName || companySettings.bankIban)
+          ? `
       <div class="footer-section">
         <div class="footer-label">Bank Details</div>
         <div class="bank-details">
-          ${companySettings.bankName ? `<div class="bank-detail"><span class="bank-detail-label">Bank:</span> ${companySettings.bankName}</div>` : ''}
-          ${companySettings.bankIban ? `<div class="bank-detail"><span class="bank-detail-label">IBAN:</span> ${companySettings.bankIban}</div>` : ''}
-          ${companySettings.bankSwift ? `<div class="bank-detail"><span class="bank-detail-label">SWIFT/BIC:</span> ${companySettings.bankSwift}</div>` : ''}
-          ${companySettings.bankAccountNumber ? `<div class="bank-detail"><span class="bank-detail-label">Account:</span> ${companySettings.bankAccountNumber}</div>` : ''}
+          ${companySettings.bankName ? `<div class="bank-detail"><span class="bank-detail-label">Bank:</span> ${companySettings.bankName}</div>` : ""}
+          ${companySettings.bankIban ? `<div class="bank-detail"><span class="bank-detail-label">IBAN:</span> ${companySettings.bankIban}</div>` : ""}
+          ${companySettings.bankSwift ? `<div class="bank-detail"><span class="bank-detail-label">SWIFT/BIC:</span> ${companySettings.bankSwift}</div>` : ""}
+          ${companySettings.bankAccountNumber ? `<div class="bank-detail"><span class="bank-detail-label">Account:</span> ${companySettings.bankAccountNumber}</div>` : ""}
         </div>
       </div>
-      ` : ''}
+      `
+          : ""
+      }
       
-      ${invoiceSettings.invoiceFooter ? `
+      ${
+        invoiceSettings.invoiceFooter
+          ? `
       <div class="footer-section">
         <div class="footer-text">${invoiceSettings.invoiceFooter}</div>
       </div>
-      ` : ''}
+      `
+          : ""
+      }
     </div>
     
-    ${invoiceSettings.thankYouMessage ? `
+    ${
+      invoiceSettings.thankYouMessage
+        ? `
     <div class="thank-you">${invoiceSettings.thankYouMessage}</div>
-    ` : ''}
+    `
+        : ""
+    }
     
-    ${invoiceSettings.showLegalDisclaimer && invoiceSettings.legalDisclaimer ? `
+    ${
+      invoiceSettings.showLegalDisclaimer && invoiceSettings.legalDisclaimer
+        ? `
     <!-- Legal Disclaimer Section -->
     <div style="margin-top: 30px; padding: 20px; background: #f9f9f9; border: 1px solid #e5e5e5; border-radius: 4px; page-break-inside: avoid;">
       <h4 style="margin: 0 0 15px 0; font-size: 11px; font-weight: 600; color: #333; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #ddd; padding-bottom: 8px;">
@@ -520,17 +590,19 @@ export const InvoiceService = {
         ${formatDisclaimer(invoiceSettings.legalDisclaimer, {
           companyName: invoice.companyName,
           companyEmail: invoice.companyEmail || companySettings.email,
-          vatNumber: invoice.companyVatNumber || '',
+          vatNumber: invoice.companyVatNumber || "",
         })}
       </div>
     </div>
-    ` : ''}
+    `
+        : ""
+    }
   </div>
 </body>
 </html>
     `.trim();
   },
-  
+
   /**
    * Get invoice by ID
    */
@@ -538,7 +610,7 @@ export const InvoiceService = {
     await connectToDatabase();
     return Invoice.findById(invoiceId);
   },
-  
+
   /**
    * Get invoices for a user
    */
@@ -547,17 +619,18 @@ export const InvoiceService = {
     return Invoice.find({ userId })
       .sort({ createdAt: -1 })
       .limit(limit)
-      .lean();
+      .lean() as unknown as IInvoice[];
   },
-  
+
   /**
    * Get invoice by transaction ID
    */
-  getInvoiceByTransactionId: async (transactionId: string): Promise<IInvoice | null> => {
+  getInvoiceByTransactionId: async (
+    transactionId: string,
+  ): Promise<IInvoice | null> => {
     await connectToDatabase();
     return Invoice.findOne({ transactionId });
   },
 };
 
 export default InvoiceService;
-

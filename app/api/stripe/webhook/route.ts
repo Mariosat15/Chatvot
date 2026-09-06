@@ -1,150 +1,296 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getStripeClient } from '@/lib/stripe/config';
-import { completeDeposit, cancelDeposit } from '@/lib/actions/trading/wallet.actions';
-import { getPaymentProviderCredentials } from '@/lib/services/settings.service';
-import { PaymentFraudService } from '@/lib/services/fraud/payment-fraud.service';
-import Stripe from 'stripe';
+import { NextRequest, NextResponse } from "next/server";
+import { getStripeClient } from "@/lib/stripe/config";
+import {
+  completeDeposit,
+  cancelDeposit,
+} from "@/lib/actions/trading/wallet.actions";
+import { getPaymentProviderCredentials } from "@/lib/services/settings.service";
+import { PaymentFraudService } from "@/lib/services/fraud/payment-fraud.service";
+import { recordDecline, clearDeclines } from "@/lib/utils/rate-limiter";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import { connectToDatabase } from "@/database/mongoose";
+import Stripe from "stripe";
+
+/**
+ * Stripe Webhook Handler
+ *
+ * Handles DEPOSIT confirmations from Stripe.
+ * When a user pays via Stripe, this webhook confirms the payment and adds credits.
+ *
+ * WITHDRAWALS are handled manually by admin (not via Stripe).
+ *
+ * Required Stripe Events in Dashboard:
+ * - payment_intent.succeeded (REQUIRED - adds credits when user pays)
+ * - payment_intent.payment_failed (optional - marks failed deposits)
+ * - payment_intent.canceled (optional - handles abandoned payments)
+ * - charge.refunded (optional - for tracking refunds)
+ */
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.text();
-    const signature = req.headers.get('stripe-signature');
+    const signature = req.headers.get("stripe-signature");
 
     if (!signature) {
-      console.error('❌ No Stripe signature found');
-      return NextResponse.json({ error: 'No signature' }, { status: 400 });
+      console.error("❌ No Stripe signature found");
+      return NextResponse.json({ error: "No signature" }, { status: 400 });
     }
 
-    // Get Stripe client and webhook secret from database
+    // Get Stripe client and webhook secret
     const stripe = await getStripeClient();
-    const stripeConfig = await getPaymentProviderCredentials('stripe');
-    const webhookSecret = stripeConfig?.webhook_secret || stripeConfig?.webhookUrl || process.env.STRIPE_WEBHOOK_SECRET;
+
+    // Try database config first, then .env
+    const stripeConfig = (await getPaymentProviderCredentials("stripe")) as
+      | { webhook_secret?: string }
+      | null;
+    const webhookSecret =
+      stripeConfig?.webhook_secret || process.env.STRIPE_WEBHOOK_SECRET;
+
+    console.log(
+      "🔐 Webhook secret source:",
+      stripeConfig?.webhook_secret
+        ? "database"
+        : process.env.STRIPE_WEBHOOK_SECRET
+          ? ".env"
+          : "NOT FOUND",
+    );
 
     if (!webhookSecret) {
-      console.error('❌ No Stripe webhook secret configured');
-      return NextResponse.json({ error: 'Webhook not configured' }, { status: 400 });
+      console.error("❌ No Stripe webhook secret configured");
+      console.error(
+        "   💡 Add webhook secret in Admin Panel → Payment Providers → Stripe → Configure",
+      );
+      console.error(
+        "   💡 Or add STRIPE_WEBHOOK_SECRET=whsec_xxx to your .env file",
+      );
+      return NextResponse.json(
+        { error: "Webhook not configured" },
+        { status: 400 },
+      );
     }
 
     // Verify webhook signature
     let event: Stripe.Event;
 
     try {
-      event = stripe.webhooks.constructEvent(
-        body,
-        signature,
-        webhookSecret
-      );
+      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
     } catch (err) {
-      console.error('❌ Webhook signature verification failed:', err);
+      console.error("❌ Webhook signature verification failed:", err);
       return NextResponse.json(
-        { error: 'Webhook signature verification failed' },
-        { status: 400 }
+        { error: "Webhook signature verification failed" },
+        { status: 400 },
       );
     }
 
-    console.log(`📨 Stripe Webhook Event: ${event.type}`);
+    console.log("📨 Stripe Webhook:", event.type);
 
-    // Handle different event types
+    // Handle deposit-related events
     switch (event.type) {
-      case 'payment_intent.succeeded':
-        await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent);
+      // ==========================================
+      // DEPOSIT EVENTS (user pays → gets credits)
+      // ==========================================
+      case "payment_intent.succeeded":
+        await handlePaymentIntentSucceeded(
+          event.data.object as Stripe.PaymentIntent,
+        );
         break;
 
-      case 'payment_intent.payment_failed':
-        await handlePaymentIntentFailed(event.data.object as Stripe.PaymentIntent);
+      case "payment_intent.payment_failed":
+        await handlePaymentIntentFailed(
+          event.data.object as Stripe.PaymentIntent,
+        );
         break;
 
-      case 'payment_intent.canceled':
-        await handlePaymentIntentCanceled(event.data.object as Stripe.PaymentIntent);
+      case "payment_intent.canceled":
+        await handlePaymentIntentCanceled(
+          event.data.object as Stripe.PaymentIntent,
+        );
         break;
 
-      case 'payment_intent.expired':
-        await handlePaymentIntentCanceled(event.data.object as Stripe.PaymentIntent);
-        break;
-
-      case 'charge.refunded':
+      case "charge.refunded":
         await handleChargeRefunded(event.data.object as Stripe.Charge);
         break;
 
       default:
-        console.log(`⚠️ Unhandled event type: ${event.type}`);
+        console.log("ℹ️ Unhandled event type:", event.type);
     }
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error('❌ Webhook error:', error);
+    console.error("❌ Webhook error:", error);
     return NextResponse.json(
-      { error: 'Webhook handler failed' },
-      { status: 500 }
+      { error: "Webhook handler failed" },
+      { status: 500 },
     );
   }
 }
 
-// Handle successful payment
-async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
+/**
+ * Handle successful payment - ADD CREDITS TO USER
+ * Includes idempotency check to prevent duplicate processing
+ */
+async function handlePaymentIntentSucceeded(
+  paymentIntent: Stripe.PaymentIntent,
+) {
   try {
     const { transactionId, userId } = paymentIntent.metadata;
 
     if (!transactionId || !userId) {
-      console.error('❌ Missing metadata in payment intent:', paymentIntent.id);
+      console.error("❌ Missing metadata in payment intent:", paymentIntent.id);
       return;
     }
 
-    console.log(`✅ Payment succeeded: ${paymentIntent.id}`);
-    console.log(`   Amount: €${paymentIntent.amount / 100}`);
-    console.log(`   User: ${userId}`);
-    console.log(`   Transaction: ${transactionId}`);
+    // IDEMPOTENCY CHECK: Verify transaction hasn't already been processed
+    // This prevents duplicate credits if Stripe sends the same webhook multiple times
+    await connectToDatabase();
 
-    // Complete the deposit in database
+    // Check 1: By paymentId (Stripe payment intent ID)
+    const existingByPaymentId = (await WalletTransaction.findOne({
+      paymentId: paymentIntent.id,
+      status: "completed",
+    }).lean()) as { _id: { toString(): string }; status?: string } | null;
+
+    if (existingByPaymentId) {
+      console.log("⚠️ IDEMPOTENCY: Payment already processed:", paymentIntent.id);
+      console.log("   Existing transaction:", existingByPaymentId._id);
+      return; // Already processed, skip
+    }
+
+    // Check 2: By transactionId and status
+    const existingTransaction = (await WalletTransaction.findById(
+      transactionId,
+    ).lean()) as { _id: { toString(): string }; status?: string } | null;
+
+    if (!existingTransaction) {
+      console.error("❌ Transaction not found in database:", transactionId);
+      return;
+    }
+
+    if (existingTransaction.status === "completed") {
+      console.log("⚠️ IDEMPOTENCY: Transaction already completed:", transactionId);
+      return; // Already processed, skip
+    }
+
+    console.log("✅ Payment succeeded:", paymentIntent.id);
+    console.log("   Amount: €", paymentIntent.amount / 100);
+    console.log("   User:", userId);
+    console.log("   Transaction:", transactionId);
+
+    // Fetch card details for future refund reference
+    let cardDetails:
+      | {
+          brand?: string;
+          last4?: string;
+          expMonth?: number;
+          expYear?: number;
+          country?: string;
+          fingerprint?: string;
+        }
+      | undefined;
+
+    const paymentMethodId = paymentIntent.payment_method;
+    if (paymentMethodId && typeof paymentMethodId === "string") {
+      try {
+        const stripe = await getStripeClient();
+        const paymentMethod =
+          await stripe.paymentMethods.retrieve(paymentMethodId);
+
+        if (paymentMethod.type === "card" && paymentMethod.card) {
+          cardDetails = {
+            brand: paymentMethod.card.brand,
+            last4: paymentMethod.card.last4,
+            expMonth: paymentMethod.card.exp_month,
+            expYear: paymentMethod.card.exp_year,
+            country: paymentMethod.card.country || undefined,
+            fingerprint: paymentMethod.card.fingerprint || undefined,
+          };
+          console.log(
+            `   💳 Card: ${cardDetails.brand} ****${cardDetails.last4}`,
+          );
+        }
+      } catch (err) {
+        console.warn("⚠️ Could not fetch card details:", err);
+      }
+    }
+
+    // Complete the deposit - this adds credits to user's wallet
     await completeDeposit(
       transactionId,
       paymentIntent.id,
-      paymentIntent.payment_method_types[0] || 'card'
+      paymentIntent.payment_method_types[0] || "card",
+      cardDetails,
     );
 
-    console.log(`✅ Deposit completed for transaction ${transactionId}`);
+    console.log("✅ Credits added for transaction", transactionId);
 
-    // FRAUD DETECTION: Track payment fingerprint
+    // Trigger journey milestone check after successful deposit
+    try {
+      const { checkAndCompleteMilestones } = await import(
+        "@/lib/services/journey-progress.service"
+      );
+      const journeyResult = await checkAndCompleteMilestones(userId);
+      if (journeyResult.completed.length > 0) {
+        console.log(
+          `🗺️ Journey milestones completed after deposit: ${journeyResult.completed.join(", ")}`,
+        );
+      }
+    } catch (journeyError) {
+      console.error("🗺️ Error checking journey milestones:", journeyError);
+      // Don't fail the deposit if milestone check fails
+    }
+
+    // Track for fraud detection
     await trackPaymentFingerprint(paymentIntent, userId);
+
+    // Reason: Clear decline-velocity counters after a successful charge so
+    // a single past decline (e.g., wrong CVV) doesn't keep legitimate users
+    // locked out.
+    try {
+      await clearDeclines(userId);
+      const clientIp = paymentIntent.metadata?.clientIp;
+      if (clientIp) await clearDeclines(`ip:${clientIp}`);
+    } catch {
+      // Non-blocking
+    }
   } catch (error) {
-    console.error('❌ Error handling successful payment:', error);
+    console.error("❌ Error handling successful payment:", error);
   }
 }
 
-// Track payment fingerprint for fraud detection
-async function trackPaymentFingerprint(paymentIntent: Stripe.PaymentIntent, userId: string) {
+/**
+ * Track payment fingerprint for fraud detection
+ */
+async function trackPaymentFingerprint(
+  paymentIntent: Stripe.PaymentIntent,
+  userId: string,
+) {
   try {
-    // Get payment method details from Stripe
     const stripe = await getStripeClient();
     const paymentMethodId = paymentIntent.payment_method;
 
-    if (!paymentMethodId || typeof paymentMethodId !== 'string') {
-      console.log(`⚠️ No payment method ID found for fraud tracking`);
+    if (!paymentMethodId || typeof paymentMethodId !== "string") {
       return;
     }
 
-    console.log(`💳 Retrieving payment method for fraud detection...`);
     const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
 
-    if (paymentMethod.type !== 'card' || !paymentMethod.card) {
-      console.log(`⚠️ Payment method is not a card, skipping fraud detection`);
+    if (paymentMethod.type !== "card" || !paymentMethod.card) {
       return;
     }
 
-    // Extract card fingerprint (Stripe's unique identifier for this card)
     const cardFingerprint = paymentMethod.card.fingerprint;
 
     if (!cardFingerprint) {
-      console.log(`⚠️ No card fingerprint available`);
       return;
     }
 
-    console.log(`🔍 Tracking payment fingerprint: ${cardFingerprint.substring(0, 12)}...`);
+    console.log(
+      `🔍 Tracking payment fingerprint: ${cardFingerprint.substring(0, 8)}...`,
+    );
 
-    // Track payment fingerprint and detect shared payments
     const result = await PaymentFraudService.trackPaymentFingerprint({
       userId,
-      paymentProvider: 'stripe',
+      paymentProvider: "stripe",
       paymentFingerprint: cardFingerprint,
       cardLast4: paymentMethod.card.last4,
       cardBrand: paymentMethod.card.brand,
@@ -153,87 +299,122 @@ async function trackPaymentFingerprint(paymentIntent: Stripe.PaymentIntent, user
       providerAccountId: paymentMethodId,
       transactionId: paymentIntent.id,
       amount: paymentIntent.amount / 100,
-      currency: paymentIntent.currency
+      currency: paymentIntent.currency,
     });
 
     if (result.fraudDetected) {
-      console.log(`🚨 FRAUD DETECTED: Payment method shared across ${result.linkedUsers.length + 1} accounts!`);
-      console.log(`   Linked users: ${result.linkedUsers.join(', ')}`);
-    } else {
-      console.log(`✅ Payment fingerprint tracked, no fraud detected`);
+      console.log(
+        `🚨 FRAUD: Payment method shared across ${result.linkedUsers.length + 1} accounts!`,
+      );
     }
   } catch (error) {
-    console.error('❌ Error tracking payment fingerprint:', error);
-    // Don't throw - payment already succeeded, this is just fraud detection
+    console.error("❌ Error tracking payment fingerprint:", error);
   }
 }
 
-// Handle failed payment
+/**
+ * Handle failed payment
+ */
 async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
   try {
-    const { transactionId, userId } = paymentIntent.metadata;
+    const { transactionId, userId, clientIp } = paymentIntent.metadata;
 
-    console.error(`❌ Payment failed: ${paymentIntent.id}`);
-    console.error(`   User: ${userId}`);
-    console.error(`   Reason: ${paymentIntent.last_payment_error?.message}`);
+    console.error("❌ Payment failed:", paymentIntent.id);
+    console.error("   Reason:", paymentIntent.last_payment_error?.message);
 
     if (transactionId) {
-      // Cancel the pending transaction
-      await cancelDeposit(transactionId, 'failed', paymentIntent.last_payment_error?.message || 'Payment failed');
-      console.log(`✅ Transaction ${transactionId} marked as failed`);
+      await cancelDeposit(
+        transactionId,
+        "failed",
+        paymentIntent.last_payment_error?.message || "Payment failed",
+      );
     }
 
-    // Send notification to user about failed deposit
+    // SECURITY: Track decline velocity (see lib/utils/rate-limiter.ts).
+    // Classic card-testing burns many cards through a single account/IP; the
+    // per-minute rate limit only counts *requests*, not *failures*, so without
+    // this the same user could attempt hundreds of stolen cards per hour.
     if (userId) {
       try {
-        const { notificationService } = await import('@/lib/services/notification.service');
-        await notificationService.notifyDepositFailed(
-          userId,
-          paymentIntent.amount / 100,
-          paymentIntent.last_payment_error?.message || 'Payment could not be processed'
-        );
-        console.log(`🔔 Deposit failed notification sent to user ${userId}`);
-      } catch (error) {
-        console.error('❌ Error sending deposit failed notification:', error);
+        const userBlock = await recordDecline(userId);
+        if (userBlock.blocked) {
+          console.warn(
+            `🚨 Decline-velocity threshold tripped for user ${userId} ` +
+              `— deposits blocked until ${new Date(userBlock.blockedUntil!).toISOString()}`,
+          );
+        }
+      } catch (err) {
+        console.error("⚠️ Decline-velocity (user) failed:", err);
+      }
+    }
+    if (clientIp) {
+      try {
+        const ipBlock = await recordDecline(`ip:${clientIp}`);
+        if (ipBlock.blocked) {
+          console.warn(
+            `🚨 Decline-velocity threshold tripped for IP ${clientIp} ` +
+              `— deposits blocked until ${new Date(ipBlock.blockedUntil!).toISOString()}`,
+          );
+        }
+      } catch (err) {
+        console.error("⚠️ Decline-velocity (ip) failed:", err);
       }
     }
 
+    // Notify user
+    if (userId) {
+      try {
+        const { notificationService } =
+          await import("@/lib/services/notification.service");
+        await notificationService.notifyDepositFailed(
+          userId,
+          paymentIntent.amount / 100,
+          paymentIntent.last_payment_error?.message ||
+            "Payment could not be processed",
+        );
+      } catch (error) {
+        console.error("❌ Error sending notification:", error);
+      }
+    }
   } catch (error) {
-    console.error('❌ Error handling failed payment:', error);
+    console.error("❌ Error handling failed payment:", error);
   }
 }
 
-// Handle canceled/expired payment (user closed window or abandoned payment)
-async function handlePaymentIntentCanceled(paymentIntent: Stripe.PaymentIntent) {
+/**
+ * Handle canceled/expired payment
+ */
+async function handlePaymentIntentCanceled(
+  paymentIntent: Stripe.PaymentIntent,
+) {
   try {
-    const { transactionId, userId } = paymentIntent.metadata;
+    const { transactionId } = paymentIntent.metadata;
 
-    console.log(`🚫 Payment canceled/expired: ${paymentIntent.id}`);
-    console.log(`   User: ${userId}`);
-    console.log(`   Status: ${paymentIntent.status}`);
+    console.log("🚫 Payment canceled:", paymentIntent.id);
 
     if (transactionId) {
-      // Cancel the pending transaction
-      await cancelDeposit(transactionId, 'cancelled', 'Payment was canceled or expired');
-      console.log(`✅ Transaction ${transactionId} marked as cancelled`);
+      await cancelDeposit(
+        transactionId,
+        "cancelled",
+        "Payment was canceled or expired",
+      );
     }
-
   } catch (error) {
-    console.error('❌ Error handling canceled payment:', error);
+    console.error("❌ Error handling canceled payment:", error);
   }
 }
 
-// Handle refunded charge
+/**
+ * Handle refunded charge (for tracking - admin handles refunds manually)
+ */
 async function handleChargeRefunded(charge: Stripe.Charge) {
   try {
-    console.log(`💸 Charge refunded: ${charge.id}`);
-    console.log(`   Amount: €${charge.amount_refunded / 100}`);
+    console.log("💸 Charge refunded:", charge.id);
+    console.log("   Amount: €", charge.amount_refunded / 100);
 
-    // TODO: Handle refund in database (deduct credits)
-    // We'll implement this later
-
+    // Log for audit - actual credit deduction should be done via admin panel
+    // TODO: Optionally auto-deduct credits when refund is issued
   } catch (error) {
-    console.error('❌ Error handling refund:', error);
+    console.error("❌ Error handling refund:", error);
   }
 }
-

@@ -1,127 +1,179 @@
-import { redirect } from 'next/navigation';
-import { unstable_noStore as noStore } from 'next/cache';
-import { auth } from '@/lib/better-auth/auth';
-import { headers } from 'next/headers';
-import { getCompetitionById } from '@/lib/actions/trading/competition.actions';
-import { getCompetitionTradeHistory } from '@/lib/actions/trading/trade-history.actions';
-import CompetitionParticipant from '@/database/models/trading/competition-participant.model';
-import { connectToDatabase } from '@/database/mongoose';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { 
-  ArrowLeft, 
-  Trophy, 
-  TrendingUp, 
-  TrendingDown, 
-  BarChart3, 
-  Target, 
-  Clock,
-  DollarSign,
-  Percent,
-  Activity,
-  Award,
-  Calendar,
+import { redirect } from "next/navigation";
+import { unstable_noStore as noStore } from "next/cache";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { getCompetitionById } from "@/lib/actions/trading/competition.actions";
+import { getCompetitionTradeHistory } from "@/lib/actions/trading/trade-history.actions";
+import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
+import { connectToDatabase } from "@/database/mongoose";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import {
+  ArrowLeft,
   ChevronRight,
-  Eye
-} from 'lucide-react';
+  Eye,
+  LayoutDashboard,
+} from "lucide-react";
+import { GameIcon } from "@/components/ui/GameIcon";
 
-const CompetitionResultsPage = async ({ params }: { params: Promise<{ id: string }> }) => {
+const CompetitionResultsPage = async ({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) => {
   noStore();
-  
+
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) redirect('/sign-in');
+  if (!session?.user) redirect("/sign-in");
 
   const { id: competitionId } = await params;
 
   // Get competition details
   const competition = await getCompetitionById(competitionId);
   if (!competition) {
-    redirect('/competitions');
+    redirect("/competitions");
   }
 
-  // Check if user was a participant
+  // PERF: Fetch participant + trade history in parallel (both only need competitionId)
   await connectToDatabase();
-  const participantDoc = await CompetitionParticipant.findOne({
-    competitionId,
-    userId: session.user.id,
-  }).lean();
+  const [participantDoc, tradeHistoryResult] = await Promise.all([
+    CompetitionParticipant.findOne({
+      competitionId,
+      userId: session.user.id,
+    }).lean(),
+    getCompetitionTradeHistory(competitionId),
+  ]);
 
   if (!participantDoc) {
     redirect(`/competitions/${competitionId}`);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const participant = participantDoc as any;
-
-  // Get trade history
-  const tradeHistoryResult = await getCompetitionTradeHistory(competitionId);
-  const tradeHistory = tradeHistoryResult.success ? tradeHistoryResult.trades : [];
+  const tradeHistory = tradeHistoryResult.success
+    ? tradeHistoryResult.trades
+    : [];
 
   // Calculate stats
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const winningTrades = tradeHistory.filter((t: any) => t.realizedPnl > 0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const losingTrades = tradeHistory.filter((t: any) => t.realizedPnl < 0);
-  const totalPnl = tradeHistory.reduce((sum: number, t: any) => sum + (t.realizedPnl || 0), 0);
-  const winRate = tradeHistory.length > 0 ? (winningTrades.length / tradeHistory.length) * 100 : 0;
-  const avgWin = winningTrades.length > 0 
-    ? winningTrades.reduce((sum: number, t: any) => sum + t.realizedPnl, 0) / winningTrades.length 
-    : 0;
-  const avgLoss = losingTrades.length > 0 
-    ? Math.abs(losingTrades.reduce((sum: number, t: any) => sum + t.realizedPnl, 0)) / losingTrades.length 
-    : 0;
-  const profitFactor = avgLoss > 0 ? avgWin / avgLoss : avgWin > 0 ? Infinity : 0;
-  const largestWin = Math.max(...winningTrades.map((t: any) => t.realizedPnl), 0);
-  const largestLoss = Math.min(...losingTrades.map((t: any) => t.realizedPnl), 0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const totalPnl = tradeHistory.reduce(
+    (sum: number, t: any) => sum + (t.realizedPnl || 0),
+    0,
+  );
+  const winRate =
+    tradeHistory.length > 0
+      ? (winningTrades.length / tradeHistory.length) * 100
+      : 0;
+  const avgWin =
+    winningTrades.length > 0
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        winningTrades.reduce((sum: number, t: any) => sum + t.realizedPnl, 0) /
+        winningTrades.length
+      : 0;
+  const avgLoss =
+    losingTrades.length > 0
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Math.abs(
+          losingTrades.reduce((sum: number, t: any) => sum + t.realizedPnl, 0),
+        ) / losingTrades.length
+      : 0;
+  const profitFactor =
+    avgLoss > 0 ? avgWin / avgLoss : avgWin > 0 ? Infinity : 0;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const largestWin = Math.max(
+    ...winningTrades.map((t: any) => t.realizedPnl),
+    0,
+  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const largestLoss = Math.min(
+    ...losingTrades.map((t: any) => t.realizedPnl),
+    0,
+  );
 
   // Check if user won a prize
-  const prizeWon = competition.finalLeaderboard?.find((l: any) => l.userId === session.user.id)?.prizeAmount || 0;
-  const finalRank = participant.currentRank || competition.finalLeaderboard?.findIndex((l: any) => l.userId === session.user.id) + 1 || '—';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const prizeWon =
+    competition.finalLeaderboard?.find((l: any) => l.userId === session.user.id)
+      ?.prizeAmount || 0;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const leaderboardIndex =
+    competition.finalLeaderboard?.findIndex(
+      (l: any) => l.userId === session.user.id,
+    ) ?? -1;
+  const finalRank =
+    participant.currentRank ||
+    (leaderboardIndex >= 0 ? leaderboardIndex + 1 : null) ||
+    "—";
 
   const formatDate = (date: Date) => {
-    return new Date(date).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return new Date(date).toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   return (
-    <div className="flex min-h-screen flex-col gap-6 p-4 md:p-8 bg-gradient-to-br from-gray-900 via-gray-900 to-purple-900/20">
+    <div className="flex min-h-screen flex-col gap-4 sm:gap-6 p-3 sm:p-4 md:p-8 bg-gradient-to-br from-gray-900 via-gray-900 to-purple-900/20 overflow-x-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <Link href={`/competitions/${competitionId}`}>
-          <Button variant="ghost" className="w-fit gap-2 text-gray-400 hover:text-gray-100">
+      <div className="flex items-center justify-between flex-wrap gap-2 sm:gap-4">
+        <Link href="/competitions">
+          <Button
+            variant="ghost"
+            className="w-fit gap-2 text-gray-400 hover:text-gray-100 min-h-[44px]"
+          >
             <ArrowLeft className="h-4 w-4" />
-            Back to Competition
+            <span className="hidden sm:inline">Back to Competitions</span>
+            <span className="sm:hidden">Back</span>
+          </Button>
+        </Link>
+        <Link href={`/competitions/${competitionId}?view=details`}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 border-blue-500/50 text-blue-400 hover:bg-blue-500/10 min-h-[44px]"
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            <span className="hidden sm:inline">View Competition Details</span>
+            <span className="sm:hidden">Details</span>
           </Button>
         </Link>
       </div>
 
       {/* Competition Info Header */}
-      <div className="rounded-2xl bg-gradient-to-br from-purple-500/20 via-gray-800 to-gray-900 p-6 md:p-8 border border-purple-500/30 shadow-xl">
+      <div className="rounded-xl sm:rounded-2xl bg-gradient-to-br from-purple-500/20 via-gray-800 to-gray-900 p-4 sm:p-6 md:p-8 border border-purple-500/30 shadow-xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2 mb-2">
-              <Trophy className="h-6 w-6 text-purple-400" />
+              <GameIcon name="trophy" size={24} />
               <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-400 text-sm font-medium">
                 COMPLETED
               </span>
             </div>
-            <h1 className="text-3xl font-bold text-gray-100">{competition.name}</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-100 truncate">
+              {competition.name}
+            </h1>
             <p className="text-gray-400 mt-1">{competition.description}</p>
           </div>
-          
+
           <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-gray-500" />
+              <GameIcon name="timer" size={16} />
               <span className="text-sm text-gray-400">
-                {formatDate(competition.startTime)} - {formatDate(competition.endTime)}
+                {formatDate(competition.startTime)} -{" "}
+                {formatDate(competition.endTime)}
               </span>
             </div>
             {prizeWon > 0 && (
               <div className="px-4 py-2 bg-yellow-500/20 border border-yellow-500/30 rounded-xl">
                 <p className="text-yellow-400 font-bold flex items-center gap-2">
-                  <Award className="h-5 w-5" />
+                  <GameIcon name="trophy" size={20} />
                   You won {prizeWon.toFixed(2)} credits!
                 </p>
               </div>
@@ -131,134 +183,185 @@ const CompetitionResultsPage = async ({ params }: { params: Promise<{ id: string
       </div>
 
       {/* Final Performance Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Final Rank */}
-        <div className="rounded-xl bg-gradient-to-br from-yellow-500/10 to-gray-800/50 border border-yellow-500/30 p-5">
+        <div className="rounded-xl bg-gradient-to-br from-yellow-500/10 to-gray-800/50 border border-yellow-500/30 p-3 sm:p-5">
           <div className="flex items-center gap-2 mb-2">
-            <Trophy className="h-5 w-5 text-yellow-500" />
-            <span className="text-sm font-medium text-gray-400">Final Rank</span>
+            <GameIcon name="crown" size={20} />
+            <span className="text-xs sm:text-sm font-medium text-gray-400">
+              Final Rank
+            </span>
           </div>
-          <p className="text-4xl font-black text-yellow-500">#{finalRank}</p>
-          <p className="text-xs text-gray-500 mt-1">Out of {competition.currentParticipants} participants</p>
+          <p className="text-2xl sm:text-4xl font-black text-yellow-500">#{finalRank}</p>
+          <p className="text-xs text-gray-500 mt-1">
+            Out of {competition.currentParticipants} participants
+          </p>
         </div>
 
         {/* Final P&L */}
-        <div className={`rounded-xl bg-gradient-to-br ${
-          totalPnl >= 0 ? 'from-green-500/10 border-green-500/30' : 'from-red-500/10 border-red-500/30'
-        } to-gray-800/50 border p-5`}>
+        <div
+          className={`rounded-xl bg-gradient-to-br ${
+            totalPnl >= 0
+              ? "from-green-500/10 border-green-500/30"
+              : "from-red-500/10 border-red-500/30"
+          } to-gray-800/50 border p-3 sm:p-5`}
+        >
           <div className="flex items-center gap-2 mb-2">
-            {totalPnl >= 0 ? (
-              <TrendingUp className="h-5 w-5 text-green-500" />
-            ) : (
-              <TrendingDown className="h-5 w-5 text-red-500" />
-            )}
-            <span className="text-sm font-medium text-gray-400">Total P&L</span>
+            <GameIcon name={totalPnl >= 0 ? "profit" : "loss"} size={20} />
+            <span className="text-xs sm:text-sm font-medium text-gray-400">Total P&L</span>
           </div>
-          <p className={`text-4xl font-black ${totalPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-            {totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)}
+          <p
+            className={`text-2xl sm:text-4xl font-black ${totalPnl >= 0 ? "text-green-500" : "text-red-500"}`}
+          >
+            {totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)}
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            {((participant.currentCapital - participant.startingCapital) / participant.startingCapital * 100).toFixed(2)}% ROI
+            {(
+              ((participant.currentCapital - participant.startingCapital) /
+                participant.startingCapital) *
+              100
+            ).toFixed(2)}
+            % ROI
           </p>
         </div>
 
         {/* Win Rate */}
-        <div className="rounded-xl bg-gradient-to-br from-blue-500/10 to-gray-800/50 border border-blue-500/30 p-5">
+        <div className="rounded-xl bg-gradient-to-br from-blue-500/10 to-gray-800/50 border border-blue-500/30 p-3 sm:p-5">
           <div className="flex items-center gap-2 mb-2">
-            <Target className="h-5 w-5 text-blue-500" />
-            <span className="text-sm font-medium text-gray-400">Win Rate</span>
+            <GameIcon name="target" size={20} />
+            <span className="text-xs sm:text-sm font-medium text-gray-400">Win Rate</span>
           </div>
-          <p className="text-4xl font-black text-blue-500">{winRate.toFixed(1)}%</p>
-          <p className="text-xs text-gray-500 mt-1">{winningTrades.length}W / {losingTrades.length}L</p>
+          <p className="text-2xl sm:text-4xl font-black text-blue-500">
+            {winRate.toFixed(1)}%
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            {winningTrades.length}W / {losingTrades.length}L
+          </p>
         </div>
 
         {/* Total Trades */}
-        <div className="rounded-xl bg-gradient-to-br from-purple-500/10 to-gray-800/50 border border-purple-500/30 p-5">
+        <div className="rounded-xl bg-gradient-to-br from-purple-500/10 to-gray-800/50 border border-purple-500/30 p-3 sm:p-5">
           <div className="flex items-center gap-2 mb-2">
-            <Activity className="h-5 w-5 text-purple-500" />
-            <span className="text-sm font-medium text-gray-400">Total Trades</span>
+            <GameIcon name="sword" size={20} />
+            <span className="text-xs sm:text-sm font-medium text-gray-400">
+              Total Trades
+            </span>
           </div>
-          <p className="text-4xl font-black text-purple-500">{tradeHistory.length}</p>
-          <p className="text-xs text-gray-500 mt-1">Profit Factor: {profitFactor === Infinity ? '∞' : profitFactor.toFixed(2)}</p>
+          <p className="text-2xl sm:text-4xl font-black text-purple-500">
+            {tradeHistory.length}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            Profit Factor:{" "}
+            {profitFactor === Infinity ? "∞" : profitFactor.toFixed(2)}
+          </p>
         </div>
       </div>
 
       {/* Detailed Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Account Summary */}
-        <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-6">
+        <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4 sm:p-6">
           <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-green-500" />
+            <GameIcon name="coin" size={20} />
             Account Summary
           </h3>
           <div className="space-y-3">
             <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
               <span className="text-gray-400">Starting Capital</span>
-              <span className="text-gray-100 font-bold">${participant.startingCapital.toLocaleString()}</span>
+              <span className="text-gray-100 font-bold">
+                ${participant.startingCapital.toLocaleString()}
+              </span>
             </div>
             <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
               <span className="text-gray-400">Final Capital</span>
-              <span className="text-gray-100 font-bold">${participant.currentCapital.toLocaleString()}</span>
+              <span className="text-gray-100 font-bold">
+                ${participant.currentCapital.toLocaleString()}
+              </span>
             </div>
             <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
               <span className="text-gray-400">Net P&L</span>
-              <span className={`font-bold ${totalPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                {totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)}
+              <span
+                className={`font-bold ${totalPnl >= 0 ? "text-green-500" : "text-red-500"}`}
+              >
+                {totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)}
               </span>
             </div>
             <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
               <span className="text-gray-400">ROI</span>
-              <span className={`font-bold ${totalPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                {((participant.currentCapital - participant.startingCapital) / participant.startingCapital * 100).toFixed(2)}%
+              <span
+                className={`font-bold ${totalPnl >= 0 ? "text-green-500" : "text-red-500"}`}
+              >
+                {(
+                  ((participant.currentCapital - participant.startingCapital) /
+                    participant.startingCapital) *
+                  100
+                ).toFixed(2)}
+                %
               </span>
             </div>
           </div>
         </div>
 
         {/* Trading Stats */}
-        <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-6">
-          <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-blue-500" />
+        <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4 sm:p-6">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
+            <GameIcon name="target" size={20} />
             Trading Statistics
           </h3>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
             <div className="p-3 bg-gray-900/50 rounded-lg">
               <p className="text-xs text-gray-500">Winning Trades</p>
-              <p className="text-xl font-bold text-green-500">{winningTrades.length}</p>
+              <p className="text-xl font-bold text-green-500">
+                {winningTrades.length}
+              </p>
             </div>
             <div className="p-3 bg-gray-900/50 rounded-lg">
               <p className="text-xs text-gray-500">Losing Trades</p>
-              <p className="text-xl font-bold text-red-500">{losingTrades.length}</p>
+              <p className="text-xl font-bold text-red-500">
+                {losingTrades.length}
+              </p>
             </div>
             <div className="p-3 bg-gray-900/50 rounded-lg">
               <p className="text-xs text-gray-500">Average Win</p>
-              <p className="text-xl font-bold text-green-500">${avgWin.toFixed(2)}</p>
+              <p className="text-xl font-bold text-green-500">
+                ${avgWin.toFixed(2)}
+              </p>
             </div>
             <div className="p-3 bg-gray-900/50 rounded-lg">
               <p className="text-xs text-gray-500">Average Loss</p>
-              <p className="text-xl font-bold text-red-500">${avgLoss.toFixed(2)}</p>
+              <p className="text-xl font-bold text-red-500">
+                ${avgLoss.toFixed(2)}
+              </p>
             </div>
             <div className="p-3 bg-gray-900/50 rounded-lg">
               <p className="text-xs text-gray-500">Largest Win</p>
-              <p className="text-xl font-bold text-green-500">${largestWin.toFixed(2)}</p>
+              <p className="text-xl font-bold text-green-500">
+                ${largestWin.toFixed(2)}
+              </p>
             </div>
             <div className="p-3 bg-gray-900/50 rounded-lg">
               <p className="text-xs text-gray-500">Largest Loss</p>
-              <p className="text-xl font-bold text-red-500">${Math.abs(largestLoss).toFixed(2)}</p>
+              <p className="text-xl font-bold text-red-500">
+                ${Math.abs(largestLoss).toFixed(2)}
+              </p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Trade History */}
-      <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-100 flex items-center gap-2">
-            <Clock className="h-5 w-5 text-purple-500" />
+      <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4 sm:p-6">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-100 flex items-center gap-2">
+            <GameIcon name="timer" size={20} />
             Trade History
           </h3>
           <Link href={`/competitions/${competitionId}/trade?viewOnly=true`}>
-            <Button variant="outline" size="sm" className="gap-2 border-purple-500/50 text-purple-400 hover:bg-purple-500/10">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 border-purple-500/50 text-purple-400 hover:bg-purple-500/10"
+            >
               <Eye className="h-4 w-4" />
               View Charts
             </Button>
@@ -267,8 +370,12 @@ const CompetitionResultsPage = async ({ params }: { params: Promise<{ id: string
 
         {tradeHistory.length === 0 ? (
           <div className="py-12 text-center">
-            <Activity className="h-12 w-12 text-gray-600 mx-auto mb-3" />
-            <p className="text-gray-400">No trades were made in this competition</p>
+            <div className="flex justify-center mb-3">
+              <GameIcon name="sword" size={48} className="opacity-50" />
+            </div>
+            <p className="text-gray-400">
+              No trades were made in this competition
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -285,26 +392,34 @@ const CompetitionResultsPage = async ({ params }: { params: Promise<{ id: string
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-700/50">
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {tradeHistory.slice(0, 50).map((trade: any) => {
-                  const duration = trade.holdingTimeSeconds 
-                    ? trade.holdingTimeSeconds < 60 
+                  const duration = trade.holdingTimeSeconds
+                    ? trade.holdingTimeSeconds < 60
                       ? `${trade.holdingTimeSeconds}s`
                       : trade.holdingTimeSeconds < 3600
-                      ? `${Math.floor(trade.holdingTimeSeconds / 60)}m`
-                      : `${Math.floor(trade.holdingTimeSeconds / 3600)}h ${Math.floor((trade.holdingTimeSeconds % 3600) / 60)}m`
-                    : '—';
-                  
+                        ? `${Math.floor(trade.holdingTimeSeconds / 60)}m`
+                        : `${Math.floor(trade.holdingTimeSeconds / 3600)}h ${Math.floor((trade.holdingTimeSeconds % 3600) / 60)}m`
+                    : "—";
+
                   return (
-                    <tr key={trade._id} className="hover:bg-gray-700/30 transition-colors">
+                    <tr
+                      key={trade._id}
+                      className="hover:bg-gray-700/30 transition-colors"
+                    >
                       <td className="py-3 px-2">
-                        <span className="font-medium text-gray-100">{trade.symbol}</span>
+                        <span className="font-medium text-gray-100">
+                          {trade.symbol}
+                        </span>
                       </td>
                       <td className="py-3 px-2">
-                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                          trade.side === 'buy' || trade.side === 'long'
-                            ? 'bg-green-500/20 text-green-400'
-                            : 'bg-red-500/20 text-red-400'
-                        }`}>
+                        <span
+                          className={`px-2 py-0.5 rounded text-xs font-bold ${
+                            trade.side === "buy" || trade.side === "long"
+                              ? "bg-green-500/20 text-green-400"
+                              : "bg-red-500/20 text-red-400"
+                          }`}
+                        >
                           {trade.side?.toUpperCase()}
                         </span>
                       </td>
@@ -314,21 +429,28 @@ const CompetitionResultsPage = async ({ params }: { params: Promise<{ id: string
                       <td className="py-3 px-2 text-right text-gray-300 font-mono text-sm">
                         {trade.exitPrice?.toFixed(5)}
                       </td>
-                      <td className={`py-3 px-2 text-right font-bold ${
-                        trade.realizedPnl >= 0 ? 'text-green-500' : 'text-red-500'
-                      }`}>
-                        {trade.realizedPnl >= 0 ? '+' : ''}${trade.realizedPnl?.toFixed(2)}
+                      <td
+                        className={`py-3 px-2 text-right font-bold ${
+                          trade.realizedPnl >= 0
+                            ? "text-green-500"
+                            : "text-red-500"
+                        }`}
+                      >
+                        {trade.realizedPnl >= 0 ? "+" : ""}$
+                        {trade.realizedPnl?.toFixed(2)}
                       </td>
                       <td className="py-3 px-2 text-right text-gray-400 text-sm">
                         {duration}
                       </td>
                       <td className="py-3 px-2 text-right text-gray-400 text-sm">
-                        {trade.closedAt ? new Date(trade.closedAt).toLocaleString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        }) : '—'}
+                        {trade.closedAt
+                          ? new Date(trade.closedAt).toLocaleString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : "—"}
                       </td>
                     </tr>
                   );
@@ -345,11 +467,11 @@ const CompetitionResultsPage = async ({ params }: { params: Promise<{ id: string
       </div>
 
       {/* Action Buttons */}
-      <div className="flex flex-wrap gap-4 justify-center">
-        <Link href={`/competitions/${competitionId}`}>
+      <div className="flex flex-wrap gap-3 sm:gap-4 justify-center">
+        <Link href={`/competitions/${competitionId}?view=details`}>
           <Button variant="outline" className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Competition
+            <LayoutDashboard className="h-4 w-4" />
+            View Competition Details
           </Button>
         </Link>
         <Link href={`/competitions/${competitionId}/trade?viewOnly=true`}>
@@ -361,7 +483,7 @@ const CompetitionResultsPage = async ({ params }: { params: Promise<{ id: string
         </Link>
         <Link href="/competitions">
           <Button variant="outline" className="gap-2">
-            <Trophy className="h-4 w-4" />
+            <GameIcon name="trophy" size={16} />
             Browse More Competitions
           </Button>
         </Link>
@@ -371,4 +493,3 @@ const CompetitionResultsPage = async ({ params }: { params: Promise<{ id: string
 };
 
 export default CompetitionResultsPage;
-

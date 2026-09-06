@@ -1,12 +1,27 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useState } from 'react';
-import { createChart, IChartApi, ISeriesApi, CandlestickData, Time } from 'lightweight-charts';
-import { ForexSymbol, FOREX_PAIRS } from '@/lib/services/pnl-calculator.service';
-import { usePrices } from '@/contexts/PriceProvider';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { useEffect, useRef, useState } from "react";
+import {
+  createChart,
+  IChartApi,
+  ISeriesApi,
+  CandlestickData,
+  Time,
+} from "lightweight-charts";
+import {
+  ForexSymbol,
+  FOREX_PAIRS,
+} from "@/lib/services/pnl-calculator.service";
+import { usePrices } from "@/contexts/PriceProvider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 
 interface TradingChartProps {
   competitionId: string;
@@ -15,12 +30,12 @@ interface TradingChartProps {
 const TradingChart = ({ competitionId }: TradingChartProps) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
 
   const { prices, subscribe, unsubscribe } = usePrices();
 
-  const [symbol, setSymbol] = useState<ForexSymbol>('EUR/USD');
-  const [timeframe, setTimeframe] = useState<'1m' | '5m' | '15m' | '1h'>('5m');
+  const [symbol, setSymbol] = useState<ForexSymbol>("EUR/USD");
+  const [timeframe, setTimeframe] = useState<"1m" | "5m" | "15m" | "1h">("5m");
   const [isLoading, setIsLoading] = useState(true);
 
   // Subscribe to price updates
@@ -35,12 +50,12 @@ const TradingChart = ({ competitionId }: TradingChartProps) => {
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
-        background: { color: '#1a1d2e' },
-        textColor: '#8892b0',
+        background: { color: "#1a1d2e" },
+        textColor: "#8892b0",
       },
       grid: {
-        vertLines: { color: '#2d3748' },
-        horzLines: { color: '#2d3748' },
+        vertLines: { color: "#2d3748" },
+        horzLines: { color: "#2d3748" },
       },
       width: chartContainerRef.current.clientWidth,
       height: 500,
@@ -54,11 +69,11 @@ const TradingChart = ({ competitionId }: TradingChartProps) => {
     });
 
     const candlestickSeries = chart.addCandlestickSeries({
-      upColor: '#22c55e',
-      downColor: '#ef4444',
+      upColor: "#22c55e",
+      downColor: "#ef4444",
       borderVisible: false,
-      wickUpColor: '#22c55e',
-      wickDownColor: '#ef4444',
+      wickUpColor: "#22c55e",
+      wickDownColor: "#ef4444",
     });
 
     chartRef.current = chart;
@@ -73,10 +88,10 @@ const TradingChart = ({ competitionId }: TradingChartProps) => {
       }
     };
 
-    window.addEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
 
     return () => {
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener("resize", handleResize);
       chart.remove();
     };
   }, []);
@@ -87,15 +102,16 @@ const TradingChart = ({ competitionId }: TradingChartProps) => {
       setIsLoading(true);
 
       try {
-        const response = await fetch('/api/trading/candles', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ symbol, timeframe, count: 100 }),
+        const response = await fetch("/api/trading/candles", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ symbol, timeframe }), // Server uses admin settings for count
         });
 
         if (response.ok) {
           const data = await response.json();
           if (candlestickSeriesRef.current && data.candles) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const formattedCandles = data.candles.map((candle: any) => ({
               time: (candle.timestamp / 1000) as Time,
               open: candle.open,
@@ -109,7 +125,7 @@ const TradingChart = ({ competitionId }: TradingChartProps) => {
           }
         }
       } catch (error) {
-        console.error('Error loading chart data:', error);
+        console.error("Error loading chart data:", error);
       } finally {
         setIsLoading(false);
       }
@@ -123,16 +139,19 @@ const TradingChart = ({ competitionId }: TradingChartProps) => {
     const currentPrice = prices.get(symbol);
     if (!currentPrice || !candlestickSeriesRef.current || isLoading) return;
 
-    console.log(`📊 Chart Update: ${symbol} @ ${currentPrice.mid.toFixed(5)}`);
-
     // Use current timestamp rounded to the nearest timeframe interval
     const getTimeframeSeconds = () => {
       switch (timeframe) {
-        case '1m': return 60;
-        case '5m': return 300;
-        case '15m': return 900;
-        case '1h': return 3600;
-        default: return 300;
+        case "1m":
+          return 60;
+        case "5m":
+          return 300;
+        case "15m":
+          return 900;
+        case "1h":
+          return 3600;
+        default:
+          return 300;
       }
     };
 
@@ -153,7 +172,7 @@ const TradingChart = ({ competitionId }: TradingChartProps) => {
     } catch (error) {
       // If update fails, it's likely because the time is too old
       // This is expected and can be safely ignored
-      console.debug('Chart update skipped:', error);
+      console.debug("Chart update skipped:", error);
     }
   }, [prices, symbol, isLoading, timeframe]);
 
@@ -163,7 +182,10 @@ const TradingChart = ({ competitionId }: TradingChartProps) => {
       <div className="flex items-center gap-4 flex-wrap">
         {/* Symbol Selector */}
         <div className="flex-1 min-w-[200px]">
-          <Select value={symbol} onValueChange={(value) => setSymbol(value as ForexSymbol)}>
+          <Select
+            value={symbol}
+            onValueChange={(value) => setSymbol(value as ForexSymbol)}
+          >
             <SelectTrigger className="bg-dark-300 border-dark-400">
               <SelectValue />
             </SelectTrigger>
@@ -179,13 +201,13 @@ const TradingChart = ({ competitionId }: TradingChartProps) => {
 
         {/* Timeframe Selector */}
         <div className="flex gap-2">
-          {(['1m', '5m', '15m', '1h'] as const).map((tf) => (
+          {(["1m", "5m", "15m", "1h"] as const).map((tf) => (
             <Button
               key={tf}
               size="sm"
-              variant={timeframe === tf ? 'default' : 'ghost'}
+              variant={timeframe === tf ? "default" : "ghost"}
               onClick={() => setTimeframe(tf)}
-              className={timeframe === tf ? 'bg-primary' : ''}
+              className={timeframe === tf ? "bg-primary" : ""}
             >
               {tf}
             </Button>
@@ -217,4 +239,3 @@ const TradingChart = ({ competitionId }: TradingChartProps) => {
 };
 
 export default TradingChart;
-

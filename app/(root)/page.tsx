@@ -1,19 +1,11 @@
-import LiveDashboardWrapper from "@/components/dashboard/LiveDashboardWrapper";
-import { getUserDashboardData } from "@/lib/actions/dashboard.actions";
+import { redirect } from "next/navigation";
 
-// Force dynamic rendering - this page uses authentication
-export const dynamic = 'force-dynamic';
+// This page just redirects to dashboard
+// The actual root "/" shows the landing page for visitors
+export const dynamic = "force-dynamic";
 
-const Home = async () => {
-    // Get user's competition dashboard data
-    const dashboardData = await getUserDashboardData();
+const RootRedirect = async () => {
+  redirect("/dashboard");
+};
 
-    return (
-        <div className="flex min-h-screen home-wrapper">
-          {/* Live Dashboard with Auto-Refresh */}
-          <LiveDashboardWrapper initialData={dashboardData} />
-        </div>
-    )
-}
-
-export default Home;
+export default RootRedirect;

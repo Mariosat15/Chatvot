@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      `viewport-fit=cover` and no user scaling: this is a drag-driven game on a grid sized to the
+      viewport, so a pinch-zoom mid-drag moves the board under the finger. Zoom is a genuine
+      accessibility control, which is why the grid scales itself to the available space instead -
+      a larger phone gets larger cells rather than a scrollable board.
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <!--
+      The launch token appears once, in this document's own URL. `no-referrer` stops it travelling
+      in a `Referer` header from anything this page fetches or links to; every request after the
+      first sends it in a request body instead.
+    -->
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Circuit</title>
+    <link rel="stylesheet" href="/play/app.css" />
+  </head>
+  <body>
+    <!--
+      Every screen ships in the document and is toggled with `hidden`, rather than being built in
+      JavaScript. A timed game must not wait for a second round trip to show its board, and the
+      one thing this page must never do is make the player's clock pay for our loading.
+    -->
+    <main id="app">
+      <section id="screen-loading" class="screen">
+        <div class="spinner" aria-hidden="true"></div>
+        <p class="muted">Loading your round...</p>
+      </section>
+
+      <section id="screen-intro" class="screen" hidden>
+        <h1 id="intro-title">Circuit</h1>
+        <p id="intro-limit" class="lead"></p>
+        <!--
+          The rules are shown as a diagram-free list on purpose: three sentences, no jargon, no
+          brand words. The specification requires the game to be playable with no language, and
+          the terminals are numbered for the same reason - but a player who CAN read English
+          should not have to discover the coverage rule by failing a board.
+        -->
+        <ul id="intro-rules" class="rules">
+          <li>Drag between the two circles that share a number.</li>
+          <li>Paths cannot cross or overlap.</li>
+          <li>Every square must be used.</li>
+        </ul>
+        <button id="start" class="primary" type="button">Start</button>
+        <p class="muted small">Your time starts when you tap Start.</p>
+      </section>
+
+      <section id="screen-play" class="screen play" hidden>
+        <header class="bar">
+          <span id="progress" class="progress"></span>
+          <span id="clock" class="clock" aria-live="off"></span>
+          <button id="leave" class="ghost" type="button">Leave</button>
+        </header>
+
+        <div id="board-wrap" class="board-wrap">
+          <!-- `touch-action: none` lives in the stylesheet: a drag must not scroll the page. -->
+          <svg id="board" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Puzzle grid">
+          </svg>
+        </div>
+
+        <footer class="bar footer">
+          <p id="hint" class="hint" aria-live="polite"></p>
+          <div class="actions">
+            <button id="clear" class="ghost" type="button">Clear</button>
+            <button id="submit" class="primary" type="button" disabled>Submit</button>
+          </div>
+        </footer>
+      </section>
+
+      <section id="screen-result" class="screen" hidden>
+        <h1 id="result-title">Round ended</h1>
+        <p id="result-detail" class="lead"></p>
+        <button id="done" class="primary" type="button">Back to contest</button>
+      </section>
+
+      <section id="screen-error" class="screen" hidden>
+        <h1>Something went wrong</h1>
+        <p id="error-detail" class="lead"></p>
+        <button id="retry" class="ghost" type="button">Try again</button>
+      </section>
+    </main>
+
+    <script type="module" src="/play/app.js"></script>
+  </body>
+</html>

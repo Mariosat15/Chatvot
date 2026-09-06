@@ -1,29 +1,91 @@
-import { Schema, model, models, Document } from 'mongoose';
+import { Schema, model, models, Document } from "mongoose";
 
 // Competition Structure
 export interface ICompetition extends Document {
   name: string; // "Weekly Forex Challenge"
   description: string;
   slug: string; // URL-friendly name
-  
+
+  // Game identity (X1 foundation)
+  // Reason: the contest engine is game-agnostic; these two fields are how it knows which
+  // game module settles, ranks and scores a contest. Defaulted to trading so every
+  // existing document and every writer that predates the games work stays correct.
+  gameType: string; // "trading" | "provider" - selects the game MODULE
+  gameKey: string; // e.g. "trading" or "provider:acme:trivia-blitz" - IMMUTABLE once written
+
+  // Provider-game round settings ("External game plans/04" section 2.1).
+  //
+  // X3 deliberately passed these in as a `RoundContestConfig` rather than storing them,
+  // because nothing created a provider contest yet and six unread fields on a mirrored
+  // model would have been dead weight. The admin contest wizard is that caller, so they
+  // land here now.
+  //
+  // ALL OPTIONAL, AND THAT IS NOT LAZINESS. A trading contest has no play window and no
+  // attempts policy; making any of these required would make every existing document
+  // invalid and every trading writer wrong. `gameConfig` being absent IS the statement
+  // "this is not a provider contest".
+  gameConfig?: {
+    providerKey: string;
+    gameCode: string;
+    /** Operator answers, already validated against the title's `configSchema`. */
+    settings?: Record<string, unknown>;
+  };
+  /** Generated once at creation and shared by every round, so all players get the same content. */
+  contentSeed?: string;
+  /** When play may happen. Distinct from registration close and from contest end. */
+  playWindowStart?: Date;
+  playWindowEnd?: Date;
+  /** How long after the play window a late provider result is still accepted. */
+  resultGracePeriodSeconds?: number;
+  attemptsPolicy?: "single" | "best_of_n" | "sum_of_n";
+  attemptsAllowed?: number;
+  unresolvedRoundPolicy?: "score_zero" | "exclude" | "hold_and_alert";
+
   // Entry & Capital
   entryFee: number; // Credits required to enter
   startingCapital: number; // Trading points (virtual capital)
   minParticipants: number; // Minimum to start
   maxParticipants: number; // Maximum allowed
   currentParticipants: number; // Current count
-  
+
   // Timing
   startTime: Date;
   endTime: Date;
   registrationDeadline: Date;
-  
+
   // Status
-  status: 'draft' | 'upcoming' | 'active' | 'completed' | 'cancelled';
+  status:
+    | "draft"
+    | "upcoming"
+    | "active"
+    | "finalizing"
+    | "completed"
+    | "cancelled"
+    | "emergency_ended";
   cancellationReason?: string; // Reason if cancelled (e.g., "Did not meet minimum participants")
-  
+
+  // Pause State (for risk mitigation)
+  isPaused: boolean;
+  pausedAt?: Date;
+  pauseReason?: string;
+  totalPauseDuration: number; // Total milliseconds the competition was paused
+  pauseHistory: {
+    pausedAt: Date;
+    resumedAt?: Date;
+    duration?: number; // milliseconds
+    reason: string;
+    pausedBy: string; // Admin ID
+    resumedBy?: string;
+  }[];
+
+  // Emergency End (for price feed issues)
+  emergencyEndedAt?: Date;
+  emergencyEndReason?: string;
+  emergencyEndedBy?: string; // Admin ID
+  usedSnapshotId?: string; // ID of price snapshot used for emergency finalization
+
   // Trading Rules
-  assetClasses: ('stocks' | 'forex' | 'crypto' | 'indices')[];
+  assetClasses: ("stocks" | "forex" | "crypto" | "indices")[];
   allowedSymbols: string[]; // Whitelist (empty = all allowed)
   blockedSymbols: string[]; // Blacklist
   leverage: {
@@ -32,14 +94,14 @@ export interface ICompetition extends Document {
     max: number;
     default: number;
   };
-  
+
   // Competition Type
-  competitionType: 'time_based' | 'goal_based' | 'hybrid';
+  competitionType: "time_based" | "goal_based" | "hybrid";
   goalConfig?: {
     targetReturn: number; // First to reach X% wins
     targetCapital: number; // First to reach X capital wins
   };
-  
+
   // Prize Distribution
   prizePool: number; // Total credits in pool
   platformFeePercentage: number; // % taken by platform
@@ -47,31 +109,68 @@ export interface ICompetition extends Document {
     rank: number;
     percentage: number;
   }[]; // e.g., [{ rank: 1, percentage: 70 }, { rank: 2, percentage: 20 }, ...]
-  
+
   // Competition Rules & Ranking
   rules: {
-    rankingMethod: 'pnl' | 'roi' | 'total_capital' | 'win_rate' | 'total_wins' | 'profit_factor';
-    tieBreaker1: 'trades_count' | 'win_rate' | 'total_capital' | 'roi' | 'join_time' | 'split_prize';
-    tieBreaker2?: 'trades_count' | 'win_rate' | 'total_capital' | 'roi' | 'join_time' | 'split_prize';
+    rankingMethod:
+      | "pnl"
+      | "roi"
+      | "total_capital"
+      | "win_rate"
+      | "total_wins"
+      | "profit_factor";
+    tieBreaker1:
+      | "trades_count"
+      | "win_rate"
+      | "total_capital"
+      | "roi"
+      | "join_time"
+      | "split_prize";
+    tieBreaker2?:
+      | "trades_count"
+      | "win_rate"
+      | "total_capital"
+      | "roi"
+      | "join_time"
+      | "split_prize";
     minimumTrades: number;
     minimumWinRate?: number;
-    tiePrizeDistribution: 'split_equally' | 'split_weighted' | 'first_gets_all';
+    tiePrizeDistribution: "split_equally" | "split_weighted" | "first_gets_all";
     disqualifyOnLiquidation: boolean;
   };
-  
+
   // Level Requirements
   levelRequirement: {
     enabled: boolean;
     minLevel: number; // 1-10 (1=Novice, 10=Trading God)
     maxLevel?: number; // Optional max level (for beginner-only competitions)
   };
-  
+
+  // Difficulty Settings
+  difficulty?: {
+    mode: "auto" | "manual";
+    manualLevel?:
+      | "beginner"
+      | "intermediate"
+      | "advanced"
+      | "expert"
+      | "extreme";
+  };
+
   // Restrictions
   maxPositionSize: number; // Max % of capital per position
   maxOpenPositions: number; // Max simultaneous positions
   allowShortSelling: boolean;
   marginCallThreshold: number; // % of capital before forced close
-  
+
+  // Margin Settings (copied from trading risk settings at creation time)
+  marginSettings?: {
+    liquidation: number; // Stopout level %
+    call: number; // Margin call level %
+    warning: number; // Warning level %
+    safe: number; // Safe level %
+  };
+
   // Risk Limits (per-competition)
   riskLimits: {
     maxDrawdownPercent: number; // Max drawdown from starting capital before trading blocked
@@ -80,27 +179,55 @@ export interface ICompetition extends Document {
     equityCheckEnabled: boolean; // Enable equity-based checks (anti-mirror trading)
     enabled: boolean; // Whether to enforce these limits
   };
-  
+
   // Results
   winnerId?: string;
   winnerPnL?: number;
+  noWinners?: boolean;
+  earlyEndReason?: string;
+  /**
+   * The stored result of a finished contest.
+   *
+   * FOUR FIELDS WERE BEING DISCARDED HERE UNTIL X5, and three of them were trading's.
+   * Finalization has always written `isTied`, `qualificationStatus` and
+   * `disqualificationReason` into this array, and this schema declared none of them - so
+   * Mongoose's strict mode dropped them on every save while reporting success. The stored
+   * leaderboard has therefore never recorded whether a rank was shared or why a player was
+   * disqualified, and every screen reading it back has shown neither.
+   *
+   * `score` is the X5 addition. Without it a provider contest's stored leaderboard would
+   * hold ranks and prizes but no results at all.
+   *
+   * The trading fields stay optional because a game with no virtual account has no capital
+   * and no profit - chapter 05 section 10: generalised, explicitly scoped, or absent.
+   */
   finalLeaderboard?: {
     rank: number;
     userId: string;
     username: string;
-    finalCapital: number;
-    pnl: number;
-    pnlPercentage: number;
-    totalTrades: number;
-    winRate: number;
     prizeAmount: number;
+    /** Trading. */
+    finalCapital?: number;
+    pnl?: number;
+    pnlPercentage?: number;
+    totalTrades?: number;
+    winRate?: number;
+    /** Score-reporting games. Stored RAW, never the negated comparison value. */
+    score?: number;
+    isTied?: boolean;
+    qualificationStatus?: string;
+    disqualificationReason?: string;
   }[];
-  
+
   // Admin
   createdBy: string; // Admin ID
   imageUrl?: string;
   tags: string[]; // 'beginner', 'advanced', 'forex', etc.
-  
+
+  // Game Master (if created by a game master)
+  gameMasterId?: string; // User ID of the game master who created this
+  gameMasterName?: string; // Cached for display
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -123,14 +250,66 @@ const CompetitionSchema = new Schema<ICompetition>(
       lowercase: true,
       trim: true,
     },
+    // Reason: default rather than required. A rolling deploy has old code writing
+    // contests with no game label, and an unlabelled contest would later be settled by
+    // whichever module the reader guessed - invariant 5 in "External game plans/11".
+    gameType: {
+      type: String,
+      required: true,
+      default: "trading",
+      index: true,
+    },
+      gameKey: {
+        type: String,
+        required: true,
+        default: "trading",
+        index: true,
+      },
+      // Provider round settings - see the interface for why every one is optional.
+      gameConfig: {
+        type: {
+          providerKey: { type: String, required: true },
+          gameCode: { type: String, required: true },
+          settings: { type: Schema.Types.Mixed },
+        },
+        required: false,
+        default: undefined,
+        _id: false,
+      },
+      contentSeed: { type: String },
+      playWindowStart: { type: Date },
+      playWindowEnd: { type: Date },
+      resultGracePeriodSeconds: { type: Number, min: 0, default: undefined },
+      attemptsPolicy: {
+        type: String,
+        enum: ["single", "best_of_n", "sum_of_n"],
+        default: undefined,
+      },
+      attemptsAllowed: { type: Number, min: 1, default: undefined },
+      unresolvedRoundPolicy: {
+        type: String,
+        enum: ["score_zero", "exclude", "hold_and_alert"],
+        default: undefined,
+      },
     entryFee: {
       type: Number,
       required: true,
       min: 0,
     },
+    // CONDITIONALLY REQUIRED, so a provider contest can exist at all.
+    //
+    // Virtual trading capital is meaningless for a chess puzzle or a reflex game, but this
+    // was `required: true, min: 100` - so a provider contest could not be saved without
+    // inventing a number, and an invented number is worse than an absent one: it renders in
+    // any summary that has not yet learned about games.
+    //
+    // Trading is unaffected. The predicate is true for every existing document, because
+    // `gameType` defaults to "trading", so nothing already stored becomes invalid.
     startingCapital: {
       type: Number,
-      required: true,
+      required: function (this: { gameType?: string }) {
+        return (this.gameType ?? "trading") === "trading";
+      },
       min: 100,
     },
     minParticipants: {
@@ -166,16 +345,62 @@ const CompetitionSchema = new Schema<ICompetition>(
     status: {
       type: String,
       required: true,
-      enum: ['draft', 'upcoming', 'active', 'completed', 'cancelled'],
-      default: 'draft',
+      enum: [
+        "draft",
+        "upcoming",
+        "active",
+        "finalizing",
+        "completed",
+        "cancelled",
+        "emergency_ended",
+      ],
+      default: "draft",
     },
     cancellationReason: {
+      type: String,
+    },
+    // Pause State
+    isPaused: {
+      type: Boolean,
+      default: false,
+    },
+    pausedAt: {
+      type: Date,
+    },
+    pauseReason: {
+      type: String,
+    },
+    totalPauseDuration: {
+      type: Number,
+      default: 0,
+    },
+    pauseHistory: [
+      {
+        pausedAt: { type: Date, required: true },
+        resumedAt: { type: Date },
+        duration: { type: Number },
+        reason: { type: String, required: true },
+        pausedBy: { type: String, required: true },
+        resumedBy: { type: String },
+      },
+    ],
+    // Emergency End
+    emergencyEndedAt: {
+      type: Date,
+    },
+    emergencyEndReason: {
+      type: String,
+    },
+    emergencyEndedBy: {
+      type: String,
+    },
+    usedSnapshotId: {
       type: String,
     },
     assetClasses: [
       {
         type: String,
-        enum: ['stocks', 'forex', 'crypto', 'indices'],
+        enum: ["stocks", "forex", "crypto", "indices"],
       },
     ],
     allowedSymbols: [String],
@@ -189,8 +414,8 @@ const CompetitionSchema = new Schema<ICompetition>(
     competitionType: {
       type: String,
       required: true,
-      enum: ['time_based', 'goal_based', 'hybrid'],
-      default: 'time_based',
+      enum: ["time_based", "goal_based", "hybrid"],
+      default: "time_based",
     },
     goalConfig: {
       targetReturn: { type: Number },
@@ -218,19 +443,40 @@ const CompetitionSchema = new Schema<ICompetition>(
     rules: {
       rankingMethod: {
         type: String,
-        enum: ['pnl', 'roi', 'total_capital', 'win_rate', 'total_wins', 'profit_factor'],
+        enum: [
+          "pnl",
+          "roi",
+          "total_capital",
+          "win_rate",
+          "total_wins",
+          "profit_factor",
+        ],
         required: true,
-        default: 'pnl',
+        default: "pnl",
       },
       tieBreaker1: {
         type: String,
-        enum: ['trades_count', 'win_rate', 'total_capital', 'roi', 'join_time', 'split_prize'],
+        enum: [
+          "trades_count",
+          "win_rate",
+          "total_capital",
+          "roi",
+          "join_time",
+          "split_prize",
+        ],
         required: true,
-        default: 'trades_count',
+        default: "trades_count",
       },
       tieBreaker2: {
         type: String,
-        enum: ['trades_count', 'win_rate', 'total_capital', 'roi', 'join_time', 'split_prize'],
+        enum: [
+          "trades_count",
+          "win_rate",
+          "total_capital",
+          "roi",
+          "join_time",
+          "split_prize",
+        ],
       },
       minimumTrades: {
         type: Number,
@@ -245,9 +491,9 @@ const CompetitionSchema = new Schema<ICompetition>(
       },
       tiePrizeDistribution: {
         type: String,
-        enum: ['split_equally', 'split_weighted', 'first_gets_all'],
+        enum: ["split_equally", "split_weighted", "first_gets_all"],
         required: true,
-        default: 'split_equally',
+        default: "split_equally",
       },
       disqualifyOnLiquidation: {
         type: Boolean,
@@ -273,6 +519,17 @@ const CompetitionSchema = new Schema<ICompetition>(
         max: 10,
       },
     },
+    difficulty: {
+      mode: {
+        type: String,
+        enum: ["auto", "manual"],
+        default: "auto",
+      },
+      manualLevel: {
+        type: String,
+        enum: ["beginner", "intermediate", "advanced", "expert", "extreme"],
+      },
+    },
     maxPositionSize: {
       type: Number,
       required: true,
@@ -295,9 +552,18 @@ const CompetitionSchema = new Schema<ICompetition>(
     marginCallThreshold: {
       type: Number,
       required: true,
-      default: 50, // 50% of starting capital
+      default: 100, // Margin call level from risk settings (can be 100%+)
       min: 10,
-      max: 90,
+      max: 1000, // Allow high margin call levels
+    },
+    marginSettings: {
+      type: {
+        liquidation: { type: Number, default: 50 },
+        call: { type: Number, default: 100 },
+        warning: { type: Number, default: 150 },
+        safe: { type: Number, default: 200 },
+      },
+      required: false,
     },
     riskLimits: {
       maxDrawdownPercent: {
@@ -333,17 +599,29 @@ const CompetitionSchema = new Schema<ICompetition>(
     winnerPnL: {
       type: Number,
     },
+    noWinners: {
+      type: Boolean,
+    },
+    earlyEndReason: {
+      type: String,
+    },
     finalLeaderboard: [
       {
         rank: Number,
         userId: String,
         username: String,
+        prizeAmount: Number,
         finalCapital: Number,
         pnl: Number,
         pnlPercentage: Number,
         totalTrades: Number,
         winRate: Number,
-        prizeAmount: Number,
+        // Add-only, X5. `score` is what a provider contest's result IS; the other three
+        // have been written by trading finalization all along and silently discarded.
+        score: Number,
+        isTied: Boolean,
+        qualificationStatus: String,
+        disqualificationReason: String,
       },
     ],
     createdBy: {
@@ -354,10 +632,17 @@ const CompetitionSchema = new Schema<ICompetition>(
       type: String,
     },
     tags: [String],
+    gameMasterId: {
+      type: String,
+      index: true, // For finding competitions by game master
+    },
+    gameMasterName: {
+      type: String,
+    },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes for fast queries
@@ -365,33 +650,43 @@ CompetitionSchema.index({ status: 1, startTime: -1 });
 // Note: slug already has unique index from schema definition (unique: true)
 CompetitionSchema.index({ createdBy: 1 });
 CompetitionSchema.index({ status: 1, registrationDeadline: 1 });
+// PERFORMANCE: Additional indexes for common queries
+CompetitionSchema.index({ status: 1, endTime: 1 }); // Finding active/ending competitions
+CompetitionSchema.index({ status: 1, currentParticipants: 1 }); // Finding competitions with spots
+CompetitionSchema.index({ tags: 1, status: 1 }); // Tag-based filtering
+CompetitionSchema.index({ gameMasterId: 1, status: 1 }); // Game master competitions
+// Game-scoped queries: contest lists filtered by game, and the finalization sweeps
+CompetitionSchema.index({ gameType: 1, status: 1 });
+CompetitionSchema.index({ gameKey: 1, status: 1 });
+// Reason: the reconciliation sweep asks "which contests have a play window closing soon",
+// which without this index is a collection scan on the hot path ("04" section 2.1).
+CompetitionSchema.index({ status: 1, playWindowEnd: 1 });
 
 // Virtual for days until start
-CompetitionSchema.virtual('daysUntilStart').get(function () {
-  if (this.status !== 'upcoming') return 0;
+CompetitionSchema.virtual("daysUntilStart").get(function () {
+  if (this.status !== "upcoming") return 0;
   const now = new Date();
   const diff = this.startTime.getTime() - now.getTime();
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 });
 
 // Virtual for competition duration
-CompetitionSchema.virtual('durationDays').get(function () {
+CompetitionSchema.virtual("durationDays").get(function () {
   const diff = this.endTime.getTime() - this.startTime.getTime();
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 });
 
 // Virtual for is registration open
-CompetitionSchema.virtual('isRegistrationOpen').get(function () {
+CompetitionSchema.virtual("isRegistrationOpen").get(function () {
   const now = new Date();
   return (
-    this.status === 'upcoming' &&
+    this.status === "upcoming" &&
     now < this.registrationDeadline &&
     this.currentParticipants < this.maxParticipants
   );
 });
 
 const Competition =
-  models?.Competition || model<ICompetition>('Competition', CompetitionSchema);
+  models?.Competition || model<ICompetition>("Competition", CompetitionSchema);
 
 export default Competition;
-

@@ -1,6 +1,6 @@
 <div align="center">
   <br />
-  <img src="public/readme/hero.webp" alt="Chartvolt Banner">
+  
   <br />
 
   <div>
@@ -336,8 +336,28 @@ chartvolt/
 ├── contexts/                     # React contexts
 ├── hooks/                        # Custom React hooks
 ├── inngest/                      # Background job definitions
-└── public/                       # Static assets
+├── public/                       # Static assets
+└── Videos/                       # Tutorial video files (committed, see Videos/README.md)
 ```
+
+### Tutorial Videos
+
+The platform ships a built-in tutorial library that surfaces in
+**Dashboard → Tutorials** on the user side.
+
+- Source video files live under `Videos/` at the repo root and are
+  committed to git so they ship as defaults with every white-label
+  deployment.
+- Admins manage tutorials via **Admin → Help → Tutorial Videos**
+  (upload, edit metadata, toggle visibility, delete). Uploaded files
+  also land in `Videos/` so a white-label customer can commit their
+  own tutorials to their branch and override the defaults.
+- Videos are streamed with HTTP Range support from
+  `/api/tutorials/videos/[filename]` so the player can scrub without
+  re-downloading. Metadata lives in MongoDB collection
+  `tutorialvideos`.
+
+See [`Videos/README.md`](./Videos/README.md) for the full workflow.
 
 ---
 

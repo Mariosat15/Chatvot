@@ -1,18 +1,55 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Trophy, Loader2, CheckCircle, AlertCircle, DollarSign } from 'lucide-react';
-import { enterCompetition } from '@/lib/actions/trading/competition.actions';
-import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
-import Link from 'next/link';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Trophy,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+  DollarSign,
+  History,
+  Ban,
+  Skull,
+  Lock,
+  TrendingUp,
+} from "lucide-react";
+import { enterCompetition } from "@/lib/actions/trading/competition.actions";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import Link from "next/link";
+import { GameIcon } from "@/components/ui/GameIcon";
+import { GAME_ICONS, type GameIconName } from "@/lib/constants/game-icons";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
+import ActionTermsDialog, {
+  ACTION_TERM_SLUGS,
+} from "@/components/ActionTermsDialog";
+import { isProviderContest } from "@/lib/services/games/contest-config";
 
+// Level names for display
+const LEVEL_NAMES: Record<number, { icon: string; title: string }> = {
+  1: { icon: "🌱", title: "Novice Trader" },
+  2: { icon: "📚", title: "Apprentice Trader" },
+  3: { icon: "⚔️", title: "Skilled Trader" },
+  4: { icon: "🎯", title: "Expert Trader" },
+  5: { icon: "💎", title: "Elite Trader" },
+  6: { icon: "👑", title: "Master Trader" },
+  7: { icon: "🔥", title: "Grand Master" },
+  8: { icon: "⚡", title: "Trading Champion" },
+  9: { icon: "🌟", title: "Market Legend" },
+  10: { icon: "👑", title: "Trading God" },
+};
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface CompetitionEntryButtonProps {
+   
   competition: any;
   userBalance: number;
   isUserIn: boolean;
   isFull: boolean;
+  participantStatus?: string; // 'active' | 'liquidated' | 'disqualified' | 'completed' | 'cancelled'
+  userLevel?: { level: number; title: string; icon: string };
+  registrationClosed?: boolean; // Whether registration deadline has passed
 }
 
 export default function CompetitionEntryButton({
@@ -20,43 +57,161 @@ export default function CompetitionEntryButton({
   userBalance,
   isUserIn,
   isFull,
+  participantStatus,
+  userLevel = { level: 1, title: "Novice Trader", icon: "🌱" },
+  registrationClosed = false,
 }: CompetitionEntryButtonProps) {
   const [entering, setEntering] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const router = useRouter();
+  const { settings } = useAppSettings();
+  const cs = settings?.currency?.symbol || "€";
 
   const entryFee = competition.entryFee || competition.entryFeeCredits || 0;
-  const startingCapital = competition.startingCapital || competition.startingTradingPoints || 0;
+  const startingCapital =
+    competition.startingCapital || competition.startingTradingPoints || 0;
   const canAfford = userBalance >= entryFee;
-  const isActive = competition.status === 'active';
-  const isUpcoming = competition.status === 'upcoming';
-  const canEnter = (isActive || isUpcoming) && !isFull && canAfford && !isUserIn;
 
+  /**
+   * Whether this contest is played through an external game provider rather than by trading.
+   *
+   * Reason it uses the strict helper rather than `gameType === "provider"`: this decides where
+   * the button SENDS the player, and `/play` can do nothing without a provider key and a game
+   * code. A contest labelled provider but missing them would land the player on a screen that
+   * can only refuse, whereas leaving them on the contest page at least tells them the truth.
+   * That is the opposite of the admin list's question, which is only "how should this row be
+   * labelled" and therefore uses the looser `hasProviderGameLabel`.
+   *
+   * `contest-config.ts` is model-free, so importing it into a client component pulls no database
+   * code into the browser bundle - its only import is a type.
+   */
+  const isProviderGame = isProviderContest(competition);
+
+  const isActive = competition.status === "active";
+  const isUpcoming = competition.status === "upcoming";
+  const isCompleted = competition.status === "completed";
+
+  // Check level requirements
+  const levelReq = competition.levelRequirement;
+  const hasLevelReq = levelReq?.enabled;
+  const minLevel = levelReq?.minLevel || 1;
+  const maxLevel = levelReq?.maxLevel;
+
+  // Determine if user meets level requirements
+  const meetsMinLevel = !hasLevelReq || userLevel.level >= minLevel;
+  const meetsMaxLevel =
+    !hasLevelReq || !maxLevel || userLevel.level <= maxLevel;
+  const meetsLevelReq = meetsMinLevel && meetsMaxLevel;
+
+  // Get level requirement message
+  const getLevelReqMessage = () => {
+    if (!hasLevelReq) return null;
+
+    const minLvl = Number(minLevel);
+    // eslint-disable-next-line security/detect-object-injection
+    const minLevelInfo = LEVEL_NAMES[minLvl] || {
+      icon: "🌱",
+      title: `Level ${minLevel}`,
+    };
+    const maxLvl = maxLevel ? Number(maxLevel) : null;
+    // eslint-disable-next-line security/detect-object-injection
+    const maxLevelInfo = maxLvl ? LEVEL_NAMES[maxLvl] : null;
+
+    if (!meetsMinLevel) {
+      return {
+        type: "too_low",
+        message: `Requires ${minLevelInfo.icon} ${minLevelInfo.title} or higher`,
+        detailText: `Your level: `,
+        detailIcon: userLevel.icon,
+        detailTitle: userLevel.title,
+      };
+    }
+
+    if (!meetsMaxLevel && maxLevelInfo) {
+      return {
+        type: "too_high",
+        message: `Only for traders up to ${maxLevelInfo.icon} ${maxLevelInfo.title}`,
+        detailText: `Your level: `,
+        detailIcon: userLevel.icon,
+        detailTitle: userLevel.title,
+      };
+    }
+
+    return null;
+  };
+
+  const levelReqMessage = getLevelReqMessage();
+
+  // Reason: Block entry if registration deadline has passed, even if competition is still "active"
+  const canEnter =
+    (isActive || isUpcoming) &&
+    !isFull &&
+    canAfford &&
+    !isUserIn &&
+    meetsLevelReq &&
+    !registrationClosed;
+
+  // Check if user is disqualified (liquidated or disqualified status)
+  const isDisqualified =
+    participantStatus === "liquidated" || participantStatus === "disqualified";
+
+  // Get disqualification reason for display
+  const getDisqualificationReason = () => {
+    switch (participantStatus) {
+      case "liquidated":
+        return "Your account was liquidated due to margin call.";
+      case "disqualified":
+        return "You were disqualified from this competition.";
+      default:
+        return "You are no longer eligible for prizes.";
+    }
+  };
+
+  // Reason: Show terms dialog before entering a competition
   const handleEnter = async () => {
     if (!canAfford) {
-      toast.error(`Insufficient balance. Need €${entryFee}`);
+      toast.error(`Insufficient balance. Need ${cs}${entryFee}`);
       return;
     }
 
     if (isFull) {
-      toast.error('Competition is full');
+      toast.error("Competition is full");
       return;
     }
 
     if (isUserIn) {
-      toast.info('You are already in this competition');
+      toast.info("You are already in this competition");
       return;
     }
 
+    // Show terms dialog before proceeding
+    setShowTerms(true);
+  };
+
+  /** Called after user accepts terms — proceeds with competition entry */
+  const proceedAfterTerms = async () => {
+    setShowTerms(false);
     setEntering(true);
 
     try {
       // Device fingerprinting happens globally via FingerprintProvider
       // Server-side restriction checks happen in enterCompetition action
-      await enterCompetition(competition._id);
-      toast.success('Successfully entered competition!');
-      router.refresh();
+      const result = await enterCompetition(competition._id);
+      if (result.success) {
+        toast.success("Successfully entered competition!");
+        router.refresh();
+      } else {
+        toast.error("Entry blocked", {
+          description: result.error || "Unable to enter competition. Please try again.",
+        });
+        setEntering(false);
+      }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to enter competition');
+      const description =
+        error instanceof Error && error.message
+          ? error.message
+          : "Something went wrong. Please try again or contact support if the issue persists.";
+      toast.error("Failed to enter competition", { description });
       setEntering(false);
     }
   };
@@ -66,51 +221,129 @@ export default function CompetitionEntryButton({
       {/* Already Entered */}
       {isUserIn ? (
         <div className="space-y-4">
-          <div className="flex items-center gap-3 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-            <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-green-400">You're in this competition!</p>
-              <p className="text-xs text-gray-400 mt-1">
-                {isActive ? 'Start trading now' : 'Competition will start soon'}
-              </p>
-            </div>
-          </div>
+          {/* Disqualified State */}
+          {isDisqualified ? (
+            <>
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+                {participantStatus === "liquidated" ? (
+                  <Skull className="h-5 w-5 text-red-500 shrink-0" />
+                ) : (
+                  <Ban className="h-5 w-5 text-red-500 shrink-0" />
+                )}
+                <div>
+                  <p className="text-sm font-medium text-red-400">
+                    You are disqualified
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {getDisqualificationReason()}
+                  </p>
+                </div>
+              </div>
 
-          {isActive ? (
-            <Link href={`/competitions/${competition._id}/trade`}>
-              <Button className="w-full bg-blue-500 hover:bg-blue-600">
-                <Trophy className="mr-2 h-4 w-4" />
-                Start Trading
-              </Button>
-            </Link>
-          ) : isUpcoming ? (
-            <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-              <p className="text-xs text-yellow-400 text-center">
-                ⏰ Trading will unlock when the competition starts
-              </p>
-            </div>
-          ) : null}
+              {/*
+                Withheld from a provider contest, not relabelled: there are no trades to show,
+                so the destination has nothing in it. The page's own "View Results" link already
+                covers what a provider player wants here, and offering a history button that
+                opens an empty trading terminal would read as their rounds having been lost.
+              */}
+              {!isProviderGame && (
+                <Link
+                  href={`/competitions/${competition._id}/trade?viewOnly=true`}
+                >
+                  <Button className="w-full bg-purple-500 hover:bg-purple-600 cursor-pointer active:scale-95 transition-all duration-150 shadow-lg hover:shadow-purple-500/25">
+                    <History className="mr-2 h-4 w-4" />
+                    View Trade History
+                  </Button>
+                </Link>
+              )}
+            </>
+          ) : (
+            /* Active Participant */
+            <>
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-green-400">
+                    You&apos;re in this competition!
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {isActive
+                      ? isProviderGame
+                        ? "Play your round now"
+                        : "Start trading now"
+                      : isCompleted
+                        ? "Competition has ended"
+                        : "Competition will start soon"}
+                  </p>
+                </div>
+              </div>
+
+              {isActive ? (
+                /*
+                  A provider contest is played at /play, never at /trade. Reason this is a
+                  branch and not a redirect on the trade page alone: the trade route guards
+                  itself too, but a player who is shown a button labelled "Start Trading" for a
+                  puzzle has already been told something false, and a bounce afterwards does not
+                  unsay it.
+                */
+                <Link
+                  href={
+                    isProviderGame
+                      ? `/competitions/${competition._id}/play`
+                      : `/competitions/${competition._id}/trade`
+                  }
+                >
+                  <Button className="w-full bg-blue-500 hover:bg-blue-600 cursor-pointer active:scale-95 transition-all duration-150 shadow-lg hover:shadow-blue-500/25">
+                    <Trophy className="mr-2 h-4 w-4" />
+                    {isProviderGame ? "Play" : "Start Trading"}
+                  </Button>
+                </Link>
+              ) : isUpcoming ? (
+                <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                  <p className="text-xs text-yellow-400 text-center">
+                    ⏰{" "}
+                    {isProviderGame
+                      ? "Play will unlock when the competition starts"
+                      : "Trading will unlock when the competition starts"}
+                  </p>
+                </div>
+              ) : isCompleted && !isProviderGame ? (
+                /* See the disqualified branch above for why a provider contest gets no
+                   trade-history button. */
+                <Link
+                  href={`/competitions/${competition._id}/trade?viewOnly=true`}
+                >
+                  <Button className="w-full bg-purple-500 hover:bg-purple-600 cursor-pointer active:scale-95 transition-all duration-150 shadow-lg hover:shadow-purple-500/25">
+                    <History className="mr-2 h-4 w-4" />
+                    View Trade History
+                  </Button>
+                </Link>
+              ) : null}
+            </>
+          )}
         </div>
       ) : (
         /* Entry Section */
         <div className="space-y-4">
           <div>
-            <h3 className="text-lg font-semibold text-gray-100 mb-2">Entry Requirements</h3>
+            <h3 className="text-lg font-semibold text-gray-100 mb-2">
+              Entry Requirements
+            </h3>
             <div className="space-y-2">
               <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50">
                 <span className="text-sm text-gray-400">Entry Fee</span>
                 <span className="text-sm font-semibold text-gray-100">
-                  €{entryFee}
+                  {cs}{entryFee}
                 </span>
               </div>
               <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50">
                 <span className="text-sm text-gray-400">Your Balance</span>
                 <span
                   className={`text-sm font-semibold ${
-                    canAfford ? 'text-green-500' : 'text-red-500'
+                    canAfford ? "text-green-500" : "text-red-500"
                   }`}
                 >
-                  €{userBalance.toFixed(2)}
+                  {cs}{userBalance.toFixed(2)}
                 </span>
               </div>
             </div>
@@ -120,19 +353,32 @@ export default function CompetitionEntryButton({
           <Button
             onClick={handleEnter}
             disabled={!canEnter || entering}
-            className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold 
+              disabled:opacity-50 disabled:cursor-not-allowed
+              cursor-pointer active:scale-95 transition-all duration-150
+              shadow-lg hover:shadow-yellow-500/25"
           >
             {entering ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Entering...
               </>
+            ) : registrationClosed ? (
+              <>
+                <Lock className="mr-2 h-4 w-4" />
+                Registration Closed
+              </>
+            ) : !meetsLevelReq ? (
+              <>
+                <Lock className="mr-2 h-4 w-4" />
+                Level Restricted
+              </>
             ) : isFull ? (
-              'Competition Full'
+              "Competition Full"
             ) : !canAfford ? (
               <>
                 <DollarSign className="mr-2 h-4 w-4" />
-                Need €{Math.abs(entryFee - userBalance).toFixed(2)} More
+                Need {cs}{Math.abs(entryFee - userBalance).toFixed(2)} More
               </>
             ) : (
               <>
@@ -142,8 +388,65 @@ export default function CompetitionEntryButton({
             )}
           </Button>
 
+          {/* Registration Closed Warning */}
+          {registrationClosed && !isUserIn && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+              <Lock className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-red-400">
+                Registration for this competition has closed. No new entries are being accepted.
+              </p>
+            </div>
+          )}
+
+          {/* Level Requirement Warning */}
+          {levelReqMessage && (
+            <div
+              className={`flex items-start gap-2 p-3 rounded-lg ${
+                levelReqMessage.type === "too_low"
+                  ? "bg-purple-500/10 border border-purple-500/20"
+                  : "bg-orange-500/10 border border-orange-500/20"
+              }`}
+            >
+              {levelReqMessage.type === "too_low" ? (
+                <TrendingUp className="h-4 w-4 text-purple-500 shrink-0 mt-0.5" />
+              ) : (
+                <Lock className="h-4 w-4 text-orange-500 shrink-0 mt-0.5" />
+              )}
+              <div>
+                <p
+                  className={`text-xs font-medium ${
+                    levelReqMessage.type === "too_low"
+                      ? "text-purple-400"
+                      : "text-orange-400"
+                  }`}
+                >
+                  {levelReqMessage.message}
+                </p>
+                <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                  {levelReqMessage.detailText}
+                  {levelReqMessage.detailIcon && levelReqMessage.detailIcon in GAME_ICONS ? (
+                    <GameIcon name={levelReqMessage.detailIcon as GameIconName} size={12} />
+                  ) : levelReqMessage.detailIcon ? (
+                    <span>{levelReqMessage.detailIcon}</span>
+                  ) : null}
+                  {levelReqMessage.detailTitle}
+                </p>
+                {levelReqMessage.type === "too_low" && (
+                  <Link href="/profile">
+                    <Button
+                      variant="link"
+                      className="h-auto p-0 text-xs text-purple-400 underline mt-1 cursor-pointer hover:text-purple-300 active:scale-95 transition-all"
+                    >
+                      Level Up Your Account →
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Warnings */}
-          {!canAfford && (
+          {!canAfford && meetsLevelReq && (
             <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
               <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
               <div>
@@ -153,7 +456,7 @@ export default function CompetitionEntryButton({
                 <Link href="/wallet">
                   <Button
                     variant="link"
-                    className="h-auto p-0 text-xs text-red-400 underline mt-1"
+                    className="h-auto p-0 text-xs text-red-400 underline mt-1 cursor-pointer hover:text-red-300 active:scale-95 transition-all"
                   >
                     Go to Wallet
                   </Button>
@@ -162,7 +465,7 @@ export default function CompetitionEntryButton({
             </div>
           )}
 
-          {isFull && (
+          {isFull && meetsLevelReq && (
             <div className="flex items-start gap-2 p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
               <AlertCircle className="h-4 w-4 text-orange-500 shrink-0 mt-0.5" />
               <p className="text-xs text-orange-400">
@@ -174,13 +477,20 @@ export default function CompetitionEntryButton({
           {/* Info */}
           <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
             <p className="text-xs text-blue-300">
-              ℹ️ Entry fee is non-refundable. You will receive{' '}
-              ${startingCapital.toLocaleString()} in trading capital to compete.
+              ℹ️ Entry fee is non-refundable. You will receive $
+              {startingCapital.toLocaleString()} in trading capital to compete.
             </p>
           </div>
         </div>
       )}
+
+      {/* Action Terms Dialog — shown before entering competition */}
+      <ActionTermsDialog
+        slug={ACTION_TERM_SLUGS.COMPETITION_ENTRY}
+        open={showTerms}
+        onAccept={proceedAfterTerms}
+        onDecline={() => setShowTerms(false)}
+      />
     </div>
   );
 }
-

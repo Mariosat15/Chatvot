@@ -1,4 +1,4 @@
-import { Schema, model, models, Document } from 'mongoose';
+import { Schema, model, models, Document } from "mongoose";
 
 // Track participants in each competition
 export interface ICompetitionParticipant extends Document {
@@ -6,19 +6,27 @@ export interface ICompetitionParticipant extends Document {
   userId: string; // Reference to Better Auth user
   username: string; // For leaderboard display
   email: string; // For notifications
-  
+
+  // Game-agnostic result (X1 foundation)
+  // Reason: every field below this block is trading-shaped. `score` is the ONE number
+  // the ranking engine reads whatever the game - for trading it is derived from the
+  // configured ranking metric, for a provider game it is the reported round score.
+  // Invariant 4 in "External game plans/11": every participant gets a score.
+  score: number;
+  gameKey: string; // Denormalised from the contest for cross-game statistics queries
+
   // Capital & Performance
-  startingCapital: number; // Initial trading points
-  currentCapital: number; // Updated real-time
-  availableCapital: number; // Not tied up in positions
+  startingCapital?: number; // Absent on a provider participant
+  currentCapital?: number; // Absent on a provider participant
+  availableCapital?: number; // Absent on a provider participant
   usedMargin: number; // Capital tied in open positions
-  
+
   // P&L Metrics
   pnl: number; // Total profit/loss
   pnlPercentage: number; // ROI percentage
   realizedPnl: number; // From closed positions
   unrealizedPnl: number; // From open positions
-  
+
   // Trading Statistics
   totalTrades: number;
   winningTrades: number;
@@ -28,29 +36,29 @@ export interface ICompetitionParticipant extends Document {
   averageLoss: number;
   largestWin: number;
   largestLoss: number;
-  
+
   // Position Stats
   currentOpenPositions: number;
   maxDrawdown: number; // Worst decline from peak
   maxDrawdownPercentage: number;
-  
+
   // Ranking
   currentRank: number;
   highestRank: number; // Best rank achieved
-  
+
   // Status
-  status: 'active' | 'liquidated' | 'completed' | 'disqualified' | 'refunded';
+  status: "active" | "liquidated" | "completed" | "disqualified" | "refunded";
   liquidationReason?: string;
   disqualificationReason?: string;
-  
+
   // Risk Management
   marginCallWarnings: number; // How many times warned
   lastMarginCallAt?: Date;
-  
+
   // Timing
   enteredAt: Date;
   lastTradeAt?: Date;
-  
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -73,19 +81,55 @@ const CompetitionParticipantSchema = new Schema<ICompetitionParticipant>(
       type: String,
       required: true,
     },
-    startingCapital: {
+    // Reason: defaults to 0 so existing rows and every current writer stay valid.
+    // Trading's score is populated at settlement from the ranking metric; nothing
+    // reads it until the ranking seam is switched over.
+    score: {
       type: Number,
       required: true,
+      default: 0,
+    },
+    gameKey: {
+      type: String,
+      required: true,
+      default: "trading",
+      index: true,
+    },
+    // The three virtual-capital fields, required only for a trading participant.
+    //
+    // Reason: a provider-game player has no starting capital - `Competition.startingCapital`
+    // is not even set on a provider contest - so an unconditional requirement made a
+    // provider participant unsaveable. It failed as a Mongoose validation error naming a
+    // concept the player was never shown.
+    //
+    // The `|| "trading"` is load-bearing, exactly as on `Competition.startingCapital`:
+    // `gameKey` defaults to "trading", but a row written before that default existed has
+    // none, and such a row IS a trading participant. Written as `this.gameKey === "trading"`
+    // an unlabelled trading participant would save with no capital and every downstream
+    // calculation would divide by it.
+    //
+    // Narrowing this is a change to TRADING's contract, not only an allowance for provider
+    // games - the guarantee moved out of the schema and into a predicate, and the predicate
+    // is now the only thing standing between a trading participant and a missing balance.
+    startingCapital: {
+      type: Number,
+      required: function (this: { gameKey?: string }) {
+        return (this.gameKey || "trading") === "trading";
+      },
       min: 0,
     },
     currentCapital: {
       type: Number,
-      required: true,
+      required: function (this: { gameKey?: string }) {
+        return (this.gameKey || "trading") === "trading";
+      },
       min: 0,
     },
     availableCapital: {
       type: Number,
-      required: true,
+      required: function (this: { gameKey?: string }) {
+        return (this.gameKey || "trading") === "trading";
+      },
       min: 0,
     },
     usedMargin: {
@@ -190,8 +234,8 @@ const CompetitionParticipantSchema = new Schema<ICompetitionParticipant>(
     status: {
       type: String,
       required: true,
-      enum: ['active', 'liquidated', 'completed', 'disqualified', 'refunded'],
-      default: 'active',
+      enum: ["active", "liquidated", "completed", "disqualified", "refunded"],
+      default: "active",
     },
     liquidationReason: {
       type: String,
@@ -219,30 +263,54 @@ const CompetitionParticipantSchema = new Schema<ICompetitionParticipant>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes for fast queries
-CompetitionParticipantSchema.index({ competitionId: 1, userId: 1 }, { unique: true });
+CompetitionParticipantSchema.index(
+  { competitionId: 1, userId: 1 },
+  { unique: true },
+);
 CompetitionParticipantSchema.index({ competitionId: 1, currentRank: 1 });
 CompetitionParticipantSchema.index({ competitionId: 1, pnl: -1 }); // For leaderboard
+CompetitionParticipantSchema.index({ competitionId: 1, score: -1 }); // Game-agnostic leaderboard
+CompetitionParticipantSchema.index({ userId: 1, gameKey: 1 }); // Cross-game player statistics
 CompetitionParticipantSchema.index({ userId: 1, status: 1 });
+// PERFORMANCE: Additional indexes for common queries
+CompetitionParticipantSchema.index({ competitionId: 1, status: 1, pnl: -1 }); // Active participants leaderboard
+CompetitionParticipantSchema.index({ userId: 1, enteredAt: -1 }); // User's competition history
+CompetitionParticipantSchema.index({ competitionId: 1, currentCapital: -1 }); // Capital-based ranking
+// PERFORMANCE: Speeds up margin-check job's participant lookup
+CompetitionParticipantSchema.index({ competitionId: 1, status: 1, currentOpenPositions: 1 });
 
 // Virtual for profit factor (average win / average loss)
-CompetitionParticipantSchema.virtual('profitFactor').get(function () {
+CompetitionParticipantSchema.virtual("profitFactor").get(function () {
   if (this.averageLoss === 0) return 0;
   return Math.abs(this.averageWin / this.averageLoss);
 });
 
 // Virtual for is at risk (close to margin call)
-CompetitionParticipantSchema.virtual('isAtRisk').get(function () {
+CompetitionParticipantSchema.virtual("isAtRisk").get(function () {
+  // Reason: a provider-game participant has no capital, so the division below would be
+  // `undefined / undefined` = NaN, and `NaN < 60` is false.
+  //
+  // BE HONEST ABOUT WHAT THIS GUARD IS: today it changes no answer, because the accidental
+  // NaN result is the same `false` this returns deliberately. It is clarity and future
+  // safety, not a bug fix - a probe that removed it could not turn any test red, which is
+  // how that was established rather than assumed. It earns its place because the accident
+  // only holds for `<`: flip this to `>` for an "is healthy" check and NaN silently answers
+  // false to that too, which would then be wrong.
+  if (!this.startingCapital || this.currentCapital === undefined) return false;
+
   const capitalPercentage = (this.currentCapital / this.startingCapital) * 100;
   return capitalPercentage < 60; // Below 60% of starting capital
 });
 
 const CompetitionParticipant =
   models?.CompetitionParticipant ||
-  model<ICompetitionParticipant>('CompetitionParticipant', CompetitionParticipantSchema);
+  model<ICompetitionParticipant>(
+    "CompetitionParticipant",
+    CompetitionParticipantSchema,
+  );
 
 export default CompetitionParticipant;
-

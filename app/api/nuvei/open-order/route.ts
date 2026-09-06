@@ -1,0 +1,511 @@
+/**
+ * Nuvei Open Order API
+ * Server-side endpoint to create a session token for Nuvei Web SDK
+ *
+ * POST /api/nuvei/open-order
+ * Body: { amount: number, currency: string, vatAmount, platformFeeAmount, etc. }
+ */
+
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/better-auth/auth";
+import { headers } from "next/headers";
+import { nuveiService } from "@/lib/services/nuvei.service";
+import { connectToDatabase } from "@/database/mongoose";
+import CreditWallet from "@/database/models/trading/credit-wallet.model";
+import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import KYCSettings from "@/database/models/kyc-settings.model";
+import AppSettings from "@/database/models/app-settings.model";
+import {
+  RateLimiters,
+  getRateLimitHeaders,
+  isDeclineBlocked,
+  getClientIP,
+} from "@/lib/utils/rate-limiter";
+import { createSecurityLogger } from "@/lib/utils/security-logger";
+import { getRequestGeo } from "@/lib/utils/request-geo";
+
+export async function POST(req: NextRequest) {
+  // SECURITY: Create logger for this request
+  const securityLogger = createSecurityLogger(req);
+
+  try {
+    // Get authenticated user
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user?.id) {
+      await securityLogger.log({
+        statusCode: 401,
+        success: false,
+        errorMessage: "Not authenticated",
+      });
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    const userId = session.user.id;
+
+    // SECURITY: Rate limiting — per-user (5/min) and per-IP (10/min).
+    // Reason: Per-user alone is bypassable by an attacker rotating accounts
+    // from the same IP. Per-IP catches the aggregate flood used in card
+    // testing campaigns.
+    const rateLimitResult = RateLimiters.deposit(userId);
+    if (!rateLimitResult.success) {
+      console.log("🛡️ Rate limit exceeded for user - deposit:", userId);
+      return NextResponse.json(
+        {
+          error: "Too many requests. Please wait a moment before trying again.",
+        },
+        {
+          status: 429,
+          headers: getRateLimitHeaders(rateLimitResult),
+        },
+      );
+    }
+
+    const clientIp = getClientIP(req);
+    // Reason: Captured at checkout so chargeback defense packets can prove the
+    // browser/device used by the cardholder. Nuvei's DMN does not echo this
+    // back, so it must be persisted from the originating request.
+    const clientUserAgent = (req.headers.get("user-agent") || "").slice(0, 500);
+    if (clientIp !== "unknown") {
+      const ipLimitResult = RateLimiters.depositByIp(clientIp);
+      if (!ipLimitResult.success) {
+        console.log("🛡️ IP rate limit exceeded - deposit:", clientIp);
+        await securityLogger.log({
+          statusCode: 429,
+          success: false,
+          errorMessage: "Deposit IP rate limit exceeded",
+        });
+        return NextResponse.json(
+          {
+            error:
+              "Too many payment attempts from your network. Please wait a moment and try again.",
+          },
+          {
+            status: 429,
+            headers: getRateLimitHeaders(ipLimitResult),
+          },
+        );
+      }
+    }
+
+    // SECURITY: Decline-velocity block — rejects deposits from users who
+    // recently accumulated multiple declined payments (card-testing pattern).
+    // The block is set by the webhook on DECLINED/ERROR DMNs. Applied to both
+    // the userId and the IP so that an attacker cannot sidestep by simply
+    // switching accounts.
+    const userDeclineBlock = await isDeclineBlocked(userId);
+    if (userDeclineBlock.blocked) {
+      const minutesLeft = Math.ceil(
+        (userDeclineBlock.retryAfterMs ?? 0) / 60000,
+      );
+      console.log(
+        `🛡️ Decline-velocity block active for user ${userId} (${minutesLeft}m left)`,
+      );
+      await securityLogger.log({
+        statusCode: 429,
+        success: false,
+        errorMessage: "Decline-velocity block (user)",
+      });
+      return NextResponse.json(
+        {
+          error:
+            "We've paused deposits from your account due to repeated declined payments. Please try again later or contact support.",
+        },
+        { status: 429 },
+      );
+    }
+    if (clientIp !== "unknown") {
+      const ipDeclineBlock = await isDeclineBlocked(`ip:${clientIp}`);
+      if (ipDeclineBlock.blocked) {
+        console.log(
+          `🛡️ Decline-velocity block active for IP ${clientIp}`,
+        );
+        await securityLogger.log({
+          statusCode: 429,
+          success: false,
+          errorMessage: "Decline-velocity block (IP)",
+        });
+        return NextResponse.json(
+          {
+            error:
+              "We've paused deposits from your network due to repeated declined payments. Please try again later.",
+          },
+          { status: 429 },
+        );
+      }
+    }
+
+    await connectToDatabase();
+
+    // Check if KYC is required for deposits
+    const kycSettings = await KYCSettings.findOne();
+    if (kycSettings?.enabled && kycSettings?.requiredForDeposit) {
+      const wallet = await CreditWallet.findOne({ userId });
+      if (!wallet?.kycVerified) {
+        console.log(
+          `🛡️ KYC required for deposit - user ${userId} not verified`,
+        );
+        // Reason: Use custom KYC message from settings if available
+        const kycMessage =
+          kycSettings?.kycRequiredMessage ||
+          "KYC verification required before depositing. Please complete identity verification first.";
+        return NextResponse.json(
+          { error: kycMessage },
+          { status: 403 },
+        );
+      }
+    }
+
+    // ✅ CHECK USER RESTRICTIONS - Blocked users cannot deposit
+    const { canUserPerformAction } =
+      await import("@/lib/services/user-restriction.service");
+    const restrictionCheck = await canUserPerformAction(userId, "deposit");
+
+    if (!restrictionCheck.allowed) {
+      console.log(
+        `❌ Deposit blocked for user ${userId}: ${restrictionCheck.reason}`,
+      );
+      await securityLogger.log({
+        statusCode: 403,
+        success: false,
+        errorMessage: "User restricted from deposits",
+      });
+      return NextResponse.json(
+        {
+          error:
+            restrictionCheck.reason ||
+            "Your account is restricted and cannot make deposits. Please contact support.",
+        },
+        { status: 403 },
+      );
+    }
+
+    const body = await req.json();
+    const {
+      amount, // Total amount to charge (includes VAT + platform fee)
+      currency = "EUR",
+      baseAmount,
+      vatPercentage = 0,
+    } = body;
+
+    // SECURITY: Strict amount validation
+    const amountNum = parseFloat(amount);
+    if (!amount || isNaN(amountNum) || amountNum <= 0) {
+      return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+    }
+
+    await connectToDatabase();
+
+    // Get base currency settings
+    const appSettings = await AppSettings.findById("app-settings");
+    const cs = appSettings?.currency?.symbol || "€";
+    const baseCurrencyCode = appSettings?.currency?.code || "EUR";
+
+    // SECURITY: Minimum deposit — honor the admin-configured value
+    // (transactions.minimumDeposit), falling back to 10 only if unset.
+    const minDeposit = appSettings?.transactions?.minimumDeposit ?? 10;
+    const maxDeposit = appSettings?.transactions?.maximumDeposit ?? 10000;
+    if (amountNum < minDeposit) {
+      return NextResponse.json(
+        { error: `Minimum deposit is ${cs}${minDeposit}` },
+        { status: 400 },
+      );
+    }
+
+    // SECURITY: Maximum deposit to prevent money laundering
+    if (amountNum > maxDeposit) {
+      return NextResponse.json(
+        { error: `Maximum deposit is ${cs}${maxDeposit.toLocaleString()}` },
+        { status: 400 },
+      );
+    }
+
+    // SECURITY: Validate currency (allow base currency and common alternatives)
+    const allowedCurrencies = [baseCurrencyCode, "EUR", "USD", "GBP"];
+    if (!allowedCurrencies.includes(currency.toUpperCase())) {
+      return NextResponse.json({ error: "Invalid currency" }, { status: 400 });
+    }
+
+    // SECURITY: Check for recent pending transactions to prevent duplicate orders
+    const recentPending = await WalletTransaction.findOne({
+      userId,
+      status: "pending",
+      provider: "nuvei",
+      createdAt: { $gte: new Date(Date.now() - 5000) }, // Last 5 seconds only
+    });
+
+    if (recentPending) {
+      console.log(
+        `🛡️ Blocked duplicate order - recent pending: ${recentPending._id}`,
+      );
+      return NextResponse.json(
+        { error: "Please wait a moment before trying again." },
+        { status: 429 },
+      );
+    }
+
+    // Auto-cancel any OLD pending Nuvei transactions (older than 30 minutes)
+    const oldPending = await WalletTransaction.updateMany(
+      {
+        userId,
+        status: "pending",
+        provider: "nuvei",
+        createdAt: { $lt: new Date(Date.now() - 30 * 60 * 1000) },
+      },
+      {
+        $set: {
+          status: "cancelled",
+          failureReason: "Session expired",
+          processedAt: new Date(),
+        },
+      },
+    );
+
+    if (oldPending.modifiedCount > 0) {
+      console.log(
+        `🧹 Auto-cancelled ${oldPending.modifiedCount} old pending Nuvei transactions`,
+      );
+    }
+
+    // Ensure wallet exists
+    let wallet = await CreditWallet.findOne({ userId });
+    if (!wallet) {
+      wallet = await CreditWallet.create({
+        userId,
+        creditBalance: 0,
+        totalDeposited: 0,
+        totalWithdrawn: 0,
+        totalSpentOnCompetitions: 0,
+        totalWonFromCompetitions: 0,
+        totalSpentOnChallenges: 0,
+        totalWonFromChallenges: 0,
+        totalSpentOnMarketplace: 0,
+        isActive: true,
+      });
+    }
+
+    const currentBalance = wallet.creditBalance || 0;
+
+    // Get fee settings from DB (server-side source of truth)
+    const CreditConversionSettings = (
+      await import("@/database/models/credit-conversion-settings.model")
+    ).default;
+    const feeSettings = await CreditConversionSettings.getSingleton();
+    const serverPlatformFeePercent =
+      feeSettings.platformDepositFeePercentage || 0;
+    const eurToCreditsRate = feeSettings.eurToCreditsRate || 1;
+
+    // Reason: Clamp vatPercentage to 0-30% to prevent manipulation. VAT is
+    // jurisdiction-dependent so we accept it from the client but within bounds.
+    const clampedVatPercent = Math.max(
+      0,
+      Math.min(30, parseFloat(vatPercentage) || 0),
+    );
+
+    // Reason: Compute credits server-side using the same formula as the
+    // frontend (DepositModal.tsx):
+    //   total = base * (1 + vat%) * (1 + platformFee%)
+    //   base  = total / ((1 + vat%) * (1 + platformFee%))
+    const divisor =
+      (1 + clampedVatPercent / 100) * (1 + serverPlatformFeePercent / 100);
+    const serverBaseAmount =
+      Math.round((amountNum / divisor) * 100) / 100;
+
+    // SECURITY: Reject if the client's baseAmount diverges from the server
+    // computation by more than €0.50 (allows minor rounding differences).
+    if (
+      baseAmount !== undefined &&
+      baseAmount !== null &&
+      Math.abs(parseFloat(baseAmount) - serverBaseAmount) > 0.5
+    ) {
+      console.error(
+        `🚨 SECURITY: baseAmount mismatch — client sent ${baseAmount}, server computed ${serverBaseAmount}`,
+      );
+      return NextResponse.json(
+        { error: "Invalid fee calculation. Please refresh and try again." },
+        { status: 400 },
+      );
+    }
+
+    // Reason: Convert EUR base amount to credits using the configured rate.
+    // serverBaseAmount is in EUR; eurToCreditsRate converts to platform credits.
+    const creditsToReceive = Math.round(serverBaseAmount * eurToCreditsRate * 100) / 100;
+
+    // Reason: Fee amounts must be in EUR (not credits) for financial records.
+    const serverVatAmount =
+      Math.round(serverBaseAmount * clampedVatPercent) / 100;
+    const serverPlatformFeeAmount =
+      Math.round(
+        (serverBaseAmount + serverVatAmount) * serverPlatformFeePercent,
+      ) / 100;
+
+    const bankDepositFeePercentage =
+      feeSettings.bankDepositFeePercentage || 2.9;
+    const bankDepositFeeFixed = feeSettings.bankDepositFeeFixed || 0.3;
+    const bankFeePercentage = (amountNum * bankDepositFeePercentage) / 100;
+    const bankFeeTotal = bankFeePercentage + bankDepositFeeFixed;
+    const netPlatformEarning = serverPlatformFeeAmount - bankFeeTotal;
+
+    // Build description (same format as Stripe)
+    let txDescription = `${creditsToReceive} credits`;
+    const feeParts = [];
+    if (serverVatAmount > 0)
+      feeParts.push(`VAT €${serverVatAmount.toFixed(2)}`);
+    if (serverPlatformFeeAmount > 0)
+      feeParts.push(`Fee €${serverPlatformFeeAmount.toFixed(2)}`);
+    if (feeParts.length > 0) {
+      txDescription = `${creditsToReceive} credits (Total paid: €${amountNum.toFixed(2)} incl. ${feeParts.join(", ")})`;
+    }
+
+    console.log(`💰 Nuvei Deposit calculation (server-verified):`);
+    console.log("   EUR Base:", serverBaseAmount, "→ Credits:", creditsToReceive, `(rate: ${eurToCreditsRate})`);
+    console.log("   Total Charged: €", amountNum);
+    console.log("   VAT (%):", clampedVatPercent, "€", serverVatAmount);
+    console.log("   Platform Fee (%):", serverPlatformFeePercent, "€", serverPlatformFeeAmount);
+    console.log("   Bank Fee: €", bankFeeTotal.toFixed(2));
+    console.log("   Net Platform Earning: €", netPlatformEarning.toFixed(2));
+
+    // STEP 1: Create pending transaction with full fee metadata (like Stripe)
+    const pendingTransaction = await WalletTransaction.create({
+      userId,
+      transactionType: "deposit",
+      amount: creditsToReceive, // Credits user will receive (not total charged)
+      currency,
+      balanceBefore: currentBalance,
+      balanceAfter: currentBalance + creditsToReceive,
+      status: "pending",
+      provider: "nuvei",
+      paymentMethod: "card",
+      description: txDescription,
+      metadata: {
+        walletId: wallet._id.toString(),
+        initiatedAt: new Date().toISOString(),
+        paymentProvider: "nuvei",
+        eurAmount: serverBaseAmount,
+        creditsReceived: creditsToReceive,
+        exchangeRate: eurToCreditsRate,
+        totalCharged: amountNum,
+        vatAmount: serverVatAmount,
+        vatPercentage: clampedVatPercent,
+        platformDepositFeePercentage: serverPlatformFeePercent,
+        platformFeeAmount: serverPlatformFeeAmount,
+        bankDepositFeePercentage: bankDepositFeePercentage,
+        bankDepositFeeFixed: bankDepositFeeFixed,
+        bankFeeTotal: parseFloat(bankFeeTotal.toFixed(2)),
+        netPlatformEarning: parseFloat(netPlatformEarning.toFixed(2)),
+        // Reason: Stored so the webhook can record decline-velocity against
+        // the originating IP (not just the userId).
+        clientIp: clientIp !== "unknown" ? clientIp : undefined,
+        userAgent: clientUserAgent || undefined,
+        // Cloudflare-derived geo at deposit creation (surfaced in the admin
+        // live-ops dashboard; zero external lookup).
+        ...(() => {
+          const geo = getRequestGeo(req);
+          return {
+            clientCountry: geo.country,
+            clientCity: geo.city,
+            clientRegion: geo.region,
+          };
+        })(),
+      },
+    });
+
+    // STEP 2: Generate clientUniqueId using transaction ID (max 45 chars for Nuvei)
+    // Format: txn_[24charTransactionId] = 4 + 24 = 28 chars
+    const clientUniqueId = `txn_${pendingTransaction._id.toString()}`;
+
+    // Get webhook URL for DMN notifications (prefer stored DMN URL from admin config)
+    const clientConfig = await nuveiService.getClientConfig();
+    const origin = req.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL;
+    // Use DMN URL from credentials if available, otherwise fallback to origin-based URL
+    const storedDmnUrl = process.env.NUVEI_DMN_URL;
+    const notificationUrl = storedDmnUrl || `${origin}/api/nuvei/webhook`;
+
+    // STEP 3: Create order session with Nuvei
+    // CRITICAL: Include userTokenId to enable UPO (User Payment Option) storage for future refunds
+    // Note: Don't specify userCountry - let Nuvei determine from card BIN for proper 3DS handling
+    const userTokenId = `user_${userId}`;
+    const result = await nuveiService.openOrder({
+      amount: amountNum.toFixed(2),
+      currency,
+      clientUniqueId,
+      userEmail: session.user.email || "",
+      // CRITICAL: userTokenId is required for UPO storage - without this, UPOs won't be saved
+      userTokenId,
+      // Let Nuvei determine country from card for proper 3DS2 compliance
+      notificationUrl,
+    });
+
+    if ("error" in result) {
+      // Delete the pending transaction if Nuvei call failed
+      await WalletTransaction.findByIdAndDelete(pendingTransaction._id);
+      return NextResponse.json({ error: result.error }, { status: 500 });
+    }
+
+    // STEP 4: Update transaction with Nuvei response data (use $set with dot notation to PRESERVE fee metadata)
+    await WalletTransaction.findByIdAndUpdate(pendingTransaction._id, {
+      $set: {
+        providerTransactionId: result.orderId,
+        "metadata.sessionToken": result.sessionToken,
+        "metadata.clientUniqueId": clientUniqueId,
+        "metadata.orderId": result.orderId,
+        "metadata.nuveiMerchantId": result.merchantId,
+        "metadata.nuveiSiteId": result.merchantSiteId,
+      },
+    });
+
+    // SECURITY: Log successful deposit initiation
+    await securityLogger.log({
+      userId,
+      userEmail: session.user.email,
+      body: {
+        amount: amountNum,
+        currency,
+        transactionId: pendingTransaction._id,
+      },
+      statusCode: 200,
+      success: true,
+    });
+
+    return NextResponse.json({
+      success: true,
+      sessionToken: result.sessionToken,
+      orderId: result.orderId,
+      clientUniqueId,
+      // CRITICAL: Pass userTokenId to frontend for createPayment - required for UPO storage
+      userTokenId,
+      config: clientConfig,
+      userEmail: session.user.email || "",
+    });
+  } catch (error) {
+    console.error("Nuvei open order error:", error);
+
+    // SECURITY: Log failed deposit initiation
+    await securityLogger.log({
+      statusCode: 500,
+      success: false,
+      errorMessage: error instanceof Error ? error.message : "Unknown error",
+    });
+
+    return NextResponse.json(
+      { error: "Failed to create payment session" },
+      { status: 500 },
+    );
+  }
+}
+
+// Get Nuvei client config
+export async function GET() {
+  try {
+    const clientConfig = await nuveiService.getClientConfig();
+    return NextResponse.json(clientConfig);
+  } catch (error) {
+    console.error("Nuvei config error:", error);
+    return NextResponse.json(
+      { enabled: false, error: "Failed to get Nuvei config" },
+      { status: 500 },
+    );
+  }
+}
