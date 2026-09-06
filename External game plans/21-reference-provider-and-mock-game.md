@@ -176,6 +176,8 @@ brought forward.
 
 Read this before the sections above, which describe the target. **The two halves exist and have
 never spoken to each other**, so anything implying a working provider game is describing the plan.
+The game is playable by a human, in a browser, on a phone-sized screen - but only against the
+service's own smoke tool, never yet launched from a ChartVolt contest.
 
 | | State |
 |---|---|
@@ -185,10 +187,11 @@ never spoken to each other**, so anything implying a working provider game is de
 | The four spec endpoints | **Built.** Catalogue, create round, fetch round, void round, plus signed inbound auth with a rotation window, a retrying result callback, and a four-stage reconciliation sweeper |
 | Spec-ambiguity log | **Built and open.** `games-service/AMBIGUITY-LOG.md`. **Not yet resolved back into `01` and the requirements HTML** |
 | The platform adapter | **Built.** `chartvolt-games` registered in both registry copies, four files under `lib/services/game-providers/adapters/`, mirrored into `apps/admin` and verified byte-identical. 49 tests, 24 probes |
-| **The playable board** | **NOT BUILT.** The launch URL has no screen behind it, so on the provider's side the lifecycle is reachable only by API and by test - the same gap the play screen closed on the platform's side on 5 September |
+| **The playable board** | **Built.** `GET /play?t={token}` serves a real game: `public/play/` (4 files, no build step) behind `src/http/play-page.ts`. Dragging with a finger draws paths, the clock runs, a solved board advances, and the round settles into a signed result. Verified by a human-equivalent browser run on both titles. 11 headless tests drive the browser module against the server's verifier; 13 probes |
 | **Provider registration** | **NOT DONE.** `chartvolt-games` has never been registered through the admin screens, and `games-service` has no `.env`, so it has never been started against the platform |
 | **Any end-to-end round** | **NOT DONE.** No round has travelled between the two halves |
-| Content set, mobile, localisation, runbook | **NOT STARTED** |
+| Mobile support | **Built for the game screen, not yet for the catalogue.** The board is sized from the viewport, uses `100dvh`, and sets `touch-action: none` so a drag does not scroll the page - which is the one CSS rule in the file that decides whether the game works on a phone at all |
+| Content set, localisation, runbook | **NOT STARTED.** Both titles declare `en` only, deliberately: declaring a locale and shipping English strings for it renders confident English copy on a Greek game page with nothing raising an error |
 
 **Two claims to avoid making about what is built.** "Code-complete" for the service means its own
 suites pass in-process against `mongodb-memory-server`; it has never run against the platform. And
@@ -208,7 +211,39 @@ before the end-to-end rehearsal. Note it was found by building against the docum
 by reading the code, which is exactly the mechanism section 2 says makes this phase worth doing:
 a spec written by the same people as the platform is never tested by them re-reading it.
 
-**Three implementation decisions worth carrying forward:**
+**The play surface found a live defect in the service and two more gaps in the issued spec.**
+
+- **`stateFor` reported an unstarted round as finished**, because `finished` was derived from
+  "there is no board to show" - and a round nobody has played has no board either. Every existing
+  caller reached that function *after* starting, so nothing caught it; it became visible the moment
+  a client existed that reads the state before offering a Start button, which would have shown a
+  result screen for a round the player had not begun. It now derives from the terminal status, or
+  from the **owed** status where a deadline has passed but no writer has recorded it yet - reporting
+  the stored value there would leave a live board running against a dead clock for up to a minute.
+- **A13: the provider is never told the origin it is embedded in**, so `postMessage` has no target
+  origin to use. The strict-looking guess - derive it from `returnUrl` - fails **silently**: the
+  browser drops the message, the platform never receives `ready`, and a spinner sits over a game
+  that is running perfectly. Posting to `*` discloses nothing, because the message type has no
+  score, rank or player field, and the platform already checks `event.origin` against the launch
+  URL and `event.source` against the frame's own window. **Fix is one field on create-round**, and
+  it is the same fact a CSP `frame-src` allowlist would need.
+- **A14: `replayUrl` is required on every result and completely undefined.** This service builds
+  one and **no route serves it**, so the platform is handed a URL that answers `NOT_FOUND`. Not a
+  live defect - nothing follows the field yet - but it is a promise made inside a signed payload.
+  It needs an owner decision rather than a guess, because a replay showing *the puzzle* is a
+  content leak: a contest's boards are shared, so a losing player could read a live contest's
+  content out of their own finished round.
+
+**Four implementation decisions worth carrying forward:**
+
+- **The frame message type has no score field, rather than a field nobody reads.** The client is
+  an input device: it collects drags and posts the cells the player joined, and the server - which
+  generated the puzzle - checks them and derives the score. The client does enforce the rules as
+  you draw, but that is **feedback, not enforcement**, and `tools/test-board.ts` drives the browser
+  module headlessly to assert its answers agree with `engine/verify.ts` on the same boards. Two of
+  those tests first passed against a *generated* puzzle whose own shape made the guard redundant -
+  a test can be structurally unable to fail while looking like coverage, so they were rewritten
+  against a hand-built board.
 
 - **`verifyCallback` cannot verify a signature for any provider whose secret is in the database.**
   The interface declares it synchronous; the secret is behind `select: false`. The mock passes only

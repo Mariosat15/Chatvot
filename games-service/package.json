@@ -15,10 +15,12 @@
     "test:scoring": "tsx tools/test-scoring.ts",
     "test:api": "tsx tools/test-api.ts",
     "test:play": "tsx tools/test-play.ts",
-    "test": "npm run check:isolation && npm run typecheck && npm run test:engine && npm run test:scoring && npm run test:api && npm run test:play",
+    "test:board": "tsx tools/test-board.ts",
+    "test": "npm run check:isolation && npm run typecheck && npm run test:engine && npm run test:scoring && npm run test:api && npm run test:play && npm run test:board",
     "probe:engine": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/probe-engine.ps1",
     "probe:scoring": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/probe-scoring.ps1",
-    "probe:api": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/probe-api.ps1"
+    "probe:api": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/probe-api.ps1",
+    "probe:board": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/probe-board.ps1"
   },
   "dependencies": {
     "cors": "^2.8.5",

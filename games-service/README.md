@@ -122,18 +122,68 @@ provider holding its own copy is a provider that keeps posting to a decommission
 
 ---
 
+## The play surface
+
+The launch URL the platform is handed points at `GET /play?t={token}`, served from
+`public/play/` by `src/http/play-page.ts`. Four files, no build step and no framework: a phone on
+a bad connection is the target, and a bundler here would buy nothing.
+
+**The client is an input device, not a source of truth.** It draws a board, it collects drags,
+and it posts the cells the player joined. It never computes or transmits a score - the server
+generated the puzzle, so the server checks the paths and derives the score. The frame message
+type has **no score field at all**, deliberately, rather than a field nobody reads: the player
+has a developer console, so removing it is stronger than remembering not to trust it.
+
+Three details are load-bearing rather than cosmetic, and each has a test:
+
+- **`touch-action: none` on the board.** Without it a drag scrolls the page on every touch
+  device and the game is unplayable on a phone, which is where most players are.
+- **`Referrer-Policy: no-referrer`, as a header and a meta tag.** The launch token is in the
+  query string, so any outbound request would otherwise carry a single-use credential in its
+  referrer.
+- **An explicit three-entry allowlist of servable filenames**, not a path join. There is no
+  arithmetic to get wrong, so traversal is unreachable rather than defended against.
+
+The client enforces the puzzle's rules as it draws - no crossing, no routing through another
+pair's terminal, retraction when you drag back - but that is **feedback, not enforcement**. Every
+rule is checked again by `src/engine/verify.ts` against a submission the server does not trust,
+and `tools/test-board.ts` drives the browser module headlessly to assert the two agree.
+
+### Playing it by hand
+
+```
+npx tsx tools/smoke-play.ts                                  # circuit-sprint, medium
+npx tsx tools/smoke-play.ts circuit-perfect small 3 --reveal
+```
+
+Boots the service against an in-memory MongoDB, creates one round, prints a launch URL to open,
+and prints the signed result callback when it arrives. `--reveal` prints a valid covering of the
+first board, which is what makes a full solve verifiable by hand - a puzzle you cannot solve
+cannot be used to test the path that scores a solved one.
+
+---
+
 ## Tests
 
 ```
-npm test              # isolation, typecheck, then all four suites
+npm test              # isolation, typecheck, then all five suites
 npm run probe:api     # break each guard, one at a time, and watch its test fail
+npm run probe:board   # the same, for the play surface and the browser module
 ```
 
-`npm test` runs 71 API and play tests plus the engine and scoring suites. The probe scripts are
-the more important half: a green suite proves nothing until each guard has been watched failing,
-so every probe removes exactly one guard and asserts that the test written for it goes red **and
-that the blast radius is small** - a one-line change turning many tests red usually means the
-harness damaged the file rather than removed the guard.
+`npm test` runs **152 tests**: 42 engine, 21 scoring, 40 API, 38 play and delivery, 11 board
+client. The probe scripts are the more important half: a green suite proves nothing until each
+guard has been watched failing, so every probe removes exactly one guard and asserts that the
+test written for it goes red **and that the blast radius is small** - a one-line change turning
+many tests red usually means the harness damaged the file rather than removed the guard.
+
+Four things the probes found that the green suite could not, all recorded in the scripts
+themselves. The sweeper chose its own terminal status while `playability` already decided the
+same rule, so the only test of "a run-out clock completes rather than expires" went through the
+copy nobody was probing. The suppressed-callback test read the delivery record before any sweeper
+tick had touched it, so "still pending" was true because nothing had run yet. And two board tests
+passed against a *generated* puzzle whose own shape made the guard redundant - rewritten against
+a hand-built board where removing the guard cannot help but change the answer.
 
 Two things the probes found that the green suite could not, both recorded in the scripts
 themselves. The sweeper chose its own terminal status while `playability` already decided the

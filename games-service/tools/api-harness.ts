@@ -258,6 +258,20 @@ export async function callPlay<T = Record<string, unknown>>(
   return { status: response.status, body: parsed as T, raw };
 }
 
+/**
+ * A plain GET with no credentials, returning the response unparsed.
+ *
+ * The play page and its assets are not JSON, so `callPlay` cannot describe them - and the headers
+ * matter here in a way they do not for the API: `Referrer-Policy` is what keeps the launch token
+ * out of somebody else's logs, and a wrong `Content-Type` on a module is a blank frame.
+ */
+export async function fetchRaw(
+  url: string,
+): Promise<{ status: number; text: string; headers: Headers }> {
+  const response = await fetch(url.startsWith("http") ? url : `${baseUrl}${url}`);
+  return { status: response.status, text: await response.text(), headers: response.headers };
+}
+
 export function tokenFromLaunchUrl(launchUrl: string): string {
   return new URL(launchUrl).searchParams.get("t") ?? "";
 }

@@ -252,6 +252,58 @@ whether declaring fewer locales costs them reach or costs them the integration.
 
 ---
 
+## A13 - The provider is never told the origin it is embedded in `OPEN` (gap, found building the play surface)
+
+**Where:** Section 7, the frame messages, and endpoint 2's request fields.
+
+The game is required to talk to the platform with `postMessage`, and `postMessage` takes a
+**target origin**. Nothing in the specification supplies one. `POST /v1/rounds` sends
+`returnUrl`, but that is where to send the player *afterwards*, which is not the same fact - on
+a white-labelled deployment the page hosting the frame and the page the player returns to can be
+different origins, and the document never says they agree.
+
+**Why the safe-looking guess is the dangerous one.** Deriving the target origin from `returnUrl`
+looks stricter and fails **silently**: the browser drops the message with no error the page can
+see, so the platform never receives `ready` and shows a loading spinner over a game that is
+running perfectly. There is no log line on either side.
+
+**Guessed:** post to `*`, and say why in the file. It discloses nothing, because the platform's
+own message type has no score, rank or player field - `height` is the only number that crosses
+the boundary. The check that matters is on the receiving side and the platform already makes it:
+it compares `event.origin` against the launch URL it loaded **and** `event.source` against the
+frame's own window, which no unrelated page can satisfy.
+
+**Fix:** add a `parentOrigin` to the create-round request. It costs one field and it lets a
+provider be strict without guessing. Note this is also the field a **CSP `frame-src`** allowlist
+would need on the platform side, which is still unwritten - see `13` s1.1a.
+
+---
+
+## A14 - `replayUrl` is required on every result and its behaviour is undefined `OPEN` (gap)
+
+**Where:** Section 8's result body.
+
+Every terminal result carries a `replayUrl`, and the specification says nothing about what it
+must serve, who may open it, whether it needs to authenticate, or how long it must keep working.
+A dispute over prize money is exactly when someone follows it, which is also the point at which
+"it 404s" is the worst possible answer.
+
+**What this service does today, stated plainly because it is a known gap rather than a
+decision:** it builds `{publicUrl}/replay/{providerRoundId}?t={token}` from a hash of the round,
+and **no route serves that path.** So the platform is being handed a URL that answers
+`NOT_FOUND`. It is not a live defect - nothing on the platform side renders or follows the field
+yet, and the admin round inspector shows the raw delivery rather than linking out of it - but it
+is a promise made in a signed payload and it must not be left implied.
+
+**Needs an owner decision, not a guess:** a replay that shows the player's own paths is a
+support and dispute tool worth having; a replay that shows *the puzzle* is a content leak, since
+a contest's boards are shared and a losing player could read a live contest's content from their
+own finished round. The safe form is almost certainly "the player's submitted paths, after the
+contest's play window has closed, behind the single-use token" - which is a scoping question the
+specification should answer for every provider rather than leaving each to invent.
+
+---
+
 ## Not ambiguities - two places the spec is better than expected
 
 Recorded because a log of only complaints misrepresents the document.

@@ -26,6 +26,7 @@ import {
   callApi,
   callPlay,
   clearRounds,
+  fetchRaw,
   received,
   receiverBehaviour,
   startService,
@@ -49,6 +50,7 @@ interface PlayStateBody {
   board?: ClientBoard;
   boardsSolved: number;
   boardTarget?: number;
+  durationSeconds?: number;
   endsAt?: string;
   finished?: { status: string; boardsSolved: number };
 }
@@ -126,6 +128,97 @@ async function main(): Promise<number> {
   await startService({ sandbox: true });
 
   console.log("");
+  console.log("The play surface the launch URL points at");
+
+  await test("the launch URL the platform is handed actually loads a page", async () => {
+    /*
+     * The whole lifecycle can be correct by API and still be unreachable by clicking, and this
+     * platform has already shipped that exact gap twice - a publish route no admin screen called,
+     * and a launch route no player screen called. `launchUrl` is the one string the platform puts
+     * in an iframe, so it is worth a test that follows it rather than assuming it resolves.
+     */
+    await clearRounds();
+    const { callbackUrl } = await import("./api-harness");
+    const created = await callApi<{ launchUrl: string }>("/v1/rounds", {
+      method: "POST",
+      body: createBody({ resultCallbackUrl: callbackUrl }),
+    });
+    assert.equal(created.status, 201);
+
+    const page = await fetchRaw(created.body.launchUrl);
+    assert.equal(page.status, 200, "the launch URL did not load");
+    assert.match(page.headers.get("content-type") ?? "", /text\/html/);
+    assert.match(page.text, /<svg[^>]+id="board"/, "the page has no board to draw on");
+  });
+
+  await test("the page never contains the launch token", async () => {
+    // The token is a credential. It has to arrive in the URL, because that is the only channel the
+    // specification gives a provider for authenticating an embedded frame - but putting it in the
+    // HTML as well would place it in any cache that ignores our headers and in every saved copy of
+    // the page. The client reads it from `location.search` instead.
+    await clearRounds();
+    const { token } = await openRound();
+    const page = await fetchRaw(`/play?t=${token}`);
+    assert.equal(page.status, 200);
+    assert.ok(!page.text.includes(token), "the launch token was rendered into the document");
+  });
+
+  await test("every asset the page references is actually served", async () => {
+    // A renamed file is a blank frame, and it is the kind of break that a typecheck, a lint and
+    // every other test in this repository would pass through: the page is HTML and the allowlist
+    // that serves it is TypeScript, so nothing connects the two but this assertion.
+    const page = await fetchRaw("/play");
+    const references = [...page.text.matchAll(/(?:src|href)="(\/play\/[^"]+)"/g)].map(
+      (match) => match[1],
+    );
+    assert.ok(references.length >= 2, `expected the page to reference assets, saw ${references}`);
+
+    for (const reference of references) {
+      const asset = await fetchRaw(reference);
+      assert.equal(asset.status, 200, `${reference} is referenced but not served`);
+      assert.ok(asset.text.length > 0, `${reference} served nothing`);
+    }
+  });
+
+  await test("an unknown asset is JSON, not an HTML error page", async () => {
+    // Section 14's rule reaches here too. An HTML body from a path under `/play` would be the one
+    // response the platform cannot read, and the framework's default for an unknown route is
+    // exactly that.
+    const missing = await fetchRaw("/play/not-a-file.js");
+    assert.equal(missing.status, 404);
+    assert.match(missing.headers.get("content-type") ?? "", /application\/json/);
+    assert.equal(JSON.parse(missing.text).error.code, "NOT_FOUND");
+  });
+
+  await test("an encoded traversal cannot read a file outside the play directory", async () => {
+    /*
+     * The reason the served files are an allowlist rather than a directory.
+     *
+     * A path segment cannot contain a literal slash, which is what makes this look safe - but
+     * Express decodes route parameters, so `%2f` arrives as `/` and `path.join` follows it out of
+     * the directory. `package.json` sits two levels up, and the service's `.env` sits beside it.
+     */
+    const escaped = await fetchRaw("/play/..%2f..%2fpackage.json");
+    assert.equal(escaped.status, 404, "a traversal was served");
+    assert.ok(
+      !escaped.text.includes("chartvolt-games-service"),
+      "a file outside the play directory was served",
+    );
+  });
+
+  await test("the surface refuses to send a referrer", async () => {
+    // The token appears once, in this page's own URL. Without this header any request the page
+    // makes to a third party would carry it in `Referer`, which is how a credential ends up in
+    // somebody else's access log.
+    for (const path of ["/play", "/play/app.js", "/play/app.css"]) {
+      const response = await fetchRaw(path);
+      assert.equal(response.status, 200, path);
+      assert.equal(response.headers.get("referrer-policy"), "no-referrer", path);
+      assert.equal(response.headers.get("x-content-type-options"), "nosniff", path);
+    }
+  });
+
+  console.log("");
   console.log("The play session");
 
   await test("an invalid launch token is a 401, never a 404", async () => {
@@ -175,6 +268,23 @@ async function main(): Promise<number> {
     const stored = await Round.findOne({ roundId });
     assert.equal(stored?.startedAt, undefined, "a GET started the clock");
     assert.equal(stored?.status, "created");
+  });
+
+  await test("a round that has not started is not reported as finished", async () => {
+    // `finished` means the round is over, not "there is no board to show" - and a round nobody has
+    // started has no board either. Conflating the two answered a freshly created round with
+    // `finished: { status: "created" }`, so a client reading the state before offering a Start
+    // button would render a result screen for a round that had never been played.
+    await clearRounds();
+    const { token } = await openRound({ config: { durationSeconds: 90, gridSize: "small" } });
+
+    const state = await callPlay<PlayStateBody>(`/play/api/state?t=${token}`, undefined, "GET");
+    assert.equal(state.body.finished, undefined, "a round that never started reported finished");
+    assert.equal(state.body.board, undefined, "an unstarted round handed out a board");
+    // The one moment the player needs the length of the round is before they start it, which is
+    // exactly when `endsAt` does not exist yet.
+    assert.equal(state.body.durationSeconds, 90);
+    assert.equal(state.body.endsAt, undefined);
   });
 
   await test("resuming returns the same board rather than a new one", async () => {
@@ -379,6 +489,23 @@ async function main(): Promise<number> {
     assert.equal(typeof event.body.durationMs, "number");
     assert.ok(event.body.startedAt && event.body.completedAt, "timestamps missing");
     assert.ok(String(event.body.replayUrl).startsWith("http"));
+
+    /*
+     * The breakdown, under the name the platform's adapter reads.
+     *
+     * Untested until 6 September 2026, and the gap was found by a smoke tool that printed
+     * `body.breakdown` and `body.scoreType` - neither of which exists - and therefore reported
+     * empty values for a round that had reported correctly. The service was right and the tool was
+     * wrong, but nothing in this suite could have said so, which is the reason for asserting the
+     * NAME here: the field is `scoreBreakdown`, the platform's `normalise.ts` reads exactly that,
+     * and a rename on either side is a display panel that silently goes blank.
+     */
+    const breakdown = event.body.scoreBreakdown as Record<string, unknown> | undefined;
+    assert.ok(breakdown, "no scoreBreakdown was delivered");
+    assert.equal(breakdown.boardsCompleted, 3);
+    // `scoreType` is a property of a catalogue title, never of a round. Asserted absent so a
+    // future addition has to be a deliberate change to the contract rather than a stray field.
+    assert.equal("scoreType" in event.body, false, "a round reported a scoreType");
   });
 
   await test("the delivered payload never contains the content seed", async () => {

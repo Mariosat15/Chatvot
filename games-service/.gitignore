@@ -8,6 +8,11 @@ dist/
 tools/.probe-*.log
 tools/.probe-*.err
 
+# Smoke-run logs. `tools/smoke-play.ts` prints a launch token, so these must never be committed
+# even though the round it belongs to lives in an in-memory database that dies with the process.
+tools/.smoke*.log
+tools/.smoke*.err
+
 # Local secrets. The service refuses to boot without them, so there will be a file like this.
 .env
 .env.local

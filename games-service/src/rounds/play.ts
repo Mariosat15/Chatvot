@@ -2,7 +2,7 @@ import { generateForPlayer } from "../engine/generate";
 import { toClientPuzzle, type ClientPuzzle } from "../engine/puzzle";
 import { REFUSAL_MESSAGES, verifyAttempt, type AttemptRefusal } from "../engine/verify";
 import { findTitle, shapeFor, type PerfectConfig, type RoundConfig } from "../games/titles";
-import { Round, type RoundDocument } from "../store/round.model";
+import { Round, isTerminal, type RoundDocument } from "../store/round.model";
 import { ApiError, unknownRound } from "../http/errors";
 import { finishRound, gameplayEndsAt, playability } from "./lifecycle";
 
@@ -43,6 +43,13 @@ export interface PlayState {
   boardsSolved: number;
   /** Present for Circuit Perfect, which has a fixed set. Absent for Sprint, which has no limit. */
   boardTarget?: number;
+  /**
+   * Present for Circuit Sprint, so the pre-start panel can tell the player how long they get.
+   *
+   * `endsAt` cannot answer that question, because it does not exist until the clock has started -
+   * and the one moment the player needs to know the length is before they start it.
+   */
+  durationSeconds?: number;
   /** When the gameplay clock stops, so the client can render a countdown it does not own. */
   endsAt?: string;
   /** Where to send the player when they leave. */
@@ -110,11 +117,30 @@ function stateFor(round: RoundDocument, board?: ClientPuzzle): PlayState {
     returnUrl: round.returnUrl,
   };
 
+  if (config.kind === "sprint") state.durationSeconds = config.durationSeconds;
   if (board) state.board = board;
   if (endsAt) state.endsAt = endsAt.toISOString();
-  if (!board) {
-    state.finished = { status: round.status, boardsSolved: solvedCount(round) };
-  }
+
+  /*
+   * `finished` means the round is over. It is deliberately NOT "there is no board to show".
+   *
+   * The first version of this line was `if (!board)`, and a round that has not started yet has no
+   * board either - so `GET /play/api/state` on a freshly created round answered
+   * `finished: { status: "created" }`, which is a result screen for a round nobody has played.
+   * Nothing caught it because every other caller reaches here after starting, and it only became
+   * visible when a client existed that reads the state before offering the player a Start button.
+   *
+   * The second case takes the OWED status rather than the stored one: a deadline that has passed is
+   * over from the player's seat, but only `finishRound` and the sweeper write a terminal status, so
+   * the stored value is still `in_progress` for as long as a minute. Reporting that would leave the
+   * frame rendering a live board against a dead clock.
+   */
+  const status = playability(round, new Date());
+  const over = isTerminal(round.status)
+    ? round.status
+    : (!status.playable && status.owes) || null;
+
+  if (over) state.finished = { status: over, boardsSolved: solvedCount(round) };
 
   return state;
 }

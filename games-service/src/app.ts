@@ -10,6 +10,7 @@ import { listGames } from "./http/catalogue";
 import { serveAsset } from "./http/assets";
 import { ApiError, sendError } from "./http/errors";
 import { requirePlatformAuth, type SignedRequest } from "./http/inbound-auth";
+import { servePlayAsset, servePlayPage } from "./http/play-page";
 import { getState, postLeave, postSession, postSubmit } from "./http/play-routes";
 import { getRound, postRound, postVoidRound } from "./http/rounds";
 import { armRound, finishRoundForTesting, redeliver, requireSandbox } from "./http/sandbox";
@@ -117,6 +118,13 @@ export function createApp() {
   app.get("/assets/:gameCode/:asset", serveAsset);
 
   // ── the play surface ──────────────────────────────────────────────────────────────────────────
+  //
+  // The page and its assets first, then the client-facing API. The two are separate concerns that
+  // happen to share a prefix: `/play` is served to an unauthenticated browser, and `/play/api/*`
+  // authenticates with the launch token from the URL that browser was given.
+  app.get("/play", servePlayPage);
+  app.get("/play/:asset", servePlayAsset);
+
   app.post("/play/api/session", wrap(postSession));
   app.get("/play/api/state", wrap(getState));
   app.post("/play/api/submit", wrap(postSubmit));

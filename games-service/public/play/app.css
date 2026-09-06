@@ -1,0 +1,262 @@
+/*
+ * Circuit - the play surface's styling.
+ *
+ * DARK, SELF-CONTAINED, AND DELIBERATELY NOT CHARTVOLT-BRANDED
+ * -----------------------------------------------------------
+ * This service is an arm's-length provider. Its frame carries no platform logo, colour token or
+ * font, because the whole value of X4a is that it proves the seam works for a third party - and a
+ * third party's game cannot import our design system. The one concession is a neutral dark
+ * surface, which sits acceptably inside either a light or a dark host.
+ *
+ * No web fonts: a font request is a render-blocking round trip on a mobile connection, and on a
+ * timed title the player's clock would pay for it.
+ */
+
+:root {
+  --surface: #0b1220;
+  --panel: #131c2e;
+  --cell: #1c2740;
+  --cell-edge: #263252;
+  --text: #e8eefc;
+  --muted: #8fa0c0;
+  --accent: #38bdf8;
+  --danger: #fb7185;
+  --ready: #4ade80;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--surface);
+  color: var(--text);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  /* Reason: a long-press on a grid cell must not raise the browser's text-selection handles. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app {
+  /* `dvh` rather than `vh`: on a phone the address bar collapses on scroll, and `vh` keeps the
+     old height, which pushes the Submit button under the browser chrome exactly when it is
+     needed. */
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.screen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 20px;
+  text-align: center;
+}
+
+.screen[hidden] {
+  display: none;
+}
+
+.screen.play {
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  letter-spacing: -0.01em;
+}
+
+.lead {
+  margin: 0;
+  max-width: 30rem;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.muted {
+  color: var(--muted);
+  margin: 0;
+}
+
+.small {
+  font-size: 0.8rem;
+}
+
+.rules {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.95rem;
+  text-align: left;
+  max-width: 22rem;
+}
+
+.rules li::before {
+  content: "-";
+  margin-right: 8px;
+  color: var(--accent);
+}
+
+button {
+  font: inherit;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  padding: 12px 20px;
+  /* 44px is the smallest reliable touch target, and this is a timed game: a missed tap is the
+     player's time. */
+  min-height: 44px;
+  cursor: pointer;
+}
+
+button.primary {
+  background: var(--accent);
+  color: #06121f;
+  font-weight: 650;
+}
+
+button.primary:disabled {
+  background: var(--cell-edge);
+  color: var(--muted);
+  cursor: default;
+}
+
+button.ghost {
+  background: transparent;
+  border-color: var(--cell-edge);
+  color: var(--muted);
+}
+
+.bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bar.footer {
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progress {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.clock {
+  font-size: 1.3rem;
+  font-weight: 650;
+  /* Tabular figures, so the countdown does not shift the layout every second. */
+  font-variant-numeric: tabular-nums;
+}
+
+.clock.urgent {
+  color: var(--danger);
+}
+
+.board-wrap {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+svg#board {
+  /* The one rule in this file that is load-bearing rather than cosmetic: without it a drag
+     scrolls the page on every touch device and the game is unplayable on a phone. */
+  touch-action: none;
+  display: block;
+  background: var(--panel);
+  border-radius: 14px;
+  padding: 0;
+}
+
+svg#board .cell {
+  fill: var(--cell);
+  stroke: var(--cell-edge);
+  stroke-width: 1;
+}
+
+svg#board .trace {
+  pointer-events: none;
+}
+
+svg#board .terminal {
+  pointer-events: none;
+}
+
+svg#board .terminal-label {
+  pointer-events: none;
+  fill: #06121f;
+  font-weight: 700;
+}
+
+.hint {
+  margin: 0;
+  min-height: 1.25rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.hint.ready {
+  color: var(--ready);
+}
+
+.hint.refused {
+  color: var(--danger);
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.actions button {
+  flex: 1;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid var(--cell-edge);
+  border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 3s;
+  }
+}
