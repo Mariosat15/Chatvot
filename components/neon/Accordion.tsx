@@ -1,14 +1,11 @@
 "use client";
 
-import type { LucideIcon } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { IconTile } from "@/components/neon/Cards";
-import type { NeonAccent } from "@/components/neon/tokens";
 
 /**
  * The collapsible pills along the bottom of the sheet - Eligible Assets, Risk Management,
@@ -31,13 +28,23 @@ import type { NeonAccent } from "@/components/neon/tokens";
  * `type="multiple"` because these are independent reference sections. A single-open accordion
  * would close the disqualification rules when a player opened the prize table, which is
  * actively unhelpful when the two are being compared.
+ *
+ * EVERY PROP HERE IS DATA OR RENDERED OUTPUT, NEVER A COMPONENT, and that is a hard requirement
+ * rather than a preference. This is the only client component in the kit, so it is the only
+ * place a server/client boundary exists, and a React component is a *function* - which cannot
+ * cross it. The first version took `icon: LucideIcon` and `accent`, built the tile here, and
+ * **crashed the whole trading lobby at runtime** with "Functions cannot be passed directly to
+ * Client Components": a lucide icon is a `forwardRef` object whose `render` is a function, so
+ * the error names `{$$typeof, render, displayName}` rather than anything recognisable as an
+ * icon. `content` was already correct - rendered on the server and handed in - and `icon` now
+ * works the same way. **If a prop is ever added here, it must be serialisable.**
  */
 
 export interface NeonAccordionSection {
   /** Stable across renders and never an index - Radix tracks open state by this value. */
   id: string;
-  icon: LucideIcon;
-  accent: NeonAccent;
+  /** An ALREADY-RENDERED tile, e.g. `<IconTile icon={Coins} accent="prize" size="sm" />`. */
+  icon: React.ReactNode;
   title: string;
   /** Rendered on the server and handed in, so the sections themselves stay server components. */
   content: React.ReactNode;
@@ -60,7 +67,7 @@ export function NeonAccordion({
         >
           <AccordionTrigger className="px-3 py-3 hover:no-underline [&[data-state=open]]:border-b [&[data-state=open]]:border-[#161E36]">
             <span className="flex items-center gap-2.5">
-              <IconTile icon={section.icon} accent={section.accent} size="sm" />
+              {section.icon}
               <span className="text-sm font-medium text-gray-200">
                 {section.title}
               </span>

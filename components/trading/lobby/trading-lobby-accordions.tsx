@@ -6,7 +6,7 @@ import {
   ShieldAlert,
   Trophy,
 } from "lucide-react";
-import { NeonNote, NeonRow } from "@/components/neon/Cards";
+import { IconTile, NeonNote, NeonRow } from "@/components/neon/Cards";
 import type { NeonAccordionSection } from "@/components/neon/Accordion";
 
 /**
@@ -121,8 +121,7 @@ export function buildTradingLobbySections({
   /* ---------- Eligible assets and the account a trader is given ---------- */
   sections.push({
     id: "eligible-assets",
-    icon: Coins,
-    accent: "players",
+    icon: <IconTile icon={Coins} accent="players" size="sm" />,
     title: "Eligible Assets",
     content: (
       <div className="space-y-2">
@@ -172,8 +171,7 @@ export function buildTradingLobbySections({
   /* ---------- The format, and the thresholds a trader must clear ---------- */
   sections.push({
     id: "trading-rules",
-    icon: Scale,
-    accent: "value",
+    icon: <IconTile icon={Scale} accent="value" size="sm" />,
     title: "Trading Rules",
     content: (
       <div className="space-y-2">
@@ -210,8 +208,7 @@ export function buildTradingLobbySections({
   if (rules) {
     sections.push({
       id: "scoring",
-      icon: Gauge,
-      accent: "entry",
+      icon: <IconTile icon={Gauge} accent="entry" size="sm" />,
       title: "Scoring",
       content: (
         <div className="space-y-2">
@@ -266,8 +263,7 @@ export function buildTradingLobbySections({
   /* ---------- Risk limits and the margin ladder, which were two cards ---------- */
   sections.push({
     id: "risk-management",
-    icon: ShieldAlert,
-    accent: "ended",
+    icon: <IconTile icon={ShieldAlert} accent="ended" size="sm" />,
     title: "Risk Management",
     content: (
       <div className="space-y-2">
@@ -338,8 +334,7 @@ export function buildTradingLobbySections({
   ) {
     sections.push({
       id: "disqualification",
-      icon: Ban,
-      accent: "ended",
+      icon: <IconTile icon={Ban} accent="ended" size="sm" />,
       title: "Disqualification",
       content: (
         <div className="space-y-2">
@@ -388,8 +383,7 @@ export function buildTradingLobbySections({
   /* ---------- How prize money is worked out, which used to be a footnote ---------- */
   sections.push({
     id: "prizes",
-    icon: Trophy,
-    accent: "prize",
+    icon: <IconTile icon={Trophy} accent="prize" size="sm" />,
     title: "Prizes",
     content: (
       <div className="space-y-2">

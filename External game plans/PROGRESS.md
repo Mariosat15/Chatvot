@@ -697,6 +697,30 @@ lint clean, `next build` green.
   owner has made it the present. **The old section keeps its reasoning and gains a superseded
   banner; it was not rewritten to look prescient.**
 
+**AND IT SHIPPED WITH A DEFECT THAT TOOK THE TRADING LOBBY DOWN IN PRODUCTION** - **R39**,
+reported by the owner from a live screen a few minutes later, and the only entry in the register
+found that way rather than by us. `components/neon/Accordion.tsx` is the only `"use client"` file
+in the kit and therefore the only server/client boundary on either lobby; it took
+`icon: LucideIcon` and built the tile itself, and **a React component is a function, which cannot
+cross that boundary.** Every request to a trading contest's lobby rendered the error boundary -
+not degraded, *unavailable*, on the platform's busiest player screen. The icon is now handed in
+already rendered, exactly as the sibling `content` prop always was. Nothing was backfilled and
+nothing could be: the page threw on render, so there is no bad data, only failed requests.
+
+**The three reasons nothing caught it are the reason it is written up at this length.** A green
+`next build` is not evidence that a dynamic page renders, and this build had been green through
+the bug twice, because a `ƒ` route is never prerendered. The typecheck cannot help either, and
+that is structural rather than bad luck - `icon: LucideIcon` is a perfectly good prop type, and
+**no type in this codebase means "serialisable"**. And every guard on this screen was structural,
+so none of them rendered anything. **The first guard written for it stayed green when the bug was
+reintroduced**, which is the part to remember: `typeof !== "function"` and "has `$$typeof`" are
+*both satisfied by a lucide icon*, since a `forwardRef` is an object carrying
+`Symbol.for("react.forward_ref")` - the error message had said exactly that and it was read past.
+`isValidElement` is the check. **Safe by accident is not safe.** The guard is now two tests, both
+probed: a behavioural one asserting every section's `icon` and `content` are elements, and a
+structural one asserting `Accordion.tsx` mentions `LucideIcon` **nowhere**, plus an enumeration
+that turns red if a second client component is ever added to the kit.
+
 **Still outstanding and not to be rounded up:** a rules surface for a provider title, so the
 sheet's **View Rules** button is a link to `/help/competitions` instead; the sheet's styling of
 the equity chart; the announcements panel and Share Event button, which are not features; and the

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 /**
@@ -700,6 +700,93 @@ describe("the two lobbies are built from one design kit", () => {
       expect(readCode(consumer)).not.toMatch(
         /(bg|text|border|from|to|via)-\$\{/,
       );
+    }
+  });
+
+  it("hands the one client component data, never components", () => {
+    /*
+      THIS IS THE GUARD FOR A BUG THAT REACHED THE OWNER'S SCREEN, and the way it got there is
+      the part worth keeping. `NeonAccordion` is the only `"use client"` file in the kit, so it
+      is the only server/client boundary on either lobby. Its first version took
+      `icon: LucideIcon` and built the tile itself - and a React component is a *function*,
+      which cannot cross that boundary. Every request to the trading lobby threw "Functions
+      cannot be passed directly to Client Components", naming `{$$typeof, render, displayName}`
+      rather than anything a reader would recognise as an icon.
+
+      **Nothing in the pipeline could have caught it.** The typecheck is happy: `LucideIcon` is
+      a perfectly good prop type, and the rule it breaks is a React runtime rule, not a type
+      rule. `next build` is happy: the lobby is a dynamic route, so it is never prerendered, and
+      **a green build is not evidence that a dynamic page renders**. And every other test in
+      this block reads source rather than rendering. So this test reads the boundary itself.
+    */
+    const accordion = readCode("components/neon/Accordion.tsx");
+
+    expect(accordion).toMatch(/^"use client"/);
+    // Not "no LucideIcon prop" - no reference at all, so the import cannot come back first.
+    expect(accordion).not.toMatch(/LucideIcon/);
+    expect(accordion).toMatch(/icon: React\.ReactNode/);
+
+    /*
+      And the enumeration, so a SECOND client component in the kit cannot be added without
+      someone reading the paragraph above. If this fails, the new file needs the same treatment,
+      not an addition to the list.
+    */
+    const clientFiles = readdirSync(join(ROOT, "components", "neon")).filter(
+      (name) =>
+        /\.tsx?$/.test(name) &&
+        readCode(join("components", "neon", name)).includes('"use client"'),
+    );
+    expect(clientFiles).toEqual(["Accordion.tsx"]);
+  });
+
+  it("pre-renders every accordion icon on the server", async () => {
+    /*
+      The behavioural half of the guard above. The structural test proves the component does not
+      *accept* a function; this proves the caller does not *pass* one, which is a different
+      claim and is the one that actually broke.
+
+      **`isValidElement` is the check, and the obvious alternatives both pass the bug.** A lucide
+      icon is a `forwardRef` object, so `typeof` is `"object"`, not `"function"` - and it carries
+      a `$$typeof` of its own, `Symbol.for("react.forward_ref")`. The original error message said
+      as much, printing `{$$typeof: ..., render: function, displayName: ...}`. A first draft of
+      this test asserted exactly those two things and **stayed green when the bug was
+      reintroduced**, which is how it was found: the assertion was satisfied by the very value it
+      existed to reject. Safe by accident is not safe.
+    */
+    const { isValidElement } = await import("react");
+    const { buildTradingLobbySections } = await import(
+      "../../components/trading/lobby/trading-lobby-accordions"
+    );
+
+    const sections = buildTradingLobbySections({
+      competition: {
+        rules: {
+          allowedAssets: ["forex"],
+          minimumTrades: 3,
+          maxLeverage: 100,
+          maxPositionsOpen: 5,
+          rankingMethod: "highest_pnl",
+        },
+        startingCapital: 10000,
+        prizePool: 500,
+        maxParticipants: 50,
+        prizeDistribution: [{ position: 1, percentage: 100 }],
+      },
+      riskSettings: {
+        marginCallLevel: 80,
+        stopOutLevel: 50,
+        maxLeverage: 100,
+      } as never,
+      currSymbol: "$",
+    });
+
+    expect(sections.length).toBeGreaterThan(0);
+
+    for (const section of sections) {
+      expect(isValidElement(section.icon)).toBe(true);
+      expect(isValidElement(section.content)).toBe(true);
+      expect(typeof section.title).toBe("string");
+      expect(typeof section.id).toBe("string");
     }
   });
 

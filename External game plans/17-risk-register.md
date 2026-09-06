@@ -55,6 +55,7 @@ chapter covers risks to the programme and to the application.
 | R36 | **A plain-http `NEXT_PUBLIC_BASE_URL` gives the provider a result callback it cannot use.** `round-launch.service.ts:273` builds `resultCallbackUrl` from it, so it is where every score is POSTed. Two consequences, and the second is the one that would be mistaken for a provider fault: the callback token travels unencrypted, and **certbot installs an http → https redirect as a matter of course while the fetch specification converts a POST following a 301 into a GET** - so the result arrives as a GET, is rejected, and the round is written off as unresolved. The visible symptom is players reporting vanished scores days later | Medium | **CLOSED 6 Sep 2026. Found on the owner's live deployment**, which held `http://chartvolt.com/` against an https site - and found by the games setup script's origin check while doing something else entirely, not by analysis. Latent: no provider round has ever launched in production, so **nothing was backfilled and there is nothing to backfill.** The guard already refused an *absent* value while accepting an explicitly-set localhost - **the same failure reached by a value that looks configured** | `publicBaseUrl()` refuses plain http and loopback hosts under `NODE_ENV=production` only, failing closed on anything `URL` cannot parse. Five tests in `__tests__/services/provider-round-launch.test.ts` + `tools/probe-launch-base-url.ps1` (7 probes). **The development carve-out is pinned as firmly as the refusals**, because every local rehearsal serves plain http on loopback and a guard that fires there gets switched off rather than fixed. `resultCallbackUrl` appears at five call sites and **only one constructs it** - verified with `rg`, so the single guard covers all of them |
 | R37 | **The provider leaderboard ranked on nothing.** Both `getCompetitionLeaderboard` copies were written for trading: the main app's projection listed only trading metrics so `score` was never selected, and neither app's `participantData` mapping carried `score` or `scoreDirection`. So every provider participant reached `calculateRankings` with `score` undefined, `getProviderRankingValue` read `score ?? 0`, **the whole field tied on zero, and the board rendered in whatever order the tie-breakers or the documents happened to give.** A lower-is-better title was worse than wrong - it was *reversed on the board and correct at settlement*, so a player could lead a race-time contest all week and be paid last | High | **CLOSED 6 Sep 2026, found by writing a test for something else** - a reproduction of the owner's live error page, which this was not. Latent for payouts: settlement resolves both fields itself (R32/R33), so **no prize has ever been misapplied and nothing was backfilled.** Not latent for players: the board is a live read, so any provider contest entered before this date displayed a meaningless order. **This is R32/R33 one layer out** - the write path was fixed on 5 Sep and the two READ paths were never examined, which is the "count the callers" rule applied to a seam rather than to a writer | `resolveScoreDirection` extracted to `lib/services/games/score-direction.service.ts` (mirrored) and now used by **settlement and both leaderboards**, so the live board and the payout cannot disagree. 11 tests in `__tests__/services/provider-contest-lobby-shape.test.ts`, `tools/probe-leaderboard-score.ps1` (5 probes, all red). **`scoreDirection` is still not stored per row** - `05` s2 forbids it, because per-row storage lets two rows in one board disagree, which is incoherent rather than merely wrong |
 | R38 | **A warning no operator could ever clear.** `provider_game.lastSuccessfulRoundAt` was declared in X2 and **read** by the contest wizard's pre-flight checklist, which warns when a title's sandbox looks stale - but **nothing has ever written it.** So the field was `null` on every title however many rounds had scored, and every operator creating or publishing a provider contest was shown a stale-sandbox caution that no amount of successful play could remove. The harm is not the wording: an advisory that is always on is an advisory nobody reads, so the *next* warning in that list - one that matters - is skipped with it | Low | **CLOSED 6 Sep 2026, found while building the provider health panel** by grepping for the field's writer before displaying it. Latent for money and **live for operators** from the day the wizard shipped. **Nothing was backfilled**: the timestamp is a freshness signal, and inventing one from `game_round` history would assert a fact about a sandbox nobody observed | Stamped at the sibling of gate 11b in `result-ingestion.service.ts`, the single ingestion door, and **only for `completed`** - `abandoned`, `expired` and `voided` are terminal too, so stamping them would make the signal mean "a round ended recently", which is true of a provider failing every round. The write is wrapped so its failure cannot fail the ingestion: the score is money-bearing and a cosmetic timestamp must never be able to reject it. 3 tests in `__tests__/services/round-lifecycle.test.ts`, 2 probes in `tools/probe-provider-health.ps1`. **The sibling fields are worse and were handled differently** - `game_provider.healthStatus` and `lastHealthCheckAt` have the same no-writer defect *and* `healthStatus` defaults to `"down"`, so the provider list could render a working provider as down. They were removed from the admin DTOs rather than given a writer; see `12` s4.2b for why health is derived instead |
+| R39 | **The trading lobby was completely unavailable in production**, for every trading contest, from the design-kit deploy until the fix. Not degraded - the error boundary, on the platform's busiest player screen. One prop caused it: the kit's accordion is the only `"use client"` file in it, and it took `icon: LucideIcon`, so a **React component - a function - was being passed across the server/client boundary**. The runtime error names `{$$typeof, render, displayName}`, a `forwardRef` object, which reads as nothing recognisable | High | **CLOSED 6 Sep 2026, reported by the owner from a live screen** - the only entry here found that way rather than by us. **Nothing was backfilled and nothing could be:** the page threw on render, so there is no bad data, only failed requests. The fix is a deploy, not a migration | The icon is now handed in already rendered, exactly as the sibling `content` prop always was. **Three things nothing in the pipeline could have caught:** `next build` was green twice through this bug, because a dynamic route is never prerendered and **a green build is not evidence that a dynamic page renders**; the typecheck is happy, because `LucideIcon` is a fine prop type and **no type in this codebase means "serialisable"**; and every other guard on this screen is structural, so none of them render anything. **The first guard written for it was green on the reintroduced bug** - `typeof !== "function"` and "has `$$typeof`" are both satisfied by a lucide icon, since a `forwardRef` is an object carrying `Symbol.for("react.forward_ref")`. `isValidElement` is the check. 2 tests, 2 probes |
 | R24 | Scope creep before anything ships | Medium | **High** | All |
 | R25 | Round write contention under load | Medium | Medium | X12 |
 | X15 | "Challenge any user" harassment surface - no report-user feature exists | Medium | Medium | X10 |
@@ -960,6 +961,47 @@ poller replaces a permanently-stale value with a silently-ageing one. They were 
 admin DTOs and the health verdict is **derived on request** instead. See `12` s4.2b. The fields
 stay on the model, because a Mongoose field is add-only in practice and removing them is a
 mirrored migration for no gain.
+
+### R39 - A component passed across the client boundary took the trading lobby down in production - **CLOSED, 6 September 2026**
+
+**The only entry in this register that was reported by the owner from a live screen rather than
+found by us**, and the only one whose harm was total: every request to
+`/competitions/[id]` for a trading contest rendered the error boundary. Not degraded, not
+subtly wrong - **unavailable**, for the platform's busiest player screen, for as long as the
+build was deployed.
+
+**The cause is one prop.** `components/neon/Accordion.tsx` is the only `"use client"` file in
+the design kit, so it is the only server/client boundary on either lobby, and it took
+`icon: LucideIcon` and built the tile itself. **A React component is a function, and a function
+cannot cross that boundary.** The runtime error names
+`{$$typeof: ..., render: function, displayName: ...}` - a `forwardRef` object - which is
+recognisable as a lucide icon only once you already know. Fixed by taking the icon as
+already-rendered output, exactly as the sibling `content` prop already did.
+
+**Four things generalise, and the last two are the ones to keep.**
+
+- **A green `next build` is not evidence that a dynamic page renders.** The lobby is `ƒ`, so it
+  is never prerendered and the build never executed it. The build had been green through this
+  bug twice.
+- **The typecheck cannot help here, and that is structural rather than bad luck.**
+  `icon: LucideIcon` is a perfectly good prop type; the rule it breaks is a React *runtime*
+  serialisation rule. **There is no type in the codebase that means "serialisable".**
+- **The first guard written for it stayed green when the bug was reintroduced, and the reason is
+  the trap itself.** The obvious assertions - `typeof icon !== "function"` and
+  `icon` has a `$$typeof` - are both **satisfied by a lucide icon**, because a `forwardRef` is an
+  object and carries its own `$$typeof` of `Symbol.for("react.forward_ref")`. The error message
+  had said exactly that and it was read past. `isValidElement` is the check. **Safe by accident
+  is not safe** - the same shape as the prototype-chain lookup in the round-resolution action
+  list.
+- **The whole class is invisible to structural tests**, which is what every other guard on this
+  screen is. The behavioural test now imports `buildTradingLobbySections` and asserts each
+  section's `icon` and `content` are elements, and a structural test asserts `Accordion.tsx`
+  mentions `LucideIcon` **nowhere** - not merely that it has no such prop - plus an enumeration
+  that turns red if a **second** client component is ever added to the kit, so nobody adds one
+  without meeting this paragraph.
+
+**Nothing was backfilled and nothing could be:** the page threw on render, so there is no bad
+data, only requests that failed. The fix is a deploy, not a migration.
 
 ---
 

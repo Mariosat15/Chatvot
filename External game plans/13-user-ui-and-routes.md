@@ -416,6 +416,17 @@ what replaced it.
   simply have shared a folder and a naming prefix for ever, and the next reader would have had no
   way to tell which `Arena*` component belonged to which feature. **Check what a plausible folder
   name already means before taking it.**
+- **The accordion is the only `"use client"` file in the kit, so it is the only boundary - and it
+  took the trading lobby down in production.** It accepted `icon: LucideIcon` and built the tile
+  itself; a React component is a *function*, which cannot cross a server/client boundary, so
+  every request to a trading contest's lobby rendered the error boundary. It is now handed the
+  icon **already rendered**, exactly as the sibling `content` prop always was. Three things
+  nothing in the pipeline could catch, all worth carrying: **a green `next build` is not evidence
+  that a dynamic page renders**, because `ƒ` routes are never prerendered; the typecheck is happy
+  because **no type in this codebase means "serialisable"**; and the guard written for it was
+  itself green on the reintroduced bug, because `typeof !== "function"` and "has `$$typeof`" are
+  **both satisfied by a lucide icon** - a `forwardRef` is an object carrying
+  `Symbol.for("react.forward_ref")`. `isValidElement` is the check. Recorded as **R39**.
 - **An asset path is unverifiable by the compiler, so a test asserts every banner file exists.**
   The artwork was first committed to `public/assets/arena/` while the kit had moved to
   `components/neon/` - four string literals pointing at nothing. Nothing would have failed: no
