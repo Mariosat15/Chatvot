@@ -402,8 +402,8 @@ Remember the mirror: every model touched here exists twice.
 ### E6 - Player UI and rewards
 
 - [~] Contest browse and lobby, showing game thumbnails and rules - **the lobby is built and
-  themed** (6 Sep 2026, `13` s4.1b and s4.1c); **browse is not**, and neither is a rules surface a
-  game can fill
+  themed** (6 Sep 2026, `13` s4.1b, then s4.1c, then **s4.1d** which supersedes s4.1c and rebuilds
+  *both* lobbies on one kit); **browse is not**, and neither is a rules surface a game can fill
 - [x] **`/competitions/[id]/play` iframe host, with origin checks and a strict message allowlist** (5 Sep 2026, `13` s1.1a)
 - [ ] Live leaderboard during play
 - [x] **Result screen with the generic `scoreBreakdown` renderer** (5 Sep 2026, `13` s1.1a)
@@ -429,14 +429,22 @@ yet do is *find* the contest by game - `/competitions` is still the trading-shap
 provider contest is discovered there among trading ones with no thumbnail and no rules summary.
 
 **The lobby is the half of that first bullet which IS built**, since 6 September 2026: a provider
-contest gets its own lobby (`13` s4.1b) wearing the trading lobby's exact chrome (`13` s4.1c). The
-bullet stays unfinished rather than ticked because the other two things it asks for are genuinely
-absent - **browsing by game**, and **thumbnails and a rules summary**. The second is not styling:
-`provider_game` carries no rules content a lobby could render, and the trading lobby's rules
-accordion is entirely trading material, so there is nothing to put in the panel the supplied
-mock-up draws. **A half-built bullet ticked is how a plan starts lying about itself**, which is the
-same reason the `exclude` refund was tracked as outstanding in four places while nothing consumed
-`blocksSettlement` at all.
+contest gets its own lobby (`13` s4.1b), and both lobbies are now built from one design kit taken
+from the owner's component sheet (`13` **s4.1d**). Note the reference point moved twice in a day -
+s4.1c made the game lobby match the *trading* lobby, and s4.1d makes both match the *sheet*, so
+the trading lobby is a screen that changed rather than the standard. **Reading s4.1c as current
+gets three rules backwards**, which is why it carries a superseded banner instead of an edit.
+
+The bullet stays unfinished rather than ticked because the other two things it asks for are
+genuinely absent - **browsing by game**, and **thumbnails and a rules summary**. Neither is
+styling. `provider_game` carries no rules content a lobby could render, and the trading lobby's
+rules accordion is entirely trading material, so there is nothing to put in the panel the sheet
+draws - which is why the game lobby's footer offers `/help/competitions` rather than the sheet's
+**View Rules** button. Thumbnails are the same shape of gap: the four hero banners now shipped are
+resolved from a **local map keyed by game code**, not from a catalogue field, so a second provider
+title arrives with a generic trophy until somebody supplies art. **A half-built bullet ticked is
+how a plan starts lying about itself**, which is the same reason the `exclude` refund was tracked
+as outstanding in four places while nothing consumed `blocksSettlement` at all.
 
 **Three things the play screen deliberately does not do, stated so no summary reads it as
 finished.** There is no live leaderboard during play, so a player sees their standing only when

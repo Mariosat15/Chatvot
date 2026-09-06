@@ -1,8 +1,4 @@
-import {
-  ArrowLeft,
-  BarChart3,
-} from "lucide-react";
-import { GameIcon } from "@/components/ui/GameIcon";
+import { ArrowLeft, BarChart3, Trophy } from "lucide-react";
 import {
   calculateCompetitionDifficulty,
   DifficultyLevel,
@@ -15,15 +11,14 @@ import {
 } from "@/lib/actions/trading/competition.actions";
 import { getWalletBalance } from "@/lib/actions/trading/wallet.actions";
 import { getTradingRiskSettings } from "@/lib/actions/trading/risk-settings.actions";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
 import CompetitionLeaderboard from "@/components/trading/CompetitionLeaderboard";
-import CompetitionEntryButton from "@/components/trading/CompetitionEntryButton";
 import CompetitionDashboard from "@/components/trading/CompetitionDashboard";
 import CompetitionStatusMonitor from "@/components/trading/CompetitionStatusMonitor";
 import UTCClock from "@/components/trading/UTCClock";
-import LiveCountdown from "@/components/trading/LiveCountdown";
-import InlineCountdown from "@/components/trading/InlineCountdown";
+import TradingLobbyHero from "@/components/trading/lobby/TradingLobbyHero";
+import TradingLobbySidebar from "@/components/trading/lobby/TradingLobbySidebar";
+import { NeonCountPill, NeonPanel } from "@/components/neon/Cards";
+import { NeonPill } from "@/components/neon/Buttons";
 import ProviderContestLobby from "@/components/games/ProviderContestLobby";
 import { hasProviderGameLabel } from "@/lib/services/games/contest-config";
 import { isRegistrationClosed } from "@/lib/utils/registration-deadline";
@@ -224,99 +219,12 @@ const CompetitionDetailsPage = async ({
 
     const difficultyData = getDifficultyData();
 
-    const colorMap: Record<
-      DifficultyLevel,
-      { bg: string; border: string; text: string; barColor: string }
-    > = {
-      Novice: {
-        bg: "from-green-500/20 to-emerald-500/10",
-        border: "border-green-500/40",
-        text: "text-green-400",
-        barColor: "bg-green-500",
-      },
-      Apprentice: {
-        bg: "from-green-500/20 to-teal-500/10",
-        border: "border-green-500/40",
-        text: "text-green-300",
-        barColor: "bg-green-400",
-      },
-      Skilled: {
-        bg: "from-blue-500/20 to-cyan-500/10",
-        border: "border-blue-500/40",
-        text: "text-blue-400",
-        barColor: "bg-blue-500",
-      },
-      Expert: {
-        bg: "from-blue-500/20 to-indigo-500/10",
-        border: "border-blue-500/40",
-        text: "text-blue-300",
-        barColor: "bg-blue-400",
-      },
-      Elite: {
-        bg: "from-yellow-500/20 to-amber-500/10",
-        border: "border-yellow-500/40",
-        text: "text-yellow-400",
-        barColor: "bg-yellow-500",
-      },
-      Master: {
-        bg: "from-yellow-500/20 to-orange-500/10",
-        border: "border-yellow-500/40",
-        text: "text-yellow-300",
-        barColor: "bg-yellow-400",
-      },
-      "Grand Master": {
-        bg: "from-orange-500/20 to-red-500/10",
-        border: "border-orange-500/40",
-        text: "text-orange-400",
-        barColor: "bg-orange-500",
-      },
-      Champion: {
-        bg: "from-orange-500/20 to-pink-500/10",
-        border: "border-orange-500/40",
-        text: "text-orange-300",
-        barColor: "bg-orange-400",
-      },
-      Legend: {
-        bg: "from-red-500/20 to-pink-500/10",
-        border: "border-red-500/40",
-        text: "text-red-400",
-        barColor: "bg-red-500",
-      },
-      "Trading God": {
-        bg: "from-red-500/20 to-purple-500/10",
-        border: "border-red-500/40",
-        text: "text-red-500",
-        barColor: "bg-red-600",
-      },
-    };
-
-    const emojiMap: Record<DifficultyLevel, string> = {
-      Novice: "🌱",
-      Apprentice: "📚",
-      Skilled: "⚔️",
-      Expert: "🎯",
-      Elite: "💎",
-      Master: "👑",
-      "Grand Master": "🔥",
-      Champion: "⚡",
-      Legend: "🌟",
-      "Trading God": "👑",
-    };
-
-    const descriptionMap: Record<DifficultyLevel, string> = {
-      Novice: "Perfect for new traders learning the basics.",
-      Apprentice: "Building your trading skills with room to grow.",
-      Skilled: "Moderate challenge with balanced risk.",
-      Expert: "Higher stakes for experienced traders.",
-      Elite: "Challenging competition for skilled traders.",
-      Master: "Professional level competition.",
-      "Grand Master": "Very challenging. Expert risk management required.",
-      Champion: "Elite competition with high pressure.",
-      Legend: "Extreme difficulty for the best traders only.",
-      "Trading God": "Ultimate challenge. Only legends survive.",
-    };
-
-    const diffColors = colorMap[difficultyData.level];
+    /*
+      The difficulty tint, emoji and description used to be three ninety-line dictionaries
+      here. They are presentation for one card, so they moved into
+      `components/trading/lobby/TradingLobbySidebar.tsx` with the card that renders them - as
+      `Map`s, because they were indexed by a value derived from a competition document.
+    */
 
     return (
       <div className="flex min-h-screen flex-col gap-4 sm:gap-6 p-3 sm:p-4 md:p-8 overflow-x-hidden">
@@ -329,29 +237,15 @@ const CompetitionDetailsPage = async ({
         />
 
         {/* Header with Back Button and UTC Clock */}
-        <div className="flex items-center justify-between flex-wrap gap-2 sm:gap-4">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Link href="/competitions">
-              <Button
-                variant="ghost"
-                className="w-fit gap-2 text-gray-400 hover:text-gray-100 min-h-[44px]"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span className="hidden sm:inline">Back to Competitions</span>
-                <span className="sm:hidden">Back</span>
-              </Button>
-            </Link>
+        <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <NeonPill href="/competitions" icon={ArrowLeft} label="Back to Competitions" />
             {isCompleted && isUserIn && (
-              <Link href={`/competitions/${id}/results`}>
-                <Button
-                  size="sm"
-                  className="gap-2 bg-purple-600 hover:bg-purple-700 min-h-[44px]"
-                >
-                  <BarChart3 className="h-4 w-4" />
-                  <span className="hidden sm:inline">View Results</span>
-                  <span className="sm:hidden">Results</span>
-                </Button>
-              </Link>
+              <NeonPill
+                href={`/competitions/${id}/results`}
+                icon={BarChart3}
+                label="View Results"
+              />
             )}
           </div>
           <div className="hidden sm:block">
@@ -359,113 +253,14 @@ const CompetitionDetailsPage = async ({
           </div>
         </div>
 
-        {/* Competition Header */}
-        <div className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-yellow-500/20 via-gray-800 to-gray-900 p-4 sm:p-6 md:p-8 shadow-xl border border-yellow-500/20">
-          <div className="absolute top-0 right-0 opacity-10">
-            <GameIcon name="trophy" size={192} />
-          </div>
-
-          <div className="relative z-10">
-            {/* Status Badge */}
-            {isCancelled && (
-              <div className="mb-4">
-                <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-600 text-white text-lg font-bold">
-                  🚫 CANCELLED
-                </span>
-                {competition.cancellationReason && (
-                  <p className="mt-2 text-red-400 text-sm bg-red-900/30 px-4 py-2 rounded-lg border border-red-500/30">
-                    <strong>Reason:</strong> {competition.cancellationReason}
-                  </p>
-                )}
-              </div>
-            )}
-            {isActive && (
-              <span className="inline-flex items-center gap-2 mb-4 px-3 py-1 rounded-full bg-blue-500 text-white text-sm font-medium animate-pulse">
-                <div className="w-2 h-2 bg-white rounded-full"></div>
-                LIVE NOW
-              </span>
-            )}
-
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-100 mb-2">
-              {competition.name}
-            </h1>
-            <p className="text-gray-400 mb-6 max-w-2xl">
-              {competition.description}
-            </p>
-
-            {/* Key Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-              <div>
-                <p className="text-[11px] sm:text-xs text-gray-500 uppercase tracking-wider">
-                  Prize Pool
-                </p>
-                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-yellow-500">
-                  {currSymbol}
-                  {(
-                    competition.prizePool ||
-                    competition.prizePoolCredits ||
-                    0
-                  ).toFixed(0)}
-                </p>
-              </div>
-              <div>
-                <p className="text-[11px] sm:text-xs text-gray-500 uppercase tracking-wider">
-                  Entry Fee
-                </p>
-                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-100">
-                  {currSymbol}{competition.entryFee || competition.entryFeeCredits || 0}
-                </p>
-              </div>
-              <div>
-                <p className="text-[11px] sm:text-xs text-gray-500 uppercase tracking-wider">
-                  Participants
-                </p>
-                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-100">
-                  {competition.currentParticipants}/
-                  {competition.maxParticipants}
-                </p>
-                {isUpcoming && competition.minParticipants > 0 && (
-                  <p
-                    className={`text-xs mt-1 ${competition.currentParticipants < competition.minParticipants ? "text-orange-400" : "text-green-400"}`}
-                  >
-                    Min: {competition.minParticipants}{" "}
-                    {competition.currentParticipants <
-                    competition.minParticipants
-                      ? "(need more!)"
-                      : "✓"}
-                  </p>
-                )}
-              </div>
-              <div>
-                <p className="text-[11px] sm:text-xs text-gray-500 uppercase tracking-wider">
-                  {isCancelled
-                    ? "Status"
-                    : isActive
-                      ? "Time Remaining"
-                      : isCompleted
-                        ? "Status"
-                        : "Starts In"}
-                </p>
-                <div
-                  className={`text-xl sm:text-2xl md:text-3xl font-bold ${isCancelled ? "text-red-500" : isActive ? "text-yellow-400" : "text-gray-100"}`}
-                >
-                  {isCancelled ? (
-                    "Cancelled"
-                  ) : isCompleted ? (
-                    "Completed"
-                  ) : (
-                    <InlineCountdown
-                      targetDate={
-                        isActive ? competition.endTime : competition.startTime
-                      }
-                      type={isActive ? "end" : "start"}
-                    />
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <TradingLobbyHero
+          competition={competition}
+          currSymbol={currSymbol}
+          isActive={isActive}
+          isUpcoming={isUpcoming}
+          isCompleted={isCompleted}
+          isCancelled={isCancelled}
+        />
 
         {/* Two Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -517,19 +312,26 @@ const CompetitionDetailsPage = async ({
             )}
 
             {/* Leaderboard */}
-            <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4 sm:p-6">
-              <div className="flex items-center gap-2 mb-4 sm:mb-6 flex-wrap">
-                <GameIcon name="trophy" size={20} />
-                <h2 className="text-lg sm:text-xl font-bold text-gray-100">Leaderboard</h2>
-                <span className="px-2 py-0.5 rounded-full bg-gray-700 text-gray-300 text-xs font-medium">
-                  {leaderboard.length} traders
-                </span>
-                {competition.rules?.minimumTrades > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 text-xs font-medium">
-                    Min: {competition.rules.minimumTrades} trades
-                  </span>
-                )}
-              </div>
+            <NeonPanel
+              icon={Trophy}
+              accent="prize"
+              title="Leaderboard"
+              action={
+                <div className="flex items-center gap-2">
+                  {/*
+                    "traders" here and "players" on the game lobby. The appearance comes from the
+                    kit; the wording deliberately does not, because the two words describe
+                    genuinely different things and a shared label would be wrong on one screen.
+                  */}
+                  <NeonCountPill>{leaderboard.length} traders</NeonCountPill>
+                  {competition.rules?.minimumTrades > 0 && (
+                    <NeonCountPill tone="warn">
+                      Min {competition.rules.minimumTrades} trades
+                    </NeonCountPill>
+                  )}
+                </div>
+              }
+            >
               <CompetitionLeaderboard
                 leaderboard={leaderboard}
                 userParticipantId={userParticipant?._id}
@@ -537,677 +339,26 @@ const CompetitionDetailsPage = async ({
                 minimumTrades={competition.rules?.minimumTrades || 0}
                 competitionStatus={competition.status}
               />
-            </div>
+            </NeonPanel>
           </div>
 
           {/* ========== RIGHT COLUMN: SIDEBAR ========== */}
-          <div className="space-y-4">
-            {/* ===== SECTION 1: ACTION & TIMING ===== */}
-            {/* Entry Button/Info */}
-            {(!isCompleted || (isUserIn && userParticipant)) && (
-              <CompetitionEntryButton
-                competition={competition}
-                userBalance={walletBalance.balance}
-                isUserIn={isUserIn}
-                isFull={isFull}
-                participantStatus={userParticipant?.status}
-                userLevel={userLevel}
-                registrationClosed={registrationClosed}
-              />
-            )}
-
-            {/* Live Countdown */}
-            {isUpcoming && (
-              <LiveCountdown
-                targetDate={new Date(competition.startTime)}
-                label="⏳ Competition Starts In"
-                type="start"
-                status="upcoming"
-              />
-            )}
-            {isActive && (
-              <LiveCountdown
-                targetDate={new Date(competition.endTime)}
-                label="⏱️ Time Remaining"
-                type="end"
-                status="active"
-              />
-            )}
-
-            {/* Schedule */}
-            <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <GameIcon name="timer" size={16} />
-                <h3 className="text-sm font-semibold text-gray-100">
-                  Schedule (UTC)
-                </h3>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between p-2 bg-gray-900/50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-xs text-gray-400">Start</span>
-                  </div>
-                  <span className="text-sm font-bold text-white">
-                    {formatUTCDate(new Date(competition.startTime))}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-2 bg-gray-900/50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                    <span className="text-xs text-gray-400">End</span>
-                  </div>
-                  <span className="text-sm font-bold text-white">
-                    {formatUTCDate(new Date(competition.endTime))}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* ===== SECTION 2: COMPETITION DETAILS ===== */}
-            <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <GameIcon name="guideBook" size={16} />
-                <h3 className="text-sm font-semibold text-gray-100">
-                  Competition Details
-                </h3>
-              </div>
-
-              <div className="space-y-3">
-                {/* Competition Type */}
-                <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                  <div className="flex items-center gap-2 mb-1">
-                    <GameIcon name="fireSpell" size={14} />
-                    <span className="text-xs font-medium text-blue-400">
-                      Type
-                    </span>
-                  </div>
-                  <p className="text-sm font-bold text-white">
-                    {competition.competitionType === "time_based" &&
-                      "⏱️ Time-Based"}
-                    {competition.competitionType === "goal_based" &&
-                      "🎯 Goal-Based"}
-                    {competition.competitionType === "hybrid" && "🔄 Hybrid"}
-                  </p>
-                </div>
-
-                {/* Quick Stats Grid */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="p-2.5 bg-gray-900/50 rounded-lg text-center">
-                    <p className="text-[11px] text-gray-500 uppercase">
-                      Capital
-                    </p>
-                    <p className="text-sm font-bold text-green-400">
-                      $
-                      {(
-                        competition.startingCapital ||
-                        competition.startingTradingPoints ||
-                        0
-                      ).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="p-2.5 bg-gray-900/50 rounded-lg text-center">
-                    <p className="text-[11px] text-gray-500 uppercase">
-                      Leverage
-                    </p>
-                    <p className="text-sm font-bold text-purple-400">
-                      {/* Reason: Use competition-specific leverage, not platform-wide settings */}
-                      {competition.leverage?.enabled
-                        ? `1:${competition.leverage.min} to 1:${competition.leverage.max}`
-                        : `1:${competition.leverage?.max || riskSettings.maxLeverage}`}
-                    </p>
-                  </div>
-                  <div className="p-2.5 bg-gray-900/50 rounded-lg text-center">
-                    <p className="text-[11px] text-gray-500 uppercase">
-                      Max Positions
-                    </p>
-                    <p className="text-sm font-bold text-cyan-400">
-                      {competition.maxOpenPositions || 10}
-                    </p>
-                  </div>
-                  <div className="p-2.5 bg-gray-900/50 rounded-lg text-center">
-                    <p className="text-[11px] text-gray-500 uppercase">
-                      Position Size
-                    </p>
-                    <p className="text-sm font-bold text-cyan-400">
-                      {competition.maxPositionSize || 100}%
-                    </p>
-                  </div>
-                </div>
-
-                {/* Asset Classes */}
-                <div className="flex flex-wrap gap-1.5">
-                  {competition.assetClasses.map((asset: string) => (
-                    <span
-                      key={asset}
-                      className="px-2 py-1 rounded bg-blue-500/20 text-xs font-medium text-blue-400 uppercase"
-                    >
-                      {asset === "forex" && "💱 "}
-                      {asset === "crypto" && "₿ "}
-                      {asset === "stocks" && "📈 "}
-                      {asset}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Difficulty Level */}
-            <div
-              className={`rounded-xl bg-gradient-to-br ${diffColors.bg} border ${diffColors.border} p-4`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <GameIcon name="target" size={16} />
-                  <span className="text-sm font-semibold text-white">
-                    Difficulty
-                  </span>
-                  <span className="text-lg">
-                    {emojiMap[difficultyData.level]}
-                  </span>
-                </div>
-                <span
-                  className={`px-2 py-1 rounded-lg text-xs font-bold ${diffColors.barColor}/20 ${diffColors.text}`}
-                >
-                  {difficultyData.label}
-                </span>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="mb-2">
-                <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full ${diffColors.barColor} transition-all`}
-                    style={{ width: `${difficultyData.score}%` }}
-                  />
-                </div>
-                <div className="flex justify-between text-[11px] text-gray-500 mt-1">
-                  <span>Easier</span>
-                  <span className={diffColors.text}>
-                    {difficultyData.score}/100
-                  </span>
-                  <span>Harder</span>
-                </div>
-              </div>
-
-              <p className="text-xs text-gray-400">
-                {descriptionMap[difficultyData.level]}
-              </p>
-            </div>
-
-            {/* ===== SECTION 3: RULES & REQUIREMENTS ===== */}
-            {/* Competition Rules */}
-            {competition.rules && (
-              <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <GameIcon name="trophy" size={16} />
-                    <h3 className="text-sm font-semibold text-gray-100">
-                      Competition Rules
-                    </h3>
-                  </div>
-                  <Link
-                    href="/help/competitions"
-                    className="text-xs text-blue-400 hover:text-blue-300"
-                  >
-                    View Guide
-                  </Link>
-                </div>
-                <div className="space-y-3 text-sm">
-                  {/* Ranking Method */}
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-400">Ranking:</span>
-                      <span className="font-semibold text-blue-400">
-                        {
-                           
-                          ({
-                            pnl: "Highest P&L",
-                            roi: "Highest ROI %",
-                            total_capital: "Highest Capital",
-                            win_rate: "Highest Win Rate",
-                            total_wins: "Most Winning Trades",
-                            profit_factor: "Best Profit Factor",
-                          } as Record<string, string>)[competition.rules.rankingMethod] || "Highest P&L"
-                        }
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-gray-500 mt-0.5">
-                      {
-                         
-                        ({
-                          pnl: "Winner is determined by total profit & loss (realized + unrealized).",
-                          roi: "Winner is determined by the highest return on investment percentage.",
-                          total_capital: "Winner has the highest account balance at the end.",
-                          win_rate: "Winner has the highest percentage of winning trades.",
-                          total_wins: "Winner has the most profitable trades closed.",
-                          profit_factor: "Winner has the best ratio of winning to losing trades.",
-                        } as Record<string, string>)[competition.rules.rankingMethod] || "Winner is determined by total profit & loss."
-                      }
-                    </p>
-                  </div>
-
-                  {/* Tie Breaker 1 */}
-                  {competition.rules.tieBreaker1 && (
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-400">Tie Breaker 1:</span>
-                        <span className="font-semibold text-purple-400">
-                          {
-                             
-                            ({
-                              trades_count: "Most Trades",
-                              win_rate: "Higher Win Rate",
-                              total_capital: "Higher Capital",
-                              roi: "Higher ROI",
-                              join_time: "First to Join",
-                              split_prize: "Split Prize",
-                            } as Record<string, string>)[competition.rules.tieBreaker1] || competition.rules.tieBreaker1
-                          }
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-gray-500 mt-0.5">
-                        {
-                           
-                          ({
-                            trades_count: "If tied, the trader with more completed trades wins.",
-                            win_rate: "If tied, the trader with a higher win rate wins.",
-                            total_capital: "If tied, the trader with more capital wins.",
-                            roi: "If tied, the trader with a higher return on investment wins.",
-                            join_time: "If tied, the trader who joined first wins.",
-                            split_prize: "If tied, the prize is split equally between tied traders.",
-                          } as Record<string, string>)[competition.rules.tieBreaker1] || "Used to break ties in the ranking."
-                        }
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Tie Breaker 2 */}
-                  {competition.rules.tieBreaker2 && (
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-400">Tie Breaker 2:</span>
-                        <span className="font-semibold text-purple-400">
-                          {
-                             
-                            ({
-                              trades_count: "Most Trades",
-                              win_rate: "Higher Win Rate",
-                              total_capital: "Higher Capital",
-                              roi: "Higher ROI",
-                              join_time: "First to Join",
-                              split_prize: "Split Prize",
-                            } as Record<string, string>)[competition.rules.tieBreaker2] || competition.rules.tieBreaker2
-                          }
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-gray-500 mt-0.5">
-                        {
-                           
-                          ({
-                            trades_count: "If still tied, the trader with more completed trades wins.",
-                            win_rate: "If still tied, the trader with a higher win rate wins.",
-                            total_capital: "If still tied, the trader with more capital wins.",
-                            roi: "If still tied, the trader with a higher return on investment wins.",
-                            join_time: "If still tied, the trader who joined first wins.",
-                            split_prize: "If still tied, the prize is split equally.",
-                          } as Record<string, string>)[competition.rules.tieBreaker2] || "Used as a secondary tie breaker."
-                        }
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Min Trades */}
-                  {competition.rules.minimumTrades > 0 && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-400">Min Trades:</span>
-                      <span className="font-medium text-amber-400">
-                        {competition.rules.minimumTrades}
-                      </span>
-                    </div>
-                  )}
-                  {competition.rules.minimumWinRate > 0 && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-400">Min Win Rate:</span>
-                      <span className="font-medium text-amber-400">
-                        {competition.rules.minimumWinRate}%
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Level Requirement */}
-            {competition.levelRequirement?.enabled && (
-              <div className="rounded-xl bg-purple-500/10 border border-purple-500/20 p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-lg">👑</span>
-                  <h3 className="text-sm font-semibold text-purple-400">
-                    Level Requirement
-                  </h3>
-                </div>
-                <p className="text-sm font-medium text-white">
-                  {(() => {
-                    const levelNames = [
-                      "",
-                      "🌱 Novice",
-                      "📚 Apprentice",
-                      "⚔️ Skilled",
-                      "🎯 Expert",
-                      "💎 Elite",
-                      "👑 Master",
-                      "🔥 Grand Master",
-                      "⚡ Champion",
-                      "🌟 Legend",
-                      "👑 Trading God",
-                    ];
-                    const min = Number(competition.levelRequirement.minLevel);
-                    const max = competition.levelRequirement.maxLevel ? Number(competition.levelRequirement.maxLevel) : null;
-                    // eslint-disable-next-line security/detect-object-injection
-                    const minName = levelNames[min] || `Level ${min}`;
-                    // eslint-disable-next-line security/detect-object-injection
-                    const maxName = max ? levelNames[max] || `Level ${max}` : null;
-                    return maxName
-                      ? `${minName} to ${maxName}`
-                      : `${minName} or higher`;
-                  })()}
-                </p>
-              </div>
-            )}
-
-            {/* Disqualification Rules */}
-            {competition.rules &&
-              (competition.rules.minimumTrades > 0 ||
-                competition.rules.disqualifyOnLiquidation ||
-                competition.rules.minimumWinRate) && (
-                <div className="rounded-xl bg-red-500/10 border border-red-500/30 p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <GameIcon name="skull" size={16} />
-                    <h3 className="text-sm font-semibold text-red-400">
-                      ⚠️ Disqualification Rules
-                    </h3>
-                  </div>
-
-                  <div className="space-y-2">
-                    {competition.rules.minimumTrades > 0 && (
-                      <div className="p-2.5 bg-gray-900/70 rounded-lg border border-orange-500/20">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-medium text-orange-400">
-                            Min Trades Required
-                          </span>
-                          <span className="px-2 py-0.5 bg-orange-500/20 text-orange-400 text-xs font-bold rounded">
-                            {competition.rules.minimumTrades}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-gray-500">
-                          Complete {competition.rules.minimumTrades}+ trades or
-                          be disqualified
-                        </p>
-                      </div>
-                    )}
-
-                    {competition.rules.disqualifyOnLiquidation && (
-                      <div className="p-2.5 bg-gray-900/70 rounded-lg border border-red-500/20">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-medium text-red-400">
-                            Liquidation = DQ
-                          </span>
-                          <span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-[11px] font-bold rounded animate-pulse">
-                            ACTIVE
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-gray-500">
-                          Getting liquidated = immediate disqualification
-                        </p>
-                      </div>
-                    )}
-
-                    {competition.rules.minimumWinRate > 0 && (
-                      <div className="p-2.5 bg-gray-900/70 rounded-lg border border-yellow-500/20">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-medium text-yellow-400">
-                            Min Win Rate
-                          </span>
-                          <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-bold rounded">
-                            {competition.rules.minimumWinRate}%
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-gray-500">
-                          Win rate below {competition.rules.minimumWinRate}% =
-                          disqualified
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-            {/* ===== SECTION 4: RISK & MARGIN ===== */}
-            {/* Risk Limits */}
-            <div
-              className={`rounded-xl p-4 ${competition.riskLimits?.enabled ? "bg-red-500/10 border border-red-500/20" : "bg-gray-800/50 border border-gray-700"}`}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <GameIcon name="shield1" size={16} />
-                <h3 className="text-sm font-semibold text-gray-100">
-                  Risk Limits
-                </h3>
-                <span
-                  className={`px-1.5 py-0.5 text-[11px] font-bold rounded ${competition.riskLimits?.enabled ? "bg-red-500/20 text-red-400" : "bg-gray-700 text-gray-500"}`}
-                >
-                  {competition.riskLimits?.enabled ? "🛡️ ACTIVE" : "OFF"}
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between p-2 bg-gray-900/50 rounded-lg">
-                  <span className="text-xs text-gray-400">Max Drawdown</span>
-                  <span
-                    className={`text-sm font-bold ${competition.riskLimits?.enabled ? "text-red-400" : "text-gray-500"}`}
-                  >
-                    {competition.riskLimits?.maxDrawdownPercent || 50}%
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-2 bg-gray-900/50 rounded-lg">
-                  <span className="text-xs text-gray-400">
-                    Daily Loss Limit
-                  </span>
-                  <span
-                    className={`text-sm font-bold ${competition.riskLimits?.enabled ? "text-orange-400" : "text-gray-500"}`}
-                  >
-                    {competition.riskLimits?.dailyLossLimitPercent || 20}%
-                  </span>
-                </div>
-                {competition.riskLimits?.equityCheckEnabled && (
-                  <div className="flex items-center justify-between p-2 bg-purple-500/10 rounded-lg border border-purple-500/20">
-                    <span className="text-xs text-purple-400">
-                      Equity Drawdown
-                    </span>
-                    <span className="text-sm font-bold text-purple-400">
-                      {competition.riskLimits?.equityDrawdownPercent || 30}%
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Margin Levels */}
-            <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <GameIcon name="skull" size={16} />
-                <h3 className="text-sm font-semibold text-gray-100">
-                  Margin Levels
-                </h3>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between p-2 bg-red-500/10 rounded-lg border border-red-500/20">
-                  <div className="flex items-center gap-1.5">
-                    <GameIcon name="skull" size={12} />
-                    <span className="text-xs text-red-400">Liquidation</span>
-                  </div>
-                  <span className="text-sm font-black text-red-500">
-                    {riskSettings.marginLiquidation}%
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-2 bg-orange-500/10 rounded-lg border border-orange-500/20">
-                  <div className="flex items-center gap-1.5">
-                    <GameIcon name="warning" size={12} />
-                    <span className="text-xs text-orange-400">Margin Call</span>
-                  </div>
-                  <span className="text-sm font-black text-orange-400">
-                    {riskSettings.marginCall}%
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-2 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
-                  <div className="flex items-center gap-1.5">
-                    <GameIcon name="warning" size={12} />
-                    <span className="text-xs text-yellow-400">Warning</span>
-                  </div>
-                  <span className="text-sm font-black text-yellow-400">
-                    {riskSettings.marginWarning}%
-                  </span>
-                </div>
-                <div className="flex items-center justify-between p-2 bg-green-500/10 rounded-lg border border-green-500/20">
-                  <div className="flex items-center gap-1.5">
-                    <GameIcon name="shield1" size={12} />
-                    <span className="text-xs text-green-400">Safe</span>
-                  </div>
-                  <span className="text-sm font-black text-green-400">
-                    {riskSettings.marginSafe}%
-                  </span>
-                </div>
-              </div>
-
-              {/* Visual Scale */}
-              <div className="mt-3 p-2 bg-gray-900/50 rounded-lg">
-                <div className="h-2 bg-gray-800 rounded-full overflow-hidden flex">
-                  <div className="bg-red-500" style={{ width: "20%" }} />
-                  <div className="bg-orange-500" style={{ width: "20%" }} />
-                  <div className="bg-yellow-500" style={{ width: "20%" }} />
-                  <div className="bg-green-500" style={{ width: "40%" }} />
-                </div>
-                <div className="flex justify-between text-[11px] text-gray-500 mt-1">
-                  <span>💀</span>
-                  <span>🚨</span>
-                  <span>⚠️</span>
-                  <span>✅</span>
-                </div>
-              </div>
-            </div>
-
-            {/* ===== SECTION 5: PRIZES ===== */}
-            <div className="rounded-xl bg-gradient-to-br from-yellow-500/10 to-gray-800/50 border border-yellow-500/30 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <GameIcon name="trophy" size={16} />
-                  <h3 className="text-sm font-semibold text-gray-100">
-                    Prize Distribution
-                  </h3>
-                </div>
-                {competition.platformFeePercentage > 0 && (
-                  <span className="text-[11px] text-blue-400">
-                    Fee: {competition.platformFeePercentage}%
-                  </span>
-                )}
-              </div>
-
-              {(() => {
-                const prizePositions = competition.prizeDistribution.length;
-                const currentParticipants =
-                  competition.currentParticipants || 0;
-                const prizePool =
-                  competition.prizePool || competition.prizePoolCredits || 0;
-                const platformFeePercentage =
-                  (competition.platformFeePercentage || 0) / 100;
-                const filledPositions = Math.min(
-                  currentParticipants,
-                  prizePositions,
-                );
-
-                let unclaimedPercentage = 0;
-                if (currentParticipants < prizePositions) {
-                  competition.prizeDistribution.forEach(
-                    (prize: { percentage: number }, index: number) => {
-                      if (index >= currentParticipants)
-                        unclaimedPercentage += prize.percentage;
-                    },
-                  );
-                }
-                const bonusPerWinner =
-                  filledPositions > 0
-                    ? unclaimedPercentage / filledPositions
-                    : 0;
-
-                return (
-                  <>
-                    {/* Status */}
-                    <div
-                      className={`mb-3 p-2 rounded-lg text-xs ${currentParticipants >= prizePositions ? "bg-green-500/10 text-green-400" : "bg-amber-500/10 text-amber-400"}`}
-                    >
-                      {currentParticipants >= prizePositions
-                        ? `✅ ${currentParticipants}/${prizePositions} positions filled`
-                        : `🎁 ${currentParticipants}/${prizePositions} filled - ${unclaimedPercentage}% bonus available!`}
-                    </div>
-
-                    {/* Prize List */}
-                    <div className="space-y-2">
-                      {competition.prizeDistribution.map(
-                        (
-                          prize: { percentage: number; rank?: number },
-                          index: number,
-                        ) => {
-                          const isFilled = index < currentParticipants;
-                          const adjustedPercentage =
-                            isFilled && bonusPerWinner > 0
-                              ? prize.percentage + bonusPerWinner
-                              : prize.percentage;
-                          const netAmount =
-                            ((prizePool * adjustedPercentage) / 100) *
-                            (1 - platformFeePercentage);
-
-                          return (
-                            <div
-                              key={index}
-                              className={`p-2.5 rounded-lg flex items-center justify-between ${isFilled ? "bg-gray-800/50 border border-gray-700" : "bg-gray-900/30 opacity-50"}`}
-                            >
-                              <div className="flex items-center gap-2">
-                                <GameIcon
-                                  name={index === 0 ? "crown" : index === 1 ? "rank2" : index === 2 ? "rank3" : "trophy"}
-                                  size={16}
-                                />
-                                <span className="text-sm font-medium text-gray-300">
-                                  #{prize.rank ?? index + 1}
-                                </span>
-                                <span className="px-1.5 py-0.5 text-[11px] rounded bg-yellow-500/20 text-yellow-400">
-                                  {prize.percentage}%
-                                </span>
-                                {isFilled && bonusPerWinner > 0 && (
-                                  <span className="px-1.5 py-0.5 text-[11px] rounded bg-green-500/20 text-green-400">
-                                    +{bonusPerWinner.toFixed(1)}%
-                                  </span>
-                                )}
-                              </div>
-                              <span
-                                className={`text-sm font-bold ${isFilled ? "text-yellow-500" : "text-gray-500"}`}
-                              >
-                                {isFilled ? `${currSymbol}${netAmount.toFixed(2)}` : "—"}
-                              </span>
-                            </div>
-                          );
-                        },
-                      )}
-                    </div>
-
-                    <p className="mt-3 text-[11px] text-gray-500">
-                      🎁 Unclaimed positions split equally among winners
-                    </p>
-                  </>
-                );
-              })()}
-            </div>
-          </div>
+          <TradingLobbySidebar
+            competition={competition}
+            riskSettings={riskSettings}
+            difficultyData={difficultyData}
+            currSymbol={currSymbol}
+            walletBalance={walletBalance.balance}
+            isUserIn={isUserIn && !!userParticipant}
+            isFull={isFull}
+            isActive={isActive}
+            isUpcoming={isUpcoming}
+            isCompleted={isCompleted}
+            participantStatus={userParticipant?.status}
+            userLevel={userLevel}
+            registrationClosed={registrationClosed}
+            formatUTCDate={formatUTCDate}
+          />
         </div>
       </div>
     );

@@ -1,4 +1,11 @@
-import { GameIcon, RankIcon } from "@/components/ui/GameIcon";
+import { Gamepad2 } from "lucide-react";
+import {
+  NeonAvatar,
+  NeonPlayerName,
+  NeonRankBadge,
+  neonRowClasses,
+} from "@/components/neon/LeaderboardRow";
+import { NEON_TABLE_HEAD } from "@/components/neon/tokens";
 
 /**
  * The leaderboard for a contest played through a game provider.
@@ -23,11 +30,11 @@ import { GameIcon, RankIcon } from "@/components/ui/GameIcon";
  * separately. The raw score is displayed as stored, because a persisted race time shown as a
  * negative number is unexplainable to a player.
  *
- * THE ROW TREATMENT IS THE TRADING BOARD'S (owner requirement, 6 Sep 2026): the same 3D rank
- * medals, the same tinted row cards, the same blue highlight and "You" chip on the player's own
- * row, the same uppercase column headings. Only the columns differ, which is the whole point -
- * two boards that look like one product and report different things, rather than one board
- * reporting a number it does not have.
+ * THE ROW PIECES COME FROM `components/neon/LeaderboardRow`, WHICH THE TRADING BOARD ALSO USES:
+ * the same rank medal, the same initials chip, the same "you" highlight, the same uppercase
+ * column headings. Only the columns differ, which is the whole point - two boards that look
+ * like one product and report different things, rather than one board reporting a number it
+ * does not have.
  */
 
 export interface ProviderLeaderboardRow {
@@ -55,10 +62,8 @@ export default function ProviderLeaderboard({
 }: ProviderLeaderboardProps) {
   if (rows.length === 0) {
     return (
-      <div className="rounded-lg bg-gray-900/50 border border-gray-700/50 p-8 text-center">
-        <div className="flex justify-center mb-3 opacity-40">
-          <GameIcon name="joystick1" size={40} />
-        </div>
+      <div className="rounded-xl border border-[#161E36] bg-[#080C18]/60 p-8 text-center">
+        <Gamepad2 className="mx-auto mb-3 h-8 w-8 text-gray-600" />
         <p className="text-sm font-medium text-gray-300">
           No one has played yet.
         </p>
@@ -70,61 +75,46 @@ export default function ProviderLeaderboard({
   }
 
   return (
-    <div className="space-y-2 overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
+    <div className="-mx-3 overflow-x-auto px-3 sm:mx-0 sm:px-0">
       <div className="min-w-[320px]">
-        <div className="grid grid-cols-[auto_1fr_auto] gap-3 px-3 md:px-4 pb-2 border-b border-gray-700 text-xs font-medium text-gray-500 uppercase tracking-wider">
-          <div className="flex-shrink-0">Rank</div>
+        <div
+          className={`grid grid-cols-[auto_1fr_auto] gap-3 px-3 pb-2 md:px-4 ${NEON_TABLE_HEAD}`}
+        >
+          <div className="w-8 shrink-0">#</div>
           <div className="min-w-0">Player</div>
-          <div className="text-right flex-shrink-0 min-w-[80px]">
-            {scoreLabel}
-          </div>
+          <div className="min-w-[80px] shrink-0 text-right">{scoreLabel}</div>
         </div>
 
-        <div className="space-y-1 pt-2">
+        <div className="space-y-2 pt-2">
           {rows.map((row) => {
             const isYou = row.userId === currentUserId;
 
             return (
               <div
                 key={row.userId}
-                className={`grid grid-cols-[auto_1fr_auto] gap-3 p-3 md:p-4 rounded-lg transition-colors ${
-                  isYou
-                    ? "bg-blue-500/10 border border-blue-500/30"
-                    : row.currentRank <= 3
-                      ? "bg-yellow-500/5 border border-yellow-500/20 hover:bg-yellow-500/10"
-                      : "bg-gray-800/30 border border-transparent hover:bg-gray-800/50"
-                }`}
+                className={`grid grid-cols-[auto_1fr_auto] items-center gap-3 p-3 md:px-4 ${neonRowClasses(
+                  { rank: row.currentRank, isCurrentUser: isYou },
+                )}`}
               >
                 {/*
-                  The 3D medals the trading board uses, rather than a bare number. `RankIcon`
-                  covers the first seven places and falls back to a star badge, so a large field
-                  does not need a special case here.
+                  The rank is rendered from the value the server computed, never from this row's
+                  index in the array. Ranking is decided once by `calculateRankings`, which knows
+                  whether the game scores upward or downward, so a board numbering its own rows
+                  would quietly disagree with the payout for every lower-is-better game.
                 */}
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <RankIcon rank={row.currentRank} size={22} />
-                  <span className="text-sm font-semibold text-gray-400">
-                    {row.currentRank}
-                  </span>
-                </div>
+                <NeonRankBadge rank={row.currentRank} />
 
-                <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <NeonAvatar name={row.username || "Anonymous"} />
                   {row.userTitleIcon && (
-                    <span className="flex-shrink-0">{row.userTitleIcon}</span>
+                    <span className="shrink-0">{row.userTitleIcon}</span>
                   )}
-                  <span
-                    className={`text-sm font-medium truncate ${
-                      isYou ? "text-blue-400" : "text-gray-100"
-                    }`}
-                  >
-                    {row.username || "Anonymous"}
-                  </span>
-                  {isYou && (
-                    <span className="px-1.5 py-0.5 rounded text-xs bg-blue-500/20 text-blue-400 flex-shrink-0">
-                      You
-                    </span>
-                  )}
+                  <NeonPlayerName
+                    name={row.username || "Anonymous"}
+                    isCurrentUser={isYou}
+                  />
                   {row.isTied && (
-                    <span className="px-1.5 py-0.5 rounded text-xs bg-amber-500/20 text-amber-400 flex-shrink-0 font-semibold">
+                    <span className="shrink-0 rounded bg-amber-500/20 px-1.5 py-0.5 text-xs font-semibold text-amber-300">
                       = #{row.currentRank}
                     </span>
                   )}
@@ -137,7 +127,7 @@ export default function ProviderLeaderboard({
                   the read-side form of the `score ?? 0` that made every provider participant
                   tie in R37.
                 */}
-                <div className="text-right flex-shrink-0 min-w-[80px] self-center">
+                <div className="min-w-[80px] shrink-0 self-center text-right">
                   {row.score === undefined || row.score === null ? (
                     <span className="text-sm text-gray-600">-</span>
                   ) : (

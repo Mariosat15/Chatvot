@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Trophy, Ban, AlertTriangle, Skull, ShieldX } from "lucide-react";
 import { GameIcon } from "@/components/ui/GameIcon";
 import { GAME_ICONS, type GameIconName } from "@/lib/constants/game-icons";
+import { neonRowClasses } from "@/components/neon/LeaderboardRow";
+import { NEON_TABLE_HEAD } from "@/components/neon/tokens";
 import ProfileCard from "@/components/profile/ProfileCard";
 
 interface LeaderboardEntry {
@@ -156,8 +158,10 @@ export default function CompetitionLeaderboard({
     <div className="space-y-2 overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
       <div className="min-w-[640px]">
       {/* Header */}
-      <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto_auto_auto] gap-2 md:gap-3 px-3 md:px-4 pb-2 border-b border-gray-700 text-xs font-medium text-gray-500 uppercase tracking-wider">
-        <div className="flex-shrink-0">Rank</div>
+      <div
+        className={`grid grid-cols-[auto_1fr_auto_auto_auto_auto_auto_auto] gap-2 md:gap-3 px-3 md:px-4 pb-2 ${NEON_TABLE_HEAD}`}
+      >
+        <div className="flex-shrink-0">#</div>
         <div className="min-w-0">Trader</div>
         <div className="text-right flex-shrink-0 min-w-[80px]">Capital</div>
         <div className="text-right flex-shrink-0 min-w-[70px]">P&L</div>
@@ -186,14 +190,26 @@ export default function CompetitionLeaderboard({
           return (
             <div
               key={entry._id}
-              className={`grid grid-cols-[auto_1fr_auto_auto_auto_auto_auto_auto] gap-2 md:gap-3 p-3 md:p-4 rounded-lg transition-colors relative ${
+              /*
+                The row shell comes from the shared kit, so this board and the game board are
+                the same object with different columns. Disqualification is tested FIRST and
+                keeps its own treatment: it is the one state that must beat both "this is you"
+                and "this is a paid position", because a struck-through row tinted as a winner
+                would read as a prize a disqualified trader is about to be paid.
+              */
+              className={`relative grid grid-cols-[auto_1fr_auto_auto_auto_auto_auto_auto] gap-2 p-3 md:gap-3 md:p-4 ${
                 isDisqualified
-                  ? "bg-red-500/5 border border-red-500/30 opacity-70"
-                  : isCurrentUser
-                    ? "bg-blue-500/10 border border-blue-500/30"
-                    : isPrizePosition
-                      ? "bg-yellow-500/5 border border-yellow-500/20 hover:bg-yellow-500/10"
-                      : "bg-gray-800/30 border border-transparent hover:bg-gray-800/50"
+                  ? "rounded-xl border border-rose-500/30 bg-rose-500/5 opacity-70"
+                  : neonRowClasses({
+                      /*
+                        `isPrizePosition`, not the raw rank, decides the podium tint here. A
+                        trading contest can pay four places or one, so the kit's top-three
+                        default would tint a third place that wins nothing and leave a paid
+                        fourth plain.
+                      */
+                      rank: isPrizePosition ? 1 : 99,
+                      isCurrentUser,
+                    })
               }`}
             >
               {/* Red strikethrough line for disqualified */}

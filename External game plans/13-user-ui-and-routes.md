@@ -286,6 +286,16 @@ it as `PROBE BROKEN` in its own colour rather than as a green.
 
 ### 4.1c The theme pass - one product, two games (owner requirement, 6 September 2026)
 
+> **SUPERSEDED THE SAME DAY BY 4.1d, AND KEPT AS HISTORY RATHER THAN REWRITTEN.** Read 4.1d for
+> what is built now. Four claims below are stale as *present* facts and each one is worth knowing
+> was once true: `components/games/lobby-ui.tsx` **no longer exists**; the 3D `GameIcon` set and
+> the rank medals are **no longer used on either lobby**; the trading page is **no longer
+> byte-identical**, because the owner decided it should be restyled too; and the class-string
+> comparison tests described here **have been replaced**, for the reason given in 4.1d. What
+> survives intact is the *argument* - why a game lobby wearing a stranger's chrome is a trust
+> problem rather than a taste problem - and the rule that sharing the chrome must never become
+> sharing the content.
+
 The lobby built in 4.1b was **correct and looked like a different application.** It answered all
 three of section 4's questions, showed no trading figure, and used flat lucide glyphs, its own
 narrower container, its own small plain headings and its own card shells. The owner's instruction
@@ -353,11 +363,13 @@ lobby's own source and by the suite - **not by a screenshot.** Owner review is t
 #### The saved design reference
 
 `External game plans/design-reference/` holds the two images the owner supplied, deliberately
-committed rather than left in a chat:
+committed rather than left in a chat. **There are now seven, catalogued in that folder's own
+`README.md`, which is the file to read** - the table below is left as it was written, with one
+correction inline because it is a wrong *fact* rather than a superseded *decision*:
 
 | File | What it is |
 |---|---|
-| `trading-lobby-as-built.png` | The live trading lobby, which is **the theme being matched** |
+| ~~`trading-lobby-as-built.png`~~ → `trading-lobby-target.png` | Described here as "the live trading lobby, the theme being matched". **It was a mock, not a capture, and the filename was wrong.** Proven when the owner re-supplied the same picture as a *target* and the two files came back **byte-identical**. Renamed, and the folder's `README.md` now labels every image mock or capture so the mistake cannot repeat |
 | `game-lobby-target-and-style-sheet.png` | A game lobby mock-up (*Circuit Perfect*) beside a **ChartVolt style sheet** - background and header art, an icon set, stat cards, four status cards, four button styles, a leaderboard row, avatars, panels and glow elements |
 
 The owner's framing: *"see the image how the app will have the theme in the future, just save
@@ -370,6 +382,118 @@ the gradient, and trading is the reference the instruction named), and the **foo
 with a View Rules button** - a rules surface for a provider title is real outstanding work, since
 the trading lobby's rules accordion is entirely trading content and a game has nothing to put in
 it yet.
+
+### 4.1d Both lobbies rebuilt on one design kit (owner requirement, 6 September 2026)
+
+**The instruction reversed the direction of 4.1c.** That slice made the game lobby match the
+trading lobby, because consistency was the ask and the trading lobby was the thing to be
+consistent with. The owner then supplied a full component sheet and five screen mocks and said:
+*"remake the lobby for all games and trading to match the images exactly with the icons images
+colours etc, we will start making the app look more game themed."* So the reference moved. The
+trading lobby is no longer the standard - **the sheet is**, and the trading lobby is one of the
+two screens that had to change to meet it.
+
+Saying that plainly matters because 4.1c's central engineering decision - keep the trading page
+byte-identical, so its unchanged behaviour is evidence nothing moved - **is exactly what this
+slice had to give up.** That guarantee was not traded away casually and section 4.1e below says
+what replaced it.
+
+#### What was built
+
+| Piece | Files | Notes |
+|---|---|---|
+| The kit | `components/neon/tokens.ts`, `Cards.tsx`, `Hero.tsx`, `Buttons.tsx`, `Accordion.tsx`, `LeaderboardRow.tsx`, `banners.ts` | **None of it is mirrored.** `check:mirrors` says nothing about any of it |
+| The artwork | `public/assets/neon/banner-{circuit-sprint,circuit-perfect,trading,championship}.webp` | Generated, then converted PNG → WebP: **8.0 MB → 564 KB** |
+| The game lobby | `components/games/ProviderContestLobby.tsx`, `ProviderLeaderboard.tsx` | Rebuilt on the kit. `lobby-ui.tsx` **deleted** |
+| The trading lobby | `app/(root)/competitions/[id]/page.tsx` plus `components/trading/lobby/{TradingLobbyHero,TradingLobbySidebar,TradingPrizeTable,trading-lobby-accordions}.tsx` | The page went from **1,224 lines to 377** |
+| The trading board | `components/trading/CompetitionLeaderboard.tsx` | Row shell and column headings now come from the kit; its columns are unchanged |
+
+#### Six facts that drift easily
+
+- **`components/neon/` is not `components/arena/`, and the near-miss is worth recording.** The
+  kit was first written into `components/arena/`, which already holds the **Live Arena broadcast
+  dashboard** - an unrelated, existing feature. Nothing collided at build time; the two would
+  simply have shared a folder and a naming prefix for ever, and the next reader would have had no
+  way to tell which `Arena*` component belonged to which feature. **Check what a plausible folder
+  name already means before taking it.**
+- **An asset path is unverifiable by the compiler, so a test asserts every banner file exists.**
+  The artwork was first committed to `public/assets/arena/` while the kit had moved to
+  `components/neon/` - four string literals pointing at nothing. Nothing would have failed: no
+  type error, no build error, no log line, just a broken image on every lobby on the platform.
+  `allNeonBanners()` exists so the test exhausts the map rather than sampling it, and a probe
+  restoring the wrong path turns it red. **Any string that names a file rather than a symbol needs
+  an assertion, because the compiler has no opinion about it.**
+- **The icon set is a deliberate REVERSAL, not a drift.** 4.1c required the 3D `GameIcon` PNGs
+  and banned lucide glyphs; this slice requires the opposite on both lobbies. The sheet specifies
+  flat line glyphs in tinted rounded tiles, and since the trading lobby moved too, the platform
+  moved rather than one screen diverging. A document citing 4.1c's icon rule as current is stale.
+- **The hero is violet-family now, not trading's gold.** 4.1c's reasoning - consistency beats
+  mock-accuracy - was correct *while the mock was the future*. The owner has made the mock the
+  present, so the gold hero is gone from both screens.
+- **Each contest type gets its own hero banner, resolved from `banners.ts`, and a game we have no
+  art for falls through to a generic trophy.** A visibly generic fallback is acceptable here in a
+  way it never is for a number: an operator sees a wrong-looking banner immediately, whereas a
+  defaulted figure is believed. The map is local rather than a `provider_game` field because
+  artwork per title is a catalogue-content question that belongs with the game pages, and adding
+  a field now would put a URL nothing maintains in front of players.
+- **The trading sidebar's nine always-open cards became four open items and six accordions**, and
+  which stayed open is pinned by a test rather than left to judgement. Open: the entry control,
+  the countdown, the schedule, the prize table - everything a trader *decides* on. Collapsed:
+  eligible assets, trading rules, scoring, risk management, disqualification, prizes detail -
+  reference material. Burying a decision would be the same class of error as an aggregate that
+  quietly means trading only: correct-looking, and wrong exactly where it matters.
+- **The count pill wording is still per-screen on purpose.** `NeonCountPill` exists because both
+  lobbies had hand-written the same seven-class string - the "one rule, two copies" shape behind
+  `referenceId`, `failedReason`, `challengeId` and the Game Master `||`. But the *words* stay
+  with the caller: a game has **players**, a trading contest has **traders**, and a shared label
+  would be wrong on one of the two screens.
+
+#### What is still not built, and must not be summarised as done
+
+- **A rules surface for a provider title.** The sheet's footer strip has a **View Rules** button;
+  the game lobby renders a link to `/help/competitions` instead, because the catalogue stores a
+  `description` and no rules summary or how-to-play. A button that opens nothing is worse than an
+  honest destination.
+- **The equity chart on the trading hero** is unchanged from the existing dashboard component;
+  the sheet's styling of it was not applied.
+- **The announcements panel and the "Share Event" button** in `trading-lobby-target.png` are not
+  features that exist.
+- **The four `future-*.png` mocks** - dashboard, competitions hub, game arena, leaderboards - are
+  a later phase by owner decision, and most of what they show is missing **data**, not styling.
+  See `design-reference/README.md`.
+- **Never verified by eye.** Both pages are behind sign-in and the automated browser has no
+  session, so this was proven by the suite and by reading the source. **Owner review is the
+  remaining step**, and any claim of visual sign-off before that is wrong.
+
+### 4.1e What replaced the byte-identical guarantee
+
+4.1c kept the trading page untouched so that its behaviour was evidence nothing had moved. Once
+the owner asked for it to be restyled, that evidence was unavailable, so three things were put in
+its place - and the reasoning generalises to any restyle of a screen that computes money.
+
+- **The money computation was extracted whole and is asserted character for character.**
+  `TradingPrizeTable.tsx` carries the unclaimed-position redistribution, the bonus split and the
+  platform-fee deduction exactly as the page had them. A test pins four expressions verbatim,
+  and two probes - changing the denominator, and dropping the fee - go red. **Extracting and
+  restyling in one commit is normally forbidden**; where it is unavoidable, the calculation needs
+  an assertion that cannot pass a rewrite.
+- **The consistency guard changed shape, because the old one could not survive this.** Comparing
+  class strings between two files works for two files. The sheet covers **seven** screens, and
+  pairwise comparison of seven is twenty-one comparisons, the first missing one of which is
+  silent. The property is now **one definition, and no screen has chrome of its own**: the
+  kit-owned literals are asserted to appear in the token file and in *no* consumer, so
+  re-introducing a bespoke panel to either lobby turns a test red and names the file. **This is a
+  stronger claim than the old one and it does not grow with the number of screens.**
+- **The negative assertion is the one that matters.** "Both lobbies import the kit" is trivially
+  satisfiable - a file can import the kit and hand-roll a panel beside it, which is precisely how
+  the drift starts.
+
+`__tests__/games/provider-play-ui.test.ts` is **56 tests**; `tools/probe-lobby-theme.ps1` is
+**23 probes**. Two of them exposed defects in the guards rather than in the code, both from
+families already recorded here: a `/<NeonHero/` match **passed while the component had been
+swapped for `<NeonHeroReplacement`**, because a prefix match cannot distinguish a component from
+one whose name starts the same way; and `/neonRowClasses\(/` was satisfiable by the **import
+line** alone. Assert the call with an argument, and put a boundary character after a tag name.
 
 ---
 

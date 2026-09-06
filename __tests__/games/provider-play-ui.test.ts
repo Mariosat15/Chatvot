@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
@@ -40,7 +40,6 @@ const ROUNDS_ROUTE = "app/api/competitions/[id]/rounds/route.ts";
 const LOBBY_PAGE = "app/(root)/competitions/[id]/page.tsx";
 const PROVIDER_LOBBY = "components/games/ProviderContestLobby.tsx";
 const PROVIDER_BOARD = "components/games/ProviderLeaderboard.tsx";
-const LOBBY_UI = "components/games/lobby-ui.tsx";
 
 describe("a page load never consumes an attempt", () => {
   /**
@@ -444,7 +443,17 @@ describe("a provider contest gets its own lobby, not the trading one", () => {
     // with no adapter and Edit withheld from a provider contest.
     expect(code).toMatch(/const canLaunch = isProviderContest\(competition\)/);
     expect(code).toMatch(/isUserIn && !canLaunch/);
-    expect(code).toMatch(/missing the game details/i);
+
+    /*
+      The restyle rewrote this copy, and the assertion was widened rather than pinned to the new
+      sentence, because the exact phrasing is not the property - naming the missing thing is.
+      Two clauses are load-bearing and both are asserted: it says the GAME DETAILS are what is
+      missing, so an operator reading a player's screenshot knows where to look, and it says
+      NOTHING WAS CHARGED, because a player shown a dead Play button on a paid contest otherwise
+      has no way to know whether their attempt was spent.
+    */
+    expect(code).toMatch(/game details[\s\S]{0,60}missing/i);
+    expect(code).toMatch(/nothing has been charged/i);
   });
 
   it("reads only fields the catalogue model actually declares", () => {
@@ -519,66 +528,130 @@ describe("the provider leaderboard shows a score and nothing it does not have", 
 });
 
 /**
- * THE GAME LOBBY AND THE TRADING LOBBY MUST LOOK LIKE ONE PRODUCT (owner requirement, 6 Sep
- * 2026), while sharing none of the trading content.
+ * THE TWO LOBBIES MUST LOOK LIKE ONE PRODUCT (owner requirement, 6 Sep 2026), while sharing
+ * none of the trading content.
  *
- * These are the strongest tests in this file, and they are worth explaining. Every other
- * assertion here reads one file and checks it against a rule written in a comment. **These read
- * BOTH lobbies and compare them to each other**, so the guard survives the trading lobby being
- * restyled: change the hero gradient on the trading page and these go red, pointing at the game
- * lobby that has to follow. A test that hard-coded the class string instead would stay green
- * while the two screens drifted apart, which is the failure it exists to catch.
+ * HOW THIS BLOCK CHANGED, AND WHY, because the previous version was the recommended approach in
+ * this very file one day earlier. It kept the two screens consistent by asserting that specific
+ * class strings appeared in BOTH lobby files - a genuine comparison, which survived the trading
+ * page being edited. What killed it was the owner's decision to restyle the trading lobby too,
+ * and the four further screens in the same style sheet: pairwise class-string comparison
+ * between five screens is twenty comparisons, and the first one somebody forgets to add is
+ * silent. **The property is now that there is one definition and neither screen has chrome of
+ * its own**, which is a stronger claim and does not grow with the number of screens.
+ *
+ * THE TEST THAT MATTERS MOST IS THE NEGATIVE ONE. Asserting both lobbies import the kit is easy
+ * to satisfy and easy to defeat - a file can import the kit and still hand-roll a panel beside
+ * it, which is exactly how the drift starts. So the panel shell's literal value is asserted to
+ * appear in the token file and in NO other file: re-introducing a bespoke panel to either lobby
+ * turns this red and names the file.
  *
  * The reason it matters more than it sounds: a player reaches both screens from the same
  * competitions list. A different corner radius, border tone or heading size is read as a
- * different website, not as a different game. The first version of this lobby was functionally
- * correct - it answered all three of `13` s4's questions - and looked like a separate
- * application, because it was written with flat icons and its own spacing.
+ * different website, not as a different game.
  */
-describe("the game lobby wears the trading lobby's theme", () => {
-  /** The class strings whose being IDENTICAL in both files is the whole property. */
-  const SHARED_CHROME = [
-    // The page shell: same padding ramp, same overflow guard, same gap.
-    "flex min-h-screen flex-col gap-4 sm:gap-6 p-3 sm:p-4 md:p-8 overflow-x-hidden",
-    // The hero: gradient, radius ramp, shadow and tinted border.
-    "relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-yellow-500/20 via-gray-800 to-gray-900 p-4 sm:p-6 md:p-8 shadow-xl border border-yellow-500/20",
-    // The two-column split and the leaderboard panel it sits in.
-    "grid grid-cols-1 lg:grid-cols-3 gap-6",
-    "rounded-xl bg-gray-800/50 border border-gray-700 p-4 sm:p-6",
-    // The hero figure's label and value typography.
-    "text-[11px] sm:text-xs text-gray-500 uppercase tracking-wider",
-    "text-xl sm:text-2xl md:text-3xl font-bold",
-    // The h1.
-    "text-2xl sm:text-3xl md:text-4xl font-bold text-gray-100 mb-2",
+describe("the two lobbies are built from one design kit", () => {
+  const KIT_TOKENS = "components/neon/tokens.ts";
+  const KIT_CARDS = "components/neon/Cards.tsx";
+  const TRADING_HERO = "components/trading/lobby/TradingLobbyHero.tsx";
+  const TRADING_SIDEBAR = "components/trading/lobby/TradingLobbySidebar.tsx";
+  const TRADING_BOARD = "components/trading/CompetitionLeaderboard.tsx";
+
+  /** The literal values the kit owns. Nothing outside the kit may spell these out. */
+  const KIT_ONLY_LITERALS = [
+    // The panel shell - the single most repeated surface in both lobbies.
+    "border-[#1B2540] bg-[#0A0F1F]/80",
+    // The leaderboard row shell and its "this is you" variant.
+    "border-[#161E36] bg-[#080C18]/80",
+    "border-sky-500/40 bg-sky-500/10",
   ];
 
-  it.each(SHARED_CHROME)("uses the trading lobby's own class string: %s", (chrome) => {
-    const trading = readCode(LOBBY_PAGE);
-    const game = readCode(PROVIDER_LOBBY) + readCode(LOBBY_UI);
+  it.each(KIT_ONLY_LITERALS)(
+    "defines %s in the kit and nowhere else",
+    (literal) => {
+      // Reading the kit first is what makes this a comparison rather than a snapshot: if the
+      // design changes, the literal moves and this test tells you where it went.
+      const kit = readCode(KIT_TOKENS) + readCode(KIT_CARDS);
+      expect(kit).toContain(literal);
 
-    // Asserting it is in the trading page too is not redundant - it is what makes this a
-    // comparison rather than a hard-coded snapshot of today's design.
-    expect(trading).toContain(chrome);
-    expect(game).toContain(chrome);
+      for (const consumer of [
+        PROVIDER_LOBBY,
+        PROVIDER_BOARD,
+        LOBBY_PAGE,
+        TRADING_HERO,
+        TRADING_SIDEBAR,
+      ]) {
+        expect(readCode(consumer)).not.toContain(literal);
+      }
+    },
+  );
+
+  it("dresses both heroes with the same component", () => {
+    /*
+      Not "both files contain a hero" - the SAME component, so a change to the banner treatment,
+      the scrim or the h1 size cannot reach one screen and miss the other.
+
+      THE TRAILING CHARACTER CLASS IS THE WHOLE TEST. Written `/<NeonHero/` this passed while a
+      probe swapped the tag for `<NeonHeroReplacement`, because a prefix match cannot tell a
+      component from one whose name merely starts the same way. Fifth instance of that family
+      here, after the fixed-character Edit guard, `canTransitionRound`, `MIN_REASON_LENGTH` and
+      the duplicated `!expectedOrigin`.
+    */
+    expect(readCode(PROVIDER_LOBBY)).toMatch(/<NeonHero[\s>]/);
+    expect(readCode(TRADING_HERO)).toMatch(/<NeonHero[\s>]/);
+
+    for (const hero of [PROVIDER_LOBBY, TRADING_HERO]) {
+      expect(readCode(hero)).toMatch(
+        /from "@\/components\/neon\/Hero"/,
+      );
+    }
   });
 
-  it("heads its panels with the same 3D icon set, not flat glyphs", () => {
-    const lobby = readCode(PROVIDER_LOBBY);
-    const ui = readCode(LOBBY_UI);
-    const board = readCode(PROVIDER_BOARD);
-
-    // The trading lobby heads every panel with `GameIcon`. Mixing lucide line icons into the
-    // same column is the single most visible way two screens stop looking like one product.
-    expect(ui).toMatch(/<GameIcon\s+name=\{icon\}/);
-    expect(board).toMatch(/<RankIcon rank=\{row\.currentRank\}/);
-
-    // ArrowLeft is the one exception, because the trading lobby's back button uses it too.
-    const lucide = lobby.match(/from "lucide-react"/g) ?? [];
-    expect(lucide.length).toBeLessThanOrEqual(1);
-    for (const flat of ["<Clock", "<Trophy", "<Users", "<Coins", "<Info", "<Medal"]) {
-      expect(lobby).not.toContain(flat);
-      expect(board).not.toContain(flat);
+  it("draws every figure with the same stat card, four across", () => {
+    /*
+      The first version of this test counted `<StatCard` occurrences and required exactly four.
+      It failed on correct code: the game lobby's fourth tile is a ternary - "Your score" for a
+      player with a seat, a countdown for one without - so five occurrences render four tiles.
+      **Counting source occurrences of a branch is not counting what renders**, and the honest
+      property is the grid: the sheet puts four figures across, and a fifth would need either a
+      five-column grid or a wrap, both of which show up here.
+    */
+    for (const consumer of [PROVIDER_LOBBY, TRADING_HERO]) {
+      const code = readCode(consumer);
+      expect(code).toMatch(/<StatCard/);
+      expect(code).toMatch(/grid-cols-2[^"]*(md|lg):grid-cols-4/);
+      const grids = code.match(/grid-cols-4/g) ?? [];
+      expect(grids.length).toBe(1);
     }
+  });
+
+  it("gives both leaderboards the same row shell and column headings", () => {
+    for (const board of [PROVIDER_BOARD, TRADING_BOARD]) {
+      const code = readCode(board);
+      // The call WITH its argument, not the identifier: both files also name it on an import
+      // line, and an import is not a use.
+      expect(code).toMatch(/neonRowClasses\([\s\S]{0,80}rank:/);
+      expect(code).toMatch(/NEON_TABLE_HEAD/);
+    }
+  });
+
+  it("uses the flat icon set from the sheet, not the 3D game icons", () => {
+    /*
+      THIS IS A DELIBERATE REVERSAL of the rule that stood here yesterday, which required the 3D
+      `GameIcon` PNGs and banned lucide glyphs. That was right while the trading lobby used
+      them - consistency was the instruction, and the trading lobby was the thing to be
+      consistent with. The owner's style sheet specifies flat line glyphs in tinted tiles, and
+      the trading lobby now follows it too, so the whole platform moved rather than one screen
+      diverging. Recorded in `13` s4.1d rather than quietly swapped.
+    */
+    for (const consumer of [PROVIDER_LOBBY, PROVIDER_BOARD, TRADING_HERO]) {
+      const code = readCode(consumer);
+      expect(code).toMatch(/from "lucide-react"/);
+      expect(code).not.toMatch(/GameIcon|RankIcon/);
+    }
+
+    // And the tiles are drawn in one place, so their size and tint cannot drift per screen.
+    expect(readCode(KIT_CARDS)).toMatch(/export function IconTile/);
   });
 
   it("reuses the trading lobby's time components instead of formatting time itself", () => {
@@ -588,6 +661,7 @@ describe("the game lobby wears the trading lobby's theme", () => {
     // inconsistency as a different card radius - and it would be a second place for the
     // "Started"/"Ended" wording to drift.
     expect(code).toMatch(/<UTCClock\s*\/>/);
+    expect(readCode(TRADING_HERO)).toMatch(/<InlineCountdown/);
     expect(code).toMatch(/<InlineCountdown[\s\S]{0,200}targetDate=/);
     expect(code).not.toMatch(/1000 \* 60 \* 60/);
   });
@@ -595,26 +669,72 @@ describe("the game lobby wears the trading lobby's theme", () => {
   it("says players, never traders", () => {
     const code = readCode(PROVIDER_LOBBY);
 
-    // The trading lobby's identical count pill says "traders". Copying it wholesale is the
+    // The trading lobby's equivalent count pill says "traders". Copying it wholesale is the
     // trading-shaped-label problem in the one place on the page a player is certain to read.
     expect(code).toMatch(/leaderboard\.length\}\s*players/);
     expect(code).not.toMatch(/traders/);
   });
 
   it("builds no Tailwind class by interpolation", () => {
-    const ui = readCode(LOBBY_UI);
-    const lobby = readCode(PROVIDER_LOBBY);
+    /*
+      Tailwind compiles the classes it can SEE in the source, so `border-\${accent}-500/30` is a
+      class that exists in the TypeScript and in no stylesheet. It renders completely unstyled
+      and reads as a broken CSS build rather than as a bug in this file - which is why the
+      accents are lookup tables. Conditional whole class strings are fine; a partial is not.
 
-    // Tailwind compiles the classes it can SEE in the source, so `border-${accent}-500/30` is a
-    // class that exists in the TypeScript and in no stylesheet. It renders completely unstyled
-    // and reads as a broken CSS build rather than as a bug in this file - which is why the
-    // accent is a lookup table. Conditional whole class strings are fine; a partial is not.
-    for (const code of [ui, lobby]) {
-      expect(code).not.toMatch(/(bg|text|border|from|to|via)-\$\{/);
+      The kit is included in the sweep on purpose: it is the file with the most accents in it and
+      therefore the most tempting place to write one.
+    */
+    for (const consumer of [
+      KIT_TOKENS,
+      KIT_CARDS,
+      "components/neon/Hero.tsx",
+      "components/neon/Buttons.tsx",
+      "components/neon/LeaderboardRow.tsx",
+      PROVIDER_LOBBY,
+      PROVIDER_BOARD,
+      TRADING_HERO,
+      TRADING_SIDEBAR,
+      "components/trading/lobby/trading-lobby-accordions.tsx",
+    ]) {
+      expect(readCode(consumer)).not.toMatch(
+        /(bg|text|border|from|to|via)-\$\{/,
+      );
     }
   });
 
-  it("renders no trading panel from the trading lobby", () => {
+  it("points every hero banner at a file that exists", async () => {
+    const { allNeonBanners, providerBanner } = await import(
+      "../../components/neon/banners"
+    );
+
+    /*
+      A banner whose file is missing renders as a broken image: no error, no log line, and the
+      page is otherwise perfect. This caught a real mistake within a minute of being written -
+      the artwork was committed to `public/assets/arena/` while the kit lived in
+      `components/neon/`, so every lobby on the platform would have shipped with no banner.
+
+      `allNeonBanners()` exists for this, so the map is exhausted rather than sampled: a fifth
+      banner added without its file cannot slip past.
+    */
+    const banners = allNeonBanners();
+    expect(banners.length).toBeGreaterThanOrEqual(4);
+
+    for (const banner of banners) {
+      expect(banner.src.startsWith("/assets/")).toBe(true);
+      expect(existsSync(join(ROOT, "public", banner.src))).toBe(true);
+      // Alt text, not a filename: these are decorative-but-labelled hero images.
+      expect(banner.alt.length).toBeGreaterThan(10);
+    }
+
+    // And an unknown game falls back rather than resolving to nothing, because a new provider
+    // title arrives before its artwork does.
+    expect(providerBanner("a-game-nobody-has-drawn-yet").src).toBe(
+      providerBanner(null).src,
+    );
+  });
+
+  it("renders no trading panel on the game lobby", () => {
     const code = readCode(PROVIDER_LOBBY);
 
     // The reason the lobby is a branch rather than a set of guards is that none of this belongs
@@ -630,6 +750,53 @@ describe("the game lobby wears the trading lobby's theme", () => {
     ]) {
       expect(code).not.toContain(panel);
     }
+  });
+
+  it("keeps the trading sidebar's decisions open and only its reference material collapsed", () => {
+    const sidebar = readCode(TRADING_SIDEBAR);
+
+    /*
+      Collapsing the sidebar is the one behaviour change in the restyle, so what stayed open is
+      pinned rather than left to a comment. The entry control, the countdown, the schedule and
+      the prize table are what a trader decides on; burying any of them would be the same class
+      of error as an aggregate that quietly means trading only - correct-looking, and wrong
+      exactly where it matters.
+    */
+    const accordionAt = sidebar.indexOf("<NeonAccordion");
+    expect(accordionAt).toBeGreaterThan(-1);
+
+    for (const open of [
+      "<CompetitionEntryButton",
+      "<LiveCountdown",
+      "Schedule (UTC)",
+      "<TradingPrizeTable",
+    ]) {
+      const at = sidebar.indexOf(open);
+      expect(at).toBeGreaterThan(-1);
+      // Position, not presence: everything above the accordion is open by construction.
+      expect(at).toBeLessThan(accordionAt);
+    }
+  });
+
+  it("moves no money computation while restyling the prize table", () => {
+    const table = readCode("components/trading/lobby/TradingPrizeTable.tsx");
+
+    /*
+      The prize table was extracted from the page in the same commit that restyled it, which is
+      normally forbidden - an extraction's value is that green tests prove nothing moved. These
+      four expressions are the whole calculation, asserted character for character, because they
+      decide what a winner is paid and a restyle must not touch them.
+    */
+    expect(table).toContain(
+      "competition.prizePool || competition.prizePoolCredits || 0",
+    );
+    expect(table).toContain(
+      "(competition.platformFeePercentage || 0) / 100",
+    );
+    expect(table).toContain(
+      "filledPositions > 0 ? unclaimedPercentage / filledPositions : 0",
+    );
+    expect(table).toContain("(1 - platformFeePercentage)");
   });
 });
 

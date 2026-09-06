@@ -1,20 +1,33 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { GameIcon } from "@/components/ui/GameIcon";
+import {
+  ArrowLeft,
+  Clock,
+  Gamepad2,
+  Info,
+  Link2,
+  LifeBuoy,
+  RotateCcw,
+  Trophy,
+  TriangleAlert,
+  Users,
+} from "lucide-react";
 import { connectToDatabase } from "@/database/mongoose";
 import ProviderGame from "@/database/models/games/provider-game.model";
 import CompetitionEntryButton from "@/components/trading/CompetitionEntryButton";
 import UTCClock from "@/components/trading/UTCClock";
 import InlineCountdown from "@/components/trading/InlineCountdown";
 import ProviderLeaderboard from "@/components/games/ProviderLeaderboard";
+import { NeonHero, NeonStatusBadge } from "@/components/neon/Hero";
+import { providerBanner } from "@/components/neon/banners";
+import { NeonPill } from "@/components/neon/Buttons";
 import {
-  HeroFigure,
-  PanelNote,
-  PanelRow,
-  SidePanel,
-  StatusBadge,
-} from "@/components/games/lobby-ui";
+  NeonCountPill,
+  NeonNote,
+  NeonPanel,
+  NeonRow,
+  StatCard,
+  StatusCard,
+} from "@/components/neon/Cards";
+import { NEON_PANEL } from "@/components/neon/tokens";
 import { getPlayState } from "@/lib/services/games/round-status.service";
 import { isProviderContest } from "@/lib/services/games/contest-config";
 
@@ -32,25 +45,28 @@ import { isProviderContest } from "@/lib/services/games/contest-config";
  * for finished contests.
  *
  * IT IS A BRANCH AT THE TOP OF THE PAGE, NOT A FIELD-BY-FIELD GUARD, and that is deliberate.
- * Threading conditionals through 1,100 lines of trading layout would touch every line the live
- * trading lobby depends on to serve a contest type that has never had a player. Branching once
- * leaves the trading path byte-identical, which is the only thing that makes the existing lobby
- * tests meaningful evidence that nothing moved.
+ * Threading conditionals through a thousand lines of trading layout would touch every line the
+ * live trading lobby depends on, to serve a contest type that has never had a player.
  *
  * THREE FACTS `13` SECTION 4 SAYS A PROVIDER LOBBY MUST ANSWER, because a player will hit all
  * three and a lobby that stays silent generates support tickets: when the play window opens and
  * closes, how many attempts are left, and what happens if a round never finishes. The third is
  * the one nobody thinks to show and the one that costs money when it happens.
  *
- * THE CHROME IS THE TRADING LOBBY'S, DELIBERATELY AND EXACTLY (owner requirement, 6 Sep 2026).
- * Same page shell, same back-button-and-UTC-clock header, same gradient hero with a watermark
- * icon behind it, same uppercase hero figures, same two-thirds/one-third grid, same panel
- * shells, same 3D `GameIcon` set. The first version of this screen was correct and looked like
- * a different application - flat lucide glyphs, a narrower container, small plain headings -
- * and a player reaching it from the same competitions list reads that as a different site
- * rather than as a different game. What is emphatically NOT shared is the content: no capital,
- * no margin, no leverage, no asset classes, no profit and loss, no trade counts. `05` section
- * 10 makes that binding rather than stylistic.
+ * THE CHROME COMES FROM `components/neon/`, WHICH THE TRADING LOBBY ALSO WEARS (owner
+ * requirement, 6 Sep 2026, from the style sheet in
+ * `External game plans/design-reference/component-sheet.png`). This replaces an earlier and
+ * weaker arrangement worth describing, because the reason it was replaced generalises: the two
+ * lobbies used to be kept consistent by copying the trading page's class strings into this file
+ * and having a test compare the two files. That works for two screens and collapses at five -
+ * the same sheet also specifies the dashboard, the competitions hub, the game arena and the
+ * rankings page, and pairwise comparison between five screens is twenty comparisons nobody
+ * maintains. **One definition with tests on the definition** is the version that survives the
+ * next screen.
+ *
+ * What is emphatically not shared is the content: no capital, no margin, no leverage, no asset
+ * classes, no profit and loss, no trade counts. `05` section 10 makes that binding rather than
+ * stylistic.
  */
 
 interface ProviderContestLobbyProps {
@@ -115,16 +131,12 @@ export default async function ProviderContestLobby({
     read like English and would leak our own naming onto a player screen. Also never the
     provider's brand: `13` section 4 requires provider-neutral labels, because the player is
     playing a ChartVolt game.
-  */
-  /*
+
     `displayName` and `scoreType`, both of which `provider-game.model.ts` really declares. The
     first draft of this read a third field the model does NOT have, which would have rendered
-    nothing for ever while looking entirely correct. Sixth instance of the class, after
-    `billsPerRound` on the pre-flight checklist, `publishedAt` on the publish update,
-    `scoreDirection` on the participant, `suspensionEndsAt` on the restriction and `referenceId`
-    on the wallet transaction: **an unverified field name is a claim, not a fact**, and a
-    hand-written `.lean<{...}>()` generic is precisely where one survives a typecheck, because
-    the compiler checks the generic rather than the schema.
+    nothing for ever while looking entirely correct. **An unverified field name is a claim, not a
+    fact**, and a hand-written `.lean<{...}>()` generic is precisely where one survives a
+    typecheck, because the compiler checks the generic rather than the schema.
   */
   const title = await ProviderGame.findOne({
     providerKey: competition?.gameConfig?.providerKey,
@@ -183,8 +195,8 @@ export default async function ProviderContestLobby({
   const isCancelled = status === "cancelled";
 
   /*
-    The fourth hero figure is a countdown on a running or upcoming contest and a word on a
-    finished one, which is what the trading lobby does. `InlineCountdown` is reused rather than
+    The fourth figure is a countdown on a running or upcoming contest and a word on a finished
+    one, which is what the trading lobby does. `InlineCountdown` is reused rather than
     reimplemented: a game lobby that formats "2d 4h" differently from the trading lobby is the
     same inconsistency as a different card radius, and it would also be a second place for the
     "Started"/"Ended" wording to drift.
@@ -192,161 +204,141 @@ export default async function ProviderContestLobby({
   const countdownTarget = isActive ? competition.endTime : competition.startTime;
 
   return (
-    <div className="flex min-h-screen flex-col gap-4 sm:gap-6 p-3 sm:p-4 md:p-8 overflow-x-hidden">
-      <div className="flex items-center justify-between flex-wrap gap-2 sm:gap-4">
-        <Link href="/competitions">
-          <Button
-            variant="ghost"
-            className="w-fit gap-2 text-gray-400 hover:text-gray-100 min-h-[44px]"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Back to Competitions</span>
-            <span className="sm:hidden">Back</span>
-          </Button>
-        </Link>
+    <div className="flex min-h-screen flex-col gap-4 overflow-x-hidden p-3 sm:gap-6 sm:p-4 md:p-8">
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
+        <NeonPill
+          href="/competitions"
+          icon={ArrowLeft}
+          label="Back to Competitions"
+        />
         <div className="hidden sm:block">
           <UTCClock />
         </div>
       </div>
 
-      {/* Hero - the trading lobby's header, with a joystick watermark instead of a trophy */}
-      <div className="relative overflow-hidden rounded-xl sm:rounded-2xl bg-gradient-to-br from-yellow-500/20 via-gray-800 to-gray-900 p-4 sm:p-6 md:p-8 shadow-xl border border-yellow-500/20">
-        <div className="absolute top-0 right-0 opacity-10">
-          <GameIcon name="joystick1" size={192} />
-        </div>
-
-        <div className="relative z-10">
-          <StatusBadge status={status} />
-
-          {/*
-            The game's identity, from the catalogue. A pill rather than a line of text because
-            the contest name is the h1 and the game is the category it belongs to - the same
-            relationship the admin competitions list draws with its game badge.
-          */}
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1">
-            <GameIcon name="joystick1" size={14} />
-            <span className="text-xs font-semibold text-violet-200">
-              {gameName}
-            </span>
-          </div>
-
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-100 mb-2">
-            {competition.name}
-          </h1>
-          {competition.description && (
-            <p className="text-gray-400 mb-6 max-w-2xl">
-              {competition.description}
-            </p>
-          )}
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-            <HeroFigure
-              label="Prize Pool"
-              tone="prize"
-              value={`${currencySymbol}${(competition.prizePool ?? 0).toLocaleString()}`}
-            />
-            <HeroFigure
-              label="Entry Fee"
-              value={
-                competition.entryFee
-                  ? `${currencySymbol}${competition.entryFee.toLocaleString()}`
-                  : "Free"
-              }
-            />
-            <HeroFigure
-              label="Players"
-              value={`${competition.currentParticipants ?? 0}/${competition.maxParticipants ?? 0}`}
-              note={
-                status === "upcoming" && competition.minParticipants > 0 ? (
-                  <p
-                    className={`text-xs mt-1 ${
-                      (competition.currentParticipants ?? 0) <
-                      competition.minParticipants
-                        ? "text-orange-400"
-                        : "text-green-400"
-                    }`}
-                  >
-                    Min: {competition.minParticipants}
-                    {(competition.currentParticipants ?? 0) <
+      <NeonHero
+        /*
+          The artwork is chosen by the game's own code, so a second title gets its own banner
+          without touching this file. A game we have no art for falls through to a generic
+          trophy, which is visibly generic rather than silently wrong - see `banners.ts` for why
+          that is an acceptable fallback here and would not be in anything producing a number.
+        */
+        banner={providerBanner(competition?.gameConfig?.gameCode)}
+        badge={{ icon: Gamepad2, label: gameName }}
+        title={competition.name}
+        subtitle={competition.description}
+        status={<NeonStatusBadge status={status} />}
+      >
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 sm:gap-4">
+          <StatCard
+            icon={Trophy}
+            accent="prize"
+            label="Prize pool"
+            value={`${currencySymbol}${(competition.prizePool ?? 0).toLocaleString()}`}
+          />
+          <StatCard
+            icon={Link2}
+            accent="entry"
+            label="Entry fee"
+            value={
+              competition.entryFee
+                ? `${currencySymbol}${competition.entryFee.toLocaleString()}`
+                : "Free"
+            }
+          />
+          <StatCard
+            icon={Users}
+            accent="players"
+            label="Players"
+            value={`${competition.currentParticipants ?? 0} / ${competition.maxParticipants ?? 0}`}
+            note={
+              status === "upcoming" && competition.minParticipants > 0 ? (
+                <p
+                  className={`mt-2 text-xs ${
+                    (competition.currentParticipants ?? 0) <
                     competition.minParticipants
-                      ? " (need more!)"
-                      : " ✓"}
-                  </p>
-                ) : undefined
+                      ? "text-orange-400"
+                      : "text-emerald-400"
+                  }`}
+                >
+                  Minimum {competition.minParticipants}
+                  {(competition.currentParticipants ?? 0) <
+                  competition.minParticipants
+                    ? " - needs more players"
+                    : " - reached"}
+                </p>
+              ) : undefined
+            }
+          />
+          {/*
+            The score, not PnL. A puzzle has no profit and loss, and `05` section 10 makes this a
+            binding rule rather than a style point: every figure is either generalised across
+            games or explicitly scoped to one. There is no third option, and the failure mode of
+            getting it wrong is not a crash - a trading-only figure keeps computing and keeps
+            rendering.
+
+            A dash, never a zero, for a player with no scored round. Same read-side rule as the
+            leaderboard cell and the dashboard card: an absent score and a score of nothing are
+            different facts, and conflating them is what made every provider participant tie.
+          */}
+          {isUserIn ? (
+            <StatCard
+              icon={Gamepad2}
+              accent="score"
+              label="Your score"
+              value={state ? state.participantScore.toLocaleString() : "-"}
+            />
+          ) : (
+            <StatCard
+              icon={Clock}
+              accent={isCancelled ? "ended" : isActive ? "entry" : "waiting"}
+              label={
+                isCancelled || isCompleted
+                  ? "Status"
+                  : isActive
+                    ? "Time remaining"
+                    : "Starts in"
+              }
+              value={
+                isCancelled ? (
+                  "Cancelled"
+                ) : isCompleted ? (
+                  "Completed"
+                ) : countdownTarget ? (
+                  <InlineCountdown
+                    targetDate={new Date(countdownTarget).toISOString()}
+                    type={isActive ? "end" : "start"}
+                  />
+                ) : (
+                  "-"
+                )
               }
             />
-            {/*
-              The score, not PnL. A puzzle has no profit and loss, and `05` section 10 makes this
-              a binding rule rather than a style point: every figure is either generalised across
-              games or explicitly scoped to one. There is no third option, and the failure mode of
-              getting it wrong is not a crash - a trading-only figure keeps computing and keeps
-              rendering.
-
-              A dash, never a zero, for a player with no scored round. Same read-side rule as the
-              leaderboard cell and the dashboard card: an absent score and a score of nothing are
-              different facts, and conflating them is what made every provider participant tie.
-            */}
-            {isUserIn ? (
-              <HeroFigure
-                label="Your Score"
-                value={state ? state.participantScore.toLocaleString() : "-"}
-              />
-            ) : (
-              <HeroFigure
-                label={
-                  isCancelled
-                    ? "Status"
-                    : isActive
-                      ? "Time Remaining"
-                      : isCompleted
-                        ? "Status"
-                        : "Starts In"
-                }
-                tone={isCancelled ? "cancelled" : isActive ? "live" : "neutral"}
-                value={
-                  isCancelled ? (
-                    "Cancelled"
-                  ) : isCompleted ? (
-                    "Completed"
-                  ) : countdownTarget ? (
-                    <InlineCountdown
-                      targetDate={new Date(countdownTarget).toISOString()}
-                      type={isActive ? "end" : "start"}
-                    />
-                  ) : (
-                    "-"
-                  )
-                }
-              />
-            )}
-          </div>
+          )}
         </div>
-      </div>
+      </NeonHero>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          {/* The trading lobby's leaderboard shell, with a score board inside it */}
-          <div className="rounded-xl bg-gray-800/50 border border-gray-700 p-4 sm:p-6">
-            <div className="flex items-center gap-2 mb-4 sm:mb-6 flex-wrap">
-              <GameIcon name="trophy" size={20} />
-              <h2 className="text-lg sm:text-xl font-bold text-gray-100">
-                Leaderboard
-              </h2>
-              {/*
-                "players", never "traders". The trading lobby's identical pill says traders, and
-                copying it wholesale is the trading-shaped-label problem in the one place a
-                player is certain to read.
-              */}
-              <span className="px-2 py-0.5 rounded-full bg-gray-700 text-gray-300 text-xs font-medium">
-                {leaderboard.length} players
-              </span>
-            </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <NeonPanel
+            icon={Trophy}
+            accent="prize"
+            title="Leaderboard"
+            action={
+              /*
+                "players", never "traders". The trading lobby's equivalent pill says traders, and
+                copying it wholesale would put a trading label in the one place a player is
+                certain to read.
+              */
+              <NeonCountPill>{leaderboard.length} players</NeonCountPill>
+            }
+          >
             <ProviderLeaderboard
               rows={leaderboard}
               currentUserId={userId}
               scoreLabel={scoreLabel}
             />
-          </div>
+          </NeonPanel>
         </div>
 
         <div className="space-y-6">
@@ -361,64 +353,81 @@ export default async function ProviderContestLobby({
 
           {/*
             A control that cannot work must refuse with its reason rather than be quietly
-            disabled - third instance of the rule, after a provider enabled with no adapter and
-            the Edit button withheld from a provider contest. A greyed-out button teaches the
-            player nothing and sends them to support; this at least tells an operator what is
-            missing.
+            disabled - after a provider enabled with no adapter and the Edit button withheld from
+            a provider contest. A greyed-out button teaches the player nothing and sends them to
+            support; this at least tells an operator what is missing.
           */}
           {isUserIn && !canLaunch && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-              <GameIcon name="warning" size={16} className="mt-0.5 shrink-0" />
-              <p className="text-xs text-amber-300">
-                This competition is missing the game details needed to start a
-                round. Nothing has been charged for an attempt. Please contact
-                support.
-              </p>
-            </div>
+            <StatusCard
+              icon={TriangleAlert}
+              accent="waiting"
+              title="This competition cannot start a round yet"
+              detail="The game details needed to start a round are missing. Nothing has been charged for an attempt. Please contact support."
+            />
           )}
 
           {(playWindowStart || playWindowEnd) && (
-            <SidePanel icon="timer" title="Play window" accent="sky">
+            <NeonPanel icon={Clock} accent="players" title="Play window">
               <div className="space-y-2">
                 {playWindowStart && (
-                  <PanelRow label="Opens" value={playWindowStart} />
+                  <NeonRow label="Opens" value={playWindowStart} />
                 )}
                 {playWindowEnd && (
-                  <PanelRow label="Closes" value={playWindowEnd} />
+                  <NeonRow label="Closes" value={playWindowEnd} />
                 )}
               </div>
-              <PanelNote>
+              <NeonNote>
                 The play window can be narrower than the competition itself, so
                 check both.
-              </PanelNote>
-            </SidePanel>
+              </NeonNote>
+            </NeonPanel>
           )}
 
           {state && (
-            <SidePanel icon="target" title="Your attempts" accent="violet">
-              <PanelRow
+            <NeonPanel icon={RotateCcw} accent="score" title="Your attempts">
+              <NeonRow
                 label="Remaining"
-                emphasis
+                accent="score"
                 value={`${state.attemptsRemaining} of ${state.attemptsPermitted}`}
               />
-              {attemptsCopy && <PanelNote>{attemptsCopy}</PanelNote>}
-              <PanelNote>
+              {attemptsCopy && <NeonNote>{attemptsCopy}</NeonNote>}
+              <NeonNote>
                 An attempt is used the moment a round opens, even if you leave
                 before finishing.
-              </PanelNote>
-            </SidePanel>
+              </NeonNote>
+            </NeonPanel>
           )}
 
           {unresolvedCopy && (
-            <SidePanel
-              icon="guideBook"
+            <NeonPanel
+              icon={Info}
+              accent="waiting"
               title="If a round does not finish"
-              accent="amber"
             >
-              <PanelNote>{unresolvedCopy}</PanelNote>
-            </SidePanel>
+              <NeonNote>{unresolvedCopy}</NeonNote>
+            </NeonPanel>
           )}
         </div>
+      </div>
+
+      {/*
+        The sheet's footer help strip. It points at `/help/competitions`, which really exists and
+        is where the trading lobby's help link already goes - the mock's "View Rules" button does
+        NOT have a destination yet, because a provider title has no rules surface: the catalogue
+        stores a `description` and no rules summary or how-to-play. Building one is real
+        outstanding work rather than a styling gap, so this offers the honest destination instead
+        of a button that opens nothing.
+      */}
+      <div
+        className={`${NEON_PANEL} flex flex-wrap items-center justify-between gap-3 px-4 py-3`}
+      >
+        <div className="flex items-center gap-2.5">
+          <LifeBuoy className="h-4 w-4 text-sky-300" />
+          <p className="text-xs text-gray-400">
+            Need help? Read how competitions work, or contact support.
+          </p>
+        </div>
+        <NeonPill href="/help/competitions" icon={LifeBuoy} label="Help centre" />
       </div>
     </div>
   );
