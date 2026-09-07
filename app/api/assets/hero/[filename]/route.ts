@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, access, writeFile, mkdir } from "fs/promises";
+import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
-import { constants } from "fs";
 import { encodeBrandingFileKey } from "@/lib/utils/branding-file-key";
 
 /**
@@ -17,24 +16,22 @@ export async function GET(
     const { filename } = await params;
     const sanitizedFilename = path.basename(filename.split("?")[0]);
 
-    // Reason: `/*turbopackIgnore: true*/` prevents NFT from widening the
-    // trace to the whole project due to the runtime-only `process.cwd()` read.
-    const possiblePaths = [
-      path.join("/var/www/chartvolt", "public", "uploads", "hero", sanitizedFilename),
-      path.join(/*turbopackIgnore: true*/ process.cwd(), "public", "uploads", "hero", sanitizedFilename),
-    ];
+    // Reason for the shape - one literal-segment `path.join` inline at the `fs` call.
+    // Measured against a real `next build`: a path Turbopack cannot fold, such as a loop
+    // variable over an array of candidates, makes the traced pattern a bare `<dynamic>`
+    // matching every file in the repository, and `/*turbopackIgnore: true*/` on
+    // `process.cwd()` hides the resulting warning without narrowing anything, so the
+    // widened trace resurfaces as "unexpected file in NFT list" naming `next.config.ts`.
+    // Reading directly rather than `access` then `readFile` is one syscall instead of
+    // two, since a failed read answers the same question.
+    //
+    // The hardcoded `/var/www/chartvolt` candidate that used to come first was removed
+    // rather than kept: `ecosystem.config.js` starts `chartvolt-web` with
+    // `cwd: __dirname`, so in production `process.cwd()` is already that directory.
+    const heroDir = path.join(process.cwd(), "public", "uploads", "hero");
 
-    let filePath: string | null = null;
-    for (const p of possiblePaths) {
-      try {
-        await access(p, constants.R_OK);
-        filePath = p;
-        break;
-      } catch {}
-    }
-
-    if (filePath) {
-      const fileBuffer = await readFile(filePath);
+    try {
+      const fileBuffer = await readFile(path.join(heroDir, sanitizedFilename));
       const ext = sanitizedFilename.split(".").pop()?.toLowerCase();
       return new NextResponse(fileBuffer, {
         headers: {
@@ -42,6 +39,8 @@ export async function GET(
           "Cache-Control": "public, max-age=86400",
         },
       });
+    } catch {
+      // Not on disk - fall through to the database restore below.
     }
 
     // File not on disk — try to restore from database backup
@@ -61,12 +60,17 @@ export async function GET(
         console.log(`🔄 [Hero Serve] Restoring from DB: ${sanitizedFilename}`);
         const buffer = Buffer.from(fileEntry.data, "base64");
 
-        // Auto-restore to disk
+        // Auto-restore to disk.
+        // Reason: restores into the directory this route actually reads. It used to take
+        // `dirname(possiblePaths[0])`, which was the hardcoded `/var/www/chartvolt` path,
+        // so in development the recovered image was written somewhere never read back and
+        // every later request went to the database again.
         try {
-          const restoreDir = path.dirname(possiblePaths[0]);
-          await mkdir(restoreDir, { recursive: true });
-          await writeFile(path.join(restoreDir, sanitizedFilename), buffer);
-        } catch {}
+          await mkdir(heroDir, { recursive: true });
+          await writeFile(path.join(heroDir, sanitizedFilename), buffer);
+        } catch {
+          // Serving from memory still works; the next request will restore again.
+        }
 
         return new NextResponse(buffer, {
           headers: {

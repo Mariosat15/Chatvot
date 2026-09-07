@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, access, writeFile, mkdir } from "fs/promises";
+import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
-import { constants } from "fs";
 import { encodeBrandingFileKey } from "@/lib/utils/branding-file-key";
 
 // Reason: Track which missing filenames have already been warned about to avoid
@@ -24,64 +23,64 @@ export async function GET(
     // Also strip query params
     const sanitizedFilename = path.basename(filename.split("?")[0]);
 
-    // Try multiple possible locations for the file
-    // Production path comes first for speed in production
-    const possiblePaths = [
-      // Production: /var/www/chartvolt/public/assets/images
-      path.join(
-        "/var/www/chartvolt",
-        "public",
-        "assets",
-        "images",
-        sanitizedFilename,
-      ),
-      // Production admin fallback
-      path.join(
-        "/var/www/chartvolt",
-        "apps",
-        "admin",
-        "public",
-        "assets",
-        "images",
-        sanitizedFilename,
-      ),
-      // Local dev: current app's public folder.
-      // Reason: `/*turbopackIgnore: true*/` prevents NFT from widening
-      // the trace to the whole project due to the runtime-only `process.cwd()` read.
-      path.join(/*turbopackIgnore: true*/ process.cwd(), "public", "assets", "images", sanitizedFilename),
-      // Local dev: admin app's public folder (monorepo)
-      path.join(
-        /*turbopackIgnore: true*/ process.cwd(),
-        "apps",
-        "admin",
-        "public",
-        "assets",
-        "images",
-        sanitizedFilename,
-      ),
-    ];
+    // Look in this app's public folder, then the admin app's (monorepo: web app at the
+    // root, admin at apps/admin).
+    //
+    // Reason for the shape - each `readFile` spells out its own directory rather than
+    // looping over an array of candidates, which reads as needless repetition and is not.
+    // Measured against a real `next build`: a path Turbopack cannot fold, such as a loop
+    // variable over an array or an array index, makes the traced pattern a bare
+    // `<dynamic>` matching every file in the repository, and `/*turbopackIgnore: true*/`
+    // on `process.cwd()` hides the resulting warning without narrowing anything, so the
+    // widened trace resurfaces as "unexpected file in NFT list" naming `next.config.ts`.
+    // One literal-segment `path.join` per `fs` call emits neither warning.
+    // Reading directly rather than `access` then `readFile` is also one syscall instead
+    // of two, since a failed read answers the same question.
+    //
+    // The two hardcoded `/var/www/chartvolt` candidates that used to come first were
+    // removed rather than kept: `ecosystem.config.js` starts `chartvolt-web` with
+    // `cwd: __dirname`, so in production `process.cwd()` is already that directory and
+    // they could only ever resolve to the same two paths.
+    let fileBuffer: Buffer | null = null;
 
-    let filePath: string | null = null;
+    try {
+      fileBuffer = await readFile(
+        path.join(
+          process.cwd(),
+          "public",
+          "assets",
+          "images",
+          sanitizedFilename,
+        ),
+      );
+    } catch {
+      // Not in this app's public folder - try the admin app's.
+    }
 
-    for (const possiblePath of possiblePaths) {
+    if (!fileBuffer) {
       try {
-        await access(possiblePath, constants.R_OK);
-        filePath = possiblePath;
-        break;
+        fileBuffer = await readFile(
+          path.join(
+            process.cwd(),
+            "apps",
+            "admin",
+            "public",
+            "assets",
+            "images",
+            sanitizedFilename,
+          ),
+        );
       } catch {
-        // File doesn't exist at this path, try next
+        // Not on disk at all - fall through to the database restore below.
       }
     }
 
-    // If file found on disk, serve it directly
-    if (filePath) {
-      const fileBuffer = await readFile(filePath);
+    if (fileBuffer) {
       const ext = sanitizedFilename.split(".").pop()?.toLowerCase();
-      const contentType = getContentType(ext);
 
       return new NextResponse(fileBuffer as unknown as BodyInit, {
         headers: {
-          "Content-Type": contentType,
+          "Content-Type": getContentType(ext),
           "Cache-Control": "no-cache, no-store, must-revalidate",
           Pragma: "no-cache",
           Expires: "0",
@@ -106,14 +105,24 @@ export async function GET(
         console.log(`🔄 [Serve] Restoring branding image from DB: ${sanitizedFilename}`);
         const buffer = Buffer.from(fileEntry.data, "base64");
 
-        // Auto-restore file to disk for future requests
+        // Auto-restore file to disk for future requests.
+        // Reason: the restore target is spelled out rather than taken from
+        // `dirname(possiblePaths[0])`. That first candidate was the hardcoded
+        // `/var/www/chartvolt` path, so in development this wrote the recovered image
+        // into a directory the app never reads from - and it created that directory to
+        // do it - which meant every subsequent request went back to the database.
         try {
-          const restoreDir = possiblePaths[0] ? path.dirname(possiblePaths[0]) : null;
-          if (restoreDir) {
-            await mkdir(restoreDir, { recursive: true });
-            await writeFile(path.join(restoreDir, sanitizedFilename), buffer);
-            console.log(`✅ [Serve] Auto-restored to disk: ${path.join(restoreDir, sanitizedFilename)}`);
-          }
+          const restoreDir = path.join(
+            process.cwd(),
+            "public",
+            "assets",
+            "images",
+          );
+          await mkdir(restoreDir, { recursive: true });
+          await writeFile(path.join(restoreDir, sanitizedFilename), buffer);
+          console.log(
+            `✅ [Serve] Auto-restored to disk: ${path.join(restoreDir, sanitizedFilename)}`,
+          );
         } catch (restoreErr) {
           console.warn(`⚠️ [Serve] Could not auto-restore to disk:`, restoreErr);
         }
@@ -136,7 +145,7 @@ export async function GET(
     if (!warnedMissing.has(sanitizedFilename)) {
       warnedMissing.add(sanitizedFilename);
       console.warn(
-        `⚠️ Branding image not found: ${sanitizedFilename} (checked ${possiblePaths.length} paths + DB). Re-upload from Admin > Settings > Branding to fix.`,
+        `⚠️ Branding image not found: ${sanitizedFilename} (checked disk + DB). Re-upload from Admin > Settings > Branding to fix.`,
       );
     }
 

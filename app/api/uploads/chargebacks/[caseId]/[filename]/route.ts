@@ -1,8 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, access } from "fs/promises";
-import { constants } from "fs";
+import { readFile } from "fs/promises";
 import path from "path";
 import { getAdminSession } from "@/lib/admin/auth";
+
+/**
+ * Reason: a Map has no prototype chain, so the lookup is total for any extension a
+ * filename can produce. An object index walks the prototype, and "constructor" returns
+ * something truthy that survives the `|| fallback` and reaches a Content-Type header.
+ */
+const CONTENT_TYPES = new Map<string, string>([
+  ["pdf", "application/pdf"],
+  ["jpg", "image/jpeg"],
+  ["jpeg", "image/jpeg"],
+  ["png", "image/png"],
+  ["gif", "image/gif"],
+  ["webp", "image/webp"],
+  ["txt", "text/plain; charset=utf-8"],
+  ["csv", "text/csv; charset=utf-8"],
+  ["doc", "application/msword"],
+  [
+    "docx",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ],
+  ["xls", "application/vnd.ms-excel"],
+  [
+    "xlsx",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ],
+]);
+
+function contentTypeFor(ext: string): string {
+  return CONTENT_TYPES.get(ext) || "application/octet-stream";
+}
 
 /**
  * GET /api/uploads/chargebacks/[caseId]/[filename]
@@ -29,62 +58,42 @@ export async function GET(
       return NextResponse.json({ error: "Invalid path" }, { status: 400 });
     }
 
-    const candidates = [
-      path.join(
-        /*turbopackIgnore: true*/ process.cwd(),
-        "public",
-        "uploads",
-        "chargebacks",
-        safeCaseId,
-        safeFilename,
-      ),
-      path.join(
-        "/var/www/chartvolt",
-        "public",
-        "uploads",
-        "chargebacks",
-        safeCaseId,
-        safeFilename,
-      ),
-    ];
+    // Reason: exactly one candidate, spelled as one `path.join` of literal segments, is
+    // what keeps Turbopack's trace scoped to this directory instead of the whole
+    // repository. Three spellings were measured against a real `next build`:
+    //   - joining a base directory with the dynamic segments at the `fs` call site emits
+    //     an "overly broad pattern" warning matching ~14,000 files;
+    //   - adding `/*turbopackIgnore: true*/` hides that warning but the trace still
+    //     widens, which then surfaces as "unexpected file in NFT list";
+    //   - this form, a single resolvable prefix, emits neither.
+    // The previous second candidate hardcoded `/var/www/chartvolt` and was removed rather
+    // than kept: `ecosystem.config.js` starts `chartvolt-web` with `cwd: __dirname`, so
+    // `process.cwd()` is already that directory in production and the fallback could only
+    // ever resolve to the same path it did.
+    const filePath = path.join(
+      process.cwd(),
+      "public",
+      "uploads",
+      "chargebacks",
+      safeCaseId,
+      safeFilename,
+    );
 
-    let filePath: string | null = null;
-    for (const p of candidates) {
-      try {
-        await access(p, constants.R_OK);
-        filePath = p;
-        break;
-      } catch {
-        // try next
-      }
-    }
-
-    if (!filePath) {
+    let buf: Buffer;
+    try {
+      // Reason: read directly rather than `access` then `readFile`. One syscall instead
+      // of two, since a failed read answers the same question, and it keeps the path
+      // expression at the `fs` call where the analyser can resolve it.
+      buf = await readFile(filePath);
+    } catch {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const buf = await readFile(filePath);
     const ext = safeFilename.split(".").pop()?.toLowerCase() || "bin";
-    const contentTypes: Record<string, string> = {
-      pdf: "application/pdf",
-      jpg: "image/jpeg",
-      jpeg: "image/jpeg",
-      png: "image/png",
-      gif: "image/gif",
-      webp: "image/webp",
-      txt: "text/plain; charset=utf-8",
-      csv: "text/csv; charset=utf-8",
-      doc: "application/msword",
-      docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      xls: "application/vnd.ms-excel",
-      xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    };
-    // eslint-disable-next-line security/detect-object-injection -- ext is a lowercased word from a path.basename(); not user HTML.
-    const contentType = contentTypes[ext] || "application/octet-stream";
 
     return new NextResponse(buf as unknown as BodyInit, {
       headers: {
-        "Content-Type": contentType,
+        "Content-Type": contentTypeFor(ext),
         // No cache: admin review, may be superseded by re-uploads.
         "Cache-Control": "private, no-store",
       },

@@ -13,6 +13,25 @@ import {
 import { readFile } from "fs/promises";
 import path from "path";
 
+/**
+ * One entry of `marketplace-defaults.json`, the file an operator writes with
+ * "Save as Defaults" in the admin panel. Only the fields the seed actually reads back
+ * are declared - the file carries the whole item, but everything else is re-derived
+ * from the hardcoded list below, so widening this type would imply the seed honours
+ * fields it ignores.
+ */
+interface SavedMarketplaceDefault {
+  slug: string;
+  imageUrl?: string;
+  iconName?: string;
+  fullDescription?: string;
+  shortDescription?: string;
+  price?: number;
+  originalPrice?: number;
+  tags?: string[];
+  isFeatured?: boolean;
+}
+
 // ============================================================================
 // NOTE: All indicator and strategy definitions have been removed.
 // They will be rebuilt one-by-one with proper testing.
@@ -3786,33 +3805,64 @@ export async function seedMarketplaceItems(
   // at the end of the seed function by comparing against processedSlugs.
 
   // ---- Load saved defaults JSON (contains imageUrl and admin-customized data) ----
-  let savedDefaults: Record<string, any> = {};
+  // Reason: a Map rather than a plain object, because the key is a slug read out of a
+  // JSON file on disk. An object index walks the prototype chain, so a file containing
+  // a slug of "constructor" or "__proto__" yields something truthy that survives the
+  // `if (jsonData)` below and is then spread over a real catalogue item.
+  const savedDefaults = new Map<string, SavedMarketplaceDefault>();
   try {
-    const possiblePaths = [
-      path.join(process.cwd(), "apps", "admin", "lib", "data", "marketplace-defaults.json"),
-      path.join(process.cwd(), "lib", "data", "marketplace-defaults.json"),
-      path.join(process.cwd(), "..", "..", "apps", "admin", "lib", "data", "marketplace-defaults.json"),
-    ];
+    // Reason for the shape - each `readFile` spells out its own path rather than looping
+    // over an array of candidates, which reads as needless repetition and is not.
+    // Measured against a real `next build`: a path Turbopack cannot fold, such as a loop
+    // variable over an array, makes the traced pattern a bare `<dynamic>` matching every
+    // file in the repository, which is reported as "unexpected file in NFT list" naming
+    // `next.config.ts` and over-bundles the standalone output. A third candidate reaching
+    // `../..` out of the project was removed: `ecosystem.config.js` starts every app with
+    // a `cwd` inside the repository, so it could never resolve.
+    const adminDefaults = path.join(
+      process.cwd(),
+      "apps",
+      "admin",
+      "lib",
+      "data",
+      "marketplace-defaults.json",
+    );
+    const localDefaults = path.join(
+      process.cwd(),
+      "lib",
+      "data",
+      "marketplace-defaults.json",
+    );
 
-    for (const jsonPath of possiblePaths) {
+    let raw: string | null = null;
+    let loadedFrom = adminDefaults;
+
+    try {
+      raw = await readFile(adminDefaults, "utf-8");
+    } catch {
       try {
-        const raw = await readFile(jsonPath, "utf-8");
-        const items = JSON.parse(raw);
-        if (Array.isArray(items)) {
-          for (const item of items) {
-            if (item.slug) {
-              savedDefaults[item.slug] = item;
-            }
-          }
-          console.log(`📄 [Seed] Loaded ${items.length} saved defaults from ${jsonPath}`);
-        }
-        break;
+        raw = await readFile(localDefaults, "utf-8");
+        loadedFrom = localDefaults;
       } catch {
-        continue;
+        // Neither file is present - the hardcoded list below is the whole seed.
       }
     }
 
-    if (Object.keys(savedDefaults).length === 0) {
+    if (raw) {
+      const items: unknown = JSON.parse(raw);
+      if (Array.isArray(items)) {
+        for (const item of items as SavedMarketplaceDefault[]) {
+          if (item.slug) {
+            savedDefaults.set(item.slug, item);
+          }
+        }
+        console.log(
+          `📄 [Seed] Loaded ${items.length} saved defaults from ${loadedFrom}`,
+        );
+      }
+    }
+
+    if (savedDefaults.size === 0) {
       console.log(`📄 [Seed] No marketplace-defaults.json found, using hardcoded data only`);
     }
   } catch (err) {
@@ -3820,14 +3870,14 @@ export async function seedMarketplaceItems(
   }
 
   // ---- Build merged item list: hardcoded + JSON defaults (JSON wins for admin-customized fields) ----
-  const mergedItems: any[] = [];
+  const mergedItems: Partial<IMarketplaceItem>[] = [];
   const processedSlugs = new Set<string>();
 
   for (const _hardcoded of ALL_ITEMS) {
     const hardcoded = _hardcoded as Partial<IMarketplaceItem>;
     const slug = hardcoded.slug as string;
     if (!slug) { mergedItems.push(hardcoded); continue; }
-    const jsonData = savedDefaults[slug];
+    const jsonData = savedDefaults.get(slug);
     if (jsonData) {
       mergedItems.push({
         ...hardcoded,
@@ -3869,8 +3919,10 @@ export async function seedMarketplaceItems(
 
       if (existing) {
         existing.indicatorType = itemData.indicatorType;
-        existing.strategyConfig = itemData.strategyConfig as any;
-        existing.cosmeticType = itemData.cosmeticType as any;
+        existing.strategyConfig =
+          itemData.strategyConfig as IMarketplaceItem["strategyConfig"];
+        existing.cosmeticType =
+          itemData.cosmeticType as IMarketplaceItem["cosmeticType"];
         if (!existing.imageUrl && itemData.imageUrl) {
           existing.imageUrl = itemData.imageUrl;
         }
@@ -3900,7 +3952,8 @@ export async function seedMarketplaceItems(
           existing.tags = itemData.tags || existing.tags;
         }
         if (itemData.gameMasterConfig) {
-          existing.gameMasterConfig = itemData.gameMasterConfig as any;
+          existing.gameMasterConfig =
+            itemData.gameMasterConfig as IMarketplaceItem["gameMasterConfig"];
         }
         await existing.save();
         result.updated++;
@@ -3927,8 +3980,8 @@ export async function seedMarketplaceItems(
       slug: { $nin: validSlugs },
     });
     if (staleItems.length > 0) {
-      const staleIds = staleItems.map((i: any) => i._id);
-      const staleSlugs = staleItems.map((i: any) => `${i.slug} (${i.category})`);
+      const staleIds = staleItems.map((i) => i._id);
+      const staleSlugs = staleItems.map((i) => `${i.slug} (${i.category})`);
       const { UserPurchase } = await import("@/database/models/marketplace/user-purchase.model");
       await UserPurchase.deleteMany({ itemId: { $in: staleIds } });
       await MarketplaceItem.deleteMany({ slug: { $nin: validSlugs } });

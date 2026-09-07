@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, access, writeFile, mkdir } from "fs/promises";
+import { readFile, writeFile, mkdir } from "fs/promises";
 import path from "path";
-import { constants } from "fs";
 
 /**
  * GET /api/assets/marketplace/[filename]
@@ -34,50 +33,94 @@ export async function GET(
       filenamesToTry.push(webpFilename);
     }
 
-    // Base directories to search (no hardcoded paths - works on any server).
-    // Reason: `/*turbopackIgnore: true*/` prevents Turbopack's NFT from
-    // widening the trace to the whole project. These directories are
-    // read at runtime only and should never be bundled.
-    const baseDirs = [
+    // Search four directories, in order, for each candidate filename. No hardcoded
+    // paths, so this works whatever directory the server was started from.
+    //
+    // Reason for the shape - each `readFile` spells out its own directory instead of
+    // looping over an array of them, which reads as needless repetition and is not.
+    // Measured against a real `next build`:
+    //   - looping over an array of base directories leaves Turbopack unable to fold the
+    //     loop variable, so the traced pattern includes a bare `<dynamic>` matching every
+    //     file in the repository. That is the "overly broad pattern" warning this route
+    //     used to emit, and it also fired on an array index (`baseDirs[1]`) and on a
+    //     `string | null` assigned in a loop and read after it;
+    //   - `/*turbopackIgnore: true*/` on `process.cwd()` silences that warning without
+    //     narrowing anything, so the widened trace resurfaces as "unexpected file in NFT
+    //     list" naming `next.config.ts`. Comments to that effect were here, doing that;
+    //   - one literal-segment `path.join` per `fs` call emits neither warning.
+    // Reading directly rather than `access` then `readFile` is also one syscall per
+    // candidate instead of two, since a failed read answers the same question.
+    for (const fname of filenamesToTry) {
+      let fileBuffer: Buffer | null = null;
+
       // Committed assets (defaults saved via "Save as Defaults") - check first
-      path.join(/*turbopackIgnore: true*/ process.cwd(), "public", "assets", "marketplace"),
+      try {
+        fileBuffer = await readFile(
+          path.join(process.cwd(), "public", "assets", "marketplace", fname),
+        );
+      } catch {
+        // Not here - fall through to the next directory.
+      }
+
       // Runtime uploads
-      path.join(/*turbopackIgnore: true*/ process.cwd(), "public", "uploads", "marketplace"),
-      // Admin app's directories (monorepo: web app is at root, admin at apps/admin)
-      path.join(/*turbopackIgnore: true*/ process.cwd(), "apps", "admin", "public", "uploads", "marketplace"),
-      path.join(/*turbopackIgnore: true*/ process.cwd(), "apps", "admin", "public", "assets", "marketplace"),
-    ];
-
-    let filePath: string | null = null;
-    let actualFilename: string = sanitizedFilename;
-
-    // Try each filename in each directory
-    outer: for (const fname of filenamesToTry) {
-      for (const baseDir of baseDirs) {
-        const possiblePath = path.join(baseDir, fname);
+      if (!fileBuffer) {
         try {
-          await access(possiblePath, constants.R_OK);
-          filePath = possiblePath;
-          actualFilename = fname;
-          break outer;
+          fileBuffer = await readFile(
+            path.join(process.cwd(), "public", "uploads", "marketplace", fname),
+          );
         } catch {
-          // File doesn't exist at this path, try next
+          // Not here either.
         }
       }
-    }
 
-    // If found on disk, serve directly
-    if (filePath) {
-      const fileBuffer = await readFile(filePath);
-      const ext = actualFilename.split(".").pop()?.toLowerCase();
-      const contentType = getContentType(ext);
+      // The admin app's directories (monorepo: web app at root, admin at apps/admin)
+      if (!fileBuffer) {
+        try {
+          fileBuffer = await readFile(
+            path.join(
+              process.cwd(),
+              "apps",
+              "admin",
+              "public",
+              "uploads",
+              "marketplace",
+              fname,
+            ),
+          );
+        } catch {
+          // Not here either.
+        }
+      }
 
-      return new NextResponse(fileBuffer as unknown as BodyInit, {
-        headers: {
-          "Content-Type": contentType,
-          "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
-        },
-      });
+      if (!fileBuffer) {
+        try {
+          fileBuffer = await readFile(
+            path.join(
+              process.cwd(),
+              "apps",
+              "admin",
+              "public",
+              "assets",
+              "marketplace",
+              fname,
+            ),
+          );
+        } catch {
+          // Not on disk under this filename - try the next filename, then the database.
+        }
+      }
+
+      if (fileBuffer) {
+        return new NextResponse(fileBuffer as unknown as BodyInit, {
+          headers: {
+            "Content-Type": getContentType(
+              fname.split(".").pop()?.toLowerCase(),
+            ),
+            "Cache-Control":
+              "public, max-age=3600, stale-while-revalidate=86400",
+          },
+        });
+      }
     }
 
     // Not on disk - try to serve from MongoDB (imageData on MarketplaceItem)
@@ -99,9 +142,17 @@ export async function GET(
         );
         const buffer = Buffer.from(item.imageData, "base64");
 
-        // Auto-restore to disk for future requests
+        // Auto-restore to disk for future requests.
+        // Reason: the literal join is repeated rather than read back out of `baseDirs`.
+        // `baseDirs[1]` is an array index the analyser cannot fold, which turned this
+        // write into a `<dynamic> '/' <dynamic>` pattern covering the whole project.
         try {
-          const restoreDir = baseDirs[1]; // public/uploads/marketplace
+          const restoreDir = path.join(
+            process.cwd(),
+            "public",
+            "uploads",
+            "marketplace",
+          );
           await mkdir(restoreDir, { recursive: true });
           await writeFile(path.join(restoreDir, sanitizedFilename), buffer);
           console.log(
