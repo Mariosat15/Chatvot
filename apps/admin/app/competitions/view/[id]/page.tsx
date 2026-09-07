@@ -1,4 +1,4 @@
-import {
+﻿import {
   Trophy,
   Users,
   DollarSign,
@@ -7,7 +7,6 @@ import {
   Edit,
   Clock,
   Target,
-  Award,
   User,
 } from "lucide-react";
 import {
@@ -28,8 +27,9 @@ import {
   showsTradingConfiguration,
   resolveEditHref,
   resolveNoWinnersNotice,
-  PRIZE_REDISTRIBUTION_NOTE,
 } from "@/lib/admin/contest-result-presentation";
+import ContestPrizePanel from "@/components/admin/competitions/ContestPrizePanel";
+import SettledResultPanel from "@/components/admin/competitions/SettledResultPanel";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 
 // Derived from the actions rather than hand-written. Reason: a hand-written row interface is
@@ -38,9 +38,10 @@ import WalletTransaction from "@/database/models/trading/wallet-transaction.mode
 type LeaderboardRow = Awaited<
   ReturnType<typeof getCompetitionLeaderboard>
 >[number];
-type PrizeSlice = NonNullable<
-  Awaited<ReturnType<typeof getCompetitionById>>["prizeDistribution"]
->[number];
+// `PrizeSlice` lived here until the prize sidebar stopped mapping the raw distribution: both
+// branches now iterate rows produced by `prize-projection.ts` or
+// `resolveSettledPrizeRows`, which carry their own types. Deleted rather than kept unused,
+// because an unused local type is where a stale field shape survives a rename.
 
 interface AdminCompetitionViewPageProps {
   params: Promise<{ id: string }>;
@@ -65,8 +66,8 @@ const AdminCompetitionViewPage = async ({
   // `_` form like its two neighbours rather than deleted, because it is a settings read the
   // next person adding a credits-denominated figure here will want.
   const _creditName = appSettings?.credits?.name || "Credits";
-  const _creditSymbol = appSettings?.credits?.symbol || "⚡";
-  const currencySymbol = appSettings?.currency?.symbol || "€";
+  const _creditSymbol = appSettings?.credits?.symbol || "âš¡";
+  const currencySymbol = appSettings?.currency?.symbol || "â‚¬";
   const _currencyCode = appSettings?.currency?.code || "EUR";
 
   try {
@@ -518,7 +519,7 @@ const AdminCompetitionViewPage = async ({
                                               : "bg-gray-700 text-gray-300"
                                     }`}
                                   >
-                                    {isDisqualified ? "✗" : displayRank}
+                                    {isDisqualified ? "âœ—" : displayRank}
                                   </div>
                                   <div>
                                     <div className="flex items-center gap-2 flex-wrap">
@@ -535,7 +536,7 @@ const AdminCompetitionViewPage = async ({
                                       )}
                                       {isWinner && (
                                         <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-semibold rounded">
-                                          🏆 WINNER
+                                          ðŸ† WINNER
                                         </span>
                                       )}
                                       {gmInfo && (
@@ -561,7 +562,7 @@ const AdminCompetitionViewPage = async ({
                                           <span
                                             className={`text-red-400 ${subline ? "ml-2" : ""}`}
                                           >
-                                            {subline ? "• " : ""}
+                                            {subline ? "â€¢ " : ""}
                                             {
                                               participant.disqualificationReason
                                             }
@@ -571,7 +572,7 @@ const AdminCompetitionViewPage = async ({
                                     )}
                                     {gmInfo && (
                                       <p className="text-xs text-purple-400 mt-1">
-                                        GM: {gmInfo.gmEmail} • Earned:{" "}
+                                        GM: {gmInfo.gmEmail} â€¢ Earned:{" "}
                                         {currencySymbol}
                                         {gmInfo.gmEarning.toFixed(2)}
                                       </p>
@@ -653,6 +654,17 @@ const AdminCompetitionViewPage = async ({
                   );
                 })()}
               </div>
+
+              {/*
+                THE SETTLED SNAPSHOT, WHICH WAS RENDERED BY NO ADMIN SCREEN AT ALL, and
+                the panel explains why it is a second table rather than columns on the
+                board above. It renders nothing when there is no settled record.
+              */}
+              <SettledResultPanel
+                finalLeaderboard={competition.finalLeaderboard}
+                isProviderGame={isProviderGame}
+                currencySymbol={currencySymbol}
+              />
             </div>
 
             {/* Sidebar */}
@@ -676,128 +688,20 @@ const AdminCompetitionViewPage = async ({
                 />
               </div>
 
-              {/* Prize Distribution */}
-              <div className="bg-gradient-to-br from-yellow-500/10 to-gray-900 border border-yellow-500/30 rounded-xl p-6 shadow-xl">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-100 flex items-center gap-2">
-                    <Award className="h-5 w-5 text-yellow-400" />
-                    Prize Distribution
-                  </h3>
-                  {competition.platformFeePercentage > 0 && (
-                    <div className="px-3 py-1 bg-blue-500/20 border border-blue-500/30 rounded-lg">
-                      <p className="text-xs font-semibold text-blue-300">
-                        Platform Fee: {competition.platformFeePercentage}%
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  {competition.prizeDistribution?.map(
-                    (prize: PrizeSlice, index: number) => {
-                      const prizePool =
-                        competition.prizePool ||
-                        competition.prizePoolCredits ||
-                        0;
-                      const grossAmount = (prizePool * prize.percentage) / 100;
-                      const platformFeePercentage =
-                        (competition.platformFeePercentage || 0) / 100;
-                      const netAmount =
-                        grossAmount * (1 - platformFeePercentage);
-                      const feeAmount = grossAmount - netAmount;
-
-                      return (
-                        <div
-                          key={index}
-                          className="p-4 rounded-xl bg-gray-800/50 border border-gray-700"
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              {index === 0 && (
-                                <Trophy className="h-5 w-5 text-yellow-500" />
-                              )}
-                              {index === 1 && (
-                                <Trophy className="h-5 w-5 text-gray-400" />
-                              )}
-                              {index === 2 && (
-                                <Trophy className="h-5 w-5 text-orange-600" />
-                              )}
-                              {index > 2 && (
-                                <Trophy className="h-5 w-5 text-gray-600" />
-                              )}
-                              <span className="text-sm font-bold text-gray-300">
-                                Rank #{prize.rank}
-                              </span>
-                              <span className="px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400 text-xs font-semibold">
-                                {prize.percentage}%
-                              </span>
-                            </div>
-                            {/*
-                              The same unit as the Prize Pool stat above, the "Won:" figure on
-                              each row, and the player-facing prize table. This said
-                              the configured credit name while all three of those said the
-                              currency symbol, so one screen labelled one quantity two ways -
-                              and the operator comparing a rank's amount against what a winner
-                              was actually paid had to work out whether the two numbers were
-                              even in the same unit.
-                            */}
-                            <div className="text-right">
-                              <p className="text-lg font-black text-yellow-500">
-                                {currencySymbol}
-                                {netAmount.toFixed(2)}
-                              </p>
-                            </div>
-                          </div>
-
-                          {competition.platformFeePercentage > 0 && (
-                            <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-700/50">
-                              <span>From pool: {grossAmount.toFixed(2)}</span>
-                              <span className="text-red-400">
-                                Fee: -{feeAmount.toFixed(2)}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    },
-                  )}
-                </div>
-
-                {competition.platformFeePercentage > 0 && (
-                  <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                    <p className="text-xs text-blue-300 flex items-start gap-2">
-                      <span className="text-blue-400 font-bold">ℹ️</span>
-                      <span>
-                        Winners receive net amounts after{" "}
-                        {competition.platformFeePercentage}% platform fee. Total
-                        pool: {currencySymbol}
-                        {(
-                          competition.prizePool ||
-                          competition.prizePoolCredits ||
-                          0
-                        ).toFixed(2)}
-                        .
-                      </span>
-                    </p>
-                  </div>
-                )}
-
-                {/*
-                  THE AMOUNTS ABOVE ARE CONFIGURED, NOT PAID, and nothing on this screen said
-                  so. Two things move them and both are invisible here: an unplaced rank has
-                  its share split among the players who did place, and since R45 a player with
-                  no result holds no rank at all. So the figures are a floor - and an operator
-                  reconciling them against the wallet credits concludes the payout is broken,
-                  which is exactly the report that led here.
-
-                  `PrizeDistributionEditor` already says this where prizes are EDITED. One
-                  shared string, so the two screens cannot drift into describing one payout two
-                  ways.
-                */}
-                <p className="text-xs text-gray-500 mt-4 leading-relaxed">
-                  {PRIZE_REDISTRIBUTION_NOTE}
-                </p>
-              </div>
+              {/*
+                THE PRIZE PANEL REPORTS ONE OF TWO DIFFERENT THINGS - a projection while
+                the outcome is unknown, the recorded amounts once settlement has run -
+                and the component owns that choice. It shared no arithmetic with the
+                player-facing table before, which is why the two screens quoted different
+                amounts for the same rank.
+              */}
+              <ContestPrizePanel
+                distribution={competition.prizeDistribution || []}
+                finalLeaderboard={competition.finalLeaderboard}
+                competition={competition}
+                currencySymbol={currencySymbol}
+                platformFeePercentage={competition.platformFeePercentage || 0}
+              />
 
               {/* Rules */}
               {competition.rules && (

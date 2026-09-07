@@ -640,6 +640,73 @@ Newest at the top.
 
 ---
 
+### 7 Sep 2026 - `12` s2.6 - THE PRIZE SIDEBAR SHOWED NEITHER WHAT WILL BE PAID NOR WHAT WAS
+
+**Shipped:** `lib/utils/prize-projection.ts` (**mirrored, byte-identical**), the projection
+consumed by both `components/competitions/PrizeTable.tsx` and the new
+`apps/admin/components/admin/competitions/ContestPrizePanel.tsx`, plus
+`SettledResultPanel.tsx` and three resolvers on `contest-result-presentation.ts`. `12` **s2.6**.
+26 tests in `__tests__/admin/contest-prize-basis.test.ts`, **18 probes in
+`tools/probe-contest-prize-basis.ps1`, all red on exactly the expected test.** Suite **1218
+passed**. Admin typecheck at the **223 baseline**, lists diffed rather than counted.
+
+**This closes both items `12` s2.4 recorded as deferred, and the finding is that they were one
+item - and that the fix filed for the first half would have been wrong on its own.**
+
+The sidebar printed each rank's bare configured percentage. The player's table has
+redistributed an unclaimed position's share since long before this programme, so **the two
+screens quoted different amounts for the same rank**, and the operator's was the one that then
+disagreed with the ledger.
+
+**Five things that generalise.**
+
+- **"Recompute it live" was the wrong fix for a finished contest, and it is what the plan
+  filed.** Applied after settlement a projection divides by how many players *entered* where
+  settlement divided by how many *placed* - a different number since R45 - so it produces a
+  second wrong figure beside the right one with nothing on screen to distinguish them. The
+  right answer was already stored: `finalLeaderboard` carries each winner's real `prizeAmount`
+  and **was rendered by no admin screen at all**, which was the *other* deferred item. The two
+  halves answer each other. **A deferral is a hypothesis about what the fix is**, and reading
+  the data before implementing it is what showed the hypothesis was half wrong.
+- **The basis must be keyed on the RECORD, never on the status.** A contest can be completed
+  with no stored leaderboard - predating the field, cancelled, or settlement never ran - and
+  `status === "completed"` would caption a column of blanks as the amounts paid. That is worse
+  than the projection it replaced, and it is the tidier-looking condition.
+- **A caution is scoped to the claim beside it.** "These figures are a floor" is true of a
+  projection and **false** beside a recorded payment, where it tells an operator a completed
+  payout might exceed the amount in the ledger. One slot, two strings, chosen by the basis -
+  and the heading moves with it, because "Prize Distribution" above real money reads as
+  configuration and invites exactly the reconciliation that fails. Third instance after the
+  play-window note and the wizard's publishing note.
+- **Extraction is a claim about what the green tests mean, so the parameter name was part of
+  the diff.** The four expressions deciding what a winner is paid moved character for
+  character out of the component into the shared module, along with the four assertions pinning
+  them - and the module's parameter is called `competition` **because renaming it would have
+  broken the verbatim match and thrown away the proof.** Second time these four have survived a
+  move unchanged.
+- **A snapshot and a live recomputation are two answers and must stay two tables.** The board
+  is recomputed per request, so it says how the contest would rank today; the snapshot says how
+  it ranked when the credits moved. They can differ - a late score rejected, a row edited, a
+  disqualification recorded at the time - and merging them hides precisely that. The stored
+  `disqualificationReason` is the only field here that cannot be reconstructed afterwards, and
+  it is the one an operator has to give the player.
+
+**Two green probes, two different causes, and that question now has six recorded instances.**
+One was a **weak test** - the `disqualificationReason` guard was a bare `toContain` and the
+field is named a second time *inside* the element it guards, so `{false && (` left the suite
+green. Fifth instance of that class after the fixed-character Edit guard, `canTransitionRound`,
+`MIN_REASON_LENGTH` and `expectedOrigin`: **assert the condition with its operator and count
+the occurrences.** The other was a **guard that changes no answer** - the `filledPositions > 0`
+ternary is unreachable as a difference, because `filledPositions` is zero only when every row is
+unfilled, so the `Infinity` it would produce is read by nothing. It is kept (it is one of the
+four pinned expressions, and the accident holds only for `>`), and the probe file **records it
+as unprobeable with the reason** rather than shipping a green probe.
+
+**Nothing was backfilled and nothing needed to be** - no money logic changed, and every figure
+this touches is a read.
+
+---
+
 ### 7 Sep 2026 - `12` s2.5 - THE ROUND LENGTH AND THE CONTEST CLOCK NEVER REFERRED TO EACH OTHER
 
 **Shipped:** `apps/admin/components/admin/games/RoundClockNote.tsx` (new, shared by the wizard

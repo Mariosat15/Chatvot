@@ -923,28 +923,35 @@ describe("the two lobbies are built from one design kit", () => {
     expect(table).toContain("no result");
   });
 
-  it("moves no money computation while restyling the prize table", () => {
-    // Moved out of `components/trading/lobby/` on 7 Sep 2026 so the game lobby renders the
-    // same component rather than a second copy of a payout calculation. The four assertions
-    // below travelled with it unchanged, which is what makes the move provably behaviour-free.
-    const table = readCode("components/competitions/PrizeTable.tsx");
-
+  it("moves no money computation while restyling or relocating the prize table", () => {
     /*
-      The prize table was extracted from the page in the same commit that restyled it, which is
-      normally forbidden - an extraction's value is that green tests prove nothing moved. These
-      four expressions are the whole calculation, asserted character for character, because they
-      decide what a winner is paid and a restyle must not touch them.
+      THE FOUR ASSERTIONS HAVE NOW SURVIVED TWO MOVES UNCHANGED, which is the entire point of
+      them. First out of `components/trading/lobby/` on 7 Sep 2026 so the game lobby renders one
+      component rather than a second copy; then out of the component into
+      `lib/utils/prize-projection.ts` later the same day, so the ADMIN prize sidebar computes
+      the same answer instead of showing the bare configured share.
+
+      They are asserted character for character because they decide what a winner is paid, and
+      an extraction's whole value is that a green suite proves nothing moved - which it only
+      does if nothing else changed in the same edit. The projection module's parameter is named
+      `competition` for exactly this reason: renaming it would have broken the verbatim match
+      and thrown away the proof.
     */
-    expect(table).toContain(
+    const projection = readCode("lib/utils/prize-projection.ts");
+
+    expect(projection).toContain(
       "competition.prizePool || competition.prizePoolCredits || 0",
     );
-    expect(table).toContain(
-      "(competition.platformFeePercentage || 0) / 100",
-    );
-    expect(table).toContain(
+    expect(projection).toContain("(competition.platformFeePercentage || 0) / 100");
+    expect(projection).toContain(
       "filledPositions > 0 ? unclaimedPercentage / filledPositions : 0",
     );
-    expect(table).toContain("(1 - platformFeePercentage)");
+    expect(projection).toContain("(1 - platformFeePercentage)");
+
+    // And the component is now layout only, so a future restyle cannot reach the money at all.
+    const table = readCode("components/competitions/PrizeTable.tsx");
+    expect(table).toContain("projectPrizeDistribution(competition)");
+    expect(table).not.toContain("unclaimedPercentage / filledPositions");
   });
 });
 

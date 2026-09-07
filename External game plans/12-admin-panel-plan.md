@@ -486,6 +486,15 @@ the wallet credits concludes the payout is wrong. `PrizeDistributionEditor` alre
 where prizes are *edited*; saying it where they are *read* is the half that was missing, and it
 is **one exported string** so the two screens cannot drift into describing one payout two ways.
 
+**SUPERSEDED LATER THE SAME DAY BY s2.6, and the caution is now conditional.** The two items
+this section filed as deferred - a live redistribution in the sidebar, and `finalLeaderboard`
+rendered nowhere - turned out to be **one** item, and the fix filed for the first half was
+wrong on its own: projecting onto a finished contest divides by entrants where settlement
+divided by placers. The sidebar now projects while the outcome is unknown and reports the
+recorded amounts once it is not, so **the floor caution above renders only in the projected
+case** - beside a real payment it is a warning that has become false. Read s2.6, not this
+paragraph, for what the screen does today.
+
 **The live code is `apps/admin/lib/admin/contest-result-presentation.ts` and
 `apps/admin/app/competitions/view/[id]/page.tsx`.** Nothing here is mirrored, and no money
 logic changed - every fix is on a read path.
@@ -586,6 +595,93 @@ and reported green: `readCode` strips comments deliberately, because these files
 mistakes they forbid. **A mention in a comment is not per-game code**, so the mutation had to
 become code. Both are the same rule from opposite directions - *the guard and its probe must
 agree on what the property actually is.*
+
+### 2.6 The prize sidebar showed neither what will be paid nor what was - BUILT 7 September 2026
+
+This closes both items s2.4 recorded as deferred, and the useful finding is that **they were
+one item, and the thing that was filed for the first half would have been wrong.**
+
+**What was on the screen.** The sidebar mapped `competition.prizeDistribution` and printed each
+rank's bare configured percentage of the pool. The player-facing table has redistributed an
+unclaimed position's share since long before this programme, so **the two screens quoted
+different amounts for the same rank** - and the operator's was the one that then disagreed with
+the wallet ledger. On a settled contest both were wrong, because settlement divides by how many
+players *placed* and both screens divide by how many *entered*, a different number since R45.
+
+**Why "recompute it live" was the wrong fix on its own.** That is what s2.4 filed, and applied
+to a finished contest it produces a second wrong figure sitting beside the right one, with
+nothing on the screen to say which is which. A projection is the correct answer only while the
+outcome is genuinely unknown. Once settlement has run there is a recorded fact -
+`finalLeaderboard` carries each winner's real `prizeAmount` - and **that record was rendered by
+no admin screen at all**, which was the *other* deferred item. So the two halves answer each
+other: project before settlement, report after it.
+
+| Basis | Source | Caution shown |
+|---|---|---|
+| `projected` | `lib/utils/prize-projection.ts`, the same module the player's table uses | The figures are a floor |
+| `settled` | `finalLeaderboard`, per rank, ties summed | These are the amounts actually paid |
+
+Six things about it are load-bearing.
+
+- **The basis is keyed on the record existing, never on `status === "completed"`.** A contest
+  can be completed with no stored leaderboard - it predates the field, it was cancelled, or
+  settlement never ran - and reading the basis off the status would caption a column of blanks
+  as the amounts paid, which is worse than the projection it replaced.
+- **The projection was extracted, not reimplemented.** The admin app cannot import a main-app
+  component, so the alternative was a second copy of a payout calculation - the "one rule, two
+  copies" shape behind `referenceId`, `failedReason`, `challengeId` and the Game Master `||`.
+  The four expressions that decide what a winner is paid moved character for character, along
+  with the four text assertions pinning them, **which is the only thing that makes the move
+  provably behaviour-free**. The module's parameter is named `competition` for exactly that
+  reason: renaming it would have broken the verbatim match and thrown away the proof.
+- **The floor caution must not render beside real payments.** Telling an operator that a
+  completed payout "can be higher than the amount here" is a warning that has become false -
+  the same class as the play screen's play-window note and the wizard's publishing note, both
+  of which sent somebody looking for something that no longer existed. One slot, two strings,
+  chosen by the basis. The heading changes with it too: "Prize Distribution" above real money
+  reads as configuration, so an operator assumes the figures are meant to match the ledger and
+  reports a defect when they do not.
+- **A rank nobody placed in reports `-`, never `0`.** The read-side form of R45 again, and the
+  same choice the score column makes one panel over.
+- **A tied rank is summed, not sampled.** `distributePrizesWithTies` splits the combined share
+  of the tied positions between the tied players, so both hold their own `prizeAmount`.
+  Reporting one understates the rank by half; averaging produces a figure that appears in no
+  ledger row at all. A tie is also **inferred from two rows sharing a rank**, because `isTied`
+  is add-only and was silently discarded before X5, so historical contests hold tied rows with
+  the flag unset.
+- **The settled snapshot is a second table, not extra columns.** The board above it is
+  recomputed on every request, so it answers "how would this rank today"; the snapshot answers
+  "how did it rank when the credits moved". They can legitimately differ - a late score
+  rejected, a participant row edited, a disqualification recorded at the time - and merging them
+  hides exactly that. The stored `disqualificationReason` is the field that cannot be
+  reconstructed afterwards and is the one an operator has to give the player.
+
+`ContestPrizePanel.tsx` and `SettledResultPanel.tsx` are components rather than more JSX
+because the page was **744 lines and over the limit before this work**; inline it reached 1,097
+and is now **785**. The extraction is also what makes the branch provable: a structural
+assertion over a page rendering both can show the file mentions a paid amount and cannot show
+which branch produced it.
+
+**26 tests** in `__tests__/admin/contest-prize-basis.test.ts`, **18 probes** in
+`tools/probe-contest-prize-basis.ps1`, all red on exactly the expected test. Suite **1218
+passed**. Admin typecheck at the **223 baseline**, error lists diffed rather than counted -
+the single error in the changed page moved one line and is the pre-existing `db` narrowing.
+`lib/utils/prize-projection.ts` is **mirrored and byte-identical**, pinned by a text comparison
+because `check:mirrors` compares models; the two panels and `contest-result-presentation.ts`
+are admin-only.
+
+**Two probes came back green and the two causes were different, which is the fifth and sixth
+instance of that question having three answers.** One was a **weak test**: the
+`disqualificationReason` guard was written as a bare `toContain`, and the field is named a
+second time *inside* the element it guards, so replacing the condition with `{false && (` left
+the suite green. Fifth instance of that class after the fixed-character Edit guard,
+`canTransitionRound`, `MIN_REASON_LENGTH` and `expectedOrigin` - assert the condition with its
+operator and **count the occurrences**. The other was a **guard that changes no answer**: the
+`filledPositions > 0` ternary cannot be reached in a way that alters the output, because
+`filledPositions` is zero only when every row is unfilled, so the `Infinity` it would produce
+is read by nothing. It is kept - it is one of the four pinned expressions, and the accident
+holds only for `>` - but the probe file **records it as unprobeable with the reason** rather
+than shipping a green probe, on the same reasoning as R42's second game gate.
 
 ---
 

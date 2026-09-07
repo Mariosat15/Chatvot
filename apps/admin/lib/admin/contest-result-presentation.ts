@@ -137,20 +137,138 @@ export function resolveEditHref(
 }
 
 /**
- * The caution that belongs beside a configured prize table.
+ * The caution that belongs beside a PROJECTED prize table.
  *
- * The percentages on this screen are what an operator TYPED, not what settlement will pay. Two
- * things move them, and both are invisible here: a rank nobody places in has its share split
- * among the players who did, and a player with no result holds no rank at all (R45). So the
- * figures can only ever be a floor, and an operator comparing them against the wallet credits
- * concludes the payout is wrong - which is what happened.
+ * The percentages are what an operator TYPED, not what settlement will pay. Two things move
+ * them, and both are invisible on a contest that has not settled: a rank nobody places in has
+ * its share split among the players who did, and a player with no result holds no rank at all
+ * (R45). So the figures can only ever be a floor, and an operator comparing them against the
+ * wallet credits concludes the payout is wrong - which is what happened.
  *
  * The `PrizeDistributionEditor` already says this at the point of editing. Repeating it at the
  * point of READING is the half that was missing, and it is one exported string rather than two
  * literals so the two screens cannot drift into describing the payout differently.
+ *
+ * IT MUST NOT RENDER BESIDE SETTLED AMOUNTS. Once `finalLeaderboard` exists the figures are
+ * what was actually paid, and telling an operator that a real payment "can be higher than the
+ * amount here" is a caution that has become false - the same failure as the play screen's
+ * play-window note and the wizard's publishing note, both of which sent somebody looking for
+ * something that was not there. `resolvePrizeBasisNote` picks between the two.
  */
 export const PRIZE_REDISTRIBUTION_NOTE =
   "These are the configured shares. A rank nobody places in is not kept by the platform - its share is split among the players who did place, and a player who recorded no result holds no rank. Actual payouts can therefore be higher than the amounts here.";
+
+/** The same slot once the money has moved. */
+export const PRIZE_SETTLED_NOTE =
+  "These are the amounts actually paid, read from the settled result rather than from the configured shares - so they already include any share redistributed away from a rank nobody claimed. A rank showing no payment is one nobody placed in.";
+
+export function resolvePrizeBasisNote(basis: PrizeBasis): string {
+  return basis === "settled" ? PRIZE_SETTLED_NOTE : PRIZE_REDISTRIBUTION_NOTE;
+}
+
+/**
+ * Whether the prize sidebar is reporting a projection or a fact.
+ *
+ * Reason it is not simply `status === "completed"`: a contest can be completed with no stored
+ * leaderboard - it predates the field, or it was cancelled, or settlement never ran - and
+ * reading "settled" off the status would render a column of blanks captioned as the amounts
+ * paid. **The presence of the record is the only evidence that there is a record.**
+ */
+export type PrizeBasis = "settled" | "projected";
+
+/** One entry of the stored `finalLeaderboard`, narrowed to what this module reads. */
+export interface SettledLeaderboardEntry {
+  rank?: number | null;
+  username?: string | null;
+  userId?: string | null;
+  prizeAmount?: number | null;
+  isTied?: boolean | null;
+  score?: number | null;
+  qualificationStatus?: string | null;
+  disqualificationReason?: string | null;
+}
+
+export interface SettledPrizeRow {
+  rank: number;
+  configuredPercentage: number;
+  /** Total credited at this rank. `null` when nobody held it. */
+  paidAmount: number | null;
+  /** Who was paid. More than one name means the rank was tied. */
+  names: string[];
+  isTied: boolean;
+}
+
+/**
+ * What each paying rank ACTUALLY paid, from the settled snapshot.
+ *
+ * WHY THIS EXISTS. `finalLeaderboard` is written by `prize-payout.service.ts` with each
+ * winner's real `prizeAmount`, plus `isTied` and the qualification snapshot - and it was
+ * **rendered by no admin screen at all.** So the one record that answers the operator's actual
+ * question, "what did rank 2 get", was on the document and invisible, while the sidebar beside
+ * it showed a percentage that settlement had almost certainly not used.
+ *
+ * WHY IT IS NOT A LIVE RECOMPUTATION, which is what was originally filed for this. Projecting
+ * the redistribution onto a finished contest is still a projection: it divides by how many
+ * people *entered*, and settlement divides by how many *placed*, which R45 made a different
+ * number. So on a settled contest a live recomputation would be a second wrong figure sitting
+ * next to the right one, with nothing on the screen to say which was which. The projection is
+ * the correct answer only while the outcome is genuinely unknown.
+ *
+ * TIES ARE SUMMED PER RANK, not averaged and not shown once. `distributePrizesWithTies` splits
+ * the combined share of the tied positions between the tied players, so two players at rank 1
+ * each hold their own `prizeAmount`. Reporting one of them would understate the rank by half,
+ * and averaging them would produce a figure that appears in no ledger row at all.
+ */
+export function resolveSettledPrizeRows(input: {
+  distribution: { rank?: number | null; percentage: number }[];
+  finalLeaderboard?: SettledLeaderboardEntry[] | null;
+}): SettledPrizeRow[] | null {
+  const settled = input.finalLeaderboard ?? [];
+  if (settled.length === 0) return null;
+
+  return input.distribution.map((prize, index) => {
+    const rank = prize.rank ?? index + 1;
+    const atRank = settled.filter((entry) => entry.rank === rank);
+    const paidEntries = atRank.filter(
+      (entry) => typeof entry.prizeAmount === "number" && entry.prizeAmount > 0,
+    );
+
+    return {
+      rank,
+      configuredPercentage: prize.percentage,
+      // Reason `null` rather than `0`: nobody holding a rank and a rank paying nothing are
+      // different facts, and `0` is the one an operator reads as a bug. Same distinction as
+      // the score column's `-` (R45).
+      paidAmount:
+        paidEntries.length > 0
+          ? paidEntries.reduce((sum, entry) => sum + (entry.prizeAmount ?? 0), 0)
+          : null,
+      names: atRank.map(
+        (entry) => entry.username || entry.userId || "Unknown player",
+      ),
+      isTied: atRank.length > 1 || atRank.some((entry) => entry.isTied === true),
+    };
+  });
+}
+
+/**
+ * The settled rows nobody was going to see otherwise: everybody who finished, in rank order,
+ * with the qualification verdict settlement recorded at the time.
+ *
+ * The live leaderboard beside this is RECOMPUTED on every request, so it answers "how would
+ * this contest rank today". After settlement those can differ - a disqualification recorded at
+ * the time, a score arriving late and rejected, a participant row edited - and when they do,
+ * the live view is the one that cannot explain the payout. This is the snapshot the money was
+ * paid from.
+ */
+export function resolveSettledResultRows(
+  finalLeaderboard?: SettledLeaderboardEntry[] | null,
+): SettledLeaderboardEntry[] | null {
+  const settled = finalLeaderboard ?? [];
+  if (settled.length === 0) return null;
+
+  return [...settled].sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
+}
 
 /**
  * What to tell an operator when a finished contest paid nobody.
