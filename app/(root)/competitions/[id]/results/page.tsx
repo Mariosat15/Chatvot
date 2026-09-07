@@ -15,6 +15,21 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 import { GameIcon } from "@/components/ui/GameIcon";
+import { hasProviderGameLabel } from "@/lib/services/games/contest-config";
+
+/*
+  The two row shapes this page reduces over, named rather than annotated `any` at each call
+  site. They are deliberately minimal - only the fields the statistics below read - because a
+  parameter type narrower than the array's element type is still assignable, and widening it
+  to the full document would tie this page to two schemas it only aggregates.
+
+  Reason they exist at all: there were six `eslint-disable-next-line` comments here that
+  silenced nothing. Each arrow function had been wrapped onto its own line by the formatter,
+  which left the comment covering the line above the `any` it was written for, so the file
+  could not pass `--max-warnings=0` and the suppressions read as though it did.
+*/
+type ClosedTradeRow = { realizedPnl: number };
+type FinalLeaderboardRow = { userId: string; prizeAmount?: number };
 
 const CompetitionResultsPage = async ({
   params,
@@ -34,6 +49,21 @@ const CompetitionResultsPage = async ({
     redirect("/competitions");
   }
 
+  /*
+    THIS PAGE IS THE TRADING POST-MORTEM AND NOTHING ELSE. Everything below is trade history,
+    win rate, profit factor and capital - concepts a puzzle does not have. It threw on every
+    provider contest, because the participant schema makes the three virtual-capital fields
+    conditional on `gameKey === "trading"`, so the reads below found `undefined`.
+
+    The lobby was fixed to stop routing provider players here, but this URL is reachable
+    directly - from a bookmark, from history, or from the redirect the trading dashboard
+    still issues - so the guard belongs here too. Two gates, because the failure is a
+    server-rendered throw that shows the player an error boundary naming nothing.
+  */
+  if (hasProviderGameLabel(competition)) {
+    redirect(`/competitions/${competitionId}`);
+  }
+
   // PERF: Fetch participant + trade history in parallel (both only need competitionId)
   await connectToDatabase();
   const [participantDoc, tradeHistoryResult] = await Promise.all([
@@ -50,18 +80,36 @@ const CompetitionResultsPage = async ({
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const participant = participantDoc as any;
+
+  /*
+    Defence in depth behind the provider redirect above, and it earns its place independently:
+    an UNLABELLED contest resolves to trading by invariant 5, and a row written before the
+    capital fields were required has neither. `?? 0` degrades one figure to zero; the
+    unguarded read took the whole page down. Reason it is not a dash: this block is money for
+    a trading account, and every other figure beside it is already a number.
+  */
+  const startingCapital: number = participant.startingCapital ?? 0;
+  const currentCapital: number = participant.currentCapital ?? 0;
+  // Reason: a contest configured with no starting capital divided by zero here, which renders
+  // as "NaN% ROI" or "Infinity% ROI" beside a real money figure. There is no meaningful return
+  // on a stake of nothing, so it reports zero rather than a symbol nobody can act on.
+  const roiPercent =
+    startingCapital > 0
+      ? ((currentCapital - startingCapital) / startingCapital) * 100
+      : 0;
   const tradeHistory = tradeHistoryResult.success
     ? tradeHistoryResult.trades
     : [];
 
   // Calculate stats
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const winningTrades = tradeHistory.filter((t: any) => t.realizedPnl > 0);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const losingTrades = tradeHistory.filter((t: any) => t.realizedPnl < 0);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const winningTrades = tradeHistory.filter(
+    (t: ClosedTradeRow) => t.realizedPnl > 0,
+  );
+  const losingTrades = tradeHistory.filter(
+    (t: ClosedTradeRow) => t.realizedPnl < 0,
+  );
   const totalPnl = tradeHistory.reduce(
-    (sum: number, t: any) => sum + (t.realizedPnl || 0),
+    (sum: number, t: ClosedTradeRow) => sum + (t.realizedPnl || 0),
     0,
   );
   const winRate =
@@ -70,39 +118,39 @@ const CompetitionResultsPage = async ({
       : 0;
   const avgWin =
     winningTrades.length > 0
-      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        winningTrades.reduce((sum: number, t: any) => sum + t.realizedPnl, 0) /
-        winningTrades.length
+      ? winningTrades.reduce(
+          (sum: number, t: ClosedTradeRow) => sum + t.realizedPnl,
+          0,
+        ) / winningTrades.length
       : 0;
   const avgLoss =
     losingTrades.length > 0
-      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        Math.abs(
-          losingTrades.reduce((sum: number, t: any) => sum + t.realizedPnl, 0),
+      ? Math.abs(
+          losingTrades.reduce(
+            (sum: number, t: ClosedTradeRow) => sum + t.realizedPnl,
+            0,
+          ),
         ) / losingTrades.length
       : 0;
   const profitFactor =
     avgLoss > 0 ? avgWin / avgLoss : avgWin > 0 ? Infinity : 0;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const largestWin = Math.max(
-    ...winningTrades.map((t: any) => t.realizedPnl),
+    ...winningTrades.map((t: ClosedTradeRow) => t.realizedPnl),
     0,
   );
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const largestLoss = Math.min(
-    ...losingTrades.map((t: any) => t.realizedPnl),
+    ...losingTrades.map((t: ClosedTradeRow) => t.realizedPnl),
     0,
   );
 
   // Check if user won a prize
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const prizeWon =
-    competition.finalLeaderboard?.find((l: any) => l.userId === session.user.id)
-      ?.prizeAmount || 0;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    competition.finalLeaderboard?.find(
+      (l: FinalLeaderboardRow) => l.userId === session.user.id,
+    )?.prizeAmount || 0;
   const leaderboardIndex =
     competition.finalLeaderboard?.findIndex(
-      (l: any) => l.userId === session.user.id,
+      (l: FinalLeaderboardRow) => l.userId === session.user.id,
     ) ?? -1;
   const finalRank =
     participant.currentRank ||
@@ -216,11 +264,7 @@ const CompetitionResultsPage = async ({
             {totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)}
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            {(
-              ((participant.currentCapital - participant.startingCapital) /
-                participant.startingCapital) *
-              100
-            ).toFixed(2)}
+            {roiPercent.toFixed(2)}
             % ROI
           </p>
         </div>
@@ -269,13 +313,13 @@ const CompetitionResultsPage = async ({
             <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
               <span className="text-gray-400">Starting Capital</span>
               <span className="text-gray-100 font-bold">
-                ${participant.startingCapital.toLocaleString()}
+                ${startingCapital.toLocaleString()}
               </span>
             </div>
             <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
               <span className="text-gray-400">Final Capital</span>
               <span className="text-gray-100 font-bold">
-                ${participant.currentCapital.toLocaleString()}
+                ${currentCapital.toLocaleString()}
               </span>
             </div>
             <div className="flex items-center justify-between p-3 bg-gray-900/50 rounded-lg">
@@ -291,12 +335,7 @@ const CompetitionResultsPage = async ({
               <span
                 className={`font-bold ${totalPnl >= 0 ? "text-green-500" : "text-red-500"}`}
               >
-                {(
-                  ((participant.currentCapital - participant.startingCapital) /
-                    participant.startingCapital) *
-                  100
-                ).toFixed(2)}
-                %
+                {roiPercent.toFixed(2)}%
               </span>
             </div>
           </div>

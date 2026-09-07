@@ -8,6 +8,8 @@ import {
   vi,
 } from "vitest";
 import mongoose from "mongoose";
+import { readFileSync } from "node:fs";
+import { resolve as pathResolve } from "node:path";
 import {
   startTestMongo,
   stopTestMongo,
@@ -275,6 +277,72 @@ describe("competition cancellation and refunds", () => {
     expect(await balances()).toEqual(PLAYERS.map(() => START_BALANCE));
   });
 
+  it("refunds every player even when the caller cancelled the competition first (R43)", async () => {
+    // Reason: this is the shape of R43, a LIVE money defect. The Inngest sweep that cancels
+    // an undersubscribed competition wrote `status: "cancelled"` itself and only then called
+    // this action. The claim below is `status: { $ne: "cancelled" }`, so it matched nothing,
+    // took the already-cancelled branch, logged "refunds were already issued" when none had
+    // been, and returned refundedCount: 0. Every player's entry fee stayed in the platform's
+    // pocket, with a cancelled competition and a log line that agreed refunds had happened.
+    //
+    // The caller is the root cause and is fixed separately. This pins the action itself as
+    // self-healing, because the failure is silent and the next caller to cancel-then-refund
+    // would reintroduce it with no error anywhere.
+    const competitionId = await seedCancelledScenario();
+
+    // Exactly what lib/inngest/functions.ts did before the fix.
+    await mongoose.connection.db
+      ?.collection("competitions")
+      .updateOne(
+        { _id: new mongoose.Types.ObjectId(competitionId) },
+        { $set: { status: "cancelled", cancellationReason: "Undersubscribed" } },
+      );
+
+    const result = await cancelCompetitionAndRefund(
+      competitionId,
+      "Competition cancelled - did not meet minimum participants",
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.refundedCount).toBe(PLAYERS.length);
+    expect(result.totalRefunded).toBe(PLAYERS.length * ENTRY_FEE);
+    expect(await balances()).toEqual(PLAYERS.map(() => START_BALANCE));
+
+    const rows = await refundRows(competitionId);
+    expect(rows).toHaveLength(PLAYERS.length);
+
+    // The pool must still be emptied, or a cancelled competition keeps a fundable pot.
+    const comp = await readCompetition(competitionId);
+    expect(comp?.prizePool).toBe(0);
+  });
+
+  it("still refunds only once when a pre-cancelled competition is swept twice (R43 must not reopen live bug 5)", async () => {
+    // Reason: the R43 fix widens the door - an already-cancelled competition is no longer
+    // refused outright. That is precisely the condition live bug 5 relied on, so idempotency
+    // must now come from the per-player ledger rows rather than from the status, exactly as
+    // `exclusion-refund.ts` does it. Without this test the R43 fix reads as correct while
+    // paying every player twice.
+    const competitionId = await seedCancelledScenario();
+
+    await mongoose.connection.db
+      ?.collection("competitions")
+      .updateOne(
+        { _id: new mongoose.Types.ObjectId(competitionId) },
+        { $set: { status: "cancelled" } },
+      );
+
+    const first = await cancelCompetitionAndRefund(competitionId, "Sweep one");
+    const afterFirst = await balances();
+    const second = await cancelCompetitionAndRefund(competitionId, "Sweep two");
+    const afterSecond = await balances();
+
+    expect(first.refundedCount).toBe(PLAYERS.length);
+    expect(second.refundedCount).toBe(0);
+    expect(afterFirst).toEqual(PLAYERS.map(() => START_BALANCE));
+    expect(afterSecond).toEqual(afterFirst);
+    expect(await refundRows(competitionId)).toHaveLength(PLAYERS.length);
+  });
+
   it("skips a player with no wallet rather than aborting the whole refund", async () => {
     // Reason: the loop `continue`s when a wallet is missing, so one bad row does not strand
     // everyone else's money inside a cancelled competition. Worth pinning because the
@@ -295,5 +363,68 @@ describe("competition cancellation and refunds", () => {
 
     const comp = await readCompetition(competitionId);
     expect(comp?.status).toBe("cancelled");
+  });
+});
+
+/**
+ * R43's root cause: the caller, not the action.
+ *
+ * The behavioural tests above make the action self-healing, which is the safety net. This
+ * block guards the actual defect - a scheduled sweep that cancelled a competition itself
+ * and then asked for the refund. Structural, because the sweep is an
+ * `inngest.createFunction` wrapper that a unit test cannot drive without a full Inngest
+ * harness, and the property is a one-line absence that is invisible at runtime.
+ *
+ * No database, so this describe deliberately does not start the test mongo above.
+ */
+describe("R43: the undersubscribed sweep must not cancel before refunding", () => {
+  const CRON_COPIES = [
+    "lib/inngest/functions.ts",
+    "apps/admin/lib/inngest/functions.ts",
+  ];
+
+  /** Strips comments, because both files now DISCUSS the defect at length. */
+  function codeOf(relativePath: string): string {
+    const source = readFileSync(
+      pathResolve(process.cwd(), relativePath),
+      "utf8",
+    );
+    return source
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  }
+
+  it.each(CRON_COPIES)(
+    "%s refunds without writing a cancelled status of its own",
+    (relativePath) => {
+      const code = codeOf(relativePath);
+
+      // Locate the sweep by its call to the refund action, then examine the statements
+      // around it. Reason: `status: "cancelled"` appears legitimately elsewhere in these
+      // files (queries that read cancelled competitions), so a file-wide match would fail
+      // on correct code - which is the fastest way to have a guard deleted.
+      const callIndex = code.indexOf("cancelCompetitionAndRefund(");
+      expect(callIndex).toBeGreaterThan(-1);
+
+      const branch = code.slice(Math.max(0, callIndex - 1200), callIndex);
+
+      // Assert the slice actually captured the branch, or a test examining nothing passes.
+      expect(branch).toContain("minRequired");
+
+      expect(branch).not.toMatch(/\$set\s*:\s*\{[^}]*status\s*:\s*["']cancelled["']/);
+      expect(branch).not.toContain("cancellationReason:");
+    },
+  );
+
+  it.each(CRON_COPIES)("%s logs the refund count it was given", (relativePath) => {
+    const code = codeOf(relativePath);
+
+    // Reason: the old log printed the participant count unconditionally, so the run that
+    // refunded nobody reported a full payout. The defect survived because its only
+    // observable was a log line that agreed with the intention rather than the outcome.
+    expect(code).toMatch(
+      /const\s+refund\s*=\s*await\s+cancelCompetitionAndRefund\(/,
+    );
+    expect(code).toMatch(/refund\.refundedCount/);
   });
 });

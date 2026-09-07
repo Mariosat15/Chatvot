@@ -59,6 +59,7 @@ chapter covers risks to the programme and to the application.
 | R40 | **An admin route with NO authentication at all.** `POST /api/finalize-old-competitions` checked nothing - not a weak check, not a token-validity check that should have been a section check. Any anonymous caller who knew the path could force-finalize every `completed` competition: closing `TradingPosition` rows at live prices, writing `TradeHistory`, recalculating PnL, and hitting an external forex API once per position | Critical | **CLOSED 7 Sep 2026. Unauthenticated and LIVE, so unlike almost everything else here it was reachable today** - but scoped to contests already `completed`, so no prize, no wallet movement, no running contest. The realistic harm is a corrupted trade history and audit trail plus an unmetered API bill. **Do not round that up to "anyone could pay themselves" or down to "it only touches completed contests".** No backfill, and **no way to know whether it was ever called** - a route with no guard also has no attribution | `guardSection("competitions")`, placed **before `connectToDatabase()`** so a refusal opens no connection and reaches no query. **Second unauthenticated route in this programme** after Prerequisite A's `/api/simulator/*`, and the general rule is why both are recorded: **the routes with NO guard are not found by reading the ones with weak guards.** Every sibling had *something*. Found by enumerating the lifecycle routes and **counting guards against exported handlers**, which is a different activity from reading each route. Pinned by position, not presence - a guard at the bottom of the handler satisfies any mention-based check after every write has landed. `__tests__/admin/live-contest-controls.test.ts`, `tools/probe-live-controls.ps1` |
 | R41 | **Pausing a provider contest did nothing.** `isPaused` is a trading-era field honoured by `order.actions.ts`; `round-launch.service.ts` never read it. So an operator got a success toast, a PAUSED banner and a notification to every participant while **players carried on starting and finishing rounds.** Worse than a dead control because `IncidentsSection.tsx` pauses a contest when an operator raises an incident - the one moment they most need play to stop is the moment they were most confidently told it had | High | **CLOSED 7 Sep 2026.** Latent: no provider contest has run in production, so nobody has played through a pause and **nothing was backfilled** - the defect is an absent check, not a stored value. Two siblings found with it: **resume compensated `endTime`, which gates nothing a player plays inside**, so a two-hour pause silently ate two hours of playing time; and the operator's control panel said **seven trading-shaped things**, the worst being "All positions will be closed at current prices" above the emergency-cancel confirm on a contest with no positions | A gate in `round-launch.service.ts` before any seat lookup or round creation, with its own `contest_paused` refusal rather than a generic `contest_not_open` - the contest IS open, so the UI must offer "come back shortly". Resume extends `playWindowEnd` and, only while still future, `playWindowStart`. Panel wording moved to `apps/admin/lib/admin/contest-control-copy.ts`. **The general rule, and the reason this is R-series not X-series: a capability the platform already has does not extend to a new game by itself, and the way it fails is silence.** When adding a game, **enumerate the operator controls that already exist and ask which code path enforces each one** - not whether the field is set. 63 tests, 31 probes |
 | R42 | **The admin cron refused to settle provider contests, so whether one paid out at all was a coin flip.** `apps/admin`'s `finalizeCompetition` had no provider dispatch - only `routeToTradingSettlement`, which answers "may *trading* settle this" - so a provider contest reaching it was refused and left `active`. **Both apps register `checkAndFinalizeCompetitions` on an every-minute cron**, so the contest settled correctly or never settled at all depending on which process claimed it first. Not a missing stage: **nobody was paid anything**, and the contest sat finished-looking and unsettled with no error a person sees | Critical | **CLOSED 7 Sep 2026.** Latent - no provider contest has settled in production, so **nothing was backfilled** and there is nothing to backfill, the defect being an absent branch rather than a stored value. **Do not describe it as "the admin app paid less"** - it paid nothing and completed nothing | The same six-line dispatch the main app has had since X5, placed **before `startSession()`**: `finalizeProviderCompetition` opens its own session and takes its own lock, so dispatching after would nest a transaction inside one the caller owns. **R26's shape one layer out, so the general rule replaces the two instances: the four finalize functions are not four copies of one function, and a capability added to one is not thereby added to the others.** Two silent instruments here - `provider-finalize.ts` and `provider-settlement.service.ts` were **already mirrored into `apps/admin` and imported by nothing**, so `check:mirrors` agreed and the file-size heuristic that found R26 raises nothing, because only the *call site* was absent. 3 tests in `__tests__/services/admin-finalize-gamemaster-parity.test.ts`, 4 probes in `tools/probe-admin-provider-dispatch.ps1` |
+| R43 | **The undersubscribed sweep cancelled competitions and refunded nobody - and unlike almost everything else in this register, it was losing real money in production, on both game types, every day.** The every-minute cron in both apps set `status: "cancelled"` itself and *then* called `cancelCompetitionAndRefund`, whose claim is `status: { $ne: "cancelled" }` - the very lock added to fix the double-refund defect. The claim matched nothing, so the action returned `success: true` with `refundedCount: 0` and **every player's entry fee stayed with the platform**, against a competition showing `cancelled` | Critical | **CLOSED 7 Sep 2026.** **Not latent and not retroactive.** Unusually for this register the affected contests **can** be identified - cancelled, participants not `refunded`, no `competition_refund` rows - because all three facts are stored. **No backfill was written deliberately**: crediting wallets from inferred history is an unreviewed money writer and who to compensate is an owner decision. Do not summarise this as "refunds were delayed" - they never happened | Both crons stop writing a status; cancelling belongs to the refund action, which does it in the same transaction as the money. Because the failure is silent the action is **also** self-healing, which reopens live bug 5's door - so **idempotency moved off the status and onto the per-player `competition_refund` ledger rows**, the key `exclusion-refund.ts` already uses. **The general rule is the inverse of live bug 5's: a lock keyed on a field any caller can write is only as good as every caller's restraint, and the ones that break it report success.** Three silent instruments: the refund logged "refunds were already issued" as an *inference*, the caller logged `participantCount` rather than the returned count, and the correctly-behaving `getCompetitionById` backup path masked how often it failed. 8 tests, 5 probes in `tools/probe-cancel-refund.ps1` |
 | R24 | Scope creep before anything ships | Medium | **High** | All |
 | R25 | Round write contention under load | Medium | Medium | X12 |
 | X15 | "Challenge any user" harassment surface - no report-user feature exists | Medium | Medium | X10 |
@@ -1141,6 +1142,75 @@ the raw driver does no casting, so settlement's query matched nothing. It did no
 the contest `completed` and **returned success**. Only the prize count disagreed. That is the
 argument for asserting the money separately from the terminal status - **a status assertion passes
 either way.**
+
+### R43 - The undersubscribed sweep cancelled competitions and refunded nobody - **CLOSED, 7 September 2026**
+
+**This is the one entry in this register that was losing real money on both game types, every
+day, in production.** Almost everything else here is latent; this was not.
+
+`updateCompetitionStatuses` runs on an **every-minute cron in both apps**. When a competition
+reached `startTime` below `minParticipants` it did two things in this order:
+
+1. `Competition.findByIdAndUpdate(comp._id, { $set: { status: "cancelled", ... } })`
+2. `cancelCompetitionAndRefund(comp._id, ...)`
+
+Step 1 is what cost the money. `cancelCompetitionAndRefund` claims its competition with
+`findOneAndUpdate({ _id, status: { $ne: "cancelled" } })` - **the lock added to fix the
+double-refund defect (live bug 5)**. Step 1 had already written that status, so the claim matched
+nothing, the action took its already-cancelled branch, and returned
+`{ success: true, refundedCount: 0, totalRefunded: 0 }`.
+
+**Every player's entry fee stayed with the platform.** The competition showed `cancelled`, the
+participants were never marked `refunded`, and `prizePool` kept its funded value because only the
+refund path zeroes it.
+
+**Three things conspired to make it unreportable**, and each is worth carrying separately.
+
+- **The refund's own log asserted the opposite of what happened.** The branch printed
+  `"is already cancelled; refunds were already issued"` - an inference, not an observation. It was
+  written for a retried delivery, where it is true, and it reads as reassurance in the one case
+  where it is false.
+- **The caller's log reported its intention, not its outcome.** It printed
+  `` `💰 Refunded ${participantCount} participants` `` unconditionally, ignoring the returned
+  `refundedCount`. So the run that refunded nobody logged a full payout. **A success log computed
+  from the request rather than the response cannot report a failure.**
+- **The two paths that did work hid how often it failed.** `getCompetitionById` cancels
+  undersubscribed competitions as a backup during render and does **not** pre-set the status, so it
+  refunds correctly. Whether a player got their money back depended on whether the cron or a page
+  load got there first - and the cron polls every minute, so it nearly always won.
+
+**The fix is in two places, and the second one is the point.**
+
+The root cause is the caller: both crons no longer write a status, because cancelling is the refund
+action's job and it does it in the same transaction as the money, which is the only way the two
+cannot disagree. But the failure is **silent**, so the action was also made self-healing: an
+already-cancelled competition is now refunded rather than refused.
+
+That widens the door live bug 5 relied on being shut, so **idempotency had to move off the status
+and onto the per-player `competition_refund` ledger rows** - which is exactly what
+`lib/services/settlement/exclusion-refund.ts` already does, and it states in its own comment that
+the transaction is not what provides idempotency. The new key is strictly stronger: a player who
+has been paid back has a row, one who has not does not, whatever any caller did to the status.
+
+**The general rule, and it is the inverse of the one live bug 5 taught.** That defect produced
+"setting the final status up front IS the lock", which is still true. R43 is what happens when a
+**caller performs the lock's write for it**: the lock cannot tell a duplicate request from a
+first one, and it fails in the direction that keeps the money. So - **a lock keyed on a field any
+caller can write is only as good as every caller's restraint, and the ones that break it report
+success.** Prefer a key derived from the work actually done.
+
+**Not retroactive, and the affected players *can* be found**, which is unusual here and worth
+stating plainly rather than defaulting to the usual "nothing to backfill". A cancelled competition
+whose participants are not `refunded`, and which has no `competition_refund` rows against its
+`competitionId`, is precisely an affected contest - all three facts are stored. **No backfill
+script was written**: crediting wallets from inferred history is an unreviewed money writer, and
+which players to compensate is an owner decision. The query to find them is the deliverable.
+
+Pinned by 4 behavioural and 4 structural tests in
+`__tests__/services/competition-cancel-refund.test.ts`, and 5 probes in
+`tools/probe-cancel-refund.ps1`, **all red with exactly 1 failure each.** The structural half
+matters because the root cause is a one-line *absence* in a file where `status: "cancelled"` also
+appears legitimately, so the guard slices around the refund call rather than matching the file.
 
 ---
 

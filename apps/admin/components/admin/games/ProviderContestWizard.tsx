@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ConfigSchemaFields, defaultConfigValues } from "./ConfigSchemaFields";
+import { PrizeDistributionEditor } from "./PrizeDistributionEditor";
 import type { ContestableTitle } from "./contest-types";
 import {
   type ContestDraft,
@@ -332,22 +333,31 @@ function StepTiming({
           value={draft.endTime}
           onChange={(v) => patch({ endTime: v })}
         />
-        <DateField
-          label="Play window opens"
-          value={draft.playWindowStart}
-          onChange={(v) => patch({ playWindowStart: v })}
-        />
-        <DateField
-          label="Play window closes"
-          value={draft.playWindowEnd}
-          onChange={(v) => patch({ playWindowEnd: v })}
-        />
       </div>
+      {/*
+        THE PLAY WINDOW USED TO BE TWO MORE DATE FIELDS HERE, AND IT IS NOT A SIMPLIFICATION TO
+        REMOVE THEM - it is the fix for a contest that could not do what a contest is for.
+
+        Four dates let an operator open play at a different moment from the contest, which
+        sounds like flexibility and is really a way to build a contest nobody can win fairly:
+        players who started earlier got a longer run at it, and the field named "ends" gated
+        nothing a player played inside. The owner's requirement is one clock for everybody -
+        the contest opens, every player has exactly the same window, it closes, every round
+        closes with it and settlement runs.
+
+        So the window is now DERIVED from the contest, in `contest-draft.ts`, and there is
+        nothing to set. Entry is not squeezed by this: registration closes at `startTime`, so
+        an operator who wants five minutes of sign-up time creates the contest five minutes
+        before it starts. That is what the trading wizard already does.
+      */}
       <p className="text-xs text-gray-500">
-        The play window is when rounds can be started. It sits inside the contest.
+        Every player gets the same window. Rounds can be started from the start
+        time, and any round still open at the end time is closed with the
+        contest. Players can join until the contest starts, so create it far
+        enough ahead to leave sign-up time.
       </p>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <NumberField
           label="Entry fee"
           value={draft.entryFee}
@@ -362,6 +372,31 @@ function StepTiming({
           label="Max players"
           value={draft.maxParticipants}
           onChange={(v) => patch({ maxParticipants: v })}
+        />
+        {/*
+          Missing until now, and silently: the draft carried `platformFeePercentage: 10` and
+          the wizard never rendered it, so every provider contest took ten per cent whatever
+          the operator wanted. The editor has always exposed it, which is the worse version of
+          the bug - the setting appears once the contest exists, so it reads as a field the
+          operator forgot rather than one they were never offered.
+        */}
+        <NumberField
+          label="Platform fee %"
+          value={draft.platformFeePercentage}
+          onChange={(v) => patch({ platformFeePercentage: v })}
+        />
+      </div>
+      <p className="text-xs text-gray-500">
+        Below the minimum the contest auto-cancels and every entry fee is
+        refunded in full.
+      </p>
+
+      <div className="space-y-2">
+        <Label className="text-gray-200">Prize distribution</Label>
+        <PrizeDistributionEditor
+          value={draft.prizeDistribution}
+          onChange={(v) => patch({ prizeDistribution: v })}
+          platformFeePercentage={draft.platformFeePercentage}
         />
       </div>
 

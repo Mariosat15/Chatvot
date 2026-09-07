@@ -374,6 +374,67 @@ point**, not even on a zero-participant draft: the target above permits it, but 
 immutable and a draft is cheap to delete and recreate, so the permission buys nothing and
 costs an immutability guarantee.
 
+### 2.3 One contest clock, and a prize split an operator could reach - BUILT 7 September 2026
+
+Owner-reported, and both halves are the same failure this codebase keeps producing: **a
+control that appears to exist and does nothing.**
+
+**The prize split was unreachable.** The wizard's third step has been labelled
+"Timing & prizes" since it was built, with a heading reading "Timing, entry and prizes", and
+it rendered **no prize control at all**. `contest-draft.ts` seeded a fixed 50/30/20 and
+`platformFeePercentage: 10`, and neither could be changed, so **every provider contest ever
+created paid those three shares and took that fee** whatever the operator intended.
+`provider-contest.service.ts` has accepted and validated `prizeDistribution` and
+`platformFeePercentage` since the day it was written - only the operator could not reach
+them. **That is worse than an unbuilt step, because the step's own label asserted the
+setting was there**, so an operator reasonably concluded they had already chosen it. Same
+class as a provider enabled with no adapter, or six `rankingMethod` options a provider game
+ignores.
+
+The editor was the other half of the same story and the more misleading one: it exposed the
+fee and a percentage-only prize control - **no way to add a rank, remove one, or move a
+share to a different position** - so an operator could reweight three winners but never make
+it five or two. The setting therefore *appeared* once the contest existed, which reads as a
+field they forgot rather than one they were never offered.
+
+`PrizeDistributionEditor.tsx` is now one component used by **both** screens. It is a second
+implementation of the trading form's *UI* and deliberately **not** of the rule: the shares
+are validated in `provider-contest.service.ts`, which stays the only place that decides
+whether a distribution is acceptable, and the component's total is an affordance so the
+operator sees the problem before submitting. Extracting the trading form's editor instead
+would have put a refactor of a 2,900-line form live trading contests depend on in front of a
+provider fix - the same reasoning that produced two wizards in s2.1.
+
+**There were two contest clocks.** `startTime`/`endTime` and
+`playWindowStart`/`playWindowEnd` were four separate operator-set dates with nothing keeping
+them related, and **the field named "end" gated nothing a player played inside**:
+`createRound` clamps a round's `expiresAt` to `playWindowEnd` and the launch service refuses
+before `playWindowStart`. So a contest could run to 14:00 with play shutting at 13:20, and a
+player who started earlier got a longer run at the same pot. The owner's requirement is one
+clock for everybody.
+
+The window is now **derived** from the contest clock by `deriveWindow` in `contest-draft.ts`,
+and the two date fields are gone from both screens. Four facts about it are load-bearing:
+
+- **The fields are still stored and still read.** The clamp is exactly the universal cut-off
+  the owner asked for, so they earn their keep; what had to go was the operator's ability to
+  set them to something *other* than the contest.
+- **One function produces the pair, and that is the point.** Two dates that must agree is the
+  "one rule, two copies" shape behind five defects here already, none of which
+  `check:mirrors` can see.
+- **Removing them from the wizard alone would not have been enough.** `toEditRequestBody`
+  sends the window too, so an operator moving `endTime` in the editor would have left
+  `playWindowEnd` behind and **shortened play without touching any field named "play"**.
+- **Entry time is not squeezed by this.** Registration closes at `startTime`, so an operator
+  wanting five minutes of sign-up creates the contest five minutes before it starts - which
+  is what the trading wizard already does, and what the owner described.
+
+Pinned by `__tests__/admin/provider-contest-schedule-and-prizes.test.ts` (14 tests). The
+structural half reads source because these are `"use client"` components with no DOM in this
+suite, so **comments are stripped first and every assertion matches a construct** - a JSX
+element with its props, or an operator - never a bare identifier that an import line would
+satisfy.
+
 ---
 
 ## 3. Contest list and detail screens

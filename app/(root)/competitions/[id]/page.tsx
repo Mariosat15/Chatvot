@@ -91,10 +91,34 @@ const CompetitionDetailsPage = async ({
     const isFull =
       competition.currentParticipants >= competition.maxParticipants;
 
-    // Reason: Participants of completed competitions land on the results
-    // page by default. ?view=details bypasses this so users can revisit
-    // the competition detail view (leaderboard, chart, etc.) from results.
-    if (isCompleted && isUserIn && query.view !== "details") {
+    /*
+      Reason: Participants of completed competitions land on the results
+      page by default. ?view=details bypasses this so users can revisit
+      the competition detail view (leaderboard, chart, etc.) from results.
+
+      THE GAME CHECK IS NOT A REFINEMENT, IT IS A CRASH FIX. `/results` is the trading
+      post-mortem - trade history, win rate, profit factor - and it dereferences
+      `participant.startingCapital` and `participant.currentCapital` unguarded. Those two
+      fields are conditional on `gameKey === "trading"` in the participant schema, so a
+      provider participant genuinely has neither, and this redirect walked every provider
+      player of a finished contest straight into `undefined.toLocaleString()`. The player saw
+      the generic error boundary, which names nothing and offers "Try Again" on a page that
+      can only fail again.
+
+      A provider player stays on this lobby instead, which is already game-aware and already
+      renders the final standings and their own score for a `completed` contest. It is the
+      right destination on its own merits, not merely the safe one.
+
+      The label alone, deliberately not the stricter `isProviderContest`: a provider contest
+      whose keys never resolved still has no trading capital to render, so the strict helper
+      would send exactly the broken case down the broken path.
+    */
+    if (
+      isCompleted &&
+      isUserIn &&
+      query.view !== "details" &&
+      !hasProviderGameLabel(competition)
+    ) {
       redirect(`/competitions/${id}/results`);
     }
 

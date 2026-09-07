@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import type { ConfigField } from "@/lib/services/games/config-schema";
 import { ConfigSchemaFields } from "./ConfigSchemaFields";
+import { PrizeDistributionEditor } from "./PrizeDistributionEditor";
 import {
   type ContestDraft,
   emptyDraft,
@@ -58,8 +59,6 @@ interface StoredContest {
   prizeDistribution?: { rank: number; percentage: number }[];
   startTime?: string;
   endTime?: string;
-  playWindowStart?: string;
-  playWindowEnd?: string;
   attemptsPolicy?: "single" | "best_of_n" | "sum_of_n";
   attemptsAllowed?: number;
   unresolvedRoundPolicy?: "score_zero" | "exclude" | "hold_and_alert";
@@ -334,9 +333,18 @@ export function ProviderContestEditor({
             onChange={(v) => patch({ platformFeePercentage: v })}
           />
         </div>
-        <PrizeDistributionFields
-          distribution={draft.prizeDistribution}
+        {/*
+          Was a local `PrizeDistributionFields` that could edit a percentage and nothing else -
+          no way to add a rank, remove one, or change which position a share belonged to. So an
+          operator could reweight three winners but never make it five, or two. The wizard could
+          not reach the setting at all, which is why every provider contest shipped with the
+          same 50/30/20. One component now, shared with the wizard, because the pair of them
+          disagreeing about what a prize split IS was the whole problem.
+        */}
+        <PrizeDistributionEditor
+          value={draft.prizeDistribution}
           disabled={entered}
+          platformFeePercentage={draft.platformFeePercentage}
           onChange={(prizeDistribution) => patch({ prizeDistribution })}
         />
       </section>
@@ -360,21 +368,18 @@ export function ProviderContestEditor({
             disabled={entered}
             onChange={(v) => patch({ endTime: v })}
           />
-          <DateField
-            id="playWindowStart"
-            label="Play window opens"
-            value={draft.playWindowStart}
-            disabled={entered}
-            onChange={(v) => patch({ playWindowStart: v })}
-          />
-          <DateField
-            id="playWindowEnd"
-            label="Play window closes"
-            value={draft.playWindowEnd}
-            disabled={entered}
-            onChange={(v) => patch({ playWindowEnd: v })}
-          />
         </div>
+        {/*
+          The two play-window fields were here and are gone; the window is derived from the
+          contest clock in `contest-draft.ts`. Removing them from the wizard alone would not
+          have been enough - this form sends the window too, so an operator moving the end time
+          here would have left `playWindowEnd` behind and shortened play without touching any
+          field named "play".
+        */}
+        <p className="text-xs text-gray-500">
+          Every player gets the same window. Any round still open at the end
+          time is closed with the contest.
+        </p>
       </section>
 
       <section className="space-y-4">
@@ -479,8 +484,6 @@ function draftFromStored(contest: StoredContest): ContestDraft {
     description: contest.description ?? "",
     startTime: isoToLocal(contest.startTime),
     endTime: isoToLocal(contest.endTime),
-    playWindowStart: isoToLocal(contest.playWindowStart),
-    playWindowEnd: isoToLocal(contest.playWindowEnd),
     entryFee: contest.entryFee ?? 0,
     minParticipants: contest.minParticipants ?? 2,
     maxParticipants: contest.maxParticipants ?? 100,
@@ -563,56 +566,3 @@ function DateField({
   );
 }
 
-function PrizeDistributionFields({
-  distribution,
-  disabled,
-  onChange,
-}: {
-  distribution: { rank: number; percentage: number }[];
-  disabled?: boolean;
-  onChange: (next: { rank: number; percentage: number }[]) => void;
-}) {
-  const total = distribution.reduce((sum, p) => sum + p.percentage, 0);
-
-  return (
-    <div className="space-y-2">
-      <Label className="text-gray-200">Prize split</Label>
-      <div className="space-y-2">
-        {distribution.map((entry, index) => (
-          <div key={entry.rank} className="flex items-center gap-3">
-            <span className="text-sm text-gray-400 w-16">
-              Rank {entry.rank}
-            </span>
-            <Input
-              type="number"
-              min={0}
-              max={100}
-              value={entry.percentage}
-              disabled={disabled}
-              onChange={(e) => {
-                const next = distribution.map((p, i) =>
-                  i === index
-                    ? { ...p, percentage: Number(e.target.value) }
-                    : p,
-                );
-                onChange(next);
-              }}
-              className="bg-gray-700 border-gray-600 text-gray-100 w-28 disabled:opacity-50"
-            />
-            <span className="text-sm text-gray-500">%</span>
-          </div>
-        ))}
-      </div>
-      {/* The same 0.01 tolerance the server uses, because a three-way even split cannot
-          total exactly 100 in decimal. Showing a red "99.99" an operator cannot fix is how
-          a screen teaches people to distrust its validation. */}
-      <p
-        className={`text-xs ${
-          Math.abs(total - 100) > 0.01 ? "text-red-400" : "text-gray-500"
-        }`}
-      >
-        Total: {total}% {Math.abs(total - 100) > 0.01 && "- must be 100%"}
-      </p>
-    </div>
-  );
-}

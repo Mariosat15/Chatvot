@@ -14,11 +14,15 @@ export interface ContestDraft {
   name: string;
   description: string;
 
-  /** `datetime-local` strings, which are local-time and have no zone. */
+  /**
+   * `datetime-local` strings, which are local-time and have no zone.
+   *
+   * THERE IS ONE CONTEST CLOCK AND NO SEPARATE PLAY WINDOW. The draft used to carry
+   * `playWindowStart` and `playWindowEnd` as two more operator-set dates; see
+   * `deriveWindow` below for why they are now computed from these two instead.
+   */
   startTime: string;
   endTime: string;
-  playWindowStart: string;
-  playWindowEnd: string;
 
   entryFee: number;
   minParticipants: number;
@@ -41,8 +45,6 @@ export const emptyDraft: ContestDraft = {
   description: "",
   startTime: "",
   endTime: "",
-  playWindowStart: "",
-  playWindowEnd: "",
   entryFee: 0,
   minParticipants: 2,
   maxParticipants: 100,
@@ -75,16 +77,37 @@ export function toRequestBody(draft: ContestDraft): Record<string, unknown> {
     // Sent as-is. The `datetime-local` value carries no zone, so `new Date()` on the server
     // would read it in the SERVER's zone, not the operator's. Appending nothing and letting
     // the browser resolve it is the fix: `toISOString` here pins the operator's own zone.
-    startTime: localToIso(draft.startTime),
-    endTime: localToIso(draft.endTime),
-    playWindowStart: localToIso(draft.playWindowStart),
-    playWindowEnd: localToIso(draft.playWindowEnd),
+    ...deriveWindow(draft),
     attemptsPolicy: draft.attemptsPolicy,
     attemptsAllowed:
       draft.attemptsPolicy === "single" ? undefined : draft.attemptsAllowed,
     unresolvedRoundPolicy: draft.unresolvedRoundPolicy,
     resultGracePeriodSeconds: draft.resultGracePeriodSeconds,
     perRoundCostAcknowledged: draft.perRoundCostAcknowledged,
+  };
+}
+
+/**
+ * The contest clock, and the play window derived from it.
+ *
+ * ONE CLOCK, FOUR FIELDS ON THE WIRE. The server still stores `playWindowStart` and
+ * `playWindowEnd`, and the round services still read them - `createRound` clamps a round's
+ * `expiresAt` to the window end, and the launch service refuses before the window start. That
+ * clamp is exactly the universal cut-off the owner asked for, so the fields earn their keep;
+ * what had to go was the operator's ability to set them to something OTHER than the contest.
+ *
+ * Two dates that must agree is the "one rule, two copies" shape that has produced five defects
+ * in this codebase already, so this is the only function that produces the pair. It is not
+ * enough that the wizard stops asking: `toEditRequestBody` sends them too, and an edit that
+ * moved `endTime` while leaving `playWindowEnd` behind would shorten play without touching any
+ * field named "play".
+ */
+function deriveWindow(draft: ContestDraft): Record<string, string> {
+  return {
+    startTime: localToIso(draft.startTime),
+    endTime: localToIso(draft.endTime),
+    playWindowStart: localToIso(draft.startTime),
+    playWindowEnd: localToIso(draft.endTime),
   };
 }
 
@@ -120,10 +143,7 @@ export function toEditRequestBody(
     minParticipants: draft.minParticipants,
     platformFeePercentage: draft.platformFeePercentage,
     prizeDistribution: draft.prizeDistribution,
-    startTime: localToIso(draft.startTime),
-    endTime: localToIso(draft.endTime),
-    playWindowStart: localToIso(draft.playWindowStart),
-    playWindowEnd: localToIso(draft.playWindowEnd),
+    ...deriveWindow(draft),
     attemptsPolicy: draft.attemptsPolicy,
     attemptsAllowed:
       draft.attemptsPolicy === "single" ? undefined : draft.attemptsAllowed,

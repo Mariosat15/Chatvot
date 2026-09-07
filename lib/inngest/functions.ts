@@ -260,24 +260,36 @@ export const updateCompetitionStatuses = inngest.createFunction(
             `🚫 CANCELLING "${comp.name}" - only ${participantCount} participants, need ${minRequired}`,
           );
 
-          await Competition.findByIdAndUpdate(comp._id, {
-            $set: {
-              status: "cancelled",
-              cancellationReason: `Did not meet minimum participants requirement (${participantCount}/${minRequired})`,
-            },
-          });
-
-          // Refund all participants
+          // R43: this used to set `status: "cancelled"` here, BEFORE calling the refund.
+          // That single write cost every player their entry fee. The refund action claims
+          // its competition with `status: { $ne: "cancelled" }` - the lock that stops a
+          // double refund - so pre-setting the status made the claim match nothing, and the
+          // action returned success having refunded no one.
+          //
+          // Cancelling is the refund action's job and it does it inside the same
+          // transaction as the money, which is the only way the two can't disagree. Do not
+          // reintroduce a status write here: it fails silently, with a cancelled
+          // competition and a log line that says the refunds went out.
           try {
             const { cancelCompetitionAndRefund } =
               await import("@/lib/actions/trading/competition-cancel.actions");
-            await cancelCompetitionAndRefund(
+            const refund = await cancelCompetitionAndRefund(
               comp._id.toString(),
-              `Competition cancelled - did not meet minimum ${minRequired} participants`,
+              `Competition cancelled - did not meet minimum ${minRequired} participants (${participantCount}/${minRequired})`,
             );
-            console.log(
-              `💰 Refunded ${participantCount} participants for "${comp.name}"`,
-            );
+
+            // Report what actually happened, not what was asked for. The old log printed
+            // `participantCount` unconditionally, so the run that refunded nobody logged a
+            // full payout and nothing anywhere contradicted it.
+            if (refund.refundedCount > 0) {
+              console.log(
+                `💰 Refunded ${refund.refundedCount} participants (${refund.totalRefunded} credits) for "${comp.name}"`,
+              );
+            } else if (participantCount > 0) {
+              console.warn(
+                `⚠️ Cancelled "${comp.name}" with ${participantCount} participants but refunded none - check for existing refunds`,
+              );
+            }
           } catch (refundError) {
             console.error(
               `❌ Error refunding participants for "${comp.name}":`,
@@ -395,10 +407,17 @@ export const monitorMarginLevels = inngest.createFunction(
       await connectToDatabase();
 
       // Load admin settings to get check interval
+      // Reason: `getSingleton` is a custom static, which Mongoose's inferred model type
+      // does not carry. Narrowing to the one method used beats an `any` that would also
+      // hide a typo in the field read on the next line.
       const TradingRiskSettings = (
         await import("@/database/models/trading-risk-settings.model")
-      ).default;
-      const settings = await (TradingRiskSettings as any).getSingleton();
+      ).default as unknown as {
+        getSingleton: () => Promise<{
+          marginCheckIntervalSeconds?: number;
+        } | null>;
+      };
+      const settings = await TradingRiskSettings.getSingleton();
       const checkIntervalSeconds = settings?.marginCheckIntervalSeconds || 60;
 
       console.log(
@@ -416,12 +435,17 @@ export const monitorMarginLevels = inngest.createFunction(
         `📊 Will perform ${checksPerMinute} checks (every ${actualInterval.toFixed(1)}s)`,
       );
 
+      // Reason for the explicit lean shape: only `_id` and `slug` are selected, and both
+      // are real fields on each model. It replaces five `as any` casts at the read sites
+      // below, which would equally have hidden a misspelled field name.
+      type MarginCheckRow = { _id: unknown; slug?: string };
+
       // Get all active competitions
       const activeCompetitions = await Competition.find({
         status: "active",
       })
         .select("_id slug")
-        .lean();
+        .lean<MarginCheckRow[]>();
 
       // Get all active challenges too
       const Challenge = (
@@ -431,7 +455,7 @@ export const monitorMarginLevels = inngest.createFunction(
         status: "active",
       })
         .select("_id slug")
-        .lean();
+        .lean<MarginCheckRow[]>();
 
       if (
         (!activeCompetitions || activeCompetitions.length === 0) &&
@@ -454,12 +478,12 @@ export const monitorMarginLevels = inngest.createFunction(
         // Check margin for each competition
         for (const competition of activeCompetitions) {
           try {
-            const competitionId = String((competition as any)._id);
+            const competitionId = String(competition._id);
             await checkMarginCalls(competitionId);
             totalChecks++;
           } catch (error) {
             console.error(
-              `Error checking margins for competition ${(competition as any).slug}:`,
+              `Error checking margins for competition ${competition.slug}:`,
               error,
             );
           }
@@ -468,12 +492,12 @@ export const monitorMarginLevels = inngest.createFunction(
         // Check margin for each challenge (reuses same function - challengeId works as competitionId)
         for (const challenge of activeChallenges) {
           try {
-            const challengeId = String((challenge as any)._id);
+            const challengeId = String(challenge._id);
             await checkMarginCalls(challengeId);
             totalChecks++;
           } catch (error) {
             console.error(
-              `Error checking margins for challenge ${(challenge as any)._id}:`,
+              `Error checking margins for challenge ${String(challenge._id)}:`,
               error,
             );
           }

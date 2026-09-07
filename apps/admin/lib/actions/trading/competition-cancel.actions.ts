@@ -54,7 +54,7 @@ export async function cancelCompetitionAndRefund(
     // the entry fee and the name.
     //
     // Keep this identical to the copy in the main app.
-    const competition = await Competition.findOneAndUpdate(
+    let competition = await Competition.findOneAndUpdate(
       { _id: competitionId, status: { $ne: "cancelled" } },
       {
         $set: {
@@ -67,20 +67,39 @@ export async function cancelCompetitionAndRefund(
     );
 
     if (!competition) {
-      // Either it does not exist or it is already cancelled. Tell the two apart, because
-      // one is a bug in the caller and the other is a duplicate request doing no harm.
-      const exists = await Competition.exists({ _id: competitionId }).session(
-        session,
-      );
-      if (!exists) {
+      // Either it does not exist or it is already cancelled.
+      const existing =
+        await Competition.findById(competitionId).session(session);
+      if (!existing) {
         throw new Error("Competition not found");
       }
 
+      // R43, and this branch used to lose real money. It returned success with
+      // refundedCount: 0 and logged "refunds were already issued", on the assumption that
+      // an already-cancelled competition must have been refunded by whoever cancelled it.
+      // The Inngest sweep broke that assumption: it set `status: "cancelled"` itself and
+      // then called this action, so the claim above matched nothing and EVERY player's
+      // entry fee was silently kept. Cancelled competition, agreeable log line, no refunds.
+      //
+      // So an already-cancelled competition is now refunded rather than refused, and
+      // idempotency comes from the per-player ledger rows gathered below instead of from
+      // the status. That is a strictly stronger key - it is what `exclusion-refund.ts`
+      // already uses - and it heals whatever the caller did to the status first.
       console.log(
-        `↩️ Competition ${competitionId} is already cancelled; refunds were already issued`,
+        `↩️ Competition ${competitionId} is already cancelled; checking for unrefunded players`,
       );
-      await session.abortTransaction();
-      return { success: true, refundedCount: 0, totalRefunded: 0 };
+      competition = existing;
+
+      // The pre-cancelling caller set a status but not the pool, so it can still be
+      // non-zero here. A cancelled competition holding a fundable pot is how a later sweep
+      // pays prizes out of money that has just been given back.
+      if (existing.prizePool !== 0) {
+        await Competition.findByIdAndUpdate(
+          competitionId,
+          { $set: { prizePool: 0 } },
+          { session },
+        );
+      }
     }
 
     // Get all participants
@@ -94,6 +113,21 @@ export async function cancelCompetitionAndRefund(
     let totalRefunded = 0;
     let refundedCount = 0;
 
+    // IDEMPOTENCY, and it is deliberately not the status claim above that provides it any
+    // more. The claim was enough only while every caller left the status alone; R43 proved
+    // one did not, and refusing an already-cancelled competition outright is what lost the
+    // money. Keying on the ledger row each refund writes is exact: a player who has been
+    // paid back has a row, one who has not does not, whatever any caller did to the status.
+    const priorRefunds = await WalletTransaction.find({
+      competitionId,
+      transactionType: "competition_refund",
+    })
+      .select("userId")
+      .session(session)
+      .lean<{ userId: string }[]>();
+
+    const alreadyRefunded = new Set(priorRefunds.map((t) => String(t.userId)));
+
     // Import notification service
     const { notificationService } =
       await import("@/lib/services/notification.service");
@@ -101,6 +135,13 @@ export async function cancelCompetitionAndRefund(
     // Refund each participant
     for (const participant of participants) {
       const userId = participant.userId.toString();
+
+      // Reason: already paid back, on an earlier run or by another caller. Skipping keeps a
+      // second sweep a no-op for this player while still refunding anyone it missed, which
+      // a single competition-wide early return could not do.
+      if (alreadyRefunded.has(userId)) {
+        continue;
+      }
 
       // Get participant's wallet
       const wallet = await CreditWallet.findOne({ userId }).session(session);
@@ -208,10 +249,15 @@ export async function cancelCompetitionAndRefund(
       session,
     });
 
-    // Reason: the status, reason and prize pool were already set by the claiming update at
-    // the top of this transaction, which is what makes a second caller a no-op. Setting them
-    // again here would be harmless but misleading - it would read as though the lock were
-    // advisory rather than the thing preventing a double refund.
+    // Reason: the status, reason and prize pool are set by the claiming update at the top of
+    // this transaction, or by the healing branch beside it when a caller had already
+    // cancelled. Setting them again here would be harmless but misleading.
+    //
+    // This comment used to say the claim is "the thing preventing a double refund". That was
+    // true when it was written and R43 made it false: the claim is now a fast path, and what
+    // prevents a double refund is the per-player `competition_refund` ledger check above.
+    // Left visible rather than quietly reworded, because a reader who trusts the old
+    // sentence will conclude the ledger check is redundant and delete it.
 
     await session.commitTransaction();
     committed = true;

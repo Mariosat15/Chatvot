@@ -6,6 +6,8 @@ import {
   neonRowClasses,
 } from "@/components/neon/LeaderboardRow";
 import { NEON_TABLE_HEAD } from "@/components/neon/tokens";
+import { GameIcon } from "@/components/ui/GameIcon";
+import { GAME_ICONS, type GameIconName } from "@/lib/constants/game-icons";
 
 /**
  * The leaderboard for a contest played through a game provider.
@@ -106,9 +108,28 @@ export default function ProviderLeaderboard({
 
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <NeonAvatar name={row.username || "Anonymous"} />
-                  {row.userTitleIcon && (
-                    <span className="shrink-0">{row.userTitleIcon}</span>
-                  )}
+                  {/*
+                    `userTitleIcon` is TWO different things depending on the level, which is
+                    why rendering it raw was wrong rather than merely plain. Most levels store
+                    an artwork KEY - level 2 is literally `"guideBook"` - and a few store an
+                    emoji. Printed as text, a player's rank badge read "guideBook" beside
+                    their name.
+
+                    The resolution rule is not invented here: `LeaderboardContent.tsx` has
+                    always done exactly this, so the provider board was the copy that never
+                    learned it. `Object.hasOwn` rather than `in`, because `in` walks the
+                    prototype chain and would resolve a title of "toString" to a missing
+                    artwork file.
+                  */}
+                  {row.userTitleIcon &&
+                    (Object.hasOwn(GAME_ICONS, row.userTitleIcon) ? (
+                      <GameIcon
+                        name={row.userTitleIcon as GameIconName}
+                        size={16}
+                      />
+                    ) : (
+                      <span className="shrink-0">{row.userTitleIcon}</span>
+                    ))}
                   <NeonPlayerName
                     name={row.username || "Anonymous"}
                     isCurrentUser={isYou}
