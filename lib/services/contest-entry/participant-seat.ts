@@ -17,6 +17,10 @@ import { resolveGameType, TRADING_GAME_TYPE } from "@/lib/games";
  * an aggregate that groups by `gameKey` silently files the player under the wrong game
  * forever, because `gameKey` is immutable.
  *
+ * ONE THING IS OMITTED FOR EVERY GAME: `score`. See the note beside where it used to be
+ * written. It is not a game-conditional field - a seat has no score whatever the game,
+ * because a seat is a paid entry and a score is a result.
+ *
  * **The three virtual-capital fields are omitted.** A chess player has no starting capital,
  * and `competition.startingCapital` is `undefined` on a provider contest, so copying it
  * would write `undefined` into fields the schema requires. The schema now makes those three
@@ -48,7 +52,14 @@ export function buildParticipantSeat(
 
     // Never defaulted. See the header - a defaulted label is a wrong label.
     gameKey: input.gameKey || TRADING_GAME_TYPE,
-    score: 0,
+
+    /*
+      NO `score` KEY. It used to be `score: 0` here, and that was R50: `providerHasResult`
+      reads a stored nought as "played and scored nothing", so seating every player with one
+      made a player who never launched a round eligible for a prize. The seat records that
+      somebody paid to enter; the score records what they did afterwards, and until a round
+      reports there is nothing to record. See the schema path, which also carried a default.
+    */
 
     currentRank: 0,
     highestRank: 0,

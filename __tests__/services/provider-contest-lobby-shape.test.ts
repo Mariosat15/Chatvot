@@ -237,10 +237,18 @@ describe("the document a provider contest actually stores", () => {
 
     expect(raw!.currentCapital).toBeUndefined();
     expect(raw!.startingCapital).toBeUndefined();
-    // But the numeric display fields DO default, so `.toFixed()` on them cannot throw.
+    // The trading display fields DO default, so `.toFixed()` on them cannot throw. That is
+    // also R46's mechanism: they render perfectly on a provider contest while meaning nothing.
     expect(raw!.pnl).toBe(0);
     expect(raw!.pnlPercentage).toBe(0);
-    expect(raw!.score).toBe(0);
+    /*
+      `score` DELIBERATELY DOES NOT, since R50 - and it is the one field on this row where the
+      absence carries meaning, because `providerHasResult` decides prize eligibility on it. The
+      cost is that every reader must guard rather than lean on a default, which is why the hero
+      tile, the leaderboard cell and the dashboard card all test `typeof === "number"` and show
+      a dash. A default here would be a claim that the player has already played.
+    */
+    expect(raw!.score).toBeUndefined();
   });
 });
 

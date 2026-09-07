@@ -92,6 +92,32 @@ extracted for the reason the simulator's equivalent was: **a test can compare a 
 function's keys against `schema.paths`, and no assertion on a saved document can**, because
 strict mode has already discarded the evidence.
 
+#### Seam 2 amendment - `score` is optional, and the row says so (R50, 7 September 2026)
+
+**The table above says `score: number` and that was wrong in a way nothing could see for
+three days.** X1 declared it `required: true, default: 0` and the seat builder wrote
+`score: 0` alongside, which reads as thorough and is the defect: R45 decides prize
+eligibility with `Number.isFinite(participant.score)`, so **a nought is a claim that the
+player attempted the game and scored nothing.** Every entrant therefore qualified for a
+prize from the moment they paid, and a player who never launched a round took a rank from
+the players who did.
+
+The field is now `score?: number` with `required: false` and **no default**, in both
+copies, the seat writes no `score` key at all, and `syncParticipantScore` `$unset`s it when
+no round contributed rather than storing a zero. **The seat records that somebody paid to
+enter; the score records what they did afterwards.**
+
+Two things to keep right when touching this row again.
+
+- **A default is not a neutral starting value on a field something makes a decision from.**
+  Same class as `entryBlockThreshold` and `canEnterChallenges` - a stored value and an
+  absent one are different facts, and a schema default destroys the difference for every
+  row it touches. If a field's absence means anything at all, it cannot have a default.
+- **`ChallengeParticipant` still defaults to 0**, deliberately, pinned by its own test so
+  it reads as a decision rather than as drift. Nothing reads a challenge participant's
+  score, provider challenges are E8, and the model is touched by dozens of trading files.
+  **The first provider challenge will reproduce R50 exactly** unless it is fixed first.
+
 ### Seam 3 - Settlement and finalization
 
 | | |

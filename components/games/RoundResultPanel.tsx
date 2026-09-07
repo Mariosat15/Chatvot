@@ -152,8 +152,17 @@ export function RoundResultPanel({
         <div className="rounded-lg border border-gray-700 bg-gray-900/60 p-4">
           <p className="text-xs uppercase tracking-wide text-gray-500">This round</p>
           <p className="mt-1 text-3xl font-bold text-gray-100">{round.score}</p>
+          {/*
+            A dash rather than a blank when the contest score is absent. This block only renders
+            for a round that scored, so the two normally agree - but a round whose score was
+            later voided leaves the participant with none, and "Your competition score: " with
+            nothing after it reads as a broken page rather than as an answer.
+          */}
           <p className="mt-2 text-xs text-gray-400">
-            Your competition score: {state.participantScore}
+            Your competition score:{" "}
+            {typeof state.participantScore === "number"
+              ? state.participantScore.toLocaleString()
+              : "-"}
           </p>
         </div>
       )}

@@ -11,8 +11,9 @@ export interface ICompetitionParticipant extends Document {
   // Reason: every field below this block is trading-shaped. `score` is the ONE number
   // the ranking engine reads whatever the game - for trading it is derived from the
   // configured ranking metric, for a provider game it is the reported round score.
-  // Invariant 4 in "External game plans/11": every participant gets a score.
-  score: number;
+  // Invariant 4 in "External game plans/11": every participant gets a score FIELD. It is
+  // optional because a value means a result arrived - see the schema path below (R50).
+  score?: number;
   gameKey: string; // Denormalised from the contest for cross-game statistics queries
 
   // Capital & Performance
@@ -81,13 +82,28 @@ const CompetitionParticipantSchema = new Schema<ICompetitionParticipant>(
       type: String,
       required: true,
     },
-    // Reason: defaults to 0 so existing rows and every current writer stay valid.
-    // Trading's score is populated at settlement from the ranking metric; nothing
-    // reads it until the ranking seam is switched over.
+    /*
+      NO DEFAULT, AND NOT REQUIRED - AN ABSENT SCORE IS THE FACT "NO RESULT HAS ARRIVED".
+
+      This was `required: true, default: 0` from X1 until 7 September 2026, on the reasoning
+      that a default keeps existing rows and every current writer valid. That was true and it
+      silently defeated R45. `providerHasResult` is `Number.isFinite(participant.score)`, so a
+      stored nought says "this player attempted the game and scored nothing" - and Mongoose
+      applied the default to every seat at the moment of joining. **Every entrant therefore
+      held a finite score before they had played at all**, the "No score recorded"
+      disqualification could never fire, and a player who never launched a round was ranked and
+      paid for a position they had not earned.
+
+      A default IS a stored value, which is the same rule that made `entryBlockThreshold` and
+      `canEnterChallenges` defects: a stored value and an absent one are different facts, and a
+      schema default erases the difference for every row it touches.
+
+      Trading is unaffected either way - its module answers `hasResult` with an unconditional
+      `true`, because a flat account is a real result, and it ranks on its own metrics.
+    */
     score: {
       type: Number,
-      required: true,
-      default: 0,
+      required: false,
     },
     gameKey: {
       type: String,

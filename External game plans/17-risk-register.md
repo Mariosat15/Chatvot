@@ -66,6 +66,7 @@ chapter covers risks to the programme and to the application.
 | R47 | **The Game Master route that answered to nobody, and the one that answered to everybody.** `POST /api/gamemasters/sync-referrals` had **no authentication on either handler** while all four of its siblings under `/api/gamemasters` required section access - and `PATCH /api/gamemasters/[id]`'s `update_limits` did `{ ...subscription.limits, ...limits }`, writing every key the browser sent onto the document that decides a Game Master's daily cap, participant cap, revenue share and which games they may create, through a **raw-driver** update that runs no Mongoose validation, so the schema's own bounds never applied. Third sibling: the **admin** creation route read only the cached `subscription.limits` and never checked `canCreateCompetitions`, so a Game Master whose package withdrew creation could still create through it | Medium | **CLOSED 7 Sep 2026.** State the sync-referrals exposure in **both** directions or it gets triaged wrongly: the POST takes **no body**, so the mapping comes from `userreferrals` and a caller could **not** redirect commission to themselves - what they could do is apply a pending attribution change an operator had deliberately not applied, and drive an unbounded `findOne` + `updateOne` loop over every active referral on demand; the GET returned up to ten real user ids and names to anybody who asked. **There is no way to know whether either was ever called - a route with no guard writes no attribution.** Nothing backfilled, and there is nothing to backfill: the mass assignment stored whatever an operator actually sent | The unauthenticated route was found by **counting exported handlers against guards**, not by reading them - every neighbour having a guard is exactly what sends a reader past the file that has none, and it is the same technique that found R40. `update_limits` became an allow-list in `apps/admin/lib/admin/gamemaster-limits-update.ts` that **refuses an unknown field by name rather than dropping it**, because dropping means the edit appears to save and the operator concludes they misclicked; the allow-list is a `Set`, so `"constructor"` cannot pass a lookup that walks the prototype chain. Both creation routes now resolve through one shared gate. Found while adding `allowedGameTypes` to the same subdocument - **generalising code is a better bug-finding instrument than looking for bugs.** 59 tests, 18 probes |
 | R48 | **The ending decided whether the play counted.** `syncParticipantScore` selected a player's rounds with `status: "completed"` alone, so a real partial score stored on `game_round` never reached `participant.score` and the player ranked on the seat default of nought. **Neither codebase ever had a rule about finishing** - `games-service` scores any board solved, and the provider spec asks twice for a partial score - so this was the platform discarding a correct result. **The row that made it urgent is `expired`**: `createRound` clamps a round's `expiresAt` to `playWindowEnd`, so under the universal cut-off it is the ORDINARY ending for anyone still playing at the final whistle, which means the better a contest was attended right to its end, the more of its players ranked at nought. Sibling on the read side: `findCountedAttempt` filtered on the presence of a score alone, already wrong for `voided`, whose rounds store `rawScore: 0` deliberately. Sibling in admin: **Game Performance counted every player caught by the cut-off as having abandoned the game**, on the screen an operator uses to decide whether to keep a title running | Medium | **CLOSED 7 Sep 2026.** **Latent - nothing backfilled**, because no provider contest has settled in production, so no prize was paid on the wrong ranking. Say it that way: the scores were never lost, they are on `game_round`, so a wrongly-settled contest could be recomputed - there simply is not one. A document describing this as a distribution bug is wrong; `distributePrizesWithTies` was correct throughout and the defect was upstream of it, in whether a score arrived at all | `SCORING_ROUND_STATUSES` is `completed`, `expired`, `abandoned`; `voided` and `unresolved` stay out for two DIFFERENT reasons - the first has no score by construction, the second is `unresolvedRoundPolicy`'s question and counting it here answers it twice. **The boundary is asserted in both directions**, because a widening with no upper bound is indistinguishable from having no rule. The read side **imports the predicate rather than restating it** and takes `status` as a REQUIRED parameter, so a caller cannot omit it and get a silent "nothing counted". Checked rather than assumed: an attempt is consumed on round **creation**, so there is no incentive to abandon deliberately, and every attempts policy makes a cut-short run helpful or neutral, never harmful |
 | R49 | **The dead null check under a noisy log line.** The reported symptom was three stack traces for one junk URL, because `/competitions/[id]` matches any segment under `/competitions/` and both of the lobby's reads threw inside one `Promise.all`. **The defect the chase found is that `getCompetitionById` threw for BOTH kinds of absence** - a malformed id and a missing document - and its catch re-wrapped both as one message, so **every caller's `if (!competition)` was unreachable.** Three authors independently wrote one: `/results` and `/trade` redirected to `/competitions` for a deleted contest and instead showed a server-error boundary, and `GET /api/competitions/[id]/status` - which is **polled** - answered 500 where its own code carefully answered 404. A deleted contest and a database outage produced the same message, so a page could not tell "this does not exist" from "we are broken" | Low | **CLOSED 7 Sep 2026.** **Live, and split precisely: the noise was harmless and the dead guard was not.** The player already got a 404 from the lobby, so no wrong screen was ever shown there; the two sibling pages showed an error boundary for a contest that had merely been deleted. No money, no payout, **nothing to backfill** - the defect is an unreachable branch rather than a stored value. A document calling this a logging fix is describing the symptom | `null` means it does not exist, a throw means something failed. Six routes refuse a junk id before any read, each writing **one** `warn` line naming the route and the value - a silent guard makes a bad link inside the application indistinguishable from a crawler. The pages' catch had to widen from `NEXT_REDIRECT` to the whole **`NEXT_`** family, because `notFound()` also throws, so the new 404 was caught, logged as a failure and re-issued. The shape test is ours rather than `ObjectId.isValid`'s **because that is a dependency's opinion about a URL**, which has already widened once; a test asserts the two agree today |
+| R50 | **The phantom zero that made every entrant a winner.** `providerHasResult` is `Number.isFinite(participant.score)`, and the module's own comment draws the distinction the fix rests on: a stored nought means "played and scored nothing" and is eligible, an absent score means no result and wins nothing. **Three writers each supplied a nought before the player had played** - `buildParticipantSeat` wrote `score: 0` into every seat at join, the schema declared the field `required: true, default: 0`, and the play state's `?? 0` did it again on the read. So every entrant held a finite score from the moment they paid, the "No score recorded" disqualification could not fire for anybody, and **R45's gate was dead on the day it shipped.** In the owner's own example - three ranks at 70/20/10, two players who played and one who never launched a round - the non-player ranked third on a phantom zero and was paid for it instead of the rank being redistributed | Medium | **CLOSED 7 Sep 2026.** **Latent for money, live for the screen.** No provider contest has settled in production, so no prize was paid on a phantom zero - but the lobby's hero tile has been showing `0` rather than a dash to every player who had not yet played, under a comment insisting it must show a dash. **A migration was needed even so, and that is the part a summary would drop:** a schema default fixes future rows only, so every seat already written holds a real `0` and an OPEN provider contest would still settle the old way. `tools/games/clear-phantom-participant-scores.ts` is report-only until `--apply` and **has not been run** | A default IS a stored value - the same rule that made `entryBlockThreshold` and `canEnterChallenges` defects. **Any one of the three writers is enough to reintroduce it**, so there is a probe per writer rather than a probe for the fix. R45's own suite passed throughout because it builds participants as plain objects and omits `score` to mean "never played" - **a shape no production writer could produce**, which is the third instance of a fixture testing the consumer instead of the producer and the first where the fixture supplied an *absence*. `ChallengeParticipant` deliberately still defaults, pinned by a test, because provider challenges are E8 |
 | R24 | Scope creep before anything ships | Medium | **High** | All |
 | R25 | Round write contention under load | Medium | Medium | X12 |
 | X15 | "Challenge any user" harassment surface - no report-user feature exists | Medium | Medium | X10 |
@@ -1622,6 +1623,93 @@ would pass the shape check, reach `findById`, and raise the CastError this chang
 And one harness lesson worth the line: `$RESULTS` silently aliased the `$results` accumulator,
 because **PowerShell variable names are case-insensitive**, which surfaced as a "read as empty"
 failure on an unrelated file and read exactly like the probe having destroyed a route.
+
+---
+
+### R50 - The phantom zero that made every entrant a winner - **CLOSED, 7 September 2026**
+
+**R45 shipped on 7 September and was dead the same day.** Its gate is `providerHasResult`, and
+the module comment beside it states the distinction the whole fix depends on:
+
+> a stored zero orders last and is eligible, because the player attempted the game; an absent
+> score orders last and wins nothing. **A stored value and an absent one are different facts.**
+
+The module was written correctly. **Three other places then made the absent case unreachable**,
+and any one of them is sufficient on its own:
+
+| Writer | What it did |
+|---|---|
+| `buildParticipantSeat` | wrote `score: 0` into every seat at the moment of joining |
+| `competition-participant.model.ts` (both copies) | declared the field `required: true, default: 0`, so even a writer that omitted it stored a nought |
+| `round-status.service.ts` | `participant.score ?? 0`, which put one on the play screen as well |
+
+So **every entrant held a finite score before they had played at all.** `Number.isFinite(0)` is
+true, so every player qualified, and the "No score recorded" disqualification could not fire for
+anybody in any contest.
+
+**What it costs, in the owner's own words:** "if the admin sets more winners and we don't have
+them then the prize goes to the available winners... each of the 2 gets its percentage and the
+3rd is split between the 2 equally." Three ranks at 70/20/10, two players who played, one who
+never launched a round. The third rank should be unclaimed and redistributed. Instead the
+non-player ranked third on a phantom zero and was paid 10% of the pot. **No error, no log line,
+and a prize table that looks deliberate** - which is this codebase's recurring failure shape.
+
+**Why R45's own suite never noticed, and it is the most transferable part.**
+`provider-prize-eligibility.test.ts` builds its participants as plain objects and omits `score`
+to mean "never played" - **a shape no production writer could produce.** Third instance of *a
+fixture that supplies the value under test has tested the consumer, not the producer*, after
+trading finalization's `pnl` and the settlement suites that seeded the scores they ranked. The
+new twist is worth naming: here the fixture supplied an **absence**, which is harder to spot
+than a wrong value, because the assertion reads exactly like the intended behaviour and the
+test's own name describes the case correctly.
+
+**Two facts about the harm, and rounding either one is wrong.** **Latent for money:** no
+provider contest has settled in production, so no prize has been paid on a phantom zero. **Live
+for the screen:** the lobby's hero tile has shown `0` rather than a dash to every player who had
+not yet played, directly beneath a comment insisting it must show a dash - the sixth instance of
+*an aside in a comment is a claim, not a fact*, and the first where the comment was guarding the
+very fact it violated.
+
+**A migration was needed even though the schema is fixed, and a summary would drop this.** A
+schema default fixes **future rows only**. Mongoose has already persisted a real `0` into every
+seat ever written, so an **open** provider contest seated before the fix would still settle the
+old way. Same shape as `canEnterChallenges`, where flipping the default fixed ten writers with
+one line and the migration was still not optional.
+`tools/games/clear-phantom-participant-scores.ts` is report-only until `--apply` and **has not
+been run against any database**; it refuses trading participants, anybody holding a contributing
+round, any score that is not exactly zero, settled contests, and seats mislabelled `trading` on
+a provider contest - which it reports for a human, because `gameKey` is immutable (R7).
+
+**`ChallengeParticipant` deliberately still defaults `score` to 0**, and that asymmetry is
+pinned by its own test so it reads as a decision rather than as drift. Provider challenges do
+not exist yet (E8 / X10), nothing reads a challenge participant's score, and the model is
+touched by dozens of trading files - so widening its contract inside a commit whose whole claim
+is a provider prize fix would buy nothing and put that claim at risk. **The trap it leaves is
+real:** the first provider challenge will seat both players with a phantom zero and reproduce
+this entry exactly.
+
+Pinned by `__tests__/services/provider-score-presence.test.ts` (12 tests, every one driven
+through the real seat builder, schema and `applyResult` rather than through an object literal)
+and `__tests__/services/phantom-score-cleanup.test.ts` (11), with
+`tools/probe-phantom-score.ps1` - **13 probes, one per writer plus one per migration refusal**,
+because a probe for "the fix" would be satisfied while two of the three writers were still
+supplying a nought.
+
+**One probe stayed green, and the answer was the fifth cause: a second guard covered it.** The
+exact `score: 0` appears twice in the migration - in the read that builds the report, and
+re-asserted inside the `updateMany` so a score arriving between the two survives. Widening the
+read alone left the suite green, because the write refused the row. The fix was to assert
+**`totalClearable`**, the figure an operator reads *before* `--apply`, since a report offering to
+clear a scored player is wrong however the write then behaves. The write copy is **recorded as
+unprobed with the reason**, on the R42 precedent: widening it alone changes nothing any test can
+observe, so a probe for it would be green on a correct file and a broken one alike.
+
+**One fixture lesson from writing the proof.** Two tests first seeded the contest as
+`completed`, since that is the state prizes are decided in - and **gate 9 of ingestion refuses a
+result for a closed contest**, so no score ever landed and the players tied on nought. Both went
+red, for a reason that had nothing to do with the defect. **A test failing for the wrong reason
+is worth no more than one passing for the wrong reason**, and only reading the failure told them
+apart.
 
 ---
 

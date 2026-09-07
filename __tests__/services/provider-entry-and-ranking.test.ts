@@ -172,7 +172,13 @@ describe("the participant schema, now that capital is conditional", () => {
 
     expect(saved.gameKey).toBe("provider:acme:chess");
     expect(saved.startingCapital).toBeUndefined();
-    expect(saved.score).toBe(0);
+    /*
+      `toBeUndefined` since R50, where this used to assert the schema's `default: 0`. A seat
+      records that somebody paid to enter; a score records what they did afterwards. Storing a
+      nought at entry told `providerHasResult` the player had attempted the game, which made
+      every entrant prize-eligible before playing.
+    */
+    expect(saved.score).toBeUndefined();
   });
 
   it("still refuses a TRADING participant with no capital", async () => {
@@ -270,9 +276,14 @@ describe("the provider game module", () => {
     expect(new Set(values).size).toBe(1);
   });
 
-  it("treats an absent score as zero rather than crashing", () => {
-    // By ranking time the unresolved-round policy has already decided what a missing
-    // result means, so an absent score here is a settled zero, not an error.
+  it("ORDERS an absent score last rather than crashing, which is not the same as paying it", () => {
+    /*
+      The comment here used to say an absent score "is a settled zero, not an error", and that
+      sentence was doing real harm - it reads as though nothing further needs deciding. Ordering
+      and ELIGIBILITY are two questions: `getRankingValue` places a scoreless player last, and
+      `hasResult` is what stops last place being a paid position. Last place is paid whenever
+      the contest has as many prize ranks as entrants, which is R45.
+    */
     expect(
       providerGameModule.getRankingValue(
         { userId: "u", status: "active", enteredAt: new Date() },

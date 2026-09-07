@@ -31,6 +31,7 @@
 | **The round-start gate** | **Code-complete 7 Sep 2026** (`12` s2.7), from an owner report that a contest which had just opened said *"there is not enough time left in this competition to finish a round"* beside a countdown reading fifty-nine minutes. **It was correct code enforcing a rule nobody had chosen.** Chapter `03` s1.2 reserves the **catalogue ceiling**, not the length the operator configured, so with Circuit Sprint's 300-second ceiling **any contest under five minutes refused every round for its entire duration** - not near the end, from the instant it opened. **And the rule's premise had quietly stopped holding:** it assumes a cut-short round is worth nothing, which was true when a contest was won by *finishing* and is not now that partial performance is the basis for winning. So it became `roundStartPolicy`, a per-contest choice, with the old rule as the **default** rather than deleted - still the right answer for a title where a shortened round means nothing. **Two defaults differ on purpose and will be read as a bug:** the schema reserves, because a schema default fixes future rows only and a pre-existing contest must keep the rule its entrants signed up under; the wizard's new drafts do not. **The disclosure is what makes the permissive branch defensible** - an attempt is consumed on *creation* and cannot be handed back, so the player is told how much time they will actually get, on the panel and on the button. Shipped with **auto-publish** (a checkbox, default on, whose flag deliberately never reaches the server, because publishing re-runs the pre-flight against the **stored** record) and the two smaller reports: a finished contest says **"Competition ended"**, and a provider participant is now **redirected to `/results`** like a trading one. **48 probes across three harnesses** |
 | **The two deadlines a player could not see** | **Code-complete 7 Sep 2026** (`13` s1.1e), the last of the owner's report on this screen. Neither moment that governs whether a player may act was on screen: **when entry closes**, and **the last instant a full attempt can be started**, which in a contest that reserves a full round is earlier than the contest end. **Both are countdowns rather than timestamps** because these pages are server-rendered - an open tab never learns the door has shut. The entry one is **game-agnostic by placement rather than by a branch**, living in `CompetitionEntryButton`, which both lobbies already render, so trading got it for nothing; it counts to `resolveRegistrationDeadline`, **extracted from `isRegistrationClosed`** rather than written beside it, because that function clamps against `startTime` for documents an old bug wrote with a deadline *before* the start and a forgetful copy would count down to a moment already past while the gate beside it still admitted the player. The attempt cut-off is s1.1c's arithmetic **moved into one producer** (`components/games/round-window.ts`) so the lobby and the play screen cannot disagree, and the **negative** assertion is the load-bearing half - importing it is trivially satisfied by a screen that recomputes it five lines later, which is what the pre-flight did. Two places where the tidier version is wrong: the producer **does not know the policy**, and an **absent round length yields no cut-off rather than a guessed one**. **32 probes**, of which **three older ones were re-aimed rather than left green** - the standing cost of an extraction |
 | **Does a partial run count?** | **Yes, since 7 Sep 2026 - and it did not before, which was R48.** The owner's report was that only a player who finished every board seemed to win. **Nobody had built that rule**: `games-service` scores any board solved and chapter `01` asks twice for a partial score. The platform threw it away - `syncParticipantScore` selected rounds by `status: "completed"` alone, so a real partial score sat on `game_round`, never reached `participant.score`, and the seat ranked on its default of nought. **So a round's ENDING decided whether the play counted**, and the row that made it urgent is `expired`: `createRound` clamps `expiresAt` to `playWindowEnd`, so under the universal cut-off that is the **ordinary** ending for anyone still playing at the final whistle - meaning the better a contest was attended right to its end, the more of its players ranked at nought. `completed`, `expired` and `abandoned` now count; **`voided` and `unresolved` stay out for two different reasons** and must not be collapsed. Two siblings: the results screen's `findCountedAttempt` filtered on the presence of a score alone, **already wrong for `voided`** whose rounds store `rawScore: 0` deliberately, and now imports the predicate rather than restating it; and admin **Game Performance counted every player caught by the cut-off as having abandoned the game**, on the screen that decides whether a title keeps running. **Latent, nothing backfilled** - no provider contest has settled in production |
+| **Who is eligible for a prize?** | **R45 shipped the gate on 7 Sep 2026 and R50 made it work the same day.** `providerHasResult` is `Number.isFinite(participant.score)` and was written correctly - **an absent score was simply unreachable in production.** Three places supplied a nought before a player had played: `buildParticipantSeat` wrote `score: 0` at join, both schema copies declared `required: true, default: 0`, and the play state read `?? 0`. **Every entrant therefore qualified from the moment they paid**, so in the owner's own example - three ranks at 70/20/10, two players who played and one who never launched a round - the non-player ranked third on a phantom zero and took 10% of the pot instead of the rank being redistributed. **A schema default IS a stored value**, the same rule behind `entryBlockThreshold` and `canEnterChallenges`. **Latent for money, live for the screen**: nothing has settled in production, but the lobby's hero tile showed `0` rather than a dash, under a comment insisting on the dash. **A migration is needed even so** - a default fixes future rows only, so every existing seat holds a real `0` and an *open* contest would still settle the old way; `tools/games/clear-phantom-participant-scores.ts` is report-only and **has not been run**. R45's own suite passed throughout because it builds participants as **object literals omitting `score`, a shape no production writer could produce**. **`ChallengeParticipant` still defaults deliberately** (E8), pinned by a test - **the first provider challenge will reproduce this exactly** |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
 | **Phase in progress** | **X4a - STARTED 6 Sep 2026. The two halves connected 7 Sep 2026** - see the row above and `21` s4.1d. What remains is the *clicking* half: the provider has still never been registered through the admin screens, and nothing has been deployed. `games-service/` (the provider) and the `chartvolt-games` adapter (the platform) are both code-complete. **The game is playable by a human**: the launch URL serves a real board, verified in a browser on both titles, which also fixed a live defect - an unstarted round reported itself as `finished`, so the first screen a paying player saw was a result screen for a round they had not played. It also **found and then closed a defect in the platform's own published auth scheme** (**R34**): there was no `callbackToken` field anywhere, so a provider implementing `Bearer {CALLBACK_TOKEN}` exactly was rejected and logged as a probable attack. Latent throughout, so nothing was backfilled. **Nothing technical now stands between the two halves** - what remains is deploying the service and registering it. It is now **deployable**: a PM2 entry, an nginx block for a `games.` subdomain, `env.example` and a `deploy/README.md` runbook, plus **two production-only boot guards** for the play origin and the frame allowlist, both of which previously failed invisibly. Writing the runbook also found that the admin panel **could not register a loopback provider at all**. See the three 6 Sep work-log entries |
 | **Next phase, scope decided** | **X4a - ChartVolt as a first-party provider, with a real playable game** (`21`), **3.5-5 weeks**, starting before the provider health panel. It exists because **the review gate the programme is sequenced around cannot currently be held**: `mock.adapter.ts` returns a hostname that does not resolve, so the play screen's iframe fails to load and the final step has never been performed by a person. **Owner decided 5 Sep 2026 that it is both** the reference implementation *and* open question 10's hedge game - which **modifies the 2 Sep "no in-house game is built" decision** and is recorded in the decision log rather than by editing that entry. **No commercial dependency.** Two things not to misread: **risk X8 is reduced when it ships, not now**, and X4a **shrinks X4 without replacing it** - a provider we control cannot rehearse a real partner's auth, error shapes, latency or pricing |
@@ -876,6 +877,69 @@ widening with no upper bound is indistinguishable from having no rule at all. Fu
 unproven since X4a shipped - **a partial run has not been driven through the real service by
 clicking**, only through the ingestion function by test. `npm run test:e2e-round` drives a full
 round end to end; it does not cut one short.
+
+---
+
+### 7 Sep 2026 - R50 - THE PHANTOM ZERO THAT MADE EVERY ENTRANT A WINNER
+
+**Shipped:** `score` optional with **no default** on both `CompetitionParticipant` copies,
+`buildParticipantSeat` writing no `score` key, `syncParticipantScore` `$unset`ting rather than
+storing a nought, `PlayState.participantScore` optional, a dash on both screens that render it,
+`tools/games/clear-phantom-participant-scores.ts` (report-only, **not run**) with its logic in
+`clear-phantom-scores-core.ts`, 23 new tests across two files and 13 probes.
+
+**R45 shipped this morning and was dead before lunch, and the reason generalises.** Its gate is
+`providerHasResult` - `Number.isFinite(participant.score)` - written correctly, with a comment
+stating the distinction it rests on: a stored nought means the player attempted the game and
+scored nothing, an absent score means no result and wins nothing. **Three other places supplied a
+nought before the player had played, and any one of them is sufficient on its own:** the seat
+builder wrote `score: 0` at join, both schema copies declared `required: true, default: 0`, and
+the play state's read did it again with `?? 0`. So every entrant qualified from the moment they
+paid, and the "No score recorded" disqualification could not fire for anybody.
+
+**In the owner's own example** - three ranks at 70/20/10, two players who played, one who never
+launched a round - the third rank should be unclaimed and redistributed to the two who placed.
+Instead the non-player ranked third on a phantom zero and was paid 10% of the pot. `13` s4.1b's
+rule that an absent score renders `-` and never `0` was violated by the very screen whose comment
+asserts it - the sixth instance of **an aside in a comment is a claim, not a fact**, and the first
+where the comment was guarding the fact it broke.
+
+**Latent for money, live for the screen, and rounding either way is wrong.** No provider contest
+has settled in production, so no prize has been paid on a phantom zero; the lobby's hero tile has
+shown `0` to every player who had not yet played.
+
+**A migration was needed anyway, which is the part a summary drops.** A schema default fixes
+**future rows only** - every seat already written holds a real `0`, so an **open** provider
+contest would still settle the old way. Same shape as `canEnterChallenges`, where flipping the
+default fixed ten writers in one line and the migration was still not optional. The script
+refuses trading participants, anybody holding a contributing round, any score that is not exactly
+zero, settled contests, and R7-mislabelled seats, which it reports for a human because `gameKey`
+is immutable.
+
+**Why R45's own suite passed throughout:** it builds participants as object literals and omits
+`score` to mean "never played" - **a shape no production writer could produce.** Third instance of
+*a fixture that supplies the value under test has tested the consumer, not the producer*, and the
+first where the fixture supplied an **absence**, which is harder to notice because the assertion
+and the test's name both read exactly right.
+
+**`ChallengeParticipant` still defaults to 0 deliberately**, pinned by its own test so it reads as
+a decision. Nothing reads a challenge participant's score and provider challenges are E8 - but
+**the first one will reproduce this entry exactly.**
+
+**A probe stayed green for a fifth distinct reason: a second guard covered it.** The exact
+`score: 0` appears twice in the migration, in the read and re-asserted in the write. Widening the
+read alone left the suite green because the write refused the row; asserting **`totalClearable`**
+- the number an operator reads before `--apply` - turned it red. The write copy is **recorded as
+unprobed with the reason** rather than carrying a probe that reports green either way.
+
+**A fixture lesson worth keeping.** Two tests first seeded the contest `completed`, since that is
+the state prizes are decided in - and **gate 9 refuses a result for a closed contest**, so no
+score landed and both players tied on nought. Both tests went red for a reason unrelated to the
+defect. **A test that fails for the wrong reason is worth no more than one that passes for the
+wrong reason.**
+
+**Verified:** `check:mirrors` green, both typechecks at their baselines, full suite **69 files /
+1421 tests**, 13 probes red on exactly the expected test.
 
 ---
 

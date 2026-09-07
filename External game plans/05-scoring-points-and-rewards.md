@@ -489,6 +489,26 @@ sits on the game module interface beside `getRankingValue` and `getTieBreakerVal
 Asked of the module for the reason section 10 gives: `if (gameType === "provider")` is the shape
 that makes the next game silently fail while the query runs and the page renders.
 
+> **THIS GATE WAS DEAD ON THE DAY IT SHIPPED, AND THE REASON IS THE PART TO CARRY (R50, 7
+> September 2026).** The rule above is right and it could not fire, because **an absent score was
+> unreachable in production.** Three places supplied a nought before the player had played:
+> `buildParticipantSeat` wrote `score: 0` into every seat at join, both `CompetitionParticipant`
+> copies declared the field `required: true, default: 0`, and `round-status.service.ts` did it
+> again on the read with `?? 0`. Every entrant therefore held a finite score from the moment they
+> paid, and **the owner's own example - two players who played, one who never launched a round -
+> still paid the third rank to the non-player.**
+>
+> **A schema default IS a stored value**, which is the same rule behind the `entryBlockThreshold`
+> and `canEnterChallenges` defects. The seat now writes no score, the field is optional with no
+> default, and `syncParticipantScore` `$unset`s it when no round contributed - so the sentence
+> above about a stored zero versus an absent one is finally a description of the data rather than
+> only of the comparison.
+>
+> **Why the eligibility suite passed throughout:** it builds participants as object literals and
+> omits `score` to mean "never played", **a shape no production writer could produce**. Pinned
+> now by `provider-score-presence.test.ts`, every test of which goes through the real seat
+> builder, the real schema and `applyResult` rather than through a literal.
+
 **Scoped to a completed contest, and this is the part that looks like a bug in the fix.** The
 gate only fires once the contest is over, matching the two trading checks beside it.
 `getCompetitionLeaderboard` ranks with the contest's **live** status, so the same function draws

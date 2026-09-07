@@ -400,7 +400,13 @@ describe("a provider score reaches the participant row ranking reads", () => {
     });
 
     const after = await CompetitionParticipant.findById(seat._id);
-    expect(after?.score).toBe(0);
+    /*
+      `toBeUndefined` since R50, and the change makes this assertion stronger rather than
+      merely different. It used to read `toBe(0)`, which was the seat's default - so it could
+      not tell "the practice round was ignored" from "the practice round was counted and
+      happened to score nothing". An untouched row now holds no score at all.
+    */
+    expect(after?.score).toBeUndefined();
   });
 
   it("refuses to score a contest with no attempts policy rather than guessing one", async () => {
@@ -437,7 +443,9 @@ describe("a provider score reaches the participant row ranking reads", () => {
       competitionId: contest._id,
       userId: USER,
     });
-    expect(seat?.score).toBe(0);
+    // See the note on the practice test above: an unscored row holds no score since R50, which
+    // distinguishes "the sync refused" from "the sync ran and the answer was nought".
+    expect(seat?.score).toBeUndefined();
   });
 
   it("still records the round when there is no participant row to update", async () => {
@@ -689,7 +697,13 @@ describe("a partial run counts - the ending decides nothing about eligibility", 
       source: "manual",
     });
 
-    expect((await CompetitionParticipant.findById(seat._id))?.score).toBe(0);
+    /*
+      `toBeUndefined` since R50. The old `toBe(0)` was satisfied by the seat's default, so this
+      test could not tell "the voided round was ignored" from "the voided round was counted as
+      nothing" - and the second of those is a prize-eligible state. The sync now unsets the
+      field when no round contributed, which is the case a support action creates.
+    */
+    expect((await CompetitionParticipant.findById(seat._id))?.score).toBeUndefined();
   });
 
   it("does NOT count an unresolved round, which is the contest's own policy to decide", async () => {

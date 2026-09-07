@@ -311,13 +311,23 @@ export default async function ProviderContestLobby({
             A dash, never a zero, for a player with no scored round. Same read-side rule as the
             leaderboard cell and the dashboard card: an absent score and a score of nothing are
             different facts, and conflating them is what made every provider participant tie.
+
+            THAT SENTENCE WAS FALSE FOR A DAY, and the correction is left visible because the
+            next reader needs to know it was once believed. The service defaulted the field to
+            nought before the payload left it, so this tile showed `0` to a player who had not
+            played and the dash was unreachable. Fixed with the seat and the schema in R50 -
+            all three had to change, since any one of them supplying a zero is enough.
           */}
           {isUserIn ? (
             <StatCard
               icon={Gamepad2}
               accent="score"
               label="Your score"
-              value={state ? state.participantScore.toLocaleString() : "-"}
+              value={
+                typeof state?.participantScore === "number"
+                  ? state.participantScore.toLocaleString()
+                  : "-"
+              }
             />
           ) : (
             <StatCard

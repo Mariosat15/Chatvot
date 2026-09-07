@@ -124,8 +124,15 @@ export interface PlayState {
   rounds: PlayerRoundView[];
   playWindowStart?: string;
   playWindowEnd?: string;
-  /** The caller's own contest score, as ranking will read it. */
-  participantScore: number;
+  /**
+   * The caller's own contest score, as ranking will read it.
+   *
+   * OPTIONAL, AND IT WAS `number` WITH A `?? 0` BEHIND IT UNTIL R50. The lobby's hero tile
+   * carries a comment insisting it must show a dash because "an absent score and a score of
+   * nothing are different facts" - and it could never show one, because this field had
+   * already replaced the absence with a nought before the screen saw it.
+   */
+  participantScore?: number;
 }
 
 export type PlayStateOutcome =
@@ -312,7 +319,8 @@ export async function getPlayState(
         playWindowEnd: contest.playWindowEnd
           ? new Date(contest.playWindowEnd).toISOString()
           : undefined,
-        participantScore: participant.score ?? 0,
+        // Passed through, never defaulted. See the field's declaration.
+        participantScore: participant.score,
       },
     };
   } catch (error) {

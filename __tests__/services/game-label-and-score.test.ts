@@ -107,13 +107,9 @@ describe("every participant carries a game-agnostic score", () => {
       }
     });
 
-    it(`${name} defaults score to 0 and gameKey to trading`, () => {
+    it(`${name} defaults gameKey to trading`, () => {
       const doc = new model({});
 
-      expect(
-        doc.score,
-        `${name}.score did not default to 0, so existing rows and every current writer would be invalid`,
-      ).toBe(0);
       expect(doc.gameKey).toBe("trading");
     });
 
@@ -124,6 +120,43 @@ describe("every participant carries a game-agnostic score", () => {
       expect(doc.gameKey).toBe("provider:acme:trivia-blitz");
     });
   }
+
+  /*
+    THIS TEST WAS FLIPPED ON 7 SEPTEMBER 2026, NOT DELETED, and it used to read "defaults
+    score to 0 ... so existing rows and every current writer would be invalid". That reasoning
+    was sound when X1 added the field and it turned out to defeat R45 completely.
+
+    A default IS a stored value. `providerHasResult` is `Number.isFinite(participant.score)`,
+    so a defaulted nought asserts that the player attempted the game and scored nothing -
+    which made every entrant eligible for a prize from the moment they paid, and made the "No
+    score recorded" disqualification unreachable. The comment explaining why the default was
+    wanted is the valuable part of the old test, so it is kept here rather than lost with it.
+  */
+  it("CompetitionParticipant does NOT default score, because absent means no result yet", () => {
+    const doc = new CompetitionParticipant({});
+
+    expect(doc.score).toBeUndefined();
+
+    // And the field is genuinely optional, so a seat with no score is a valid document.
+    expect(doc.validateSync()?.errors?.score).toBeUndefined();
+  });
+
+  it("ChallengeParticipant still defaults score, which is deliberate and is E8's to revisit", () => {
+    /*
+      THE ASYMMETRY IS PINNED SO IT READS AS A DECISION RATHER THAN AS DRIFT. Only
+      `CompetitionParticipant` was changed: provider challenges do not exist yet (E8 / X10),
+      nothing reads a challenge participant's score, and the model is touched by dozens of
+      trading files - so widening its contract inside a commit whose whole claim is a provider
+      prize fix would buy nothing and put that claim at risk.
+
+      What it leaves behind is a trap, which is why this is a test and not a silence: the first
+      provider challenge will seat both players with a phantom zero and reproduce R50 exactly.
+      Whoever builds E8 must bring this field with them.
+    */
+    const doc = new ChallengeParticipant({});
+
+    expect(doc.score).toBe(0);
+  });
 });
 
 describe("the addition is additive - no trading field was displaced", () => {

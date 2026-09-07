@@ -66,5 +66,9 @@ export interface PlayState {
   rounds: PlayerRoundView[];
   playWindowStart?: string;
   playWindowEnd?: string;
-  participantScore: number;
+  /**
+   * Absent until a round has reported. See the service's copy - a nought here is a claim that
+   * the player attempted the game and scored nothing, which decides prize eligibility.
+   */
+  participantScore?: number;
 }

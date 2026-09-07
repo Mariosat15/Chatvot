@@ -43,7 +43,12 @@ import type { AttemptsPolicy } from "./round-types";
  */
 
 export type ScoreSyncOutcome =
-  | { synced: true; score: number; roundsCounted: number }
+  /**
+   * `score` is absent when no round contributed one, which is a different outcome from a
+   * sync that could not run - the row WAS updated, to hold no score. Callers that report the
+   * score onward must pass the absence through rather than substituting a nought.
+   */
+  | { synced: true; score?: number; roundsCounted: number }
   | { synced: false; reason: string };
 
 /**
@@ -202,7 +207,25 @@ export async function syncParticipantScore(input: {
     .map((round) => round.rawScore)
     .filter((value): value is number => typeof value === "number");
 
-  const score = combineRoundScores(scores, policy, scoreDirection);
+  /*
+    NOTHING CONTRIBUTED MEANS NO SCORE, NOT A SCORE OF NOTHING - and the two must be stored
+    differently, because `providerHasResult` reads a stored nought as "played and scored
+    nothing" and pays that player for the position they land in.
+
+    `combineRoundScores` returns 0 for an empty list, which is right for its own job: it is
+    the identity for a sum and it keeps the function total. Writing that 0 to the participant
+    would be the phantom-zero defect (R50) arriving one step later than the seat's. The case
+    is reachable: a support action voids a player's only round, the sync runs again from the
+    round inspector, and every contributing round is gone.
+
+    `$unset` rather than leaving the field alone, because the sync's contract is that it
+    recomputes from persisted rounds - a stale score surviving a re-sync would be a number no
+    round supports, which is the harder kind of wrong to explain.
+  */
+  const contributed = scores.length > 0;
+  const score = contributed
+    ? combineRoundScores(scores, policy, scoreDirection)
+    : undefined;
 
   // `$set` of a value derived from persisted rows, never `$inc`. See the header.
   //
@@ -217,7 +240,7 @@ export async function syncParticipantScore(input: {
   // wrong; an incoherent one looks plausible and cannot be explained to a player.
   const updated = await CompetitionParticipant.findOneAndUpdate(
     { competitionId: contestId, userId },
-    { $set: { score } },
+    contributed ? { $set: { score } } : { $unset: { score: "" } },
     { new: true },
   );
 
