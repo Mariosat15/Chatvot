@@ -1129,8 +1129,14 @@ describe("the play screen counts down on the server's clock", () => {
       Asserting the comparison, not the flag's name: `tooLateToStart` appears in the blocked
       list, the reason chain and the button label, so a name-only match survives the arithmetic
       being deleted.
+
+      RE-AIMED 7 September 2026, when the arithmetic moved into `round-window.ts` so the lobby
+      could count down to the same instant. It is still the comparison rather than the name, one
+      indirection along: `cutoffMs` comes from the shared producer and `now > cutoffMs` is the
+      refusal. Left pointed at the old inline expression, this test fails on correct code, which
+      is the fastest way to have a guard deleted.
     */
-    expect(code).toMatch(/now\s*\+\s*roundNeedsMs\s*>\s*windowEndMs/);
+    expect(code).toMatch(/cutoffMs !== null && !windowClosed && now > cutoffMs/);
 
     // And it must not fire on a resume, which reopens the round the player already has and so
     // needs no fresh room in the window.
@@ -1214,11 +1220,17 @@ describe("the game lobby shows a joined player the clock", () => {
       tile counts down only for someone who has NOT entered - once they do, it is replaced by
       their score. So the countdown vanished at exactly the moment it started to matter.
 
-      Asserting there are now TWO countdowns rather than merely one, because the hero's has been
-      there all along and a bare `<InlineCountdown` match is green on the bug.
+      Asserting the COUNT rather than the presence, because the hero's has been there all along
+      and a bare `<InlineCountdown` match is green on the bug.
+
+      THREE since 7 September 2026: the hero tile, the window's close, and the last moment a new
+      attempt may start. The third is a different clock from the second and is the one players
+      miss - see "the last moment to start an attempt has one producer" below. If this number
+      falls, one of the three has been removed; if it rises, a fourth clock has appeared on a
+      screen that already shows three, which is its own problem.
     */
     const countdowns = code.match(/<InlineCountdown/g) ?? [];
-    expect(countdowns.length).toBe(2);
+    expect(countdowns.length).toBe(3);
 
     // Reused, not re-implemented. A third place that formats "2d 4h" is a third place for the
     // wording to drift, which is the shape behind several defects here.
@@ -1259,8 +1271,13 @@ describe("the round-start policy reaches the player", () => {
 
     // The arithmetic is unchanged and the POLICY is a separate term, so the two facts stay
     // separable: whether a full round still fits, and whether this contest insists on one.
+    //
+    // The comparison itself moved into `round-window.ts` on 7 September 2026, when the lobby
+    // began counting down to the same cut-off. What is asserted here is that this screen ASKS
+    // rather than deciding - see the suite below for why a second answer would be worse than
+    // no answer at all.
     expect(code).toMatch(
-      /reservesFullRound = state\.roundStartPolicy !== "until_window_closes"/,
+      /reservesFullRound = contestReservesFullRound\(state\.roundStartPolicy\)/,
     );
     expect(code).toMatch(
       /tooLateToStart = fullRoundNoLongerFits && reservesFullRound/,
@@ -1331,5 +1348,273 @@ describe("the round-start policy reaches the player", () => {
     expect(service).toMatch(
       /if \(config\.roundStartPolicy === "until_window_closes"\) return true/,
     );
+  });
+});
+
+describe("the last moment to start an attempt has one producer", () => {
+  const ROUND_WINDOW = "components/games/round-window.ts";
+
+  /*
+    THE LOBBY IS READ BEFORE THE PLAY SCREEN IS VISITED, which is why this matters more than an
+    ordinary duplication. A player decides whether to travel to `/play` based on what the lobby
+    tells them about the clock; a lobby promising time that the pre-flight then refuses is worse
+    than a lobby that says nothing, because it converts a plannable deadline into a broken
+    button.
+  */
+
+  it("computes the cut-off in one place, and does not know the policy", async () => {
+    const { fullRoundCutoffMs, contestReservesFullRound } = await import(
+      "../../components/games/round-window"
+    );
+
+    const windowEnd = new Date("2026-09-08T14:00:00Z").getTime();
+    expect(fullRoundCutoffMs(windowEnd, 300)).toBe(
+      new Date("2026-09-08T13:55:00Z").getTime(),
+    );
+
+    /*
+      IT MUST ANSWER THE SAME NUMBER UNDER BOTH POLICIES, and folding the policy in is the
+      tempting simplification. It would return `null` for `until_window_closes` - exactly the
+      case where the play screen still needs the figure, in order to say how much time a
+      shortened attempt will get. The arithmetic is one fact; what each screen does with it is
+      two.
+    */
+    expect(contestReservesFullRound("until_window_closes")).toBe(false);
+    expect(contestReservesFullRound("reserve_full_round")).toBe(true);
+    // Fails closed on anything unrecognised, matching both `contest-config.ts` copies.
+    expect(contestReservesFullRound(undefined)).toBe(true);
+    expect(contestReservesFullRound("")).toBe(true);
+    expect(contestReservesFullRound("until_window_close")).toBe(true);
+  });
+
+  it("produces no cut-off when the round length is unknown, rather than guessing one", async () => {
+    const { fullRoundCutoffMs } = await import(
+      "../../components/games/round-window"
+    );
+
+    // A guessed deadline that disables Play is worse than letting the server name the real
+    // reason - the server applies no gate it cannot compute either.
+    expect(fullRoundCutoffMs(Date.now(), undefined)).toBeNull();
+    expect(fullRoundCutoffMs(Date.now(), Number.NaN)).toBeNull();
+    expect(fullRoundCutoffMs(null, 300)).toBeNull();
+  });
+
+  it("is read by both screens and recomputed by neither", () => {
+    const preflight = readCode(PREFLIGHT);
+    const lobby = readCode(PROVIDER_LOBBY);
+
+    expect(preflight).toMatch(
+      /fullRoundCutoffMs\(windowEndMs, state\.maxRoundSeconds\)/,
+    );
+    expect(lobby).toMatch(
+      /fullRoundCutoffMs\(playWindowEndMs, state\.maxRoundSeconds\)/,
+    );
+
+    /*
+      THE NEGATIVE ASSERTION IS THE LOAD-BEARING HALF. Importing the module is trivially
+      satisfied by a screen that imports it and then does the subtraction itself anyway, which
+      is exactly what the pre-flight did before the extraction.
+
+      SCOPED TO THE CUT-OFF, NOT TO THE ROUND LENGTH, and the distinction is why the first
+      version of this failed on correct code. `roundNeedsMs = maxRoundSeconds * 1000` stays in
+      the pre-flight legitimately - it is how the screen says "a round needs up to 5 min", which
+      is the round's own length and not a deadline derived from the window. What must not be
+      recomputed is the subtraction that produces the moment.
+    */
+    for (const code of [preflight, lobby]) {
+      expect(code).not.toMatch(/now\s*\+\s*roundNeedsMs\s*>\s*windowEndMs/);
+      expect(code).not.toMatch(/windowEndMs\s*-\s*roundNeedsMs/);
+      expect(code).not.toMatch(/windowEndMs\s*-\s*state\.maxRoundSeconds/);
+    }
+
+    // The lobby has no honest use for the raw round length at all - it states no round duration
+    // - so there the multiplication itself is the tell.
+    expect(lobby).not.toMatch(/maxRoundSeconds \* 1000/);
+
+    /*
+      AND THE PRODUCER MUST STAY IMPORTABLE BY BOTH. `RoundPreflight` is `"use client"` and the
+      lobby is a server component, so the moment this module imports a model - or declares
+      itself client-only - one of its two consumers stops building. Same requirement as
+      `components/games/play-state.ts` and `apps/admin/lib/admin/contest-control-copy.ts`, both
+      of which were first written as a second copy for exactly this reason.
+    */
+    const producer = readCode(ROUND_WINDOW);
+    expect(producer).not.toMatch(/"use client"/);
+    expect(producer).not.toMatch(/^import /m);
+  });
+
+  it("shows the lobby countdown only where a cut-off really exists", () => {
+    const lobby = readCode(PROVIDER_LOBBY);
+
+    /*
+      SLICED BY INDEX, NOT SCANNED TOWARDS. A leftmost-first regex over the whole file opens at
+      an unrelated construct hundreds of characters earlier and swallows legitimate markup, and
+      the guard then fails on correct code - which is the fastest way to have it deleted. The
+      length assertions exist because a slice that found nothing passes every match against it.
+    */
+    const labelAt = lobby.indexOf("Last attempt can start in");
+    expect(labelAt).toBeGreaterThan(-1);
+    const guardAt = lobby.lastIndexOf("{isActive &&", labelAt);
+    expect(guardAt).toBeGreaterThan(-1);
+
+    const guard = lobby.slice(guardAt, labelAt);
+    const row = lobby.slice(labelAt, labelAt + 400);
+    expect(guard.length).toBeGreaterThan(60);
+
+    /*
+      Three conditions, and dropping any one of them states something false. Without
+      `reservesFullRound` a permissive contest is given a deadline it does not have, and a
+      player leaves believing they have missed it. Without `isActive` the row appears on an
+      upcoming contest, where the countdown is to a moment inside a window that has not
+      opened. Without the null check there is no cut-off to count down to.
+    */
+    expect(guard).toMatch(/reservesFullRound/);
+    expect(guard).toMatch(/attemptCutoffMs !== null/);
+
+    /*
+      "Passed", not "Ended". The contest has not ended - only the chance to open a new round
+      has, and a player already inside a round may still finish it. This is the same class of
+      correction as the play-window note that had become false: a word that is right about one
+      clock and wrong about the one it is attached to.
+    */
+    expect(row).toMatch(/zeroLabel="Passed"/);
+  });
+
+  it("tells a joined player what happens to a round still running at the close, per policy", () => {
+    const lobby = readCode(PROVIDER_LOBBY);
+
+    /*
+      THE SENTENCE HAS TO GO BOTH WAYS. Under `reserve_full_round` a round CANNOT still be
+      running at the close - that is what holding time back achieves - so promising it would be
+      closed and scored describes an impossibility, and a player reading it concludes they may
+      start whenever they like. Under `until_window_closes` the opposite is true and is exactly
+      what makes a shortened attempt worth taking.
+    */
+    const noteStart = lobby.indexOf("Every player gets the same window.");
+    expect(noteStart).toBeGreaterThan(-1);
+    const note = lobby.slice(noteStart, lobby.indexOf("</NeonNote>", noteStart));
+    expect(note.length).toBeGreaterThan(200);
+    expect(note).toMatch(/reservesFullRound/);
+    expect(note).toMatch(/finish inside it/);
+    expect(note).toMatch(/still running then is\s*\n?\s*closed/);
+  });
+});
+
+describe("a player is told how long they have left to join", () => {
+  /*
+    THE OWNER'S REPORT: a player could see that a competition started in four minutes and had no
+    way to know that four minutes was also all the time they had to enter. The panel said
+    "Registration Closed" only once the door had already shut - the one moment the fact is of no
+    use to them.
+  */
+
+  it("counts down to the same instant the gate compares against", () => {
+    const code = readCode(ENTRY_BUTTON);
+
+    /*
+      `resolveRegistrationDeadline` was split out of `isRegistrationClosed` for this. The clamp
+      against `startTime` inside it is not hypothetical - an old bug wrote deadlines an hour
+      BEFORE the start - so a copy of the rule here that forgot it would tell those players
+      entry had closed before it opened, while the button stayed open. One instant, two readers.
+    */
+    expect(code).toMatch(/resolveRegistrationDeadline\(competition\)/);
+    expect(code).not.toMatch(/registrationDeadline\s*<\s*start/);
+    expect(code).not.toMatch(/competition\.registrationDeadline/);
+  });
+
+  it("says something different when no deadline is set, rather than nothing", () => {
+    const code = readCode(ENTRY_BUTTON);
+
+    /*
+      A contest with no deadline is a real configuration, not a missing value - entry stays open
+      while it runs. Substituting `startTime` would refuse to say so and count down to a door
+      that does not shut then; saying nothing at all would leave a player who saw a countdown on
+      another competition assuming this one hides a deadline too.
+    */
+    const block = code.slice(
+      code.indexOf("{showEntryCountdown &&"),
+      code.indexOf("{/* Entry Button */}"),
+    );
+    expect(block.length).toBeGreaterThan(400);
+    expect(block).toMatch(/entryDeadline \?/);
+    expect(block).toMatch(/Entry closes in/);
+    expect(block).toMatch(/Entry stays open/);
+  });
+
+  it("is withheld from someone who has already joined or already missed it", () => {
+    const code = readCode(ENTRY_BUTTON);
+
+    /*
+      A countdown to a door you are already through is noise, and one shown beside the red
+      "Registration for this competition has closed" panel contradicts it. The status terms
+      matter too: a completed or cancelled contest has no entry deadline worth counting to.
+    */
+    expect(code).toMatch(
+      /showEntryCountdown =\s*\n?\s*!isUserIn && !registrationClosed && \(isActive \|\| isUpcoming\)/,
+    );
+  });
+
+  it("names the moment as well as the remaining time", () => {
+    const code = readCode(ENTRY_BUTTON);
+    const block = code.slice(
+      code.indexOf("{showEntryCountdown &&"),
+      code.indexOf("{/* Entry Button */}"),
+    );
+
+    /*
+      The pairing the play screen already uses. A bare countdown cannot be written down, and a
+      bare timestamp asks the player to subtract two times in their head - one of them in a zone
+      they do not live in.
+    */
+    expect(block).toMatch(/toUTCString\(\)/);
+
+    /*
+      `zeroLabel` is not cosmetic here. The page is server-rendered, so an open tab cannot learn
+      that `registrationClosed` has flipped; without it the countdown reaches zero and reads
+      "Started", which is wrong twice over - the competition may not have started, and what
+      happened is that entry closed.
+    */
+    expect(block).toMatch(/zeroLabel="Closed"/);
+  });
+
+  it("keeps the countdown component's default wording for every existing caller", async () => {
+    const code = readCode("components/trading/InlineCountdown.tsx");
+
+    // Additive: `zeroLabel` overrides, and absent it the two words the trading lobby and the
+    // hero tile have always shown are unchanged. Also in the effect's dependencies, or the
+    // first render's word would stick.
+    expect(code).toMatch(
+      /zeroLabel \?\? \(type === "start" \? "Started" : "Ended"\)/,
+    );
+    expect(code).toMatch(/\[targetDate, type, zeroLabel\]/);
+  });
+
+  it("resolves the deadline as a shared instant, with the clamp intact", async () => {
+    const { resolveRegistrationDeadline, isRegistrationClosed } = await import(
+      "../../lib/utils/registration-deadline"
+    );
+
+    const startTime = new Date("2026-09-08T13:00:00Z");
+    const early = new Date("2026-09-08T12:00:00Z");
+
+    // Clamped up to the start, which is what keeps the legacy documents joinable.
+    expect(
+      resolveRegistrationDeadline({ startTime, registrationDeadline: early })!.getTime(),
+    ).toBe(startTime.getTime());
+
+    // A later deadline is its own instant.
+    const late = new Date("2026-09-08T13:30:00Z");
+    expect(
+      resolveRegistrationDeadline({ startTime, registrationDeadline: late })!.getTime(),
+    ).toBe(late.getTime());
+
+    /*
+      `null` rather than a substituted `startTime`, so the caller has to decide what an absent
+      deadline means. Returning the start here would have silently given every deadline-free
+      contest a door, and `isRegistrationClosed` would then have closed it.
+    */
+    expect(resolveRegistrationDeadline({ startTime })).toBeNull();
+    expect(resolveRegistrationDeadline({ registrationDeadline: "not a date" })).toBeNull();
+    expect(isRegistrationClosed({ startTime })).toBe(false);
   });
 });

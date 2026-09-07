@@ -108,9 +108,12 @@ Probe -Name "the pre-flight goes back to the browser's clock" `
   -Replace '  const now = Date.now();' `
   -ExpectRed 'uses that clock for every gate rather than'
 
-Probe -Name 'the too-late-to-start arithmetic is deleted' `
+# RE-AIMED 7 SEP 2026, second time. The arithmetic moved into `round-window.ts` so the lobby
+# could count down to the same instant, so the comparison here is now `now > cutoffMs`. Aimed at
+# the old inline expression this reported DID NOT APPLY, which reads like a broken harness.
+Probe -Name 'the too-late-to-start comparison is deleted' `
   -File $PREFLIGHT `
-  -Find '    now + roundNeedsMs > windowEndMs;' `
+  -Find '    !resuming && cutoffMs !== null && !windowClosed && now > cutoffMs;' `
   -Replace '    false;' `
   -ExpectRed 'blocks Play when a round can no longer finish inside the window'
 
@@ -174,22 +177,24 @@ Probe -Name "the joined player's countdown is removed, leaving only the hero's" 
   -Replace '                      new Date(countdownTarget).toUTCString()' `
   -ExpectRed 'counts down in the play-window panel'
 
+# RE-AIMED 7 SEP 2026: the note became policy-aware, so the sentence this used to replace no
+# longer exists verbatim. The claim under test is unchanged - a false player-facing caution is
+# worse than none.
 Probe -Name 'the false play-window note comes back' `
   -File $LOBBY `
-  -Find '                Every player gets the same window. Any round still open when it
-                closes is closed with the competition, and the scores stand as
-                they were.' `
-  -Replace '                The play window can be narrower than the competition itself, so
-                check both.' `
+  -Find '                Every player gets the same window.{" "}' `
+  -Replace '                The play window can be narrower than the competition itself.{" "}' `
   -ExpectRed 'no longer tells players the play window can be narrower'
 
 Write-Host "`n=== the round-start policy ===" -ForegroundColor Cyan
 
 # The gate left unconditional, which is the defect the owner reported: a contest shorter than
 # the catalogue ceiling withholding Play from the moment it opened.
+# RE-AIMED 7 SEP 2026: the comparison moved into `round-window.ts`, so the pre-flight now asks
+# rather than deciding. Same claim, one indirection along.
 Probe -Name 'the policy is ignored and every contest reserves a full round' `
   -File $PREFLIGHT `
-  -Find '  const reservesFullRound = state.roundStartPolicy !== "until_window_closes";' `
+  -Find '  const reservesFullRound = contestReservesFullRound(state.roundStartPolicy);' `
   -Replace '  const reservesFullRound = true;' `
   -ExpectRed 'offers a shortened round instead of refusing, when the contest allows it'
 
@@ -229,5 +234,148 @@ Probe -Name "the client's PlayState drops the policy" `
   -Find '  roundStartPolicy: "reserve_full_round" | "until_window_closes";' `
   -Replace '  roundStartPolicyName?: string;' `
   -ExpectRed "is a field on the client's own PlayState"
+
+Write-Host "`n=== the last moment to start, shared by two screens ===" -ForegroundColor Cyan
+
+$WINDOW = 'components/games/round-window.ts'
+
+# The arithmetic wrong in the direction that looks safe: reserving nothing means Play stays
+# offered right up to the close, and the server then refuses the click.
+Probe -Name 'the cut-off no longer subtracts the round length' `
+  -File $WINDOW `
+  -Find '  return playWindowEndMs - maxRoundSeconds * 1000;' `
+  -Replace '  return playWindowEndMs;' `
+  -ExpectRed 'computes the cut-off in one place, and does not know the policy'
+
+# The tempting simplification: fold the policy in and return null for the permissive case. It is
+# exactly when the play screen still needs the figure, in order to say how much time is left.
+Probe -Name 'the producer learns the policy and answers null for the permissive case' `
+  -File $WINDOW `
+  -Find '  return roundStartPolicy !== "until_window_closes";' `
+  -Replace '  return true;' `
+  -ExpectRed 'computes the cut-off in one place, and does not know the policy'
+
+# An absent duration must produce no cut-off rather than a guessed one. Treating it as zero
+# gives every contest a cut-off equal to its close, which reads correct and disables nothing.
+Probe -Name 'an unknown round length is guessed at rather than declined' `
+  -File $WINDOW `
+  -Find '  if (typeof maxRoundSeconds !== "number" || !Number.isFinite(maxRoundSeconds)) {
+    return null;
+  }' `
+  -Replace '  if (typeof maxRoundSeconds !== "number") {
+    maxRoundSeconds = 0;
+  }' `
+  -ExpectRed 'produces no cut-off when the round length is unknown'
+
+# The negative half of the extraction: the screen imports the producer and then does the
+# subtraction itself anyway, which is exactly what the pre-flight did before the extraction.
+Probe -Name 'the pre-flight recomputes the cut-off beside the shared one' `
+  -File $PREFLIGHT `
+  -Find '  const cutoffMs = fullRoundCutoffMs(windowEndMs, state.maxRoundSeconds);' `
+  -Replace '  const cutoffMs =
+    windowEndMs !== null && roundNeedsMs !== null ? windowEndMs - roundNeedsMs : null;' `
+  -ExpectRed 'is read by both screens and recomputed by neither'
+
+Write-Host "`n=== the lobby's second clock ===" -ForegroundColor Cyan
+
+# The row shown regardless of policy, so a permissive contest is given a deadline it does not
+# have and a player leaves believing they have missed it.
+Probe -Name "the last-attempt row ignores the contest's policy" `
+  -File $LOBBY `
+  -Find '                {isActive &&
+                  reservesFullRound &&' `
+  -Replace '                {isActive &&
+                  true &&' `
+  -ExpectRed 'shows the lobby countdown only where a cut-off really exists'
+
+# "Ended" instead of "Passed". The contest has NOT ended - only the chance to open a new round
+# has, and a player already inside a round may still finish it.
+Probe -Name 'the passed cut-off tells the player the contest has ended' `
+  -File $LOBBY `
+  -Find '                          zeroLabel="Passed"' `
+  -Replace '                          zeroLabel="Ended"' `
+  -ExpectRed 'shows the lobby countdown only where a cut-off really exists'
+
+# The note stating the permissive consequence under BOTH policies. Under `reserve_full_round` a
+# round cannot still be running at the close, so it promises an impossibility and a player
+# concludes they may start whenever they like.
+Probe -Name 'the play-window note says the same thing under either policy' `
+  -File $LOBBY `
+  -Find '                {reservesFullRound
+                  ? "An attempt has to begin early enough to finish inside it, so the last one starts before the window shuts."
+                  : "You can start an attempt at any time until it shuts, and anything still running then is closed with the competition and scored on what you managed."}' `
+  -Replace '                {"You can start an attempt at any time until it shuts, and anything still running then is closed with the competition and scored on what you managed."}' `
+  -ExpectRed 'tells a joined player what happens to a round still running at the close'
+
+Write-Host "`n=== how long is left to join ===" -ForegroundColor Cyan
+
+$ENTRY = 'components/trading/CompetitionEntryButton.tsx'
+
+# The deadline recomputed in the component. Identical today, and the clamp against `startTime`
+# is what keeps the legacy documents joinable - a copy that forgets it tells those players entry
+# closed before it opened, while the button stays open.
+Probe -Name 'the entry deadline is recomputed instead of shared' `
+  -File $ENTRY `
+  -Find '  const entryDeadline = resolveRegistrationDeadline(competition);' `
+  -Replace '  const entryDeadline = competition.registrationDeadline
+    ? new Date(competition.registrationDeadline)
+    : null;' `
+  -ExpectRed 'counts down to the same instant the gate compares against'
+
+# The countdown shown to somebody already through the door, beside the red panel saying entry
+# has closed - two statements about the same fact, contradicting each other.
+Probe -Name 'the countdown is shown after the door has already shut' `
+  -File $ENTRY `
+  -Find '    !isUserIn && !registrationClosed && (isActive || isUpcoming);' `
+  -Replace '    !isUserIn;' `
+  -ExpectRed 'is withheld from someone who has already joined or already missed it'
+
+# A deadline-free contest silently given no sentence at all. A player who saw a countdown on
+# another competition then assumes this one hides a deadline too.
+Probe -Name 'a contest with no deadline says nothing rather than saying so' `
+  -File $ENTRY `
+  -Find '                  Entry stays open for as long as this competition is running.' `
+  -Replace '                  {null}' `
+  -ExpectRed 'says something different when no deadline is set, rather than nothing'
+
+# `zeroLabel` dropped, so the countdown reaches zero and reads "Ended" - and this page is
+# server-rendered, so an open tab cannot learn that `registrationClosed` has flipped.
+Probe -Name 'the passed entry deadline reverts to the default wording' `
+  -File $ENTRY `
+  -Find '                    zeroLabel="Closed"' `
+  -Replace '                    className=""' `
+  -ExpectRed 'names the moment as well as the remaining time'
+
+# The absolute time removed, leaving a countdown a player cannot write down.
+Probe -Name 'the entry deadline loses its absolute time' `
+  -File $ENTRY `
+  -Find '                    ({entryDeadline.toUTCString()})' `
+  -Replace '                    ()' `
+  -ExpectRed 'names the moment as well as the remaining time'
+
+# The shared component's default wording changed for every existing caller, which is how an
+# additive prop stops being additive.
+Probe -Name "InlineCountdown's default zero wording is changed for everyone" `
+  -File 'components/trading/InlineCountdown.tsx' `
+  -Find '        setCountdown(zeroLabel ?? (type === "start" ? "Started" : "Ended"));' `
+  -Replace '        setCountdown(zeroLabel ?? "Closed");' `
+  -ExpectRed "keeps the countdown component's default wording for every existing caller"
+
+# The prop left out of the effect's dependencies, so the first render's word sticks.
+Probe -Name 'the zero label is not a dependency of the ticking effect' `
+  -File 'components/trading/InlineCountdown.tsx' `
+  -Find '  }, [targetDate, type, zeroLabel]);' `
+  -Replace '  }, [targetDate, type]);' `
+  -ExpectRed "keeps the countdown component's default wording for every existing caller"
+
+# `null` replaced by a substituted `startTime`, which silently gives every deadline-free contest
+# a door - and `isRegistrationClosed` would then close it.
+Probe -Name 'an absent deadline is substituted with the start time' `
+  -File 'lib/utils/registration-deadline.ts' `
+  -Find '  if (!contest.registrationDeadline) return null;' `
+  -Replace '  if (!contest.registrationDeadline) {
+    return contest.startTime ? new Date(contest.startTime) : null;
+  }' `
+  -ExpectRed 'resolves the deadline as a shared instant, with the clamp intact'
 
 Write-Host "`n=== done ===`n" -ForegroundColor Cyan

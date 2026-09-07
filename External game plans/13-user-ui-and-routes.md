@@ -236,6 +236,53 @@ test. Two of that harness's older probes were **re-aimed rather than left green*
 `!resuming` guard moved onto the new flag, and aimed at the old name a probe reports "did not
 apply", which reads exactly like a broken harness rather than a moved guard.
 
+### 1.1e The two deadlines a player could not see (7 September 2026)
+
+Two moments govern whether a player can act, and neither was on screen. The owner's report was
+that "the user doesn't know the window he has to join". The second half is the same complaint one
+step later: a player who *has* joined, in a contest that reserves a full round, has a cut-off for
+opening a new attempt that is **earlier than the contest end** - and the only thing telling them
+was the pre-flight refusing, after the moment had passed.
+
+**Both are countdowns rather than timestamps, and that is not a style choice.** These pages are
+server-rendered, so an open tab never learns that the door has shut; a printed deadline is a fact
+the reader has to compare against a clock they may not share with the server. `InlineCountdown`
+already existed for the trading hero and needed one addition - a `zeroLabel`, because its default
+reads "Ended" when it lands, and the *contest* has not ended when *entry* closes. The prop is
+optional and the default is pinned by a test, since an additive prop stops being additive the
+moment somebody changes the fallback to suit the newest caller.
+
+**The entry countdown is game-agnostic because it is in `CompetitionEntryButton`**, which both
+lobbies render. It counts to `resolveRegistrationDeadline`, extracted from `isRegistrationClosed`
+rather than reimplemented beside it: that function carries a clamp against `startTime` for
+documents an old bug wrote with a deadline *before* the start, and a second copy forgetting the
+clamp would count down to a moment already past while the gate beside it still admitted the
+player. **A contest with no deadline says so** rather than rendering nothing, because a player who
+saw a countdown on the previous competition otherwise assumes this one is hiding one.
+
+**The attempt cut-off is the arithmetic from `1.1c`, moved so that two screens can share it.**
+`components/games/round-window.ts` is the only producer of it - `fullRoundCutoffMs` and
+`contestReservesFullRound` - and the **negative** assertion is the load-bearing half of the test,
+because importing the module is trivially satisfied by a screen that then subtracts the round
+length again a few lines down, which is exactly what the pre-flight did before the extraction.
+Two properties of the producer are worth stating because the tidier version of each is wrong. It
+**does not know the policy**: folding that in and returning `null` for a permissive contest reads
+like a simplification and destroys the play screen's ability to say how much unshortened time is
+left. And an **absent round length yields no cut-off rather than a guessed one** - treating it as
+zero gives every contest a cut-off equal to its close, which reads correct on the screen and
+gates nothing.
+
+**The lobby's note is policy-aware, and the two branches make opposite promises.** Under
+`reserve_full_round` an attempt has to begin early enough to finish, so nothing is running at the
+close; under `until_window_closes` something is, and it is scored on what the player managed.
+Stating the permissive sentence under both is the failure this replaces - a caution that is right
+in general and wrong in the case being looked at.
+
+**32 probes in `tools/probe-play-clock.ps1`**, all red on exactly the expected test. Three of the
+older ones were **re-aimed rather than left green**, all three for the same reason: the arithmetic
+they targeted moved into the shared module or the note they replaced was reworded. Aimed at the
+old text a probe reports "did not apply", which is indistinguishable from a broken harness.
+
 ### What it does not do
 
 - **No live leaderboard during play** (section 11's polling recommendation is unimplemented). A

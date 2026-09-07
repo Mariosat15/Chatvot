@@ -4,6 +4,7 @@ import { AlertCircle, Clock, Loader2, Play, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatRemaining, useServerClock } from "@/hooks/useServerClock";
 import type { PlayState } from "./play-state";
+import { contestReservesFullRound, fullRoundCutoffMs } from "./round-window";
 
 /**
  * What a player is told before they commit an attempt.
@@ -94,13 +95,18 @@ export function RoundPreflight({
     typeof state.maxRoundSeconds === "number"
       ? state.maxRoundSeconds * 1000
       : null;
+  /*
+    THE CUT-OFF COMES FROM `round-window.ts`, WHICH IS ALSO WHAT THE LOBBY COUNTS DOWN TO.
+
+    It used to be computed here as `now + roundNeedsMs > windowEndMs`. Identical arithmetic, but
+    the lobby now shows a player how long they have left to start, and a lobby that promises
+    time this screen then refuses is worse than a lobby that says nothing. One producer, two
+    readers.
+  */
+  const cutoffMs = fullRoundCutoffMs(windowEndMs, state.maxRoundSeconds);
   const fullRoundNoLongerFits =
-    !resuming &&
-    windowEndMs !== null &&
-    roundNeedsMs !== null &&
-    !windowClosed &&
-    now + roundNeedsMs > windowEndMs;
-  const reservesFullRound = state.roundStartPolicy !== "until_window_closes";
+    !resuming && cutoffMs !== null && !windowClosed && now > cutoffMs;
+  const reservesFullRound = contestReservesFullRound(state.roundStartPolicy);
   const tooLateToStart = fullRoundNoLongerFits && reservesFullRound;
   /*
     How much play time is actually left, stated only when it is less than a full round.
@@ -291,13 +297,13 @@ export function RoundPreflight({
                   of play before the contest closes your round and scores what you
                   managed.
                 </p>
-              ) : reservesFullRound ? (
+              ) : reservesFullRound && cutoffMs !== null ? (
                 <p className="text-xs text-gray-500">
                   A round needs up to{" "}
                   {Math.max(1, Math.round(roundNeedsMs / 60000))} min, so the last one
                   can start{" "}
                   <span className="tabular-nums">
-                    {formatRemaining(windowEndMs - roundNeedsMs - now)}
+                    {formatRemaining(cutoffMs - now)}
                   </span>{" "}
                   from now.
                 </p>

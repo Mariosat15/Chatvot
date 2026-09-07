@@ -6,12 +6,23 @@ interface InlineCountdownProps {
   targetDate: string;
   type: "start" | "end";
   className?: string;
+  /**
+   * What to show once the target has passed, overriding "Started" / "Ended".
+   *
+   * Reason it is a prop rather than a third `type`: the two existing words describe a contest's
+   * own clock, and this component is now also counting down to the entry deadline, where
+   * "Started" would be actively wrong - the contest may not have started, and what closed was
+   * the door. An open page cannot re-render the server's `registrationClosed`, so the word at
+   * zero is the only thing that tells a waiting player the moment has gone.
+   */
+  zeroLabel?: string;
 }
 
 export default function InlineCountdown({
   targetDate,
   type,
   className = "",
+  zeroLabel,
 }: InlineCountdownProps) {
   const [countdown, setCountdown] = useState<string>("");
 
@@ -22,7 +33,7 @@ export default function InlineCountdown({
       const diff = target.getTime() - now.getTime();
 
       if (diff <= 0) {
-        setCountdown(type === "start" ? "Started" : "Ended");
+        setCountdown(zeroLabel ?? (type === "start" ? "Started" : "Ended"));
         return;
       }
 
@@ -48,7 +59,7 @@ export default function InlineCountdown({
     const interval = setInterval(calculateTime, 1000);
 
     return () => clearInterval(interval);
-  }, [targetDate, type]);
+  }, [targetDate, type, zeroLabel]);
 
   return (
     <span className={`tabular-nums ${className}`}>{countdown || "..."}</span>

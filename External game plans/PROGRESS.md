@@ -29,6 +29,7 @@
 | **Money defects closed** | **R26 closed 5 Sep 2026** - the admin cron's finalize copy paid **no** Game Master earnings and recorded no `retained_gm_fee` either, so the commission silently stayed with the platform. This one was **actively losing money rather than latent**: both apps run `checkAndFinalizeCompetitions` on an every-minute cron, so payment depended on which cron won the race. **Not retroactive - no backfill**, and past contests cannot be found by querying for retained rows because none were written. Also **R31** (a 0% Game Master rate paid 5%) and the two P0 score defects, same day |
 | **Game Master creation** | **The permission gate is code-complete 7 Sep 2026** (`19` s3.2a) and the construction half is not - both routes now *refuse* a provider contest with a message naming the missing capability, where before they would have stamped one `gameKey: "provider"` and `gameKey` is immutable. **Do not read it as "Game Masters can run game contests"**; read it as "the platform now knows they cannot". `limits.allowedGameTypes` exists, defaults to `["trading"]`, and is resolved through **one mirrored model-free module** with precedence **override → package → cached limits → default** that reports *which* decided - because "your package does not allow this" sends a Game Master to buy an upgrade that cannot help when an administrator denied it by hand. **Three defects found on the way, none of them about games.** `POST /api/gamemasters/sync-referrals` had **no authentication on either handler** while all four siblings required section access - found by counting handlers against guards, the only technique that finds the file where every neighbour has one; it could not redirect commission, but it could apply an attribution change an operator had withheld and the GET leaked real user ids and names. `update_limits` was a **mass assignment** onto the subdocument holding the daily cap, participant cap and revenue share, updated with the **raw driver** so the schema's own `min: 2` never ran. And the **"Comps: ON" badge was lying** - it read the cached flag under a tooltip crediting the package, so an administrator's explicit deny rendered green while every create was refused. Also: the main route floored `minParticipants` at **1**, which is a paid single-player contest and against a hard constraint. **R47.** The **creation UI is blocked rather than deferred** by `19` s5's economic constraint, not by effort |
 | **The round-start gate** | **Code-complete 7 Sep 2026** (`12` s2.7), from an owner report that a contest which had just opened said *"there is not enough time left in this competition to finish a round"* beside a countdown reading fifty-nine minutes. **It was correct code enforcing a rule nobody had chosen.** Chapter `03` s1.2 reserves the **catalogue ceiling**, not the length the operator configured, so with Circuit Sprint's 300-second ceiling **any contest under five minutes refused every round for its entire duration** - not near the end, from the instant it opened. **And the rule's premise had quietly stopped holding:** it assumes a cut-short round is worth nothing, which was true when a contest was won by *finishing* and is not now that partial performance is the basis for winning. So it became `roundStartPolicy`, a per-contest choice, with the old rule as the **default** rather than deleted - still the right answer for a title where a shortened round means nothing. **Two defaults differ on purpose and will be read as a bug:** the schema reserves, because a schema default fixes future rows only and a pre-existing contest must keep the rule its entrants signed up under; the wizard's new drafts do not. **The disclosure is what makes the permissive branch defensible** - an attempt is consumed on *creation* and cannot be handed back, so the player is told how much time they will actually get, on the panel and on the button. Shipped with **auto-publish** (a checkbox, default on, whose flag deliberately never reaches the server, because publishing re-runs the pre-flight against the **stored** record) and the two smaller reports: a finished contest says **"Competition ended"**, and a provider participant is now **redirected to `/results`** like a trading one. **48 probes across three harnesses** |
+| **The two deadlines a player could not see** | **Code-complete 7 Sep 2026** (`13` s1.1e), the last of the owner's report on this screen. Neither moment that governs whether a player may act was on screen: **when entry closes**, and **the last instant a full attempt can be started**, which in a contest that reserves a full round is earlier than the contest end. **Both are countdowns rather than timestamps** because these pages are server-rendered - an open tab never learns the door has shut. The entry one is **game-agnostic by placement rather than by a branch**, living in `CompetitionEntryButton`, which both lobbies already render, so trading got it for nothing; it counts to `resolveRegistrationDeadline`, **extracted from `isRegistrationClosed`** rather than written beside it, because that function clamps against `startTime` for documents an old bug wrote with a deadline *before* the start and a forgetful copy would count down to a moment already past while the gate beside it still admitted the player. The attempt cut-off is s1.1c's arithmetic **moved into one producer** (`components/games/round-window.ts`) so the lobby and the play screen cannot disagree, and the **negative** assertion is the load-bearing half - importing it is trivially satisfied by a screen that recomputes it five lines later, which is what the pre-flight did. Two places where the tidier version is wrong: the producer **does not know the policy**, and an **absent round length yields no cut-off rather than a guessed one**. **32 probes**, of which **three older ones were re-aimed rather than left green** - the standing cost of an extraction |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
 | **Phase in progress** | **X4a - STARTED 6 Sep 2026. The two halves connected 7 Sep 2026** - see the row above and `21` s4.1d. What remains is the *clicking* half: the provider has still never been registered through the admin screens, and nothing has been deployed. `games-service/` (the provider) and the `chartvolt-games` adapter (the platform) are both code-complete. **The game is playable by a human**: the launch URL serves a real board, verified in a browser on both titles, which also fixed a live defect - an unstarted round reported itself as `finished`, so the first screen a paying player saw was a result screen for a round they had not played. It also **found and then closed a defect in the platform's own published auth scheme** (**R34**): there was no `callbackToken` field anywhere, so a provider implementing `Bearer {CALLBACK_TOKEN}` exactly was rejected and logged as a probable attack. Latent throughout, so nothing was backfilled. **Nothing technical now stands between the two halves** - what remains is deploying the service and registering it. It is now **deployable**: a PM2 entry, an nginx block for a `games.` subdomain, `env.example` and a `deploy/README.md` runbook, plus **two production-only boot guards** for the play origin and the frame allowlist, both of which previously failed invisibly. Writing the runbook also found that the admin panel **could not register a loopback provider at all**. See the three 6 Sep work-log entries |
 | **Next phase, scope decided** | **X4a - ChartVolt as a first-party provider, with a real playable game** (`21`), **3.5-5 weeks**, starting before the provider health panel. It exists because **the review gate the programme is sequenced around cannot currently be held**: `mock.adapter.ts` returns a hostname that does not resolve, so the play screen's iframe fails to load and the final step has never been performed by a person. **Owner decided 5 Sep 2026 that it is both** the reference implementation *and* open question 10's hedge game - which **modifies the 2 Sep "no in-house game is built" decision** and is recorded in the decision log rather than by editing that entry. **No commercial dependency.** Two things not to misread: **risk X8 is reduced when it ships, not now**, and X4a **shrinks X4 without replacing it** - a provider we control cannot rehearse a real partner's auth, error shapes, latency or pricing |
@@ -734,9 +735,61 @@ written and the probe re-aimed at it and its own suite. Two older probes in
 reads like a broken harness rather than a moved guard.
 
 **Deferred:** nothing from this slice. The two remaining items from the owner's report are
-separate: the **entry countdown** wording for a player deciding whether to join, and confirming
-that a **partial run scores** end to end in `games-service` rather than only being rankable in
-principle.
+separate: the **entry countdown** wording for a player deciding whether to join (**done the same
+day** - see the entry below), and confirming that a **partial run scores** end to end in
+`games-service` rather than only being rankable in principle.
+
+### 7 Sep 2026 - X6 / `13` s1.1e - THE TWO DEADLINES A PLAYER COULD NOT SEE
+
+**Shipped:** the countdown to entry closing, on both lobbies, and the countdown to the last
+moment an attempt can be started, in the game lobby. From the owner's report that "the user
+doesn't know the window he has to join". `13` s1.1e is the authoritative account.
+
+**Both are countdowns rather than timestamps, and that is the reason rather than the style.**
+These pages are server-rendered, so an open tab never learns the door has shut. `InlineCountdown`
+already existed and needed one addition, `zeroLabel`, because its default lands on "Ended" and
+the **contest** has not ended when **entry** closes. Optional prop, default pinned by a test:
+an additive prop stops being additive the moment somebody retunes the fallback for the newest
+caller.
+
+**Game-agnostic by placement, not by a branch.** The entry countdown lives in
+`CompetitionEntryButton`, which both lobbies already render, so trading got it for nothing.
+
+**`resolveRegistrationDeadline` was extracted from `isRegistrationClosed`, not written beside
+it.** That function clamps against `startTime` for documents an old bug wrote with a deadline
+*before* the start; a fresh copy forgetting the clamp counts down to a moment already past while
+the gate next to it still admits the player - the "one rule, two copies" shape behind
+`referenceId`, `failedReason`, `challengeId` and the Game Master `||`. **A contest with no
+deadline says so**, because a player who saw a countdown on the previous competition otherwise
+assumes this one hides one.
+
+**The attempt cut-off is s1.1c's arithmetic moved into `components/games/round-window.ts` so two
+screens can share one producer**, and the **negative** assertion is the load-bearing half -
+importing the module is trivially satisfied by a screen that subtracts the round length again
+five lines later, which is what the pre-flight did before the extraction. Two properties where
+the tidier version is wrong: the producer **does not know the policy** (folding it in and
+returning `null` for a permissive contest reads as a simplification and destroys the play
+screen's ability to say how much unshortened time is left), and an **absent round length yields
+no cut-off rather than a guessed one** (treating it as zero gives every contest a cut-off equal
+to its close, which reads correct and gates nothing).
+
+**The lobby's play-window note is now policy-aware, and its two branches make opposite
+promises** - nothing is running at the close under `reserve_full_round`, something is under
+`until_window_closes`. One sentence for both is a caution right in general and wrong in the case
+being looked at, the same class as an aggregate that quietly means trading only.
+
+**Tests:** whole suite **1361 passed** (66 files). **32 probes in `probe-play-clock.ps1`, all red
+on exactly the expected test** - 17 existing plus 15 new. Main typecheck at its pre-existing 198
+with none in the touched files, touched files lint clean at `--max-warnings=0`.
+
+**Three older probes were re-aimed rather than left green**, all for one reason: the arithmetic
+they targeted moved into the shared module, or the note they replaced was reworded. Aimed at the
+old text a probe reports "did not apply", which is indistinguishable from a broken harness. That
+is now the standing cost of an extraction - **budget for re-aiming the probes that pointed at the
+code you moved.**
+
+**Deferred:** nothing here. The last item from the owner's report is confirming a **partial run
+scores** end to end.
 
 **Next chat should:** verify partial scoring end to end - a `circuit-sprint` round cut short by
 the contest clock must deliver a score for the boards completed, not nothing. The platform now

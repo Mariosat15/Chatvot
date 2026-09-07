@@ -14,6 +14,7 @@ import {
   Lock,
   TrendingUp,
   Flag,
+  Clock,
 } from "lucide-react";
 import { enterCompetition } from "@/lib/actions/trading/competition.actions";
 import { useRouter } from "next/navigation";
@@ -26,6 +27,8 @@ import ActionTermsDialog, {
   ACTION_TERM_SLUGS,
 } from "@/components/ActionTermsDialog";
 import { isProviderContest } from "@/lib/services/games/contest-config";
+import InlineCountdown from "@/components/trading/InlineCountdown";
+import { resolveRegistrationDeadline } from "@/lib/utils/registration-deadline";
 
 // Level names for display
 const LEVEL_NAMES: Record<number, { icon: string; title: string }> = {
@@ -151,6 +154,30 @@ export default function CompetitionEntryButton({
     !isUserIn &&
     meetsLevelReq &&
     !registrationClosed;
+
+  /*
+    HOW LONG IS LEFT TO JOIN, which this panel never said.
+
+    The owner's report: a player could see that a competition started in four minutes and had
+    no way to know that four minutes was also all the time they had to enter. The panel said
+    "Registration Closed" once the door had already shut, which is the one moment the fact is
+    of no use to them.
+
+    It reads the SAME instant the gate compares against - `resolveRegistrationDeadline` was
+    split out of `isRegistrationClosed` for this, rather than the deadline being recomputed
+    here. Recomputing it would mean a countdown reaching zero while the button stayed open, or
+    the reverse, the first time that function's clamp against `startTime` changed. That clamp is
+    not hypothetical: it exists because an old bug wrote deadlines an hour BEFORE the start, and
+    a copy of this rule that forgot it would tell those players entry closed before it opened.
+
+    A contest with no deadline is a real configuration rather than a missing value, so it gets
+    its own sentence instead of a countdown to a substituted `startTime`. Saying nothing would
+    leave a player who has seen the countdown on one competition assuming this one has a hidden
+    deadline too.
+  */
+  const entryDeadline = resolveRegistrationDeadline(competition);
+  const showEntryCountdown =
+    !isUserIn && !registrationClosed && (isActive || isUpcoming);
 
   // Check if user is disqualified (liquidated or disqualified status)
   const isDisqualified =
@@ -375,6 +402,53 @@ export default function CompetitionEntryButton({
               </div>
             </div>
           </div>
+
+          {/*
+            THE DOOR, ABOVE THE CONTROL THAT OPENS IT.
+
+            Placed before the button rather than under it because it is the fact that decides
+            whether to press it now, and a player who scrolls no further has still seen it.
+
+            The absolute time sits beside the countdown for a player planning when to come back,
+            the same pairing the play screen uses - a bare countdown cannot be written down and
+            a bare timestamp asks them to subtract two times in their head, one of them in a
+            zone they do not live in.
+
+            `zeroLabel` matters more than it looks. This page is server-rendered, so an open tab
+            cannot learn that `registrationClosed` has flipped; without it the countdown would
+            reach zero and read "Started", which is wrong twice over - the competition may not
+            have started, and what happened is that entry closed.
+          */}
+          {showEntryCountdown && (
+            <div className="flex items-start gap-2 rounded-lg border border-gray-700 bg-gray-900/60 p-3">
+              <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+              {entryDeadline ? (
+                <p className="text-xs text-gray-300">
+                  Entry closes in{" "}
+                  <InlineCountdown
+                    targetDate={entryDeadline.toISOString()}
+                    type="end"
+                    zeroLabel="Closed"
+                    className="font-semibold text-amber-300"
+                  />
+                  <span className="ml-1 text-gray-500">
+                    ({entryDeadline.toUTCString()})
+                  </span>
+                  <span className="mt-1 block text-gray-500">
+                    After that no new entries are accepted, whether or not the
+                    competition is still running.
+                  </span>
+                </p>
+              ) : (
+                <p className="text-xs text-gray-300">
+                  Entry stays open for as long as this competition is running.
+                  {isProviderGame
+                    ? " Joining later leaves you less time to play."
+                    : " Joining later leaves you less time to trade."}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Entry Button */}
           <Button

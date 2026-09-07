@@ -32,6 +32,10 @@ import {
 import { NEON_PANEL } from "@/components/neon/tokens";
 import { getPlayState } from "@/lib/services/games/round-status.service";
 import { isProviderContest } from "@/lib/services/games/contest-config";
+import {
+  contestReservesFullRound,
+  fullRoundCutoffMs,
+} from "@/components/games/round-window";
 
 /**
  * The lobby a player sees for a contest played through a game provider.
@@ -204,6 +208,31 @@ export default async function ProviderContestLobby({
     "Started"/"Ended" wording to drift.
   */
   const countdownTarget = isActive ? competition.endTime : competition.startTime;
+
+  /*
+    THE DOOR ON STARTING AN ATTEMPT, which is a different clock from the contest's end and was
+    shown on neither this screen nor anywhere a player looks before travelling to the play
+    screen. The owner's report was about the entry deadline; this is its sibling, and the two
+    are easy to conflate: one is the last moment to *join*, this is the last moment to *start*.
+
+    Derived from `fullRoundCutoffMs`, the same producer `RoundPreflight` uses to decide whether
+    Play is still offered. A second expression here would eventually promise time the play
+    screen refuses, which is worse than saying nothing at all.
+
+    Only for a player holding a seat, because `state` is the authoritative source and a player
+    without one has no attempts to start. Only while the cut-off is real: under
+    `until_window_closes` there is none, and implying one would send a player away believing
+    they had missed a deadline that does not exist.
+  */
+  const playWindowEndMs = state?.playWindowEnd
+    ? new Date(state.playWindowEnd).getTime()
+    : null;
+  const attemptCutoffMs = state
+    ? fullRoundCutoffMs(playWindowEndMs, state.maxRoundSeconds)
+    : null;
+  const reservesFullRound = state
+    ? contestReservesFullRound(state.roundStartPolicy)
+    : true;
 
   return (
     <div className="flex min-h-screen flex-col gap-4 overflow-x-hidden p-3 sm:gap-6 sm:p-4 md:p-8">
@@ -422,6 +451,34 @@ export default async function ProviderContestLobby({
                     }
                   />
                 )}
+                {/*
+                  THE SECOND DEADLINE, AND THE ONE PLAYERS MISS. Under `reserve_full_round` the
+                  last attempt has to begin a full round before the window shuts, so a player
+                  watching "Closes in 4m" on a game whose rounds run five minutes has in fact
+                  already missed it. Stating the contest's close and staying silent about this
+                  one is how a player arrives at the play screen to find Play disabled with
+                  time visibly left on the clock they were shown.
+
+                  `zeroLabel` is "Passed" rather than "Ended", because the contest has not
+                  ended - only the chance to open a new round has, and a player with a round
+                  already running may still finish it.
+                */}
+                {isActive &&
+                  reservesFullRound &&
+                  attemptCutoffMs !== null &&
+                  attemptCutoffMs > Date.now() && (
+                    <NeonRow
+                      label="Last attempt can start in"
+                      accent="waiting"
+                      value={
+                        <InlineCountdown
+                          targetDate={new Date(attemptCutoffMs).toISOString()}
+                          type="end"
+                          zeroLabel="Passed"
+                        />
+                      }
+                    />
+                  )}
               </div>
               {/*
                 THIS NOTE USED TO SAY THE PLAY WINDOW COULD BE NARROWER THAN THE COMPETITION,
@@ -432,10 +489,25 @@ export default async function ProviderContestLobby({
                 because the fact players actually need is what happens to a round still open
                 when the clock runs out.
               */}
+              {/*
+                THE SECOND HALF OF THE SENTENCE DEPENDS ON THE POLICY, and getting it wrong is
+                not harmless in either direction.
+
+                Under `reserve_full_round` a round cannot still be running at the close - that
+                is the entire point of holding time back - so promising that it would be closed
+                and scored describes a situation the contest has made impossible, and a player
+                reading it concludes they may start whenever they like. Under
+                `until_window_closes` the opposite is true and must be said, because it is the
+                fact that makes a shortened attempt worth taking at all.
+
+                It defaults to the reserving wording for a player with no seat, matching the
+                schema default rather than the wizard's.
+              */}
               <NeonNote>
-                Every player gets the same window. Any round still open when it
-                closes is closed with the competition, and the scores stand as
-                they were.
+                Every player gets the same window.{" "}
+                {reservesFullRound
+                  ? "An attempt has to begin early enough to finish inside it, so the last one starts before the window shuts."
+                  : "You can start an attempt at any time until it shuts, and anything still running then is closed with the competition and scored on what you managed."}
               </NeonNote>
             </NeonPanel>
           )}
