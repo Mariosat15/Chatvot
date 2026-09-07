@@ -93,6 +93,15 @@ export interface PlayState {
    */
   maxRoundSeconds?: number;
   /**
+   * Whether this contest stops new rounds one full round before it ends.
+   *
+   * Sent because the pre-flight mirrors the launch service's gate, and since 7 September 2026
+   * that gate is the contest's choice rather than a platform rule. Deriving it on the client
+   * from anything else - the window length, the game - would be a second copy of a decision
+   * only the stored contest can answer.
+   */
+  roundStartPolicy: "reserve_full_round" | "until_window_closes";
+  /**
    * Whether an operator has paused the contest, and why.
    *
    * Carried separately from `contestStatus` because a paused contest is still `active` - the
@@ -284,6 +293,10 @@ export async function getPlayState(
           typeof title?.maxDurationSeconds === "number"
             ? title.maxDurationSeconds
             : undefined,
+        // From the normalised config, never from `contest.roundStartPolicy` directly, so the
+        // screen and the gate cannot resolve an unrecognised stored value differently.
+        roundStartPolicy:
+          config.config.roundStartPolicy ?? "reserve_full_round",
         isPaused: contest.isPaused === true,
         pauseReason: contest.pauseReason,
         gameKey: contest.gameKey,

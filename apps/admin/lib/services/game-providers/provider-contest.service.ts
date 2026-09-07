@@ -13,6 +13,7 @@ import { runPreflight } from "@/lib/services/games/contest-preflight";
 import type { PreflightResult } from "@/lib/services/games/contest-preflight";
 import type {
   AttemptsPolicy,
+  RoundStartPolicy,
   UnresolvedRoundPolicy,
   UnscoredContestPolicy,
 } from "@/lib/services/games/round-types";
@@ -62,6 +63,8 @@ export interface CreateProviderContestInput {
   unresolvedRoundPolicy: UnresolvedRoundPolicy;
   /** Owner decision, 7 Sep 2026. See `UnscoredContestPolicy`. */
   unscoredContestPolicy?: UnscoredContestPolicy;
+  /** Owner decision, 7 Sep 2026. See `RoundStartPolicy`. */
+  roundStartPolicy?: RoundStartPolicy;
   resultGracePeriodSeconds: number;
   perRoundCostAcknowledged?: boolean;
 
@@ -166,6 +169,7 @@ export async function preflightProviderContest(
     | "attemptsPolicy"
     | "attemptsAllowed"
     | "unresolvedRoundPolicy"
+    | "roundStartPolicy"
     | "resultGracePeriodSeconds"
     | "perRoundCostAcknowledged"
   >,
@@ -228,6 +232,10 @@ export async function preflightProviderContest(
     attemptsPolicy: input.attemptsPolicy,
     attemptsAllowed: input.attemptsAllowed,
     unresolvedRoundPolicy: input.unresolvedRoundPolicy,
+    // Reason it is passed rather than left to the checker's default: the same short contest
+    // is a hard refusal under one policy and a warning under the other, so omitting it would
+    // refuse exactly the contests the permissive setting exists to allow.
+    roundStartPolicy: input.roundStartPolicy,
     perRoundCostAcknowledged: input.perRoundCostAcknowledged,
     // The catalogue already records this, so the sandbox check reads a real fact rather
     // than a placeholder. It is set when a round for this title last completed
@@ -308,6 +316,10 @@ export async function createProviderContest(
       // `unclaimed_pool`, so omitting it on a NEW provider contest would silently give the
       // operator the trading answer while the wizard showed them the refund selected.
       unscoredContestPolicy: input.unscoredContestPolicy ?? "refund_entry_fees",
+      // Same reasoning as the line above, one field along: the schema default reserves a full
+      // round, so omitting it would give a new contest the gate the owner asked us to stop
+      // applying by default while the wizard showed the permissive option selected.
+      roundStartPolicy: input.roundStartPolicy ?? "until_window_closes",
 
       entryFee: input.entryFee,
       minParticipants: input.minParticipants,

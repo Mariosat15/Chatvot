@@ -384,6 +384,84 @@ describe("RoundService - creation and attempts", () => {
     if (!outcome.success) expect(outcome.refusal).toBe("play_window_too_short");
   });
 
+  it("starts that same round, shortened, when the contest lets players start at any time", async () => {
+    /*
+      THE OTHER HALF OF THE GATE ABOVE, and the reason the setting exists.
+
+      Reserving the catalogue ceiling made a contest shorter than that ceiling refuse every
+      round from the instant it opened - the owner's report was a Circuit Sprint contest
+      showing "not enough time left" beside a countdown reading minutes. 300-second ceiling,
+      so anything under five minutes was unplayable however it was configured.
+
+      Asserted on the STORED round rather than on the refusal code, because the interesting
+      claim is not that it was permitted - it is that the round the player gets is bounded by
+      the contest and cannot outlive it. A permissive policy that also lifted the clamp would
+      leave a round running after settlement had ranked everybody.
+    */
+    const contestId = await seedCompetition();
+    const playWindowEnd = new Date(Date.now() + 60_000);
+
+    const outcome = await createRound({
+      providerKey: MOCK_PROVIDER_KEY,
+      gameCode: GAME_CODE,
+      gameKey: GAME_KEY,
+      userId: new Types.ObjectId().toString(),
+      contestType: "competition",
+      contestId,
+      config: contestConfig({
+        playWindowEnd,
+        roundStartPolicy: "until_window_closes",
+      }),
+      returnUrl: "https://chartvolt.test/return",
+      resultCallbackUrl: "https://chartvolt.test/cb",
+    });
+
+    expect(outcome.success).toBe(true);
+    if (!outcome.success) return;
+
+    const round = await GameRound.findOne({ roundId: outcome.roundId });
+    expect(round!.expiresAt.getTime()).toBeLessThanOrEqual(playWindowEnd.getTime());
+    // And genuinely shortened: well under the 300-second ceiling the gate used to demand.
+    expect(round!.expiresAt.getTime() - Date.now()).toBeLessThan(300_000);
+  });
+
+  it("still refuses once the window has actually closed, under either policy", async () => {
+    /*
+      The guard against reading the permissive policy as "no window check at all". A closed
+      window is a different fact from a narrow one: the contest is over, so a round started
+      then would be created with an expiry already in the past and scored on nothing.
+
+      Note the refusal differs from the one above - `play_window_closed`, not
+      `play_window_too_short` - and asserting it here rather than merely asserting a refusal
+      is what keeps the two facts distinguishable. Collapsing them would let a player be told
+      the contest is too short when it has simply ended.
+    */
+    const contestId = await seedCompetition();
+
+    for (const roundStartPolicy of [
+      "reserve_full_round",
+      "until_window_closes",
+    ] as const) {
+      const outcome = await createRound({
+        providerKey: MOCK_PROVIDER_KEY,
+        gameCode: GAME_CODE,
+        gameKey: GAME_KEY,
+        userId: new Types.ObjectId().toString(),
+        contestType: "competition",
+        contestId,
+        config: contestConfig({
+          playWindowEnd: new Date(Date.now() - 1_000),
+          roundStartPolicy,
+        }),
+        returnUrl: "https://chartvolt.test/return",
+        resultCallbackUrl: "https://chartvolt.test/cb",
+      });
+
+      expect(outcome.success).toBe(false);
+      if (!outcome.success) expect(outcome.refusal).toBe("play_window_closed");
+    }
+  });
+
   it("never sets expiresAt beyond the play window end", async () => {
     const contestId = await seedCompetition();
     const playWindowEnd = new Date(Date.now() + 4 * 60 * 1000);

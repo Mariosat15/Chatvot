@@ -73,13 +73,18 @@ export function RoundPreflight({
   const windowClosed = windowEndMs !== null ? windowEndMs <= now : false;
 
   /*
-    NO ROOM LEFT FOR A ROUND, which the player used to discover by pressing Play.
+    NO ROOM LEFT FOR A ROUND, which is now the CONTEST'S RULE rather than the platform's.
 
-    `createRound` refuses when `now + maxDurationSeconds > playWindowEnd`, and it is right to:
-    a round cut short by the window would be scored on a partial game. But the refusal arrived
-    as a red box after the click, next to a fully enabled button - the exact screen in the
-    owner's report. Stating it up front turns it from an error into an explanation, and the
-    countdown below says how long is left before it applies.
+    `createRound` refuses when `now + maxDurationSeconds > playWindowEnd`, but only while the
+    contest is on `reserve_full_round`. See `RoundStartPolicy` in `round-types.ts` for why that
+    stopped being unconditional; the part that matters here is that the number being reserved
+    is the CATALOGUE ceiling, so this used to disable Play for the entire life of any contest
+    shorter than it - beside a countdown saying minutes remained. That was the owner's report.
+
+    Under `until_window_closes` the round is permitted and SHORTENED, so this screen owes the
+    player the length they will actually get before they spend an attempt on it. That
+    disclosure is the whole reason the permissive branch is defensible, so it is not optional
+    decoration - see `shortenedMs` below.
 
     Only when we know the duration. An absent `maxRoundSeconds` applies no gate rather than
     guessing, because a guess that disables the button is worse than leaving the server's
@@ -89,12 +94,26 @@ export function RoundPreflight({
     typeof state.maxRoundSeconds === "number"
       ? state.maxRoundSeconds * 1000
       : null;
-  const tooLateToStart =
+  const fullRoundNoLongerFits =
     !resuming &&
     windowEndMs !== null &&
     roundNeedsMs !== null &&
     !windowClosed &&
     now + roundNeedsMs > windowEndMs;
+  const reservesFullRound = state.roundStartPolicy !== "until_window_closes";
+  const tooLateToStart = fullRoundNoLongerFits && reservesFullRound;
+  /*
+    How much play time is actually left, stated only when it is less than a full round.
+
+    Reason it is derived from the window rather than from the round: `resolveExpiry` clamps
+    `expiresAt` to `playWindowEnd`, so this IS the length the player will get, not an estimate
+    of it. A figure that merely approximated the server's clamp would drift from it the first
+    time either side changed.
+  */
+  const shortenedMs =
+    fullRoundNoLongerFits && !reservesFullRound && windowEndMs !== null
+      ? windowEndMs - now
+      : null;
 
   /*
     THE CONTEST'S OWN STATE, which this screen used to ignore entirely - it read attempts and
@@ -181,7 +200,13 @@ export function RoundPreflight({
                   ? "No attempts left"
                   : resuming
                     ? "Resume your round"
-                    : "Play";
+                    : // Reason the shortening reaches the button and not only the panel above:
+                      // the button is the thing being pressed, and a player who has skimmed
+                      // the panel should still not be able to spend an attempt without having
+                      // seen that this round is not a full one.
+                      shortenedMs !== null
+                      ? "Play a shortened round"
+                      : "Play";
 
   return (
     <div className="space-y-4 rounded-xl border border-gray-700 bg-gray-800/50 p-6">
@@ -243,21 +268,47 @@ export function RoundPreflight({
               </span>
             </p>
             {/*
-              Stated only while a round still fits, because once it does not the blocked panel
-              above says so outright and two panels about the same clock contradict each other
-              in tone. The purpose of this line is to let a player see the cut-off approaching
-              while they can still do something about it.
+              THREE SENTENCES FOR THREE SITUATIONS, and they must not be collapsed into one.
+
+              A cut-off that exists is a deadline the player can plan around; a cut-off that
+              does not exist must not be implied, or a player leaves and comes back to find
+              they could have played all along. And once a round no longer fits, the honest
+              thing is the length they will actually get - see `shortenedMs`.
+
+              Nothing is said while `tooLateToStart`, because the blocked panel above already
+              states it outright and two panels about the same clock contradict each other in
+              tone.
             */}
-            {roundNeedsMs !== null && !tooLateToStart && !resuming && (
-              <p className="text-xs text-gray-500">
-                A round needs up to {Math.max(1, Math.round(roundNeedsMs / 60000))}{" "}
-                min, so the last one can start{" "}
-                <span className="tabular-nums">
-                  {formatRemaining(windowEndMs - roundNeedsMs - now)}
-                </span>{" "}
-                from now.
-              </p>
-            )}
+            {roundNeedsMs !== null &&
+              !tooLateToStart &&
+              !resuming &&
+              (shortenedMs !== null ? (
+                <p className="text-xs text-amber-300/90">
+                  Less than a full round is left. Start now and you get{" "}
+                  <span className="font-semibold tabular-nums">
+                    {formatRemaining(shortenedMs)}
+                  </span>{" "}
+                  of play before the contest closes your round and scores what you
+                  managed.
+                </p>
+              ) : reservesFullRound ? (
+                <p className="text-xs text-gray-500">
+                  A round needs up to{" "}
+                  {Math.max(1, Math.round(roundNeedsMs / 60000))} min, so the last one
+                  can start{" "}
+                  <span className="tabular-nums">
+                    {formatRemaining(windowEndMs - roundNeedsMs - now)}
+                  </span>{" "}
+                  from now.
+                </p>
+              ) : (
+                <p className="text-xs text-gray-500">
+                  A round runs up to{" "}
+                  {Math.max(1, Math.round(roundNeedsMs / 60000))} min. You can start one
+                  at any time until the contest ends - anything still running then is
+                  closed and scored on what you managed.
+                </p>
+              ))}
           </div>
         </div>
       )}

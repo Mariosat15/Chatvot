@@ -29,6 +29,7 @@ export interface ProviderContestFields {
   attemptsPolicy?: string;
   attemptsAllowed?: number;
   unresolvedRoundPolicy?: string;
+  roundStartPolicy?: string;
 }
 
 /**
@@ -119,6 +120,13 @@ export function contestRoundConfig(
         attemptsPolicy === "single" ? undefined : contest.attemptsAllowed,
       playWindowEnd: contest.playWindowEnd,
       contentSeed: contest.contentSeed,
+      // Reason for the explicit comparison rather than a cast: an unrecognised stored value
+      // must fall back to the reserving branch, which is the safe one. A cast would carry a
+      // typo straight into the gate and open play the operator never asked to open.
+      roundStartPolicy:
+        contest.roundStartPolicy === "until_window_closes"
+          ? "until_window_closes"
+          : "reserve_full_round",
       settings: contest.gameConfig?.settings,
     },
   };

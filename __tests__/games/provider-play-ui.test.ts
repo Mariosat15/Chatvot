@@ -1123,8 +1123,7 @@ describe("the play screen counts down on the server's clock", () => {
     const code = readCode(PREFLIGHT);
 
     /*
-      Mirrors `createRound`'s refusal, which is right to exist - a round cut short by the window
-      would be scored on a partial game. What was wrong was WHERE the player met it: a red box
+      Mirrors `createRound`'s refusal. What was wrong was WHERE the player met it: a red box
       after the click, beside a fully enabled button.
 
       Asserting the comparison, not the flag's name: `tooLateToStart` appears in the blocked
@@ -1135,7 +1134,13 @@ describe("the play screen counts down on the server's clock", () => {
 
     // And it must not fire on a resume, which reopens the round the player already has and so
     // needs no fresh room in the window.
-    expect(code).toMatch(/tooLateToStart\s*=\s*\n?\s*!resuming/);
+    //
+    // Asserted on `fullRoundNoLongerFits`, which is where the arithmetic and the `!resuming`
+    // guard now live. `tooLateToStart` is that AND the contest's start policy, since 7 Sep
+    // 2026 - see the test below. Reading `!resuming` off the derived flag instead would go
+    // green on a version that dropped it from the arithmetic and reintroduced it later.
+    expect(code).toMatch(/fullRoundNoLongerFits\s*=\s*\n?\s*!resuming/);
+    expect(code).toMatch(/tooLateToStart\s*=\s*fullRoundNoLongerFits/);
 
     // An unknown round length applies NO gate rather than guessing. A guess that disables the
     // button is worse than letting the server name the real reason.
@@ -1237,5 +1242,94 @@ describe("the game lobby shows a joined player the clock", () => {
     // Replaced rather than deleted: the fact players actually need is what happens to a round
     // still open when the clock runs out, which is the owner's question about the universal cut-off.
     expect(code).toMatch(/Every player gets the same window/);
+  });
+});
+
+describe("the round-start policy reaches the player", () => {
+  /*
+    THE REFUSAL THE OWNER SAW, and it was not a wording problem. `tooLateToStart` reserved the
+    catalogue ceiling, so a contest shorter than that ceiling withheld Play from the moment it
+    opened - "there is not enough time left in this competition" above a countdown reading
+    fifty-nine minutes. Circuit Sprint's ceiling is 300 seconds, so every contest under five
+    minutes was unplayable no matter how it was configured.
+  */
+
+  it("offers a shortened round instead of refusing, when the contest allows it", () => {
+    const code = readCode(PREFLIGHT);
+
+    // The arithmetic is unchanged and the POLICY is a separate term, so the two facts stay
+    // separable: whether a full round still fits, and whether this contest insists on one.
+    expect(code).toMatch(
+      /reservesFullRound = state\.roundStartPolicy !== "until_window_closes"/,
+    );
+    expect(code).toMatch(
+      /tooLateToStart = fullRoundNoLongerFits && reservesFullRound/,
+    );
+  });
+
+  it("tells the player how long they will actually get before they spend the attempt", () => {
+    const code = readCode(PREFLIGHT);
+
+    /*
+      THE DISCLOSURE IS WHAT MAKES THE PERMISSIVE BRANCH DEFENSIBLE, so it is not decoration.
+      An attempt is consumed on creation and cannot be handed back; a player who starts a
+      four-minute game with ninety seconds left and is not told has been charged for a game
+      they could never finish.
+
+      Derived from the WINDOW, not from the round length, because `resolveExpiry` clamps
+      `expiresAt` to `playWindowEnd` - so this is the length the server will grant rather than
+      an estimate of it. A figure computed the other way drifts from the clamp the first time
+      either side changes.
+    */
+    expect(code).toMatch(/shortenedMs\s*=\s*\n?\s*fullRoundNoLongerFits && !reservesFullRound/);
+    expect(code).toMatch(/windowEndMs - now/);
+
+    /*
+      It must reach the BUTTON, not only a paragraph. The button is the thing being pressed,
+      and a player who has skimmed the panel should still not be able to spend an attempt
+      without having seen that this round is a short one.
+    */
+    const label = code.slice(
+      code.indexOf("const buttonLabel ="),
+      code.indexOf("return ("),
+    );
+    expect(label.length).toBeGreaterThan(200);
+    expect(label).toMatch(/shortenedMs !== null/);
+  });
+
+  it("takes the policy from the server's normalised config, never from the contest field", () => {
+    const service = readCode("lib/services/games/round-status.service.ts");
+
+    /*
+      The same rule as `maxRoundSeconds` and the market-hours gate: the value the screen shows
+      must come from the place the gate reads. `contest-config.ts` normalises an unrecognised
+      or absent value to `reserve_full_round`; reading `contest.roundStartPolicy` straight off
+      the document would let a bad stored value offer a button `round.service.ts` refuses.
+    */
+    expect(service).toMatch(/config\.config\.roundStartPolicy \?\? "reserve_full_round"/);
+    expect(service).not.toMatch(/contest\.roundStartPolicy/);
+  });
+
+  it("is a field on the client's own PlayState, pinned to the service's", () => {
+    // `components/games/play-state.ts` is a deliberate second copy - the service imports
+    // Mongoose models and cannot be pulled into the browser - so the two field lists are held
+    // together by a test rather than by the compiler.
+    expect(readCode("components/games/play-state.ts")).toMatch(
+      /roundStartPolicy: "reserve_full_round" \| "until_window_closes"/,
+    );
+  });
+
+  it("gates the server on the same policy, and permits the round rather than shortening it", () => {
+    const service = readCode("lib/services/games/round.service.ts");
+
+    /*
+      The gate returns early, so the round is created and `resolveExpiry` clamps it. That
+      ordering matters: shortening the requested duration here instead would tell the provider
+      a round is 90 seconds long while the platform still expects the title's own result
+      shape, and the two would disagree about what a finished round looks like.
+    */
+    expect(service).toMatch(
+      /if \(config\.roundStartPolicy === "until_window_closes"\) return true/,
+    );
   });
 });

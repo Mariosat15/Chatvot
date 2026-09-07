@@ -7,8 +7,10 @@ import {
   preflightProviderContest,
 } from "@/lib/services/game-providers/provider-contest.service";
 import {
+  ROUND_START_POLICIES,
   UNSCORED_CONTEST_POLICIES,
   type AttemptsPolicy,
+  type RoundStartPolicy,
   type UnresolvedRoundPolicy,
   type UnscoredContestPolicy,
 } from "@/lib/services/games/round-types";
@@ -45,6 +47,7 @@ interface ContestBody {
   attemptsAllowed?: number;
   unresolvedRoundPolicy?: UnresolvedRoundPolicy;
   unscoredContestPolicy?: UnscoredContestPolicy;
+  roundStartPolicy?: RoundStartPolicy;
   resultGracePeriodSeconds?: number;
   perRoundCostAcknowledged?: boolean;
 }
@@ -94,6 +97,22 @@ export async function POST(request: NextRequest) {
       attemptsPolicy: body.attemptsPolicy ?? "single",
       attemptsAllowed: body.attemptsAllowed,
       unresolvedRoundPolicy: body.unresolvedRoundPolicy ?? "score_zero",
+      /*
+        IN `shared`, SO THE PRE-FLIGHT SEES IT TOO. The same short contest is a hard refusal
+        under one policy and a warning under the other, so leaving it out of the check would
+        refuse exactly the contests this setting exists to permit - and the operator would be
+        refused on the review step by a rule the form had just let them turn off.
+
+        The fallback is the permissive one, which is NOT the schema default, and this is the
+        one place where "fail closed" gives the wrong answer: refusing play is not the safe
+        direction here, it is a contest nobody can enter a round in. A stale client that sends
+        nothing gets what the current wizard would have sent.
+      */
+      roundStartPolicy: ROUND_START_POLICIES.includes(
+        body.roundStartPolicy as RoundStartPolicy,
+      )
+        ? (body.roundStartPolicy as RoundStartPolicy)
+        : ("until_window_closes" as RoundStartPolicy),
       resultGracePeriodSeconds: body.resultGracePeriodSeconds ?? 600,
       perRoundCostAcknowledged: body.perRoundCostAcknowledged,
     };

@@ -20,6 +20,7 @@ import { ConfigSchemaFields } from "./ConfigSchemaFields";
 import { RoundClockNote } from "./RoundClockNote";
 import { PrizeDistributionEditor } from "./PrizeDistributionEditor";
 import { UnscoredPolicyField } from "./UnscoredPolicyField";
+import { RoundStartPolicyField } from "./RoundStartPolicyField";
 import {
   type ContestDraft,
   emptyDraft,
@@ -65,6 +66,7 @@ interface StoredContest {
   attemptsAllowed?: number;
   unresolvedRoundPolicy?: "score_zero" | "exclude" | "hold_and_alert";
   unscoredContestPolicy?: "unclaimed_pool" | "refund_entry_fees";
+  roundStartPolicy?: "reserve_full_round" | "until_window_closes";
   resultGracePeriodSeconds?: number;
   gameConfig?: {
     providerKey?: string;
@@ -297,6 +299,7 @@ export function ProviderContestEditor({
           startTime={draft.startTime}
           endTime={draft.endTime}
           maxDurationSeconds={maxDurationSeconds}
+          roundStartPolicy={draft.roundStartPolicy}
         />
         {schema?.ok === false ? (
           <p className="text-sm text-red-300">{schema.error}</p>
@@ -397,6 +400,18 @@ export function ProviderContestEditor({
           startTime={draft.startTime}
           endTime={draft.endTime}
           maxDurationSeconds={maxDurationSeconds}
+          roundStartPolicy={draft.roundStartPolicy}
+        />
+        {/*
+          Beside the dates, as in the wizard, because it changes what the note above says.
+          Frozen once anyone has entered: it is not on `EDITABLE_ONCE_ENTERED`, so the server
+          would refuse it anyway - the `disabled` here is so an operator finds that out
+          before submitting rather than as a refusal naming a field they did not mean to send.
+        */}
+        <RoundStartPolicyField
+          value={draft.roundStartPolicy}
+          disabled={entered}
+          onChange={(value) => patch({ roundStartPolicy: value })}
         />
       </section>
 
@@ -519,8 +534,13 @@ function draftFromStored(contest: StoredContest): ContestDraft {
     // existed really will settle to the unclaimed pool, so showing the operator a refund here
     // would misreport what the stored contest does.
     unscoredContestPolicy: contest.unscoredContestPolicy ?? "unclaimed_pool",
+    // Same reasoning as the line above: the SCHEMA default, so a contest created before the
+    // field existed is shown the gate it really enforces rather than the wizard's answer.
+    roundStartPolicy: contest.roundStartPolicy ?? "reserve_full_round",
     resultGracePeriodSeconds: contest.resultGracePeriodSeconds ?? 900,
     perRoundCostAcknowledged: false,
+    // Not an edit concept: the contest already exists, and publishing is its own control.
+    publishOnSave: false,
   };
 }
 

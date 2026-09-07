@@ -200,6 +200,42 @@ hammer the endpoint every second or leave the button stale for twenty of them.
 `tools/probe-play-clock.ps1` (12 probes, **all red on exactly the expected test with exactly one
 failure each**).
 
+### 1.1d The gate above became the contest's choice, and the player is told (7 September 2026)
+
+`tooLateToStart` as described in `1.1c` was **correct code enforcing a rule nobody had chosen**,
+and the paragraph above understates when it fires. It reserves the **catalogue ceiling**, not
+the length the operator configured, so a contest shorter than that ceiling withheld Play *for
+its entire duration* - "there is not enough time left in this competition" above a countdown
+reading fifty-nine minutes, which is the owner's second report on this screen. `12` section 2.7
+is the authoritative account; three things belong here, on the player's side of it.
+
+**The flag split into two, and the split is the point.** `fullRoundNoLongerFits` is the
+arithmetic, unchanged, including the `!resuming` guard - a resume reopens the round the player
+already has and needs no fresh room. `tooLateToStart` is that **and** the contest insisting on a
+full round. Keeping them separate is what lets one contest refuse where another shortens; a
+single flag could only ever do one.
+
+**The disclosure is what makes the permissive branch defensible, and it is not decoration.** An
+attempt is consumed when a round is *created* and cannot be handed back, so a player who starts a
+four-minute game with ninety seconds left and is not told has paid for a game they could never
+finish. `shortenedMs` is derived from the **window**, never from the round length, because
+`resolveExpiry` clamps `expiresAt` to `playWindowEnd` - so it is the length the server will
+actually grant rather than an estimate of it, and a figure computed the other way drifts from
+the clamp the first time either side changes. It reaches the **button** as well as the panel
+("Play a shortened round"), because the button is what gets pressed by somebody who skimmed the
+panel.
+
+**The policy comes from the normalised config, never off the contest document.** Both
+`contest-config.ts` copies resolve an unrecognised or absent value to `reserve_full_round` -
+failing closed, the same rule as the market-hours gate - and `round-status.service.ts` reads
+that resolved value. Reading `contest.roundStartPolicy` straight off the document would let a
+typo in a stored field offer a button `round.service.ts` refuses.
+
+**42 tests in the suite, 17 probes in `tools/probe-play-clock.ps1`**, all red on the expected
+test. Two of that harness's older probes were **re-aimed rather than left green**: the
+`!resuming` guard moved onto the new flag, and aimed at the old name a probe reports "did not
+apply", which reads exactly like a broken harness rather than a moved guard.
+
 ### What it does not do
 
 - **No live leaderboard during play** (section 11's polling recommendation is unimplemented). A

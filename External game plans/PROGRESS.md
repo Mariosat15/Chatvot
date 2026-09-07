@@ -28,6 +28,7 @@
 | **REFUNDS - READ THIS BEFORE ANYTHING ELSE** | **R43 closed 7 Sep 2026, and it is the only defect in this programme that was losing real money in production, on both game types, every day.** The every-minute `updateCompetitionStatuses` cron in **both** apps set `status: "cancelled"` itself and *then* called `cancelCompetitionAndRefund`, whose claim is `status: { $ne: "cancelled" }` - **the lock added to fix live bug 5**. The claim matched nothing, so the action returned `success: true` with `refundedCount: 0` and **every player's entry fee stayed with the platform** against a competition displaying `cancelled`. Nothing about it is provider-specific. **Three instruments agreed with the intention rather than the outcome**: the refund logged "refunds were already issued" as an *inference*, the cron logged `participantCount` instead of the returned count, and the `getCompetitionById` backup path - which does not pre-cancel and so works - masked the frequency. Fixed at the caller *and* by moving idempotency off the status onto the per-player `competition_refund` ledger rows, matching `exclusion-refund.ts`. **The rule is the inverse of live bug 5's: a lock keyed on a field any caller can write is only as good as every caller's restraint, and the callers that break it report success.** **Not retroactive.** Unusually, affected contests **can** be found (cancelled + participants not `refunded` + no `competition_refund` rows), so this is *not* the usual "nothing to backfill" - but **no backfill was written**, because crediting wallets from inferred history is an unreviewed money writer and who to compensate is an **owner decision that is still outstanding** |
 | **Money defects closed** | **R26 closed 5 Sep 2026** - the admin cron's finalize copy paid **no** Game Master earnings and recorded no `retained_gm_fee` either, so the commission silently stayed with the platform. This one was **actively losing money rather than latent**: both apps run `checkAndFinalizeCompetitions` on an every-minute cron, so payment depended on which cron won the race. **Not retroactive - no backfill**, and past contests cannot be found by querying for retained rows because none were written. Also **R31** (a 0% Game Master rate paid 5%) and the two P0 score defects, same day |
 | **Game Master creation** | **The permission gate is code-complete 7 Sep 2026** (`19` s3.2a) and the construction half is not - both routes now *refuse* a provider contest with a message naming the missing capability, where before they would have stamped one `gameKey: "provider"` and `gameKey` is immutable. **Do not read it as "Game Masters can run game contests"**; read it as "the platform now knows they cannot". `limits.allowedGameTypes` exists, defaults to `["trading"]`, and is resolved through **one mirrored model-free module** with precedence **override → package → cached limits → default** that reports *which* decided - because "your package does not allow this" sends a Game Master to buy an upgrade that cannot help when an administrator denied it by hand. **Three defects found on the way, none of them about games.** `POST /api/gamemasters/sync-referrals` had **no authentication on either handler** while all four siblings required section access - found by counting handlers against guards, the only technique that finds the file where every neighbour has one; it could not redirect commission, but it could apply an attribution change an operator had withheld and the GET leaked real user ids and names. `update_limits` was a **mass assignment** onto the subdocument holding the daily cap, participant cap and revenue share, updated with the **raw driver** so the schema's own `min: 2` never ran. And the **"Comps: ON" badge was lying** - it read the cached flag under a tooltip crediting the package, so an administrator's explicit deny rendered green while every create was refused. Also: the main route floored `minParticipants` at **1**, which is a paid single-player contest and against a hard constraint. **R47.** The **creation UI is blocked rather than deferred** by `19` s5's economic constraint, not by effort |
+| **The round-start gate** | **Code-complete 7 Sep 2026** (`12` s2.7), from an owner report that a contest which had just opened said *"there is not enough time left in this competition to finish a round"* beside a countdown reading fifty-nine minutes. **It was correct code enforcing a rule nobody had chosen.** Chapter `03` s1.2 reserves the **catalogue ceiling**, not the length the operator configured, so with Circuit Sprint's 300-second ceiling **any contest under five minutes refused every round for its entire duration** - not near the end, from the instant it opened. **And the rule's premise had quietly stopped holding:** it assumes a cut-short round is worth nothing, which was true when a contest was won by *finishing* and is not now that partial performance is the basis for winning. So it became `roundStartPolicy`, a per-contest choice, with the old rule as the **default** rather than deleted - still the right answer for a title where a shortened round means nothing. **Two defaults differ on purpose and will be read as a bug:** the schema reserves, because a schema default fixes future rows only and a pre-existing contest must keep the rule its entrants signed up under; the wizard's new drafts do not. **The disclosure is what makes the permissive branch defensible** - an attempt is consumed on *creation* and cannot be handed back, so the player is told how much time they will actually get, on the panel and on the button. Shipped with **auto-publish** (a checkbox, default on, whose flag deliberately never reaches the server, because publishing re-runs the pre-flight against the **stored** record) and the two smaller reports: a finished contest says **"Competition ended"**, and a provider participant is now **redirected to `/results`** like a trading one. **48 probes across three harnesses** |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
 | **Phase in progress** | **X4a - STARTED 6 Sep 2026. The two halves connected 7 Sep 2026** - see the row above and `21` s4.1d. What remains is the *clicking* half: the provider has still never been registered through the admin screens, and nothing has been deployed. `games-service/` (the provider) and the `chartvolt-games` adapter (the platform) are both code-complete. **The game is playable by a human**: the launch URL serves a real board, verified in a browser on both titles, which also fixed a live defect - an unstarted round reported itself as `finished`, so the first screen a paying player saw was a result screen for a round they had not played. It also **found and then closed a defect in the platform's own published auth scheme** (**R34**): there was no `callbackToken` field anywhere, so a provider implementing `Bearer {CALLBACK_TOKEN}` exactly was rejected and logged as a probable attack. Latent throughout, so nothing was backfilled. **Nothing technical now stands between the two halves** - what remains is deploying the service and registering it. It is now **deployable**: a PM2 entry, an nginx block for a `games.` subdomain, `env.example` and a `deploy/README.md` runbook, plus **two production-only boot guards** for the play origin and the frame allowlist, both of which previously failed invisibly. Writing the runbook also found that the admin panel **could not register a loopback provider at all**. See the three 6 Sep work-log entries |
 | **Next phase, scope decided** | **X4a - ChartVolt as a first-party provider, with a real playable game** (`21`), **3.5-5 weeks**, starting before the provider health panel. It exists because **the review gate the programme is sequenced around cannot currently be held**: `mock.adapter.ts` returns a hostname that does not resolve, so the play screen's iframe fails to load and the final step has never been performed by a person. **Owner decided 5 Sep 2026 that it is both** the reference implementation *and* open question 10's hedge game - which **modifies the 2 Sep "no in-house game is built" decision** and is recorded in the decision log rather than by editing that entry. **No commercial dependency.** Two things not to misread: **risk X8 is reduced when it ships, not now**, and X4a **shrinks X4 without replacing it** - a provider we control cannot rehearse a real partner's auth, error shapes, latency or pricing |
@@ -647,6 +648,100 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 7 Sep 2026 - X6 / `12` s2.7 - THE GATE THAT REFUSED EVERY ROUND, AND THE DRAFT NOBODY PUBLISHED
+
+**Shipped:** `RoundStartPolicy` - `ROUND_START_POLICIES` and `ROUND_START_POLICY_COPY` on both
+`round-types.ts` copies, the conditional gate in `round.service.ts`, a **fail-closed** normaliser
+in both `contest-config.ts` copies, `roundStartPolicy` on both `competition.model.ts` copies, the
+conditional refusal in both `contest-preflight.ts` copies,
+`apps/admin/components/admin/games/RoundStartPolicyField.tsx` (new, shared by wizard and editor,
+frozen once anyone has entered), a policy-aware `RoundClockNote.tsx` and `describeRoundFit`, the
+field on `PlayState` in both the service and the client's own copy, and the shortened-round
+disclosure in `RoundPreflight.tsx` on the panel **and the button**. Plus **auto-publish**: a
+checkbox on the wizard's review step, default **on**, driving a second request after the create
+returns. Also the two smaller owner reports: a completed contest's entry panel now says
+**"Competition ended"** rather than "You're in this competition!", and a provider participant is
+**redirected to `/results`** on completion like a trading one, instead of being left on a lobby
+showing stale standings.
+
+**Files touched:** `lib/services/games/{round-types,round.service,contest-config,contest-preflight,round-status.service}.ts`
+and the four mirrored admin copies; `database/models/trading/competition.model.ts` (both);
+`components/games/{play-state.ts,RoundPreflight.tsx}`; `components/trading/CompetitionEntryButton.tsx`;
+`app/(root)/competitions/[id]/page.tsx`; `apps/admin/components/admin/games/{RoundStartPolicyField.tsx,RoundClockNote.tsx,contest-draft.ts,ProviderContestWizard.tsx,ProviderContestEditor.tsx}`;
+`apps/admin/app/api/games/contests/route.ts` and `.../[competitionId]/route.ts`;
+`apps/admin/lib/services/game-providers/provider-contest{,-edit,-publish}.service.ts`.
+
+**The refusal was correct code enforcing a rule nobody had chosen, and the report understated
+when it fires.** Chapter `03` s1.2 specifies the gate as
+`now + maxDurationSeconds <= playWindowEnd`, reserving the **catalogue ceiling** rather than the
+length the operator configured. Circuit Sprint's ceiling is 300 seconds, so **any contest under
+five minutes refused every round for its entire duration** - not near the end, from the instant
+it opened. The owner saw "there is not enough time left in this competition" above a countdown
+reading fifty-nine minutes.
+
+**And its premise had quietly stopped holding.** The rule assumes a cut-short round is scored on
+a partial game and therefore unfair. That was right when a contest was won by *finishing*; it is
+not now that **partial performance is the basis for winning**. The gate is therefore the
+contest's choice, with the old rule as the **default** rather than deleted - it is still correct
+for a title where a shortened round means nothing.
+
+**Two defaults differ on purpose and it is the pair most likely to be read as a bug.** The
+schema defaults to `reserve_full_round`, because a schema default fixes future rows only and a
+contest created before the field existed must keep the rule its entrants signed up under. The
+wizard defaults a new draft to `until_window_closes`. The **editor** defaults the publish flag to
+false and offers no control, because inheriting the wizard's default would publish a deliberately
+unpublished draft as a side effect of fixing a typo.
+
+**The same fact is a refusal or a warning depending on the policy, and it has to be both ways
+round.** Reported only on the reserving branch, an operator creating a two-minute Circuit Sprint
+contest would learn nothing about every attempt being cut off. Left a hard refusal for both, they
+could select the setting that exists for short contests and be refused for creating one.
+
+**A second-order fix that would have been missed:** the grace period now covers
+`Math.min(ceiling, window)`. Under until-close `resolveExpiry` clamps a round to the window, so
+demanding grace for the full ceiling refuses a short contest for a round length it **cannot
+produce** - the ceiling-versus-reality confusion one field along.
+
+**The publish flag never reaches the server, deliberately.** Publishing re-runs the pre-flight
+against the **stored** record, which also asks the question creation cannot: whether the settings
+actually persisted. A `publish: true` on create would bypass that or duplicate it inside the
+create transaction. **A refused publish leaves a draft and reports the pre-flight's own reasons**
+- the contest exists by then, so an error would send an operator back to create a second copy.
+
+**Deviated from plan:** `03` s1.2 states the gate unconditionally and it is now conditional -
+recorded as an amendment in that section rather than by rewriting it, with the chapter's reasoning
+preserved as the default. `12` s2.7 is the authoritative account.
+
+**Tests:** whole suite **1350 passed** (66 files). **48 probes across three harnesses, all red on
+exactly the expected test** - `probe-contest-round-clock.ps1` (21), `probe-play-clock.ps1` (17),
+and the new `probe-round-start-policy.ps1` (10, parameterised on the suite because it spans three
+of them). Main typecheck back to its pre-existing 198, admin at the **223 baseline** exactly,
+`check:mirrors` green, both apps' touched files lint clean at `--max-warnings=0`.
+
+**Two probes came back green and neither was a weak guard.** One was the recurring
+one-identifier-two-occurrences trap: deleting the clock note's timing condition left both
+`fit.reservesFullRound` and `fit.lastAttemptStart` in the file, because the settings variant
+branches on the policy too and the second name appears *inside* the guarded paragraph. Fourth
+instance; the test now slices to the construct. The other was the third cause - **no test
+existed.** Reversing the normaliser's comparison in `contest-config.ts` left the entire
+round-lifecycle suite green with **zero** red, because every test there hands `createRound` a
+hand-built config and none goes through the normaliser. A test for `contestRoundConfig` was
+written and the probe re-aimed at it and its own suite. Two older probes in
+`probe-play-clock.ps1` were also **re-aimed rather than left reporting "did not apply"**, which
+reads like a broken harness rather than a moved guard.
+
+**Deferred:** nothing from this slice. The two remaining items from the owner's report are
+separate: the **entry countdown** wording for a player deciding whether to join, and confirming
+that a **partial run scores** end to end in `games-service` rather than only being rankable in
+principle.
+
+**Next chat should:** verify partial scoring end to end - a `circuit-sprint` round cut short by
+the contest clock must deliver a score for the boards completed, not nothing. The platform now
+permits that round; whether the service reports it is a separate question and is the last piece
+of "best performance wins, finishing is not required".
 
 ---
 

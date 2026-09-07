@@ -167,6 +167,11 @@ export async function publishProviderContest(
       attemptsPolicy: contest.attemptsPolicy as never,
       attemptsAllowed: contest.attemptsAllowed,
       unresolvedRoundPolicy: contest.unresolvedRoundPolicy as never,
+      // From the STORED contest, like everything else here. Reading the wizard's default
+      // instead would let a short contest publish under a rule it does not carry, and then
+      // refuse every round once players had paid to enter it.
+      roundStartPolicy: (contest.roundStartPolicy ??
+        "reserve_full_round") as never,
       // Reason: acknowledged at creation. Re-asking on publish would make it a click to
       // dismiss rather than a decision, which is how a cost warning stops being read.
       perRoundCostAcknowledged: true,

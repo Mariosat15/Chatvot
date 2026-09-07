@@ -106,10 +106,25 @@ async function findLiveRound(
  * Whether the round could finish before the play window closes.
  *
  * Chapter 03 section 1.2: startable only if `now + maxDurationSeconds <= playWindowEnd`.
- * Reason this is a refusal and not a clamp: a round cut short by the window would be scored
- * on a partial game, and the player would rightly call that unfair. Better to say no.
+ *
+ * NOW THE CONTEST'S CHOICE RATHER THAN A LAW, and `RoundStartPolicy` carries the reasoning.
+ * The short version is that the rule reserved the CATALOGUE ceiling, so a contest shorter
+ * than that refused every round from the instant it opened - and its fairness premise, that a
+ * cut-short round is scored on a partial game, stopped holding once partial performance
+ * became the basis for winning.
+ *
+ * ABSENT MEANS THE OLD BEHAVIOUR, deliberately. A contest written before the field existed
+ * must not silently change the rule its entrants signed up under, and the reserving branch is
+ * still the correct answer for a title where a shortened round is meaningless.
+ *
+ * Under `until_window_closes` the round is not unbounded: `resolveExpiry` still clamps
+ * `expiresAt` to the window end, so it is shortened rather than allowed to outlive the
+ * contest. The player is told how long they will get by `RoundPreflight` before they spend
+ * the attempt.
  */
 function roundFitsInWindow(config: RoundContestConfig, now: Date): boolean {
+  if (config.roundStartPolicy === "until_window_closes") return true;
+
   const maxDuration = (config.maxDurationSeconds ?? 0) * 1000;
   return now.getTime() + maxDuration <= config.playWindowEnd.getTime();
 }

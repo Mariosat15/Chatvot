@@ -82,6 +82,80 @@ export const UNSCORED_CONTEST_POLICY_COPY: ReadonlyMap<
 ]);
 
 /**
+ * How late in the contest a player may still START a round.
+ *
+ * Owner decision, 7 September 2026, and it is a reversal of a rule rather than a new option,
+ * so the reasoning matters more than usual.
+ *
+ * Chapter 03 section 1.2 specified `now + maxDurationSeconds <= playWindowEnd`: a round may
+ * only start if the title's LONGEST possible round would still fit. That is
+ * `reserve_full_round`, it is still available, and it was the only behaviour until now. Its
+ * justification was fairness - "a round cut short by the window would be scored on a partial
+ * game, and the player would rightly call that unfair".
+ *
+ * TWO THINGS BROKE THAT JUSTIFICATION.
+ *
+ * The first is arithmetic the rule never accounted for. The gate reserves the CATALOGUE
+ * ceiling, not the length the operator configured, so Circuit Sprint reserves 300 seconds
+ * whatever `durationSeconds` says. A contest shorter than 300 seconds therefore refused every
+ * round from the instant it opened, telling players "there is not enough time left in this
+ * competition" while a countdown beside it said minutes remained. That is what the owner
+ * reported, and no amount of rewording fixes it.
+ *
+ * The second is that the premise is no longer true. A partial round IS scored on merit -
+ * solving two boards of five beats solving one, and the whole point of the contest is best
+ * performance rather than completion. A round cut short by the contest end is now the same
+ * event as a round cut short by its own clock, which every title already scores. So the
+ * fairness argument has moved: refusing the attempt is the unfair option, because it denies a
+ * paying entrant any chance to place while telling them the contest still has time in it.
+ *
+ * `until_window_closes` therefore permits the start and relies on DISCLOSURE instead: the
+ * pre-flight tells the player exactly how much play time they will get before the contest
+ * closes it, so spending an attempt on a shortened round is their informed choice. There is
+ * deliberately no minimum - inventing a floor would put back a hidden refusal of the same
+ * shape, differing only in the number.
+ *
+ * The two defaults differ ON PURPOSE, exactly as `UnscoredContestPolicy`'s do: the schema
+ * keeps `reserve_full_round` so contests already in the database behave as they always have,
+ * while the wizard starts a new draft on `until_window_closes`.
+ */
+export type RoundStartPolicy = "reserve_full_round" | "until_window_closes";
+
+export const ROUND_START_POLICIES: RoundStartPolicy[] = [
+  "reserve_full_round",
+  "until_window_closes",
+];
+
+/**
+ * What each choice means for the operator, in one sentence each.
+ *
+ * Same reasoning as `UNSCORED_CONTEST_POLICY_COPY` below, including the `Map`: the key comes
+ * from a stored document, so an object lookup walks the prototype chain and `"constructor"`
+ * returns something truthy that survives a `!copy` test.
+ */
+export const ROUND_START_POLICY_COPY: ReadonlyMap<
+  RoundStartPolicy,
+  { label: string; consequence: string }
+> = new Map([
+  [
+    "until_window_closes",
+    {
+      label: "Players can start a round at any time until the contest ends",
+      consequence:
+        "A round started near the end is closed when the contest closes, and scored on whatever the player achieved in the time they had. They are told how long they will get before they spend the attempt. Pick this unless a shortened round would make your game meaningless.",
+    },
+  ],
+  [
+    "reserve_full_round",
+    {
+      label: "Stop new rounds one full round before the end",
+      consequence:
+        "Nobody can start a round that the contest end would cut short, so every attempt gets the full time. The cut-off reserves this game's LONGEST possible round, not the length you configured, so it can close play well before the contest ends - and it refuses every round for the whole contest if the contest is shorter than that maximum.",
+    },
+  ],
+]);
+
+/**
  * How long after the play window a late provider result is still welcome (chapter 04
  * section 2.1), when a contest does not name its own.
  *
@@ -118,6 +192,13 @@ export interface RoundContestConfig {
   contentSeed?: string;
   /** From the catalogue. Used to check the round can finish inside the play window. */
   maxDurationSeconds?: number;
+  /**
+   * Whether a round may start that the contest end will cut short.
+   *
+   * Absent means `reserve_full_round`, matching the schema default, so a contest written
+   * before the field existed keeps the behaviour it was created under.
+   */
+  roundStartPolicy?: RoundStartPolicy;
   /** Settings for the provider, already validated against the title's configSchema. */
   settings?: Record<string, unknown>;
 }

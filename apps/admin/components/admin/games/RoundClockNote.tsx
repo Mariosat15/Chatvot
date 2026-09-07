@@ -1,6 +1,7 @@
 "use client";
 
 import { Clock, TriangleAlert } from "lucide-react";
+import type { RoundStartPolicy } from "@/lib/services/games/round-types";
 import { describeRoundFit } from "./contest-draft";
 
 /**
@@ -35,11 +36,21 @@ export function RoundClockNote({
   startTime,
   endTime,
   maxDurationSeconds,
+  roundStartPolicy,
   variant,
 }: {
   startTime: string;
   endTime: string;
   maxDurationSeconds?: number;
+  /**
+   * Which of the two cut-off rules this contest is on.
+   *
+   * IT CHANGES WHAT IS TRUE HERE, not merely what is emphasised. Under
+   * `until_window_closes` there is no "last attempt can start at" moment at all, and a note
+   * that kept printing one would be describing the other setting - which is worse than the
+   * silence this component was written to fix.
+   */
+  roundStartPolicy?: RoundStartPolicy;
   /**
    * `settings` is shown beside the game's own fields and answers "what are these for?";
    * `timing` is shown beside the contest dates and answers "when can people actually play?".
@@ -49,7 +60,12 @@ export function RoundClockNote({
    */
   variant: "settings" | "timing";
 }) {
-  const fit = describeRoundFit({ startTime, endTime, maxDurationSeconds });
+  const fit = describeRoundFit({
+    startTime,
+    endTime,
+    maxDurationSeconds,
+    roundStartPolicy,
+  });
 
   if (variant === "settings") {
     return (
@@ -66,14 +82,23 @@ export function RoundClockNote({
               When players may start an attempt is set separately, by the contest&apos;s start
               and end times on the next step.
             </p>
-            {fit && (
-              <p>
-                Whatever you choose here, the contest reserves the last{" "}
-                <strong className="text-gray-200">{fit.reservedSeconds} seconds</strong> before
-                it ends, so no attempt can be cut short. That is this game&apos;s longest
-                possible round.
-              </p>
-            )}
+            {fit &&
+              (fit.reservesFullRound ? (
+                <p>
+                  Whatever you choose here, the contest reserves the last{" "}
+                  <strong className="text-gray-200">
+                    {fit.reservedSeconds} seconds
+                  </strong>{" "}
+                  before it ends, so no attempt can be cut short. That is this
+                  game&apos;s longest possible round.
+                </p>
+              ) : (
+                <p>
+                  This contest lets players start an attempt at any time, so a length set
+                  here is the most an attempt can run - one started near the end is closed
+                  when the contest closes and scored on what the player managed.
+                </p>
+              ))}
           </div>
         </div>
       </div>
@@ -92,7 +117,7 @@ export function RoundClockNote({
               <strong className="text-gray-200">end</strong>. To give a five-minute sign-up
               window, set the start five minutes from now.
             </p>
-            {fit ? (
+            {fit && fit.reservesFullRound && fit.lastAttemptStart ? (
               <p>
                 An attempt may be started up to{" "}
                 <strong className="text-gray-200">{fit.reservedSeconds} seconds</strong> before
@@ -114,18 +139,35 @@ export function RoundClockNote({
       </div>
 
       {/*
-        The server refuses this outright in `contest-preflight.ts`, and it is the clearest late
-        failure on that list - every player would settle on zero. Surfaced here so the operator
-        finds out while editing the dates rather than on the review step.
+        THE SAME FACT, TWO CONSEQUENCES, and saying only one of them is how an operator
+        concludes the platform is broken.
+
+        Reserving, the server refuses this outright in `contest-preflight.ts`: nobody could
+        start an attempt for the whole contest, and every player would settle on zero. That
+        is the state the owner hit - the contest saved, opened, and refused every round.
+
+        Until-close, the contest is perfectly valid and this is only worth knowing. Both are
+        surfaced while the operator is editing the dates rather than on the review step.
       */}
       {fit?.windowTooShort && (
         <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
-          <p className="text-xs text-amber-200/90">
-            This contest is shorter than one round of this game (
-            {fit.reservedSeconds} seconds), so nobody could finish an attempt. Lengthen it, or
-            pick a game with shorter rounds.
-          </p>
+          {fit.reservesFullRound ? (
+            <p className="text-xs text-amber-200/90">
+              This contest is shorter than this game&apos;s longest possible round (
+              {fit.reservedSeconds} seconds), and it stops new rounds one full round
+              before the end - so <strong>nobody could start an attempt at all</strong>.
+              Lengthen the contest, pick a game with shorter rounds, or let players start
+              at any time.
+            </p>
+          ) : (
+            <p className="text-xs text-amber-200/90">
+              This contest is shorter than this game&apos;s longest possible round (
+              {fit.reservedSeconds} seconds), so every attempt will be cut short at the
+              end time and scored on what the player managed. Players are told how long
+              they have before they start.
+            </p>
+          )}
         </div>
       )}
     </div>

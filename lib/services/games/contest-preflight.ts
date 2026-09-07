@@ -1,6 +1,10 @@
 import type { ConfigField } from "./config-schema";
 import { validateConfigValues } from "./config-schema";
-import type { AttemptsPolicy, UnresolvedRoundPolicy } from "./round-types";
+import type {
+  AttemptsPolicy,
+  RoundStartPolicy,
+  UnresolvedRoundPolicy,
+} from "./round-types";
 
 /**
  * Pre-flight validation for a provider contest ("External game plans/03" section 4.1).
@@ -53,6 +57,12 @@ export interface PreflightInput {
   attemptsPolicy: AttemptsPolicy;
   attemptsAllowed?: number;
   unresolvedRoundPolicy: UnresolvedRoundPolicy;
+  /**
+   * How late a player may start a round. Absent means `reserve_full_round`, matching the
+   * schema, so a contest saved before the field existed is checked against the rule it was
+   * created under.
+   */
+  roundStartPolicy?: RoundStartPolicy;
 
   /**
    * Operator ticked "I accept the per-round cost".
@@ -170,19 +180,46 @@ export function runPreflight(input: PreflightInput): PreflightResult {
     would trade a confusing message for a round that can be cut off mid-play.
   */
   const roundSeconds = input.title.maxDurationSeconds;
+  const reservesFullRound = input.roundStartPolicy !== "until_window_closes";
   if (roundSeconds !== undefined) {
     if (windowSeconds > 0 && windowSeconds < roundSeconds) {
-      // The clearest late failure on the list: nobody can finish a round, and the contest
-      // settles with every player on zero.
-      errors.push(
-        `The contest is shorter than this game's longest possible round (${roundSeconds} seconds), so no player could finish. That is the game's maximum rather than the length set in its own settings - the platform reserves the maximum so an attempt is never cut short.`,
-      );
+      /*
+        THE SAME FACT IS A REFUSAL OR A WARNING DEPENDING ON THE START POLICY, and it has to
+        be, or the setting that exists for short contests cannot be used to create one.
+
+        Reserving: nobody can start a round at all, for the entire contest. That is the
+        clearest late failure on the list - every player settles on zero - so it stays a
+        refusal.
+
+        Until-close: the contest is legitimate and the operator has chosen it deliberately,
+        but they should still see that no attempt can run to its natural length here.
+      */
+      if (reservesFullRound) {
+        errors.push(
+          `The contest is shorter than this game's longest possible round (${roundSeconds} seconds), so no player could finish - and because this contest stops new rounds one full round before the end, nobody could start one either. That is the game's maximum rather than the length set in its own settings. Lengthen the contest, or let players start a round at any time until it ends.`,
+        );
+      } else {
+        warnings.push(
+          `The contest is shorter than this game's longest possible round (${roundSeconds} seconds), so every attempt will be cut short when the contest ends. Players are told how long they will get. That is fine if a partial run still scores meaningfully in this game.`,
+        );
+      }
     }
 
-    const requiredGrace = roundSeconds + 5 * 60;
+    /*
+      THE GRACE PERIOD ONLY HAS TO COVER A ROUND THAT CAN ACTUALLY HAPPEN. Under
+      until-close, `resolveExpiry` clamps a round to the contest end, so no round can be
+      longer than the window however high the catalogue ceiling is. Demanding grace for the
+      full ceiling would refuse a short contest for a round length it cannot produce -
+      which is the ceiling-versus-configured confusion again, one field along.
+    */
+    const longestPossibleRound =
+      reservesFullRound || !(windowSeconds > 0)
+        ? roundSeconds
+        : Math.min(roundSeconds, Math.ceil(windowSeconds));
+    const requiredGrace = longestPossibleRound + 5 * 60;
     if (input.resultGracePeriodSeconds < requiredGrace) {
       errors.push(
-        `The result grace period must be at least ${requiredGrace} seconds - this game's longest possible round (${roundSeconds} seconds) plus five minutes - or a round started at the last moment is cut off before its result can arrive.`,
+        `The result grace period must be at least ${requiredGrace} seconds - the longest round this contest can produce (${longestPossibleRound} seconds) plus five minutes - or a round started at the last moment is cut off before its result can arrive.`,
       );
     }
   }

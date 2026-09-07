@@ -46,6 +46,12 @@ export interface PlayState {
    */
   maxRoundSeconds?: number;
   /**
+   * Whether this contest stops new rounds one full round before the end, or lets a player
+   * start at any time and cuts the round off when the contest closes. The contest's choice
+   * since 7 September 2026, so it must arrive from the server rather than be inferred here.
+   */
+  roundStartPolicy: "reserve_full_round" | "until_window_closes";
+  /**
    * A paused contest is still `active`, so this cannot be derived from the status. See the
    * service's copy for why that distinction matters to the Play button.
    */

@@ -20,6 +20,7 @@ $Wizard = Join-Path $Root "apps\admin\components\admin\games\ProviderContestWiza
 $Editor = Join-Path $Root "apps\admin\components\admin\games\ProviderContestEditor.tsx"
 $Preflight = Join-Path $Root "lib\services\games\contest-preflight.ts"
 $AdminPreflight = Join-Path $Root "apps\admin\lib\services\games\contest-preflight.ts"
+$Field = Join-Path $Root "apps\admin\components\admin\games\RoundStartPolicyField.tsx"
 
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
@@ -128,8 +129,8 @@ Invoke-Probe -Name "the last-attempt moment is measured from the wrong end" `
     -Edits @(
     @{
         Target  = $Draft
-        Find    = "lastAttemptStart: new Date(end.getTime() - maxDurationSeconds * 1000),"
-        Replace = "lastAttemptStart: new Date(start.getTime() + maxDurationSeconds * 1000),"
+        Find    = "? new Date(end.getTime() - maxDurationSeconds * 1000)"
+        Replace = "? new Date(start.getTime() + maxDurationSeconds * 1000)"
     }
 )
 
@@ -247,8 +248,8 @@ Invoke-Probe -Name "the note grows a special case for one game's config key" `
     -Edits @(
     @{
         Target  = $Note
-        Find    = "  const fit = describeRoundFit({ startTime, endTime, maxDurationSeconds });"
-        Replace = "  const fit = describeRoundFit({ startTime, endTime, maxDurationSeconds });`n  const configuredRound = Number(settings[`"durationSeconds`"]);"
+        Find    = "  const fit = describeRoundFit({"
+        Replace = "  const configuredRound = Number(settings[`"durationSeconds`"]);`n  const fit = describeRoundFit({"
     }
 )
 
@@ -256,18 +257,21 @@ Invoke-Probe -Name "the note grows a special case for one game's config key" `
 
 # 11. The old wording restored, in BOTH copies at once. One copy alone leaves the test green,
 #     because the assertion loops over the pair - so this proves the pair, not one file.
+#
+#     The mutation deletes the "rather than the length set in its own settings" clause, which is
+#     the whole disclosure, and leaves the ceiling quoted bare - the state the owner reported.
 Invoke-Probe -Name "the refusal goes back to quoting a number the operator never chose" `
     -ExpectTest "calls the reserved figure the game's longest possible round, in BOTH copies" `
     -Edits @(
     @{
         Target  = $Preflight
-        Find    = "``The contest is shorter than this game's longest possible round (`${roundSeconds} seconds), so no player could finish. That is the game's maximum rather than the length set in its own settings - the platform reserves the maximum so an attempt is never cut short.``"
-        Replace = "``The play window is shorter than one round of this game (`${roundSeconds} seconds), so no player could finish.``"
+        Find    = "so no player could finish - and because this contest stops new rounds one full round before the end, nobody could start one either. That is the game's maximum rather than the length set in its own settings. Lengthen the contest, or let players start a round at any time until it ends."
+        Replace = "so no player could finish."
     },
     @{
         Target  = $AdminPreflight
-        Find    = "``The contest is shorter than this game's longest possible round (`${roundSeconds} seconds), so no player could finish. That is the game's maximum rather than the length set in its own settings - the platform reserves the maximum so an attempt is never cut short.``"
-        Replace = "``The play window is shorter than one round of this game (`${roundSeconds} seconds), so no player could finish.``"
+        Find    = "so no player could finish - and because this contest stops new rounds one full round before the end, nobody could start one either. That is the game's maximum rather than the length set in its own settings. Lengthen the contest, or let players start a round at any time until it ends."
+        Replace = "so no player could finish."
     }
 )
 
@@ -292,14 +296,126 @@ Invoke-Probe -Name "the gate reads the configured round length instead of the ce
 # --- the stale caution ---------------------------------------------------------------------
 
 # 13. The false promise restored. It told operators publishing did not exist yet, two days
-#     after it shipped.
-Invoke-Probe -Name "the review step tells the operator to wait for publishing" `
+#     after it shipped - and since 7 September the same test also forbids the version that
+#     described an unconditional draft, which became false when publishing became a checkbox.
+Invoke-Probe -Name "the review step describes an outcome the operator did not choose" `
     -ExpectTest "tells the operator to publish rather than to wait for a feature" `
     -Edits @(
     @{
         Target  = $Wizard
-        Find    = "Press{`" `"}`n            <strong className=`"text-white`">Publish</strong> on the contest list when you are`n            ready for it to appear."
-        Replace = "Publishing arrives with the player-facing game screens."
+        Find    = "{draft.publishOnSave`n                  ? `"The contest is checked once more against what was actually saved, then made visible. If that second check refuses it, the contest is kept as a draft and the reasons are shown here.`"`n                  : `"The contest is saved as a draft. Players cannot see or join a draft - press Publish on the contest list when you are ready.`"}"
+        Replace = "It will be saved as a <strong className=`"text-white`">draft</strong>."
+    }
+)
+
+# --- the round-start policy ----------------------------------------------------------------
+#
+# The setting exists because the gate reserved the CATALOGUE ceiling unconditionally, so a
+# contest shorter than that ceiling refused every round from the instant it opened. Circuit
+# Sprint's ceiling is 300 seconds, so anything under five minutes was unplayable.
+
+# 14. The derived deadline printed under until-close, where there is no deadline. This is the
+#     plausible slip: the arithmetic is still correct, it is simply about the other setting.
+Invoke-Probe -Name "a cut-off moment is named on a contest that has none" `
+    -ExpectTest "names no cut-off moment when the contest lets players start at any time" `
+    -Edits @(
+    @{
+        Target  = $Draft
+        Find    = "    lastAttemptStart: reservesFullRound`n      ? new Date(end.getTime() - maxDurationSeconds * 1000)`n      : undefined,"
+        Replace = "    lastAttemptStart: new Date(end.getTime() - maxDurationSeconds * 1000),"
+    }
+)
+
+# 15. The short-contest fact reported only on the reserving branch, so an operator creating a
+#     two-minute Circuit Sprint contest is told nothing about every attempt being cut off.
+Invoke-Probe -Name "a short contest is silent under until-close" `
+    -ExpectTest "still reports a short contest under BOTH policies, because the fact is the same" `
+    -Edits @(
+    @{
+        Target  = $Draft
+        Find    = "    windowTooShort: windowSeconds < maxDurationSeconds,"
+        Replace = "    windowTooShort: reservesFullRound && windowSeconds < maxDurationSeconds,"
+    }
+)
+
+# 16. The refusal left hard for both policies, in BOTH copies - which makes the setting
+#     unusable for exactly the contests it exists to allow.
+Invoke-Probe -Name "a short contest is refused even when it permits shortened rounds" `
+    -ExpectTest "refuses a short contest that reserves, and only warns about one that does not" `
+    -Edits @(
+    @{
+        Target  = $Preflight
+        Find    = "      if (reservesFullRound) {"
+        Replace = "      if (true) {"
+    },
+    @{
+        Target  = $AdminPreflight
+        Find    = "      if (reservesFullRound) {"
+        Replace = "      if (true) {"
+    }
+)
+
+# 17. The grace period demanded for the full ceiling regardless, which refuses a short contest
+#     for a round length it cannot produce - the ceiling-versus-reality confusion again.
+Invoke-Probe -Name "grace is demanded for a round the contest cannot produce" `
+    -ExpectTest "asks the grace period to cover a round this contest can actually produce" `
+    -Edits @(
+    @{
+        Target  = $Preflight
+        Find    = "      reservesFullRound || !(windowSeconds > 0)`n        ? roundSeconds`n        : Math.min(roundSeconds, Math.ceil(windowSeconds));"
+        Replace = "      roundSeconds;"
+    },
+    @{
+        Target  = $AdminPreflight
+        Find    = "      reservesFullRound || !(windowSeconds > 0)`n        ? roundSeconds`n        : Math.min(roundSeconds, Math.ceil(windowSeconds));"
+        Replace = "      roundSeconds;"
+    }
+)
+
+# 18. The control offered on the wizard only, so an operator can never correct the choice on a
+#     draft. Probed on the EDITOR for the same reason as probe 5.
+Invoke-Probe -Name "only the wizard offers the round-start policy" `
+    -ExpectTest "is one control, shared by the wizard and the editor" `
+    -Edits @(
+    @{
+        Target  = $Editor
+        Find    = "        <RoundStartPolicyField"
+        Replace = "        <div hidden"
+    }
+)
+
+# 19. The field growing its own copy of the option text, which is the "one rule, two copies"
+#     shape: the screen then describes a rule `round.service.ts` does not enforce.
+Invoke-Probe -Name "the control writes its own option wording" `
+    -ExpectTest "is one control, shared by the wizard and the editor" `
+    -Edits @(
+    @{
+        Target  = $Field
+        Find    = "  const copy = ROUND_START_POLICY_COPY.get(value);"
+        Replace = "  const local = { `"reserve_full_round`": { label: `"Reserve a full round`" } };`n  const copy = ROUND_START_POLICY_COPY.get(value);"
+    }
+)
+
+# 20. The note ignoring the policy and always describing the reserving rule, so it contradicts
+#     the setting the operator just chose two fields above it.
+Invoke-Probe -Name "the clock note describes the other setting" `
+    -ExpectTest "changes what the clock note SAYS, not just what it emphasises" `
+    -Edits @(
+    @{
+        Target  = $Note
+        Find    = "            {fit && fit.reservesFullRound && fit.lastAttemptStart ? ("
+        Replace = "            {fit ? ("
+    }
+)
+
+# 21. The policy editable after players have paid, which withdraws play time somebody bought.
+Invoke-Probe -Name "the policy stays editable once players have entered" `
+    -ExpectTest "frozen once anyone has paid to enter" `
+    -Edits @(
+    @{
+        Target  = $Editor
+        Find    = "          value={draft.roundStartPolicy}`n          disabled={entered}"
+        Replace = "          value={draft.roundStartPolicy}"
     }
 )
 

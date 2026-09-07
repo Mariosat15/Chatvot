@@ -247,3 +247,83 @@ describe("the prize distribution is editable", () => {
     expect(MIN_PRIZE_RANKS).toBe(2);
   });
 });
+
+// =======================================================================================
+// Publishing without a second trip
+// =======================================================================================
+
+describe("the wizard can publish what it creates", () => {
+  it("defaults a new draft to publishing, and an edited contest to not", () => {
+    /*
+      DIFFERENT DEFAULTS ON PURPOSE, and this is the pair most likely to be read as a bug.
+
+      A wizard draft defaults to publishing because that is what an operator creating a
+      contest almost always means, and the old behaviour - always a draft, publish from a
+      different screen - is how contests sat invisible past their own start time.
+
+      The EDITOR defaults to false because the contest already has a status. Carrying the
+      wizard's default into an edit would publish a draft an operator had deliberately left
+      unpublished, as a side effect of fixing a typo in its name.
+    */
+    expect(emptyDraft.publishOnSave).toBe(true);
+    expect(code(EDITOR)).toMatch(/publishOnSave: false/);
+
+    // And the editor offers no way to change it, so the false is not merely a starting point
+    // an operator can wander away from - editing a contest never publishes it.
+    expect(code(EDITOR)).not.toMatch(/publishOnSave: (?!false)/);
+    expect(code(EDITOR)).not.toMatch(/\/publish/);
+  });
+
+  it("never sends the flag to the server, at create or at edit", () => {
+    /*
+      THE LOAD-BEARING HALF. Publishing re-runs the pre-flight against the STORED record,
+      which is the whole point of it - a draft can outlive the switches that made it valid.
+      A `publish: true` on the create call would either bypass that second check or duplicate
+      it inside the create transaction, and the second check is the one that asks whether the
+      settings actually persisted.
+
+      So the flag stays in the browser and drives a second request. Asserted on the request
+      bodies rather than on the component, because that is where a well-meaning "why two
+      round trips?" simplification would land.
+    */
+    expect(toRequestBody(draftWith({ publishOnSave: true }))).not.toHaveProperty(
+      "publishOnSave",
+    );
+    expect(toRequestBody(draftWith({ publishOnSave: true }))).not.toHaveProperty("publish");
+
+    for (const entered of [false, true]) {
+      const body = toEditRequestBody(draftWith({ publishOnSave: true }), { entered });
+      expect(body).not.toHaveProperty("publishOnSave");
+      expect(body).not.toHaveProperty("publish");
+    }
+  });
+
+  it("publishes after the create returns, using the publish route", () => {
+    const source = code(WIZARD);
+
+    // Ordered: the id has to exist before it can be published, so the call is inside the
+    // create handler's success path and takes the id the server returned.
+    expect(source).toMatch(/draft\.publishOnSave && data\.competitionId/);
+    expect(source).toMatch(/publishCreated\(String\(data\.competitionId\)\)/);
+    expect(source).toMatch(/\/api\/games\/contests\/\$\{[\s\S]{0,60}?\/publish/);
+  });
+
+  it("keeps the contest and reports the reasons when the publish check refuses", () => {
+    /*
+      The failure mode worth designing for. The contest EXISTS by then - the create committed
+      - so a refused publish must not read as a failed creation, or an operator retries and
+      ends up with two contests. It also must not read as a success, which is what a
+      fire-and-forget publish would do.
+    */
+    const source = code(WIZARD);
+    const publish = source.slice(
+      source.indexOf("async function publishCreated"),
+      source.indexOf("async function submit"),
+    );
+    expect(publish.length).toBeGreaterThan(200);
+    // The refusal's own reasons, not a generic message: they are the pre-flight errors, and
+    // they are the only thing that tells the operator what to change.
+    expect(publish).toMatch(/errors/);
+    expect(publish).toMatch(/return false/);
+  });
+});

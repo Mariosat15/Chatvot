@@ -7,7 +7,9 @@ import ProviderGame from "@/database/models/games/provider-game.model";
 import { parseConfigSchema } from "@/lib/services/games/config-schema";
 import { hasProviderGameLabel } from "@/lib/admin/contest-game-label";
 import {
+  ROUND_START_POLICIES,
   UNSCORED_CONTEST_POLICIES,
+  type RoundStartPolicy,
   type UnscoredContestPolicy,
 } from "@/lib/services/games/round-types";
 import {
@@ -290,6 +292,23 @@ function parseEditBody(body: unknown): ParseOutcome {
     }
     input.unscoredContestPolicy =
       raw.unscoredContestPolicy as EditProviderContestInput["unscoredContestPolicy"];
+  }
+
+  if (raw.roundStartPolicy !== undefined) {
+    // Refused rather than coerced, for the same reason as the policy above: on an edit an
+    // unrecognised value means the two sides disagree, and substituting a default would
+    // change when players may start rounds while reporting the edit as saved.
+    if (
+      typeof raw.roundStartPolicy !== "string" ||
+      !ROUND_START_POLICIES.includes(raw.roundStartPolicy as RoundStartPolicy)
+    ) {
+      return {
+        ok: false,
+        error: "That round-start policy is not recognised.",
+      };
+    }
+    input.roundStartPolicy =
+      raw.roundStartPolicy as EditProviderContestInput["roundStartPolicy"];
   }
 
   if (Array.isArray(raw.prizeDistribution)) {

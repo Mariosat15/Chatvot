@@ -6,7 +6,10 @@
  * field goes unnoticed - it type-checks, posts, and the server reads `undefined`.
  */
 
-import type { UnscoredContestPolicy } from "@/lib/services/games/round-types";
+import type {
+  RoundStartPolicy,
+  UnscoredContestPolicy,
+} from "@/lib/services/games/round-types";
 
 export interface ContestDraft {
   providerKey: string;
@@ -36,8 +39,18 @@ export interface ContestDraft {
   attemptsAllowed?: number;
   unresolvedRoundPolicy: "score_zero" | "exclude" | "hold_and_alert";
   unscoredContestPolicy: UnscoredContestPolicy;
+  roundStartPolicy: RoundStartPolicy;
   resultGracePeriodSeconds: number;
   perRoundCostAcknowledged: boolean;
+
+  /**
+   * Publish on save rather than leaving a draft.
+   *
+   * NOT SENT TO THE CREATE ROUTE. The wizard calls the publish endpoint afterwards, so the
+   * pre-flight runs a second time against the STORED record - which is the property that
+   * makes publishing safe, and a `publish: true` flag on create would quietly discard it.
+   */
+  publishOnSave: boolean;
 }
 
 export const emptyDraft: ContestDraft = {
@@ -65,8 +78,16 @@ export const emptyDraft: ContestDraft = {
   // `unclaimed_pool` so documents written before the field existed settle the way they always
   // did; a new contest an operator is creating today gets the owner's preferred answer.
   unscoredContestPolicy: "refund_entry_fees",
+  // Also NOT the schema default, and for the same reason as the line above: stored contests
+  // keep `reserve_full_round`, while a contest an operator starts today gets the behaviour the
+  // owner asked for - a player may start whenever, and a late round is shortened rather than
+  // refused. `RoundStartPolicy` in round-types.ts carries why the rule changed.
+  roundStartPolicy: "until_window_closes",
   resultGracePeriodSeconds: 900,
   perRoundCostAcknowledged: false,
+  // Default on, per the owner: the common case is a contest meant to go live, and leaving it
+  // in draft means an operator who does not notice has a contest nobody can see or enter.
+  publishOnSave: true,
 };
 
 export function toRequestBody(draft: ContestDraft): Record<string, unknown> {
@@ -90,6 +111,7 @@ export function toRequestBody(draft: ContestDraft): Record<string, unknown> {
       draft.attemptsPolicy === "single" ? undefined : draft.attemptsAllowed,
     unresolvedRoundPolicy: draft.unresolvedRoundPolicy,
     unscoredContestPolicy: draft.unscoredContestPolicy,
+    roundStartPolicy: draft.roundStartPolicy,
     resultGracePeriodSeconds: draft.resultGracePeriodSeconds,
     perRoundCostAcknowledged: draft.perRoundCostAcknowledged,
   };
@@ -147,11 +169,29 @@ export function describeRoundFit(input: {
   startTime: string;
   endTime: string;
   maxDurationSeconds?: number;
+  /**
+   * Absent means `reserve_full_round`, matching the schema, so a stored contest with no
+   * policy is described by the rule it was created under.
+   */
+  roundStartPolicy?: RoundStartPolicy;
 }):
   | {
       reservedSeconds: number;
-      lastAttemptStart: Date;
-      /** True when no attempt could ever finish, which the server refuses outright. */
+      /**
+       * Present only while the contest reserves a full round. Under `until_window_closes`
+       * there is no cut-off to name, and returning the arithmetic anyway is how a screen
+       * ends up printing a deadline that does not exist.
+       */
+      lastAttemptStart?: Date;
+      reservesFullRound: boolean;
+      /**
+       * True when no attempt could run to its natural length.
+       *
+       * A REFUSAL OR A WARNING DEPENDING ON THE POLICY, which is why the flag says what is
+       * true rather than what the screen should do about it: reserving, nobody can start a
+       * round at all and `contest-preflight.ts` refuses; until-close, every round is simply
+       * shortened and the contest is legitimate.
+       */
       windowTooShort: boolean;
     }
   | undefined {
@@ -167,10 +207,14 @@ export function describeRoundFit(input: {
   }
 
   const windowSeconds = (end.getTime() - start.getTime()) / 1000;
+  const reservesFullRound = input.roundStartPolicy !== "until_window_closes";
 
   return {
     reservedSeconds: maxDurationSeconds,
-    lastAttemptStart: new Date(end.getTime() - maxDurationSeconds * 1000),
+    lastAttemptStart: reservesFullRound
+      ? new Date(end.getTime() - maxDurationSeconds * 1000)
+      : undefined,
+    reservesFullRound,
     windowTooShort: windowSeconds < maxDurationSeconds,
   };
 }
@@ -213,6 +257,7 @@ export function toEditRequestBody(
       draft.attemptsPolicy === "single" ? undefined : draft.attemptsAllowed,
     unresolvedRoundPolicy: draft.unresolvedRoundPolicy,
     unscoredContestPolicy: draft.unscoredContestPolicy,
+    roundStartPolicy: draft.roundStartPolicy,
     resultGracePeriodSeconds: draft.resultGracePeriodSeconds,
     perRoundCostAcknowledged: draft.perRoundCostAcknowledged,
   };

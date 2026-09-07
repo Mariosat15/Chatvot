@@ -94,6 +94,28 @@ Getting these right is what stops most of the disputes.
 Without that rule a player starts a ten-minute game with thirty seconds left and
 either loses their attempt unfairly or delays everyone's prizes.
 
+**AMENDED 7 SEPTEMBER 2026: THIS IS NOW THE DEFAULT RATHER THAN THE LAW.** It is
+`roundStartPolicy: "reserve_full_round"`, and a contest may instead choose
+`until_window_closes`, where an attempt may start until the contest closes and
+`resolveExpiry`'s clamp shortens it. `External game plans/12` section 2.7 is the
+authoritative account of what was built.
+
+Two things about the amendment, because the rule above is still right as far as it goes.
+**The failure it prevents is real and the sentence understates when it fires:** the gate
+reserves the **catalogue ceiling**, not the length the operator configured, so a contest
+shorter than that ceiling refused every round *for its entire duration* rather than only
+near the end. Circuit Sprint's ceiling is 300 seconds, so any contest under five minutes
+was unplayable. The owner reported exactly that. **And its premise no longer holds
+universally:** "loses their attempt unfairly" assumes a cut-short round is worth nothing,
+which was true when a contest was won by finishing and is not now that partial performance
+is the basis for winning. Where a shortened round genuinely means nothing, the reserving
+default is still the correct answer - which is why it is the default and why it was kept
+rather than replaced.
+
+**What did NOT change:** a round can still never outlive its contest. `resolveExpiry`
+clamps `expiresAt` to `playWindowEnd` under both policies, and a contest whose window has
+actually **closed** refuses under both.
+
 ### 1.3 Attempts policy - a required per-contest setting
 
 | Policy | Behaviour | Best for |

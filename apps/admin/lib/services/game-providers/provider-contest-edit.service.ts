@@ -7,6 +7,7 @@ import {
 } from "@/lib/services/games/config-schema";
 import type {
   AttemptsPolicy,
+  RoundStartPolicy,
   UnresolvedRoundPolicy,
   UnscoredContestPolicy,
 } from "@/lib/services/games/round-types";
@@ -72,6 +73,7 @@ export interface EditProviderContestInput {
   attemptsAllowed?: number;
   unresolvedRoundPolicy?: UnresolvedRoundPolicy;
   unscoredContestPolicy?: UnscoredContestPolicy;
+  roundStartPolicy?: RoundStartPolicy;
   resultGracePeriodSeconds?: number;
   perRoundCostAcknowledged?: boolean;
 }
@@ -215,6 +217,12 @@ export async function editProviderContest(
       attemptsAllowed: input.attemptsAllowed ?? competition.attemptsAllowed,
       unresolvedRoundPolicy: (input.unresolvedRoundPolicy ??
         competition.unresolvedRoundPolicy) as UnresolvedRoundPolicy,
+      // Falls back to the STORED value and then to the schema default, never to the wizard's.
+      // A contest created before this field existed must be re-checked against the rule it
+      // was created under, or an unrelated edit would refuse it for being too short.
+      roundStartPolicy: (input.roundStartPolicy ??
+        competition.roundStartPolicy ??
+        "reserve_full_round") as RoundStartPolicy,
       resultGracePeriodSeconds:
         input.resultGracePeriodSeconds ??
         competition.resultGracePeriodSeconds ??
@@ -390,6 +398,9 @@ function applyEdit(
   }
   if (input.unscoredContestPolicy !== undefined) {
     competition.unscoredContestPolicy = input.unscoredContestPolicy;
+  }
+  if (input.roundStartPolicy !== undefined) {
+    competition.roundStartPolicy = input.roundStartPolicy;
   }
   if (input.resultGracePeriodSeconds !== undefined) {
     competition.resultGracePeriodSeconds = input.resultGracePeriodSeconds;

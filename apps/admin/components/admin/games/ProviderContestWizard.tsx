@@ -19,6 +19,7 @@ import { ConfigSchemaFields, defaultConfigValues } from "./ConfigSchemaFields";
 import { PrizeDistributionEditor } from "./PrizeDistributionEditor";
 import { UnscoredPolicyField } from "./UnscoredPolicyField";
 import { RoundClockNote } from "./RoundClockNote";
+import { RoundStartPolicyField } from "./RoundStartPolicyField";
 import type { ContestableTitle } from "./contest-types";
 import {
   type ContestDraft,
@@ -101,6 +102,55 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
     }
   }
 
+  /**
+   * Publishes the contest that was just created, and reports honestly if it cannot.
+   *
+   * A SECOND REQUEST, NOT A FLAG ON THE FIRST, and that is the load-bearing part. The publish
+   * route re-runs the whole pre-flight against the STORED record - which asks the question
+   * creation could not, namely whether the settings actually persisted, and catches a draft
+   * whose title or provider was switched off between the two steps. A `publish: true`
+   * parameter on create would have skipped that and published on the strength of the check
+   * the caller's own input had already passed.
+   *
+   * A REFUSAL HERE LEAVES A DRAFT, NOT A FAILURE. The contest exists and is correct; only its
+   * visibility is outstanding, and the list screen's own publish button is the way to retry.
+   * Saying "created but not published" is the whole message - a bare error would send an
+   * operator back to the wizard to create a second copy of a contest that already exists.
+   */
+  async function publishCreated(competitionId: string): Promise<boolean> {
+    try {
+      const response = await fetch(
+        `/api/games/contests/${competitionId}/publish`,
+        { method: "POST" },
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        const refusals: string[] = data.errors ?? [];
+        setErrors(
+          refusals.length > 0
+            ? refusals
+            : [data.error ?? "The contest could not be published."],
+        );
+        toast.warning(
+          "Contest created, but it could not be published yet. It is saved as a draft - publish it from the competitions list once the problems below are fixed.",
+        );
+        return false;
+      }
+
+      toast.success("Contest created and published. Players can enter it now.");
+      for (const warning of (data.warnings ?? []) as string[]) {
+        toast.warning(warning);
+      }
+      return true;
+    } catch {
+      toast.warning(
+        "Contest created, but publishing failed. It is saved as a draft - publish it from the competitions list.",
+      );
+      return false;
+    }
+  }
+
   async function submit() {
     setSubmitting(true);
     try {
@@ -117,7 +167,13 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
         return;
       }
 
-      toast.success("Draft contest created. Players cannot see it yet.");
+      if (draft.publishOnSave && data.competitionId) {
+        const published = await publishCreated(String(data.competitionId));
+        if (!published) return;
+      } else {
+        toast.success("Draft contest created. Players cannot see it yet.");
+      }
+
       router.push("/?activeTab=competitions");
     } catch {
       toast.error("Something went wrong. Please contact support.");
@@ -170,6 +226,7 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
               startTime={draft.startTime}
               endTime={draft.endTime}
               maxDurationSeconds={selected.maxDurationSeconds}
+              roundStartPolicy={draft.roundStartPolicy}
             />
             {selected.schema.ok ? (
               <ConfigSchemaFields
@@ -199,6 +256,7 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
         {step === 3 && (
           <StepReview
             draft={draft}
+            patch={patch}
             title={selected}
             errors={errors}
             warnings={warnings}
@@ -240,7 +298,7 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
             className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold"
           >
             {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Create draft
+            {draft.publishOnSave ? "Create and publish" : "Create draft"}
           </Button>
         )}
       </div>
@@ -376,6 +434,18 @@ function StepTiming({
         startTime={draft.startTime}
         endTime={draft.endTime}
         maxDurationSeconds={maxDurationSeconds}
+        roundStartPolicy={draft.roundStartPolicy}
+      />
+
+      {/*
+        Placed with the dates rather than with the round settings, because the question it
+        answers is about the contest's clock - "when can people actually play?" - and it
+        changes what the note directly above says. Two screens apart, an operator would read
+        a cut-off, scroll, change the policy, and never see the note stop mentioning one.
+      */}
+      <RoundStartPolicyField
+        value={draft.roundStartPolicy}
+        onChange={(value) => patch({ roundStartPolicy: value })}
       />
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -500,11 +570,13 @@ function StepTiming({
 
 function StepReview({
   draft,
+  patch,
   title,
   errors,
   warnings,
 }: {
   draft: ContestDraft;
+  patch: (changes: Partial<ContestDraft>) => void;
   title?: ContestableTitle;
   errors: string[];
   warnings: string[];
@@ -548,19 +620,30 @@ function StepReview({
             {draft.minParticipants} to {draft.maxParticipants}
           </p>
           {/*
-            CORRECTED 7 SEP 2026. This used to end "Publishing arrives with the player-facing
-            game screens", which was true when it was written and became false on 5 September:
-            the publish button and the player play screen both exist. An operator-facing
-            caution that has become false is worse than none - this one told them the contest
-            they had just created could not be used yet, so they would go looking for a missing
-            feature instead of pressing Publish.
+            CORRECTED 7 SEP 2026, TWICE. It first ended "Publishing arrives with the
+            player-facing game screens", which was true when written and false from 5
+            September. It then described an unconditional draft, which stopped being true the
+            moment publishing became a checkbox - and a review step that describes the wrong
+            outcome is worse than one that describes none, because it is read as confirmation.
           */}
-          <p className="pt-2 text-gray-400">
-            It will be saved as a <strong className="text-white">draft</strong>. Players
-            cannot see or join a draft. Press{" "}
-            <strong className="text-white">Publish</strong> on the contest list when you are
-            ready for it to appear.
-          </p>
+          <label className="mt-2 flex cursor-pointer items-start gap-3 rounded-lg border border-gray-700 bg-gray-800/60 p-3">
+            <input
+              type="checkbox"
+              checked={draft.publishOnSave}
+              onChange={(e) => patch({ publishOnSave: e.target.checked })}
+              className="mt-0.5 h-4 w-4 accent-yellow-500"
+            />
+            <span className="text-xs text-gray-300">
+              <strong className="text-white">
+                Publish immediately, so players can enter it
+              </strong>
+              <span className="mt-1 block text-gray-400">
+                {draft.publishOnSave
+                  ? "The contest is checked once more against what was actually saved, then made visible. If that second check refuses it, the contest is kept as a draft and the reasons are shown here."
+                  : "The contest is saved as a draft. Players cannot see or join a draft - press Publish on the contest list when you are ready."}
+              </span>
+            </span>
+          </label>
         </div>
       )}
     </div>

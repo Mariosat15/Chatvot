@@ -128,6 +128,21 @@ export interface ICompetition extends Document {
    */
   unscoredContestPolicy?: "unclaimed_pool" | "refund_entry_fees";
 
+  /**
+   * How late in the contest a player may still start a round.
+   *
+   * Owner decision, 7 September 2026. `reserve_full_round` stops new rounds one full round
+   * before the end - the title's LONGEST round, from the catalogue, not the length the
+   * operator configured - and `until_window_closes` lets a player start at any time, with the
+   * round closed and scored when the contest closes.
+   *
+   * The default is `reserve_full_round` because that is what every contest did before the
+   * field existed. The provider wizard defaults its own draft to `until_window_closes`, which
+   * is the answer the owner wants for new contests; see `lib/services/games/round-types.ts`
+   * for why the rule changed at all.
+   */
+  roundStartPolicy?: "reserve_full_round" | "until_window_closes";
+
   // Competition Rules & Ranking
   rules: {
     rankingMethod:
@@ -463,6 +478,12 @@ const CompetitionSchema = new Schema<ICompetition>(
       type: String,
       enum: ["unclaimed_pool", "refund_entry_fees"],
       default: "unclaimed_pool",
+    },
+    // Add-only. Default preserves the pre-7-Sep-2026 gate for every existing document.
+    roundStartPolicy: {
+      type: String,
+      enum: ["reserve_full_round", "until_window_closes"],
+      default: "reserve_full_round",
     },
     rules: {
       rankingMethod: {

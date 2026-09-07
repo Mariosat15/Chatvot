@@ -59,7 +59,9 @@ describe("describeRoundFit - turning the reserved ceiling into a moment", () => 
     expect(fit!.reservedSeconds).toBe(300);
     // 14:00 minus the game's longest possible round. This single fact is what the two clocks
     // were missing between them.
-    expect(fit!.lastAttemptStart.getTime()).toBe(
+    // Non-null: `lastAttemptStart` is optional since the start policy became a setting, and
+    // it is present exactly when the contest reserves - which the default does.
+    expect(fit!.lastAttemptStart!.getTime()).toBe(
       new Date("2026-09-08T13:55").getTime(),
     );
     expect(fit!.windowTooShort).toBe(false);
@@ -77,7 +79,7 @@ describe("describeRoundFit - turning the reserved ceiling into a moment", () => 
       maxDurationSeconds: 300,
     });
 
-    expect(fit!.lastAttemptStart.getTime()).not.toBe(
+    expect(fit!.lastAttemptStart!.getTime()).not.toBe(
       new Date("2026-09-08T13:58").getTime(),
     );
   });
@@ -273,9 +275,15 @@ describe("the refusal stops contradicting the operator's own setting", () => {
 
   it("still gates on the ceiling rather than the configured value", () => {
     /*
-      The guard against "fixing" the confusion in the wrong direction. Reading the configured
-      round length here would let an attempt start that the contest end cuts short - scored on
-      a partial game, which chapter 03 section 1.2 exists to prevent.
+      The guard against "fixing" the confusion in the wrong direction, and it survives the
+      7 September 2026 change rather than being softened by it.
+
+      NARROWED, BECAUSE THE ORIGINAL REASON IS NO LONGER THE WHOLE TRUTH. This used to say the
+      ceiling exists so an attempt can never be cut short, full stop. Since `RoundStartPolicy`
+      that is the RESERVING branch's promise, not the platform's - a contest may now choose to
+      permit a shortened round. What has not changed is that when a contest does reserve, it
+      must reserve the ceiling: reading the configured length there would promise a full round
+      and then cut one short, which is the worst of both settings.
     */
     for (const copy of [PREFLIGHT, ADMIN_PREFLIGHT]) {
       const code = readCode(copy);
@@ -297,5 +305,192 @@ describe("the wizard's closing note", () => {
     const code = readCode(WIZARD);
     expect(code).toMatch(/Publish/);
     expect(code).not.toMatch(/Publishing arrives with/);
+
+    /*
+      CORRECTED A SECOND TIME, 7 September 2026. The note then described an unconditional
+      draft, which stopped being true the moment publishing became a checkbox - and a review
+      step that states the wrong outcome is worse than one that states none, because an
+      operator reads it as confirmation of what they just chose. It now branches on the box.
+    */
+    expect(code).not.toMatch(
+      /It will be saved as a <strong className="text-white">draft<\/strong>/,
+    );
+    expect(code).toMatch(/draft\.publishOnSave\s*\n?\s*\?/);
+  });
+});
+
+describe("the round-start policy - the gate became the contest's choice", () => {
+  /*
+    THE DEFECT THIS CLOSES, because the setting reads like a preference and is not one.
+
+    The gate reserved the CATALOGUE ceiling, so a contest shorter than that ceiling refused
+    every round from the instant it opened - "there is not enough time left in this
+    competition" beside a countdown showing minutes remaining. That is what the owner
+    reported. Circuit Sprint's ceiling is 300 seconds, so any contest under five minutes was
+    unplayable however it was configured.
+  */
+
+  it("names no cut-off moment when the contest lets players start at any time", () => {
+    const permissive = describeRoundFit({
+      startTime: "2026-09-08T13:00",
+      endTime: "2026-09-08T14:00",
+      maxDurationSeconds: 300,
+      roundStartPolicy: "until_window_closes",
+    });
+
+    // The load-bearing half. A deadline that does not exist is worse than no deadline: an
+    // operator plans around it, and a player is told to be back by a time that means nothing.
+    expect(permissive!.lastAttemptStart).toBeUndefined();
+    expect(permissive!.reservesFullRound).toBe(false);
+
+    // Absent means the schema default, so a contest saved before the field existed is still
+    // described by the rule it was created under.
+    const stored = describeRoundFit({
+      startTime: "2026-09-08T13:00",
+      endTime: "2026-09-08T14:00",
+      maxDurationSeconds: 300,
+    });
+    expect(stored!.reservesFullRound).toBe(true);
+    expect(stored!.lastAttemptStart).toBeDefined();
+  });
+
+  it("still reports a short contest under BOTH policies, because the fact is the same", () => {
+    /*
+      Only the consequence differs - a refusal one way, a warning the other. Reporting it only
+      on the reserving branch would leave an operator creating a two-minute Circuit Sprint
+      contest with no idea that every attempt will be cut off.
+    */
+    for (const policy of ["reserve_full_round", "until_window_closes"] as const) {
+      const fit = describeRoundFit({
+        startTime: "2026-09-08T13:00",
+        endTime: "2026-09-08T13:02",
+        maxDurationSeconds: 300,
+        roundStartPolicy: policy,
+      });
+      expect(fit!.windowTooShort).toBe(true);
+    }
+  });
+
+  it("refuses a short contest that reserves, and only warns about one that does not", () => {
+    /*
+      The rule that makes the setting usable at all. Left as a hard refusal for both, an
+      operator could select "players may start at any time" and then be refused for creating
+      exactly the contest that setting exists to allow.
+
+      Asserted in BOTH copies: a check that differs between the apps is a validation rule
+      whose outcome depends on which app served the form.
+    */
+    for (const copy of [PREFLIGHT, ADMIN_PREFLIGHT]) {
+      const code = readCode(copy);
+
+      expect(code).toMatch(
+        /const reservesFullRound = input\.roundStartPolicy !== "until_window_closes"/,
+      );
+
+      // The short-contest branch pushes to BOTH lists, one per policy. Asserting only that
+      // the file mentions `warnings.push` would go green on a version that refuses both.
+      const shortContest = code.slice(
+        code.indexOf("windowSeconds < roundSeconds"),
+        code.indexOf("const longestPossibleRound"),
+      );
+      expect(shortContest.length).toBeGreaterThan(200);
+      expect(shortContest).toMatch(/if \(reservesFullRound\)/);
+      expect(shortContest).toMatch(/errors\.push/);
+      expect(shortContest).toMatch(/warnings\.push/);
+    }
+  });
+
+  it("asks the grace period to cover a round this contest can actually produce", () => {
+    /*
+      `resolveExpiry` clamps a round to the contest end, so under until-close no round can be
+      longer than the window however high the ceiling is. Demanding grace for the full ceiling
+      would refuse a short contest for a round length it cannot produce - the same
+      ceiling-versus-reality confusion the whole change is about, one field along.
+    */
+    for (const copy of [PREFLIGHT, ADMIN_PREFLIGHT]) {
+      const code = readCode(copy);
+      expect(code).toMatch(
+        /reservesFullRound \|\| !\(windowSeconds > 0\)\s*\n?\s*\?\s*roundSeconds/,
+      );
+      expect(code).toMatch(/Math\.min\(roundSeconds, Math\.ceil\(windowSeconds\)\)/);
+    }
+  });
+
+  it("is one control, shared by the wizard and the editor", () => {
+    // Same reasoning as `UnscoredPolicyField` and `RoundClockNote`: a rule about where money
+    // and play time go, offered twice, eventually offers two different sets of options.
+    for (const screen of [WIZARD, EDITOR]) {
+      expect(readCode(screen)).toMatch(/<RoundStartPolicyField/);
+    }
+
+    // And the option ids and consequence sentences come from the module the SERVER reads, so
+    // the screen cannot describe a rule `round.service.ts` does not enforce.
+    const field = readCode(
+      "apps/admin/components/admin/games/RoundStartPolicyField.tsx",
+    );
+    expect(field).toMatch(/ROUND_START_POLICIES/);
+    expect(field).toMatch(/ROUND_START_POLICY_COPY/);
+    expect(field).not.toMatch(/reserve_full_round["']\s*:\s*\{/);
+  });
+
+  it("changes what the clock note SAYS, not just what it emphasises", () => {
+    /*
+      The note is the one place the derived deadline is rendered. If it kept printing one
+      under until-close it would be describing the other setting - which is worse than the
+      silence the component was written to fix.
+    */
+    const note = readCode(NOTE);
+
+    /*
+      SLICED TO THE TIMING VARIANT, because a bare `fit.reservesFullRound` match went GREEN on
+      a probe that deleted this very condition. Both identifiers appear twice - the settings
+      variant branches on the policy too, and `lastAttemptStart` is named inside the paragraph
+      being guarded - so removing the guard leaves every name in the file exactly where it was.
+
+      Fourth instance of the class, after the fixed-character Edit guard, `canTransitionRound`
+      and the play screen's two `!expectedOrigin` copies: assert position within the construct,
+      never a bare identifier.
+    */
+    const timing = note.slice(note.indexOf("Players can join from the moment"));
+    expect(timing.length).toBeGreaterThan(400);
+
+    const condition = timing.slice(0, timing.indexOf("An attempt may be started"));
+    expect(condition.length).toBeGreaterThan(100);
+    expect(condition).toMatch(/fit\.reservesFullRound/);
+    expect(condition).toMatch(/fit\.lastAttemptStart/);
+
+    // The settings variant branches too, so the policy is not merely consulted once and then
+    // ignored by the paragraph an operator reads while choosing the game's own round length.
+    const settings = note.slice(0, note.indexOf("Players can join from the moment"));
+    expect(settings).toMatch(/fit\.reservesFullRound/);
+
+    // Both screens pass the policy in. A note that always read the default would describe the
+    // reserving rule on a permissive contest and nobody would see the two disagree.
+    for (const screen of [WIZARD, EDITOR]) {
+      const code = readCode(screen);
+      const notes = code.match(/roundStartPolicy=\{draft\.roundStartPolicy\}/g) ?? [];
+      // Twice per screen: the settings variant and the timing variant.
+      expect(notes.length).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it("frozen once anyone has paid to enter", () => {
+    /*
+      It is absent from `EDITABLE_ONCE_ENTERED`, so the server refuses it anyway. The editor
+      disables it so an operator finds that out before submitting, rather than as a refusal
+      naming a field they did not knowingly change.
+    */
+    const policy = readCode(
+      "apps/admin/lib/admin/provider-contest-edit-policy.ts",
+    );
+    expect(policy).not.toMatch(/roundStartPolicy/);
+
+    const editor = readCode(EDITOR);
+    const control = editor.slice(
+      editor.indexOf("<RoundStartPolicyField"),
+      editor.indexOf("<RoundStartPolicyField") + 260,
+    );
+    expect(control.length).toBeGreaterThan(60);
+    expect(control).toMatch(/disabled=\{entered\}/);
   });
 });

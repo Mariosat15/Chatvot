@@ -96,29 +96,22 @@ const CompetitionDetailsPage = async ({
       page by default. ?view=details bypasses this so users can revisit
       the competition detail view (leaderboard, chart, etc.) from results.
 
-      THE GAME CHECK IS NOT A REFINEMENT, IT IS A CRASH FIX. `/results` is the trading
-      post-mortem - trade history, win rate, profit factor - and it dereferences
-      `participant.startingCapital` and `participant.currentCapital` unguarded. Those two
-      fields are conditional on `gameKey === "trading"` in the participant schema, so a
-      provider participant genuinely has neither, and this redirect walked every provider
-      player of a finished contest straight into `undefined.toLocaleString()`. The player saw
-      the generic error boundary, which names nothing and offers "Try Again" on a page that
-      can only fail again.
+      THIS USED TO EXCLUDE PROVIDER CONTESTS, AND THE EXCLUSION IS GONE BECAUSE THE REASON
+      FOR IT IS. It was a crash fix: `/results` was the trading post-mortem and dereferenced
+      `participant.startingCapital` and `participant.currentCapital` unguarded, which for a
+      provider participant are genuinely absent - conditional on `gameKey === "trading"` in
+      the participant schema - so the redirect walked every provider player of a finished
+      contest into `undefined.toLocaleString()` and the generic error boundary. `/results`
+      now branches on the game label at the top and renders `ProviderResultsScreen`, so
+      there is nothing left to protect them from.
 
-      A provider player stays on this lobby instead, which is already game-aware and already
-      renders the final standings and their own score for a `completed` contest. It is the
-      right destination on its own merits, not merely the safe one.
-
-      The label alone, deliberately not the stricter `isProviderContest`: a provider contest
-      whose keys never resolved still has no trading capital to render, so the strict helper
-      would send exactly the broken case down the broken path.
+      Leaving the exclusion in place after that screen shipped had a cost, which is what
+      brought it back: a provider player who had entered a finished contest was held on this
+      lobby, where the entry panel greeted them with a green tick and "You're in this
+      competition!" about something that was over, and their own rounds were nowhere on the
+      page. Trading players had been sent to a post-mortem all along.
     */
-    if (
-      isCompleted &&
-      isUserIn &&
-      query.view !== "details" &&
-      !hasProviderGameLabel(competition)
-    ) {
+    if (isCompleted && isUserIn && query.view !== "details") {
       redirect(`/competitions/${id}/results`);
     }
 

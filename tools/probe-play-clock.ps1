@@ -116,11 +116,15 @@ Probe -Name 'the too-late-to-start arithmetic is deleted' `
 
 # A resume reopens the round the player already has and needs no fresh room in the window.
 # Without this the gate would refuse to reopen a round the server would happily return.
+#
+# RE-AIMED 7 SEP 2026. The `!resuming` guard moved onto `fullRoundNoLongerFits` when the start
+# policy split the two facts apart; aimed at the old name this reported DID NOT APPLY, which
+# reads exactly like a broken harness rather than a moved guard.
 Probe -Name 'the gate fires on a resume as well as a fresh launch' `
   -File $PREFLIGHT `
-  -Find '  const tooLateToStart =
+  -Find '  const fullRoundNoLongerFits =
     !resuming &&' `
-  -Replace '  const tooLateToStart =
+  -Replace '  const fullRoundNoLongerFits =
     true &&' `
   -ExpectRed 'blocks Play when a round can no longer finish inside the window'
 
@@ -178,5 +182,52 @@ Probe -Name 'the false play-window note comes back' `
   -Replace '                The play window can be narrower than the competition itself, so
                 check both.' `
   -ExpectRed 'no longer tells players the play window can be narrower'
+
+Write-Host "`n=== the round-start policy ===" -ForegroundColor Cyan
+
+# The gate left unconditional, which is the defect the owner reported: a contest shorter than
+# the catalogue ceiling withholding Play from the moment it opened.
+Probe -Name 'the policy is ignored and every contest reserves a full round' `
+  -File $PREFLIGHT `
+  -Find '  const reservesFullRound = state.roundStartPolicy !== "until_window_closes";' `
+  -Replace '  const reservesFullRound = true;' `
+  -ExpectRed 'offers a shortened round instead of refusing, when the contest allows it'
+
+# The disclosure dropped. This is the one that makes the permissive branch indefensible rather
+# than merely untidy: an attempt is consumed on creation and cannot be handed back, so a player
+# who is not told spends their only attempt on a game they could never finish.
+Probe -Name 'the player is not told the round will be shortened' `
+  -File $PREFLIGHT `
+  -Find '    fullRoundNoLongerFits && !reservesFullRound && windowEndMs !== null
+      ? windowEndMs - now
+      : null;' `
+  -Replace '    null;' `
+  -ExpectRed 'tells the player how long they will actually get'
+
+# It reaches the paragraph but not the button - the plausible half-fix, and the button is the
+# thing being pressed by somebody who skimmed the paragraph.
+Probe -Name 'the shortening never reaches the button label' `
+  -File $PREFLIGHT `
+  -Find '                      shortenedMs !== null
+                      ? "Play a shortened round"' `
+  -Replace '                      false
+                      ? "Play a shortened round"' `
+  -ExpectRed 'tells the player how long they will actually get'
+
+# Read straight off the contest document rather than the normalised config, so a bad stored
+# value offers a button `round.service.ts` refuses.
+Probe -Name 'the policy is read off the contest instead of the normalised config' `
+  -File 'lib/services/games/round-status.service.ts' `
+  -Find '          config.config.roundStartPolicy ?? "reserve_full_round",' `
+  -Replace '          contest.roundStartPolicy ?? "reserve_full_round",' `
+  -ExpectRed "takes the policy from the server's normalised config"
+
+# The client's own copy of PlayState losing the field, which the compiler would catch in the
+# component but not in the two field lists agreeing with each other.
+Probe -Name "the client's PlayState drops the policy" `
+  -File 'components/games/play-state.ts' `
+  -Find '  roundStartPolicy: "reserve_full_round" | "until_window_closes";' `
+  -Replace '  roundStartPolicyName?: string;' `
+  -ExpectRed "is a field on the client's own PlayState"
 
 Write-Host "`n=== done ===`n" -ForegroundColor Cyan

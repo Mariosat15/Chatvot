@@ -564,6 +564,36 @@ describe("contestRoundConfig", () => {
     if (!result.ok) return;
     expect(result.config.attemptsAllowed).toBeUndefined();
   });
+
+  it("normalises the round-start policy, failing CLOSED on anything unrecognised", () => {
+    /*
+      ADDED BECAUSE A PROBE FOUND NOTHING COVERING THIS. Reversing the comparison here - reading
+      anything that is not `reserve_full_round` as permissive - left the whole round-lifecycle
+      suite green, because every test in it hands `createRound` a hand-built config and never
+      goes through this normaliser. Third instance of a green probe meaning "no test exists",
+      after the mass-assignment guard and the game badge.
+
+      Fail closed, for the same reason as the market-hours gate: wrongly reserving refuses play
+      visibly and somebody complains, wrongly permitting lets a round start that the contest end
+      cuts short on a title where a partial run scores nothing.
+
+      An absent value is the case that matters most in practice - every contest created before
+      the field existed - and it must read as the rule those contests were created under.
+    */
+    const policyOf = (roundStartPolicy?: string) => {
+      const result = contestRoundConfig({ ...stored, roundStartPolicy });
+      expect(result.ok).toBe(true);
+      return result.ok ? result.config.roundStartPolicy : undefined;
+    };
+
+    expect(policyOf("until_window_closes")).toBe("until_window_closes");
+    expect(policyOf("reserve_full_round")).toBe("reserve_full_round");
+
+    expect(policyOf(undefined)).toBe("reserve_full_round");
+    expect(policyOf("")).toBe("reserve_full_round");
+    // A typo, which a cast would have carried straight into the gate.
+    expect(policyOf("until_window_close")).toBe("reserve_full_round");
+  });
 });
 
 describe("isProviderContest", () => {

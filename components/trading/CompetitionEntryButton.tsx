@@ -13,6 +13,7 @@ import {
   Skull,
   Lock,
   TrendingUp,
+  Flag,
 } from "lucide-react";
 import { enterCompetition } from "@/lib/actions/trading/competition.actions";
 import { useRouter } from "next/navigation";
@@ -260,11 +261,37 @@ export default function CompetitionEntryButton({
           ) : (
             /* Active Participant */
             <>
-              <div className="flex items-center gap-3 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-                <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+              {/*
+                Reason the heading moves with the status rather than being a fixed
+                "You're in this competition!": on a finished contest that sentence is
+                present tense about something over, and it sat above a green tick, which
+                reads as a state the player can still act on. The subtitle already said
+                "Competition has ended" underneath, so the card contradicted itself. The
+                tick is kept only while there is something to do.
+              */}
+              <div
+                className={`flex items-center gap-3 p-4 rounded-lg ${
+                  isCompleted
+                    ? "bg-gray-500/10 border border-gray-500/30"
+                    : "bg-green-500/10 border border-green-500/20"
+                }`}
+              >
+                {isCompleted ? (
+                  <Flag className="h-5 w-5 text-gray-400 shrink-0" />
+                ) : (
+                  <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+                )}
                 <div>
-                  <p className="text-sm font-medium text-green-400">
-                    You&apos;re in this competition!
+                  <p
+                    className={`text-sm font-medium ${
+                      isCompleted ? "text-gray-300" : "text-green-400"
+                    }`}
+                  >
+                    {isCompleted ? (
+                      "Competition ended"
+                    ) : (
+                      <>You&apos;re in this competition!</>
+                    )}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
                     {isActive
@@ -272,7 +299,7 @@ export default function CompetitionEntryButton({
                         ? "Play your round now"
                         : "Start trading now"
                       : isCompleted
-                        ? "Competition has ended"
+                        ? "Final results are in - see how you placed"
                         : "Competition will start soon"}
                   </p>
                 </div>

@@ -685,6 +685,100 @@ than shipping a green probe, on the same reasoning as R42's second game gate.
 
 ---
 
+### 2.7 The gate that refused every round, and the draft nobody published - BUILT 7 September 2026
+
+Two owner reports, and neither was a wording problem. A contest that had just opened said
+**"There is not enough time left in this competition to finish a round, so no new round can be
+started"** beside a countdown reading fifty-nine minutes; and every contest the wizard produced
+went to **draft**, so it sat invisible while its own start time went past.
+
+**The refusal was correct code enforcing a rule nobody had chosen.** Chapter 03 section 1.2
+specifies the gate as `now + maxDurationSeconds <= playWindowEnd`, reserving the **catalogue
+ceiling** rather than the length the operator configured - deliberately, so an attempt could
+never be admitted that the contest end would cut short. Circuit Sprint's ceiling is **300
+seconds**, so any contest shorter than five minutes refused every round for its entire
+duration. Not intermittently, and not near the end: **from the instant it opened**.
+
+**And its premise had quietly stopped holding.** The rule rests on a cut-short round being
+scored on a partial game and therefore unfair. That was the right instinct when a contest was
+won by finishing; it is not, now that **partial performance is the basis for winning** - a
+player who completes two boards beats one who completes one, exactly as a trading contest ranks
+whoever is ahead when the bell goes. So the gate became the **contest's** choice.
+
+| Setting | `RoundStartPolicy` | What it does |
+|---|---|---|
+| Reserve a full round | `reserve_full_round` | The old rule, unchanged. The last attempt can start one full ceiling before the end |
+| Players may start at any time | `until_window_closes` | An attempt may start until the contest closes. `resolveExpiry`'s clamp shortens it, and the player is told by how much |
+
+**The schema defaults to reserving; the wizard defaults a new draft to permissive.** That pair
+is the thing most likely to be read as a bug and is deliberate: a schema default fixes future
+rows only, so every contest created before the field existed must keep the rule its entrants
+signed up under, while the setting an operator wants today is the one that does not refuse them.
+
+**The same fact is a refusal or a warning depending on the policy, and it has to be.** A
+contest shorter than the ceiling is reported by both `describeRoundFit` and both pre-flight
+copies either way - reporting it only on the reserving branch would leave an operator creating a
+two-minute Circuit Sprint contest with no idea every attempt will be cut off. But left as a hard
+refusal for both, an operator could select the setting that exists for short contests and then
+be refused for creating one.
+
+**A second-order fix that would have been missed:** the grace period is now asked to cover
+`Math.min(ceiling, window)` rather than the ceiling. Under until-close no round can be longer
+than the window however high the ceiling is, so demanding grace for the full ceiling refuses a
+short contest for a round length it **cannot produce** - the ceiling-versus-reality confusion
+again, one field along.
+
+**Auto-publish is a checkbox, default on, and the flag never reaches the server.** Publishing
+re-runs the pre-flight against the **stored** record, which is the whole point of it - a draft
+can outlive the switches that made it valid, and reading the saved document also asks the
+question creation could not, which is whether the settings actually persisted. A `publish: true`
+on the create call would either bypass that or duplicate it inside the create transaction. So
+the checkbox drives a **second request** after the create returns, and **a refused publish
+leaves a draft rather than reporting a failure** - the contest exists by then, so an error would
+send an operator back to build a second copy of it. The editor's draft defaults the flag to
+**false** and offers no control: inheriting the wizard's default would publish a deliberately
+unpublished draft as a side effect of fixing a typo.
+
+**What was built.** `ROUND_START_POLICIES` / `ROUND_START_POLICY_COPY` on both `round-types.ts`
+copies; the conditional gate in `round.service.ts`; the normaliser in both `contest-config.ts`
+copies, which **fails closed** on an unrecognised stored value; `roundStartPolicy` on both
+`competition.model.ts` copies; the conditional refusal in both `contest-preflight.ts` copies;
+`RoundStartPolicyField.tsx`, shared by the wizard and the editor and frozen once anyone has
+entered; a policy-aware `RoundClockNote.tsx` and `describeRoundFit`; the field on `PlayState` in
+both the service and the client's own copy; and the shortened-round disclosure in
+`RoundPreflight.tsx`, on the panel **and on the button**.
+
+**The disclosure is what makes the permissive branch defensible, not decoration.** An attempt is
+consumed when a round is created and cannot be handed back, so a player who starts a four-minute
+game with ninety seconds left and is not told has paid for a game they could never finish. It is
+derived from the **window**, not from the round length, because that is what the server's clamp
+will actually grant.
+
+**48 probes across three harnesses, all red on exactly the expected test** -
+`tools/probe-contest-round-clock.ps1` (21, the operator's screens and the mirrored pre-flights),
+`tools/probe-play-clock.ps1` (17, the player's), and the new
+`tools/probe-round-start-policy.ps1` (10, where it behaves: `createRound` against a real
+MongoDB, and the create-then-publish sequence). Whole suite **1350 passed**, main typecheck back
+to its pre-existing 198 and admin at the **223 baseline** exactly.
+
+**Two probes came back green and neither was a weak guard.** One was the recurring
+one-identifier-two-occurrences trap: deleting the clock note's timing condition left
+`fit.reservesFullRound` and `fit.lastAttemptStart` in the file, because the settings variant
+branches on the policy too and the second name appears **inside** the paragraph being guarded.
+Fourth instance of that class - the test now slices to the construct. The other was the third
+cause rather than the first: **no test existed at all.** Reversing the normaliser's comparison
+in `contest-config.ts` left the entire round-lifecycle suite green with **zero** red, because
+every test there hands `createRound` a hand-built config and none of them goes through the
+normaliser. A test for `contestRoundConfig` was written and the probe re-aimed at it and at its
+own suite.
+
+**A deviation from chapter 03, recorded rather than absorbed.** Section 1.2 states the gate
+unconditionally. It is now conditional, and the chapter's reasoning is preserved as the
+**default** rather than deleted - which is the honest reading, because the reserving branch is
+still the right answer for a title where a shortened round means nothing.
+
+---
+
 ## 3. Contest list and detail screens
 
 | Screen | Change |
