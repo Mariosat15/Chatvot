@@ -205,6 +205,32 @@ and prints the signed result callback when it arrives. `--reveal` prints a valid
 first board, which is what makes a full solve verifiable by hand - a puzzle you cannot solve
 cannot be used to test the path that scores a solved one.
 
+### Playing a round SOMEBODY ELSE created
+
+```
+npx tsx tools/autoplay.ts --round=cv_rnd_abc123 --base=http://127.0.0.1:4010
+npx tsx tools/autoplay.ts --round=cv_rnd_abc123 --slow=1200   # lose on purpose
+```
+
+**Note what the three tools above cannot do**, because it is the reason this one exists.
+`smoke-play.ts`, `test-play.ts` and `test-board.ts` all play this game, and every one of them
+creates its own round in its own in-memory database. Not one can play a round the *platform*
+opened - which is how "the two halves have never spoken" stayed true through three tools that
+each looked like a counterexample.
+
+This takes a `roundId` that already exists in whatever database the service is pointed at and
+plays it through the same four HTTP endpoints the browser uses, solving each board from the
+round's stored seeds. It is a **perfect player**, so it is useless for testing the verifier and
+ideal for driving the money: a contest needs somebody to finish, and a run that sometimes loses
+cannot assert a payout.
+
+It is what the platform's `npm run test:e2e-round` drives. Two things it deliberately does not
+do: it never prints a score, because the client is not told one - the score travels in the signed
+callback and nowhere else; and **nothing here is reachable over HTTP**. Reading a seed is safe for
+the same reason `--reveal` is, and for no other reason: it is a local tool run by somebody who
+already holds the database credentials. If a change ever makes any of it answer a request, that is
+the line being crossed.
+
 ---
 
 ## Tests
@@ -215,8 +241,15 @@ npm run probe:api     # break each guard, one at a time, and watch its test fail
 npm run probe:board   # the same, for the play surface and the browser module
 ```
 
-`npm test` runs **152 tests**: 42 engine, 21 scoring, 40 API, 38 play and delivery, 11 board
-client. The probe scripts are the more important half: a green suite proves nothing until each
+`npm test` runs **167 tests**: 15 config, 42 engine, 21 scoring, 40 API, 38 play and delivery,
+11 board client. (Any figure of 152 predates the config suite and is stale.)
+
+**Every one of them runs in-process against an in-memory MongoDB, so none can fail because the
+PLATFORM disagrees with this service.** That check lives on the other side, in the platform's
+`npm run test:e2e-round`, which starts this service for real and drives a round from catalogue
+sync to prize payout. Run it before believing any claim that the integration works.
+
+The probe scripts are the more important half: a green suite proves nothing until each
 guard has been watched failing, so every probe removes exactly one guard and asserts that the
 test written for it goes red **and that the blast radius is small** - a one-line change turning
 many tests red usually means the harness damaged the file rather than removed the guard.

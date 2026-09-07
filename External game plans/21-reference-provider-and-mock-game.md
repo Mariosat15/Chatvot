@@ -189,7 +189,7 @@ service's own smoke tool, never yet launched from a ChartVolt contest.
 | The platform adapter | **Built.** `chartvolt-games` registered in both registry copies, four files under `lib/services/game-providers/adapters/`, mirrored into `apps/admin` and verified byte-identical. 49 tests, 24 probes |
 | **The playable board** | **Built.** `GET /play?t={token}` serves a real game: `public/play/` (4 files, no build step) behind `src/http/play-page.ts`. Dragging with a finger draws paths, the clock runs, a solved board advances, and the round settles into a signed result. Verified by a human-equivalent browser run on both titles. 11 headless tests drive the browser module against the server's verifier; 13 probes |
 | **Provider registration** | **NOT DONE through the admin screens.** The service now has a local `.env` and has been started - including **from its production `dist` build**, not only under `tsx` - and answers signed catalogue calls. Registration was attempted in the admin UI on 6 Sep 2026 and **found a live defect**: the base-URL validator required `https://` unconditionally, so a loopback provider could not be registered at all. Fixed (see 4.1b) |
-| **Any end-to-end round** | **NOT DONE.** No round has travelled between the two halves |
+| **Any end-to-end round** | **DONE BY TEST, NOT BY CLICKING - 7 September 2026.** A round now travels between the two halves: `__tests__/games/end-to-end-round.test.ts` starts a real `games-service` process, syncs its catalogue over signed HTTP, launches a round, plays it to completion, receives the service's own signed callback and settles the contest for real money. See **4.1d**. What is still NOT done is the acceptance criterion itself, which says *by clicking, in a browser* - that needs two sessions this environment cannot create, so it is a runbook for the owner (**4.1e**) |
 | **Production deployment** | **Prepared, not performed.** PM2 entry `chartvolt-games`, `games-service/env.example`, and a runbook in `deploy/README.md`. **Two exposure routes**: proxied through the platform app at `/play` (the default since 6 Sep 2026, owner's choice - no DNS, no nginx, no certificate) or its own `games.` subdomain (the nginx block is kept). Nothing has been deployed - see 4.1b for the two boot guards this work added and 4.1c for what the proxy route costs |
 | Mobile support | **Built for the game screen, not yet for the catalogue.** The board is sized from the viewport, uses `100dvh`, and sets `touch-action: none` so a drag does not scroll the page - which is the one CSS rule in the file that decides whether the game works on a phone at all |
 | Content set, localisation, runbook | **NOT STARTED.** Both titles declare `en` only, deliberately: declaring a locale and shipping English strings for it renders confident English copy on a Greek game page with nothing raising an error |
@@ -392,6 +392,123 @@ because `loadConfig` needs the file being written; and `--dev` puts the developm
 the artifact, not in the enforcement** - the boot guard still refuses a loopback origin under
 `NODE_ENV=production`, so a dev file copied to a server fails loudly instead of pointing every
 player at their own machine.
+
+---
+
+### 4.1d The first round crossed the wall - 7 September 2026
+
+**The two halves have spoken.** A round is now created by the platform, played by a person's
+moves, scored by the service, delivered back signed, ingested through all eleven gates, written
+onto a participant and **paid out as real prize money** - in one uninterrupted sequence, with a
+real `games-service` process on a real port and real HTTP in both directions.
+
+`__tests__/games/end-to-end-round.test.ts`, run by `npm run test:e2e-round`, three tests,
+~75 seconds. Probed by `tools/probe-e2e-round.ps1`, three probes, all red on the expected test.
+
+**The gap it closes is the one 4.1a names, and it is worth restating exactly.** The adapter's 49
+tests run against a **stubbed `fetch`**, and the service's 167 run in-process against
+`mongodb-memory-server`. Two green suites, neither of which can fail because the other side
+disagrees. A stub returns what it is told. This is the first test in either repository whose
+failure mode is *the two halves disagreeing*.
+
+**What is substituted, stated precisely so nobody overclaims it.** Two things, and both are
+named in the test's own header.
+
+- **The Next.js routing layer.** There is no Next server in a vitest run, so the callback is
+  received by a bare `node:http` server that hands the raw bytes and headers to
+  `ingestProviderCallback` - which is *exactly and only* what
+  `app/api/games/providers/[providerKey]/events/route.ts` does. The HMAC, the bytes, the socket
+  and every gate are real; Next's own request plumbing is not exercised.
+- **The browser.** The board is played by `games-service/tools/autoplay.ts` through the same four
+  HTTP endpoints the browser uses. Whether a finger can draw a line on a phone is not something
+  any test can answer, and `tools/smoke-play.ts` exists for that.
+
+**Five acceptance criteria are now observed rather than asserted:** a catalogue synced from what
+the service actually published; a round launched, played and scored with the score decided by the
+service; a **lower-is-better** title where the faster player is **paid more**; a double-click that
+does not consume a second attempt; and a byte-for-byte replayed delivery absorbed as a duplicate.
+
+**Five things generalise from building it.**
+
+- **A perfect player is a tool the service has to own, and none of the three that looked like it
+  would do.** `smoke-play.ts`, `test-play.ts` and `test-board.ts` all play this game and **not one
+  of them can play a round somebody else created** - each boots its own in-memory database and
+  creates its own round inside it. That is the right shape for testing the service alone and
+  exactly the wrong shape for the one thing this phase exists to prove, and it is why the sentence
+  "the two halves have never spoken" survived three tools that each looked like a counterexample.
+  `tools/autoplay.ts` is new, takes a `roundId` that already exists, and lives **inside the
+  service** because `presentationSeed` is generated there and stored nowhere else - the platform
+  could not compute a solution if it wanted to.
+- **A map of an API is a hypothesis until a real response disagrees with it.** The play surface
+  returns a **bare `PlayState` from `session`, `state` and `leave`, and a wrapped
+  `{ accepted, refusal, state }` only from `submit`.** The first driver assumed all four were
+  wrapped, and the symptom was `Session refused: unknown` - because reading `.state` off a bare
+  state gives `undefined`, which is **indistinguishable from a refusal**. Same class as the
+  aside-verification rule, one layer out: a summary of code is a claim about it.
+- **The two titles end for different reasons and only one of them ends because you played well.**
+  `circuit-perfect` asks for a fixed board count, so solving them finishes the round.
+  `circuit-sprint` asks how many you can solve in a fixed time, so **a perfect player never
+  finishes it** - the clock does, and the sweeper writes the terminal status up to a tick later.
+  The first loop ignored `endsAt` and read as an infinite loop. It is also why this suite takes
+  75 seconds and cannot be made faster: `durationSeconds` is clamped to a **60-second floor** by
+  the title's own `configSchema`, so shortening it would test a contest no operator can create.
+- **`spawn("npx.cmd")` fails with `EINVAL` on Node 20 and later**, which closed a Windows
+  command-injection hole by refusing to launch batch files without an explicit shell. `shell: true`
+  reopens it *and* breaks on a path containing a space. Spawning the service's own
+  `node_modules/tsx/dist/cli.mjs` with `process.execPath` involves no shell at all - and using the
+  service's copy rather than the platform's keeps the isolation honest.
+- **A test this heavy must be opt-in, and the reason is not its runtime.** It needs
+  `games-service/node_modules`, which is a **separate install by design**. Left in the default
+  suite, a fresh clone fails on a missing module and it reads as *the platform* being broken. It
+  binds a port, so two runs collide. And the pre-push hook runs the suite, so quadrupling it is how
+  a team learns to reach for `--no-verify`. Hence `vitest.e2e.config.ts` and a named script.
+
+**And the finding worth recording is that there was no finding.** Every earlier phase in this
+programme produced live defects on contact - X4a's own first day produced R34, the play surface
+produced three more. **The first real round found none in the product.** The three defects this
+work did surface were in the new test driver and in the map it was written from, all corrected
+above. That is a genuinely good result and it should be stated plainly rather than dressed up:
+the protocol, the gates, the score seam and the settlement path did what the chapters said they
+would, the first time they were asked to do it together.
+
+---
+
+### 4.1e What is still not done, and the runbook for it
+
+**The acceptance criterion is "by clicking, in a browser, with no test harness involved", and this
+is a test harness.** That distinction is the whole remaining gap, and it is not a technicality:
+the two capabilities most recently found missing on this programme - a publish button and a play
+screen - were both **complete by API and unreachable by clicking**, found only by grepping for a
+caller. A passing end-to-end test is evidence about the protocol and says nothing about whether an
+operator and a player can actually get there.
+
+It cannot be closed from here: it needs an authenticated admin session and an authenticated player
+session, and this environment has neither. So it is the owner's run, and the steps are:
+
+1. **Deploy.** `games-service` on the server, `pm2 start ecosystem.config.js --only chartvolt-games`,
+   with `npm run setup:env` having written the `.env`. The play surface arrives at
+   `https://chartvolt.com/play` through the three rewrites - no DNS, no nginx, no certificate.
+2. **Register the provider** in the admin panel as **ChartVolt Games**, first-party, base URL
+   pointing at the service. Paste the four credentials `setup:env` printed. **Check the display
+   name before the first contest settles** - a provider row joined to contest history can never be
+   renamed away from it.
+3. **Sync the catalogue**, and confirm both titles appear. **Enable `circuit-perfect` first**: it
+   ends when the player finishes rather than when a clock does, so a full round takes under a
+   minute rather than the sprint's 60-second floor.
+4. **Create and publish a contest.** Draft first, then the Publish button - the checklist re-runs
+   against the stored document.
+5. **Enter it from two different player accounts and play both**, with different completion times.
+6. **Confirm the money.** The faster player must be paid more. Then check the admin round inspector
+   shows both rounds `completed` with their raw deliveries.
+
+**Four acceptance criteria remain untouched by today's work and are not scheduled**: all three
+unresolved-round policies observed by withholding a result; a score injected from the browser
+console being rejected (the frame protocol has no score field, which is proven, but not by
+attempting it from a console); the content set rendering on a game page for both titles, since
+**there is no rules surface for a provider title yet**; and localisation, which is `en` only on
+purpose. The **spec-ambiguity log is still 14 entries, all `OPEN`** - nothing there is closed by
+this service choosing a behaviour, only by `01` and the requirements HTML being amended with a
+version bump.
 
 ---
 

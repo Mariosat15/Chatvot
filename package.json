@@ -35,6 +35,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:e2e-round": "vitest run --config vitest.e2e.config.ts",
+    "probe:e2e-round": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/probe-e2e-round.ps1",
     "test:watch": "vitest --watch",
     "audit:security": "npm audit --audit-level=high",
     "prepare": "husky"

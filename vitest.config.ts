@@ -6,7 +6,22 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["**/*.{test,spec}.{ts,tsx}"],
-    exclude: ["node_modules", ".next", "apps", "dist"],
+    exclude: [
+      "node_modules",
+      ".next",
+      "apps",
+      "dist",
+      /**
+       * The cross-process end-to-end round, which has its own config and its own npm script.
+       *
+       * Reason it is excluded rather than merely slow: it starts a real `games-service` process,
+       * which needs `games-service/node_modules` - a separate install by design, since the service
+       * shares no dependencies with this repository. Left in, a fresh clone fails the WHOLE suite
+       * on a missing module and it reads as the platform being broken. See `vitest.e2e.config.ts`
+       * for the other two reasons and `npm run test:e2e-round` to run it.
+       */
+      "__tests__/games/end-to-end-round.test.ts",
+    ],
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],
