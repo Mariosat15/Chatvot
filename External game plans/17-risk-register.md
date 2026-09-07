@@ -60,6 +60,7 @@ chapter covers risks to the programme and to the application.
 | R41 | **Pausing a provider contest did nothing.** `isPaused` is a trading-era field honoured by `order.actions.ts`; `round-launch.service.ts` never read it. So an operator got a success toast, a PAUSED banner and a notification to every participant while **players carried on starting and finishing rounds.** Worse than a dead control because `IncidentsSection.tsx` pauses a contest when an operator raises an incident - the one moment they most need play to stop is the moment they were most confidently told it had | High | **CLOSED 7 Sep 2026.** Latent: no provider contest has run in production, so nobody has played through a pause and **nothing was backfilled** - the defect is an absent check, not a stored value. Two siblings found with it: **resume compensated `endTime`, which gates nothing a player plays inside**, so a two-hour pause silently ate two hours of playing time; and the operator's control panel said **seven trading-shaped things**, the worst being "All positions will be closed at current prices" above the emergency-cancel confirm on a contest with no positions | A gate in `round-launch.service.ts` before any seat lookup or round creation, with its own `contest_paused` refusal rather than a generic `contest_not_open` - the contest IS open, so the UI must offer "come back shortly". Resume extends `playWindowEnd` and, only while still future, `playWindowStart`. Panel wording moved to `apps/admin/lib/admin/contest-control-copy.ts`. **The general rule, and the reason this is R-series not X-series: a capability the platform already has does not extend to a new game by itself, and the way it fails is silence.** When adding a game, **enumerate the operator controls that already exist and ask which code path enforces each one** - not whether the field is set. 63 tests, 31 probes |
 | R42 | **The admin cron refused to settle provider contests, so whether one paid out at all was a coin flip.** `apps/admin`'s `finalizeCompetition` had no provider dispatch - only `routeToTradingSettlement`, which answers "may *trading* settle this" - so a provider contest reaching it was refused and left `active`. **Both apps register `checkAndFinalizeCompetitions` on an every-minute cron**, so the contest settled correctly or never settled at all depending on which process claimed it first. Not a missing stage: **nobody was paid anything**, and the contest sat finished-looking and unsettled with no error a person sees | Critical | **CLOSED 7 Sep 2026.** Latent - no provider contest has settled in production, so **nothing was backfilled** and there is nothing to backfill, the defect being an absent branch rather than a stored value. **Do not describe it as "the admin app paid less"** - it paid nothing and completed nothing | The same six-line dispatch the main app has had since X5, placed **before `startSession()`**: `finalizeProviderCompetition` opens its own session and takes its own lock, so dispatching after would nest a transaction inside one the caller owns. **R26's shape one layer out, so the general rule replaces the two instances: the four finalize functions are not four copies of one function, and a capability added to one is not thereby added to the others.** Two silent instruments here - `provider-finalize.ts` and `provider-settlement.service.ts` were **already mirrored into `apps/admin` and imported by nothing**, so `check:mirrors` agreed and the file-size heuristic that found R26 raises nothing, because only the *call site* was absent. 3 tests in `__tests__/services/admin-finalize-gamemaster-parity.test.ts`, 4 probes in `tools/probe-admin-provider-dispatch.ps1` |
 | R43 | **The undersubscribed sweep cancelled competitions and refunded nobody - and unlike almost everything else in this register, it was losing real money in production, on both game types, every day.** The every-minute cron in both apps set `status: "cancelled"` itself and *then* called `cancelCompetitionAndRefund`, whose claim is `status: { $ne: "cancelled" }` - the very lock added to fix the double-refund defect. The claim matched nothing, so the action returned `success: true` with `refundedCount: 0` and **every player's entry fee stayed with the platform**, against a competition showing `cancelled` | Critical | **CLOSED 7 Sep 2026.** **Not latent and not retroactive.** Unusually for this register the affected contests **can** be identified - cancelled, participants not `refunded`, no `competition_refund` rows - because all three facts are stored. **No backfill was written deliberately**: crediting wallets from inferred history is an unreviewed money writer and who to compensate is an owner decision. Do not summarise this as "refunds were delayed" - they never happened | Both crons stop writing a status; cancelling belongs to the refund action, which does it in the same transaction as the money. Because the failure is silent the action is **also** self-healing, which reopens live bug 5's door - so **idempotency moved off the status and onto the per-player `competition_refund` ledger rows**, the key `exclusion-refund.ts` already uses. **The general rule is the inverse of live bug 5's: a lock keyed on a field any caller can write is only as good as every caller's restraint, and the ones that break it report success.** Three silent instruments: the refund logged "refunds were already issued" as an *inference*, the caller logged `participantCount` rather than the returned count, and the correctly-behaving `getCompetitionById` backup path masked how often it failed. 8 tests, 5 probes in `tools/probe-cancel-refund.ps1` |
+| R44 | **Settlement ran before the grace window opened, so a player who finished in the last minute was paid nothing for a round they completed.** `checkAndFinalizeCompetitions` claims any contest whose `endTime` has passed, every minute, and since `12` s2.3 the play window *is* the contest clock - so a provider contest settled within about sixty seconds of its cut-off. `resultGracePeriodSeconds` exists precisely to say a result posted after the window is still welcome; settling first refused it as `late_recorded_not_applied`, ranked the player on nothing and paid them nothing. **The sibling was worse: nothing in the running system ever wrote `unresolved`**, because the reconciliation net that was supposed to is unscheduled (E7) - so `exclude` and `hold_and_alert` were configured controls that could not fire, and a round that never reported sat `launched` for ever against a contest finished weeks earlier | Critical | **CLOSED 7 Sep 2026.** Latent - no provider contest has settled in production, so no score was discarded and **nothing was backfilled**; the defect is an absent wait, not a stored value. **Do not summarise it as "settlement was early"** - from the player's seat, being ranked on a round they finished is indistinguishable from being cheated, and the only trace is a critical audit row nobody is watching | `lib/services/settlement/round-cutoff.ts` (mirrored) defers settlement while any round is inside the grace window - refusing a **manual** admin finalize too, deliberately, because forcing it two minutes after the cut-off destroys those scores and names the time it can run instead. Then a new `cutoff` outcome on `endLiveRoundsForContest` marks what never reported **`unresolved`, not `voided`** - `voided` reads as housekeeping and would silently override all three policies with "score zero, nothing owed". **The ordering is the subtle half:** the mark is written outside the settlement transaction and before the hold gate, because a `hold_and_alert` abort would roll it back and every cron pass would re-mark, re-block and re-roll-back for ever with nobody paid. `DEFAULT_RESULT_GRACE_SECONDS` moved to `round-types.ts` so both apps share one definition - two copies would make whether a last-minute finisher is paid depend on which cron claimed the contest, which is R26's failure mode. 8 tests, 15 probes |
 | R24 | Scope creep before anything ships | Medium | **High** | All |
 | R25 | Round write contention under load | Medium | Medium | X12 |
 | X15 | "Challenge any user" harassment surface - no report-user feature exists | Medium | Medium | X10 |
@@ -1211,6 +1212,79 @@ Pinned by 4 behavioural and 4 structural tests in
 `tools/probe-cancel-refund.ps1`, **all red with exactly 1 failure each.** The structural half
 matters because the root cause is a one-line *absence* in a file where `status: "cancelled"` also
 appears legitimately, so the guard slices around the refund call rather than matching the file.
+
+---
+
+### R44 - Settlement ran before the grace window opened - **CLOSED, 7 September 2026**
+
+The owner asked what happens when one player finishes and another is still going. **Half the
+answer was already correct**: `createRound` clamps a round's `expiresAt` to `playWindowEnd`, and
+since `12` s2.3 the play window *is* the contest clock, so there is one cut-off for everybody,
+nobody waits for anybody, and a player who starts too late to finish is refused up front rather
+than cut off mid-game.
+
+**The missing half was the handover, not the clock.** `checkAndFinalizeCompetitions` claims any
+contest whose `endTime` has passed, **every minute**. A provider does not report synchronously -
+`resultGracePeriodSeconds` exists to say how long after the window a late result is still
+welcome - so a contest settled within about sixty seconds of its cut-off, **before the grace
+window had even opened.** A player finishing at 13:59:50 had their result refused as
+`late_recorded_not_applied`, was ranked on nothing, and **was paid nothing for a round they had
+actually finished.**
+
+**A planned deferral had to be verified rather than assumed, and it changed the design.** `07`
+s2.2 puts the `unresolved` write in the reconciliation net's stage 4. **The net is not
+scheduled** - `reconcileRound` and `findRoundsNeedingReconciliation` are imported by their own
+test and nothing else, because the schedule belongs to E7/X8. That is documented in the service,
+so it is not itself a defect, but three consequences follow and none could be guessed: **nothing
+polls**, so a lost webhook is a genuinely lost score today rather than a slow one; **nothing else
+ever closed a live round**, so one sat `launched` for ever against a finished contest; and **no
+alert fires**, so any document saying an operator is paged for an unreported round is describing
+E7. Consequently `exclude` and `hold_and_alert` had never had an input, and this is the first time
+either can fire.
+
+**Three things about the fix that generalise.**
+
+- **`unresolved`, not `voided`, and the tidy-looking option was the wrong one.** `voided` is what
+  the cancellation path writes, it is one word shorter, and it reads as housekeeping. It would
+  also **silently override all three configured policies with "score zero, nothing owed"** -
+  including the ones set to refund the player or park the contest for a human. `unresolved` is the
+  one persisted fact `assessUnresolvedRounds` reads. A configured control that cannot fire is the
+  same failure as a `rankingMethod` a provider game ignores.
+- **The mark must be durable BEFORE settlement is asked to run, and both orderings fail
+  silently.** Inside the transaction, a `hold_and_alert` abort - the policy working - rolls the
+  mark back, the pre-lock gate keeps seeing nothing unresolved, and **every cron pass re-marks,
+  re-blocks and re-rolls-back for ever**: nobody paid, no round for an operator to resolve, no
+  error anywhere. Assessing the hold *before* the mark always sees zero, so a held contest settles
+  on its first pass.
+- **A deferral must also refuse a human.** An operator forcing settlement two minutes after the
+  cut-off would destroy the scores of everyone who finished in the last minute and never know, so
+  the refusal names the time it can run instead of offering an override.
+
+**One shared constant, for the reason R26 exists.** `DEFAULT_RESULT_GRACE_SECONDS` moved out of
+the reconciliation service into `round-types.ts` because settlement waits on the same window and
+settlement runs in **both** apps while that service exists only in the main one. A second copy
+would be silent in the worst way: the app with the shorter default settles first, so **whether a
+last-minute finisher is paid would depend on which cron claimed the contest.**
+
+**Two probing lessons, and the second is a new one for this register.** Four of the fifteen probes
+were green on the first run and **all four were mis-aimed rather than reporting a weak guard.**
+One added its write immediately before the lock, which the deferral returns before ever reaching.
+One widened an `if` whose body then assigned `undefined` over the value the probe had just set -
+**the probe undid itself one line later.** And two hit the case R42 first recorded: **two guards
+covering each other, where neither can be probed alone.** The query filter on
+`LIVE_ROUND_STATUSES` and the transition check both refuse to touch a reported round, and the
+pre-lock hold gate is duplicated inside the settlement transaction - so single edits left the
+suite green while both guards worked. The harness gained a two-edit mode, and the observable for
+both hold gates is **`updatedAt`**, because the two placements end at the same status with the
+same error and differ only in whether the contest was ever claimed. **A probe aimed at the wrong
+statement is indistinguishable from a guard that does nothing**, and the honest response to a
+covered pair is to remove both, not to ship a green line teaching the next reader the gate is
+decoration.
+
+**Latent, and nothing was backfilled** - no provider contest has settled in production, and the
+defect is an absent wait rather than a stored value. Pinned by 8 tests in
+`__tests__/services/provider-round-cutoff.test.ts` and 15 probes in
+`tools/probe-round-cutoff.ps1`. Design in `07` s2.3b.
 
 ---
 

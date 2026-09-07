@@ -26,6 +26,23 @@ export const UNRESOLVED_ROUND_POLICIES: UnresolvedRoundPolicy[] = [
 ];
 
 /**
+ * How long after the play window a late provider result is still welcome (chapter 04
+ * section 2.1), when a contest does not name its own.
+ *
+ * IT LIVES HERE, NOT IN `reconciliation.service.ts`, and the reason is not tidiness.
+ * Settlement waits out this window before it will rank anybody - and settlement runs in
+ * **both** apps, while the reconciliation service exists only in the main one. Importing it
+ * from there compiles in the main app and fails the admin typecheck.
+ *
+ * The stronger reason is what a second copy would do. Two defaults for the same window is
+ * the "one rule, two copies" shape behind five defects here, and this one is silent in a
+ * particularly bad way: the app with the shorter default settles first, so **whether a
+ * last-minute finisher is paid would depend on which cron claimed the contest.** That is
+ * exactly R26's failure mode. There is one definition and both apps import it.
+ */
+export const DEFAULT_RESULT_GRACE_SECONDS = 600;
+
+/**
  * The round rules a contest imposes, passed IN rather than read from the contest.
  *
  * Reason: X3 builds the round lifecycle; X5 integrates it with contests. Reading

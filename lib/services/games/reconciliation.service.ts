@@ -36,8 +36,14 @@ import type { UnresolvedRoundPolicy } from "./round-types";
  * `applyUnresolvedPolicy` for why.
  */
 
-/** Chapter 04 section 2.1. */
-export const DEFAULT_RESULT_GRACE_SECONDS = 600;
+/**
+ * Re-exported, not re-declared. It moved to `round-types.ts` when settlement started
+ * waiting out the same window, because settlement runs in both apps and this service exists
+ * only in the main one. Kept as an export here so the existing importers - and the tests
+ * that read it from this module - do not have to move with it.
+ */
+export { DEFAULT_RESULT_GRACE_SECONDS } from "./round-types";
+import { DEFAULT_RESULT_GRACE_SECONDS } from "./round-types";
 
 export interface RoundReconciliationConfig {
   unresolvedRoundPolicy: UnresolvedRoundPolicy;

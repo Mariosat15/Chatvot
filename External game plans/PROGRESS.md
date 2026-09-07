@@ -19,6 +19,7 @@
 | **Next action** | **First, an owner decision that is not technical: whether to compensate the players whose entry fees were kept by R43** (see the refunds row above). The affected contests are identifiable and the fix is not retroactive, so this is a real-money question waiting on a person, not on code. **Then technically: finish X4a** - pull and rebuild on the server, start `chartvolt-games`, register it through the admin screens, and drive one round end to end **by clicking** (`21` s4.1e has the six steps; start with `circuit-perfect`, which ends when the player finishes rather than when a 60-second clock does). **No DNS, nginx or certificate work is needed** since the play surface is proxied through the platform app (owner's choice, 6 Sep 2026). The game is **playable by a human in a browser**, **R34 is closed**, and the service is now **deployable** - PM2 entry, nginx block, `env.example` and a runbook in `deploy/README.md` (all 6 Sep 2026) - so nothing technical stands between the two halves. **Owner decided 6 Sep 2026 to deploy first and rehearse against the live site**, rather than complete the local rehearsal. Provider **health** - the last of X6's five admin destinations - **shipped 6 Sep 2026** (`12` s4.2b), so what remains of the player surface is the trading panels themselves and the per-game summary cards. **Commercially, in parallel: find and assess a provider using `08`** - X4 cannot start without one, and nothing in the programme is blocked on that search |
 | **Admin lifecycle controls** | **Code-complete 7 Sep 2026** (`12` s3.2a), and it found the worst authorization defect in the programme. `POST /api/finalize-old-competitions` had **no authentication of any kind** - **R40**, unauthenticated and reachable *today*, unlike almost everything else here. Any anonymous caller could force-finalize every `completed` competition: closing positions at live prices, writing trade history, and hitting an external forex API per position. Scoped to already-completed contests, so no prize and no wallet movement - **do not round that up, and do not round it down either.** No backfill, and **no way to know whether it was ever called**, because a route with no guard has no attribution. Five siblings authenticated on **admin-at-all rather than section access**, the sixth instance of that class. Separately, **pausing a provider contest did nothing at all** (**R41**): `isPaused` was never read by the launch service, so an operator got a success toast, a banner and a notification to every participant while play continued - and this is the route `IncidentsSection.tsx` calls when an incident is raised. Latent, since no provider contest has run in production. The rule from it: **a capability the platform already has does not extend to a new game by itself, and the way it fails is silence** |
 | **Admin provider settlement** | **Fixed 7 Sep 2026 (R42)**, found by verifying a mapping subagent's claim rather than by planned work. `apps/admin`'s `finalizeCompetition` had **no provider dispatch** - only `routeToTradingSettlement`, which answers "may *trading* settle this" - so a provider contest reaching the admin cron was refused and left `active`. **Both apps register `checkAndFinalizeCompetitions` on an every-minute cron**, so whether a provider contest settled was decided by which process claimed it first. **R26's shape one layer out and worse**: R26 skipped the Game Master's commission while still paying the players, this paid **nobody and completed nothing**. Latent - no provider contest has settled in production, **nothing backfilled**. Two instruments were silent and both are ones we trust: `provider-finalize.ts` and `provider-settlement.service.ts` were **already mirrored here and imported by nothing**, so `check:mirrors` agreed correctly, and the file-size gap that found R26 has closed to 8 KB so it raises nothing. The rule that now replaces both instances: **the four finalize functions are not four copies of one function, and a capability added to one is not thereby added to the others** |
+| **The universal cut-off** | **R44 closed 7 Sep 2026**, answering the owner's question about one player finishing while another is still going. **Half the answer was already right** - `createRound` clamps a round to `playWindowEnd` and `12` s2.3 makes that the contest clock, so there is one cut-off for everybody. **The missing half was the handover and it cost a player money:** `checkAndFinalizeCompetitions` claims any contest past `endTime` every minute, so settlement ran **before the grace window had even opened**, and a player finishing at 13:59:50 had their result refused as late, was ranked on nothing and **paid nothing for a round they completed.** Settlement now defers until the window closes - **refusing a manual admin finalize too**, because forcing it destroys those scores invisibly - then marks what never reported **`unresolved`, never `voided`**. `voided` would have silently overridden all three configured policies with "score zero, nothing owed". **The sibling finding is larger: nothing in the running system had ever written `unresolved`**, because the reconciliation net that was designed to is **unscheduled** (E7), so `exclude` and `hold_and_alert` were controls that could not fire and a round sat `launched` for ever against a finished contest. **Latent, nothing backfilled.** `07` s2.3b. **Still unanswered and not to be summarised as done: what a contest pays when nobody scored, and where an unclaimed rank's share goes** |
 | **REFUNDS - READ THIS BEFORE ANYTHING ELSE** | **R43 closed 7 Sep 2026, and it is the only defect in this programme that was losing real money in production, on both game types, every day.** The every-minute `updateCompetitionStatuses` cron in **both** apps set `status: "cancelled"` itself and *then* called `cancelCompetitionAndRefund`, whose claim is `status: { $ne: "cancelled" }` - **the lock added to fix live bug 5**. The claim matched nothing, so the action returned `success: true` with `refundedCount: 0` and **every player's entry fee stayed with the platform** against a competition displaying `cancelled`. Nothing about it is provider-specific. **Three instruments agreed with the intention rather than the outcome**: the refund logged "refunds were already issued" as an *inference*, the cron logged `participantCount` instead of the returned count, and the `getCompetitionById` backup path - which does not pre-cancel and so works - masked the frequency. Fixed at the caller *and* by moving idempotency off the status onto the per-player `competition_refund` ledger rows, matching `exclusion-refund.ts`. **The rule is the inverse of live bug 5's: a lock keyed on a field any caller can write is only as good as every caller's restraint, and the callers that break it report success.** **Not retroactive.** Unusually, affected contests **can** be found (cancelled + participants not `refunded` + no `competition_refund` rows), so this is *not* the usual "nothing to backfill" - but **no backfill was written**, because crediting wallets from inferred history is an unreviewed money writer and who to compensate is an **owner decision that is still outstanding** |
 | **Money defects closed** | **R26 closed 5 Sep 2026** - the admin cron's finalize copy paid **no** Game Master earnings and recorded no `retained_gm_fee` either, so the commission silently stayed with the platform. This one was **actively losing money rather than latent**: both apps run `checkAndFinalizeCompetitions` on an every-minute cron, so payment depended on which cron won the race. **Not retroactive - no backfill**, and past contests cannot be found by querying for retained rows because none were written. Also **R31** (a 0% Game Master rate paid 5%) and the two P0 score defects, same day |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
@@ -636,6 +637,101 @@ Newest at the top.
 
 ---
 
+### 7 Sep 2026 - X5 - R44: THE UNIVERSAL CUT-OFF, AND THE SCORES IT WAS THROWING AWAY
+
+**Shipped:** `lib/services/settlement/round-cutoff.ts` (mirrored), a `cutoff` outcome on
+`endLiveRoundsForContest` (mirrored), `DEFAULT_RESULT_GRACE_SECONDS` moved to
+`round-types.ts` so both apps share one definition, and the two gates wired into
+`provider-finalize.ts` **before** the optimistic claim. `07` **s2.3b**, risk **R44**. 8 tests
+in `__tests__/services/provider-round-cutoff.test.ts`, `tools/probe-round-cutoff.ps1` with
+**15 probes**.
+
+**Files touched:** `lib/services/settlement/round-cutoff.ts` (new, mirrored),
+`lib/services/settlement/provider-finalize.ts`, `lib/services/games/contest-round-cleanup.ts`,
+`lib/services/games/round-types.ts`, `lib/services/games/reconciliation.service.ts` (the
+constant is now re-exported, not re-declared) - **all mirrored into `apps/admin` except the
+reconciliation service, which that app does not have.**
+
+**The owner asked what happens when one player finishes and another is still going, and
+half the answer was already correct.** `createRound` clamps a round's `expiresAt` to
+`playWindowEnd`, and since s2.3 the play window **is** the contest clock - so there is
+genuinely one cut-off for everybody, nobody waits for anybody, and a player who starts too
+late to finish is refused up front instead of being cut off mid-game.
+
+**The missing half was not the clock, it was the handover, and it was losing money.**
+`checkAndFinalizeCompetitions` claims any contest whose `endTime` has passed, **every
+minute** - so a provider contest settled within about sixty seconds of its cut-off, **before
+the grace window had even opened.** A provider does not report synchronously:
+`resultGracePeriodSeconds` exists precisely to say how long after the window a late result is
+still welcome. A player finishing at 13:59:50 had their result refused as
+`late_recorded_not_applied`, was ranked on nothing, and **was paid nothing for a round they
+had actually finished.** The only trace is a critical audit row nobody is watching, and from
+the player's seat it is indistinguishable from being cheated.
+
+**The fix is a bounded wait, not a new clock.** Settlement now defers while any round is
+still inside the grace window, and the cron picks the contest up a few passes later. It
+refuses a **manual** admin finalize too, deliberately - an operator forcing settlement two
+minutes after the cut-off would destroy the scores of everyone who finished in the last
+minute and never know - and the refusal names the time it can settle, so the answer is to
+wait rather than to override.
+
+**Then the rounds that never reported are marked `unresolved`, and that word is the whole
+decision.** `voided` was the tidy-looking mistake: it reads as housekeeping, and it would
+silently override all three configured unresolved-round policies with "score zero, nothing
+owed" - including the ones set to refund the player or park the contest for a human.
+`unresolved` is the one persisted fact `assessUnresolvedRounds` reads, so the operator's
+choice actually decides. **This is the first time `exclude` and `hold_and_alert` can fire at
+all.**
+
+**The subtlest part is the ordering, and getting it wrong is silent in both directions.**
+The mark is written **outside** the settlement transaction and **before** the hold gate.
+Inside the transaction, a `hold_and_alert` abort - which is the policy working - would roll
+the mark back, the pre-lock gate would keep seeing nothing unresolved, and **every cron pass
+would re-mark, re-block and re-roll-back for ever**: nobody paid, no round for an operator to
+resolve in the inspector, and no error anywhere. And assessing the hold *before* the mark
+always sees zero, so a held contest would settle on its first pass. Both are probed.
+
+**A planned deferral had to be verified rather than assumed, and it changed the design.**
+The reconciliation net is **not scheduled** - `reconcileRound` and
+`findRoundsNeedingReconciliation` are imported by their own test and nothing else, because
+the schedule belongs to **E7/X8**. That is documented in the service itself, so it is not a
+defect, but three consequences follow and none of them could be guessed: **nothing polls**,
+so a lost webhook is a genuinely lost score today rather than a slow one; **nothing else ever
+closes a live round**, so without this step a round sat `launched` for ever against a contest
+that finished weeks ago; and **no alert fires**, so any document saying an operator is paged
+for an unreported round is describing E7. When E7 lands the two agree by construction - both
+write `unresolved`, both read it back through `assessUnresolvedRounds` - which is the property
+the plan chose a persisted status for.
+
+**One shared constant, for a reason worth repeating.** `DEFAULT_RESULT_GRACE_SECONDS` moved
+out of the reconciliation service because settlement waits on the same window and settlement
+runs in **both** apps while that service exists only in the main one. A second copy would be
+silent in the worst way: the app with the shorter default settles first, so **whether a
+last-minute finisher is paid would depend on which cron claimed the contest** - exactly R26's
+failure mode.
+
+**Deviated from plan:** `07` s2.3 designed the policies as the *reconciliation net's* stage 4.
+Settlement performs the equivalent write because the net is unscheduled and something has to.
+Recorded in `07` s2.3b rather than by rewriting s2.3, since the net's version is still the
+target.
+
+**Harm statement, stated precisely because "fixed" without it invites someone to stop
+looking:** R44 was **latent** - no provider contest has settled in production - so no score
+was actually discarded and **nothing was backfilled.** There is also nothing to backfill: the
+defect is an absent wait, not a stored value.
+
+**Deferred:** the owner's remaining question - what a contest pays when **nobody** scored,
+and where an unclaimed rank's percentage goes. The redistribution logic exists in
+`distributePrizesWithTies` and is what `TradingPrizeTable` renders; whether it behaves as the
+owner described for a provider contest is **unverified**, and no player or admin screen
+explains it. **Do not summarise the prize rules as confirmed.**
+
+**Next chat should:** verify unclaimed-rank redistribution, ties and the no-winner case for
+a provider contest against real settlement, then surface the answer on the lobby and in the
+wizard.
+
+---
+
 ### 7 Sep 2026 - X5/X6 - THE PLAY SCREEN RUNS ON THE SERVER'S CLOCK
 
 **Shipped:** `hooks/useServerClock.ts`, a `serverNow` anchor and a `maxRoundSeconds` figure on
@@ -708,18 +804,23 @@ the guard would have enforced exactly the inconsistency it exists to prevent. Na
 medals stay banned outright. **A guard that fails on correct code is the fastest way to have
 it deleted wholesale**, which here would have cost the rank-medal half too.
 
-**Deferred, and it is the next thing:** the universal cut-off is **half-built**. A round cannot
-outlive the contest, because `createRound` clamps `expiresAt` to `playWindowEnd` and the window
-is now the contest clock - but **nothing voids a round still `launched` when the contest
-finalizes.** The consequence is not a wrong payout; it is that the reconciliation net polls a
-round belonging to a settled contest, backs off, writes it `unresolved` after the grace window
-and raises a **CRITICAL alert for the normal end of a competition**. `endLiveRoundsForContest`
-already does exactly the right thing on the cancellation path and is not called from
-settlement. **Do not summarise the universal clock as done.**
+**Deferred at the time of writing, and CLOSED the same day by the entry above this one** -
+kept rather than edited away, because the sentence that was wrong is the useful part. The
+deferral read: "nothing voids a round still `launched` when the contest finalizes, so the
+reconciliation net polls it, gives up after the grace window and **raises a CRITICAL alert
+for the normal end of a competition.**"
 
-**Next chat should:** call `endLiveRoundsForContest` from provider settlement, inside the
-transaction and before ranking, then answer the owner's remaining question - what a contest
-pays when nobody finished, and where the unclaimed ranks' percentages go.
+**The consequence named there is false, and it was corrected by grepping for the caller
+rather than by reading the service.** `reconcileRound` and
+`findRoundsNeedingReconciliation` are imported by their own test **and by nothing else** -
+the schedule belongs to **E7/X8**, which is not built, and the reconciliation service says
+so in its own comment. So nothing polls, nothing gives up, and **no alert fires at all.**
+The real consequence was quieter and worse, and it is the subject of the R44 entry above.
+
+**The class, which is now the seventh instance:** an unverified aside is a claim whoever
+wrote it, including when the writer is us, two hours earlier, in a work log. Same rule that
+caught `challengeId`, the R7 severity, `billsPerRound`, the `participant.score` comment, the
+`walletMap` comment and R42.
 
 ---
 

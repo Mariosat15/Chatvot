@@ -343,6 +343,33 @@ the play screen as an E6 slice, so nothing in the lifecycle is API-only any more
 refund is on the **provider** settlement path; trading has no rounds to be unresolved, which is
 correct rather than a gap.
 
+#### E4 fourth half - the grace window, 7 September 2026 (R44)
+
+**The checklist above already said "settlement collects scores, waits out the grace period",
+and settlement did not wait.** It ran within about a minute of the cut-off, because
+`checkAndFinalizeCompetitions` claims any contest whose `endTime` has passed and `12` s2.3
+makes `endTime` the play window's end. A player who finished in the last seconds had their
+result refused as a late one and **was paid nothing for a round they had completed.** So this
+is not an item the plan omitted - it is one the plan listed and the build reported complete
+without, which is why the three build notes above could all be accurate and the phase still
+be wrong.
+
+**The larger finding was underneath it.** The item beneath, "unresolved-round policy", was
+built in E4's third half and **had no input**: the reconciliation net that was to write
+`round.status = "unresolved"` is unscheduled - it is E7 - so `exclude` and `hold_and_alert`
+could not fire at all, and a round nobody finished stayed `launched` for ever. Settlement now
+performs that write at the cut-off. **`07` s2.3b is the authoritative description**, and note
+the write is `unresolved`, never `voided`: `voided` would silently override all three policies
+with "score zero, nothing owed".
+
+**Latent, nothing backfilled.** 8 tests in `__tests__/services/provider-round-cutoff.test.ts`,
+15 probes - **four of which were green on the first run and all four mis-aimed**, one of them
+the R42 shape where two guards cover each other and neither can be probed alone.
+
+**Still not answered by E4:** what a contest pays when **nobody** scored, and where an
+unclaimed rank's percentage goes. Unverified for provider contests, and explained on no
+screen.
+
 ### E5 - Admin panel
 
 **`PARTIALLY BUILT` 4 September 2026** - provider registration, credentials, the per-title

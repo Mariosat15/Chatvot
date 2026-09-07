@@ -56,25 +56,75 @@ export interface EndLiveRoundsResult {
    * this count starts being the thing that says so. Without it, a widening of that list would
    * silently overwrite a terminal status and lose the record that a provider never reported.
    *
-   * The property "terminal rounds are left alone" is therefore held by the QUERY FILTER, and
-   * the test and the probe are aimed there. An overstated comment is a wrong fact.
+   * The property "terminal rounds are left alone" is therefore held by the QUERY FILTER in
+   * normal operation. **It is held by BOTH once the filter is the thing that breaks**, and
+   * that was measured rather than reasoned about: loosening the filter alone left the suite
+   * green, because `ROUND_TRANSITIONS` maps `completed` to nothing so the reported round is
+   * skipped here instead. The probe therefore removes both in one edit, as R42's pair of
+   * game gates had to. Neither can be proven alone, and a probe that reports one of them
+   * doing nothing is reporting on its own aim. An overstated comment is a wrong fact, and
+   * so is an understated one.
    */
   skipped: number;
 }
 
 /**
- * Move every in-flight round of one contest to `voided`.
+ * WHY THERE ARE TWO OUTCOMES AND NOT ONE, and the distinction is worth more than it looks.
+ *
+ * `cancelled` is the platform saying the attempt produced nothing usable, because the
+ * contest it belonged to was withdrawn. The player is refunded by the cancellation itself,
+ * so the round owes nobody anything and `resultSource: "manual"` is honest - a human
+ * decided.
+ *
+ * `cutoff` is the contest reaching its end with a round still open. That is a completely
+ * different fact: **nobody decided anything, the clock simply ran out**, and the platform
+ * genuinely does not know whether the player failed to finish or the provider failed to
+ * report. Chapter 07's answer to exactly that ambiguity is `status: "unresolved"` plus the
+ * contest's configured policy - so this writes the one persisted fact
+ * `assessUnresolvedRounds` reads, and lets the operator's choice of `score_zero`,
+ * `exclude` or `hold_and_alert` decide what the player gets.
+ *
+ * **Writing `voided` here instead would have been the tidy-looking mistake.** It reads as
+ * housekeeping, it is one word shorter, and it silently overrides the operator's policy with
+ * "score zero, nothing owed" for every contest - including the ones configured to refund the
+ * player or to park for a human. A configured policy that cannot fire is the same failure as
+ * a `rankingMethod` a provider game ignores.
+ */
+export type RoundEndOutcome = "cancelled" | "cutoff";
+
+const OUTCOMES: Record<
+  RoundEndOutcome,
+  { status: "voided" | "unresolved"; resultSource: "manual" | undefined }
+> = {
+  cancelled: { status: "voided", resultSource: "manual" },
+  // Reason `resultSource` is left alone: the field records WHERE a result came from, and
+  // no result came from anywhere. Stamping "manual" would claim a human adjudicated it.
+  cutoff: { status: "unresolved", resultSource: undefined },
+};
+
+/**
+ * Move every in-flight round of one contest to a terminal-or-decided status.
  *
  * Idempotent: a second call finds nothing live and returns zero, so a retried cancellation
  * costs nothing. Takes the caller's `session` when there is one, because the round must not
  * be voided if the refund transaction it belongs to rolls back.
+ *
+ * THE CUT-OFF CALLER DELIBERATELY PASSES NO SESSION, which is the opposite choice and has to
+ * be. Under `hold_and_alert` the settlement transaction ABORTS - that is the policy working -
+ * so a round marked inside it would roll back, the pre-lock gate would keep seeing nothing
+ * unresolved, and every cron pass would re-mark, re-block and re-roll-back for ever. Nobody
+ * would be paid, the admin round inspector would show no round to resolve, and there would be
+ * no error anywhere. The rounds must be durable before settlement is asked to run.
  */
 export async function endLiveRoundsForContest(input: {
   contestId: string;
   reason: string;
   session?: ClientSession;
+  /** Defaults to `cancelled`, which is the behaviour every existing caller relies on. */
+  outcome?: RoundEndOutcome;
 }): Promise<EndLiveRoundsResult> {
   const { contestId, reason, session } = input;
+  const { status: target, resultSource } = OUTCOMES[input.outcome ?? "cancelled"];
 
   const live = await GameRound.find({
     contestId,
@@ -87,24 +137,26 @@ export async function endLiveRoundsForContest(input: {
   for (const round of live) {
     // Unreachable while `LIVE_ROUND_STATUSES` stays `pending`/`launched` - see `skipped` above
     // for why it is kept anyway and where the property it looks like it holds actually lives.
-    if (!canTransitionRound(round.status as RoundStatus, "voided")) {
+    if (!canTransitionRound(round.status as RoundStatus, target)) {
       skipped++;
       continue;
     }
 
-    round.status = "voided";
-    // Reason: the same fields the manual resolution path writes, so a round voided by a
-    // cancellation is indistinguishable in shape from one voided by an operator - both are
-    // decisions, and neither should look like the reconciliation net giving up.
-    round.resultSource = "manual";
-    round.resultReceivedAt = new Date();
+    round.status = target;
+    if (resultSource) {
+      // Reason: the same fields the manual resolution path writes, so a round voided by a
+      // cancellation is indistinguishable in shape from one voided by an operator - both are
+      // decisions, and neither should look like the reconciliation net giving up.
+      round.resultSource = resultSource;
+      round.resultReceivedAt = new Date();
+    }
     await round.save({ session: session ?? undefined });
     roundIds.push(round.roundId);
   }
 
   if (roundIds.length > 0 || skipped > 0) {
     console.log(
-      `🛑 Voided ${roundIds.length} live round(s) on contest ${contestId} (${skipped} already terminal): ${reason}`,
+      `🛑 Moved ${roundIds.length} live round(s) on contest ${contestId} to ${target} (${skipped} already terminal): ${reason}`,
     );
   }
 

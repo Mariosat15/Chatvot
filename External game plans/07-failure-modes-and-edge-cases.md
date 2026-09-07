@@ -44,6 +44,12 @@ Runs every minute against rounds that are launched but unresolved.
 
 Polling is cheap and the failure it prevents is expensive. Poll generously.
 
+> **This job is written but NOT SCHEDULED - it is E7/X8, and every row above describes the
+> target rather than the build.** So nothing polls (a lost webhook is a lost score today,
+> not a slow one) and **no critical alert fires.** Stage 4's write is performed by
+> settlement instead, at the cut-off - see **s2.3b**, which is also where the reason the
+> two will agree once E7 lands is recorded.
+
 ### 2.3 The unresolved policy - an explicit per-contest choice
 
 | Policy | Behaviour | Use when |
@@ -111,6 +117,82 @@ Five things about the build that the table above cannot show:
 trading path cannot reach it, because trading has no rounds - which is correct, not a gap,
 but a document saying "settlement honours the unresolved policies" should say **provider
 settlement**.
+
+#### 2.3b BUILT, 7 September 2026 - the universal cut-off, and who actually writes `unresolved`
+
+**s2.3a was true about the policies and wrong about the trigger.** It assumed the
+reconciliation net's stage 4 would write `round.status = "unresolved"` and settlement would
+read it. **The net is not scheduled** - `reconcileRound` and
+`findRoundsNeedingReconciliation` are imported by their own test and by nothing else,
+because the schedule belongs to **E7/X8**. So until 7 September nothing in the running
+system ever wrote that status, and the three policies above could not fire at all:
+`hold_and_alert` and `exclude` were code with no input.
+
+Three consequences follow, and none of them is guessable from the table in s2.2:
+
+- **Nothing polls.** A lost webhook is a genuinely lost score today, not a slow one.
+- **Nothing else closes a live round.** Without the step below, a round sat `launched`
+ for ever against a contest that had finished weeks earlier.
+- **No alert fires.** The "Grace expired -> raise a **critical** alert" row in s2.2 is
+ describing **E7**, not the build. A document saying an operator is paged for an unreported
+ round is describing the target.
+
+**The defect that made this urgent was not the policies, it was the wait.**
+`checkAndFinalizeCompetitions` claims any contest whose `endTime` has passed, every minute,
+and since `12` s2.3 the play window *is* the contest clock - so a provider contest settled
+within about sixty seconds of its cut-off, **before the grace window had even opened.** A
+player who finished at 13:59:50 had their result refused as `late_recorded_not_applied`,
+was ranked on nothing and **was paid nothing for a round they had actually finished.** From
+the player's seat that is indistinguishable from being cheated, and the only trace is a
+critical audit row nobody is watching.
+
+**What was built.** `lib/services/settlement/round-cutoff.ts` (mirrored) answers two
+questions - is any round still inside the grace window, and how many never reported - and
+`provider-finalize.ts` acts on both **before** the optimistic claim:
+
+1. **Defer while the grace window is open.** Settlement returns a refusal naming the time
+ it can run, and the cron picks the contest up a few passes later. It refuses a **manual**
+ admin finalize too, deliberately: an operator forcing settlement two minutes after the
+ cut-off would destroy the scores of everyone who finished in the last minute and never
+ know. The answer is to wait, not to override.
+2. **Mark what never reported `unresolved`,** via a new `cutoff` outcome on
+ `endLiveRoundsForContest`. This is the first time `exclude` and `hold_and_alert` have had
+ anything to read.
+
+**`voided` was the tidy-looking mistake.** It reads as housekeeping, it is what the
+cancellation path writes, and it would silently override all three configured policies with
+"score zero, nothing owed" - including the ones set to refund the player or park the contest
+for a human. `unresolved` is the one persisted fact `assessUnresolvedRounds` reads, so the
+operator's choice actually decides. A configured policy that cannot fire is the same failure
+as a `rankingMethod` a provider game ignores.
+
+**The ordering is the subtle half, and getting it wrong is silent in both directions.** The
+mark is written **outside** the settlement transaction and **before** the hold gate. Inside
+the transaction, a `hold_and_alert` abort - which is the policy working - would roll the mark
+back, the pre-lock gate would keep seeing nothing unresolved, and **every cron pass would
+re-mark, re-block and re-roll-back for ever**: nobody paid, no round for an operator to
+resolve in the inspector, no error anywhere. And assessing the hold *before* the mark always
+sees zero, so a held contest settles on its first pass.
+
+**When E7 lands the two agree by construction** - both write `unresolved`, both read it back
+through `assessUnresolvedRounds` - which is precisely the property the plan bought by
+choosing a persisted status over a passed parameter.
+
+**Deviation from this chapter, recorded rather than absorbed:** s2.2 puts the write in the
+net's stage 4. Settlement performs the equivalent because the net is unscheduled and
+something has to. The net's version is still the target, and it will find nothing left to do
+on a contest settlement has already closed - which is the correct interaction, not a race.
+
+**Harm statement:** **latent.** No provider contest has settled in production, so no score
+was actually discarded, and **nothing was backfilled** - the defect is an absent wait, not a
+stored value. Risk **R44**. Pinned by 8 tests in
+`__tests__/services/provider-round-cutoff.test.ts` and 15 probes in
+`tools/probe-round-cutoff.ps1`.
+
+**Not answered by this slice, and not to be summarised as answered:** what a contest pays
+when **nobody** scored, and where an unclaimed rank's percentage goes. The redistribution
+exists in `distributePrizesWithTies`; whether it behaves as the owner described for a
+provider contest is **unverified**, and no player or admin screen explains it.
 
 ---
 

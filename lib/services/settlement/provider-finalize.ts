@@ -5,6 +5,8 @@ import {
   type ProviderSettlementResult,
 } from "./provider-settlement.service";
 import { assessUnresolvedRounds } from "./unresolved-rounds";
+import { assessRoundCutoff } from "./round-cutoff";
+import { endLiveRoundsForContest } from "@/lib/services/games/contest-round-cleanup";
 
 /**
  * The lock, the transaction and the retry around provider settlement.
@@ -78,10 +80,60 @@ async function attemptProviderFinalize(
   // cannot be proven by asserting the end status: both placements refuse. The difference is
   // whether a write happened.
   const policyDoc = await Competition.findById(competitionId)
-    .select("unresolvedRoundPolicy")
-    .lean<{ unresolvedRoundPolicy?: string } | null>();
+    .select("unresolvedRoundPolicy playWindowEnd resultGracePeriodSeconds")
+    .lean<{
+      unresolvedRoundPolicy?: string;
+      playWindowEnd?: Date;
+      resultGracePeriodSeconds?: number;
+    } | null>();
 
   if (policyDoc) {
+    /*
+      THE CUT-OFF GATE, WHICH MUST RUN BEFORE THE HOLD GATE AND BEFORE THE LOCK.
+
+      Ordering is a constraint, not a style choice. The hold gate reads rounds sitting at
+      `unresolved`, and the step below is what PUTS them there - so assessing first would
+      always see zero and a `hold_and_alert` contest would settle on its first pass, which
+      is the policy failing silently. And both sit before the claim so a contest that is
+      merely waiting is never moved to `finalizing`.
+    */
+    const cutoff = await assessRoundCutoff({
+      competitionId,
+      playWindowEnd: policyDoc.playWindowEnd,
+      resultGracePeriodSeconds: policyDoc.resultGracePeriodSeconds,
+    });
+
+    if (cutoff.deferSettlement) {
+      // Reason this is `console.log` and not a warning: waiting for the grace window is the
+      // system working exactly as designed, and it happens on every contest with a
+      // last-minute finisher. Logged as a warning it would train an operator to ignore
+      // warnings from this file, which is where the real refusals also come out.
+      console.log(`⏳ [PROVIDER] ${cutoff.deferReason}`);
+      return { success: false, error: cutoff.deferReason };
+    }
+
+    /*
+      THE ROUNDS THAT NEVER REPORTED, closed here so the policy can see them.
+
+      Deliberately NOT inside the settlement transaction. Under `hold_and_alert` that
+      transaction aborts - that is the policy working - so a round marked inside it would
+      roll back, the gate below would keep seeing nothing unresolved, and every cron pass
+      would re-mark, re-block and re-roll-back for ever with nobody paid and no round for an
+      operator to resolve. The mark has to be durable before settlement is asked to run.
+
+      Safe outside it because it writes only a status, on rounds whose contest has already
+      passed its grace window: they cannot be played (the launch service refuses on contest
+      status) and a genuinely late result can still be applied, because
+      `ROUND_TRANSITIONS` permits `unresolved -> completed`.
+    */
+    if (cutoff.liveRoundCount > 0) {
+      await endLiveRoundsForContest({
+        contestId: competitionId,
+        outcome: "cutoff",
+        reason: `Play closed and the ${cutoff.graceSeconds}s result grace window expired with no result`,
+      });
+    }
+
     const held = await assessUnresolvedRounds({
       competitionId,
       storedPolicy: policyDoc.unresolvedRoundPolicy,
