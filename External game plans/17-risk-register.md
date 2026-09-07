@@ -63,6 +63,7 @@ chapter covers risks to the programme and to the application.
 | R44 | **Settlement ran before the grace window opened, so a player who finished in the last minute was paid nothing for a round they completed.** `checkAndFinalizeCompetitions` claims any contest whose `endTime` has passed, every minute, and since `12` s2.3 the play window *is* the contest clock - so a provider contest settled within about sixty seconds of its cut-off. `resultGracePeriodSeconds` exists precisely to say a result posted after the window is still welcome; settling first refused it as `late_recorded_not_applied`, ranked the player on nothing and paid them nothing. **The sibling was worse: nothing in the running system ever wrote `unresolved`**, because the reconciliation net that was supposed to is unscheduled (E7) - so `exclude` and `hold_and_alert` were configured controls that could not fire, and a round that never reported sat `launched` for ever against a contest finished weeks earlier | Critical | **CLOSED 7 Sep 2026.** Latent - no provider contest has settled in production, so no score was discarded and **nothing was backfilled**; the defect is an absent wait, not a stored value. **Do not summarise it as "settlement was early"** - from the player's seat, being ranked on a round they finished is indistinguishable from being cheated, and the only trace is a critical audit row nobody is watching | `lib/services/settlement/round-cutoff.ts` (mirrored) defers settlement while any round is inside the grace window - refusing a **manual** admin finalize too, deliberately, because forcing it two minutes after the cut-off destroys those scores and names the time it can run instead. Then a new `cutoff` outcome on `endLiveRoundsForContest` marks what never reported **`unresolved`, not `voided`** - `voided` reads as housekeeping and would silently override all three policies with "score zero, nothing owed". **The ordering is the subtle half:** the mark is written outside the settlement transaction and before the hold gate, because a `hold_and_alert` abort would roll it back and every cron pass would re-mark, re-block and re-roll-back for ever with nobody paid. `DEFAULT_RESULT_GRACE_SECONDS` moved to `round-types.ts` so both apps share one definition - two copies would make whether a last-minute finisher is paid depend on which cron claimed the contest, which is R26's failure mode. 8 tests, 15 probes |
 | R45 | **A player who never played was paid a prize.** Every qualification rule in `competition-ranking.service.ts` was trading-shaped, and provider settlement switches all of them off correctly - `minimumTrades: 0` and `disqualifyOnLiquidation: false`, because a puzzle has neither - so **nothing disqualified anybody** and a participant who never launched a round ranked on the `score ?? 0` fallback. On the owner's own 70/20/10 example with one real scorer, two players who never started **took 30% of the pot**; with nobody scoring at all, all three tied at rank 1 and **split the entire pot**, the exact inverse of "if no winner, all lose" | Critical | **CLOSED 7 Sep 2026.** Latent for money - no provider contest has settled in production, **nothing was backfilled**. **Do not summarise it as a prize-distribution bug**, which is how it presents on screen and is why the owner reported a confusing distribution; it is an eligibility one, and the distribution code was correct throughout | `hasResult(participant)` joins the two scoring methods on the game module: provider answers `Number.isFinite(participant.score)`, **trading answers `true`** because a flat account is a real result and `minimumTrades` is the existing operator-set way to say otherwise. Asked of the module rather than branched on, or the next game silently fails. **Scoped to a COMPLETED contest**, matching the two trading checks - unscoped, the live leaderboard stamps every player mid-round "No score recorded", which `13` s4.1b renders as a verdict. `Number.isFinite` rather than `!= null`, which admits `NaN` and pays from a position the comparator chose at random, or truthiness, which refuses a genuine zero. **The other half is that `competition-ranking.service.ts` is a divergent duplicate nothing guarded** - 77 lines apart, `check:mirrors` covers models only, reached by both apps' every-minute cron: third finding in this one file pair after R26 and R42. The runtime parity suite **cannot** see the admin copy, because vitest aliases `@` to the root, so a structural text comparison holds it and the suite's byte-identical claim was corrected. Money goes to the existing `all_disqualified` unclaimed pool; **whether it should be refunded instead is an owner decision not taken here**. 12 tests, 10 probes |
 | R46 | **The screen that made a correct payout look broken.** `/competitions/view/[id]` rendered `pnl`, `pnlPercentage` and `totalTrades` unconditionally, and all three default to `0` on every seat regardless of game - so a provider contest showed `+0.00 / +0.00% / 0 trades` for every player while **`score`, the number it ranked on, was on the row and never displayed.** Rows in an order nothing on the page explains, with winner badges beside them. Four siblings: **Edit routed every contest to the trading editor** (the list learned this the same day - "count the writers" again), trading-only config rendered as `$0` and `1:1`, per-rank amounts labelled in credits while the pool and "Won:" used the currency symbol, and **`noWinners` read by no admin screen at all** | Medium | **CLOSED 7 Sep 2026.** **A LIVE reporting defect, never a wrong payment** - it affected every provider contest an operator has opened, and cost them the ability to reconcile. No money moved wrongly, **nothing to backfill**, nothing mirrored. **This is the screen behind the owner's "the distribution is a mess" report**, so do not read it as confirmation of a payout bug - R37 had already fixed the ranking metric and the payout was correct throughout | Presentation extracted to `apps/admin/lib/admin/contest-result-presentation.ts` **so it could be tested at all** - a structural test over JSX can assert a file mentions `score` and cannot assert which branch renders it, the weakness four earlier probes passed through. Provider rows show the score, with **`-` for an absent score and never `0`** (the read-side form of R45), and a `neutral` tone because a puzzle score is not a profit. Trading-only cards **withheld rather than zeroed**, since a printed `$0` makes a claim where withholding declines to. One shared string carries the caution that the per-rank figures are a **floor**, not the payout. Edit probed as a **swap** as well as a deletion, because a test naming one destination stays green when the two are exchanged. 12 tests, 13 probes |
+| R47 | **The Game Master route that answered to nobody, and the one that answered to everybody.** `POST /api/gamemasters/sync-referrals` had **no authentication on either handler** while all four of its siblings under `/api/gamemasters` required section access - and `PATCH /api/gamemasters/[id]`'s `update_limits` did `{ ...subscription.limits, ...limits }`, writing every key the browser sent onto the document that decides a Game Master's daily cap, participant cap, revenue share and which games they may create, through a **raw-driver** update that runs no Mongoose validation, so the schema's own bounds never applied. Third sibling: the **admin** creation route read only the cached `subscription.limits` and never checked `canCreateCompetitions`, so a Game Master whose package withdrew creation could still create through it | Medium | **CLOSED 7 Sep 2026.** State the sync-referrals exposure in **both** directions or it gets triaged wrongly: the POST takes **no body**, so the mapping comes from `userreferrals` and a caller could **not** redirect commission to themselves - what they could do is apply a pending attribution change an operator had deliberately not applied, and drive an unbounded `findOne` + `updateOne` loop over every active referral on demand; the GET returned up to ten real user ids and names to anybody who asked. **There is no way to know whether either was ever called - a route with no guard writes no attribution.** Nothing backfilled, and there is nothing to backfill: the mass assignment stored whatever an operator actually sent | The unauthenticated route was found by **counting exported handlers against guards**, not by reading them - every neighbour having a guard is exactly what sends a reader past the file that has none, and it is the same technique that found R40. `update_limits` became an allow-list in `apps/admin/lib/admin/gamemaster-limits-update.ts` that **refuses an unknown field by name rather than dropping it**, because dropping means the edit appears to save and the operator concludes they misclicked; the allow-list is a `Set`, so `"constructor"` cannot pass a lookup that walks the prototype chain. Both creation routes now resolve through one shared gate. Found while adding `allowedGameTypes` to the same subdocument - **generalising code is a better bug-finding instrument than looking for bugs.** 59 tests, 18 probes |
 | R24 | Scope creep before anything ships | Medium | **High** | All |
 | R25 | Round write contention under load | Medium | Medium | X12 |
 | X15 | "Challenge any user" harassment surface - no report-user feature exists | Medium | Medium | X10 |
@@ -1404,6 +1405,61 @@ Pinned by `__tests__/admin/contest-result-presentation.test.ts` (12 tests) and
 was extracted out of the JSX **so that it could be tested at all**: a structural test can assert
 a file mentions `score` and cannot assert which branch renders it, which is the weakness four
 earlier probes passed through. Design in `12` s2.4.
+
+---
+
+### R47 - The Game Master route that answered to nobody - **CLOSED, 7 September 2026**
+
+Three findings in the Game Master surface, none of them what the work set out to do. The task was
+to make the creation API game-aware; these turned up on the way, which is the general shape worth
+keeping: **generalising code is a better bug-finding instrument than looking for bugs.**
+
+**`POST /api/gamemasters/sync-referrals` had no authentication on either handler.** Its four
+siblings under `/api/gamemasters` all called `requireSectionAccess("gamemaster-management")`. It
+was found by **counting exported handlers against guards**, which is a different activity from
+reading each route, and it is the only technique that finds this: every neighbour having a guard
+is precisely what makes a reader's eye slide past the file that has none. The same count also
+catches the subtler shape, a file whose `GET` is guarded and whose `POST` is not.
+
+**The exposure has to be stated in both directions or it gets triaged wrongly.** The POST takes
+**no body**. The mapping it writes comes from the `userreferrals` collection, so a caller could
+**not** point commission at themselves - the "rewrite referral attribution" reading is wrong.
+What they could do is real enough: apply a pending attribution change an operator had
+deliberately not applied yet, and drive an unbounded `findOne` + `updateOne` loop across every
+active referral record, unauthenticated, as often as they liked. The GET handed up to ten real
+user ids and display names to anybody who asked. And **there is no way to find out whether either
+was ever called**, because a route with no guard writes no attribution - so say that, rather than
+letting the absence of evidence read as reassurance.
+
+**`PATCH /api/gamemasters/[id]`'s `update_limits` was a mass assignment.** It did
+`limits: { ...subscription.limits, ...limits }` - every key the browser sent, onto the subdocument
+that decides a Game Master's daily contest cap, participant cap, revenue share, and now which
+games they may create at all. The aggravating detail is that this route updates with the **raw
+MongoDB driver**, so no Mongoose validation runs: the schema's `min: 2` on `maxUsersPerCompetition`
+and its bounds on the fee percentage were never applied on this path. It is now an allow-list of
+five fields in `apps/admin/lib/admin/gamemaster-limits-update.ts`, which **refuses an unknown
+field by name rather than dropping it** - dropping is tidier and it means the edit appears to save
+while doing nothing, which is this codebase's recurring failure mode. The allow-list is a `Set`,
+so a request-supplied `"constructor"` cannot pass a lookup that walks the prototype chain; that is
+the third instance of that rule after the round-inspector action map and the contest-edit field
+list.
+
+**The admin creation route was bypassing package limits.** It resolved from the cached
+`subscription.limits` only and never read `canCreateCompetitions` at all, so a Game Master whose
+package had creation withdrawn could still create contests through it. Both routes now resolve
+through `lib/services/gamemaster/game-permissions.ts`, mirrored - one function, four sources of
+truth, and a reported `creationDecidedBy` so a refusal names the administrator when an
+administrator is the cause rather than sending the Game Master to buy an upgrade that cannot help.
+
+**Nothing was backfilled and there is nothing to backfill.** The mass assignment stored whatever
+an operator actually submitted, which is not distinguishable from intent, and the unauthenticated
+route wrote values copied from a collection it did not modify.
+
+Pinned by `__tests__/services/gamemaster-creation-permissions.test.ts` (59 tests) and
+`tools/probe-gamemaster-creation.ps1` (18 probes, all red with exactly 1 failure each). One probe
+came back **green for the third reason** - not a weak test and not a wrong claim, but **no test at
+all**: restoring the blind spread left `resolveCreationLimits` in the file, so the badge test it
+had been aimed at stayed satisfied. Naming the expected failing test is what exposed it.
 
 ---
 

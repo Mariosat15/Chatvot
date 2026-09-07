@@ -4,6 +4,12 @@ import { verifyGameMasterAuth } from "@/lib/admin/auth";
 import mongoose from "mongoose";
 import { ObjectId } from "mongodb";
 import { contestGameLabel } from "@/lib/games";
+import {
+  checkGameMasterCanCreate,
+  checkRouteCanCreateGameType,
+  MIN_CONTEST_PARTICIPANTS,
+  resolveCreationLimits,
+} from "@/lib/services/gamemaster/game-permissions";
 
 /**
  * GET /api/gamemaster/competitions
@@ -182,26 +188,75 @@ export async function POST(request: NextRequest) {
       subscription.currentPeriodCompetitionsCreated = 0;
     }
 
-    if (
-      subscription.currentPeriodCompetitionsCreated >=
-      subscription.limits.maxCompetitionsPerDay
-    ) {
+    // The CURRENT package, which this route did not read at all before.
+    //
+    // The main app's copy of this route has always read it, with a comment saying so: "this
+    // ensures if admin changes the package, the GM cannot bypass restrictions". That was
+    // true of that file and false of the platform, because this route reached the same
+    // collection with the cached `subscription.limits` and is reachable by the same person -
+    // a Game Master signs in here with their ordinary credentials at
+    // `/api/gamemaster-auth/login`. So the documented protection had a second door.
+    let packageConfig = null;
+    if (subscription.packageId) {
+      try {
+        const currentPackage = await db.collection("marketplaceitems").findOne({
+          _id: new ObjectId(subscription.packageId),
+        });
+        packageConfig = currentPackage?.gameMasterConfig ?? null;
+      } catch (e) {
+        console.error("Error fetching package:", e);
+      }
+    }
+
+    const effectiveLimits = resolveCreationLimits({
+      limits: subscription.limits,
+      packageConfig,
+      override: subscription.competitionCreationOverride,
+      overrideLimits: subscription.overrideLimits,
+    });
+
+    // This route never checked `canCreateCompetitions` at all, in any form, so a Game Master
+    // whose package withdraws competition creation could create them here. The shared gate
+    // checks it, the game and the daily quota in one call, in that order.
+    const verdict = checkGameMasterCanCreate({
+      limits: effectiveLimits,
+      requestedGameType: body.gameType,
+      competitionsCreatedToday: subscription.currentPeriodCompetitionsCreated,
+    });
+
+    if (!verdict.ok) {
+      // Reason the daily limit keeps its 429 while the other refusals are 403: the existing
+      // client branches on the status to decide whether to say "try again tomorrow", and a
+      // quota is genuinely rate limiting rather than a permission problem.
       return NextResponse.json(
         {
-          error: `You have reached your daily limit of ${subscription.limits.maxCompetitionsPerDay} competition(s). Try again tomorrow.`,
-          dailyLimit: subscription.limits.maxCompetitionsPerDay,
-          created: subscription.currentPeriodCompetitionsCreated,
+          error: verdict.message,
+          reason: verdict.reason,
+          ...(verdict.reason === "daily_limit_reached"
+            ? {
+                dailyLimit: effectiveLimits.maxCompetitionsPerDay,
+                created: subscription.currentPeriodCompetitionsCreated,
+              }
+            : {}),
         },
-        { status: 429 },
+        { status: verdict.reason === "daily_limit_reached" ? 429 : 403 },
+      );
+    }
+
+    const capability = checkRouteCanCreateGameType(verdict.gameType);
+    if (!capability.ok) {
+      return NextResponse.json(
+        { error: capability.message, reason: capability.reason },
+        { status: 400 },
       );
     }
 
     // Check max participants limit
-    if (maxParticipants > subscription.limits.maxUsersPerCompetition) {
+    if (maxParticipants > effectiveLimits.maxUsersPerCompetition) {
       return NextResponse.json(
         {
-          error: `Maximum participants cannot exceed ${subscription.limits.maxUsersPerCompetition}`,
-          maxAllowed: subscription.limits.maxUsersPerCompetition,
+          error: `Maximum participants cannot exceed ${effectiveLimits.maxUsersPerCompetition}`,
+          maxAllowed: effectiveLimits.maxUsersPerCompetition,
         },
         { status: 400 },
       );
@@ -245,7 +300,11 @@ export async function POST(request: NextRequest) {
       // Setting to a pre-calculated estimate caused double-counting: the estimate
       // was stored AND each entry fee was added on top, creating phantom credits.
       prizePool: 0,
-      minParticipants: 2,
+      // This route has always hard-coded the right number, which is why it never had the
+      // main app's single-player defect. It reads the shared constant so the two cannot
+      // drift: a literal here matching the floor by coincidence is the same trap as a
+      // migration carrying its own copy of a default.
+      minParticipants: MIN_CONTEST_PARTICIPANTS,
       maxParticipants: parseInt(maxParticipants),
       currentParticipants: 0,
       startTime: new Date(startTime),
@@ -280,11 +339,12 @@ export async function POST(request: NextRequest) {
       gameMasterName,
       createdBy: auth.userId,
       // Reason: this route inserts with the raw MongoDB driver, so Mongoose schema
-      // defaults never run and the game label would be absent (risk R7). A Game Master
-      // creates trading contests only - `limits.allowedGameTypes` defaults to
-      // `["trading"]` and provider contests are blocked until the revenue share is
-      // computed on net platform fee (chapter 19 section 5).
-      ...contestGameLabel(),
+      // defaults never run and the game label would be absent (risk R7).
+      //
+      // The type comes from the GATE's resolved value rather than from the request body or
+      // a literal, so the label cannot disagree with what was actually permitted. See the
+      // same call in the main app's copy for the full reasoning.
+      ...contestGameLabel(verdict.gameType),
       createdAt: new Date(),
       updatedAt: new Date(),
     };

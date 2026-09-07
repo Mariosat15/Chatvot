@@ -432,7 +432,20 @@ which titles are live, create a contest on one with settings drawn from the game
 anybody who has already paid, pause, resume and cancel it while it runs, inspect and end a round
 that got stuck, and read a provider's health without believing a stored field.**
 
-**What E5 still does not cover:** the **Game Master contest creation API**, which is X6.
+**What E5 still does not cover:** the **construction half** of the Game Master contest creation
+API, which is X6. Its **permission half is done** (7 Sep 2026, `19` s3.2a) - `limits.allowedGameTypes`
+is declared and enforced through one mirrored model-free gate, so both creation routes now refuse
+a provider contest with a message naming the missing capability instead of stamping one
+`gameKey: "provider"` against an immutable field. **Read that as the platform knowing a Game
+Master cannot run a game contest, not as their being able to.** The construction half needs a
+catalogue title, `configSchema` validation, round settings and the pre-flight checklist, and the
+UI is blocked by `19` s5's economic constraint rather than by effort. Three defects came with the
+gate and **none was about games** (**R47**): `POST /api/gamemasters/sync-referrals` had no
+authentication on either handler while all four siblings required section access; `update_limits`
+was a mass assignment onto the subdocument holding the daily cap, participant cap and revenue
+share, written with the raw driver so the schema's own `min: 2` never ran; and the "Comps: ON"
+badge read the cached flag under a tooltip crediting the package, so an administrator's explicit
+deny rendered green while every create was refused.
 
 **Analytics by game and provider is now done** (7 Sep 2026, `12` s5.1a), together with the
 **Game Performance** screen `12` s5 asks for and calls the one that will be looked at daily.

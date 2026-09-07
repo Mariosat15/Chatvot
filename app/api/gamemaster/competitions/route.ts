@@ -7,6 +7,12 @@ import { headers } from "next/headers";
 import GameMasterSubscription from "@/database/models/gamemaster/gamemaster-subscription.model";
 import { MarketplaceItem } from "@/database/models/marketplace/marketplace-item.model";
 import { contestGameLabel } from "@/lib/games";
+import {
+  checkGameMasterCanCreate,
+  checkRouteCanCreateGameType,
+  clampMinParticipants,
+  resolveCreationLimits,
+} from "@/lib/services/gamemaster/game-permissions";
 
 /**
  * GET /api/gamemaster/competitions
@@ -199,61 +205,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get CURRENT package settings (not cached subscription limits)
-    // This ensures if admin changes the package, the GM cannot bypass restrictions
-    let currentPackageLimits = {
-      maxCompetitionsPerDay: subscription.limits?.maxCompetitionsPerDay || 1,
-      maxUsersPerCompetition: subscription.limits?.maxUsersPerCompetition || 50,
-      canCreateCompetitions:
-        subscription.limits?.canCreateCompetitions !== false,
-      // Reason for `??`: a package configured at 0% is a configuration, not an absence, and
-      // this figure is what the Game Master is told they earn (R31).
-      referralFeePercentage: subscription.limits?.referralFeePercentage ?? 5,
-    };
-
+    // The CURRENT package, not the cached limits. Reason: the cache is what this Game
+    // Master bought and the package is what the operator currently offers, so reading the
+    // cache first is how a tightened tier is bypassed by everyone already subscribed. It
+    // stays a fallback because a package can be DELETED while somebody is subscribed to it.
+    let packageConfig = null;
     if (subscription.packageId) {
       try {
         const currentPackage = await db.collection("marketplaceitems").findOne({
           _id: new ObjectId(subscription.packageId),
         });
-        if (currentPackage?.gameMasterConfig) {
-          currentPackageLimits = {
-            maxCompetitionsPerDay:
-              currentPackage.gameMasterConfig.maxCompetitionsPerDay || 1,
-            maxUsersPerCompetition:
-              currentPackage.gameMasterConfig.maxUsersPerCompetition || 50,
-            canCreateCompetitions:
-              currentPackage.gameMasterConfig.canCreateCompetitions !== false,
-            referralFeePercentage:
-              currentPackage.gameMasterConfig.referralFeePercentage ?? 5,
-          };
-          console.log(
-            `[GM Competition] Using current package settings:`,
-            currentPackageLimits,
-          );
-        }
+        packageConfig = currentPackage?.gameMasterConfig ?? null;
       } catch (e) {
         console.error("Error fetching package:", e);
       }
     }
 
-    // Check if GM is allowed to create competitions (based on CURRENT package setting)
-    if (!currentPackageLimits.canCreateCompetitions) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "Your package does not allow competition creation. Upgrade your package to create competitions.",
-        },
-        { status: 403 },
-      );
-    }
-
-    // Use CURRENT package limits
-    const effectiveMaxCompetitionsPerDay =
-      currentPackageLimits.maxCompetitionsPerDay;
-    const effectiveMaxUsersPerCompetition =
-      currentPackageLimits.maxUsersPerCompetition;
+    // One rule, shared with the admin-hosted copy of this route. Before this existed the
+    // two disagreed about every question it answers - see `game-permissions.ts`.
+    const effectiveLimits = resolveCreationLimits({
+      limits: subscription.limits,
+      packageConfig,
+      override: subscription.competitionCreationOverride,
+      overrideLimits: subscription.overrideLimits,
+    });
 
     // Check daily competition limit
     const today = new Date();
@@ -276,24 +251,37 @@ export async function POST(request: NextRequest) {
       subscription.currentPeriodCompetitionsCreated = 0;
     }
 
-    // Check if limit reached
-    if (
-      subscription.currentPeriodCompetitionsCreated >=
-      effectiveMaxCompetitionsPerDay
-    ) {
+    // Permission to create, then the game, then the daily quota - in that order, so a Game
+    // Master whose package forbids creation is not told to come back tomorrow.
+    const verdict = checkGameMasterCanCreate({
+      limits: effectiveLimits,
+      requestedGameType: body.gameType,
+      competitionsCreatedToday: subscription.currentPeriodCompetitionsCreated,
+    });
+
+    if (!verdict.ok) {
       return NextResponse.json(
-        {
-          success: false,
-          error: `Daily limit reached. You can create ${effectiveMaxCompetitionsPerDay} competition(s) per day.`,
-        },
+        { success: false, error: verdict.message, reason: verdict.reason },
         { status: 403 },
+      );
+    }
+
+    // Separately from whether this Game Master is PERMITTED the game: can this route build
+    // one? Only trading, and it refuses rather than mislabelling - see
+    // `checkRouteCanCreateGameType`, which explains why an immutable `gameKey` makes that
+    // the difference between a visible refusal and unrecoverable data.
+    const capability = checkRouteCanCreateGameType(verdict.gameType);
+    if (!capability.ok) {
+      return NextResponse.json(
+        { success: false, error: capability.message, reason: capability.reason },
+        { status: 400 },
       );
     }
 
     // Check max participants limit
     const effectiveMaxParticipants = Math.min(
       parseInt(maxParticipants),
-      effectiveMaxUsersPerCompetition,
+      effectiveLimits.maxUsersPerCompetition,
     );
 
     // Calculate prize pool
@@ -392,7 +380,14 @@ export async function POST(request: NextRequest) {
       // far beyond what was actually collected.
       prizePool: 0,
       estimatedPrizePool, // For display purposes only (client shows this before users join)
-      minParticipants: parseInt(minParticipants) || 2,
+      // Reason this is clamped rather than `parseInt(minParticipants) || 2`: that expression
+      // is wrong in exactly one direction and it is the direction that matters. `"1"` parses
+      // to 1, which is TRUTHY, so it passed straight through - and `minParticipants: 1`
+      // means the auto-cancel-and-refund below the minimum can never fire, so a single
+      // player pays an entry fee and takes the pot back minus the platform fee. That is a
+      // paid solo game, which no paid format on this platform may be. `"0"` and `""` were
+      // caught only by luck, being falsy.
+      minParticipants: clampMinParticipants(minParticipants),
       maxParticipants: effectiveMaxParticipants,
       currentParticipants: 0,
       startTime: new Date(startTime),
@@ -462,11 +457,16 @@ export async function POST(request: NextRequest) {
       maxOpenPositions: 10,
       allowShortSelling: false,
       marginCallThreshold: 100,
-      // Reason: same bypass, for the game label (risk R7). A Game Master creates trading
-      // contests only - `limits.allowedGameTypes` defaults to `["trading"]` and provider
-      // contests are blocked until the revenue share is computed on net platform fee
-      // (chapter 19 section 5) - so the label is trading rather than caller-supplied.
-      ...contestGameLabel(),
+      // Reason: same bypass, for the game label (risk R7).
+      //
+      // The type comes from the GATE's resolved value, not from the request body and not
+      // from a literal. Taking it from the body would let a caller be admitted as one game
+      // and written as another; hard-coding it would let a future widening of
+      // `allowedGameTypes` grant a game that is then stored with the wrong label. Two gates
+      // have already run on this value: the Game Master's `allowedGameTypes`, and what this
+      // route can actually build - so it can only be trading today, and it will follow the
+      // allow-list correctly when that changes.
+      ...contestGameLabel(verdict.gameType),
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -498,11 +498,17 @@ export async function POST(request: NextRequest) {
         maxParticipants: competition.maxParticipants,
       },
       limits: {
-        dailyRemaining:
-          effectiveMaxCompetitionsPerDay -
-          subscription.currentPeriodCompetitionsCreated -
-          1,
-        maxParticipants: effectiveMaxUsersPerCompetition,
+        // Reason `Math.max(0, ...)`: `currentPeriodCompetitionsCreated` is incremented by
+        // the write above, and a cap lowered by an operator after a Game Master had already
+        // created several contests makes this arithmetic negative. "-2 remaining today" is
+        // not a fact about anything.
+        dailyRemaining: Math.max(
+          0,
+          effectiveLimits.maxCompetitionsPerDay -
+            (subscription.currentPeriodCompetitionsCreated ?? 0) -
+            1,
+        ),
+        maxParticipants: effectiveLimits.maxUsersPerCompetition,
       },
       message: "Competition created successfully!",
     });

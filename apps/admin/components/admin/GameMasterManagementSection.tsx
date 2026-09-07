@@ -134,10 +134,16 @@ export default function GameMasterManagementSection({
   }, [fetchGameMasters]);
 
   // Handle initial GM ID to auto-open specific GM's detail view
+  //
+  // Reason: `selectedGM` and `detailLoading` are read as a one-shot guard, not as
+  // dependencies. Listing them would re-run this the moment the operator CLOSES the
+  // detail view - `selectedGM` returns to null, the condition passes again, and the
+  // panel reopens itself, so the close button would appear broken.
   useEffect(() => {
     if (initialGmId && !selectedGM && !detailLoading) {
       viewDetails(initialGmId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialGmId]);
 
   const viewDetails = async (gmId: string) => {
@@ -160,7 +166,10 @@ export default function GameMasterManagementSection({
     action: string,
     extraData?: Record<string, unknown>,
   ) => {
-    // Skip confirmation for toggle actions (modal already serves as confirmation)
+    // Reason the toggle skips the confirm: it is a two-state switch whose result is visible
+    // on the badge immediately after the refetch below, and it is reversible in one click.
+    // (This comment used to say a modal served as the confirmation. There is no modal - the
+    // guard was written for a control that did not exist until 7 September 2026.)
     if (action !== "toggleCompetitionCreation") {
       if (!confirm(`Are you sure you want to ${action} this game master?`))
         return;

@@ -38,6 +38,7 @@ export interface IGameMasterSubscription extends Document {
     canCreateCompetitions: boolean; // Whether package allows competition creation
     canEarnFromChallenges: boolean; // Whether GM earns from 1v1 challenges
     challengeReferralFeePercentage?: number; // % for challenges (defaults to referralFeePercentage)
+    allowedGameTypes?: string[]; // Which games they may CREATE contests for - see the schema
   };
 
   // Admin Override for Competition Creation
@@ -190,6 +191,21 @@ const GameMasterSubscriptionSchema = new Schema<IGameMasterSubscription>(
         type: Number,
         min: 0,
         max: 50,
+      },
+      // Which games this Game Master may CREATE contests for. Chapter 19 sections 3.2/5.
+      //
+      // The default is here for completeness and NOTHING RELIES ON IT. Every subscription
+      // already in the database predates the field, and both creation routes read this
+      // collection with the raw MongoDB driver, which never hydrates - so a schema default
+      // would not apply even to a document written today. `resolveAllowedGameTypes` in
+      // `lib/services/gamemaster/game-permissions.ts` applies the trading default in code,
+      // and it is the only thing the gate reads. Do not "simplify" the gate to trust this.
+      //
+      // Not an enum: a game type is a registered module and the list grows, whereas a
+      // Mongoose enum is add-only and removing a value orphans every document storing it.
+      allowedGameTypes: {
+        type: [String],
+        default: ["trading"],
       },
     },
     competitionCreationOverride: {

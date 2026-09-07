@@ -8,22 +8,19 @@ import {
   Crown,
   Ban,
   CheckCircle,
-  XCircle,
   Calendar,
   TrendingUp,
   ChevronLeft,
-  Clock,
   Trash2,
   ExternalLink,
   User,
   Shield,
   BarChart3,
-  ChevronDown,
-  ChevronUp,
   Search,
   Filter,
 } from "lucide-react";
 import Link from "next/link";
+import CompetitionCreationControl from "./gamemaster/CompetitionCreationControl";
 
 // ─── Interfaces ───────────────────────────────────────────────────────
 interface GMSubscription {
@@ -44,7 +41,16 @@ interface GMSubscription {
     maxUsersPerCompetition: number;
     referralFeePercentage: number;
     canCreateCompetitions: boolean;
+    allowedGameTypes?: readonly string[];
+    /** Which source decided `canCreateCompetitions` - resolved server-side by the same
+     *  function both creation routes use, so this badge cannot disagree with the gate. */
+    creationDecidedBy?:
+      | "admin_override"
+      | "current_package"
+      | "cached_limits"
+      | "default";
   };
+  competitionCreationOverride?: "enabled" | "disabled" | null;
   totalReferredUsers: number;
   totalEarnings: number;
   totalCompetitionsCreated: number;
@@ -285,19 +291,11 @@ export default function GameMasterDetailView({
         {/* Action Buttons */}
         <div className="flex gap-2 flex-wrap">
           {gm.status === "active" && (
-            <div
-              className={`flex items-center gap-2 px-4 py-2 rounded ${
-                gm.limits?.canCreateCompetitions !== false
-                  ? "bg-green-600/20 text-green-400 border border-green-600/50"
-                  : "bg-gray-600/20 text-gray-400 border border-gray-600/50"
-              }`}
-              title={`Based on ${gm.packageName} package settings`}
-            >
-              <Trophy className="h-4 w-4" />
-              {gm.limits?.canCreateCompetitions !== false
-                ? "Comps: ON"
-                : "Comps: OFF"}
-            </div>
+            <CompetitionCreationControl
+              gm={gm}
+              onAction={onAction}
+              actionLoading={actionLoading}
+            />
           )}
           {gm.status === "active" && (
             <button
@@ -440,7 +438,6 @@ export default function GameMasterDetailView({
           filter={earningsFilter}
           onFilterChange={setEarningsFilter}
           stats={earningStats}
-          getStatusColor={getStatusColor}
         />
       )}
     </div>
@@ -462,24 +459,27 @@ function KPICard({
   subtitle?: string;
   prefix?: string;
 }) {
-  const colorMap: Record<string, string> = {
-    red: "text-red-400",
-    yellow: "text-yellow-400",
-    green: "text-green-400",
-    blue: "text-blue-400",
-    purple: "text-purple-400",
-    emerald: "text-emerald-400",
-    white: "text-white",
-  };
+  // Reason: a Map has no prototype chain, so the lookup is total for any string the
+  // caller passes. An object index walks the prototype, and "constructor" or "toString"
+  // returns something truthy that survives a `|| fallback` and lands in a className.
+  const colorMap = new Map<string, string>([
+    ["red", "text-red-400"],
+    ["yellow", "text-yellow-400"],
+    ["green", "text-green-400"],
+    ["blue", "text-blue-400"],
+    ["purple", "text-purple-400"],
+    ["emerald", "text-emerald-400"],
+    ["white", "text-white"],
+  ]);
   return (
     <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
       <p className="text-gray-400 text-xs mb-1">{label}</p>
-      <p className={`text-xl font-bold ${colorMap[color] || "text-white"}`}>
+      <p className={`text-xl font-bold ${colorMap.get(color) || "text-white"}`}>
         {prefix !== undefined ? prefix : ""}
         {value}
       </p>
       {subtitle && (
-        <p className={`text-xs mt-0.5 ${colorMap[color] || "text-gray-400"}`}>
+        <p className={`text-xs mt-0.5 ${colorMap.get(color) || "text-gray-400"}`}>
           {subtitle}
         </p>
       )}
@@ -868,7 +868,6 @@ function EarningsTab({
   filter,
   onFilterChange,
   stats,
-  getStatusColor,
 }: {
   earnings: GMEarning[];
   filter: string;
@@ -879,7 +878,6 @@ function EarningsTab({
     fromComps: number;
     fromChallenges: number;
   };
-  getStatusColor: (s: string) => string;
 }) {
   return (
     <div className="space-y-4">
@@ -1027,20 +1025,22 @@ function MiniStat({
   value: string | number;
   color?: string;
 }) {
-  const colorMap: Record<string, string> = {
-    red: "text-red-400",
-    yellow: "text-yellow-400",
-    green: "text-green-400",
-    blue: "text-blue-400",
-    purple: "text-purple-400",
-    emerald: "text-emerald-400",
-    gray: "text-gray-300",
-    white: "text-white",
-  };
+  // Reason: see the note on the sibling stat card above - a Map lookup is total, an
+  // object index walks the prototype chain.
+  const colorMap = new Map<string, string>([
+    ["red", "text-red-400"],
+    ["yellow", "text-yellow-400"],
+    ["green", "text-green-400"],
+    ["blue", "text-blue-400"],
+    ["purple", "text-purple-400"],
+    ["emerald", "text-emerald-400"],
+    ["gray", "text-gray-300"],
+    ["white", "text-white"],
+  ]);
   return (
     <div className="bg-gray-900/50 rounded-lg p-3 border border-gray-700/50">
       <p className="text-gray-400 text-xs mb-1">{label}</p>
-      <p className={`text-lg font-bold ${colorMap[color] || "text-white"}`}>
+      <p className={`text-lg font-bold ${colorMap.get(color) || "text-white"}`}>
         {value}
       </p>
     </div>

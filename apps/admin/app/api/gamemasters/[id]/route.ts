@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import { requireSectionAccess } from "@/lib/admin/auth";
+import {
+  validateLimitsUpdate,
+  validateOverrideUpdate,
+} from "@/lib/admin/gamemaster-limits-update";
+import {
+  resolveCreationLimits,
+  type StoredPackageConfig,
+} from "@/lib/services/gamemaster/game-permissions";
 import mongoose from "mongoose";
 import { ObjectId } from "mongodb";
 
@@ -134,10 +142,7 @@ export async function GET(
     const actualPendingEarnings = pendingEarningsAgg[0]?.total || 0;
 
     // Get CURRENT package settings (not cached subscription limits)
-    let currentLimits = {
-      ...subscription.limits,
-      canCreateCompetitions: subscription.limits?.canCreateCompetitions ?? true,
-    };
+    let packageConfig: StoredPackageConfig | null = null;
 
     if (subscription.packageId) {
       try {
@@ -145,21 +150,25 @@ export async function GET(
           _id: new ObjectId(subscription.packageId),
         });
         if (currentPackage?.gameMasterConfig) {
-          currentLimits = {
-            maxCompetitionsPerDay:
-              currentPackage.gameMasterConfig.maxCompetitionsPerDay,
-            maxUsersPerCompetition:
-              currentPackage.gameMasterConfig.maxUsersPerCompetition,
-            referralFeePercentage:
-              currentPackage.gameMasterConfig.referralFeePercentage,
-            canCreateCompetitions:
-              currentPackage.gameMasterConfig.canCreateCompetitions !== false,
-          };
+          packageConfig = currentPackage.gameMasterConfig;
         }
       } catch (e) {
         console.error("Error fetching package:", e);
       }
     }
+
+    // Reason this screen resolves through `resolveCreationLimits` rather than reading the
+    // package itself: it used to build a four-field object from the package, which meant it
+    // (a) ignored `competitionCreationOverride` entirely, so an administrator's explicit deny
+    // rendered as "Comps: ON", and (b) dropped `allowedGameTypes`, so the screen could not
+    // show which games the Game Master may create. Both creation routes decide with this
+    // function, so the badge and the gate now cannot disagree.
+    const currentLimits = resolveCreationLimits({
+      limits: subscription.limits,
+      packageConfig,
+      override: subscription.competitionCreationOverride ?? null,
+      overrideLimits: subscription.overrideLimits ?? null,
+    });
 
     return NextResponse.json({
       subscription: {
@@ -179,6 +188,12 @@ export async function GET(
         referralCode: subscription.referralCode,
         referralLink: subscription.referralLink,
         limits: currentLimits,
+        // Returned separately from the resolved limits so the screen can show BOTH what
+        // applies and whether an administrator set it by hand. Without the raw value a
+        // cleared override and an override that agrees with the package look identical.
+        competitionCreationOverride:
+          subscription.competitionCreationOverride ?? null,
+        overrideLimits: subscription.overrideLimits ?? null,
         currentPeriodCompetitionsCreated:
           subscription.currentPeriodCompetitionsCreated,
         totalCompetitionsCreated: subscription.totalCompetitionsCreated,
@@ -296,17 +311,42 @@ export async function PATCH(
         };
         break;
 
-      case "update_limits":
-        if (limits) {
-          updateData = {
-            ...updateData,
-            limits: {
-              ...subscription.limits,
-              ...limits,
-            },
-          };
+      case "update_limits": {
+        if (!limits) break;
+        // Reason this is validated rather than spread: the previous
+        // `{ ...subscription.limits, ...limits }` wrote every key the browser sent onto the
+        // document that decides how many contests a Game Master may create, what share they
+        // earn, and which games they may create at all - and a raw-driver `updateOne` runs no
+        // Mongoose validation, so the schema's own bounds never applied on this path.
+        const validated = validateLimitsUpdate(subscription.limits, limits);
+        if (!validated.ok) {
+          return NextResponse.json({ error: validated.error }, { status: 400 });
         }
+        updateData = { ...updateData, limits: validated.limits };
         break;
+      }
+
+      case "toggleCompetitionCreation": {
+        // The per-Game-Master creation override. `competitionCreationOverride` and
+        // `overrideLimits` have been on the schema since long before this project with a
+        // Mongoose virtual reading them, and until now nothing wrote them, nothing read them,
+        // and no control sent this action - see `validateOverrideUpdate` for why it is
+        // implemented rather than deleted.
+        const validated = validateOverrideUpdate(body);
+        if (!validated.ok) {
+          return NextResponse.json({ error: validated.error }, { status: 400 });
+        }
+        updateData = {
+          ...updateData,
+          competitionCreationOverride: validated.override,
+          // Written unconditionally, including as `{}` when the override is cleared or set to
+          // `disabled`. Reason: leaving a stale `overrideLimits` behind means clearing an
+          // override and setting it again later silently restores caps an operator set weeks
+          // ago and has no way to see.
+          overrideLimits: validated.overrideLimits,
+        };
+        break;
+      }
 
       case "extend":
         const extensionDays = body.extensionDays || 30;

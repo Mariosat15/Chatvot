@@ -148,6 +148,62 @@ Default `["trading"]` so no existing Game Master silently gains the ability to c
 provider contests. Editable per tier in `MarketplaceItem.gameMasterConfig`, and per Game
 Master through the existing admin `update_limits` action.
 
+#### 3.2a What was built - 7 September 2026
+
+**Code-complete.** The field is declared on `gamemaster-subscription.model.ts` - which exists
+**only** in the main app, so `check:mirrors` correctly says nothing about it - and on
+`marketplace-item.model.ts` in **both** apps, carried onto the cached copy by
+`buildSubscriptionLimits`, and enforced on both creation routes. **The admin app reaches
+subscriptions with the raw driver** (`db.collection("gamemastersubscriptions")`) rather than
+through a model, which is why there is no second copy to keep in step - and it is also why the
+schema's own `min`/`max` never ran on the admin edit path, which is half of why `update_limits`
+mattered. `59` tests in
+`__tests__/services/gamemaster-creation-permissions.test.ts`, `19` probes in
+`tools/probe-gamemaster-creation.ps1`.
+
+**One existing guard had to be loosened, and that is worth recording rather than absorbing.**
+R7's test in `__tests__/services/game-guards.test.ts` matched `...contestGameLabel()` with **no
+argument**, which was stricter than its own purpose - the guard is about the label being stamped,
+not about it being trading - so it turned red on correct code the moment these routes started
+passing a resolved game type. A guard that fails on correct code is the fastest kind to have
+deleted. It now accepts an argument, and the teeth the old pattern provided by accident are
+restored deliberately: a second assertion refuses a label derived from **caller input**, since
+deriving it from the request body is a way to mislabel a contest against an immutable field. Four
+tests added, probed with `body.gameType`, which compiles and reads entirely plausibly.
+
+**The rule lives in one place**, `lib/services/gamemaster/game-permissions.ts`, mirrored
+into `apps/admin`. That is the deliverable rather than the field, and the reason is that
+the two creation routes disagreed about **every** question it answers. `check:mirrors`
+compares models, so it has never had an opinion about this file - a test compares the two
+copies byte for byte instead, and it earned its place immediately by catching the mirror
+genuinely stale during the build.
+
+Six things about the build that a summary would flatten:
+
+- **Precedence is override → current package → cached limits → default**, and the function
+  reports **which** decided in `creationDecidedBy`. That is not diagnostics: "your package
+  does not allow competition creation" is wrong and unactionable when an administrator
+  denied it by hand, and it sends the Game Master to buy an upgrade that cannot help.
+- **An admin override does not widen the games.** It decides `canCreateCompetitions` only.
+  Letting `enabled` mean "allowed everything" would carry section 5's economic constraint
+  through a switch labelled something else, and an operator enabling creation for one
+  person has decided nothing about provider pricing.
+- **An empty stored array reads as the default, not as "no games".** An empty array is what
+  a bad edit or a half-run migration leaves behind, and taking it literally locks a Game
+  Master out of the thing they pay for.
+- **Route capability is a separate check from permission**, `checkRouteCanCreateGameType`.
+  The routes can build trading only, so granting `provider` today gets a refusal that names
+  the missing capability. Without it the route would stamp `gameKey: "provider"` instead of
+  `provider:<providerKey>:<gameCode>` - and `gameKey` is immutable, so that is the
+  difference between a visible refusal and unrecoverable data. **Widening the allow-list is
+  necessary and not sufficient**, and this is what says so.
+- **Both routes label the contest from the verdict**, not from the request body. Checking
+  permission against a resolved value while labelling from raw input lets the two disagree.
+- **The admin route was bypassing package limits entirely** - it read only the cached
+  `subscription.limits` and never checked `canCreateCompetitions`, so a Game Master whose
+  package withdrew creation could still create through it. Both routes now resolve
+  identically.
+
 Optionally, per-game referral rates:
 
 ```
@@ -215,7 +271,9 @@ Neither is caused by this project, and both are cheap now and awkward later.
 |---|---|---|
 | ~~**The admin app does not settle provider contests at all**~~ **FIXED 7 Sep 2026 (R42)** | `apps/admin`'s `finalizeCompetition` had no provider dispatch - only `routeToTradingSettlement` - so a provider contest reaching the admin cron was refused and left `active`. It now carries the same dispatch the main app has had since X5, placed before `startSession()` because `finalizeProviderCompetition` opens its own session and lock. Pinned by three more tests in the same parity suite, which now seeds a provider-shaped contest | **Strictly worse than R26 below, and the distinction is the useful part**: R26 skipped the Game Master's commission while the contest still settled and the players were still paid. This paid **nobody** and completed nothing - so a Game Master's referred players in a provider contest earned them nothing either, but as a consequence of the contest never settling rather than of a missing referral stage. Latent, **nothing backfilled**. Note the two copies of the shared services were **already mirrored and imported by nothing**, so `check:mirrors` agreed correctly |
 | ~~**The admin app does not pay Game Masters**~~ **FIXED 5 Sep 2026 (R26)** | `apps/admin/lib/actions/trading/competition-end.actions.ts` had **no Game Master earnings logic** - only `isGmCreated` on platform-fee recording. It now calls `settleFeesAndGameMasters`, the same shared stage the main app calls, and books the platform fee **net** of the commission. Pinned by `__tests__/services/admin-finalize-gamemaster-parity.test.ts`, which runs *both* apps' finalize functions over identical fixtures and compares every ledger row | A competition finalized through the admin app paid **no Game Master earnings at all** and recorded no `retained_gm_fee` either. Silent revenue loss, and **actively occurring** - both apps run the finalize cron every minute, so payment depended on which cron won the race. **The fix is not retroactive and no backfill was written**; affected contests cannot be found by querying for retained rows, since none exist |
-| **`toggleCompetitionCreation` is a dead UI reference** | Called in `GameMasterManagementSection.tsx` lines 164-189; **not implemented** in the `PATCH /api/gamemasters/[id]` handler. `competitionCreationOverride` and `overrideLimits` exist on the schema with no reader or writer | An admin clicks a button that does nothing. Worse once provider games exist and disabling a Game Master's creation rights actually matters |
+| ~~**`toggleCompetitionCreation` is a dead UI reference**~~ **FIXED 7 Sep 2026** | Two guards in `GameMasterManagementSection.tsx` special-cased the action string; the `PATCH /api/gamemasters/[id]` handler answered it with "Invalid action". `competitionCreationOverride` and `overrideLimits` sat on the schema with a Mongoose virtual reading them that had never run, because both creation routes read the collection with the raw driver. Now implemented via `validateOverrideUpdate`, with the control in `apps/admin/components/admin/gamemaster/CompetitionCreationControl.tsx` | **This row's impact statement was wrong and the correction matters.** It said "an admin clicks a button that does nothing" - **the button did not exist either**, so implementing the handler alone would have left it unreachable, which is the precedent set by a publish route and a play route that were both complete by API and unreachable by clicking. It was kept rather than deleted (the `shouldBlockEntry` precedent cuts the other way here) because it is the **only per-Game-Master control**: everything else is per-tier, so without it the only ways to stop one Game Master creating contests are to change the package for everyone on that tier, or to suspend the subscription and stop the earnings they are contractually owed |
+| ~~**`update_limits` was a mass assignment**~~ **FIXED 7 Sep 2026** | The handler did `limits: { ...subscription.limits, ...limits }` - every key the browser sent, written onto the document that decides a Game Master's daily cap, participant cap, revenue share and now which games they may create. And it writes with the **raw driver**, so no Mongoose validation ran and the schema's own bounds never applied on this path. Now an allow-list in `apps/admin/lib/admin/gamemaster-limits-update.ts` | Not found by looking for it: it surfaced while adding `allowedGameTypes` to the same subdocument, which is the general shape - **generalising code is a better bug-finding instrument than looking for bugs.** An unknown field is **refused with the field named, never dropped**, because dropping means the edit appears to save and the operator concludes they misclicked |
+| ~~**`POST /api/gamemasters/sync-referrals` was unauthenticated**~~ **FIXED 7 Sep 2026** | Both handlers had **no guard at all**, while all four of their siblings under `/api/gamemasters` required section access. Found by **counting exported handlers against guards**, not by reading the routes - every neighbour having a guard is precisely what makes reading through them go straight past the file that has none | State it in both directions. The POST takes **no body**, so the mapping comes from `userreferrals` and a caller could **not** redirect commission to themselves; what they could do is apply a pending attribution change an operator had deliberately not applied, and run an unbounded `findOne` + `updateOne` loop over every active referral on demand. The GET returned up to ten real user ids and names to anybody who asked. **There is no way to know whether either was ever called** - a route with no guard writes no attribution. Second unauthenticated route in this programme after Prerequisite A, third counting R40 |
 
 Also worth noting: the renewal worker extends `endDate` by **30 days hardcoded**
 (`gamemaster-renewal.job.ts` line 266) regardless of the tier's
@@ -274,28 +332,53 @@ only the ability to create a potentially loss-making contest is held back.
 | Item | Phase | Effort |
 |---|---|---|
 | **Set the game label on both Game Master competition inserts** | **X1** | **0.5 day - and it is a gate, not a task** |
-| `limits.allowedGameTypes`, default `["trading"]` | X1 | 0.5 day |
+| ~~`limits.allowedGameTypes`, default `["trading"]`~~ **BUILT 7 Sep 2026** | X1 | 0.5 day |
 | Admin-app finalization Game Master earnings gap (section 4) | X1 or X5 | 1-2 days |
 | Provider-cost treatment decided and implemented | Before enabling provider games for Game Masters | 1-2 days |
 | Minimum entry fee for Game Master provider contests | Same | 0.5 day |
-| Game Master creation API accepts a game and `gameConfig` | X6 | 2 days |
-| Game Master creation UI: game picker plus dynamic settings | X6 | 3 days |
+| **Game Master creation API accepts a game and `gameConfig`** | X6 | 2 days - **partly built 7 Sep 2026, see below** |
+| Game Master creation UI: game picker plus dynamic settings | X6 | 3 days - **not built, and blocked** |
 | Per-game analytics, Game Master and admin | X7 | 2 days |
-| Implement or remove `toggleCompetitionCreation` | X6 | 0.5 day |
+| ~~Implement or remove `toggleCompetitionCreation`~~ **BUILT 7 Sep 2026** | X6 | 0.5 day |
 | Tier wording | X8 | Database content, non-developer |
 | **Total** | | **~2.5 weeks** |
 
 That is an order of magnitude more than the "roughly four days of residuals" the earlier
 draft claimed, and it is why this chapter exists.
 
+**What "accepts a game" means as built, stated precisely so a summary cannot round it up.**
+Both routes now take a `gameType`, resolve what the Game Master is permitted, check it, and
+**refuse anything but trading with a message naming the missing capability**. So the
+permission half is complete and the *construction* half is not: a provider contest needs a
+catalogue title, settings validated against that title's `configSchema`, round settings and
+the pre-flight checklist, which is sections 3.1 and 3.3 of this chapter and is not built.
+**A Game Master still cannot create a provider contest**, and the reason is now a refusal
+rather than a silent trading label.
+
+**The creation UI is deliberately not built, and it is blocked rather than deferred.** A
+game picker offering one game is friction on the path Game Masters use daily - the same
+reasoning that makes the admin picker redirect straight to trading when no provider game
+exists - and section 5's economic constraint means `allowedGameTypes` should stay
+`["trading"]` until the revenue share is computed on **net** platform fee. Building the
+picker first would produce a control whose only option is the one already there. It unblocks
+when section 5 is answered, not when somebody has three days.
+
 ---
 
 ## 7. Acceptance criteria
 
-- [ ] Every Game Master competition insert sets the game label **explicitly** - verified
-      by reading a created document, not by trusting a default
-- [ ] A Game Master cannot create a contest for a game outside `limits.allowedGameTypes`
-- [ ] A Game Master cannot create a competition with `minParticipants` below 2
+- [x] Every Game Master competition insert sets the game label **explicitly** - verified
+      by reading a created document, not by trusting a default. **Done in X1**, and since
+      7 Sep 2026 the label comes from the permission **verdict** rather than the request
+      body, so the game checked and the game stamped cannot differ
+- [x] A Game Master cannot create a contest for a game outside `limits.allowedGameTypes` -
+      **done 7 Sep 2026**, both routes, `59` tests and `18` probes. Note the field is
+      enforced on the API; there is no UI to widen it beyond the `update_limits` action
+- [x] A Game Master cannot create a competition with `minParticipants` below 2 - **done
+      7 Sep 2026** via `clampMinParticipants`. The main route previously parsed the
+      caller's value with a floor of **1**, so a paid single-player contest was reachable;
+      the admin route hardcoded 2 and was correct. Both now share the one constant, and
+      `validateOverrideUpdate` applies the same floor to a per-Game-Master participant cap
 - [ ] A Game Master creating a provider contest sees the **same** settings form as an
       admin, generated from `configSchema`
 - [ ] No trading field is required to create a provider contest

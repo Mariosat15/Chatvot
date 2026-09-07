@@ -137,6 +137,7 @@ export interface IGameMasterConfig {
   canCreateCompetitions: boolean; // Whether this package allows GM to create competitions (true = can create, false = earn only from admin competitions)
   canEarnFromChallenges: boolean; // Whether GM earns referral fees from 1v1 challenges
   challengeReferralFeePercentage?: number; // Optional separate % for challenges (defaults to referralFeePercentage if not set)
+  allowedGameTypes?: string[]; // Which games this tier may CREATE contests for
 }
 
 export interface IMarketplaceItem extends Document {
@@ -179,7 +180,7 @@ export interface IMarketplaceItem extends Document {
 
   // The actual code/configuration (JSON string)
   codeTemplate: string;
-  defaultSettings: Record<string, any>;
+  defaultSettings: Record<string, unknown>;
 
   // Supported assets (empty = all)
   supportedAssets: string[];
@@ -353,6 +354,11 @@ const MarketplaceItemSchema = new Schema<IMarketplaceItem>(
       canCreateCompetitions: { type: Boolean, default: true },
       canEarnFromChallenges: { type: Boolean, default: false },
       challengeReferralFeePercentage: { type: Number, min: 0, max: 50 },
+      // Which games a Game Master on this tier may CREATE contests for. Chapter 19 s3.2.
+      // Trading only until a provider contest's Game Master share is computed on NET
+      // platform fee after provider cost (s5) - see `game-permissions.ts`, which applies
+      // that default in code because both creation routes bypass Mongoose.
+      allowedGameTypes: { type: [String], default: ["trading"] },
     },
     cosmeticType: {
       type: String,

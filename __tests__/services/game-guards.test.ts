@@ -35,11 +35,34 @@ const RAW_CONTEST_WRITERS = [
   "apps/admin/app/api/admin/end-logic-tests/run/route.ts",
 ];
 
+/**
+ * Matches the spread with or without an argument.
+ *
+ * // Reason: the guard is about the label being STAMPED, not about it being trading. The
+ * Game Master routes started passing a resolved game type on 7 Sep 2026 (`19` s3.2a), and
+ * a no-argument-only pattern turned red on correct code - the fastest way to have a guard
+ * deleted. What must not be passed is caller input, which the assertion below pins
+ * separately, because deriving the label from the request body is a way to mislabel a
+ * contest against an immutable field.
+ */
+const LABEL_SPREAD = /\.\.\.contestGameLabel\([^)]*\)/;
+
 describe("R7: every raw-driver contest insert stamps the game label", () => {
   it.each(RAW_CONTEST_WRITERS)("%s spreads contestGameLabel()", (file) => {
     const source = sourceOf(file);
-    expect(source).toMatch(/\.\.\.contestGameLabel\(\)/);
+    expect(source).toMatch(LABEL_SPREAD);
   });
+
+  it.each(RAW_CONTEST_WRITERS)(
+    "%s never derives the label from the request body",
+    (file) => {
+      const source = sourceOf(file);
+      const calls = source.match(/contestGameLabel\(([^)]*)\)/g) ?? [];
+      for (const call of calls) {
+        expect(call).not.toMatch(/\b(?:body|req|request|searchParams|params)\b/);
+      }
+    },
+  );
 
   it.each(RAW_CONTEST_WRITERS)("%s imports it rather than inlining literals", (file) => {
     const source = sourceOf(file);
@@ -55,7 +78,7 @@ describe("R7: every raw-driver contest insert stamps the game label", () => {
       const inserts = source.match(
         /\.collection\(\s*["'](?:competitions|challenges)["']\s*\)\s*\.insertOne|(?:competitions|challenges)Collection\.insertOne/g,
       );
-      const labels = source.match(/\.\.\.contestGameLabel\(\)/g);
+      const labels = source.match(new RegExp(LABEL_SPREAD, "g"));
       expect(labels?.length ?? 0).toBe(inserts?.length ?? 0);
     }
   });

@@ -1,13 +1,30 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
+import { requireSectionAccess } from "@/lib/admin/auth";
 
 /**
  * POST /api/gamemasters/sync-referrals
  * Sync UserReferral collection data to user documents
  * Ensures all users with a UserReferral record have the referredByGameMasterId field set
+ *
+ * Both handlers were UNAUTHENTICATED until 7 September 2026, while all four of their
+ * siblings under `/api/gamemasters` required section access. Found by counting exported
+ * handlers against guards rather than by reading the routes - which is the only way this
+ * one surfaces, because every neighbour having a guard is exactly what makes reading
+ * through them go straight past the file that has none.
+ *
+ * What that exposed, stated precisely in both directions. The POST takes no body, so the
+ * mapping comes from `userreferrals` and a caller could NOT redirect commission to
+ * themselves. What they could do is apply a pending attribution change an operator had
+ * deliberately not applied, and run an unbounded findOne+updateOne loop over every active
+ * referral on demand. The GET returned up to ten real user ids and names to anybody who
+ * asked. There is no way to know whether either was ever called: a route with no guard
+ * writes no attribution.
  */
 export async function POST() {
   try {
+    await requireSectionAccess("gamemaster-management");
+
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
 
@@ -120,6 +137,8 @@ export async function POST() {
  */
 export async function GET() {
   try {
+    await requireSectionAccess("gamemaster-management");
+
     const mongoose = await connectToDatabase();
     const db = mongoose.connection.db;
 
