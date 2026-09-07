@@ -64,6 +64,7 @@ chapter covers risks to the programme and to the application.
 | R45 | **A player who never played was paid a prize.** Every qualification rule in `competition-ranking.service.ts` was trading-shaped, and provider settlement switches all of them off correctly - `minimumTrades: 0` and `disqualifyOnLiquidation: false`, because a puzzle has neither - so **nothing disqualified anybody** and a participant who never launched a round ranked on the `score ?? 0` fallback. On the owner's own 70/20/10 example with one real scorer, two players who never started **took 30% of the pot**; with nobody scoring at all, all three tied at rank 1 and **split the entire pot**, the exact inverse of "if no winner, all lose" | Critical | **CLOSED 7 Sep 2026.** Latent for money - no provider contest has settled in production, **nothing was backfilled**. **Do not summarise it as a prize-distribution bug**, which is how it presents on screen and is why the owner reported a confusing distribution; it is an eligibility one, and the distribution code was correct throughout | `hasResult(participant)` joins the two scoring methods on the game module: provider answers `Number.isFinite(participant.score)`, **trading answers `true`** because a flat account is a real result and `minimumTrades` is the existing operator-set way to say otherwise. Asked of the module rather than branched on, or the next game silently fails. **Scoped to a COMPLETED contest**, matching the two trading checks - unscoped, the live leaderboard stamps every player mid-round "No score recorded", which `13` s4.1b renders as a verdict. `Number.isFinite` rather than `!= null`, which admits `NaN` and pays from a position the comparator chose at random, or truthiness, which refuses a genuine zero. **The other half is that `competition-ranking.service.ts` is a divergent duplicate nothing guarded** - 77 lines apart, `check:mirrors` covers models only, reached by both apps' every-minute cron: third finding in this one file pair after R26 and R42. The runtime parity suite **cannot** see the admin copy, because vitest aliases `@` to the root, so a structural text comparison holds it and the suite's byte-identical claim was corrected. Money goes to the existing `all_disqualified` unclaimed pool; **whether it should be refunded instead is an owner decision not taken here**. 12 tests, 10 probes |
 | R46 | **The screen that made a correct payout look broken.** `/competitions/view/[id]` rendered `pnl`, `pnlPercentage` and `totalTrades` unconditionally, and all three default to `0` on every seat regardless of game - so a provider contest showed `+0.00 / +0.00% / 0 trades` for every player while **`score`, the number it ranked on, was on the row and never displayed.** Rows in an order nothing on the page explains, with winner badges beside them. Four siblings: **Edit routed every contest to the trading editor** (the list learned this the same day - "count the writers" again), trading-only config rendered as `$0` and `1:1`, per-rank amounts labelled in credits while the pool and "Won:" used the currency symbol, and **`noWinners` read by no admin screen at all** | Medium | **CLOSED 7 Sep 2026.** **A LIVE reporting defect, never a wrong payment** - it affected every provider contest an operator has opened, and cost them the ability to reconcile. No money moved wrongly, **nothing to backfill**, nothing mirrored. **This is the screen behind the owner's "the distribution is a mess" report**, so do not read it as confirmation of a payout bug - R37 had already fixed the ranking metric and the payout was correct throughout | Presentation extracted to `apps/admin/lib/admin/contest-result-presentation.ts` **so it could be tested at all** - a structural test over JSX can assert a file mentions `score` and cannot assert which branch renders it, the weakness four earlier probes passed through. Provider rows show the score, with **`-` for an absent score and never `0`** (the read-side form of R45), and a `neutral` tone because a puzzle score is not a profit. Trading-only cards **withheld rather than zeroed**, since a printed `$0` makes a claim where withholding declines to. One shared string carries the caution that the per-rank figures are a **floor**, not the payout. Edit probed as a **swap** as well as a deletion, because a test naming one destination stays green when the two are exchanged. 12 tests, 13 probes |
 | R47 | **The Game Master route that answered to nobody, and the one that answered to everybody.** `POST /api/gamemasters/sync-referrals` had **no authentication on either handler** while all four of its siblings under `/api/gamemasters` required section access - and `PATCH /api/gamemasters/[id]`'s `update_limits` did `{ ...subscription.limits, ...limits }`, writing every key the browser sent onto the document that decides a Game Master's daily cap, participant cap, revenue share and which games they may create, through a **raw-driver** update that runs no Mongoose validation, so the schema's own bounds never applied. Third sibling: the **admin** creation route read only the cached `subscription.limits` and never checked `canCreateCompetitions`, so a Game Master whose package withdrew creation could still create through it | Medium | **CLOSED 7 Sep 2026.** State the sync-referrals exposure in **both** directions or it gets triaged wrongly: the POST takes **no body**, so the mapping comes from `userreferrals` and a caller could **not** redirect commission to themselves - what they could do is apply a pending attribution change an operator had deliberately not applied, and drive an unbounded `findOne` + `updateOne` loop over every active referral on demand; the GET returned up to ten real user ids and names to anybody who asked. **There is no way to know whether either was ever called - a route with no guard writes no attribution.** Nothing backfilled, and there is nothing to backfill: the mass assignment stored whatever an operator actually sent | The unauthenticated route was found by **counting exported handlers against guards**, not by reading them - every neighbour having a guard is exactly what sends a reader past the file that has none, and it is the same technique that found R40. `update_limits` became an allow-list in `apps/admin/lib/admin/gamemaster-limits-update.ts` that **refuses an unknown field by name rather than dropping it**, because dropping means the edit appears to save and the operator concludes they misclicked; the allow-list is a `Set`, so `"constructor"` cannot pass a lookup that walks the prototype chain. Both creation routes now resolve through one shared gate. Found while adding `allowedGameTypes` to the same subdocument - **generalising code is a better bug-finding instrument than looking for bugs.** 59 tests, 18 probes |
+| R48 | **The ending decided whether the play counted.** `syncParticipantScore` selected a player's rounds with `status: "completed"` alone, so a real partial score stored on `game_round` never reached `participant.score` and the player ranked on the seat default of nought. **Neither codebase ever had a rule about finishing** - `games-service` scores any board solved, and the provider spec asks twice for a partial score - so this was the platform discarding a correct result. **The row that made it urgent is `expired`**: `createRound` clamps a round's `expiresAt` to `playWindowEnd`, so under the universal cut-off it is the ORDINARY ending for anyone still playing at the final whistle, which means the better a contest was attended right to its end, the more of its players ranked at nought. Sibling on the read side: `findCountedAttempt` filtered on the presence of a score alone, already wrong for `voided`, whose rounds store `rawScore: 0` deliberately. Sibling in admin: **Game Performance counted every player caught by the cut-off as having abandoned the game**, on the screen an operator uses to decide whether to keep a title running | Medium | **CLOSED 7 Sep 2026.** **Latent - nothing backfilled**, because no provider contest has settled in production, so no prize was paid on the wrong ranking. Say it that way: the scores were never lost, they are on `game_round`, so a wrongly-settled contest could be recomputed - there simply is not one. A document describing this as a distribution bug is wrong; `distributePrizesWithTies` was correct throughout and the defect was upstream of it, in whether a score arrived at all | `SCORING_ROUND_STATUSES` is `completed`, `expired`, `abandoned`; `voided` and `unresolved` stay out for two DIFFERENT reasons - the first has no score by construction, the second is `unresolvedRoundPolicy`'s question and counting it here answers it twice. **The boundary is asserted in both directions**, because a widening with no upper bound is indistinguishable from having no rule. The read side **imports the predicate rather than restating it** and takes `status` as a REQUIRED parameter, so a caller cannot omit it and get a silent "nothing counted". Checked rather than assumed: an attempt is consumed on round **creation**, so there is no incentive to abandon deliberately, and every attempts policy makes a cut-short run helpful or neutral, never harmful |
 | R24 | Scope creep before anything ships | Medium | **High** | All |
 | R25 | Round write contention under load | Medium | Medium | X12 |
 | X15 | "Challenge any user" harassment surface - no report-user feature exists | Medium | Medium | X10 |
@@ -1460,6 +1461,90 @@ Pinned by `__tests__/services/gamemaster-creation-permissions.test.ts` (59 tests
 came back **green for the third reason** - not a weak test and not a wrong claim, but **no test at
 all**: restoring the blind spread left `resolveCreationLimits` in the file, so the badge test it
 had been aimed at stayed satisfied. Naming the expected failing test is what exposed it.
+
+---
+
+### R48 - The ending decided whether the play counted - **CLOSED, 7 September 2026**
+
+The owner's report was that only a player who finished every board seemed to win, and that this
+was not what they wanted: **"the users with the best performance take the prizes, it doesn't
+matter if they finish the boards."**
+
+**Neither codebase ever had a rule about finishing.** `games-service` scores any board a player
+solved and returns nothing at all only for `voided`, because the provider specification asks
+twice for a partial score on the grounds that "a dropped mobile signal should not cost someone a
+paid entry". So the provider - our own, in this case - did the right thing throughout.
+
+**The platform then discarded it.** `syncParticipantScore` selected the player's rounds with
+`status: "completed"` alone, so a genuine partial score sitting on `game_round` never reached
+`participant.score`, and the player ranked on the seat default of nought. The effect was that
+**the way a round ENDED decided whether the play counted at all**, which nothing in any chapter
+had ever said it should:
+
+| Ending | Status | Counted before | Counts now |
+|---|---|---|---|
+| The game's own clock reaching zero | `completed` | yes | yes |
+| The **contest's** window closing over the player | `expired` | **no** | yes |
+| The player leaving mid-round | `abandoned` | **no** | yes |
+| An operator voiding the round | `voided` | no | no |
+| Nobody ever reporting | `unresolved` | no | no |
+
+**The second row is what made this urgent rather than tidy.** `expired` is not a player giving
+up: `createRound` clamps a round's `expiresAt` to `playWindowEnd`, so under the universal
+cut-off - every round closed at one moment so nobody waits for anybody - it is the **ordinary**
+ending for anyone still playing at the final whistle. The better a contest was attended right up
+to its end, the more of its players ranked at nought. No error, no log line, and a prize table
+that looks deliberate.
+
+**Two statuses stay out, for two different reasons.** A `voided` round has no score by
+construction and the attempt is handed back, so any number arriving with that status is
+bookkeeping rather than play - counting it would let a support action move a leaderboard. An
+`unresolved` one is the contest's `unresolvedRoundPolicy` to decide, and counting it here would
+answer that question twice.
+
+**There is no incentive to abandon deliberately, and it was checked rather than assumed.** An
+attempt is consumed when a round is **created** (chapter `03` s1.3), so walking out buys nothing
+back. And under every attempts policy, counting a cut-short run can only help the player:
+`best_of_n` discards it if it was worse, `sum_of_n` adds it, `single` means it was their one
+attempt.
+
+**Latent, and nothing was backfilled.** No provider contest has settled in production, so no
+prize was ever paid on the wrong ranking. The scores themselves were never lost - they are
+stored on `game_round` - so a contest that had already settled wrongly could in principle be
+recomputed, but there is none.
+
+**The read side had to move with the write side.** `findCountedAttempt` in
+`contest-results.service.ts` decides which of a player's attempts the results screen labels as
+the one that counted, and its own header already said it "must agree with
+`participant-score.service.ts`". It filtered on the presence of a score alone, which was
+**already wrong for one status before R48 widened anything**: a `voided` round is stored with
+`rawScore: 0` deliberately, so the screen would have told a player a voided attempt was the one
+that counted while the leaderboard beside it ignored the round. The status rule is now
+**imported from the decider** rather than restated, and `status` is a **required** parameter, so
+a caller cannot omit it and get a silent "nothing counted". Same reasoning as
+`UNSCORED_REFUND_REASON` and the round-resolution action list - the "one rule, two copies" shape
+behind `referenceId`, `failedReason`, `challengeId` and the Game Master `||`, none of which
+`check:mirrors` can see.
+
+**One sibling, found by applying the counting rule rather than by reading the fix.** The admin
+**Game Performance** screen defined `SCORED = ["completed"]` under the comment "rounds that
+finished having produced a score", and `GAVE_UP = ["abandoned", "expired"]` under "their own
+doing, not a fault". Both sentences became false. The consequence was not cosmetic: the derived
+`abandonmentRate` counted **every player caught by the universal cut-off as having abandoned the
+game**, on the one screen an operator uses to decide whether to keep a title running - so a
+well-attended contest made its game look like one people could not get on with. The buckets are
+now split, `expired` has its **own** rate with its own threshold and its own verdict sentence
+(the remedy is a longer play window or the `until_window_closes` policy, not a different game),
+and the "did this produce results" count is taken **from the stored score rather than from any
+status**, because no status can answer it - a player cut off after two boards ends `expired` with
+a score that pays, and one who abandoned before solving anything ends `abandoned` with nothing to
+rank.
+
+Pinned by `__tests__/services/participant-score-arrival.test.ts`,
+`__tests__/games/provider-results-screen.test.ts` and `__tests__/admin/game-performance.test.ts`.
+The boundary is asserted in both directions - `expired` and `abandoned` count, `voided` and
+`unresolved` do not - because a widening with no upper bound is indistinguishable from having no
+rule.
 
 ---
 

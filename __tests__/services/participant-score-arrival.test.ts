@@ -459,3 +459,270 @@ describe("a provider score reaches the participant row ranking reads", () => {
     expect(storedRound?.status).toBe("completed");
   });
 });
+
+/**
+ * A RUN THAT WAS CUT SHORT STILL COUNTS - R48.
+ *
+ * The owner's report: "a user finishes a board but not all, and the others don't finish; the
+ * game now [only counts a win] when a user completes all the boards. That is not what I want -
+ * the users with the best performance take the prizes, it doesn't matter if they finish."
+ *
+ * Neither codebase has ever had a rule about finishing every board. `games-service` scores any
+ * board a player solved and returns nothing at all **only** for `voided`, with the reason
+ * written into `lifecycle.ts`: the specification asks twice for a partial score, because "a
+ * dropped mobile signal should not cost someone a paid entry". So the provider does the right
+ * thing and always did.
+ *
+ * The platform then threw it away. `syncParticipantScore` selected rounds by
+ * `status: "completed"` alone, so a genuine partial score stored on `game_round` never reached
+ * `participant.score`, and the player ranked on the seat default of nought. Which ending a
+ * player got decided whether their play counted:
+ *
+ *   - the game's own clock running out is `completed`, and scored;
+ *   - **the CONTEST's window closing over them is `expired`**, and was not;
+ *   - leaving mid-round is `abandoned`, and was not.
+ *
+ * The second is the one that makes this urgent rather than tidy, because `expired` is the
+ * ordinary outcome of the universal cut-off the owner asked for in the same breath - every
+ * round closed at one moment so nobody waits for anybody. Under that design, the better a
+ * contest is attended near the end, the more players are ranked at nought.
+ *
+ * `voided` and `unresolved` stay out, and for two different reasons. A `voided` round carries
+ * no score by construction and the attempt is returned. An `unresolved` one is the contest's
+ * `unresolvedRoundPolicy` to decide - score zero, exclude and refund, or hold for a human -
+ * and counting it here would take that decision away twice.
+ */
+describe("a partial run counts - the ending decides nothing about eligibility", () => {
+  /** A terminal result of any status, which is what the four provider endings look like. */
+  function endingAt(
+    roundId: string,
+    status: "completed" | "expired" | "abandoned" | "voided",
+    rawScore: number,
+  ) {
+    return {
+      roundId,
+      providerRoundId: `p_${roundId}`,
+      status,
+      rawScore,
+      scoreDirection: "higher_is_better" as const,
+      completedAt: new Date(),
+    };
+  }
+
+  it("counts a run the CONTEST window cut short, which is the universal cut-off's own ending", async () => {
+    await seedTitle();
+    const contest = await seedContest("single");
+    const seat = await seatFor(String(contest._id), USER);
+    const round = await launchedRound(contest._id, USER, 1);
+
+    // Two boards solved out of five when the contest shut: 2 x 1000 base plus speed bonuses.
+    const outcome = await applyResult({
+      providerKey: PROVIDER_KEY,
+      normalised: endingAt(round.roundId, "expired", 2140),
+      source: "manual",
+    });
+
+    expect(outcome.accepted).toBe(true);
+    expect((await GameRound.findOne({ roundId: round.roundId }))?.rawScore).toBe(2140);
+
+    // The assertion that was failing: the score has to reach the row ranking reads.
+    expect((await CompetitionParticipant.findById(seat._id))?.score).toBe(2140);
+  });
+
+  it("counts a run the player left, because the attempt was already spent", async () => {
+    // No incentive to game this: an attempt is consumed when the round is CREATED, so
+    // abandoning buys nothing. And under every attempts policy, counting an abandoned run
+    // can only help - `best_of_n` discards it if it was worse, `sum_of_n` adds it, `single`
+    // means it was their one go at it.
+    await seedTitle();
+    const contest = await seedContest("best_of_n");
+    const seat = await seatFor(String(contest._id), USER);
+    const round = await launchedRound(contest._id, USER, 1);
+
+    await applyResult({
+      providerKey: PROVIDER_KEY,
+      normalised: endingAt(round.roundId, "abandoned", 1000),
+      source: "manual",
+    });
+
+    expect((await CompetitionParticipant.findById(seat._id))?.score).toBe(1000);
+  });
+
+  it("ranks two cut-short players against each other on how far each got", async () => {
+    /*
+      THE OWNER'S EXAMPLE, EXACTLY. Two boards beats one board beats none, and none of the
+      three finished the set. Asserted as an ORDER rather than as two numbers, because the
+      complaint was about who wins - and a bug that scaled every score identically would
+      satisfy per-player assertions while still ranking wrongly.
+    */
+    await seedTitle();
+    const contest = await seedContest("single");
+
+    const twoBoards = new mongoose.Types.ObjectId().toString();
+    const oneBoard = new mongoose.Types.ObjectId().toString();
+    const noBoards = new mongoose.Types.ObjectId().toString();
+
+    for (const [userId, score] of [
+      [twoBoards, 2140],
+      [oneBoard, 1080],
+      [noBoards, 0],
+    ] as const) {
+      await seatFor(String(contest._id), userId);
+      const round = await launchedRound(contest._id, userId, 1);
+      await applyResult({
+        providerKey: PROVIDER_KEY,
+        normalised: endingAt(round.roundId, "expired", score),
+        source: "manual",
+      });
+    }
+
+    const seats = await CompetitionParticipant.find({ competitionId: String(contest._id) })
+      .select("userId score")
+      .lean<{ userId: string; score: number }[]>();
+
+    const byUser = new Map(seats.map((s) => [s.userId, s.score]));
+    expect(byUser.get(twoBoards)).toBe(2140);
+    expect(byUser.get(oneBoard)).toBe(1080);
+    expect(byUser.get(noBoards)).toBe(0);
+
+    // Reason this is the load-bearing line: it is the owner's sentence, in code.
+    expect(byUser.get(twoBoards)!).toBeGreaterThan(byUser.get(oneBoard)!);
+    expect(byUser.get(oneBoard)!).toBeGreaterThan(byUser.get(noBoards)!);
+  });
+
+  it("aggregates cut-short attempts alongside completed ones under best_of_n", async () => {
+    // The mixed case, which is the normal one: a first attempt that ran out of game clock and
+    // a second the contest closed over. Scoring only one of the two endings silently discards
+    // whichever half a player happened to get.
+    await seedTitle();
+    const contest = await seedContest("best_of_n");
+    const seat = await seatFor(String(contest._id), USER);
+
+    const first = await launchedRound(contest._id, USER, 1);
+    await applyResult({
+      providerKey: PROVIDER_KEY,
+      normalised: endingAt(first.roundId, "completed", 1500),
+      source: "manual",
+    });
+
+    const second = await launchedRound(contest._id, USER, 2);
+    await applyResult({
+      providerKey: PROVIDER_KEY,
+      normalised: endingAt(second.roundId, "expired", 3200),
+      source: "manual",
+    });
+
+    expect((await CompetitionParticipant.findById(seat._id))?.score).toBe(3200);
+  });
+
+  it("takes the LOWEST of two cut-short attempts when lower is better", async () => {
+    // A time trial cut short reports a worse time, not a better one, so the direction has to
+    // survive the widened status filter. Taking the maximum here would rank the player on the
+    // attempt they did worst at.
+    await seedTitle("lower_is_better");
+    const contest = await seedContest("best_of_n");
+    const seat = await seatFor(String(contest._id), USER);
+
+    const first = await launchedRound(contest._id, USER, 1);
+    await applyResult({
+      providerKey: PROVIDER_KEY,
+      normalised: {
+        ...endingAt(first.roundId, "expired", 92),
+        scoreDirection: "lower_is_better" as const,
+      },
+      source: "manual",
+    });
+
+    const second = await launchedRound(contest._id, USER, 2);
+    await applyResult({
+      providerKey: PROVIDER_KEY,
+      normalised: {
+        ...endingAt(second.roundId, "abandoned", 140),
+        scoreDirection: "lower_is_better" as const,
+      },
+      source: "manual",
+    });
+
+    expect((await CompetitionParticipant.findById(seat._id))?.score).toBe(92);
+  });
+
+  it("sums cut-short attempts under sum_of_n, so partial work accumulates", async () => {
+    await seedTitle();
+    const contest = await seedContest("sum_of_n");
+    const seat = await seatFor(String(contest._id), USER);
+
+    const first = await launchedRound(contest._id, USER, 1);
+    await applyResult({
+      providerKey: PROVIDER_KEY,
+      normalised: endingAt(first.roundId, "expired", 1100),
+      source: "manual",
+    });
+
+    const second = await launchedRound(contest._id, USER, 2);
+    await applyResult({
+      providerKey: PROVIDER_KEY,
+      normalised: endingAt(second.roundId, "abandoned", 900),
+      source: "manual",
+    });
+
+    expect((await CompetitionParticipant.findById(seat._id))?.score).toBe(2000);
+  });
+
+  it("does NOT count a voided round, which carries no score and returns the attempt", async () => {
+    /*
+      THE BOUNDARY THAT KEEPS THE WIDENING HONEST. `games-service` returns no score at all for
+      a voided round - `scoreFor` short-circuits on it - so any number arriving with that
+      status is bookkeeping rather than play. Counting it would let an operator's support
+      action change a leaderboard.
+
+      Seeded at 5000 deliberately: a value that would come first if it were counted, so the
+      test fails loudly rather than coincidentally passing on a small number.
+    */
+    await seedTitle();
+    const contest = await seedContest("single");
+    const seat = await seatFor(String(contest._id), USER);
+    const round = await launchedRound(contest._id, USER, 1);
+
+    await applyResult({
+      providerKey: PROVIDER_KEY,
+      normalised: endingAt(round.roundId, "voided", 5000),
+      source: "manual",
+    });
+
+    expect((await CompetitionParticipant.findById(seat._id))?.score).toBe(0);
+  });
+
+  it("does NOT count an unresolved round, which is the contest's own policy to decide", async () => {
+    // `unresolved` is written by the settlement cut-off and by a failed range check. Both mean
+    // "no usable result", and `unresolvedRoundPolicy` already decides what the player gets.
+    // Counting it here would apply two answers to one question.
+    await seedTitle();
+    const contest = await seedContest("single");
+    const seat = await seatFor(String(contest._id), USER);
+
+    await GameRound.create({
+      roundId: `cv_rnd_${Math.random().toString(16).slice(2).padEnd(24, "0")}`,
+      providerKey: PROVIDER_KEY,
+      gameCode: GAME_CODE,
+      gameKey: GAME_KEY,
+      userId: USER,
+      contestType: "competition",
+      contestId: contest._id,
+      attemptNumber: 1,
+      mode: "ranked",
+      status: "unresolved",
+      rawScore: 4200,
+      expiresAt: new Date(Date.now() + 600_000),
+    });
+
+    // Driven through a second round so the sync actually runs.
+    const scored = await launchedRound(contest._id, USER, 2);
+    await applyResult({
+      providerKey: PROVIDER_KEY,
+      normalised: endingAt(scored.roundId, "completed", 300),
+      source: "manual",
+    });
+
+    expect((await CompetitionParticipant.findById(seat._id))?.score).toBe(300);
+  });
+});

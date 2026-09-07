@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
-import GameRound from "@/database/models/games/game-round.model";
+import GameRound, {
+  type RoundStatus,
+} from "@/database/models/games/game-round.model";
 import Competition from "@/database/models/trading/competition.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import type { ProviderScoreDirection } from "@/lib/services/game-providers/contract";
@@ -44,8 +46,65 @@ export type ScoreSyncOutcome =
   | { synced: true; score: number; roundsCounted: number }
   | { synced: false; reason: string };
 
-/** Rounds that contribute a score. Nothing else has a number worth ranking. */
-const SCORING_ROUND_STATUS = "completed";
+/**
+ * Rounds that contribute a score.
+ *
+ * THIS WAS `completed` ALONE UNTIL 7 SEPTEMBER 2026, AND THAT WAS R48. The owner's report was
+ * that only a player who finished every board seemed to win. Neither codebase has ever had a
+ * rule about finishing: `games-service` scores any board a player solved, and returns nothing
+ * at all only for `voided`, because the provider specification asks twice for a partial score
+ * on the grounds that "a dropped mobile signal should not cost someone a paid entry".
+ *
+ * The platform then discarded it. A real partial score was stored on `game_round` and never
+ * reached `participant.score`, so the player ranked on the seat default of nought - which made
+ * **the way a round ENDED decide whether the play counted at all**:
+ *
+ *   - the game's own clock expiring is `completed`, and counted;
+ *   - the CONTEST's window closing over the player is `expired`, and did not;
+ *   - leaving mid-round is `abandoned`, and did not.
+ *
+ * The second is what made it urgent rather than tidy. `expired` is the ordinary ending under
+ * the universal cut-off - every round closed at one moment so nobody waits for anybody - so
+ * the better a contest was attended near its end, the more players ranked at nought. No error,
+ * no log line, and a prize table that looks deliberate.
+ *
+ * WHAT STAYS OUT, for two different reasons. A `voided` round has no score by construction and
+ * the attempt is handed back, so any number arriving with that status is bookkeeping rather
+ * than play - counting it would let a support action move a leaderboard. An `unresolved` one is
+ * the contest's `unresolvedRoundPolicy` to decide (score zero, exclude and refund, or hold for
+ * a human), and counting it here would answer that question twice.
+ *
+ * There is no incentive to abandon deliberately: an attempt is consumed when the round is
+ * CREATED. And under every attempts policy, counting a cut-short run can only help the player -
+ * `best_of_n` discards it if it was worse, `sum_of_n` adds it, `single` means it was their one
+ * attempt.
+ */
+export const SCORING_ROUND_STATUSES: RoundStatus[] = [
+  "completed",
+  "expired",
+  "abandoned",
+];
+
+/**
+ * Whether a round's score is one that ranking counts.
+ *
+ * EXPORTED SO THE PLAYER'S RESULTS SCREEN CANNOT DISAGREE WITH THIS FILE. `findCountedAttempt`
+ * in `contest-results.service.ts` decides which attempt to label as the one that counted, and
+ * its own header says it "must agree with `participant-score.service.ts`". It filtered on the
+ * presence of a score alone, which was already wrong for one status and would have drifted
+ * further the moment this list changed again: a **voided** round is stored with `rawScore: 0`,
+ * deliberately - the adapter defaults an absent score to zero and notes it is "safe HERE
+ * specifically because a voided round never reaches ranking" - so the screen would tell a
+ * player that a voided attempt was the one that counted while the leaderboard ignored it.
+ *
+ * Sharing the predicate makes the agreement structural rather than a coincidence held by a
+ * test. Same reasoning as `UNSCORED_REFUND_REASON` and the round-resolution action list: when
+ * one rule is read in two places, the second copy drifts silently and in the direction where
+ * the writer stays correct and the screen starts lying.
+ */
+export function roundContributesScore(status: string | undefined): boolean {
+  return SCORING_ROUND_STATUSES.includes(status as RoundStatus);
+}
 
 /**
  * Combine one player's round scores into the single number ranking compares.
@@ -134,7 +193,7 @@ export async function syncParticipantScore(input: {
   const rounds = await GameRound.find({
     contestId,
     userId,
-    status: SCORING_ROUND_STATUS,
+    status: { $in: SCORING_ROUND_STATUSES },
   })
     .select("rawScore")
     .lean<{ rawScore?: number }[]>();

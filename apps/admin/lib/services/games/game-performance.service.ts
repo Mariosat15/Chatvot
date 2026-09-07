@@ -51,10 +51,36 @@ export function resolveWindow(raw: string | null): PerformanceWindow {
   );
 }
 
-/** Rounds that finished having produced a score. */
-const SCORED = ["completed"] as const;
-/** Rounds a player walked away from or ran out of time on. Their own doing, not a fault. */
-const GAVE_UP = ["abandoned", "expired"] as const;
+/**
+ * Rounds that ran to their own natural end - the game's clock reaching zero, or every board
+ * solved. NOT "rounds that produced a score", which this list used to claim.
+ *
+ * R48 is why the distinction matters. A round that ended any of the three ways below still
+ * contributes whatever the player achieved to their score and their prize; only `voided` and
+ * `unresolved` do not. So a count of `completed` answers "how many players got to play the
+ * game out", which is a real question, and does not answer "how many results this game
+ * produced", which is a different one.
+ */
+const RAN_FULL_COURSE = ["completed"] as const;
+/**
+ * Rounds the player left. `leaveRound` in the game service, or an operator resolving one by
+ * hand. This is the abandonment signal, and it is the only status that is the player's doing.
+ */
+const LEFT_EARLY = ["abandoned"] as const;
+/**
+ * Rounds the CONTEST closed over while the player was still in them.
+ *
+ * Held apart from `abandoned` because it is not the player's doing and, on a busy contest, not
+ * a fault at all: `createRound` clamps a round's `expiresAt` to `playWindowEnd`, so under the
+ * universal cut-off every round still open at the final whistle ends this way. Counting these
+ * as abandonment - which this screen did until 7 September 2026 - meant the better a contest
+ * was attended right to its end, the less popular its game appeared. That is the number an
+ * operator uses to decide whether to keep a game running.
+ *
+ * A high share here is a SCHEDULING signal: the play window is too short for the round length
+ * an operator configured, or players are starting too late in it.
+ */
+const CUT_OFF = ["expired"] as const;
 /** Rounds an operator or the platform ended. Not the player's doing and not the provider's. */
 const CANCELLED = ["voided"] as const;
 /** Rounds nobody ever reported. The provider's failure, and the one that costs money. */
@@ -73,21 +99,50 @@ export interface GamePerformanceRow {
   inCatalogue: boolean;
   rounds: {
     started: number;
-    scored: number;
-    gaveUp: number;
+    /** Ran to the game's own end. See `RAN_FULL_COURSE` - not the same as "scored". */
+    ranFullCourse: number;
+    /** The player left. */
+    leftEarly: number;
+    /** The contest window closed over them. Still scores what they achieved. */
+    cutOff: number;
     cancelled: number;
     neverReported: number;
     live: number;
   };
   /**
-   * Share of finished rounds the player did not complete. `null` when none finished.
+   * Rounds carrying a score that ranking counts - `RAN_FULL_COURSE`, `LEFT_EARLY` or `CUT_OFF`
+   * with a stored number. `null` is impossible; zero is meaningful.
+   *
+   * Counted from the score rather than from the status, because the status cannot answer it: a
+   * player who abandoned before solving anything ends `abandoned` with nothing to rank, and a
+   * player cut off after two boards ends `expired` with two boards' worth of score that pays.
+   */
+  scoreProducing: number;
+  /**
+   * Share of finished rounds the player walked out of. `null` when none finished.
    *
    * A share and not a count, for the reason `provider-health.service.ts` gives about its own
    * threshold: two abandoned out of four is a game people cannot get on with, and two out of
    * four hundred is a phone call. A count calls the first fine.
+   *
+   * `expired` is deliberately NOT in here - see `CUT_OFF`.
    */
   abandonmentRate: number | null;
-  /** Median-free mean of `durationMs` over scored rounds, in seconds. `null` when none. */
+  /**
+   * Share of finished rounds the contest window closed over. `null` when none finished.
+   *
+   * Reported beside the abandonment rate rather than merged into it because the two have
+   * different remedies: this one is answered by lengthening the play window or by the
+   * `until_window_closes` round-start policy, not by changing the game.
+   */
+  cutOffRate: number | null;
+  /**
+   * Median-free mean of `durationMs`, in seconds, over rounds that ran their full course.
+   *
+   * Scoped that way on purpose: mixing in a round the contest cut off after twenty seconds
+   * would drag the figure towards how the schedule was set rather than how long the game takes
+   * to play, which is the question this column is here to answer.
+   */
   averagePlaySeconds: number | null;
   /**
    * Mean delay between the provider saying a round finished and us receiving the result.
@@ -137,6 +192,14 @@ export type PerformanceVerdict =
  * `problem`. A round nobody ever reported IS a fault, so that has its own lower threshold.
  */
 const WATCH_ABANDONMENT_SHARE = 0.35;
+/**
+ * Share of finished rounds the contest window closed over before it is worth a mention.
+ *
+ * Higher than the abandonment threshold on purpose. Some rounds ending this way is normal and
+ * expected - under the universal cut-off, anyone still playing at the final whistle ends here -
+ * so it only says something once it is most of them.
+ */
+const WATCH_CUT_OFF_SHARE = 0.5;
 const PROBLEM_UNREPORTED_SHARE = 0.1;
 
 export async function getGamePerformance(
@@ -153,6 +216,7 @@ export async function getGamePerformance(
       GameRound.aggregate<{
         _id: { gameKey: string; status: string };
         n: number;
+        withScore: number;
         players: string[];
       }>([
         { $match: { createdAt: { $gte: since }, mode: "ranked" } },
@@ -160,11 +224,14 @@ export async function getGamePerformance(
           $group: {
             _id: { gameKey: "$gameKey", status: "$status" },
             n: { $sum: 1 },
+            // Reason this is counted per status rather than once: whether a score counts
+            // depends on the status it arrived with, so the two facts have to stay together.
+            withScore: { $sum: { $cond: [{ $isNumber: "$rawScore" }, 1, 0] } },
             players: { $addToSet: "$userId" },
           },
         },
       ]),
-      // Duration and latency, over scored rounds only.
+      // Duration and latency, over rounds that ran their full course only.
       //
       // Reason they are computed in the database rather than by pulling rounds back: a busy
       // title's rounds are the largest collection on this screen and the answer is two numbers.
@@ -179,7 +246,7 @@ export async function getGamePerformance(
           $match: {
             createdAt: { $gte: since },
             mode: "ranked",
-            status: { $in: [...SCORED] },
+            status: { $in: [...RAN_FULL_COURSE] },
           },
         },
         {
@@ -317,19 +384,34 @@ export async function getGamePerformance(
         forKey
           .filter((row) => statuses.includes(row._id.status))
           .reduce((sum, row) => sum + row.n, 0);
+      const scoresIn = (statuses: readonly string[]) =>
+        forKey
+          .filter((row) => statuses.includes(row._id.status))
+          .reduce((sum, row) => sum + row.withScore, 0);
 
       const rounds = {
         started: forKey.reduce((sum, row) => sum + row.n, 0),
-        scored: countOf(SCORED),
-        gaveUp: countOf(GAVE_UP),
+        ranFullCourse: countOf(RAN_FULL_COURSE),
+        leftEarly: countOf(LEFT_EARLY),
+        cutOff: countOf(CUT_OFF),
         cancelled: countOf(CANCELLED),
         neverReported: countOf(NEVER_REPORTED),
         live: countOf(LIVE),
       };
 
+      const scoreProducing = scoresIn([
+        ...RAN_FULL_COURSE,
+        ...LEFT_EARLY,
+        ...CUT_OFF,
+      ]);
+
       const players = new Set(forKey.flatMap((row) => row.players)).size;
       const finished =
-        rounds.scored + rounds.gaveUp + rounds.cancelled + rounds.neverReported;
+        rounds.ranFullCourse +
+        rounds.leftEarly +
+        rounds.cutOff +
+        rounds.cancelled +
+        rounds.neverReported;
       const duration = durationByKey.get(gameKey);
       // The funnel, computed as a SET DIFFERENCE rather than a subtraction of two counts.
       // Reason: the two sets are gathered from different collections, so a user present in one
@@ -354,7 +436,9 @@ export async function getGamePerformance(
         providerName: providerNameByKey.get(providerKey) || providerKey,
         inCatalogue: Boolean(title),
         rounds,
-        abandonmentRate: finished > 0 ? rounds.gaveUp / finished : null,
+        scoreProducing,
+        abandonmentRate: finished > 0 ? rounds.leftEarly / finished : null,
+        cutOffRate: finished > 0 ? rounds.cutOff / finished : null,
         averagePlaySeconds:
           typeof duration?.playMs === "number" && Number.isFinite(duration.playMs)
             ? duration.playMs / 1000
@@ -375,7 +459,7 @@ export async function getGamePerformance(
           ? [...entrants].filter((userId) => !playedInContests?.has(userId)).length
           : null,
         windowDays,
-        ...verdictFor({ rounds, finished, windowDays }),
+        ...verdictFor({ rounds, scoreProducing, finished, windowDays }),
       };
 
       return row;
@@ -392,10 +476,12 @@ export async function getGamePerformance(
  */
 function verdictFor(input: {
   rounds: GamePerformanceRow["rounds"];
+  /** Rounds carrying a rankable score. Counted from the score, never inferred from a status. */
+  scoreProducing: number;
   finished: number;
   windowDays: number;
 }): { verdict: PerformanceVerdict; summary: string } {
-  const { rounds, finished, windowDays } = input;
+  const { rounds, scoreProducing, finished, windowDays } = input;
 
   if (rounds.started === 0) {
     return {
@@ -420,30 +506,44 @@ function verdictFor(input: {
     };
   }
 
-  if (rounds.scored === 0) {
+  // Reason this reads the score count and not a status count: after R48 a round can end three
+  // different ways and still be worth ranking, so "did this game produce results" is a question
+  // only the stored score can answer. Judging it by `completed` alone called a contest whose
+  // every round was cut off by its own window a total failure, when those players were paid.
+  if (scoreProducing === 0) {
     return {
       verdict: "problem",
       summary: `${finished} rounds finished in the last ${windowDays} days and not one produced a score.`,
     };
   }
 
-  const abandonShare = rounds.gaveUp / finished;
+  const abandonShare = rounds.leftEarly / finished;
   if (abandonShare > WATCH_ABANDONMENT_SHARE) {
     return {
       verdict: "watch",
-      summary: `${rounds.gaveUp} of ${finished} finished rounds were abandoned or ran out of time (${Math.round(abandonShare * 100)}%). That is players not completing the game rather than the game failing - worth reading the settings before the artwork.`,
+      summary: `${rounds.leftEarly} of ${finished} finished rounds were walked out of (${Math.round(abandonShare * 100)}%). That is players leaving the game rather than the game failing - worth reading the settings before the artwork.`,
+    };
+  }
+
+  // A separate verdict from abandonment, because the remedy is separate: this is the contest
+  // window being too short for the round length, not a game people cannot get on with.
+  const cutOffShare = rounds.cutOff / finished;
+  if (cutOffShare > WATCH_CUT_OFF_SHARE) {
+    return {
+      verdict: "watch",
+      summary: `${rounds.cutOff} of ${finished} finished rounds were still being played when the contest closed (${Math.round(cutOffShare * 100)}%). They still scored what the player achieved, but the play window is short for this game's round length.`,
     };
   }
 
   if (rounds.neverReported > 0) {
     return {
       verdict: "watch",
-      summary: `${rounds.scored} rounds scored normally, but ${rounds.neverReported} never reported a result at all.`,
+      summary: `${scoreProducing} rounds scored normally, but ${rounds.neverReported} never reported a result at all.`,
     };
   }
 
   return {
     verdict: "healthy",
-    summary: `${rounds.scored} of ${finished} finished rounds produced a score, with none unreported.`,
+    summary: `${scoreProducing} of ${finished} finished rounds produced a score, with none unreported.`,
   };
 }

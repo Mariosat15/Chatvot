@@ -113,10 +113,79 @@ Rules:
 |---|---|
 | `single` | The one round |
 | `best_of_n` | Best by `scoreDirection` |
-| `sum_of_n` | Sum of all completed rounds; incomplete sets are ranked below complete ones |
+| `sum_of_n` | Sum of every round that scored; a player who used fewer attempts simply has less to add |
 
 The counted round is recorded as `bestRoundId` so a player can always be shown
 exactly which attempt earned their position.
+
+**"Every round that scored" is not "every round that completed"**, and this table said the
+second until 7 September 2026. See 2.1a - the distinction turned out to be a live defect.
+
+### 2.1a A round's ENDING says nothing about whether the play counted (R48, 7 September 2026)
+
+The owner's report was that only a player who finished every board seemed to win, and that this
+was the opposite of the intention: **best performance takes the prize whether or not the set was
+finished, exactly as a trading contest ranks whoever traded best.**
+
+**Nothing in this chapter ever said otherwise, and neither does the game.** `games-service`
+scores any board a player solved, and returns nothing at all only for `voided` - chapter `01`
+asks twice for a partial score, on the grounds that a dropped mobile signal must not cost
+somebody a paid entry. The defect was that the platform then threw the number away:
+`syncParticipantScore` selected the player's rounds by `status: "completed"` alone, so a real
+partial score sitting on `game_round` never reached `participant.score` and the seat ranked on
+its default of nought.
+
+So the rule, stated positively because the negative version is what caused this:
+
+> **A round contributes whatever the player achieved. How it ended decides only whether there is
+> a number to contribute, never whether that number is allowed to count.**
+
+| Status | Meaning | Counts |
+|---|---|---|
+| `completed` | The game reached its own end - clock at zero, or every board solved | yes |
+| `expired` | The **contest's** window closed over a player still playing | yes |
+| `abandoned` | The player left, or an operator resolved the round by hand | yes |
+| `voided` | An operator voided it; the attempt is handed back | **no** |
+| `unresolved` | Nobody ever reported | **no** |
+
+**`expired` is the row that matters and the one that reads wrongly.** It is not a player giving
+up. `createRound` clamps a round's `expiresAt` to `playWindowEnd`, so under the universal cut-off
+that section 9's settlement depends on - every round closed at one moment so nobody waits for
+anybody - `expired` is the **ordinary** ending for anybody still playing at the final whistle. A
+rule excluding it therefore punished attendance: the better a contest was played right up to its
+end, the more of its players ranked at nought.
+
+**The two exclusions are excluded for two different reasons**, and collapsing them into "these
+statuses have no score" would be wrong. A `voided` round has no score *by construction*, and any
+number found on one is bookkeeping rather than play - the adapter stores zero deliberately - so
+counting it would let a support action move a leaderboard. An `unresolved` round is
+`unresolvedRoundPolicy`'s question to answer (`score_zero`, `exclude`, `hold_and_alert`), and
+counting it here would answer that question a second time, in a different place, with a different
+answer.
+
+**Checked rather than assumed, because the obvious objection is fairness.** There is no incentive
+to abandon deliberately: an attempt is consumed when a round is **created** (`03` s1.3), so
+walking out buys nothing back. And under every policy in 2.1, counting a cut-short run is helpful
+or neutral and never harmful - `best_of_n` discards it if it was worse, `sum_of_n` adds it,
+`single` means it was the player's one attempt.
+
+**The read side had to move with the write side, and it was already wrong before this widened
+anything.** `findCountedAttempt` decides which attempt the player's results screen labels as the
+one that counted. It filtered on the presence of a score alone - so a `voided` round, stored with
+`rawScore: 0` on purpose, would have been reported to the player as the attempt that counted
+while the leaderboard beside it ignored the round entirely. The predicate is now **imported from
+the file that writes the score** rather than restated, and `status` is a **required** parameter,
+so a caller cannot omit it and quietly receive "nothing counted".
+
+**One sibling in the admin app, found by the counting rule rather than by reading the fix.** The
+Game Performance screen split rounds into `SCORED = ["completed"]` and
+`GAVE_UP = ["abandoned", "expired"]`. Both labels became false, and the derived
+`abandonmentRate` counted **every player caught by the universal cut-off as having abandoned the
+game** - on the one screen that answers "should we keep running this title". `expired` now has
+its own bucket, its own rate, its own threshold and its own verdict sentence, because the remedy
+is a longer play window or the `until_window_closes` policy rather than a different game; and the
+"did this produce results" figure is counted **from the stored score, never from a status**,
+since no status can answer it.
 
 ### 2.2 How `scoreDirection` actually reaches ranking - BUILT 4 September 2026
 

@@ -2,6 +2,7 @@ import { connectToDatabase } from "@/database/mongoose";
 import GameRound from "@/database/models/games/game-round.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import { resolveScoreDirection } from "./score-direction.service";
+import { roundContributesScore } from "./participant-score.service";
 import type { AttemptsPolicy } from "./round-types";
 
 /**
@@ -97,18 +98,32 @@ interface ResultsContest {
  *
  * Exported because it is the one piece of judgement on this screen and it must agree with
  * `participant-score.service.ts`, which is what wrote the score at ingestion time. The two
- * are separate code today - this one reports, that one decides - so a test pins them against
- * the same policy list rather than trusting the coincidence.
+ * are separate code - this one reports, that one decides - so the STATUS RULE IS IMPORTED
+ * FROM THE DECIDER rather than restated here. It used to filter on the presence of a score
+ * alone, and that was already wrong for one status: a **voided** round is stored with
+ * `rawScore: 0` on purpose, so this screen would label a voided attempt as the one that
+ * counted while the leaderboard beside it ignored the round entirely.
  *
  * `sum_of_n` deliberately marks NOTHING as counted: every scored round contributed, so
  * highlighting one would be a lie about how the total was reached.
  */
 export function findCountedAttempt(
-  rounds: { attemptNumber: number; score?: number }[],
+  /**
+   * `status` is REQUIRED rather than optional, and that is the point of the parameter.
+   *
+   * Optional would let the predicate fail open on an absent value, which is the wrong
+   * direction for a gate, or fail closed and silently return "nothing counted" for any caller
+   * that forgot it. `game_round.status` is `required: true` on the schema, so a round without
+   * one is a shape production cannot produce - the compiler should refuse the fixture rather
+   * than the function tolerating it.
+   */
+  rounds: { attemptNumber: number; status: string; score?: number }[],
   policy: AttemptsPolicy,
   scoreDirection: string,
 ): number | null {
-  const scored = rounds.filter((r) => Number.isFinite(r.score));
+  const scored = rounds.filter(
+    (r) => Number.isFinite(r.score) && roundContributesScore(r.status),
+  );
   if (scored.length === 0) return null;
 
   if (policy === "sum_of_n") return null;

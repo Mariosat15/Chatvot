@@ -46,9 +46,9 @@ describe("findCountedAttempt", () => {
   it("picks the highest score when higher is better", () => {
     const counted = findCountedAttempt(
       [
-        { attemptNumber: 1, score: 120 },
-        { attemptNumber: 2, score: 340 },
-        { attemptNumber: 3, score: 90 },
+        { attemptNumber: 1, status: "completed", score: 120 },
+        { attemptNumber: 2, status: "completed", score: 340 },
+        { attemptNumber: 3, status: "completed", score: 90 },
       ],
       "best_of_n",
       "higher_is_better",
@@ -63,9 +63,9 @@ describe("findCountedAttempt", () => {
     // visible self-contradiction rather than a rounding difference.
     const counted = findCountedAttempt(
       [
-        { attemptNumber: 1, score: 120 },
-        { attemptNumber: 2, score: 340 },
-        { attemptNumber: 3, score: 90 },
+        { attemptNumber: 1, status: "completed", score: 120 },
+        { attemptNumber: 2, status: "completed", score: 340 },
+        { attemptNumber: 3, status: "completed", score: 90 },
       ],
       "best_of_n",
       "lower_is_better",
@@ -79,8 +79,8 @@ describe("findCountedAttempt", () => {
     // reached. The screen has a separate branch that lists them all instead.
     const counted = findCountedAttempt(
       [
-        { attemptNumber: 1, score: 120 },
-        { attemptNumber: 2, score: 340 },
+        { attemptNumber: 1, status: "completed", score: 120 },
+        { attemptNumber: 2, status: "completed", score: 340 },
       ],
       "sum_of_n",
       "higher_is_better",
@@ -92,8 +92,8 @@ describe("findCountedAttempt", () => {
   it("returns null when no round scored", () => {
     const counted = findCountedAttempt(
       [
-        { attemptNumber: 1, score: undefined },
-        { attemptNumber: 2, score: undefined },
+        { attemptNumber: 1, status: "completed", score: undefined },
+        { attemptNumber: 2, status: "completed", score: undefined },
       ],
       "best_of_n",
       "higher_is_better",
@@ -102,11 +102,98 @@ describe("findCountedAttempt", () => {
     expect(counted).toBeNull();
   });
 
+  it("counts an attempt the contest window cut short, like the leaderboard does", () => {
+    // R48's read side. `expired` is the universal cut-off's own ending, so if this screen
+    // ignored it a player whose partial run WAS ranked would be told no attempt counted.
+    const counted = findCountedAttempt(
+      [
+        { attemptNumber: 1, status: "completed", score: 900 },
+        { attemptNumber: 2, status: "expired", score: 2140 },
+      ],
+      "best_of_n",
+      "higher_is_better",
+    );
+
+    expect(counted).toBe(2);
+  });
+
+  it("does NOT count a voided attempt, even though one is stored with a score of zero", () => {
+    /*
+      THE INCONSISTENCY THAT WAS ALREADY LIVE, and the reason this function now imports the
+      status rule instead of restating it. The adapter defaults an absent score to zero and
+      says so, on the grounds that "a voided round never reaches ranking" - true of the
+      leaderboard, and this screen was the one place it was false. Filtering on the presence
+      of a score alone labelled a voided attempt as the one that counted, beside a final score
+      that had excluded it.
+
+      Asserted as `null`, not merely "not 1": under `single` there is no other attempt to fall
+      back to, so a screen that got this wrong has nothing else to point at.
+    */
+    expect(
+      findCountedAttempt(
+        [{ attemptNumber: 1, status: "voided", score: 0 }],
+        "single",
+        "higher_is_better",
+      ),
+    ).toBeNull();
+
+    // And it must not win a comparison against a real attempt on a lower-is-better title,
+    // where a stored zero is the BEST possible score.
+    expect(
+      findCountedAttempt(
+        [
+          { attemptNumber: 1, status: "voided", score: 0 },
+          { attemptNumber: 2, status: "expired", score: 92 },
+        ],
+        "best_of_n",
+        "lower_is_better",
+      ),
+    ).toBe(2);
+  });
+
+  it("does NOT count an unresolved attempt, which the contest's own policy decides", () => {
+    expect(
+      findCountedAttempt(
+        [{ attemptNumber: 1, status: "unresolved", score: 400 }],
+        "single",
+        "higher_is_better",
+      ),
+    ).toBeNull();
+  });
+
+  it("reads the status rule from the decider rather than restating it", () => {
+    /*
+      THE STRUCTURAL HALF, and it is the load-bearing one. Both functions agreeing today is
+      what the behavioural tests above prove; this is what stops them diverging the next time
+      the list changes, which is exactly how a voided round came to be reported as counted
+      while the leaderboard ignored it.
+
+      Asserts the CALL with its argument, not the identifier - `toContain` on the name stays
+      true when the import line survives a hand-rolled status check underneath it, which has
+      caught this codebase out four times.
+    */
+    const service = stripComments(
+      readFileSync(
+        join(process.cwd(), "lib/services/games/contest-results.service.ts"),
+        "utf8",
+      ),
+    );
+
+    expect(service).toMatch(/roundContributesScore\(r\.status\)/);
+    expect(service).toMatch(
+      /import \{ roundContributesScore \} from "\.\/participant-score\.service"/,
+    );
+
+    // The negative half: no second copy of the list living on this side of the seam.
+    expect(service).not.toMatch(/"abandoned"/);
+    expect(service).not.toMatch(/status === "completed"/);
+  });
+
   it("treats a genuine zero as a score, not as an absence", () => {
     // The read-side form of R45: a player who finished with nothing still finished, and a
     // screen that hid their round would be telling them they never played.
     const counted = findCountedAttempt(
-      [{ attemptNumber: 1, score: 0 }],
+      [{ attemptNumber: 1, status: "completed", score: 0 }],
       "best_of_n",
       "higher_is_better",
     );
@@ -117,8 +204,8 @@ describe("findCountedAttempt", () => {
   it("ignores a NaN score rather than placing it arbitrarily", () => {
     const counted = findCountedAttempt(
       [
-        { attemptNumber: 1, score: Number.NaN },
-        { attemptNumber: 2, score: 5 },
+        { attemptNumber: 1, status: "completed", score: Number.NaN },
+        { attemptNumber: 2, status: "completed", score: 5 },
       ],
       "best_of_n",
       "higher_is_better",

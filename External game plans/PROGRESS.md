@@ -30,6 +30,7 @@
 | **Game Master creation** | **The permission gate is code-complete 7 Sep 2026** (`19` s3.2a) and the construction half is not - both routes now *refuse* a provider contest with a message naming the missing capability, where before they would have stamped one `gameKey: "provider"` and `gameKey` is immutable. **Do not read it as "Game Masters can run game contests"**; read it as "the platform now knows they cannot". `limits.allowedGameTypes` exists, defaults to `["trading"]`, and is resolved through **one mirrored model-free module** with precedence **override → package → cached limits → default** that reports *which* decided - because "your package does not allow this" sends a Game Master to buy an upgrade that cannot help when an administrator denied it by hand. **Three defects found on the way, none of them about games.** `POST /api/gamemasters/sync-referrals` had **no authentication on either handler** while all four siblings required section access - found by counting handlers against guards, the only technique that finds the file where every neighbour has one; it could not redirect commission, but it could apply an attribution change an operator had withheld and the GET leaked real user ids and names. `update_limits` was a **mass assignment** onto the subdocument holding the daily cap, participant cap and revenue share, updated with the **raw driver** so the schema's own `min: 2` never ran. And the **"Comps: ON" badge was lying** - it read the cached flag under a tooltip crediting the package, so an administrator's explicit deny rendered green while every create was refused. Also: the main route floored `minParticipants` at **1**, which is a paid single-player contest and against a hard constraint. **R47.** The **creation UI is blocked rather than deferred** by `19` s5's economic constraint, not by effort |
 | **The round-start gate** | **Code-complete 7 Sep 2026** (`12` s2.7), from an owner report that a contest which had just opened said *"there is not enough time left in this competition to finish a round"* beside a countdown reading fifty-nine minutes. **It was correct code enforcing a rule nobody had chosen.** Chapter `03` s1.2 reserves the **catalogue ceiling**, not the length the operator configured, so with Circuit Sprint's 300-second ceiling **any contest under five minutes refused every round for its entire duration** - not near the end, from the instant it opened. **And the rule's premise had quietly stopped holding:** it assumes a cut-short round is worth nothing, which was true when a contest was won by *finishing* and is not now that partial performance is the basis for winning. So it became `roundStartPolicy`, a per-contest choice, with the old rule as the **default** rather than deleted - still the right answer for a title where a shortened round means nothing. **Two defaults differ on purpose and will be read as a bug:** the schema reserves, because a schema default fixes future rows only and a pre-existing contest must keep the rule its entrants signed up under; the wizard's new drafts do not. **The disclosure is what makes the permissive branch defensible** - an attempt is consumed on *creation* and cannot be handed back, so the player is told how much time they will actually get, on the panel and on the button. Shipped with **auto-publish** (a checkbox, default on, whose flag deliberately never reaches the server, because publishing re-runs the pre-flight against the **stored** record) and the two smaller reports: a finished contest says **"Competition ended"**, and a provider participant is now **redirected to `/results`** like a trading one. **48 probes across three harnesses** |
 | **The two deadlines a player could not see** | **Code-complete 7 Sep 2026** (`13` s1.1e), the last of the owner's report on this screen. Neither moment that governs whether a player may act was on screen: **when entry closes**, and **the last instant a full attempt can be started**, which in a contest that reserves a full round is earlier than the contest end. **Both are countdowns rather than timestamps** because these pages are server-rendered - an open tab never learns the door has shut. The entry one is **game-agnostic by placement rather than by a branch**, living in `CompetitionEntryButton`, which both lobbies already render, so trading got it for nothing; it counts to `resolveRegistrationDeadline`, **extracted from `isRegistrationClosed`** rather than written beside it, because that function clamps against `startTime` for documents an old bug wrote with a deadline *before* the start and a forgetful copy would count down to a moment already past while the gate beside it still admitted the player. The attempt cut-off is s1.1c's arithmetic **moved into one producer** (`components/games/round-window.ts`) so the lobby and the play screen cannot disagree, and the **negative** assertion is the load-bearing half - importing it is trivially satisfied by a screen that recomputes it five lines later, which is what the pre-flight did. Two places where the tidier version is wrong: the producer **does not know the policy**, and an **absent round length yields no cut-off rather than a guessed one**. **32 probes**, of which **three older ones were re-aimed rather than left green** - the standing cost of an extraction |
+| **Does a partial run count?** | **Yes, since 7 Sep 2026 - and it did not before, which was R48.** The owner's report was that only a player who finished every board seemed to win. **Nobody had built that rule**: `games-service` scores any board solved and chapter `01` asks twice for a partial score. The platform threw it away - `syncParticipantScore` selected rounds by `status: "completed"` alone, so a real partial score sat on `game_round`, never reached `participant.score`, and the seat ranked on its default of nought. **So a round's ENDING decided whether the play counted**, and the row that made it urgent is `expired`: `createRound` clamps `expiresAt` to `playWindowEnd`, so under the universal cut-off that is the **ordinary** ending for anyone still playing at the final whistle - meaning the better a contest was attended right to its end, the more of its players ranked at nought. `completed`, `expired` and `abandoned` now count; **`voided` and `unresolved` stay out for two different reasons** and must not be collapsed. Two siblings: the results screen's `findCountedAttempt` filtered on the presence of a score alone, **already wrong for `voided`** whose rounds store `rawScore: 0` deliberately, and now imports the predicate rather than restating it; and admin **Game Performance counted every player caught by the cut-off as having abandoned the game**, on the screen that decides whether a title keeps running. **Latent, nothing backfilled** - no provider contest has settled in production |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
 | **Phase in progress** | **X4a - STARTED 6 Sep 2026. The two halves connected 7 Sep 2026** - see the row above and `21` s4.1d. What remains is the *clicking* half: the provider has still never been registered through the admin screens, and nothing has been deployed. `games-service/` (the provider) and the `chartvolt-games` adapter (the platform) are both code-complete. **The game is playable by a human**: the launch URL serves a real board, verified in a browser on both titles, which also fixed a live defect - an unstarted round reported itself as `finished`, so the first screen a paying player saw was a result screen for a round they had not played. It also **found and then closed a defect in the platform's own published auth scheme** (**R34**): there was no `callbackToken` field anywhere, so a provider implementing `Bearer {CALLBACK_TOKEN}` exactly was rejected and logged as a probable attack. Latent throughout, so nothing was backfilled. **Nothing technical now stands between the two halves** - what remains is deploying the service and registering it. It is now **deployable**: a PM2 entry, an nginx block for a `games.` subdomain, `env.example` and a `deploy/README.md` runbook, plus **two production-only boot guards** for the play origin and the frame allowlist, both of which previously failed invisibly. Writing the runbook also found that the admin panel **could not register a loopback provider at all**. See the three 6 Sep work-log entries |
 | **Next phase, scope decided** | **X4a - ChartVolt as a first-party provider, with a real playable game** (`21`), **3.5-5 weeks**, starting before the provider health panel. It exists because **the review gate the programme is sequenced around cannot currently be held**: `mock.adapter.ts` returns a hostname that does not resolve, so the play screen's iframe fails to load and the final step has never been performed by a person. **Owner decided 5 Sep 2026 that it is both** the reference implementation *and* open question 10's hedge game - which **modifies the 2 Sep "no in-house game is built" decision** and is recorded in the decision log rather than by editing that entry. **No commercial dependency.** Two things not to misread: **risk X8 is reduced when it ships, not now**, and X4a **shrinks X4 without replacing it** - a provider we control cannot rehearse a real partner's auth, error shapes, latency or pricing |
@@ -788,13 +789,93 @@ old text a probe reports "did not apply", which is indistinguishable from a brok
 is now the standing cost of an extraction - **budget for re-aiming the probes that pointed at the
 code you moved.**
 
-**Deferred:** nothing here. The last item from the owner's report is confirming a **partial run
-scores** end to end.
+**Deferred:** nothing here. The last item from the owner's report was confirming a **partial run
+scores** end to end - **done the same day, and it was a live defect. See R48 below.**
 
-**Next chat should:** verify partial scoring end to end - a `circuit-sprint` round cut short by
-the contest clock must deliver a score for the boards completed, not nothing. The platform now
-permits that round; whether the service reports it is a separate question and is the last piece
-of "best performance wins, finishing is not required".
+---
+
+### 7 Sep 2026 - R48 - THE ENDING DECIDED WHETHER THE PLAY COUNTED
+
+**Shipped:** `SCORING_ROUND_STATUSES` and `roundContributesScore` on
+`lib/services/games/participant-score.service.ts`, the widened round query beside them,
+`findCountedAttempt` in `contest-results.service.ts` importing that predicate and taking `status`
+as a **required** parameter, and the bucket split in
+`apps/admin/lib/services/games/game-performance.service.ts` with its screen.
+
+**The owner's report:** *"a user finishes a board but not all... the game now won when a user
+completes all the boards. No, that is not what I want - the users with the best performance take
+the prizes, it doesn't matter if they finish the boards."*
+
+**The finding is that nobody had built the rule they were objecting to.** `games-service` scores
+any board a player solved and withholds a score only for `voided` - chapter `01` asks **twice**
+for a partial score, on the grounds that a dropped mobile signal must not cost somebody a paid
+entry. No chapter anywhere said finishing was required. **The platform simply discarded the
+number the game had correctly produced**: `syncParticipantScore` selected the player's rounds
+with `status: "completed"` alone, so a real partial score sat on `game_round` and never reached
+`participant.score`, and the seat ranked on its default of nought.
+
+**So the defect was that the way a round ENDED decided whether the play counted at all**, and the
+row that makes it urgent rather than tidy is `expired`. That status does not mean a player gave
+up: `createRound` clamps `expiresAt` to `playWindowEnd`, so under the universal cut-off - the
+whole point of which is that nobody waits for anybody - it is the **ordinary** ending for
+everyone still playing at the final whistle. **The better a contest was attended right up to its
+end, the more of its players ranked at nought.** No error and no log line, and a prize table that
+looks deliberate.
+
+`completed`, `expired` and `abandoned` now count. **`voided` and `unresolved` stay out for two
+different reasons**, and collapsing them would be wrong: a `voided` round has no score by
+construction and the attempt is handed back, so a number found on one is bookkeeping rather than
+play and counting it would let a support action move a leaderboard; an `unresolved` round is
+`unresolvedRoundPolicy`'s question, and counting it here answers that question twice, in two
+places, differently.
+
+**The fairness objection was checked rather than waved away.** There is no incentive to abandon
+deliberately, because an attempt is consumed when the round is **created** (`03` s1.3), so
+walking out buys nothing back. And under every attempts policy, counting a cut-short run is
+helpful or neutral and never harmful: `best_of_n` discards it if it was worse, `sum_of_n` adds
+it, `single` means it was the player's one attempt.
+
+**Two siblings, both found by applying rules already on record rather than by reading the fix.**
+
+The **read side was already wrong before this widened anything.** `findCountedAttempt` decides
+which attempt the player's results screen labels as the one that counted, and its own header
+already claimed it "must agree with `participant-score.service.ts`". It filtered on the presence
+of a score alone - so a `voided` round, which the adapter stores with `rawScore: 0` on purpose,
+would have been reported to the player as the attempt that counted while the leaderboard beside
+it ignored the round. It now **imports the predicate** instead of restating it, which is the "one
+rule, two copies" shape behind `referenceId`, `failedReason`, `challengeId` and the Game Master
+`||` - and `status` is a **required** parameter, because optional would let a caller omit it and
+receive a silent "nothing counted".
+
+The **admin Game Performance screen** defined `SCORED = ["completed"]` under the comment "rounds
+that finished having produced a score" and `GAVE_UP = ["abandoned", "expired"]` under "their own
+doing, not a fault". Both sentences became false, and the consequence was not cosmetic: the
+derived `abandonmentRate` counted **every player caught by the universal cut-off as having
+abandoned the game**, on the one screen an operator uses to decide whether to keep a title
+running. So a well-attended contest made its game look like one people could not get on with.
+`expired` now has its own bucket, its own rate, its own threshold and its own verdict sentence,
+because the remedy is a longer play window or the `until_window_closes` policy rather than a
+different game. And **the "did this produce results" count is taken from the stored score, never
+from a status** - no status can answer it, since a player cut off after two boards ends `expired`
+with a score that pays and one who abandoned before solving anything ends `abandoned` with
+nothing to rank.
+
+**Latent, and nothing was backfilled.** No provider contest has settled in production, so no
+prize was ever paid on the wrong ranking. Worth stating precisely: the scores were never lost -
+they are on `game_round` - so a wrongly-settled contest could have been recomputed. There simply
+is not one.
+
+**Tests:** `__tests__/services/participant-score-arrival.test.ts` (the write side, including the
+owner's own three-player example), `__tests__/games/provider-results-screen.test.ts` (the read
+side) and `__tests__/admin/game-performance.test.ts` (25 tests). **The boundary is asserted in
+both directions** - `expired` and `abandoned` count, `voided` and `unresolved` do not - because a
+widening with no upper bound is indistinguishable from having no rule at all. Full suite green at
+**66 files, 1373 tests**.
+
+**Deferred:** nothing about scoring. What remains unproven is the same thing that has been
+unproven since X4a shipped - **a partial run has not been driven through the real service by
+clicking**, only through the ingestion function by test. `npm run test:e2e-round` drives a full
+round end to end; it does not cut one short.
 
 ---
 

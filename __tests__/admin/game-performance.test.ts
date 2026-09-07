@@ -249,7 +249,7 @@ describe("a round nobody reported is a fault; a round a player walked away from 
 
     const [watch] = await getGamePerformance(30);
     expect(watch.verdict).toBe("watch");
-    expect(watch.rounds.gaveUp).toBe(5);
+    expect(watch.rounds.leftEarly).toBe(5);
     expect(watch.abandonmentRate).toBeCloseTo(0.5, 5);
   });
 
@@ -265,6 +265,70 @@ describe("a round nobody reported is a fault; a round a player walked away from 
     const [row] = await getGamePerformance(30);
     expect(row.abandonmentRate).toBeCloseTo(0.5, 5);
     expect(row.verdict).toBe("watch");
+  });
+
+  /**
+   * R48's reporting side, and the reason this screen was re-read at all.
+   *
+   * `expired` does not mean a player gave up. `createRound` clamps a round's `expiresAt` to
+   * `playWindowEnd`, so under the universal cut-off EVERY round still open at the final
+   * whistle ends this way - and after R48 each one still scores what the player achieved and
+   * still pays them. Filing those as abandonment meant the better a contest was attended
+   * right to its end, the less popular its game looked, on the one screen an operator uses to
+   * decide whether to keep it running.
+   */
+  it("does not count a contest closing over a player as them walking out", async () => {
+    await seedCatalogue();
+    await seedRound("expired", { rawScore: 40, durationMs: 12_000 });
+    await seedRound("expired", { rawScore: 25, durationMs: 9_000 });
+    await seedRound("completed", { rawScore: 90, durationMs: 30_000 });
+    await seedRound("completed", { rawScore: 80, durationMs: 30_000 });
+
+    const [row] = await getGamePerformance(30);
+    expect(row.rounds.cutOff).toBe(2);
+    expect(row.rounds.leftEarly).toBe(0);
+    expect(row.abandonmentRate).toBe(0);
+    expect(row.cutOffRate).toBeCloseTo(0.5, 5);
+    // The two are separate verdicts because they have separate remedies. Half the rounds
+    // being cut off is under the cut-off threshold and says nothing yet.
+    expect(row.verdict).toBe("healthy");
+    expect(row.summary).not.toMatch(/abandon|walked out/i);
+  });
+
+  /**
+   * The count that answers "did this game produce results" has to come from the stored score,
+   * because no status can answer it: a player cut off after two boards ends `expired` with a
+   * score that pays, and a player who abandoned before solving anything ends `abandoned` with
+   * nothing to rank. Judging it by `completed` alone called a contest whose every round was
+   * cut off by its own window a total failure, when those players were paid.
+   */
+  it("counts a partial run as having scored, and an empty abandon as not", async () => {
+    await seedCatalogue();
+    await seedRound("expired", { rawScore: 40, durationMs: 12_000 });
+    await seedRound("abandoned", { rawScore: 15, durationMs: 8_000 });
+    await seedRound("abandoned");
+    // A voided round's score is bookkeeping rather than play - the adapter stores zero on
+    // purpose - so it must not be counted however it looks in the document.
+    await seedRound("voided", { rawScore: 0 });
+
+    const [row] = await getGamePerformance(30);
+    expect(row.scoreProducing).toBe(2);
+    expect(row.rounds.ranFullCourse).toBe(0);
+    expect(row.verdict).not.toBe("problem");
+  });
+
+  it("calls a game that finished rounds and scored nothing a problem", async () => {
+    await seedCatalogue();
+    // No `rawScore` on any of them, which is the genuine failure the old `completed === 0`
+    // check was reaching for.
+    await seedRound("abandoned");
+    await seedRound("abandoned");
+    await seedRound("expired");
+
+    const [row] = await getGamePerformance(30);
+    expect(row.scoreProducing).toBe(0);
+    expect(row.verdict).toBe("problem");
+    expect(row.summary).toMatch(/not one produced a score/i);
   });
 
   it("does not count live rounds in the abandonment denominator", async () => {

@@ -45,13 +45,16 @@ interface PerformanceRow {
   inCatalogue: boolean;
   rounds: {
     started: number;
-    scored: number;
-    gaveUp: number;
+    ranFullCourse: number;
+    leftEarly: number;
+    cutOff: number;
     cancelled: number;
     neverReported: number;
     live: number;
   };
+  scoreProducing: number;
   abandonmentRate: number | null;
+  cutOffRate: number | null;
   averagePlaySeconds: number | null;
   averageResultLatencySeconds: number | null;
   clockSkewedResults: number;
@@ -249,22 +252,45 @@ function PerformanceCard({ row }: { row: PerformanceRow }) {
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
           <Stat label="Rounds started" value={row.rounds.started.toLocaleString()} />
-          <Stat label="Scored" value={row.rounds.scored.toLocaleString()} tone="good" />
+          {/*
+            Reason this reads `scoreProducing` and not a status count: a round the contest
+            closed over, or one the player walked out of, still scores what they achieved and
+            still pays them (R48). Counting only `completed` here told an operator that a
+            well-attended contest produced almost no results.
+          */}
           <Stat
-            label="Abandoned"
+            label="Scored"
+            value={row.scoreProducing.toLocaleString()}
+            sub="incl. partial runs"
+            tone="good"
+          />
+          <Stat
+            label="Walked out"
             value={
               row.abandonmentRate === null
                 ? "-"
                 : `${Math.round(row.abandonmentRate * 100)}%`
             }
-            sub={`${row.rounds.gaveUp} rounds`}
+            sub={`${row.rounds.leftEarly} rounds`}
             tone={
               row.abandonmentRate !== null && row.abandonmentRate > 0.35
                 ? "warn"
                 : "plain"
             }
+          />
+          {/*
+            Held apart from "Walked out" because the remedy is different: a high share here is
+            the play window being short for the round length, not a game people dislike.
+          */}
+          <Stat
+            label="Cut off"
+            value={
+              row.cutOffRate === null ? "-" : `${Math.round(row.cutOffRate * 100)}%`
+            }
+            sub="contest closed first"
+            tone={row.cutOffRate !== null && row.cutOffRate > 0.5 ? "warn" : "plain"}
           />
           <Stat
             label="Never reported"
