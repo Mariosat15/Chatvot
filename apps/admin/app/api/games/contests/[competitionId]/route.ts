@@ -78,6 +78,10 @@ export async function GET(
     };
     let titleName: string | undefined;
     let scoreDirection: string | undefined;
+    // Reason: the editor explains the contest clock with `RoundClockNote`, which needs the
+    // title's longest possible round to say when the last attempt can start. It is a
+    // catalogue fact, never a contest one, so it is read here rather than stored on the draft.
+    let maxDurationSeconds: number | undefined;
 
     if (providerKey && gameCode) {
       const title = await ProviderGame.findOne({ providerKey, gameCode }).lean();
@@ -90,6 +94,7 @@ export async function GET(
       } else {
         titleName = title.displayName;
         scoreDirection = title.scoreDirection;
+        maxDurationSeconds = title.maxDurationSeconds;
         const parsed = parseConfigSchema(title.configSchema);
         schema = parsed.ok
           ? { ok: true, fields: parsed.fields }
@@ -103,6 +108,7 @@ export async function GET(
       schema,
       titleName,
       scoreDirection,
+      maxDurationSeconds,
     });
   } catch (error) {
     console.error("❌ Failed to load provider contest:", error);

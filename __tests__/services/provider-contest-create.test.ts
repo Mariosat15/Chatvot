@@ -341,7 +341,16 @@ describe("runPreflight - the hard refusals", () => {
       }),
     );
     expect(result.ok).toBe(false);
-    expect(result.errors.join(" ")).toMatch(/shorter than one round/i);
+
+    /*
+      REWORDED 7 SEP 2026, and the assertion was updated deliberately rather than the message
+      being reverted. It used to read "shorter than one round of this game (300 seconds)",
+      which is the ceiling - and an operator who had just set Circuit Sprint's own
+      `durationSeconds` to 120 was refused in the name of a number appearing on no form. The
+      owner reported that as confusing. The figure is unchanged; only its description is.
+    */
+    expect(result.errors.join(" ")).toMatch(/longest possible round/i);
+    expect(result.errors.join(" ")).toMatch(/300 seconds/);
   });
 
   it("refuses a grace period below one round plus five minutes", () => {

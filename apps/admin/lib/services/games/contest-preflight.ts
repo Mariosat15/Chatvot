@@ -154,20 +154,35 @@ export function runPreflight(input: PreflightInput): PreflightResult {
     errors.push("The play window has already closed.");
   }
 
+  /*
+    THIS IS THE TITLE'S CEILING, NOT THE ROUND LENGTH THE OPERATOR CONFIGURED, and both
+    messages below now say so.
+
+    Chapter 03 section 1.2 specifies the gate as `now + maxDurationSeconds <= playWindowEnd` -
+    deliberately the catalogue maximum, so an attempt can never be admitted that the contest
+    end would cut short. It fails closed, refusing slightly more than strictly necessary.
+
+    The wording used to call it "one round of this game", which reads as the number the
+    operator had just typed into the game's own settings - for Circuit Sprint they set 120 and
+    were refused in the name of 300. The owner reported exactly that as confusing. Naming it as
+    the game's longest possible round costs a few words and removes the contradiction; do not
+    shorten it back, and do not "fix" the gate to read the configured value instead, which
+    would trade a confusing message for a round that can be cut off mid-play.
+  */
   const roundSeconds = input.title.maxDurationSeconds;
   if (roundSeconds !== undefined) {
     if (windowSeconds > 0 && windowSeconds < roundSeconds) {
       // The clearest late failure on the list: nobody can finish a round, and the contest
       // settles with every player on zero.
       errors.push(
-        `The play window is shorter than one round of this game (${roundSeconds} seconds), so no player could finish.`,
+        `The contest is shorter than this game's longest possible round (${roundSeconds} seconds), so no player could finish. That is the game's maximum rather than the length set in its own settings - the platform reserves the maximum so an attempt is never cut short.`,
       );
     }
 
     const requiredGrace = roundSeconds + 5 * 60;
     if (input.resultGracePeriodSeconds < requiredGrace) {
       errors.push(
-        `The result grace period must be at least ${requiredGrace} seconds - one full round plus five minutes - or a round started at the last moment is cut off before its result can arrive.`,
+        `The result grace period must be at least ${requiredGrace} seconds - this game's longest possible round (${roundSeconds} seconds) plus five minutes - or a round started at the last moment is cut off before its result can arrive.`,
       );
     }
   }

@@ -509,6 +509,84 @@ cannot read its own result is indistinguishable from 13 broken guards.** It now 
 probe failing more than one test, since more damage than the probe caused is not a report about
 the guard.
 
+### 2.5 The round length and the contest clock, which never referred to each other - BUILT 7 September 2026
+
+**Owner-reported:** "the sprint circuit is confusing, it lets you set the duration like 120
+but then you specify also time in the window play, and the two don't obviously relate."
+
+They do relate, and **nothing on any screen said how.** Worth stating up front, because it
+changes what the fix is: **the platform was behaving exactly as chapter 03 specifies, and the
+whole defect was disclosure.** Nothing was miscalculated and nothing was mispaid.
+
+**The operator meets two numbers that both look like "how long", and the one that decides the
+answer is a third they never see.**
+
+| Where | Number | What it actually governs |
+|---|---|---|
+| Step 2, the game's own settings | `durationSeconds`, 60-300 for Circuit Sprint | How long **one attempt** lasts. Passed to the game; the platform does not gate on it |
+| Step 3, timing | `startTime` / `endTime` | When attempts may be **started** - one clock since s2.3, with the play window derived from it |
+| Nowhere | `maxDurationSeconds`, 300 | **The gate.** `now + maxDurationSeconds <= playWindowEnd`, from the **catalogue row** |
+
+So an operator set 120, and every part of the platform that reasons about round length
+reserved **300**. Three places read the ceiling: `contest-preflight.ts` for the window-length
+refusal and the grace-period minimum, `round.service.ts` for `roundFitsInWindow` and
+`resolveExpiry`, and `round-status.service.ts` for the figure the play screen gates the Play
+button on. The visible consequences were a refusal quoting **300 seconds** to someone who had
+just typed 120 into that game's settings, and a Play button going dead **three minutes**
+earlier than the configured round needed.
+
+**The ceiling is right and must not be "fixed" to the configured value.** Chapter 03 section
+1.2 specifies it deliberately: the gate fails closed, refusing slightly more than strictly
+necessary, so an attempt can never be admitted that the contest end would cut short. A round
+stopped mid-play would be scored on a partial game, which is the unfairness the rule exists to
+prevent. Reading the configured value would buy an honest-looking message and reintroduce
+exactly that. **A test pins the gate against this repair**, because it is the obvious one and
+it reads as a bug fix.
+
+**What was built is therefore an explanation, and one derived fact.**
+`RoundClockNote.tsx` is rendered by the wizard **and** the editor, in two variants - beside the
+game's own fields it answers *what are these for*, beside the dates it answers *when can people
+actually play*. `describeRoundFit` in `contest-draft.ts` is the only producer of the derived
+moment, which is the sentence that makes the two clocks relate: **"the last attempt can start
+at 13:55."** A rule stated as a formula is what the owner had already been unable to relate to
+their contest; a wall-clock moment is something an operator can act on.
+
+Four things about it are load-bearing.
+
+- **`maxDurationSeconds` is a catalogue field and `durationSeconds` is one game's config key**,
+  and the note may read the first and never the second. A special case for the sprint's key
+  here would break the "no developer needed for a new title" claim in the same way it would in
+  `ConfigSchemaFields`, and it is the obvious way to write this component.
+- **An absent duration states nothing**, matching `RoundPreflight.tsx`, which applies no gate
+  when the catalogue declares none. An invented deadline would contradict the server for the
+  one class of title where nobody knows the answer.
+- **The too-short-contest warning appears beside the dates**, not only on review. The server
+  refuses it either way; surfacing it at the point of cause means the operator sees it while
+  editing the thing that caused it.
+- **The refusal messages were reworded, not renumbered.** They now call the figure "this game's
+  longest possible round" and say explicitly that it is the game's maximum rather than the
+  length set in its own settings. The number is unchanged.
+
+Also corrected in the same pass: the review step ended **"Publishing arrives with the
+player-facing game screens"**, true when written and false from 5 September. An
+operator-facing caution that has become false is worse than none - this one sent an operator
+looking for a missing feature instead of pressing a button that already existed.
+
+**17 tests** in `__tests__/admin/contest-round-clock.test.ts`, **13 probes** in
+`tools/probe-contest-round-clock.ps1`, all red on exactly the expected test. Admin typecheck at
+the **223 baseline exactly**. **Nothing here is mirrored** except the two pre-flight copies,
+which were already a mirrored pair.
+
+**Two probing lessons, and both were the probe rather than the guard.** The forbidden-identifier
+test first lower-cased both sides, which made `durationSeconds` match inside
+`maxDurationSeconds` - **the guard failed on correct code**, the same over-broad shape as the
+blanket `GameIcon` ban in `13` s4.1g, and the fastest way to have a guard deleted along with the
+half that matters. And the probe for that guard first injected the config key **in a comment**
+and reported green: `readCode` strips comments deliberately, because these files explain the
+mistakes they forbid. **A mention in a comment is not per-game code**, so the mutation had to
+become code. Both are the same rule from opposite directions - *the guard and its probe must
+agree on what the property actually is.*
+
 ---
 
 ## 3. Contest list and detail screens

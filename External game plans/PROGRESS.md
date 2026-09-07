@@ -640,6 +640,70 @@ Newest at the top.
 
 ---
 
+### 7 Sep 2026 - `12` s2.5 - THE ROUND LENGTH AND THE CONTEST CLOCK NEVER REFERRED TO EACH OTHER
+
+**Shipped:** `apps/admin/components/admin/games/RoundClockNote.tsx` (new, shared by the wizard
+and the editor), `describeRoundFit` in `contest-draft.ts`, `maxDurationSeconds` carried on the
+editor's GET, reworded refusals in **both** `contest-preflight.ts` copies, and a corrected
+review-step caution. `12` **s2.5**. 17 tests in `__tests__/admin/contest-round-clock.test.ts`,
+**13 probes in `tools/probe-contest-round-clock.ps1`, all red on exactly the expected test.**
+Full suite **1192 passed**. Admin typecheck at the **223 baseline exactly**. **Nothing new is
+mirrored** - the two pre-flights were already a pair.
+
+**Owner-reported:** the sprint duration is confusing, because you set 120 and then also set a
+play window and the two do not obviously relate.
+
+**The finding is that there was no arithmetic defect, and saying so is the useful part.**
+Nothing was miscalculated, nothing mispaid, and the platform was doing exactly what chapter 03
+section 1.2 specifies. The operator meets two numbers that both look like "how long" - the
+game's own `durationSeconds`, which is one attempt, and the contest's start and end, which is
+when attempts may be started - and the gate that decides the answer reads a **third** number
+off the catalogue row, `maxDurationSeconds`, which appears on no form. Set 120 and the platform
+reserves 300: a refusal quoting a figure the operator never chose, and a Play button going dead
+three minutes early.
+
+**Four things that generalise.**
+
+- **When a report says "confusing", establish whether the code is wrong before changing it -
+  the answer here was no, and the obvious repair was the dangerous one.** Making the gate read
+  the configured length would have made every message honest and let a round be cut off
+  mid-play, scored on a partial game. That is the unfairness chapter 03 exists to prevent, and
+  it fails **closed** today on purpose. **A test now pins the gate against that specific
+  repair**, because it looks exactly like a bug fix and would review as one. This is the third
+  time a documented rule has been at risk of being "corrected" downward into a defect, after
+  the weekend competition-create block and the `entryBlockThreshold` rename.
+- **A number an operator cannot see cannot be reasoned about, and a formula is not a
+  disclosure.** "Reserves 300 seconds" is the rule; **"the last attempt can start at 13:55"**
+  is the thing somebody can act on, and it is the sentence that makes the two clocks relate. The
+  derivation lives in exactly one place, and the test asserts the **negative** - that neither
+  screen recomputes it - because importing the shared note is trivially satisfied by a screen
+  that then does its own arithmetic beside it.
+- **A field name that contains another field name will defeat a substring guard.**
+  `maxDurationSeconds` is the catalogue ceiling every title carries and the whole reason this
+  component works for a game we have never seen; `durationSeconds` is one game's config key and
+  naming it would be per-game code. The first version of the test lower-cased both sides, so the
+  legitimate one matched the forbidden one and **the guard failed on correct code** - the same
+  over-broad shape as the blanket `GameIcon` ban, and the fastest route to a guard being deleted
+  along with the half that matters.
+- **Two screens that explain one rule must share the explanation, exactly as they share the
+  rule.** The wizard and the editor each had their own paragraph about the window; both said
+  most of it and both stopped short of the fact the owner was missing. That is the "one rule, two
+  copies" shape in its documentation form, and it is worse than the code version, because an
+  operator reading two screens has no way to tell which one is lying.
+
+**Probing lesson, tenth instance, and both halves were the probe rather than the guard.** The
+per-game-special-case probe first injected the config key **in a comment** and reported green -
+correctly, because `readCode` strips comments deliberately, since these files explain the
+mistakes they forbid. **A mention in a comment is not per-game code**, so the mutation had to
+become code. Together with the substring trap above, the rule is one thing from two directions:
+**a guard and its probe must agree on what the property actually is**, and when they disagree it
+is the probe that looks broken.
+
+**Nothing was backfilled and nothing needed to be.** No stored value was wrong; the contests
+already created reserve the same ceiling they always did, and now say so.
+
+---
+
 ### 7 Sep 2026 - `13` s6.1a/s4.1h - A PLAYER'S OWN RECORD OF A GAME CONTEST
 
 **Shipped:** `components/games/ProviderResultsScreen.tsx` (new), the provider branch of

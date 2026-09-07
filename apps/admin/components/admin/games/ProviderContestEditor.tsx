@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import type { ConfigField } from "@/lib/services/games/config-schema";
 import { ConfigSchemaFields } from "./ConfigSchemaFields";
+import { RoundClockNote } from "./RoundClockNote";
 import { PrizeDistributionEditor } from "./PrizeDistributionEditor";
 import { UnscoredPolicyField } from "./UnscoredPolicyField";
 import {
@@ -87,6 +88,7 @@ export function ProviderContestEditor({
   const [stored, setStored] = useState<StoredContest | null>(null);
   const [schema, setSchema] = useState<SchemaState | null>(null);
   const [titleName, setTitleName] = useState<string>();
+  const [maxDurationSeconds, setMaxDurationSeconds] = useState<number>();
   const [draft, setDraft] = useState<ContestDraft>(emptyDraft);
   const [errors, setErrors] = useState<string[]>([]);
 
@@ -101,6 +103,7 @@ export function ProviderContestEditor({
       setStored(data.contest);
       setSchema(data.schema);
       setTitleName(data.titleName);
+      setMaxDurationSeconds(data.maxDurationSeconds);
       setDraft(draftFromStored(data.contest));
     } catch {
       toast.error("Something went wrong. Please contact support.");
@@ -289,6 +292,12 @@ export function ProviderContestEditor({
         <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
           Game settings
         </h2>
+        <RoundClockNote
+          variant="settings"
+          startTime={draft.startTime}
+          endTime={draft.endTime}
+          maxDurationSeconds={maxDurationSeconds}
+        />
         {schema?.ok === false ? (
           <p className="text-sm text-red-300">{schema.error}</p>
         ) : schema?.ok ? (
@@ -377,11 +386,18 @@ export function ProviderContestEditor({
           have been enough - this form sends the window too, so an operator moving the end time
           here would have left `playWindowEnd` behind and shortened play without touching any
           field named "play".
+
+          The paragraph that replaced them said most of the rule and stopped short of the part
+          the owner found confusing - that an attempt cannot start in the final stretch. Now
+          `RoundClockNote`, shared with the wizard so the two cannot describe the clock
+          differently.
         */}
-        <p className="text-xs text-gray-500">
-          Every player gets the same window. Any round still open at the end
-          time is closed with the contest.
-        </p>
+        <RoundClockNote
+          variant="timing"
+          startTime={draft.startTime}
+          endTime={draft.endTime}
+          maxDurationSeconds={maxDurationSeconds}
+        />
       </section>
 
       <section className="space-y-4">

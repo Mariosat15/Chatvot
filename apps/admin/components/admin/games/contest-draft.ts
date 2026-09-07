@@ -1,4 +1,4 @@
-﻿/**
+/**
  * The wizard's in-progress state, and the one place that turns it into a request.
  *
  * Kept out of the component so the shape is testable and so there is a single conversion
@@ -116,6 +116,62 @@ function deriveWindow(draft: ContestDraft): Record<string, string> {
     endTime: localToIso(draft.endTime),
     playWindowStart: localToIso(draft.startTime),
     playWindowEnd: localToIso(draft.endTime),
+  };
+}
+
+/**
+ * How the contest clock and the game's own round length relate - the one fact neither screen
+ * used to state, and the reason the owner reported the sprint duration as confusing.
+ *
+ * THE OPERATOR MEETS TWO NUMBERS THAT BOTH LOOK LIKE "HOW LONG" AND A THIRD THEY NEVER SEE.
+ * The game's settings step offers whatever the title's `configSchema` declares - for Circuit
+ * Sprint that is `durationSeconds`, 60 to 300 - which is how long ONE attempt lasts and is
+ * passed straight to the game. The timing step sets the contest's own start and end. Neither
+ * mentions the other, and the gate that actually decides when an attempt may start reads
+ * `maxDurationSeconds` from the CATALOGUE, which appears on no form.
+ *
+ * That third number is not a bug and must not be "fixed" into the configured one. Chapter 03
+ * section 1.2 specifies `now + maxDurationSeconds <= playWindowEnd`, deliberately the title's
+ * ceiling rather than this contest's setting, so the platform can never admit an attempt that
+ * the contest end would cut short - it fails closed, refusing slightly more than strictly
+ * necessary. `round.service.ts` implements it and `contest-preflight.ts` checks it.
+ *
+ * So the fix is disclosure, not arithmetic: turn the ceiling into a wall-clock moment the
+ * operator can read off, which is the single sentence that makes the two clocks relate.
+ *
+ * ABSENT DURATION MEANS NO STATEMENT, never a guessed one. `RoundPreflight.tsx` applies no
+ * gate when the catalogue does not declare a duration, so a screen that invented a deadline
+ * here would contradict the server for the one class of title where nobody knows the answer.
+ */
+export function describeRoundFit(input: {
+  startTime: string;
+  endTime: string;
+  maxDurationSeconds?: number;
+}):
+  | {
+      reservedSeconds: number;
+      lastAttemptStart: Date;
+      /** True when no attempt could ever finish, which the server refuses outright. */
+      windowTooShort: boolean;
+    }
+  | undefined {
+  const { maxDurationSeconds } = input;
+  if (typeof maxDurationSeconds !== "number" || !(maxDurationSeconds > 0)) {
+    return undefined;
+  }
+
+  const start = new Date(input.startTime);
+  const end = new Date(input.endTime);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return undefined;
+  }
+
+  const windowSeconds = (end.getTime() - start.getTime()) / 1000;
+
+  return {
+    reservedSeconds: maxDurationSeconds,
+    lastAttemptStart: new Date(end.getTime() - maxDurationSeconds * 1000),
+    windowTooShort: windowSeconds < maxDurationSeconds,
   };
 }
 

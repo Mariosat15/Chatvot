@@ -18,6 +18,7 @@ import {
 import { ConfigSchemaFields, defaultConfigValues } from "./ConfigSchemaFields";
 import { PrizeDistributionEditor } from "./PrizeDistributionEditor";
 import { UnscoredPolicyField } from "./UnscoredPolicyField";
+import { RoundClockNote } from "./RoundClockNote";
 import type { ContestableTitle } from "./contest-types";
 import {
   type ContestDraft,
@@ -164,6 +165,12 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
             <h3 className="text-lg font-semibold text-white">
               {selected.displayName} settings
             </h3>
+            <RoundClockNote
+              variant="settings"
+              startTime={draft.startTime}
+              endTime={draft.endTime}
+              maxDurationSeconds={selected.maxDurationSeconds}
+            />
             {selected.schema.ok ? (
               <ConfigSchemaFields
                 fields={selected.schema.fields}
@@ -181,7 +188,13 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
           </div>
         )}
 
-        {step === 2 && <StepTiming draft={draft} patch={patch} />}
+        {step === 2 && (
+          <StepTiming
+            draft={draft}
+            patch={patch}
+            maxDurationSeconds={selected?.maxDurationSeconds}
+          />
+        )}
 
         {step === 3 && (
           <StepReview
@@ -296,9 +309,11 @@ function StepGame({
 function StepTiming({
   draft,
   patch,
+  maxDurationSeconds,
 }: {
   draft: ContestDraft;
   patch: (changes: Partial<ContestDraft>) => void;
+  maxDurationSeconds?: number;
 }) {
   return (
     <div className="space-y-5">
@@ -350,13 +365,18 @@ function StepTiming({
         nothing to set. Entry is not squeezed by this: registration closes at `startTime`, so
         an operator who wants five minutes of sign-up time creates the contest five minutes
         before it starts. That is what the trading wizard already does.
+
+        THE PARAGRAPH THAT USED TO SIT HERE said most of this and stopped short of the fact the
+        owner was missing - that an attempt cannot be started in the final stretch, because the
+        platform reserves the game's longest possible round. It is now `RoundClockNote`, shared
+        with the editor, so the two screens cannot describe the clock differently.
       */}
-      <p className="text-xs text-gray-500">
-        Every player gets the same window. Rounds can be started from the start
-        time, and any round still open at the end time is closed with the
-        contest. Players can join until the contest starts, so create it far
-        enough ahead to leave sign-up time.
-      </p>
+      <RoundClockNote
+        variant="timing"
+        startTime={draft.startTime}
+        endTime={draft.endTime}
+        maxDurationSeconds={maxDurationSeconds}
+      />
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <NumberField
@@ -527,10 +547,19 @@ function StepReview({
             <span className="text-gray-500">Players:</span>{" "}
             {draft.minParticipants} to {draft.maxParticipants}
           </p>
+          {/*
+            CORRECTED 7 SEP 2026. This used to end "Publishing arrives with the player-facing
+            game screens", which was true when it was written and became false on 5 September:
+            the publish button and the player play screen both exist. An operator-facing
+            caution that has become false is worse than none - this one told them the contest
+            they had just created could not be used yet, so they would go looking for a missing
+            feature instead of pressing Publish.
+          */}
           <p className="pt-2 text-gray-400">
             It will be saved as a <strong className="text-white">draft</strong>. Players
-            cannot see or join a draft. Publishing arrives with the player-facing game
-            screens.
+            cannot see or join a draft. Press{" "}
+            <strong className="text-white">Publish</strong> on the contest list when you are
+            ready for it to appear.
           </p>
         </div>
       )}
