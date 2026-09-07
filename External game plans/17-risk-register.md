@@ -65,6 +65,7 @@ chapter covers risks to the programme and to the application.
 | R46 | **The screen that made a correct payout look broken.** `/competitions/view/[id]` rendered `pnl`, `pnlPercentage` and `totalTrades` unconditionally, and all three default to `0` on every seat regardless of game - so a provider contest showed `+0.00 / +0.00% / 0 trades` for every player while **`score`, the number it ranked on, was on the row and never displayed.** Rows in an order nothing on the page explains, with winner badges beside them. Four siblings: **Edit routed every contest to the trading editor** (the list learned this the same day - "count the writers" again), trading-only config rendered as `$0` and `1:1`, per-rank amounts labelled in credits while the pool and "Won:" used the currency symbol, and **`noWinners` read by no admin screen at all** | Medium | **CLOSED 7 Sep 2026.** **A LIVE reporting defect, never a wrong payment** - it affected every provider contest an operator has opened, and cost them the ability to reconcile. No money moved wrongly, **nothing to backfill**, nothing mirrored. **This is the screen behind the owner's "the distribution is a mess" report**, so do not read it as confirmation of a payout bug - R37 had already fixed the ranking metric and the payout was correct throughout | Presentation extracted to `apps/admin/lib/admin/contest-result-presentation.ts` **so it could be tested at all** - a structural test over JSX can assert a file mentions `score` and cannot assert which branch renders it, the weakness four earlier probes passed through. Provider rows show the score, with **`-` for an absent score and never `0`** (the read-side form of R45), and a `neutral` tone because a puzzle score is not a profit. Trading-only cards **withheld rather than zeroed**, since a printed `$0` makes a claim where withholding declines to. One shared string carries the caution that the per-rank figures are a **floor**, not the payout. Edit probed as a **swap** as well as a deletion, because a test naming one destination stays green when the two are exchanged. 12 tests, 13 probes |
 | R47 | **The Game Master route that answered to nobody, and the one that answered to everybody.** `POST /api/gamemasters/sync-referrals` had **no authentication on either handler** while all four of its siblings under `/api/gamemasters` required section access - and `PATCH /api/gamemasters/[id]`'s `update_limits` did `{ ...subscription.limits, ...limits }`, writing every key the browser sent onto the document that decides a Game Master's daily cap, participant cap, revenue share and which games they may create, through a **raw-driver** update that runs no Mongoose validation, so the schema's own bounds never applied. Third sibling: the **admin** creation route read only the cached `subscription.limits` and never checked `canCreateCompetitions`, so a Game Master whose package withdrew creation could still create through it | Medium | **CLOSED 7 Sep 2026.** State the sync-referrals exposure in **both** directions or it gets triaged wrongly: the POST takes **no body**, so the mapping comes from `userreferrals` and a caller could **not** redirect commission to themselves - what they could do is apply a pending attribution change an operator had deliberately not applied, and drive an unbounded `findOne` + `updateOne` loop over every active referral on demand; the GET returned up to ten real user ids and names to anybody who asked. **There is no way to know whether either was ever called - a route with no guard writes no attribution.** Nothing backfilled, and there is nothing to backfill: the mass assignment stored whatever an operator actually sent | The unauthenticated route was found by **counting exported handlers against guards**, not by reading them - every neighbour having a guard is exactly what sends a reader past the file that has none, and it is the same technique that found R40. `update_limits` became an allow-list in `apps/admin/lib/admin/gamemaster-limits-update.ts` that **refuses an unknown field by name rather than dropping it**, because dropping means the edit appears to save and the operator concludes they misclicked; the allow-list is a `Set`, so `"constructor"` cannot pass a lookup that walks the prototype chain. Both creation routes now resolve through one shared gate. Found while adding `allowedGameTypes` to the same subdocument - **generalising code is a better bug-finding instrument than looking for bugs.** 59 tests, 18 probes |
 | R48 | **The ending decided whether the play counted.** `syncParticipantScore` selected a player's rounds with `status: "completed"` alone, so a real partial score stored on `game_round` never reached `participant.score` and the player ranked on the seat default of nought. **Neither codebase ever had a rule about finishing** - `games-service` scores any board solved, and the provider spec asks twice for a partial score - so this was the platform discarding a correct result. **The row that made it urgent is `expired`**: `createRound` clamps a round's `expiresAt` to `playWindowEnd`, so under the universal cut-off it is the ORDINARY ending for anyone still playing at the final whistle, which means the better a contest was attended right to its end, the more of its players ranked at nought. Sibling on the read side: `findCountedAttempt` filtered on the presence of a score alone, already wrong for `voided`, whose rounds store `rawScore: 0` deliberately. Sibling in admin: **Game Performance counted every player caught by the cut-off as having abandoned the game**, on the screen an operator uses to decide whether to keep a title running | Medium | **CLOSED 7 Sep 2026.** **Latent - nothing backfilled**, because no provider contest has settled in production, so no prize was paid on the wrong ranking. Say it that way: the scores were never lost, they are on `game_round`, so a wrongly-settled contest could be recomputed - there simply is not one. A document describing this as a distribution bug is wrong; `distributePrizesWithTies` was correct throughout and the defect was upstream of it, in whether a score arrived at all | `SCORING_ROUND_STATUSES` is `completed`, `expired`, `abandoned`; `voided` and `unresolved` stay out for two DIFFERENT reasons - the first has no score by construction, the second is `unresolvedRoundPolicy`'s question and counting it here answers it twice. **The boundary is asserted in both directions**, because a widening with no upper bound is indistinguishable from having no rule. The read side **imports the predicate rather than restating it** and takes `status` as a REQUIRED parameter, so a caller cannot omit it and get a silent "nothing counted". Checked rather than assumed: an attempt is consumed on round **creation**, so there is no incentive to abandon deliberately, and every attempts policy makes a cut-short run helpful or neutral, never harmful |
+| R49 | **The dead null check under a noisy log line.** The reported symptom was three stack traces for one junk URL, because `/competitions/[id]` matches any segment under `/competitions/` and both of the lobby's reads threw inside one `Promise.all`. **The defect the chase found is that `getCompetitionById` threw for BOTH kinds of absence** - a malformed id and a missing document - and its catch re-wrapped both as one message, so **every caller's `if (!competition)` was unreachable.** Three authors independently wrote one: `/results` and `/trade` redirected to `/competitions` for a deleted contest and instead showed a server-error boundary, and `GET /api/competitions/[id]/status` - which is **polled** - answered 500 where its own code carefully answered 404. A deleted contest and a database outage produced the same message, so a page could not tell "this does not exist" from "we are broken" | Low | **CLOSED 7 Sep 2026.** **Live, and split precisely: the noise was harmless and the dead guard was not.** The player already got a 404 from the lobby, so no wrong screen was ever shown there; the two sibling pages showed an error boundary for a contest that had merely been deleted. No money, no payout, **nothing to backfill** - the defect is an unreachable branch rather than a stored value. A document calling this a logging fix is describing the symptom | `null` means it does not exist, a throw means something failed. Six routes refuse a junk id before any read, each writing **one** `warn` line naming the route and the value - a silent guard makes a bad link inside the application indistinguishable from a crawler. The pages' catch had to widen from `NEXT_REDIRECT` to the whole **`NEXT_`** family, because `notFound()` also throws, so the new 404 was caught, logged as a failure and re-issued. The shape test is ours rather than `ObjectId.isValid`'s **because that is a dependency's opinion about a URL**, which has already widened once; a test asserts the two agree today |
 | R24 | Scope creep before anything ships | Medium | **High** | All |
 | R25 | Round write contention under load | Medium | Medium | X12 |
 | X15 | "Challenge any user" harassment surface - no report-user feature exists | Medium | Medium | X10 |
@@ -1545,6 +1546,82 @@ Pinned by `__tests__/services/participant-score-arrival.test.ts`,
 The boundary is asserted in both directions - `expired` and `abandoned` count, `voided` and
 `unresolved` do not - because a widening with no upper bound is indistinguishable from having no
 rule.
+
+---
+
+### R49 - The dead null check under a noisy log line - **CLOSED, 7 September 2026**
+
+**The report was noise; the finding was not, and keeping the two apart is the whole entry.** The
+owner pasted three stack traces produced by a single request:
+
+```
+Error getting competition: Error: Invalid competition ID format
+Error getting leaderboard: Error: Invalid competition ID format
+Error loading competition: Error: Failed to get competition
+```
+
+`/competitions/[id]` matches **any** single segment under `/competitions/`, so it is handed
+whatever a crawler, a stale bookmark or a link built out of an `undefined` asks for. The lobby
+fetches the contest and its leaderboard in one `Promise.all`, both threw, and the page's catch
+logged its own line on top. **The player already got a clean 404**, so nothing was ever displayed
+wrongly there - the cost was three unactionable stack traces per bad URL, which is how a log stops
+being read.
+
+**What the chase found is that `getCompetitionById` threw for BOTH kinds of absence** - a
+malformed id and a missing document - and its catch re-wrapped both as the single message "Failed
+to get competition". Two live consequences:
+
+- **Every caller's `if (!competition)` was unreachable.** Three authors independently wrote one,
+ which is the strongest available evidence of what the contract was *meant* to be: `/results`
+ and `/trade` redirect to `/competitions`, and `GET /api/competitions/[id]/status` returns a
+ careful 404. None could run. So a **deleted** contest - an ordinary thing, from a bookmark or a
+ shared link - gave the two pages a server-error boundary, and gave the status route a 500 where
+ its own code says 404. That route is **polled**, so the stack trace repeated every few seconds.
+- **A deleted contest and a database outage were the same message.** No caller could distinguish
+ them, and the lobby turns both into a 404 - telling a player a contest never existed when the
+ truth is that the database was unreachable.
+
+**The contract now: `null` means it does not exist, a throw means something failed.** Nothing about
+the returned document changed. Six routes refuse a junk id before any read - the four player
+routes, the polled status route, and the admin contest view - and each writes exactly **one**
+`warn` line naming the route and the value.
+
+**The log line is not decoration.** A bad id in the log is the only way to tell a crawler probing
+the site from a link inside the application building a URL out of an `undefined` or a slug. A
+silent guard would make an in-app defect invisible, which is the same reasoning as R40's
+observation that a route with no guard has no attribution.
+
+**The noise arrived by a second route too, and the fix for that is the more surprising half.**
+Both pages' catch re-threw only `NEXT_REDIRECT`. `notFound()` is *also* implemented by throwing,
+marked `NEXT_HTTP_ERROR_FALLBACK`, so the new 404 was caught, logged as "Error loading
+competition" with a stack trace, and then re-issued by the `notFound()` in the catch - the right
+answer, reported as a fault. Widened to the whole **`NEXT_`** family.
+
+**A stale claim was corrected rather than left in place, and the correction is the useful part.**
+The shape helper's first comment justified itself by saying `ObjectId.isValid` accepts any
+12-character string, so `isValid("competitions")` would be true. **That was true of bson v4 and is
+false here** - bson 5 removed 12-length string support from the constructor and synced `isValid` to
+match (NODE-4770). The test asserting the disagreement went red, and the answer was that the claim
+was wrong rather than the test weak. The code was kept because the surviving reason is better than
+the one first given: **the acceptable shape of a URL segment is our decision and `isValid` is a
+dependency's**, it has already moved once in the direction of accepting more, and the test now
+asserts the two agree **today** - so a future widening is a red test rather than a quietly wider
+parser. Second reason, duller and just as real: one spelling shared by two apps and six routes,
+where drift would mean one app 404s a URL the other renders, reading as a caching problem rather
+than as two different rules.
+
+**Live, and nothing to backfill** - the defect is an unreachable branch, not a stored value. No
+money moved and no payout was affected.
+
+Pinned by `__tests__/services/competition-id-guard.test.ts` (20 tests) with
+`tools/probe-competition-id-guard.ps1` (**14 probes, all red on exactly the expected test**). One
+probe reported a **weak test** rather than a missing guard: the non-string case asserted only
+`null` and `undefined`, which a plain `!= null` check also refuses. What `typeof` actually buys is
+that **`RegExp.test` coerces** - `String(["<24 hex>"])` is that hex string, so a one-element array
+would pass the shape check, reach `findById`, and raise the CastError this change exists to stop.
+And one harness lesson worth the line: `$RESULTS` silently aliased the `$results` accumulator,
+because **PowerShell variable names are case-insensitive**, which surfaced as a "read as empty"
+failure on an unrelated file and read exactly like the probe having destroyed a route.
 
 ---
 

@@ -22,6 +22,10 @@ import { NeonPill } from "@/components/neon/Buttons";
 import ProviderContestLobby from "@/components/games/ProviderContestLobby";
 import { hasProviderGameLabel } from "@/lib/services/games/contest-config";
 import { isRegistrationClosed } from "@/lib/utils/registration-deadline";
+import {
+  isCompetitionIdShaped,
+  logMalformedCompetitionId,
+} from "@/lib/utils/competition-id";
 import { notFound, redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 import { auth } from "@/lib/better-auth/auth";
@@ -43,6 +47,24 @@ const CompetitionDetailsPage = async ({
   const { id } = await params;
   const query = await searchParams;
 
+  /*
+    A junk id is refused here, once, before anything is read.
+
+    THIS ROUTE MATCHES ANY SINGLE SEGMENT UNDER `/competitions/`, so it receives whatever a
+    crawler, a stale bookmark or a link built out of an `undefined` happens to ask for. Until
+    this guard existed each of those produced THREE stack traces in the production log - the
+    contest read and the leaderboard read both threw in the same `Promise.all`, and the catch
+    below logged its own "Error loading competition" on top - for what is simply a bad request.
+
+    Reason it logs one line rather than nothing: an id in the log naming this route is the only
+    way to tell a crawler probing the site from a link inside the application that is building
+    a URL wrongly. See `lib/utils/competition-id.ts`.
+  */
+  if (!isCompetitionIdShaped(id)) {
+    logMalformedCompetitionId("/competitions/[id]", id);
+    notFound();
+  }
+
   // Get session for user identification
   const session = await auth.api.getSession({ headers: await headers() });
   const userId = session?.user?.id || "";
@@ -63,6 +85,13 @@ const CompetitionDetailsPage = async ({
           .lean<{ currency?: { symbol?: string } } | null>()
           .catch(() => null),
       ]);
+    // A well-formed id for a contest that is not there. `getCompetitionById` returns `null` for
+    // this rather than throwing, so the 404 is stated here instead of arriving as a `TypeError`
+    // on the first field read and being reported as a failure in the catch below.
+    if (!competition) {
+      notFound();
+    }
+
     const currSymbol = appSettings?.currency?.symbol || "€";
     // getUserParticipant depends on isUserIn — must be sequential
     const userParticipant = isUserIn ? await getUserParticipant(id) : null;
@@ -380,11 +409,18 @@ const CompetitionDetailsPage = async ({
       </div>
     );
   } catch (error) {
-    // Reason: Next.js implements redirect() by throwing a NEXT_REDIRECT error.
-    // We must re-throw it so the redirect actually happens instead of showing 404.
+    /*
+      Reason: Next.js implements redirect() AND notFound() by throwing, and marks both with a
+      `digest`. Re-throwing is what lets the navigation actually happen.
+
+      IT MATCHES THE WHOLE `NEXT_` FAMILY, NOT JUST `NEXT_REDIRECT`, and the narrower version was
+      a live nuisance: the `notFound()` above is inside this `try`, so its control-flow throw was
+      caught here, logged as "Error loading competition" with a stack trace, and then turned into
+      a 404 by the line below - the right answer, reported as a fault.
+    */
     if (error && typeof error === "object" && "digest" in error) {
       const digest = (error as { digest?: string }).digest;
-      if (digest?.startsWith("NEXT_REDIRECT")) throw error;
+      if (typeof digest === "string" && digest.startsWith("NEXT_")) throw error;
     }
     console.error("Error loading competition:", error);
     notFound();

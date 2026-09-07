@@ -879,6 +879,75 @@ round end to end; it does not cut one short.
 
 ---
 
+### 7 Sep 2026 - R49 - THE DEAD NULL CHECK UNDER A NOISY LOG LINE
+
+**Shipped:** `lib/utils/competition-id.ts` (new, **mirrored** into `apps/admin/lib/utils/`), the
+`null` / `[]` contract on both copies of `getCompetitionById` and `getCompetitionLeaderboard`, and
+a guard at the top of six routes - `/competitions/[id]`, `/results`, `/trade`, `/play`,
+`GET /api/competitions/[id]/status` and the admin `/competitions/view/[id]`.
+
+**The owner's report** was three stack traces from one request: `Invalid competition ID format`
+twice and `Failed to get competition` once.
+
+**The noise was harmless and the finding under it was not, and keeping those apart is the point.**
+`/competitions/[id]` matches **any** segment under `/competitions/`, so it receives whatever a
+crawler, a stale bookmark or a link built from an `undefined` asks for. The lobby fetches the
+contest and the leaderboard in one `Promise.all`, both threw, and the catch logged its own line on
+top. **The player already got a clean 404** - the cost was three unactionable stack traces per bad
+URL, which is how a log stops being read at all.
+
+**`getCompetitionById` threw for BOTH kinds of absence** - malformed id and missing document - and
+its catch re-wrapped both as one message. So **every caller's `if (!competition)` was
+unreachable.** Three authors independently wrote one, which is the best evidence available of what
+the contract was meant to be: `/results` and `/trade` redirect to `/competitions`, and the status
+route returns a careful 404. None could run. **A deleted contest** - a bookmark, a shared link -
+therefore gave those two pages a server-error boundary, and gave the status route a **500** where
+its own code says 404. That route is **polled**, so it repeated every few seconds.
+
+The second consequence is quieter and worse: **a deleted contest and a database outage produced
+the same message**, so a page could not tell "this does not exist" from "we are broken", and the
+lobby turns both into a 404. The contract now: **`null` means it does not exist, a throw means
+something failed.**
+
+**The refusal logs one line naming the route and the value, deliberately.** A bad id in the log is
+the only way to tell a crawler probing the site from a link inside the application building a URL
+wrongly - the same reasoning as R40's note that a route with no guard has no attribution.
+
+**The noise arrived by a second route as well, and that half is the more surprising one.** Both
+pages' catch re-threw only `NEXT_REDIRECT`, and `notFound()` is *also* implemented by throwing - so
+the new 404 was caught, logged as "Error loading competition" with a stack trace, and then
+re-issued by the catch. The right answer, reported as a fault. Widened to the whole **`NEXT_`**
+family.
+
+**A stale claim was corrected rather than left standing, and the correction is the part to carry.**
+The shape helper's first comment justified itself by asserting that `ObjectId.isValid` accepts any
+12-character string. **True of bson v4, false here** - bson 5 removed 12-length string support and
+synced `isValid` to the constructor (NODE-4770). The test asserting the disagreement went red, and
+the answer was that **the claim was wrong rather than the test weak** - the third time that
+distinction has mattered. The code stayed because the surviving reason is better than the original:
+**the acceptable shape of a URL segment is our decision and `isValid` is a dependency's**, it has
+already moved once in the direction of accepting more, and the test now asserts the two agree
+*today*, so a version bump is a red test instead of a wider parser.
+
+**Live, and nothing to backfill** - the defect is an unreachable branch rather than a stored value.
+No money moved.
+
+**Tests:** `__tests__/services/competition-id-guard.test.ts` (20 tests) and
+`tools/probe-competition-id-guard.ps1` (**14 probes, all red on exactly the expected test**). One
+probe found a **weak test** rather than a missing guard: the non-string case asserted only `null`
+and `undefined`, which a plain `!= null` also refuses. What `typeof` buys is that **`RegExp.test`
+coerces** - `String(["<24 hex>"])` is that hex string, so a one-element array would pass the shape
+check and reach `findById`. Main typecheck **diffed line by line against a stashed baseline, 198
+before and 198 after with no entry added or removed**; admin at the 223 baseline. Full suite green
+at **67 files, 1396 tests**.
+
+**Deferred:** the sibling `if (!competition)` in `apps/admin/app/api/incidents/[id]/resolve` uses a
+**local** function of the same name and was not touched. And `updateCompetitionStatus` still throws
+for a malformed id, deliberately - it is a write, and an id it cannot use should refuse loudly
+rather than be quietly ignored.
+
+---
+
 ### 7 Sep 2026 - X6 / `19` s3.2a - THE GAME MASTER CREATION GATE, AND A ROUTE THAT ANSWERED TO NOBODY
 
 **Shipped:** `lib/services/gamemaster/game-permissions.ts` (new, pure, model-free, **mirrored**),

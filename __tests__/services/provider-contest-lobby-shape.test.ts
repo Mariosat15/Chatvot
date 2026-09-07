@@ -269,6 +269,11 @@ describe("the lobby's other reads", () => {
  * `app/(root)/error.tsx`, and the player sees "Something went wrong" with no indication of
  * which of the page's half-dozen reads failed. That makes it the first thing to test and the
  * last thing to leave throwing.
+ *
+ * NARROWED ON 7 SEP 2026, AND THE CORRECTION IS WORTH KEEPING VISIBLE: it no longer throws for
+ * a contest that is ABSENT. A malformed id answers `[]` and a missing one answers `[]`, because
+ * neither is a failure - see `__tests__/services/competition-id-guard.test.ts`. Everything above
+ * still holds for a genuine fault, which is what the sentence was written about.
  */
 describe("the leaderboard a provider contest renders", () => {
   it("does not throw for a provider contest whose participants have never traded", async () => {

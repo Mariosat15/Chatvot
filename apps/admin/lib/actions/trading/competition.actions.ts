@@ -13,6 +13,7 @@ import CompetitionParticipant from "@/database/models/trading/competition-partic
 // enterCompetition. Nothing in this app moves competition entry money any more.
 import TradingRiskSettings from "@/database/models/trading-risk-settings.model";
 import mongoose from "mongoose";
+import { isCompetitionIdShaped } from "@/lib/utils/competition-id";
 
 // Get all competitions with filters
 export const getCompetitions = async (filters?: {
@@ -41,13 +42,23 @@ export const getCompetitions = async (filters?: {
 };
 
 // Get single competition by ID
+//
+// ABSENT IS NOT AN ERROR. Both of the throws that used to live here - one for a malformed id, one
+// for a missing document - were re-wrapped by the catch below as the single message "Failed to get
+// competition", so a deleted contest and a database outage were indistinguishable, and one bad URL
+// logged a stack trace for each read the screen issued. The main app's copy was changed in the
+// same commit; keeping the two in step is the point, since a contract that differs between the
+// apps is one nobody can rely on. **`null` means it does not exist, a throw means something
+// failed.**
 export const getCompetitionById = async (competitionId: string) => {
   "use no memo"; // CRITICAL: Disable Next.js caching for real-time data
 
   try {
-    // Validate MongoDB ObjectId format
-    if (!mongoose.Types.ObjectId.isValid(competitionId)) {
-      throw new Error("Invalid competition ID format");
+    // Reason it is the shared shape test rather than `ObjectId.isValid` here: one spelling for
+    // both apps and every route, and the acceptable shape of a URL segment stays our decision
+    // rather than a dependency's. See `lib/utils/competition-id.ts`.
+    if (!isCompetitionIdShaped(competitionId)) {
+      return null;
     }
 
     await connectToDatabase();
@@ -55,7 +66,7 @@ export const getCompetitionById = async (competitionId: string) => {
     let competition = (await Competition.findById(competitionId).lean()) as any;
 
     if (!competition) {
-      throw new Error("Competition not found");
+      return null;
     }
 
     // Get participant count
@@ -420,9 +431,10 @@ export const getCompetitionLeaderboard = async (
   "use no memo"; // CRITICAL: Disable Next.js caching for real-time data
 
   try {
-    // Validate MongoDB ObjectId format
-    if (!mongoose.Types.ObjectId.isValid(competitionId)) {
-      throw new Error("Invalid competition ID format");
+    // Same contract as `getCompetitionById`: a contest that is not there has no leaderboard, which
+    // is an empty board rather than a failure.
+    if (!isCompetitionIdShaped(competitionId)) {
+      return [];
     }
 
     await connectToDatabase();
@@ -432,7 +444,7 @@ export const getCompetitionLeaderboard = async (
       competitionId,
     ).lean()) as any;
     if (!competition) {
-      throw new Error("Competition not found");
+      return [];
     }
 
     const participants = await CompetitionParticipant.find({

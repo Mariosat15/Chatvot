@@ -3,6 +3,10 @@ import { ArrowLeft } from "lucide-react";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
+import {
+  isCompetitionIdShaped,
+  logMalformedCompetitionId,
+} from "@/lib/utils/competition-id";
 import { auth } from "@/lib/better-auth/auth";
 import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
@@ -53,6 +57,13 @@ export default async function PlayPage({ params }: PlayPageProps) {
   noStore();
 
   const { id: competitionId } = await params;
+
+  // A junk id is refused before the session read, because a crawler following a bad link has no
+  // session and would otherwise be bounced to `/sign-in` for a contest that cannot exist.
+  if (!isCompetitionIdShaped(competitionId)) {
+    logMalformedCompetitionId("/competitions/[id]/play", competitionId);
+    notFound();
+  }
 
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) {

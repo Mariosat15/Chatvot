@@ -1,5 +1,9 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
+import {
+  isCompetitionIdShaped,
+  logMalformedCompetitionId,
+} from "@/lib/utils/competition-id";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { getCompetitionById } from "@/lib/actions/trading/competition.actions";
@@ -55,7 +59,18 @@ const TradingPage = async ({ params, searchParams }: TradingPageProps) => {
   const { viewOnly } = await searchParams;
   const isViewOnly = viewOnly === "true";
 
+  // A junk id is a bad request, not a fault: refuse it here rather than letting the read throw
+  // and hand the player a server-error boundary. See `lib/utils/competition-id.ts`.
+  if (!isCompetitionIdShaped(competitionId)) {
+    logMalformedCompetitionId("/competitions/[id]/trade", competitionId);
+    notFound();
+  }
+
   // Get competition details
+  //
+  // THIS NULL CHECK COULD NEVER RUN UNTIL 7 SEP 2026: `getCompetitionById` threw "Competition not
+  // found" rather than returning null, so a deleted contest showed an error boundary instead of
+  // the redirect its author intended. It answers `null` now.
   const competition = await getCompetitionById(competitionId);
   if (!competition) {
     redirect("/competitions");

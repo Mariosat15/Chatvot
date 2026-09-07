@@ -17,6 +17,7 @@ import { calculateRankings } from "@/lib/services/competition-ranking.service";
 import { resolveScoreDirection } from "@/lib/services/games/score-direction.service";
 import { getUsersWithTitles } from "@/lib/services/xp-level.service";
 import { getTitleByXP } from "@/lib/constants/levels";
+import { isCompetitionIdShaped } from "@/lib/utils/competition-id";
 
 // Get all competitions with filters
 export const getCompetitions = async (filters?: {
@@ -45,13 +46,33 @@ export const getCompetitions = async (filters?: {
 };
 
 // Get single competition by ID
+/**
+ * ABSENT IS NOT AN ERROR, AND IT USED TO BE. This returned `null` for neither case: a malformed id
+ * threw "Invalid competition ID format" and a missing document threw "Competition not found", both
+ * of which the catch below re-wrapped as the single message "Failed to get competition". Three
+ * consequences, all of them live:
+ *
+ *  - Every caller had already written `if (!competition)` - the results page, the trading page and
+ *    `GET /api/competitions/[id]/status` all have one - and **not one of them could ever run**. The
+ *    status route's careful 404 answered 500 instead, and the two pages' redirect to `/competitions`
+ *    was dead code. Three authors independently expected the contract this now honours.
+ *  - One junk URL produced three stack traces, because `/competitions/[id]` fetches this and the
+ *    leaderboard in parallel and then logs its own failure on top.
+ *  - The distinction that actually matters was destroyed: a deleted contest and a database outage
+ *    were the same message, so a page could not tell "this does not exist" from "we are broken".
+ *
+ * The contract now: **`null` means it does not exist, a throw means something failed.** Nothing
+ * about the shape of the returned document changed.
+ */
 export const getCompetitionById = async (competitionId: string) => {
   "use no memo"; // CRITICAL: Disable Next.js caching for real-time data
 
   try {
-    // Validate MongoDB ObjectId format
-    if (!mongoose.Types.ObjectId.isValid(competitionId)) {
-      throw new Error("Invalid competition ID format");
+    // Reason it is the shared shape test rather than `ObjectId.isValid` here: one spelling for
+    // both apps and every route, and the acceptable shape of a URL segment stays our decision
+    // rather than a dependency's. See `lib/utils/competition-id.ts`.
+    if (!isCompetitionIdShaped(competitionId)) {
+      return null;
     }
 
     await connectToDatabase();
@@ -59,7 +80,7 @@ export const getCompetitionById = async (competitionId: string) => {
     let competition = (await Competition.findById(competitionId).lean()) as any;
 
     if (!competition) {
-      throw new Error("Competition not found");
+      return null;
     }
 
     // Get participant count
@@ -435,9 +456,12 @@ export const getCompetitionLeaderboard = async (
   "use no memo"; // CRITICAL: Disable Next.js caching for real-time data
 
   try {
-    // Validate MongoDB ObjectId format
-    if (!mongoose.Types.ObjectId.isValid(competitionId)) {
-      throw new Error("Invalid competition ID format");
+    // Same contract as `getCompetitionById`: a contest that is not there has no leaderboard, which
+    // is an empty board rather than a failure. This threw twice - once for a malformed id and once
+    // for a missing document - and the lobby fetches it in parallel with the contest itself, so a
+    // single junk URL logged two stack traces before the page logged its own.
+    if (!isCompetitionIdShaped(competitionId)) {
+      return [];
     }
 
     await connectToDatabase();
@@ -452,7 +476,7 @@ export const getCompetitionLeaderboard = async (
       gameKey?: string;
     } | null;
     if (!competition) {
-      throw new Error("Competition not found");
+      return [];
     }
 
     // OPTIMIZATION: Only select needed fields

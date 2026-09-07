@@ -283,6 +283,58 @@ older ones were **re-aimed rather than left green**, all three for the same reas
 they targeted moved into the shared module or the note they replaced was reworded. Aimed at the
 old text a probe reports "did not apply", which is indistinguishable from a broken harness.
 
+### 1.1f A junk id in the URL, and the dead null check under it (R49, 7 September 2026)
+
+The owner reported three stack traces from one request:
+
+```
+Error getting competition: Error: Invalid competition ID format
+Error getting leaderboard: Error: Invalid competition ID format
+Error loading competition: Error: Failed to get competition
+```
+
+**`/competitions/[id]` matches any single segment under `/competitions/`,** so it is handed
+whatever a crawler, a stale bookmark or a link built out of an `undefined` asks for. Both of the
+lobby's reads threw inside one `Promise.all` and the page's catch logged its own line on top. The
+player already got a 404, so the reported symptom was noise - **and it is the chase that mattered,
+not the noise.**
+
+**`getCompetitionById` threw for both kinds of absence** - a malformed id and a missing document -
+and its catch re-wrapped both as one message. Two consequences, both live:
+
+- **Every caller's `if (!competition)` was dead code.** Three authors independently wrote one -
+ `/results`, `/trade` and `GET /api/competitions/[id]/status` - and not one could ever run. The
+ status route's careful 404 answered **500**; the two pages' redirect to `/competitions` never
+ fired, so **a deleted contest showed a server-error boundary** rather than the intended
+ redirect. Nobody had noticed because the guard reads as covering the case.
+- **A deleted contest and a database outage were the same message,** so no caller could tell "this
+ does not exist" from "we are broken" - and a page that 404s an outage tells the player the
+ contest never existed.
+
+The contract now: **`null` means it does not exist, a throw means something failed.** Six routes
+refuse a junk id before any read - the four player routes, the polled status route and the admin
+contest view - each logging **one** `warn` line naming the route and the value, because a bad id in
+the log is the only way to tell a crawler from a link inside the application building a URL
+wrongly. A silent guard would make an in-app defect invisible.
+
+**Two things worth carrying.** The shape test is spelled out rather than delegated to
+`ObjectId.isValid`, and the first draft justified that with a claim that was **stale**: `isValid`
+accepted any 12-character string in bson v4 and does not here, because bson 5 removed 12-length
+string support and synced `isValid` to the constructor. The comment was corrected rather than the
+code changed, because the surviving reason is better than the original one - **the acceptable shape
+of a URL segment is our decision and `isValid` is a dependency's**, it has already moved once in
+the direction of accepting more, and a test now asserts the two agree *today* so a version bump is
+a red test instead of a wider parser. Second: the pages' catch had to widen from `NEXT_REDIRECT` to
+the whole **`NEXT_`** family, because `notFound()` is also implemented by throwing - so the new 404
+was caught, logged as a failure with a stack trace, and then re-issued. **The noise arriving by a
+second route.**
+
+20 tests in `__tests__/services/competition-id-guard.test.ts`, **14 probes red on exactly the
+expected test**. One probe found a genuinely weak test rather than a missing guard: the non-string
+case asserted only `null` and `undefined`, which a plain `!= null` check also refuses. The
+difference `typeof` actually buys is that **`RegExp.test` coerces**, so `String(["<24 hex>"])` is
+that hex string and a one-element array would pass the shape check and reach `findById`.
+
 ### What it does not do
 
 - **No live leaderboard during play** (section 11's polling recommendation is unimplemented). A

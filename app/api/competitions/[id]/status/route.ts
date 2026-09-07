@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCompetitionById } from "@/lib/actions/trading/competition.actions";
+import {
+  isCompetitionIdShaped,
+  logMalformedCompetitionId,
+} from "@/lib/utils/competition-id";
 import { connectToDatabase } from "@/database/mongoose";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 
@@ -20,7 +24,20 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
 
+    // A junk id gets the 404 below rather than the 500 the catch would produce. This route is
+    // POLLED, so a page left open on a bad id used to write a stack trace every few seconds.
+    if (!isCompetitionIdShaped(id)) {
+      logMalformedCompetitionId("GET /api/competitions/[id]/status", id);
+      return NextResponse.json(
+        { error: "Competition not found" },
+        { status: 404 },
+      );
+    }
+
     // Get competition
+    //
+    // THIS NULL CHECK COULD NEVER RUN UNTIL 7 SEP 2026: `getCompetitionById` threw for a missing
+    // contest, so this route's careful 404 answered 500 instead. It answers `null` now.
     const competition = await getCompetitionById(id);
 
     if (!competition) {
@@ -55,7 +72,7 @@ export async function GET(
       const userParticipant = (await CompetitionParticipant.findOne({
         competitionId: id,
         userId: userId,
-      }).lean()) as any;
+      }).lean()) as { finalRank?: number | null; prizeWon?: number } | null;
 
       if (userParticipant) {
         // Get all participants sorted by finalRank

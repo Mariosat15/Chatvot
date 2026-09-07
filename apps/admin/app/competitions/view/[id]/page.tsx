@@ -1,4 +1,4 @@
-﻿import {
+import {
   Trophy,
   Users,
   DollarSign,
@@ -17,6 +17,10 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
+import {
+  isCompetitionIdShaped,
+  logMalformedCompetitionId,
+} from "@/lib/utils/competition-id";
 import { connectToDatabase } from "@/database/mongoose";
 import AppSettings from "@/database/models/app-settings.model";
 import CompetitionAdminActions from "@/components/admin/CompetitionAdminActions";
@@ -55,6 +59,14 @@ const AdminCompetitionViewPage = async ({
 
   const { id } = await params;
 
+  // A junk id is refused before any read. Reason it is stated here rather than left to the reads:
+  // `getCompetitionById` answers `null` for it now, and an operator following a stale bookmark
+  // should get a 404 rather than the generic error boundary the catch below produces.
+  if (!isCompetitionIdShaped(id)) {
+    logMalformedCompetitionId("/competitions/view/[id]", id);
+    notFound();
+  }
+
   // Get dynamic currency settings
   await connectToDatabase();
   const appSettings = await AppSettings.findById("app-settings").lean<{
@@ -74,6 +86,14 @@ const AdminCompetitionViewPage = async ({
     // Get competition data
     const competition = await getCompetitionById(id);
     const leaderboard = await getCompetitionLeaderboard(id, 100);
+
+    // A well-formed id for a contest that is not there - deleted, or from another environment.
+    // `getCompetitionById` returns `null` rather than throwing since 7 Sep 2026, so the 404 is
+    // stated here instead of arriving as a `TypeError` on the first field read below and being
+    // logged as though the screen had failed.
+    if (!competition) {
+      notFound();
+    }
 
     // The LABEL alone, deliberately not the stricter `isProviderContest`. A provider contest
     // with no resolvable keys cannot launch a round, but it is still not a trading contest -
@@ -752,6 +772,16 @@ const AdminCompetitionViewPage = async ({
       </div>
     );
   } catch (error) {
+    /*
+      Next.js implements notFound() and redirect() by throwing, and marks both with a `digest`
+      beginning `NEXT_`. Without this re-throw the 404 above is caught here, logged as though the
+      screen had failed, and then re-issued by the line below - the right answer, reported as a
+      fault, with a stack trace nobody can act on.
+    */
+    if (error && typeof error === "object" && "digest" in error) {
+      const digest = (error as { digest?: string }).digest;
+      if (typeof digest === "string" && digest.startsWith("NEXT_")) throw error;
+    }
     console.error("Error loading competition:", error);
     notFound();
   }
