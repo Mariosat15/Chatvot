@@ -435,6 +435,80 @@ suite, so **comments are stripped first and every assertion matches a construct*
 element with its props, or an operator - never a bare identifier that an import line would
 satisfy.
 
+### 2.4 The contest VIEW screen, and why the payout looked broken - BUILT 7 September 2026
+
+**R46.** The owner reported that on a contest named `newww` "the prizes, the distribution is a
+mess". It was not a payout defect. `/competitions/view/[id]` - the screen an operator opens to
+find out what happened - was written for trading and rendered `pnl`, `pnlPercentage` and
+`totalTrades` unconditionally.
+
+**The reason this is invisible rather than broken is the important part.** All three of those
+fields default to `0` on **every** seat regardless of game (`participant-seat.ts`), so they are
+present, they are zero, and they render perfectly. A provider contest therefore showed
+`+0.00`, `+0.00%` and `0 trades` against every player - while **`score`, the number the contest
+actually ranked on, was on the row and was never displayed.** R37 had already fixed the metric
+the board *ranks* by, so the order was correct; there was simply no evidence for it on screen.
+
+What an operator saw: rows in an order nothing on the page explains, every metric identical,
+winner badges and prize amounts beside them. **That reads as a broken payout**, which is why a
+reporting defect was reported as a money defect. Same class as the trading-shaped services in
+X13 and the trading-shaped competitions list in s3.1a - **the label agrees with the old world
+and keeps agreeing after it ends.**
+
+Four more things on the same screen, found by reading it once the metric was understood:
+
+- **Edit routed every contest to the trading editor.** The competitions *list* learned to route
+  by game in s2.2 on the same day; this page was missed - **"count the writers", one call site
+  along.** It is *not* a corruption path, because `PUT /api/competitions/[id]` refuses a
+  labelled provider contest outright, and that is exactly what makes it worth fixing: the
+  operator was walked through the entire trading form and refused **on submit**. Strictly worse
+  than a button that had never been offered.
+- **Starting Capital, Max Leverage and Asset Classes rendered as `$0`, `1:1` and an empty
+  list.** These are not zero on a game competition, they are **inapplicable**, and printing a
+  value makes a claim rather than declining to - an operator reads `$0` starting capital as a
+  misconfiguration to go and fix. Now withheld. Platform Fee stays, because it applies to every
+  game and decides what winners are actually paid.
+- **The per-rank amounts were labelled with the credit name while the Prize Pool stat, the
+  per-row "Won:" figure and the player-facing prize table all used the currency symbol.** One
+  screen labelling one quantity two ways, so an operator reconciling a rank against a winner's
+  actual credit had to work out whether the numbers were even in the same unit.
+- **`noWinners` was read by no admin screen anywhere.** It is written at settlement by
+  `contest-completion.service.ts`, and the only signal was an empty winners table -
+  indistinguishable from a page that failed to load. It matters more here than on trading,
+  because on a game competition **nobody scoring is a real and expected outcome**, so the notice
+  says where the money went rather than merely that nobody won.
+
+**And the caution the sidebar never carried.** The per-rank figures are what an operator
+*typed*, not what settlement pays. Two things move them and both were invisible: an unplaced
+rank has its share split among the players who did place, and since R45 a player with no result
+holds no rank at all. So the figures are a **floor** - and an operator comparing them against
+the wallet credits concludes the payout is wrong. `PrizeDistributionEditor` already said this
+where prizes are *edited*; saying it where they are *read* is the half that was missing, and it
+is **one exported string** so the two screens cannot drift into describing one payout two ways.
+
+**The live code is `apps/admin/lib/admin/contest-result-presentation.ts` and
+`apps/admin/app/competitions/view/[id]/page.tsx`.** Nothing here is mirrored, and no money
+logic changed - every fix is on a read path.
+
+The logic sits in a module rather than in ternaries in the JSX for two reasons, and the second
+is load-bearing: the page was already 744 lines and over the 500-line limit, and **a structural
+test over JSX can assert the file mentions `score` but cannot assert which branch renders it.**
+That weakness is what let four earlier probes pass against injected defects. These functions
+take a row and a flag, so a provider row and a trading row go through and get compared.
+
+Pinned by `__tests__/admin/contest-result-presentation.test.ts` (12 tests) and
+`tools/probe-admin-contest-view.ps1` (13 probes, **all red with exactly 1 failure each on the
+named test**). The Edit routing is probed as a **swap** as well as a deletion, because a test
+naming only the game editor stays green when the two destinations are exchanged - and a swap is
+precisely what sends a provider contest to the trading form.
+
+**Harness lesson, seventh instance, and the harness lied about all 13 at once.** Every probe
+first reported `UNKNOWN`: `vitest -t` files unselected tests as **skipped**, so the summary
+reads `1 failed | 11 skipped`, and the parser only matched `failed | N passed`. **A harness that
+cannot read its own result is indistinguishable from 13 broken guards.** It now also flags any
+probe failing more than one test, since more damage than the probe caused is not a report about
+the guard.
+
 ---
 
 ## 3. Contest list and detail screens

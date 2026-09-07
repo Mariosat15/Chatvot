@@ -21,6 +21,7 @@
 | **Admin provider settlement** | **Fixed 7 Sep 2026 (R42)**, found by verifying a mapping subagent's claim rather than by planned work. `apps/admin`'s `finalizeCompetition` had **no provider dispatch** - only `routeToTradingSettlement`, which answers "may *trading* settle this" - so a provider contest reaching the admin cron was refused and left `active`. **Both apps register `checkAndFinalizeCompetitions` on an every-minute cron**, so whether a provider contest settled was decided by which process claimed it first. **R26's shape one layer out and worse**: R26 skipped the Game Master's commission while still paying the players, this paid **nobody and completed nothing**. Latent - no provider contest has settled in production, **nothing backfilled**. Two instruments were silent and both are ones we trust: `provider-finalize.ts` and `provider-settlement.service.ts` were **already mirrored here and imported by nothing**, so `check:mirrors` agreed correctly, and the file-size gap that found R26 has closed to 8 KB so it raises nothing. The rule that now replaces both instances: **the four finalize functions are not four copies of one function, and a capability added to one is not thereby added to the others** |
 | **The universal cut-off** | **R44 closed 7 Sep 2026**, answering the owner's question about one player finishing while another is still going. **Half the answer was already right** - `createRound` clamps a round to `playWindowEnd` and `12` s2.3 makes that the contest clock, so there is one cut-off for everybody. **The missing half was the handover and it cost a player money:** `checkAndFinalizeCompetitions` claims any contest past `endTime` every minute, so settlement ran **before the grace window had even opened**, and a player finishing at 13:59:50 had their result refused as late, was ranked on nothing and **paid nothing for a round they completed.** Settlement now defers until the window closes - **refusing a manual admin finalize too**, because forcing it destroys those scores invisibly - then marks what never reported **`unresolved`, never `voided`**. `voided` would have silently overridden all three configured policies with "score zero, nothing owed". **The sibling finding is larger: nothing in the running system had ever written `unresolved`**, because the reconciliation net that was designed to is **unscheduled** (E7), so `exclude` and `hold_and_alert` were controls that could not fire and a round sat `launched` for ever against a finished contest. **Latent, nothing backfilled.** `07` s2.3b. **The two questions this row used to list as unanswered - what a contest pays when nobody scored, and where an unclaimed rank's share goes - were answered the same day by R45.** One remains genuinely open, and it is narrower than the pair it replaces: whether an all-unscored contest should **refund** its entrants rather than route the pot to the unclaimed pool |
 | **Prize eligibility** | **R45 closed 7 Sep 2026**, and it is the answer to the owner's question about players who do not finish. **A player who never played was paid.** Every rule in `checkQualification` was trading-shaped, and provider settlement switches all of them off *correctly* - `minimumTrades: 0`, `disqualifyOnLiquidation: false`, because a puzzle has neither - so the honest description is not that the rules were wrong but that **there were none.** An unscored participant ranked on the `score ?? 0` fallback. On the owner's own 70/20/10 example with one real scorer, **two players who never started took 30% of the pot**; with nobody scoring, all of them tied at rank 1 and **split the whole pot**, the exact inverse of "if no winner, all lose". **Do not summarise it as a prize-distribution bug** - that is how it presents on screen and is why it was reported that way, but `distributePrizesWithTies` was correct throughout and already redistributes an unfilled rank upward. Fixed by asking the module: `hasResult` answers `Number.isFinite(score)` for provider and **`true` for trading**, because a flat account is a real result and `minimumTrades` is the operator's existing way to say otherwise. **Scoped to a completed contest** - unscoped, the live board stamps every player mid-round "No score recorded". The larger half: **`competition-ranking.service.ts` is a divergent duplicate nothing guarded**, reached by both apps' every-minute cron, which is the **third finding in this one file pair** after R26 and R42. Latent for money, nothing backfilled. `05` s9.2 |
+| **The screen that made it all look broken** | **R46 closed 7 Sep 2026**, and it is the direct answer to the owner's report that on the contest `newww` "the prizes, the distribution is a mess". **No money was wrong.** `/competitions/view/[id]` rendered `pnl`, `pnlPercentage` and `totalTrades` unconditionally, and **all three default to `0` on every seat regardless of game** - so on a provider contest they were present, zero, and rendered perfectly: `+0.00 / +0.00% / 0 trades` against every player, while **`score`, the number the contest ranked on, sat on the row and was never displayed.** R37 had already fixed what the board ranks *by*, so the order was correct - there was simply no evidence for it on screen. Rows in an order nothing explains, identical metrics, winner badges beside them: **a reporting defect on top of a money screen gets reported as a money defect.** Rate it honestly - **a LIVE reporting defect, never a wrong payment**, affecting every provider contest an operator has opened. Four siblings on the same screen: **Edit routed every contest to the trading editor** (the competitions *list* learned this the same day in `12` s2.2 - "count the writers", one call site along, and the API refuses the save so the operator completed the whole trading form and was refused *on submit*), trading-only config rendered as `$0` and `1:1` where it is **inapplicable rather than zero**, per-rank amounts labelled in credits while the pool and "Won:" used the currency symbol, and **`noWinners` read by no admin screen anywhere.** Also: the sidebar's per-rank figures are a **floor**, not the payout - an unplaced rank's share is split among those who placed, and since R45 a player with no result holds no rank - and nothing said so, so an operator reconciling against wallet credits concludes the payout is wrong. **Nothing mirrored, no money logic touched, nothing to backfill.** `12` s2.4 |
 | **REFUNDS - READ THIS BEFORE ANYTHING ELSE** | **R43 closed 7 Sep 2026, and it is the only defect in this programme that was losing real money in production, on both game types, every day.** The every-minute `updateCompetitionStatuses` cron in **both** apps set `status: "cancelled"` itself and *then* called `cancelCompetitionAndRefund`, whose claim is `status: { $ne: "cancelled" }` - **the lock added to fix live bug 5**. The claim matched nothing, so the action returned `success: true` with `refundedCount: 0` and **every player's entry fee stayed with the platform** against a competition displaying `cancelled`. Nothing about it is provider-specific. **Three instruments agreed with the intention rather than the outcome**: the refund logged "refunds were already issued" as an *inference*, the cron logged `participantCount` instead of the returned count, and the `getCompetitionById` backup path - which does not pre-cancel and so works - masked the frequency. Fixed at the caller *and* by moving idempotency off the status onto the per-player `competition_refund` ledger rows, matching `exclusion-refund.ts`. **The rule is the inverse of live bug 5's: a lock keyed on a field any caller can write is only as good as every caller's restraint, and the callers that break it report success.** **Not retroactive.** Unusually, affected contests **can** be found (cancelled + participants not `refunded` + no `competition_refund` rows), so this is *not* the usual "nothing to backfill" - but **no backfill was written**, because crediting wallets from inferred history is an unreviewed money writer and who to compensate is an **owner decision that is still outstanding** |
 | **Money defects closed** | **R26 closed 5 Sep 2026** - the admin cron's finalize copy paid **no** Game Master earnings and recorded no `retained_gm_fee` either, so the commission silently stayed with the platform. This one was **actively losing money rather than latent**: both apps run `checkAndFinalizeCompetitions` on an every-minute cron, so payment depended on which cron won the race. **Not retroactive - no backfill**, and past contests cannot be found by querying for retained rows because none were written. Also **R31** (a 0% Game Master rate paid 5%) and the two P0 score defects, same day |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
@@ -636,6 +637,68 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 7 Sep 2026 - X6 - R46: THE SCREEN THAT MADE A CORRECT PAYOUT LOOK BROKEN
+
+**Shipped:** `apps/admin/lib/admin/contest-result-presentation.ts` (new, admin-only, **not
+mirrored**) and a game-aware `apps/admin/app/competitions/view/[id]/page.tsx`. `12` **s2.4**,
+risk **R46**. 12 tests in `__tests__/admin/contest-result-presentation.test.ts`, 13 probes in
+`tools/probe-admin-contest-view.ps1`, **all red with exactly 1 failure each on the named test**.
+Admin typecheck at the **223 baseline exactly**, with the one difference a pre-existing error
+that moved 18 lines because imports were added - **diffed the lists, not the counts.**
+
+**Why this exists.** The owner reported that on the contest `newww` the prize distribution was
+"a mess". It was traced expecting a payout defect and **there was none.** The view page - the
+screen an operator opens to find out what happened - rendered `pnl`, `pnlPercentage` and
+`totalTrades` unconditionally. All three default to `0` on **every** seat regardless of game, so
+a provider contest showed `+0.00`, `+0.00%` and `0 trades` for every player, while **`score`,
+the number the contest actually ranked on, was on the row and was never displayed.**
+
+**Five things from it that generalise.**
+
+- **A reporting defect sitting on a money screen gets reported as a money defect, and that is
+  rational rather than careless.** When the numbers a screen shows cannot account for the order
+  it shows them in, the only explanation the screen offers the reader is that the payout is
+  wrong. R37 had already fixed the metric the board *ranks* by, so the ordering was correct
+  throughout - but nothing on the page was evidence of it. **Two reports arrived from this one
+  screen: R45, which was real, and R46, which was the screen itself.** Chasing the first one is
+  what found the second, so treat a confusing screen as a defect in its own right rather than as
+  a symptom to be explained away once the underlying bug is fixed.
+- **"Count the writers" produced its own next instance, one day later.** The competitions list
+  learned to route Edit by game on 7 Sep (`12` s2.2); the view page has a second Edit button and
+  was missed, because the fix went to the call site somebody had noticed. **The remaining hazard
+  was not corruption** - `PUT /api/competitions/[id]` refuses a labelled provider contest - which
+  is precisely what made it worth fixing: the operator filled in the entire trading form and was
+  refused **on submit**, strictly worse than a button never offered. The general form: **when a
+  guard closes a hazard at the API, the UI paths into it stop being dangerous and start being
+  cruel**, and nothing will flag them.
+- **A field that is inapplicable must be withheld, not rendered as zero.** `$0` starting capital
+  and `1:1` leverage make a claim about a game competition rather than declining to, and an
+  operator reads `$0` as a misconfiguration to go and fix. Same reasoning as `-` rather than `0`
+  for an absent score, one layer out: **a printed value is an assertion.**
+- **The logic was extracted out of the JSX so that it could be tested at all.** A structural test
+  over a page can assert the file *mentions* `score` and cannot assert **which branch renders
+  it** - the exact weakness four earlier probes passed straight through. Passing a provider row
+  and a trading row to a function and comparing the results is a different kind of evidence. It
+  also kept a file already 744 lines from growing, but that is the lesser reason.
+- **Probe the SWAP, not only the deletion.** A test naming the game editor stays green when the
+  two Edit destinations are exchanged - and a swap is exactly what sends a provider contest to
+  the trading form. Same rule that the withholding test needed in `12` s2.2.
+
+**Harness lesson, seventh instance, and it lied about all 13 probes simultaneously.** Every one
+first reported `UNKNOWN`. `vitest -t` files unselected tests as **skipped**, so the summary reads
+`1 failed | 11 skipped`, and the parser only matched `failed | N passed`. **A harness that cannot
+read its own result is indistinguishable from thirteen broken guards**, and the instinct on
+seeing 13 unknowns is to doubt the code. It now also flags any probe failing more than one test,
+because more damage than the probe caused is not a report about the guard.
+
+**Not a money change.** Every fix is on a read path, so there is nothing to backfill and nothing
+to describe as non-retroactive. **Deliberately not done:** the sidebar still shows *configured*
+shares rather than recomputing the redistribution the way the player-facing `TradingPrizeTable`
+already does - a shared caution string says they are a floor, and making the admin figures live
+is a larger change that belongs with X6.5.
 
 ---
 

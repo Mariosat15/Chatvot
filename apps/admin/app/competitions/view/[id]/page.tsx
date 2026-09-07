@@ -22,6 +22,14 @@ import { connectToDatabase } from "@/database/mongoose";
 import AppSettings from "@/database/models/app-settings.model";
 import CompetitionAdminActions from "@/components/admin/CompetitionAdminActions";
 import { hasProviderGameLabel } from "@/lib/admin/contest-game-label";
+import {
+  resolveResultMetric,
+  resolveParticipantSubline,
+  showsTradingConfiguration,
+  resolveEditHref,
+  resolveNoWinnersNotice,
+  PRIZE_REDISTRIBUTION_NOTE,
+} from "@/lib/admin/contest-result-presentation";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
 
 // Derived from the actions rather than hand-written. Reason: a hand-written row interface is
@@ -52,7 +60,11 @@ const AdminCompetitionViewPage = async ({
     credits?: { name?: string; symbol?: string };
     currency?: { symbol?: string; code?: string };
   } | null>();
-  const creditName = appSettings?.credits?.name || "Credits";
+  // Unused since the prize sidebar moved onto the currency symbol - the unit the pool stat,
+  // the per-row "Won:" figure and the player-facing prize table all already used. Kept in the
+  // `_` form like its two neighbours rather than deleted, because it is a settings read the
+  // next person adding a credits-denominated figure here will want.
+  const _creditName = appSettings?.credits?.name || "Credits";
   const _creditSymbol = appSettings?.credits?.symbol || "⚡";
   const currencySymbol = appSettings?.currency?.symbol || "€";
   const _currencyCode = appSettings?.currency?.code || "EUR";
@@ -72,6 +84,12 @@ const AdminCompetitionViewPage = async ({
     const _isUpcoming = competition.status === "upcoming";
     const isCompleted = competition.status === "completed";
     const isCancelled = competition.status === "cancelled";
+
+    const noWinnersNotice = resolveNoWinnersNotice({
+      isCompleted,
+      noWinners: competition.noWinners,
+      participantCount: competition.currentParticipants ?? 0,
+    });
 
     // Get actual prizes won from database (WalletTransaction)
     const prizeTransactions = await WalletTransaction.find({
@@ -167,7 +185,14 @@ const AdminCompetitionViewPage = async ({
               </Button>
             </Link>
             <div className="flex gap-2">
-              <Link href={`/competitions/edit/${id}`}>
+              {/*
+                ROUTED BY GAME. The competitions list learned this on 7 Sep 2026 (`12` s2.2)
+                and this page was missed - the same "count the writers" failure, one call site
+                along. The API refuses a provider contest, so nothing could be corrupted; what
+                it did instead was walk the operator through the entire trading form and refuse
+                on submit, which is worse than never offering the button.
+              */}
+              <Link href={resolveEditHref(id, isProviderGame)}>
                 <Button className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold">
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Competition
@@ -305,27 +330,43 @@ const AdminCompetitionViewPage = async ({
                   Competition Configuration
                 </h2>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-                    <p className="text-xs text-gray-500 mb-1">
-                      Starting Capital
-                    </p>
-                    <p className="text-lg font-semibold text-gray-100">
-                      $
-                      {(
-                        competition.startingCapital ||
-                        competition.startingTradingPoints ||
-                        0
-                      ).toLocaleString()}
-                    </p>
-                  </div>
+                {/*
+                  THE TRADING-ONLY CARDS ARE WITHHELD, NOT ZEROED. Starting Capital, Max
+                  Leverage and Asset Classes are not "zero" on a game competition, they are
+                  inapplicable - and `$0` / `1:1` / an empty list make a claim about the
+                  contest rather than declining to. An operator reasonably reads `$0` starting
+                  capital as a misconfiguration they have to go and fix.
 
-                  <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-                    <p className="text-xs text-gray-500 mb-1">Max Leverage</p>
-                    <p className="text-lg font-semibold text-gray-100">
-                      1:{competition.leverageAllowed || 1}
-                    </p>
-                  </div>
+                  Platform Fee stays: it applies to every game and is the number that decides
+                  what winners are actually paid.
+                */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {showsTradingConfiguration(isProviderGame) && (
+                    <>
+                      <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+                        <p className="text-xs text-gray-500 mb-1">
+                          Starting Capital
+                        </p>
+                        <p className="text-lg font-semibold text-gray-100">
+                          $
+                          {(
+                            competition.startingCapital ||
+                            competition.startingTradingPoints ||
+                            0
+                          ).toLocaleString()}
+                        </p>
+                      </div>
+
+                      <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+                        <p className="text-xs text-gray-500 mb-1">
+                          Max Leverage
+                        </p>
+                        <p className="text-lg font-semibold text-gray-100">
+                          1:{competition.leverageAllowed || 1}
+                        </p>
+                      </div>
+                    </>
+                  )}
 
                   <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
                     <p className="text-xs text-gray-500 mb-1">Platform Fee</p>
@@ -334,19 +375,23 @@ const AdminCompetitionViewPage = async ({
                     </p>
                   </div>
 
-                  <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-                    <p className="text-xs text-gray-500 mb-1">Asset Classes</p>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {competition.assetClasses?.map((asset: string) => (
-                        <span
-                          key={asset}
-                          className="px-2 py-0.5 rounded bg-gray-700 text-xs text-gray-300 uppercase"
-                        >
-                          {asset}
-                        </span>
-                      ))}
+                  {showsTradingConfiguration(isProviderGame) && (
+                    <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+                      <p className="text-xs text-gray-500 mb-1">
+                        Asset Classes
+                      </p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {competition.assetClasses?.map((asset: string) => (
+                          <span
+                            key={asset}
+                            className="px-2 py-0.5 rounded bg-gray-700 text-xs text-gray-300 uppercase"
+                          >
+                            {asset}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
 
@@ -387,6 +432,20 @@ const AdminCompetitionViewPage = async ({
                   </span>
                 </h2>
 
+                {/*
+                  "NOBODY WAS PAID" HAD TO BE INFERRED FROM AN EMPTY TABLE, which is
+                  indistinguishable from a page that failed to load. `noWinners` is written at
+                  settlement and was read by no admin screen anywhere. It matters more on a
+                  game competition, where nobody scoring is a real and expected outcome rather
+                  than an anomaly - so the notice says where the money went, because that is
+                  the operator's actual next question.
+                */}
+                {noWinnersNotice && (
+                  <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
+                    <p className="text-sm text-amber-300">{noWinnersNotice}</p>
+                  </div>
+                )}
+
                 {(() => {
                   // Count qualified participants
                   const qualifiedParticipants = leaderboard.filter(
@@ -420,6 +479,19 @@ const AdminCompetitionViewPage = async ({
 
                             // Display rank
                             const displayRank = qualifiedRank;
+
+                            // The metric and sub-line this GAME reports. Resolved here rather
+                            // than inline so a provider row and a trading row can be compared
+                            // in a test - a structural assertion over JSX can prove the file
+                            // mentions `score` and cannot prove which branch renders it.
+                            const metric = resolveResultMetric(
+                              participant,
+                              isProviderGame,
+                            );
+                            const subline = resolveParticipantSubline(
+                              participant,
+                              isProviderGame,
+                            );
 
                             return (
                               <div
@@ -473,14 +545,30 @@ const AdminCompetitionViewPage = async ({
                                         </span>
                                       )}
                                     </div>
-                                    <p className="text-xs text-gray-500">
-                                      {participant.totalTrades} trades
-                                      {participant.disqualificationReason && (
-                                        <span className="text-red-400 ml-2">
-                                          • {participant.disqualificationReason}
-                                        </span>
-                                      )}
-                                    </p>
+                                    {/*
+                                      The trade count is trading's, and on a provider contest
+                                      it is always 0 - so it was printing "0 trades" against
+                                      every player of a game that has no trades. The
+                                      disqualification reason still has to render for both,
+                                      which is why the sub-line can be absent while the row
+                                      below it is not.
+                                    */}
+                                    {(subline ||
+                                      participant.disqualificationReason) && (
+                                      <p className="text-xs text-gray-500">
+                                        {subline}
+                                        {participant.disqualificationReason && (
+                                          <span
+                                            className={`text-red-400 ${subline ? "ml-2" : ""}`}
+                                          >
+                                            {subline ? "• " : ""}
+                                            {
+                                              participant.disqualificationReason
+                                            }
+                                          </span>
+                                        )}
+                                      </p>
+                                    )}
                                     {gmInfo && (
                                       <p className="text-xs text-purple-400 mt-1">
                                         GM: {gmInfo.gmEmail} • Earned:{" "}
@@ -491,23 +579,31 @@ const AdminCompetitionViewPage = async ({
                                   </div>
                                 </div>
                                 <div className="text-right">
+                                  {/*
+                                    THIS COLUMN IS THE OWNER'S "the distribution is a mess".
+                                    It read `pnl` and `pnlPercentage` unconditionally, and both
+                                    default to 0 on EVERY seat regardless of game - so a
+                                    provider contest showed "+0.00 / +0.00%" for every player
+                                    while `score`, the number it actually ranked on, sat on the
+                                    row unrendered. Rows in an unexplainable order, identical
+                                    metrics, winner badges against them: it reads as a broken
+                                    payout, and the payout was fine.
+                                  */}
                                   <p
                                     className={`text-sm font-bold ${
                                       isDisqualified
                                         ? "text-red-400"
-                                        : participant.pnl >= 0
+                                        : metric.tone === "positive"
                                           ? "text-green-400"
-                                          : "text-red-400"
+                                          : metric.tone === "negative"
+                                            ? "text-red-400"
+                                            : "text-gray-100"
                                     }`}
                                   >
-                                    {participant.pnl >= 0 ? "+" : ""}
-                                    {participant.pnl?.toFixed(2) || "0.00"}
+                                    {metric.value}
                                   </p>
                                   <p className="text-xs text-gray-500">
-                                    {participant.pnlPercentage >= 0 ? "+" : ""}
-                                    {participant.pnlPercentage?.toFixed(2) ||
-                                      "0.00"}
-                                    %
+                                    {metric.sub ?? metric.label}
                                   </p>
                                   {actualPrize > 0 && (
                                     <p className="text-xs text-yellow-400 font-semibold mt-1">
@@ -636,12 +732,19 @@ const AdminCompetitionViewPage = async ({
                                 {prize.percentage}%
                               </span>
                             </div>
+                            {/*
+                              The same unit as the Prize Pool stat above, the "Won:" figure on
+                              each row, and the player-facing prize table. This said
+                              the configured credit name while all three of those said the
+                              currency symbol, so one screen labelled one quantity two ways -
+                              and the operator comparing a rank's amount against what a winner
+                              was actually paid had to work out whether the two numbers were
+                              even in the same unit.
+                            */}
                             <div className="text-right">
                               <p className="text-lg font-black text-yellow-500">
-                                {netAmount.toFixed(2)}{" "}
-                                <span className="text-xs text-yellow-400">
-                                  {creditName}
-                                </span>
+                                {currencySymbol}
+                                {netAmount.toFixed(2)}
                               </p>
                             </div>
                           </div>
@@ -667,24 +770,33 @@ const AdminCompetitionViewPage = async ({
                       <span>
                         Winners receive net amounts after{" "}
                         {competition.platformFeePercentage}% platform fee. Total
-                        pool:{" "}
+                        pool: {currencySymbol}
                         {(
                           competition.prizePool ||
                           competition.prizePoolCredits ||
                           0
-                        ).toFixed(2)}{" "}
-                        {creditName}.
+                        ).toFixed(2)}
+                        .
                       </span>
                     </p>
                   </div>
                 )}
 
-                {competition.platformFeePercentage > 0 && (
-                  <p className="text-xs text-gray-500 mt-4 hidden">
-                    * Platform fee: {competition.platformFeePercentage}%
-                    deducted
-                  </p>
-                )}
+                {/*
+                  THE AMOUNTS ABOVE ARE CONFIGURED, NOT PAID, and nothing on this screen said
+                  so. Two things move them and both are invisible here: an unplaced rank has
+                  its share split among the players who did place, and since R45 a player with
+                  no result holds no rank at all. So the figures are a floor - and an operator
+                  reconciling them against the wallet credits concludes the payout is broken,
+                  which is exactly the report that led here.
+
+                  `PrizeDistributionEditor` already says this where prizes are EDITED. One
+                  shared string, so the two screens cannot drift into describing one payout two
+                  ways.
+                */}
+                <p className="text-xs text-gray-500 mt-4 leading-relaxed">
+                  {PRIZE_REDISTRIBUTION_NOTE}
+                </p>
               </div>
 
               {/* Rules */}
