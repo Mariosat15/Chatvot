@@ -4,6 +4,7 @@ import { providerCapabilities, providerScoring } from "./config";
 import {
   getProviderRankingValue,
   getProviderTieBreakerValue,
+  providerHasResult,
 } from "./scoring";
 
 /**
@@ -27,4 +28,5 @@ export const providerGameModule: GameModule = {
   scoring: providerScoring,
   getRankingValue: getProviderRankingValue,
   getTieBreakerValue: getProviderTieBreakerValue,
+  hasResult: providerHasResult,
 };

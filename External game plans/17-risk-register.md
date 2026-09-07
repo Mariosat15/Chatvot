@@ -61,6 +61,7 @@ chapter covers risks to the programme and to the application.
 | R42 | **The admin cron refused to settle provider contests, so whether one paid out at all was a coin flip.** `apps/admin`'s `finalizeCompetition` had no provider dispatch - only `routeToTradingSettlement`, which answers "may *trading* settle this" - so a provider contest reaching it was refused and left `active`. **Both apps register `checkAndFinalizeCompetitions` on an every-minute cron**, so the contest settled correctly or never settled at all depending on which process claimed it first. Not a missing stage: **nobody was paid anything**, and the contest sat finished-looking and unsettled with no error a person sees | Critical | **CLOSED 7 Sep 2026.** Latent - no provider contest has settled in production, so **nothing was backfilled** and there is nothing to backfill, the defect being an absent branch rather than a stored value. **Do not describe it as "the admin app paid less"** - it paid nothing and completed nothing | The same six-line dispatch the main app has had since X5, placed **before `startSession()`**: `finalizeProviderCompetition` opens its own session and takes its own lock, so dispatching after would nest a transaction inside one the caller owns. **R26's shape one layer out, so the general rule replaces the two instances: the four finalize functions are not four copies of one function, and a capability added to one is not thereby added to the others.** Two silent instruments here - `provider-finalize.ts` and `provider-settlement.service.ts` were **already mirrored into `apps/admin` and imported by nothing**, so `check:mirrors` agreed and the file-size heuristic that found R26 raises nothing, because only the *call site* was absent. 3 tests in `__tests__/services/admin-finalize-gamemaster-parity.test.ts`, 4 probes in `tools/probe-admin-provider-dispatch.ps1` |
 | R43 | **The undersubscribed sweep cancelled competitions and refunded nobody - and unlike almost everything else in this register, it was losing real money in production, on both game types, every day.** The every-minute cron in both apps set `status: "cancelled"` itself and *then* called `cancelCompetitionAndRefund`, whose claim is `status: { $ne: "cancelled" }` - the very lock added to fix the double-refund defect. The claim matched nothing, so the action returned `success: true` with `refundedCount: 0` and **every player's entry fee stayed with the platform**, against a competition showing `cancelled` | Critical | **CLOSED 7 Sep 2026.** **Not latent and not retroactive.** Unusually for this register the affected contests **can** be identified - cancelled, participants not `refunded`, no `competition_refund` rows - because all three facts are stored. **No backfill was written deliberately**: crediting wallets from inferred history is an unreviewed money writer and who to compensate is an owner decision. Do not summarise this as "refunds were delayed" - they never happened | Both crons stop writing a status; cancelling belongs to the refund action, which does it in the same transaction as the money. Because the failure is silent the action is **also** self-healing, which reopens live bug 5's door - so **idempotency moved off the status and onto the per-player `competition_refund` ledger rows**, the key `exclusion-refund.ts` already uses. **The general rule is the inverse of live bug 5's: a lock keyed on a field any caller can write is only as good as every caller's restraint, and the ones that break it report success.** Three silent instruments: the refund logged "refunds were already issued" as an *inference*, the caller logged `participantCount` rather than the returned count, and the correctly-behaving `getCompetitionById` backup path masked how often it failed. 8 tests, 5 probes in `tools/probe-cancel-refund.ps1` |
 | R44 | **Settlement ran before the grace window opened, so a player who finished in the last minute was paid nothing for a round they completed.** `checkAndFinalizeCompetitions` claims any contest whose `endTime` has passed, every minute, and since `12` s2.3 the play window *is* the contest clock - so a provider contest settled within about sixty seconds of its cut-off. `resultGracePeriodSeconds` exists precisely to say a result posted after the window is still welcome; settling first refused it as `late_recorded_not_applied`, ranked the player on nothing and paid them nothing. **The sibling was worse: nothing in the running system ever wrote `unresolved`**, because the reconciliation net that was supposed to is unscheduled (E7) - so `exclude` and `hold_and_alert` were configured controls that could not fire, and a round that never reported sat `launched` for ever against a contest finished weeks earlier | Critical | **CLOSED 7 Sep 2026.** Latent - no provider contest has settled in production, so no score was discarded and **nothing was backfilled**; the defect is an absent wait, not a stored value. **Do not summarise it as "settlement was early"** - from the player's seat, being ranked on a round they finished is indistinguishable from being cheated, and the only trace is a critical audit row nobody is watching | `lib/services/settlement/round-cutoff.ts` (mirrored) defers settlement while any round is inside the grace window - refusing a **manual** admin finalize too, deliberately, because forcing it two minutes after the cut-off destroys those scores and names the time it can run instead. Then a new `cutoff` outcome on `endLiveRoundsForContest` marks what never reported **`unresolved`, not `voided`** - `voided` reads as housekeeping and would silently override all three policies with "score zero, nothing owed". **The ordering is the subtle half:** the mark is written outside the settlement transaction and before the hold gate, because a `hold_and_alert` abort would roll it back and every cron pass would re-mark, re-block and re-roll-back for ever with nobody paid. `DEFAULT_RESULT_GRACE_SECONDS` moved to `round-types.ts` so both apps share one definition - two copies would make whether a last-minute finisher is paid depend on which cron claimed the contest, which is R26's failure mode. 8 tests, 15 probes |
+| R45 | **A player who never played was paid a prize.** Every qualification rule in `competition-ranking.service.ts` was trading-shaped, and provider settlement switches all of them off correctly - `minimumTrades: 0` and `disqualifyOnLiquidation: false`, because a puzzle has neither - so **nothing disqualified anybody** and a participant who never launched a round ranked on the `score ?? 0` fallback. On the owner's own 70/20/10 example with one real scorer, two players who never started **took 30% of the pot**; with nobody scoring at all, all three tied at rank 1 and **split the entire pot**, the exact inverse of "if no winner, all lose" | Critical | **CLOSED 7 Sep 2026.** Latent for money - no provider contest has settled in production, **nothing was backfilled**. **Do not summarise it as a prize-distribution bug**, which is how it presents on screen and is why the owner reported a confusing distribution; it is an eligibility one, and the distribution code was correct throughout | `hasResult(participant)` joins the two scoring methods on the game module: provider answers `Number.isFinite(participant.score)`, **trading answers `true`** because a flat account is a real result and `minimumTrades` is the existing operator-set way to say otherwise. Asked of the module rather than branched on, or the next game silently fails. **Scoped to a COMPLETED contest**, matching the two trading checks - unscoped, the live leaderboard stamps every player mid-round "No score recorded", which `13` s4.1b renders as a verdict. `Number.isFinite` rather than `!= null`, which admits `NaN` and pays from a position the comparator chose at random, or truthiness, which refuses a genuine zero. **The other half is that `competition-ranking.service.ts` is a divergent duplicate nothing guarded** - 77 lines apart, `check:mirrors` covers models only, reached by both apps' every-minute cron: third finding in this one file pair after R26 and R42. The runtime parity suite **cannot** see the admin copy, because vitest aliases `@` to the root, so a structural text comparison holds it and the suite's byte-identical claim was corrected. Money goes to the existing `all_disqualified` unclaimed pool; **whether it should be refunded instead is an owner decision not taken here**. 12 tests, 10 probes |
 | R24 | Scope creep before anything ships | Medium | **High** | All |
 | R25 | Round write contention under load | Medium | Medium | X12 |
 | X15 | "Challenge any user" harassment surface - no report-user feature exists | Medium | Medium | X10 |
@@ -1285,6 +1286,68 @@ decoration.
 defect is an absent wait rather than a stored value. Pinned by 8 tests in
 `__tests__/services/provider-round-cutoff.test.ts` and 15 probes in
 `tools/probe-round-cutoff.ps1`. Design in `07` s2.3b.
+
+---
+
+### R45 - A player who never played was paid a prize - **CLOSED, 7 September 2026**
+
+Every qualification rule in `competition-ranking.service.ts` was trading-shaped, and provider
+settlement passes exactly the values that switch all of them off: `minimumTrades: 0` and
+`disqualifyOnLiquidation: false`, correctly, because a puzzle has neither. So **nothing
+disqualified anybody.** A participant who never launched a single round ranked on the
+`score ?? 0` fallback and **was paid.**
+
+Run against the owner's own 70/20/10 example: one real scorer, two players who never started.
+The two took **30% of the pot** between them. And with nobody scoring at all, all three tied at
+rank 1 and **split the entire pot** - the exact inverse of "if no winner, all lose", and it reads
+on screen as a prize-distribution bug rather than an eligibility one, which is where the owner's
+report of a confusing distribution came from.
+
+**The fix is a question asked of the game module, not a branch here.** `hasResult(participant)`
+joins `getRankingValue` and `getTieBreakerValue` on the module interface. Provider answers
+`Number.isFinite(participant.score)`; **trading answers `true`**, because a flat account is a
+real result and `minimumTrades` is the existing, operator-set way to say otherwise. Written as
+`if (gameType === "provider")` this would have been the shape that makes the next game silently
+fail - the same trap as the trading-shaped services in `matchmaking.service.ts`.
+
+**Four things about it that generalise.**
+
+- **The gate must be scoped to a COMPLETED contest, and dropping the scope reads as a
+  tightening.** `getCompetitionLeaderboard` ranks with the contest's live status, so the same
+  function draws the board during play. Unscoped, every player mid-round is stamped
+  **disqualified** on a contest they are still playing - and since `13` s4.1b renders the reason,
+  they would read "No score recorded" as a verdict. The two trading checks beside it are scoped
+  for the same reason; matching them was right.
+- **`Number.isFinite`, not `!= null`, and truthiness is the interesting wrong answer.** `!= null`
+  admits `NaN`, which fails every comparison in the sort, so it does not land last - it lands
+  wherever the comparator leaves it and is then **paid from a position nobody chose**, which is
+  worse than a wrong order because it cannot be explained afterwards. Truthiness is shorter, reads
+  correctly, and **refuses the player who attempted the game and genuinely scored zero.** Second
+  instance after R31, where `??` would have passed a form's `NaN` onto a money path.
+- **`competition-ranking.service.ts` is a divergent duplicate that NOTHING guarded**, and it is
+  reached by both apps' every-minute finalize cron. `check:mirrors` compares **models**, and the
+  two copies are 77 lines apart because the admin one carries its own logging, so they can never
+  be byte-compared either. A rule in one copy only means the payout depends on which cron claimed
+  the contest - which is R26 and R42 exactly, making this the **third finding in this one file
+  pair**, and therefore a reason to look at the remaining pairs rather than to assume.
+- **The runtime parity suite cannot see the admin copy, and its header said it could.** Vitest
+  aliases `@` to the repository root, so both finalizers import the root ranking service; blanking
+  the admin gate leaves the whole suite green. Two probes proved it. The property moved to a
+  **structural** test comparing the two files as text - the only guard that can hold it - and the
+  suite's justification, which claimed every dependency it touches is byte-identical, was
+  corrected in place rather than reworded, because it is the reason the probes were expected to
+  work.
+
+**Where the money goes instead:** the fee stage's existing `all_disqualified` unclaimed pool, net
+of the platform fee, exactly as a trading contest with no qualified winner does. **Whether an
+all-unscored contest should instead refund its entrants is an owner decision this change did not
+take**, and the tests assert what the platform does rather than what it should do.
+
+**Live for any provider contest that had settled, and none has** - so latent for money, and
+**nothing was backfilled**. Pinned by 9 tests in
+`__tests__/services/provider-prize-eligibility.test.ts`, 3 in the parity suite, and 10 probes in
+`tools/probe-prize-eligibility.ps1`. Two probes are recorded there as **unprobed with the
+reason** rather than shipped green. Design in `05` s11.1.
 
 ---
 

@@ -26,12 +26,44 @@ import type { RankableParticipant } from "../types";
 export function getProviderRankingValue(
   participant: RankableParticipant,
 ): number {
-  // Reason: a player whose result never arrived has no score, and the unresolved-round
-  // policy has already decided what that means (scored zero, excluded, or settlement held).
-  // By the time ranking runs, an absent score is a genuine zero rather than an error.
+  /*
+    The `?? 0` places a player with no result LAST in the ordering, which is right - but a
+    comment here used to go further and say an absent score "is a genuine zero rather than
+    an error", and that sentence was doing real harm. It reads as though nothing else needs
+    deciding, and for a whole day it was the only thing standing between a player who never
+    launched a round and a prize: last place is still a paid position when the contest has
+    three prize ranks and three entrants.
+
+    Ordering and ELIGIBILITY are separate questions, and `hasResult` below answers the
+    second. An absent score orders last and wins nothing; a stored zero orders last and is
+    eligible, because the player attempted the game. **A stored value and an absent one are
+    different facts.**
+  */
   const score = participant.score ?? 0;
 
   return participant.scoreDirection === "lower_is_better" ? -score : score;
+}
+
+/**
+ * A provider participant is eligible for a prize only once a score has actually arrived.
+ *
+ * WRITTEN AS AN EXPLICIT NULL CHECK, NEVER AS TRUTHINESS. `if (!score)` is shorter, reads
+ * correctly, and refuses **a player who played and scored nothing** - a failed puzzle, a
+ * race not finished, a zero that the provider genuinely reported. Telling that player they
+ * produced no result is the same class of error as `canEnterChallenges` treating an absent
+ * value as a stored `false`.
+ *
+ * `Number.isFinite` rather than `!= null` because a `NaN` reaching here would rank as a
+ * silent last place and then be paid: `NaN` fails every comparison in the sort, so it lands
+ * wherever the sort happens to leave it, which is not a position anybody chose.
+ *
+ * Note what this does NOT do: it does not decide what an unreported round means. That is the
+ * contest's `unresolvedRoundPolicy` - score zero, exclude and refund, or hold for a human -
+ * and under `exclude` the player has already been removed from the list before ranking runs.
+ * This is the residual case: the contest settled, and this player has no number.
+ */
+export function providerHasResult(participant: RankableParticipant): boolean {
+  return Number.isFinite(participant.score);
 }
 
 /**

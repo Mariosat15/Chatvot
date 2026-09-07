@@ -127,6 +127,34 @@ export interface GameModule {
 
   /** The tie-break value, higher being better. Games with no tie-breaks return 0. */
   getTieBreakerValue(participant: RankableParticipant, tieBreaker: string): number;
+
+  /**
+   * Whether this participant produced a result the contest can rank and pay on.
+   *
+   * WHY THE ENGINE HAS TO ASK, rather than deciding for itself. `checkQualification` was
+   * entirely trading-shaped - liquidation, `minimumTrades`, `minimumWinRate` - and provider
+   * settlement legitimately passes `minimumTrades: 0` and `disqualifyOnLiquidation: false`,
+   * because a puzzle has neither. So nothing disqualified anybody: **a player who never
+   * launched a single round was ranked on a fallback zero and paid a prize**, and with
+   * 70/20/10 two such players took 30% of the pot between them. No error, no log line, and
+   * a ledger that balances.
+   *
+   * WHY IT IS A MODULE METHOD AND NOT A BRANCH. `if (gameType === "provider")` in the
+   * engine is precisely the shape that makes the next game silently fail - the same failure
+   * as the trading-shaped services in `matchmaking.service.ts`, and what invariant 9 exists
+   * to prevent. Each game answers for itself.
+   *
+   * `true` IS A LEGITIMATE ANSWER, and trading's. A trader who placed no trades still has a
+   * result: the account is flat and PnL is zero. `minimumTrades` is the operator's existing,
+   * configurable way to say that is not good enough, and it defaults to 0 - so answering
+   * `totalTrades > 0` here would impose a one-trade minimum on every trading contest ever
+   * created, which is a change to the trading contract smuggled in under a provider fix.
+   *
+   * Note this asks about ELIGIBILITY, not about ordering. A participant who answers `false`
+   * keeps their position in the ranking and is simply not paid, so a two-player tie for
+   * first does not silently become a first and a second.
+   */
+  hasResult(participant: RankableParticipant): boolean;
 }
 
 /**

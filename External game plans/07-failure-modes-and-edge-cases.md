@@ -189,10 +189,21 @@ stored value. Risk **R44**. Pinned by 8 tests in
 `__tests__/services/provider-round-cutoff.test.ts` and 15 probes in
 `tools/probe-round-cutoff.ps1`.
 
-**Not answered by this slice, and not to be summarised as answered:** what a contest pays
-when **nobody** scored, and where an unclaimed rank's percentage goes. The redistribution
-exists in `distributePrizesWithTies`; whether it behaves as the owner described for a
-provider contest is **unverified**, and no player or admin screen explains it.
+**Answered later the same day, by R45, and the answer was worse than the question implied.**
+This paragraph used to list two things as unverified: what a contest pays when **nobody**
+scored, and where an unclaimed rank's percentage goes. `distributePrizesWithTies` handled the
+second correctly all along - an unfilled rank's share goes to the players above it, exactly as
+the owner described. The first was **broken, and by a defect one step earlier than either
+question looks:** nothing disqualified a participant who never played, so they held a prize rank
+on a `score ?? 0` fallback and were paid, and an all-unscored contest split the whole pot between
+players who had done nothing. Design in `05` **s9.2**, risk **R45**.
+
+**What remains genuinely open** is narrower than the pair above and is a policy decision, not a
+gap: an all-unscored contest currently routes its pot to the existing `all_disqualified`
+unclaimed pool net of the platform fee. Given that the likeliest cause of nobody scoring is a
+**provider outage** - which is this chapter's own section 3 - refunding is at least arguable.
+Open question 17. Still true and still outstanding: **no player or admin screen explains any of
+this**, which belongs with the player-facing results work rather than here.
 
 ---
 

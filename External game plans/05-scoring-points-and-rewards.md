@@ -376,6 +376,64 @@ in the provider settlement path awards normalised points, XP, ratings or badges 
 not read "prizes paid" as "the cross-game layers are live" - section 10's rule still has to
 be applied to them.
 
+### 9.2 Who is eligible for a prize, and the answer step 3 did not have (7 September 2026)
+
+Step 3 above says "rank, resolve ties, calculate prizes". It skips the question that comes
+first: **which participants are in the ranking at all.** For a year that question had a
+trading-only answer, and R45 is what happened when a provider contest asked it.
+
+`checkQualification` had three rules - liquidation, minimum trades, minimum win rate - and
+provider settlement switches all of them off, **correctly**, because a puzzle has no
+liquidation and no trades. So the honest description of the state before this fix is not that
+the rules were wrong: **there were no rules.** A participant who never launched a single round
+had `score` absent, `getProviderRankingValue` returned the `score ?? 0` fallback, and they
+ranked and were paid.
+
+**Worked through the owner's own example**, because the abstract version understates it. Ten
+entrants, three prize ranks at 70/20/10, one player scores, two never start:
+
+| | Before | After |
+|---|---|---|
+| Player who scored | 70% | **100%** of the prize pool |
+| Two who never started | 20% and 10% | nothing, and no rank |
+| Nobody scores at all | all ten tie at rank 1 and **split the whole pot** | **nobody is paid** |
+
+The redistribution in the middle column already worked - `distributePrizesWithTies` has always
+handed an unfilled rank's share to the players above it. **The distribution code was correct
+throughout, which is worth stating plainly**, because on screen this presented as a prize
+split that made no sense and that is what got reported.
+
+**The rule, and it belongs to the module rather than to this service.** `hasResult(participant)`
+sits on the game module interface beside `getRankingValue` and `getTieBreakerValue`:
+
+- **Provider** answers `Number.isFinite(participant.score)`. Not `!= null`, which admits `NaN` -
+  and `NaN` fails every comparison in the sort, so it does not sort last, it lands wherever the
+  comparator leaves it and is **paid from a position nobody chose.** Not truthiness either, which
+  is shorter and reads correctly and **refuses the player who attempted the game and genuinely
+  scored zero** - the write-side twin of the read-side rule in `13` s4.1b that an absent score
+  renders as `-` and never as `0`.
+- **Trading** answers `true`. A flat account is a real result, and `minimumTrades` is the
+  existing, operator-set way to say otherwise. Answering `totalTrades > 0` here would read as a
+  tightening and would impose a one-trade minimum on **every trading contest ever created**,
+  which is not this change's decision to take.
+
+Asked of the module for the reason section 10 gives: `if (gameType === "provider")` is the shape
+that makes the next game silently fail while the query runs and the page renders.
+
+**Scoped to a completed contest, and this is the part that looks like a bug in the fix.** The
+gate only fires once the contest is over, matching the two trading checks beside it.
+`getCompetitionLeaderboard` ranks with the contest's **live** status, so the same function draws
+the board a player watches during play - unscoped, everybody who has not finished their round
+yet is stamped `disqualified` on a contest they are in the middle of, and `13` s4.1b renders the
+reason, so they would read "No score recorded" as a verdict rather than as a pending state.
+
+**Where the money goes when a rank is unclaimed or nobody qualifies:** the fee stage's existing
+`all_disqualified` unclaimed pool, net of the platform fee, exactly as a trading contest with no
+qualified winner does. **Whether an all-unscored contest should instead refund its entrants is
+an open owner decision** - the entrants paid to play a contest that produced no result, which is
+not obviously the same as losing one. Recorded here rather than decided, and the tests assert
+what the platform does rather than what it should do.
+
 ---
 
 ## 10. No aggregate may be trading-only

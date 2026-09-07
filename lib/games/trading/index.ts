@@ -24,4 +24,19 @@ export const tradingGameModule: GameModule = {
   scoring: tradingScoring,
   getRankingValue: getTradingRankingValue,
   getTieBreakerValue: getTradingTieBreakerValue,
+
+  /*
+    ALWAYS TRUE, AND THAT IS THE ANSWER RATHER THAN A GAP. A trading participant has a
+    result the moment they enter: the account is funded, PnL is zero, and a flat account is
+    a legitimate last place. `minimumTrades` is the operator's configurable way to say a
+    flat account should not be ranked, and it defaults to 0.
+
+    So `totalTrades > 0` here would look like a tightening and would in fact **impose a
+    one-trade minimum on every trading contest ever created**, retroactively, with no
+    operator choosing it - a change to the trading contract smuggled in under a provider
+    fix. X1's promise is that trading behaves identically, and this keeps it. Pinned by two
+    tests in `__tests__/services/provider-prize-eligibility.test.ts`, one for the default
+    and one for the explicit minimum, because a single test collapses the two behaviours.
+  */
+  hasResult: () => true,
 };

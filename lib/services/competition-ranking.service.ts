@@ -109,10 +109,16 @@ export interface RankingOptions {
  * Reason for narrowing it rather than passing the whole module: it documents that ranking
  * reads no capabilities and consults no flags, so nobody later adds an
  * "is this game enabled" check into a sort comparator.
+ *
+ * `hasResult` earns its place here for the same reason the other two are here and nothing
+ * else is - it is a question about THIS PARTICIPANT'S metrics, answerable from the row in
+ * front of it. Widening the narrowing was the fix rather than typing `checkQualification`
+ * against the whole `GameModule`: that compiles just as well and quietly reopens the door
+ * this type exists to hold shut.
  */
 type ScoringModule = Pick<
   GameModule,
-  "getRankingValue" | "getTieBreakerValue"
+  "getRankingValue" | "getTieBreakerValue" | "hasResult"
 >;
 
 /**
@@ -180,6 +186,7 @@ function areParticipantsTied(
 function checkQualification(
   participant: ParticipantData,
   rules: CompetitionRules,
+  gameModule: ScoringModule,
   options?: RankingOptions,
 ): { qualified: boolean; reason?: string } {
   const isCompleted = options?.competitionStatus === "completed";
@@ -187,6 +194,31 @@ function checkQualification(
   // Check liquidation (always applies)
   if (rules.disqualifyOnLiquidation && participant.status === "liquidated") {
     return { qualified: false, reason: "Liquidated" };
+  }
+
+  /*
+    NO RESULT, NO PRIZE - and until this existed, every check below was trading-shaped and
+    provider contests had no qualification rule at all.
+
+    Provider settlement legitimately passes `minimumTrades: 0` and
+    `disqualifyOnLiquidation: false`, because a puzzle has neither. So nothing disqualified
+    anybody: **a player who never launched a single round ranked on a fallback zero and was
+    paid a prize.** With the owner's own 70/20/10 example and one real scorer, two players
+    who never started took 30% of the pot between them, and when nobody scored at all the
+    three of them tied at rank 1 and split the entire pot.
+
+    Asked of the module rather than branched on here, because `if (gameType === "provider")`
+    is the shape that makes the next game silently fail. Trading answers `true` - a flat
+    account is a real result, and `minimumTrades` is the existing way to say otherwise.
+
+    Only when the contest is COMPLETED, matching the two checks below: a live leaderboard
+    must show a player who has not played yet as unplaced, not as disqualified.
+  */
+  if (isCompleted && !gameModule.hasResult(participant)) {
+    return {
+      qualified: false,
+      reason: "No score recorded",
+    };
   }
 
   // Check minimum trades - ONLY when competition is COMPLETED
@@ -229,7 +261,7 @@ export function calculateRankings(
 
   // Step 1: Check qualifications (min trades only checked when competition is completed)
   const qualifiedParticipants = participants.map((p) => {
-    const qualification = checkQualification(p, rules, options);
+    const qualification = checkQualification(p, rules, gameModule, options);
     return {
       ...p,
       rank: 0, // Will be assigned later

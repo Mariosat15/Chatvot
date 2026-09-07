@@ -109,10 +109,16 @@ export interface RankingOptions {
  * Reason for narrowing it rather than passing the whole module: it documents that ranking
  * reads no capabilities and consults no flags, so nobody later adds an
  * "is this game enabled" check into a sort comparator.
+ *
+ * `hasResult` earns its place here for the same reason the other two are here and nothing
+ * else is - it is a question about THIS PARTICIPANT'S metrics, answerable from the row in
+ * front of it. Widening the narrowing was the fix rather than typing `checkQualification`
+ * against the whole `GameModule`: that compiles just as well and quietly reopens the door
+ * this type exists to hold shut.
  */
 type ScoringModule = Pick<
   GameModule,
-  "getRankingValue" | "getTieBreakerValue"
+  "getRankingValue" | "getTieBreakerValue" | "hasResult"
 >;
 
 /**
@@ -180,6 +186,7 @@ function areParticipantsTied(
 function checkQualification(
   participant: ParticipantData,
   rules: CompetitionRules,
+  gameModule: ScoringModule,
   options?: RankingOptions,
 ): { qualified: boolean; reason?: string } {
   const isCompleted = options?.competitionStatus === "completed";
@@ -187,6 +194,27 @@ function checkQualification(
   // Check liquidation (always applies)
   if (rules.disqualifyOnLiquidation && participant.status === "liquidated") {
     return { qualified: false, reason: "Liquidated" };
+  }
+
+  /*
+    NO RESULT, NO PRIZE. See the main app's copy for the full reasoning; the short version is
+    that every other check here is trading-shaped, provider settlement legitimately passes
+    `minimumTrades: 0` and `disqualifyOnLiquidation: false`, and so nothing disqualified
+    anybody - **a player who never launched a round was ranked on a fallback zero and paid.**
+
+    THIS FILE IS A DIVERGENT DUPLICATE OF THE MAIN APP'S, differing only in comments and
+    `console.log` lines, and `check:mirrors` compares MODELS so it has never had an opinion
+    about it. Both apps run `checkAndFinalizeCompetitions` on an every-minute cron, so an
+    eligibility rule applied to one copy only means **whether a never-played player is paid
+    depends on which process claimed the contest** - which is exactly R26 and R42. Pinned by
+    a parity test rather than by copying the file over, because replacing it wholesale would
+    delete this app's logging as a side effect of a payout fix.
+  */
+  if (isCompleted && !gameModule.hasResult(participant)) {
+    return {
+      qualified: false,
+      reason: "No score recorded",
+    };
   }
 
   // Check minimum trades - ONLY when competition is COMPLETED
@@ -228,7 +256,7 @@ export function calculateRankings(
 
   // Step 1: Check qualifications (min trades only checked when competition is completed)
   const qualifiedParticipants = participants.map((p) => {
-    const qualification = checkQualification(p, rules, options);
+    const qualification = checkQualification(p, rules, gameModule, options);
     return {
       ...p,
       rank: 0, // Will be assigned later

@@ -366,9 +366,28 @@ with "score zero, nothing owed".
 15 probes - **four of which were green on the first run and all four mis-aimed**, one of them
 the R42 shape where two guards cover each other and neither can be probed alone.
 
-**Still not answered by E4:** what a contest pays when **nobody** scored, and where an
-unclaimed rank's percentage goes. Unverified for provider contests, and explained on no
-screen.
+#### E4 fifth half - who is eligible for a prize, 7 September 2026 (R45)
+
+The question the half above left open, and it turned out to be a live rule gap rather than an
+unverified behaviour. **A player who never played was paid.** Every rule in `checkQualification`
+was trading-shaped - liquidation, minimum trades, minimum win rate - and provider settlement
+switches all three off *correctly*, so **there were no qualification rules at all** and an
+unscored participant ranked on the `score ?? 0` fallback. Two players who never started took 30%
+of a 70/20/10 pot; with nobody scoring, everyone tied at rank 1 and split it.
+
+`hasResult` now sits on the game module beside the two scoring methods: **provider** answers
+`Number.isFinite(score)`, **trading** answers `true`. Scoped to a completed contest, matching the
+checks beside it, because the same function draws the live board.
+
+**Half of the original question needed no fix.** `distributePrizesWithTies` already hands an
+unfilled rank's share to the players above it, exactly as the owner described - so the
+distribution code was right throughout, and the defect was one step earlier, in who was on the
+list. Design in `05` **s9.2**, risk **R45**. 9 tests plus 3 in the parity suite, 10 probes.
+
+**One thing E4 still does not answer, and it is now a policy decision rather than a gap:**
+whether an all-unscored contest should **refund** its entrants instead of routing the pot to the
+existing `all_disqualified` unclaimed pool. Open question 17. Also still true: **none of this is
+explained on any player or admin screen**, which belongs with E6's results work.
 
 ### E5 - Admin panel
 

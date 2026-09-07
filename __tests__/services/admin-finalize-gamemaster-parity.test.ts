@@ -8,6 +8,8 @@ import {
   vi,
 } from "vitest";
 import mongoose from "mongoose";
+import { readFileSync } from "fs";
+import { join } from "path";
 import {
   startTestMongo,
   stopTestMongo,
@@ -37,12 +39,19 @@ import {
  * WHAT IMPORTING AN ADMIN ACTION IN THIS SUITE DOES AND DOES NOT PROVE, stated because the
  * convention elsewhere is to read admin files as text. Vitest resolves `@/` to the repo
  * root, so the admin action under test runs against the MAIN app's models and services.
- * That is sound here and it is worth being exact about why: the two copies of every
- * dependency this touches are byte-identical (`fees.service.ts`, `types.ts`,
- * `game-master-fees/`, verified with `git diff --no-index`, and `check:mirrors` guards the
- * models), and the defect was never in a dependency - it was in the action file's own
- * control flow, which is precisely what this exercises. It cannot catch drift INSIDE a
- * dependency, so it is not a substitute for `check:mirrors`.
+ * That was sound for R26 and it is worth being exact about why: R26's defect was in the
+ * action file's own control flow, which is what this exercises, and the dependencies it
+ * reached were byte-identical (`fees.service.ts`, `types.ts`, `game-master-fees/`, verified
+ * with `git diff --no-index`, plus `check:mirrors` on the models).
+ *
+ * THAT JUSTIFICATION USED TO CLAIM EVERY DEPENDENCY IS BYTE-IDENTICAL, AND IT IS NOT.
+ * Corrected rather than quietly reworded, because the sentence was believed for two days and
+ * it is the reason a probe was expected to work. `competition-ranking.service.ts` is a
+ * DIVERGENT duplicate - 77 lines apart, the admin copy carrying its own logging - and
+ * `check:mirrors` compares models, so nothing guards it. The provider settlement path reaches
+ * it in both apps. The consequence for this file is precise and easy to over-read: a runtime
+ * assertion here cannot see the admin copy of that service at all, so the eligibility rule is
+ * pinned by the structural describe block at the foot of this file instead.
  */
 
 vi.mock("next/cache", () => ({
@@ -588,7 +597,17 @@ describe("R42 - the admin app must settle a provider contest, not refuse it", ()
    * collection name is explicit: these schemas set `provider_game` rather than the pluralised
    * default, and writing to a guessed name has exactly the same symptom as writing a wrong value.
    */
-  async function seedProviderContest(): Promise<string> {
+  async function seedProviderContest(
+    /**
+     * How many of the trailing players never produced a score at all.
+     *
+     * A COUNT RATHER THAN A FLAG, because the two interesting cases are different: one
+     * unscored player among scorers tests that their prize rank is redistributed, and
+     * *every* player unscored tests that nobody is paid. A boolean would only express the
+     * first, which is the one that looks like the whole story.
+     */
+    unscoredTrailingPlayers = 0,
+  ): Promise<string> {
     const db = mongoose.connection.db;
     const competitionId = new mongoose.Types.ObjectId();
 
@@ -653,19 +672,33 @@ describe("R42 - the admin app must settle a provider contest, not refuse it", ()
 
       Scores descend so a real ranking is distinguishable from everybody tying on zero.
     */
+    const firstUnscoredIndex = PLAYERS.length - unscoredTrailingPlayers;
+
     await db?.collection("competitionparticipants").insertMany(
-      PLAYERS.map((p, index) => ({
-        competitionId: competitionId.toString(),
-        userId: p.id,
-        username: p.name,
-        email: `${p.id}@example.test`,
-        gameKey: PROVIDER_GAME_KEY,
-        score: (PLAYERS.length - index) * 100,
-        status: "active",
-        enteredAt: new Date(Date.now() - 5_400_000 + index * 1000),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })),
+      PLAYERS.map((p, index) => {
+        const seat = {
+          competitionId: competitionId.toString(),
+          userId: p.id,
+          username: p.name,
+          email: `${p.id}@example.test`,
+          gameKey: PROVIDER_GAME_KEY,
+          status: "active",
+          enteredAt: new Date(Date.now() - 5_400_000 + index * 1000),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        /*
+          THE FIELD IS OMITTED, NEVER SET TO ZERO OR NULL, and that is the fixture's whole
+          job. A player who never launched a round has no `score` path on the document at
+          all, which is a different fact from a stored zero - the player who attempted the
+          game and scored nothing. Seeding a zero here would make the test pass against a
+          truthiness check (`if (!score)`), which refuses the player who did play.
+        */
+        return index >= firstUnscoredIndex
+          ? seat
+          : { ...seat, score: (PLAYERS.length - index) * 100 };
+      }),
     );
 
     await db?.collection("creditwallets").insertMany(
@@ -756,4 +789,197 @@ describe("R42 - the admin app must settle a provider contest, not refuse it", ()
     // session" from "refused after taking the lock". The end status is identical either way.
     expect(after?.updatedAt).toEqual(before?.updatedAt);
   });
+
+  /**
+   * NO RESULT, NO PRIZE - proven at the settlement seam and in BOTH apps.
+   *
+   * `__tests__/services/provider-prize-eligibility.test.ts` pins the rule on the pure ranking
+   * functions, which is where it is easiest to read. These two tests exist because that is
+   * structurally silent about whether real settlement reaches the rule at all - the same
+   * lesson as the score seam, where every suite seeded the value under test. **When a value
+   * crosses a seam, one test must start on the far side of it.**
+   *
+   * And they live in the parity file rather than beside the pure tests because
+   * `competition-ranking.service.ts` is a **divergent duplicate**: the two copies differ in
+   * comments and `console.log` lines, `check:mirrors` compares models so it has never had an
+   * opinion about them, and both apps run `checkAndFinalizeCompetitions` on an every-minute
+   * cron. An eligibility rule applied to one copy only means **whether a player who never
+   * played is paid depends on which process won the race**, which is R26 and R42 exactly.
+   */
+  it("pays nothing to a player who never scored, and redistributes their rank", async () => {
+    const competitionId = await seedProviderContest(1);
+
+    const result = (await finalizeInAdminApp(competitionId)) as {
+      success?: boolean;
+    };
+    expect(result.success).toBe(true);
+
+    const db = mongoose.connection.db;
+    const unscored = PLAYERS[PLAYERS.length - 1];
+
+    const unscoredWallet = await db
+      ?.collection("creditwallets")
+      .findOne({ userId: unscored.id });
+
+    // The defect in one assertion: before the fix this player took rank 3's 10% of the pot
+    // for a contest they never started, and nothing anywhere recorded that as odd.
+    expect(unscoredWallet?.creditBalance).toBe(START_BALANCE);
+
+    /*
+      AND THE POT WAS STILL PAID OUT IN FULL, which is the half that a fix stopping at
+      "do not pay them" would get wrong. Rank 3 is unclaimed, so its 10% is redistributed
+      among the players who did place - the owner's own description of the rule. Asserted as
+      the total rather than per player so the test does not restate the arithmetic the
+      distribution function owns.
+    */
+    const scoredWallets = await db
+      ?.collection("creditwallets")
+      .find({ userId: { $in: PLAYERS.slice(0, -1).map((p) => p.id) } })
+      .toArray();
+
+    const paidOut = (scoredWallets ?? []).reduce(
+      (sum, w) => sum + (w.creditBalance - START_BALANCE),
+      0,
+    );
+    const pool = PLAYERS.length * ENTRY_FEE;
+    expect(paidOut).toBeCloseTo(pool * (1 - PLATFORM_FEE_PERCENT / 100), 2);
+
+    // The reason reaches the player, because `finalLeaderboard` is what every results screen
+    // reads. A disqualification with no explanation on a contest somebody paid to enter is
+    // the support ticket the field exists to answer.
+    const contest = await db
+      ?.collection("competitions")
+      .findOne({ _id: new mongoose.Types.ObjectId(competitionId) });
+    const row = (
+      contest?.finalLeaderboard as
+        | { userId: string; disqualificationReason?: string }[]
+        | undefined
+    )?.find((entry) => entry.userId === unscored.id);
+    expect(row?.disqualificationReason).toMatch(/no score/i);
+  });
+
+  it("pays nobody when nobody scored, and both apps agree", async () => {
+    /*
+      "If no winner meaning no score for anyone all loose." Before the fix every entrant tied
+      at rank 1 on a fallback zero and **split the entire pot between them**, having played
+      nothing - the opposite of nobody winning, and it read on screen as a prize-distribution
+      bug rather than as an eligibility one.
+
+      The money then goes to the fee stage's existing `all_disqualified` unclaimed pool, net
+      of the platform fee, exactly as a trading contest with no qualified winner does.
+      **Whether it should instead be refunded is an owner decision this change did not take**,
+      and the test asserts what the platform does rather than what it should do.
+    */
+    const adminContest = await seedProviderContest(PLAYERS.length);
+    const adminResult = (await finalizeInAdminApp(adminContest)) as {
+      success?: boolean;
+    };
+    expect(adminResult.success).toBe(true);
+
+    const adminMoney = await moneySnapshot(adminContest);
+    expect(adminMoney.prizeRows).toBe(0);
+
+    await clearTestMongo();
+
+    const mainContest = await seedProviderContest(PLAYERS.length);
+    await finalizeInMainApp(mainContest);
+    const mainMoney = await moneySnapshot(mainContest);
+
+    /*
+      THIS COMPARISON DOES NOT PROVE THE ADMIN COPY OF THE RANKING ENGINE LEARNED THE RULE,
+      and the comment here claimed it did until a probe disproved it. Both finalizers resolve
+      `@/lib/services/competition-ranking.service` through vitest's alias to the ROOT copy, so
+      blanking the gate in `apps/admin/lib/services/competition-ranking.service.ts` leaves this
+      whole suite green. What the comparison proves is that the two finalizers agree given one
+      ranking engine - worth having, and not the same claim. The structural test below is what
+      holds the other half.
+    */
+    expect(adminMoney).toEqual(mainMoney);
+  });
+});
+
+/**
+ * The two copies of the ranking engine, compared as TEXT because nothing else can.
+ *
+ * WHY THIS IS NOT A RUNTIME TEST, which is the first thing to try and it cannot work. Vitest
+ * aliases `@` to the repository root, so every admin file under test imports the root copy of
+ * this service - deliberately, because that is what makes admin actions testable at all. The
+ * consequence is that no runtime assertion in this file can distinguish the two copies, and a
+ * probe blanking the admin gate is green in every suite. That is a limitation of the harness,
+ * so the guard has to read the source.
+ *
+ * WHY THE PAIR NEEDS A GUARD AT ALL, when `check:mirrors` exists: it compares **models**. This
+ * service is a divergent duplicate - 77 lines apart, because the admin copy carries its own
+ * logging - so it can never be byte-compared either, and nothing in the repository has ever
+ * had an opinion about it. It is reached by BOTH apps' every-minute finalize cron, which is
+ * exactly the shape of R26 and R42, making this the third finding in this one file pair. The
+ * failure mode is not an error: a rule present in one copy only means the payout depends on
+ * which cron claimed the contest first.
+ *
+ * The correction that came with it: this suite's header used to justify itself on the grounds
+ * that "the two copies of every dependency this touches are byte-identical". That was true of
+ * `fees.service.ts` and `lib/games/` and it was never true of this one.
+ */
+describe("the eligibility gate exists in both copies of the ranking engine", () => {
+  const RANKING_COPIES = [
+    "lib/services/competition-ranking.service.ts",
+    "apps/admin/lib/services/competition-ranking.service.ts",
+  ];
+
+  /*
+    Comments are stripped before matching, because both copies explain this gate in a long
+    paragraph directly above it, and a structural test that reads prose fails in both
+    directions - it passes a file whose only surviving mention is the explanation, and flags a
+    correct file for discussing the anti-pattern.
+ 
+    HONESTLY: the strip changes no answer TODAY, and saying so beats implying it is what holds
+    the property. Neither paragraph currently writes the call out, so `hasResult` appears
+    exactly once in each file either way - checked, not assumed. It is kept because the
+    paragraph is precisely the kind of prose somebody extends with the literal call while
+    explaining it, at which point the count assertion below silently starts reading two.
+  */
+  const sourceWithoutComments = (relativePath: string): string =>
+    readFileSync(join(process.cwd(), relativePath), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/[^\n]*/g, "");
+
+  it.each(RANKING_COPIES)("%s asks the module for a result", (relativePath) => {
+    const source = sourceWithoutComments(relativePath);
+
+    /*
+      The OPERATOR is asserted, not the operand. `toContain("hasResult")` stays true when the
+      call is replaced by a hand-rolled `participant.score !== undefined`, because the name
+      survives in the import line - which is how three assertions were defeated in one file
+      during the round inspector.
+    */
+    const gate = /if\s*\(\s*isCompleted\s*&&\s*!\s*gameModule\.hasResult\(\s*participant\s*\)\s*\)/;
+    expect(source).toMatch(gate);
+
+    /*
+      And the branch has to REFUSE. Position within the construct, never a fixed-character
+      scan back from the refusal: a window of N characters begins mid-identifier and reports a
+      guard missing that is present.
+    */
+    const gateAt = source.search(gate);
+    const branch = source.slice(gateAt, gateAt + 200);
+    expect(branch.length).toBeGreaterThan(100);
+    expect(branch).toMatch(/qualified:\s*false/);
+    expect(branch).toMatch(/reason:\s*"No score recorded"/);
+  });
+
+  it.each(RANKING_COPIES)(
+    "%s scopes the gate to a completed contest",
+    (relativePath) => {
+      /*
+        Counted rather than merely matched. `isCompleted` appears several times in both files
+        for the trading checks, so the interesting failure is a SECOND unscoped call to
+        `hasResult` added beside the scoped one - which any single positive match is happy
+        with, and which would disqualify every player mid-round on the live leaderboard.
+      */
+      const source = sourceWithoutComments(relativePath);
+      const calls = source.match(/gameModule\.hasResult\(/g) ?? [];
+
+      expect(calls).toHaveLength(1);
+    },
+  );
 });
