@@ -18,7 +18,10 @@ import {
 } from "@/lib/services/pnl-calculator.service";
 import { getMultipleSymbolConfigs } from "@/lib/services/symbol-config.service";
 import mongoose from "mongoose";
-import { routeToTradingSettlement } from "@/lib/games/settlement";
+import {
+  resolveSettlementPath,
+  routeToTradingSettlement,
+} from "@/lib/games/settlement";
 import { settleFeesAndGameMasters } from "@/lib/services/settlement/fees.service";
 
 /**
@@ -26,6 +29,54 @@ import { settleFeesAndGameMasters } from "@/lib/services/settlement/fees.service
  * This is called automatically by Inngest when endTime is reached
  */
 export async function finalizeCompetition(competitionId: string) {
+  /*
+    PROVIDER DISPATCH, AND IT MUST HAPPEN BEFORE THE SESSION IS OPENED.
+
+    This app had none. `routeToTradingSettlement` below answers "may trading settle this",
+    so a provider contest reaching the admin cron was REFUSED and left `active` - it simply
+    never settled, and nobody was paid at all. The main app has dispatched correctly since
+    X5, and both apps register `checkAndFinalizeCompetitions` on an every-minute cron, so
+    whether a provider contest settled depended on **which cron claimed it first**. No flag,
+    no error a person sees, and a coin flip either way.
+
+    This is R26's shape one layer out and worse: R26 was a missing Game Master payment on
+    this same cron, so the general form is now stated rather than the two instances - the
+    four finalize functions are **not four copies of one function**, so a capability added
+    to the main app's is not thereby added to this one. `provider-finalize.ts` and
+    `provider-settlement.service.ts` were already mirrored here and imported by nothing,
+    which is why `check:mirrors` had no opinion and a size comparison raises nothing: the
+    files agree, and only the call site was absent.
+
+    Ordering is load-bearing. `finalizeProviderCompetition` opens its own session and takes
+    its own optimistic lock, so dispatching after `startSession()` would nest a transaction
+    inside one this function owns. It also has to sit before any lock for the reason the
+    main app records: refusing here leaves the contest untouched, whereas a check after the
+    lock strands it in `finalizing` with nobody able to claim it again.
+  */
+  await connectToDatabase();
+  const label = await Competition.findById(competitionId)
+    .select("gameType")
+    .lean<{ gameType?: string } | null>();
+
+  if (label) {
+    const route = resolveSettlementPath(
+      label.gameType,
+      `competition ${competitionId}`,
+    );
+
+    if (route.path === "provider") {
+      const { finalizeProviderCompetition } = await import(
+        "@/lib/services/settlement/provider-finalize"
+      );
+      return await finalizeProviderCompetition(competitionId);
+    }
+
+    if (route.path === "none") {
+      console.error(`❌ [COMPETITION] ${route.error}`);
+      return { success: false, error: route.error };
+    }
+  }
+
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -49,10 +100,13 @@ export async function finalizeCompetition(competitionId: string) {
       return { success: false, message: "Competition is not active" };
     }
 
-    // X1 seam 3: the game dispatch lives HERE rather than at the call sites, so every
-    // caller - including ones nobody has written yet - is correct by construction.
-    // Placed before any position is closed, and aborts the transaction on refusal so
-    // the competition is left exactly as it was found.
+    // The SECOND gate, and its comment used to claim to be the dispatch - which was true
+    // when this app had no provider path and is now wrong. The dispatch is above, before the
+    // session. This one asks the narrower question "may trading settle this", inside the
+    // transaction and before any position is closed, so a contest whose label changed between
+    // the two reads is refused with the transaction aborted and the contest left exactly as
+    // it was found. Kept deliberately: the two gates differ in WRITES, not in end status,
+    // which is why deleting either one leaves a suite green.
     const settlementRoute = routeToTradingSettlement(
       competition.gameType,
       `competition ${competitionId}`,

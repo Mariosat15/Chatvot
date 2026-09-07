@@ -294,6 +294,86 @@ creating provider contests now rests on it.
   only thing keeping them apart. Guarding this route on `game-providers` would have made
   every competition operator a credential holder — and it would have reviewed as consistent.
 
+### 2.2 Editing - BUILT 7 September 2026, and the trading route was a mass-assignment hole
+
+**A provider contest is now editable, and the reason Edit was withheld from it turned out to
+be a live defect in the trading path rather than a gap in the provider one.**
+
+`PUT /api/competitions/[id]` did `Object.assign(competition, body)` on the parsed request
+body. Every field on `Competition` was therefore writable by anyone holding an admin JWT,
+including `gameKey` (immutable, the join key for all historical stats), `gameType`, `status`,
+`prizePool`, `currentParticipants`, `contentSeed` and `createdBy`. **`12` s3.1a and `09` E5 —
+the only two places it was written down — both described this as a corruption risk *for
+provider contests*. It was a mass-assignment vulnerability on trading contests too, and had
+been since long before this programme.**
+
+Two things about how it was authenticated compound it, and both are instances of classes
+already on record here. The route called **`verifyAdminToken`**, which asks only whether the
+caller holds a valid admin token — so an employee granted one unrelated section could rewrite
+any contest. That is the **fifth** instance of `requireAdminAuth`-shaped authentication being
+mistaken for authorization, after Prerequisite A, the internal-secret fallbacks, the
+unprotected suspicion-score route and the provider admin routes. And the GET and DELETE
+handlers in the same file had the same weakness, which is why the fix **counts exported
+handlers against guards** rather than checking the file mentions the right helper once.
+
+| Built | Where |
+|---|---|
+| Trading allow-list and the never-editable list | `apps/admin/lib/admin/competition-update-fields.ts` |
+| Freeze rules, model-free, shared with the UI | `apps/admin/lib/admin/provider-contest-edit-policy.ts` |
+| Provider edit service | `apps/admin/lib/services/game-providers/provider-contest-edit.service.ts` |
+| Provider edit API | `apps/admin/app/api/games/contests/[competitionId]/route.ts` (GET, PATCH) |
+| Provider editor UI | `apps/admin/components/admin/games/ProviderContestEditor.tsx` |
+| Page route | `apps/admin/app/competitions/edit-game/[id]/page.tsx` |
+| Edit link routes by game | `CompetitionsListSection.tsx` |
+
+34 tests in `__tests__/admin/provider-contest-edit.test.ts`, **16 probes all red on exactly
+the expected test** (`tools/probe-contest-edit.ps1`). **None of these files is mirrored** —
+`apps/admin/lib/admin/` and the admin API routes are admin-only, so `check:mirrors` says
+nothing about any of it.
+
+**Five findings worth carrying beyond this section.**
+
+- **An allow-list must REFUSE an unknown field, not drop it.** Dropping is the tidy-looking
+  option and it means an operator's edit silently does nothing: the form posts, the route
+  answers 200, the screen re-renders the old value and the operator assumes they misclicked.
+  Refusing with the field named is the feature. Same reasoning as the config-schema parser
+  failing closed, and as refusing a contest whose round settings are missing.
+- **The never-editable list is defence in depth and must be tested by its ERROR TEXT, not by
+  whether the field is refused.** A probe removing `gameKey` from `NEVER_EDITABLE_FIELDS`
+  stayed green, because `gameKey` is absent from the allow-list too and so still fell through
+  to the unknown-field refusal — whose message also contains the words "gameKey". The
+  assertion had to pin *which* refusal fired. Without that, a future edit adding a field to
+  the allow-list quietly removes its immutability while the test stays green.
+- **An allow-list held in a plain object is not an allow-list.** `ALLOWED[key]` walks the
+  prototype chain, so `"constructor"` is admitted — truthy, survives a `!allowed` test, and
+  only fails later somewhere that reads nothing like the cause. A `Set` has no prototype
+  chain, so the check is total. Related and separate: the earlier claim that `for...in` would
+  admit inherited keys where `Object.keys` would not was **wrong for a JSON-parsed body** and
+  was corrected rather than left as a plausible-sounding aside.
+- **The freeze must key on PARTICIPANTS, not on status.** A `draft` with entrants is
+  impossible today, but an `upcoming` contest with twenty paid seats is the normal case, and a
+  status-keyed freeze lets its entry fee be changed underneath them. The tiers are: nothing
+  frozen at zero participants; `name`, `description` and a *raising* `maxParticipants` once
+  anyone has entered; nothing at all editable once `finalizing`, `completed`, `cancelled` or
+  `emergency_ended`. **`finalizing` is the one that matters most** — a change landing then may
+  or may not be counted depending purely on timing, which is the same reason X3 treats it as
+  closed for late results.
+- **An edit must re-run the pre-flight against the STORED record.** A draft can outlive the
+  switches that made it valid: the title can be disabled, the provider can be disabled, the
+  adapter can be uninstalled. This is the same rule publishing already follows, and it also
+  asks the question the creation-day validation could not — whether the settings persisted at
+  all. The settings are re-validated against the **live** `configSchema` for the same reason,
+  and the **coerced** values are stored, so `"7"` from an HTML input never reaches the provider
+  as a string.
+
+**Two deliberate scope limits.** The trading editor still exposes fewer fields than the
+trading create form — the gap this section asks to close is a *trading* UI job with no
+provider dependency, and closing it inside a security fix would have destroyed the only
+evidence that no trading edit changed behaviour. And there is **no game-type change at any
+point**, not even on a zero-participant draft: the target above permits it, but `gameKey` is
+immutable and a draft is cheap to delete and recreate, so the permission buys nothing and
+costs an immutability guarantee.
+
 ---
 
 ## 3. Contest list and detail screens
@@ -354,6 +434,14 @@ confusing screen. Same reasoning as a provider switch that cannot work refusing 
 rather than being disabled. Until a provider editor exists, cancel and recreate is the honest
 instruction.
 
+> **SUPERSEDED 7 September 2026 by s2.2, and correct as history only.** A provider contest is
+> now editable through its own editor and the Edit link **routes by game** instead of being
+> withheld. The blind assign is gone — and the paragraph above understates what it was: the
+> route authenticated on token validity rather than section access, so **every field on
+> `Competition` was writable by any admin-token holder, on trading contests too.** The
+> requirement did not change, only the remedy, which is why the test that pinned the
+> withholding was flipped rather than deleted.
+
 **Also worth recording: `startingCapital` was declared `number` and is never read here.** It
 was a lie in the type for every provider contest, which has none, and the honest fix was to
 mark it optional rather than to render a zero.
@@ -373,9 +461,143 @@ indistinguishable from a test that does not work.**
 **What this does not include:** ~~no player screen starts a round~~ (**built the same day** -
 `13` s1.1a); there is no unpublish, deliberately, because a visible contest can already have been
 paid into and cancel-with-refund is the reversible operation; and ~~the round inspector, manual
-resolution~~ (**also built the same day** - section 4.2a) and the live-contest controls in section
-4 are still unbuilt. **Correct as history, stale as a present fact** - only the live-contest
-controls and provider health remain.
+resolution~~ (**also built the same day** - section 4.2a) and ~~the live-contest controls in
+section 4~~ (**built 7 September 2026** - section 3.2a) are still unbuilt. **Correct as history,
+stale as a present fact** - nothing in this list remains outstanding.
+
+### 3.2a What was built - 7 September 2026, the live-contest controls
+
+**The lifecycle actions table above asked for three routes to become game-aware. Mapping them
+found six, an authorization sweep, and two defects that had nothing to do with games.** The
+count is the recurring lesson: after four entry paths, ten finalize sites, six raw inserts,
+seven subscription writers and one field with zero writers, a plan naming three routes is an
+assumption until `rg` says so.
+
+**Every route in the sweep, and what each one actually needed.**
+
+| Route | Found | Done |
+|---|---|---|
+| `GET /api/competitions` | Its **own inline copy** of the JWT verification - cookie read, `jwt.verify`, nothing else asked | `guardSection("competitions")`, local helper and `jsonwebtoken` import deleted |
+| `PUT/GET/DELETE /api/competitions/[id]` | Token validity only, on all three handlers | Guarded per handler (s2.2) |
+| `POST /api/competitions/[id]/pause` | `verifyAdminAuth` on POST and GET; **`isPaused` enforced nowhere for a provider game** | Guarded, plus the gate below |
+| `POST /api/competitions/[id]/cancel` | `requireAdminAuth` - admin-at-all, not section access | Guarded; live rounds now voided |
+| `POST /api/competitions/[id]/emergency-cancel` | `verifyAdminAuth`; closes positions and left rounds `launched` | Guarded; live rounds voided; reports the count |
+| `POST /api/competitions/[id]/adjust-results` | `verifyAdminAuth` | Guarded. **Still has no UI caller at all** - API-only, and recorded rather than hidden |
+| `POST /api/finalize-old-competitions` | **No authentication of any kind.** Risk **R40** | Guarded **before `connectToDatabase()`**; provider contests skipped explicitly |
+
+**`requireAdminAuth`, `verifyAdminAuth` and `verifyAdminToken` all answer "is this an admin at
+all", and none is an authorization check** - an employee granted one unrelated section passes
+every one of them. `requireSectionAccess`, which `guardSection` wraps, is the grant. That is now
+the **sixth** instance of this class after Prerequisite A, the internal-secret fallbacks, the
+unprotected suspicion-score route, the provider admin routes and `PUT` on the CRUD file, so it is
+asserted across the whole set with an `it.each` rather than case by case.
+
+**The unauthenticated one is different in kind and is R40.** The rule it produces: **the routes
+with no guard are not found by reading the ones with weak guards.** Every sibling had *something*,
+so a review pass over them would have missed this entirely. It was found by enumerating the
+lifecycle routes and **counting exported handlers against guards** - which also catches the
+subtler shape, a file whose `POST` is guarded and whose `GET` is not, passing any mention-based
+check while leaving a mutation open.
+
+**Pausing a provider contest did nothing at all, and that is R41.** The gate is now in
+`round-launch.service.ts`, before any seat lookup or round creation, with three deliberate
+properties:
+
+- **Its own `contest_paused` refusal, not `contest_not_open`.** The contest *is* open and the
+  player will be able to play, so the UI needs a different sentence and a different affordance -
+  come back shortly, not "you cannot play this". The same reasoning that kept three other
+  lifecycle refusals out of `contest_not_open` when `LaunchRefusal` was first written. Mapped to
+  **409**, grouped with the other lifecycle refusals rather than the retryable 503s.
+- **It blocks a resume as well as a start.** `blocked` is deliberately independent of `resuming`
+  in `RoundPreflight.tsx`: an operator pauses to stop play, so letting a player continue inside a
+  round they already have open defeats the control while appearing to honour it.
+- **A pause is not rendered as an error.** The red panel is for a rejected action; a pause is the
+  contest's normal state for a moment. Same distinction as the not-yet-started case in `13` s1.1b,
+  and the test counts the red containers so a second cannot be added.
+
+**Resume was compensating the wrong field, and the field it extended is the one called "end".**
+`createRound` gates on `playWindowEnd`; the launch service gates on `playWindowStart`; `endTime`
+gates neither. So extending only `endTime` gave the fairness compensation to trading and silently
+withheld it from every provider game - the contest ran longer while the window players actually
+play inside stayed exactly as short. Resume now extends `playWindowEnd`, and `playWindowStart`
+**only while it is still in the future**, because shifting a window that has already opened would
+re-close it and refuse play that was legitimately available a moment earlier.
+
+**Cancelling reached into the rounds, and the sequence it replaces is the argument for it.**
+Cancelling a trading contest closes its positions, because a position is all a trading contest
+leaves running. A provider contest leaves a **round**, and nothing was closing it: the player kept
+playing a contest that no longer existed, the provider's result was refused and audited as a late
+result, and the reconciliation net then polled the round, backed off, and after the grace window
+wrote it `unresolved` and raised a **critical** alert. **The operator got a critical alert for the
+consequence of their own deliberate action**, which is the fastest way to teach a team to ignore
+critical alerts.
+
+`lib/services/games/contest-round-cleanup.ts` (mirrored) voids them, and three things about it are
+load-bearing. It is **not a second ingestion door** - it writes a status, never a score, the same
+argument that lets `resolveRoundManually` exist in admin. It uses **`voided` with
+`resultSource: "manual"`**, because `abandoned` and `expired` describe something the player or the
+clock did, and this was a platform decision. And it is called **inside the refund transaction**,
+asserted by position against `commitTransaction()`, because a call after the commit would still
+"call the function" and would void rounds for a refund that never happened.
+
+**The operator's control panel described a different game, in seven places.** The worst read "All
+positions will be closed at current prices" above the emergency-cancel confirm button, on a
+contest with no positions, and listed "Calculate and record all P&L". Pausing reported "Trading is
+now frozen" - doubly wrong, since the pause was not being enforced. The wording now comes from
+`apps/admin/lib/admin/contest-control-copy.ts`, and two decisions there are worth keeping:
+
+- **A shared model-free module, not a ternary per string.** The panel is `"use client"` and cannot
+  import a service that reaches a Mongoose model, which is a real constraint with a real cost -
+  the same one behind `components/games/play-state.ts` and the round-resolution action list. Both
+  of those were first written as a second copy. This one is shared from the start.
+- **The consequence lists genuinely differ; they are not a renamed noun.** Pausing a trading
+  contest stops orders and closes nothing; pausing a provider contest stops rounds being started
+  *or resumed*. Emergency-cancelling a trading contest closes positions and records P&L; a
+  provider contest has its live rounds voided. **A wording pass that only swapped the noun would
+  have left the operator reading a list of things that do not happen** - which is worse than the
+  trading wording, because it reads as though somebody checked.
+
+The flag is **derived server-side by `hasProviderGameLabel`** and passed in. The panel contains no
+game check of its own, deliberately: what an operator is told about a money-adjacent action must
+not be decidable in the browser, and there would otherwise be two answers in the admin app to "is
+this a provider contest" - with the untested one in front of the operator. It is the **label**
+helper, not the strict `isProviderContest`, for the same reason as the list: a keyless provider
+contest must not be handed the dialog promising to close positions it does not have.
+
+**Force-finalize now skips provider contests explicitly, and it was already a no-op.** The loop
+closes `TradingPosition` rows at forex prices, so a provider contest fell through the
+empty-positions branch and reported "No open positions found" - a healthy-looking result about a
+puzzle. The skip says so instead. There is nothing to dispatch *to*: a provider contest that
+reached `completed` has already been through `provider-settlement.service.ts`.
+
+Pinned by `__tests__/admin/live-contest-controls.test.ts` (**63 tests**) and
+`tools/probe-live-controls.ps1` (**31 probes, all red on the expected test**). Admin typecheck at
+**223, the baseline exactly**, with no error in a changed file and - equally important - none
+disappearing; the one apparent new entry was a **line shift** of a pre-existing error, which is
+why the lists are diffed by message text rather than counted.
+
+**Three probes came back green and each had a different cause, which is the whole value of running
+them.** All three were **weak tests**, and in each case the injected defect satisfied the
+assertion with a *different string*: restoring "All positions will be closed at current prices"
+passed a guard written against the phrase "open positions"; deleting the mid-round resume line
+passed a bare `/resum/i`, because "extend the play window and the end time when resumed" contains
+it too; and replacing the pause list's mention of positions passed an assertion over the whole
+copy object, because the emergency list still said "positions". **A vocabulary guard must match
+the word, and a per-list claim must be asserted per list** - one list covering for the other is
+indistinguishable from the guard working.
+
+**And one claim was wrong rather than weak, in the same pass.** "No trading wording anywhere in
+the panel" is false and must not be restored: the emergency toast keeps "N positions closed" in
+its **trading** branch, because an operator running a trading contest still needs to be told what
+happened to their positions. The honest claim is narrower - no *unconditional* trading wording -
+and it is asserted over the JSX with the branched strings living in the handlers.
+
+**Two things are recorded rather than fixed.** `adjust-results` has **no UI caller** and is
+reachable only by API, so it is guarded but not usable by clicking; and the panel's
+`emergency_ended` status is read while `emergencyCancelActiveCompetition` writes `"cancelled"`
+with an `emergencyEndedAt` alongside, so **`emergency_ended` is a state the model declares and
+nothing ever stores.** Both belong with X6.5's admin pass rather than here - the first needs a
+screen, the second is a mirrored status decision - and neither is closed.
 
 ---
 

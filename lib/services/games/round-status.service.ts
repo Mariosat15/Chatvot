@@ -65,6 +65,17 @@ export type PlayStateRefusal =
 
 export interface PlayState {
   contestStatus: string;
+  /**
+   * Whether an operator has paused the contest, and why.
+   *
+   * Carried separately from `contestStatus` because a paused contest is still `active` - the
+   * pause is a flag, not a state - so a pre-flight deriving its answer from the status alone
+   * offers an enabled Play button that the launch service will refuse. That is the same
+   * mismatch fixed on 6 Sep 2026 for a contest that had not started yet, arriving from the
+   * one direction that fix did not cover.
+   */
+  isPaused: boolean;
+  pauseReason?: string;
   gameKey?: string;
   attemptsPolicy: string;
   attemptsPermitted: number;
@@ -150,6 +161,8 @@ export async function getPlayState(
           _id: mongoose.Types.ObjectId;
           status: string;
           gameKey?: string;
+          isPaused?: boolean;
+          pauseReason?: string;
         })
       | null
     >();
@@ -221,6 +234,8 @@ export async function getPlayState(
       success: true,
       state: {
         contestStatus: contest.status,
+        isPaused: contest.isPaused === true,
+        pauseReason: contest.pauseReason,
         gameKey: contest.gameKey,
         attemptsPolicy: config.config.attemptsPolicy,
         attemptsPermitted: permitted,

@@ -17,6 +17,8 @@
 | **Player screens** | **R37 closed 6 Sep 2026, and it is the one to read first if a provider board looks odd.** Neither app's `getCompetitionLeaderboard` passed `score` or `scoreDirection` to the ranking engine, so **every provider participant tied on zero and the board rendered in tie-break order** - and a lower-is-better title was *reversed on screen while correct at settlement*, so a player could lead all week and be paid last. **Latent for money, live for players:** settlement resolves both fields itself, so no payout was ever wrong and **nothing was backfilled**. Fixed by moving `resolveScoreDirection` out of settlement into a shared mirrored module used by all three consumers. Same day, `RoundPreflight` stopped offering an enabled **Play** button on a contest that had not started, and **the lobby became game-aware** - `app/(root)/competitions/[id]/page.tsx` now branches to `ProviderContestLobby`, which shows the play window, attempts remaining and what happens if a round never finishes, with a score leaderboard instead of one whose columns are profit and loss. The trading path below the branch is **byte-identical**. Also 6 Sep 2026, **the dashboard contest cards became game-aware** (`13` s5.1a) - and the load-bearing part is that **the plan named the wrong components**: `ActiveCompetitionCard` and `CompetitionsTable` are both orphaned, and the live one is `ContestsSidebar`, which no chapter mentioned. Fixing only what the plan named would have closed the item with the defect still on screen. See `13` s4.1a and s5.1a for exactly what is and is not built - **the trading panels, the per-game summary cards and the mega-action split are still outstanding**. Finally, on **owner instruction 6 Sep 2026, BOTH lobbies were rebuilt on one design kit** (`13` s4.1d) - `components/neon/`, from a component sheet the owner supplied, with four generated hero banners. This **superseded s4.1c of the same morning, which had made the game lobby match the trading lobby**: the sheet is now the reference and the trading lobby is one of the two screens that moved to meet it, so a document citing s4.1c's gold hero or its 3D icon rule as current is stale. The trading page is **down from 1,224 lines to 377**, with its hero, sidebar, accordions and prize table extracted into `components/trading/lobby/`, and its nine always-open sidebar cards are now four open items and six accordions - **what stayed open is pinned by a test**, because burying a decision a trader acts on is the same class of error as an aggregate that quietly means trading only. The consistency guard changed shape with it: **one definition, and no screen has chrome of its own**, because pairwise class-string comparison does not survive the sheet's seven screens. The cost is stated rather than glossed - **the trading page is no longer byte-identical**, so the money calculation was extracted whole and four of its expressions are asserted character for character. **Neither lobby has been seen by eye**; both are behind sign-in and the automated browser has no session, so owner review is the remaining step |
 | **First round crossed the wall** | **7 September 2026.** A round now travels between the two halves: created by the platform, played by real moves, scored by the service, delivered back **signed over a real socket**, ingested through all eleven gates and **paid out as real prize money**. `__tests__/games/end-to-end-round.test.ts`, `npm run test:e2e-round`, three tests, three probes red. **This closes the gap 4.1a names** - the adapter's 49 tests run against a *stubbed* `fetch` and the service's 167 run in-process, so neither could ever fail because the other side disagreed. **Two things are substituted and must not be glossed:** the Next routing layer (the callback goes to a bare `node:http` server that does exactly what the real route does - read raw bytes, call the one ingestion function) and the browser. **It is still not the acceptance criterion**, which says *by clicking* - that needs two sessions this environment cannot create, so it is a runbook in `21` s4.1e. **And the finding is that there was no finding:** every earlier phase produced live defects on contact and the first real round produced none in the product. The three it did surface were in the new test driver and the map it was written from |
 | **Next action** | **Technically: finish X4a** - pull and rebuild on the server, start `chartvolt-games`, register it through the admin screens, and drive one round end to end **by clicking** (`21` s4.1e has the six steps; start with `circuit-perfect`, which ends when the player finishes rather than when a 60-second clock does). **No DNS, nginx or certificate work is needed** since the play surface is proxied through the platform app (owner's choice, 6 Sep 2026). The game is **playable by a human in a browser**, **R34 is closed**, and the service is now **deployable** - PM2 entry, nginx block, `env.example` and a runbook in `deploy/README.md` (all 6 Sep 2026) - so nothing technical stands between the two halves. **Owner decided 6 Sep 2026 to deploy first and rehearse against the live site**, rather than complete the local rehearsal. Provider **health** - the last of X6's five admin destinations - **shipped 6 Sep 2026** (`12` s4.2b), so what remains of the player surface is the trading panels themselves and the per-game summary cards. **Commercially, in parallel: find and assess a provider using `08`** - X4 cannot start without one, and nothing in the programme is blocked on that search |
+| **Admin lifecycle controls** | **Code-complete 7 Sep 2026** (`12` s3.2a), and it found the worst authorization defect in the programme. `POST /api/finalize-old-competitions` had **no authentication of any kind** - **R40**, unauthenticated and reachable *today*, unlike almost everything else here. Any anonymous caller could force-finalize every `completed` competition: closing positions at live prices, writing trade history, and hitting an external forex API per position. Scoped to already-completed contests, so no prize and no wallet movement - **do not round that up, and do not round it down either.** No backfill, and **no way to know whether it was ever called**, because a route with no guard has no attribution. Five siblings authenticated on **admin-at-all rather than section access**, the sixth instance of that class. Separately, **pausing a provider contest did nothing at all** (**R41**): `isPaused` was never read by the launch service, so an operator got a success toast, a banner and a notification to every participant while play continued - and this is the route `IncidentsSection.tsx` calls when an incident is raised. Latent, since no provider contest has run in production. The rule from it: **a capability the platform already has does not extend to a new game by itself, and the way it fails is silence** |
+| **Admin provider settlement** | **Fixed 7 Sep 2026 (R42)**, found by verifying a mapping subagent's claim rather than by planned work. `apps/admin`'s `finalizeCompetition` had **no provider dispatch** - only `routeToTradingSettlement`, which answers "may *trading* settle this" - so a provider contest reaching the admin cron was refused and left `active`. **Both apps register `checkAndFinalizeCompetitions` on an every-minute cron**, so whether a provider contest settled was decided by which process claimed it first. **R26's shape one layer out and worse**: R26 skipped the Game Master's commission while still paying the players, this paid **nobody and completed nothing**. Latent - no provider contest has settled in production, **nothing backfilled**. Two instruments were silent and both are ones we trust: `provider-finalize.ts` and `provider-settlement.service.ts` were **already mirrored here and imported by nothing**, so `check:mirrors` agreed correctly, and the file-size gap that found R26 has closed to 8 KB so it raises nothing. The rule that now replaces both instances: **the four finalize functions are not four copies of one function, and a capability added to one is not thereby added to the others** |
 | **Money defects closed** | **R26 closed 5 Sep 2026** - the admin cron's finalize copy paid **no** Game Master earnings and recorded no `retained_gm_fee` either, so the commission silently stayed with the platform. This one was **actively losing money rather than latent**: both apps run `checkAndFinalizeCompetitions` on an every-minute cron, so payment depended on which cron won the race. **Not retroactive - no backfill**, and past contests cannot be found by querying for retained rows because none were written. Also **R31** (a 0% Game Master rate paid 5%) and the two P0 score defects, same day |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
 | **Phase in progress** | **X4a - STARTED 6 Sep 2026. The two halves connected 7 Sep 2026** - see the row above and `21` s4.1d. What remains is the *clicking* half: the provider has still never been registered through the admin screens, and nothing has been deployed. `games-service/` (the provider) and the `chartvolt-games` adapter (the platform) are both code-complete. **The game is playable by a human**: the launch URL serves a real board, verified in a browser on both titles, which also fixed a live defect - an unstarted round reported itself as `finished`, so the first screen a paying player saw was a result screen for a round they had not played. It also **found and then closed a defect in the platform's own published auth scheme** (**R34**): there was no `callbackToken` field anywhere, so a provider implementing `Bearer {CALLBACK_TOKEN}` exactly was rejected and logged as a probable attack. Latent throughout, so nothing was backfilled. **Nothing technical now stands between the two halves** - what remains is deploying the service and registering it. It is now **deployable**: a PM2 entry, an nginx block for a `games.` subdomain, `env.example` and a `deploy/README.md` runbook, plus **two production-only boot guards** for the play origin and the frame allowlist, both of which previously failed invisibly. Writing the runbook also found that the admin panel **could not register a loopback provider at all**. See the three 6 Sep work-log entries |
@@ -349,7 +351,7 @@ numbers in chapters `01`-`09` remain resolvable. **Plan against the X-phases bel
 | **X4a** | **ChartVolt as a first-party provider + a real playable game** - registered through the real admin screens, served from its own origin, reporting through the real signed callback. **Doubles as the in-house hedge game** | `21` | **3.5-5 weeks** | `IN PROGRESS` since 6 Sep 2026. **Built:** the standalone `games-service` (seeded puzzle engine, two titles, all four spec endpoints, signed auth, retrying callback, reconciliation sweeper), the platform-side `chartvolt-games` adapter, mirrored, and **the playable board** - a human can start, drag, solve, submit and see a result, verified in a browser on both titles, **167 tests** in the service. Also **deployable**: PM2 entry, `env.example`, a `deploy/README.md` runbook, and the service proven to run from its production `dist` build. **Two exposure routes** - proxied through the platform app at `/play` (owner's choice, 6 Sep 2026: no DNS, no nginx, no certificate) or its own `games.` subdomain (nginx block kept). The proxy makes the frame same-origin, which costs the cross-origin rehearsal and nothing in the protocol - `21` s4.1c. **The two halves spoke on 7 Sep 2026** (`21` s4.1d): a real round now travels between them - launched, played, scored, delivered back signed and **paid out**, with the lower-is-better title paying the faster player more. `npm run test:e2e-round`, 3 tests, 3 probes red, and it found **no product defect**. **Not built:** provider registration through the admin screens, and the end-to-end round **by clicking** - which is the acceptance criterion, and needs two sessions, so it is a runbook in `21` s4.1e. Four defects found earlier and all four **fixed**: the missing `callbackToken` field (**R34**), an https-only base-URL rule that made a loopback provider unregisterable, and two invisible configuration defaults (a localhost play origin, an absent frame allowlist). Original scope **decided 5 Sep 2026: it is both** the reference implementation and open question 10's hedge game, which is why the estimate is not 1-1.5 weeks. **No commercial dependency** - the only remaining work on the shortest useful path that does not wait on a contract. Exists because **the review gate `10` s4 is sequenced around cannot currently be held**: `mock.adapter.ts` returns `https://mock.provider.test/...`, which does not resolve, so the play screen's iframe fails to load and the last step of the lifecycle has never been performed by a person. **Runs before the provider health panel**, so health can be proven by watching it go red |
 | **X4** | Real adapter against sandbox | `09` E3 | 1 week | `NOT STARTED` - **blocked on a signed provider**. X4a shrinks it but **does not replace it**: a harness we control cannot rehearse a real partner's auth, error shapes, latency or pricing |
 | **X5** | Contest integration + settlement | `09` E4 | 1 week | **`CODE-COMPLETE`** 4 Sep 2026, **with two P0 payout defects found and fixed 5 Sep 2026** - publish, entry, ranking, round launch, settlement and **all three unresolved-round policies**. **A provider contest can be published, entered, played and paid. Publishing became clickable on 5 Sep 2026 (X6 slice), and the player round launch on the same day (`13` s1.1a) - the lifecycle is no longer API-only anywhere.** Settlement was an **extraction**: the payout, fee/GM and completion stages moved to `lib/services/settlement/` and trading was rewired onto them. Closing `exclude` also closed **`hold_and_alert`**, which nothing had ever consumed. **The two P0s are why "code-complete" must never be read as "correct":** no code path wrote `participant.score`, so every player settled on zero and split the pool equally; and settlement read `scoreDirection` off a field neither participant copy declared, so a lower-is-better game paid the slowest player first |
-| **X6** | Admin: nav restructure incl. **the single Trading section**, RBAC, provider registration, game-aware wizard, analytics, **GM creation API + wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | `PARTIALLY DONE` - nav restructure and single Trading destination **built and owner-tested 2 Sep 2026**. **Provider registration, credentials and the per-title catalogue switch code-complete 4 Sep 2026** (`12` s4.1a). **Contest wizard from `configSchema` + pre-flight validation code-complete 4 Sep 2026** (`12` s2.1) - creates a **draft**. **The publish control is code-complete 5 Sep 2026** (`12` s3.1a), which also made the competitions list game-aware: `draft` admitted as a status, its own badge, a Drafts count, a provider game badge, and the trading Edit button **withheld** from provider contests because `PUT /api/competitions/[id]` blind-assigns that form's body. **The round inspector and manual resolution are code-complete 5 Sep 2026** (`12` s4.2a) - read-only inspection plus **ending** a stuck round (void/abandoned/expired) with a mandatory reason; it deliberately **cannot enter a score**. Still `NOT STARTED`: provider health panel, live-contest controls, provider contest **editing**, analytics by provider, GM creation API |
+| **X6** | Admin: nav restructure incl. **the single Trading section**, RBAC, provider registration, game-aware wizard, analytics, **GM creation API + wizard** | `09` E5 + `12` + `19` | 3-3.5 weeks | `PARTIALLY DONE` - nav restructure and single Trading destination **built and owner-tested 2 Sep 2026**. **Provider registration, credentials and the per-title catalogue switch code-complete 4 Sep 2026** (`12` s4.1a). **Contest wizard from `configSchema` + pre-flight validation code-complete 4 Sep 2026** (`12` s2.1) - creates a **draft**. **The publish control is code-complete 5 Sep 2026** (`12` s3.1a), which also made the competitions list game-aware: `draft` admitted as a status, its own badge, a Drafts count, a provider game badge, and the trading Edit button **withheld** from provider contests because `PUT /api/competitions/[id]` blind-assigns that form's body. **The round inspector and manual resolution are code-complete 5 Sep 2026** (`12` s4.2a) - read-only inspection plus **ending** a stuck round (void/abandoned/expired) with a mandatory reason; it deliberately **cannot enter a score**. **Provider health code-complete 6 Sep 2026** (`12` s4.2b), which completed the five admin destinations. **Provider contest editing code-complete 7 Sep 2026** (`12` s2.2) - the Edit button now **routes by game** rather than being withheld, and the withholding turned out to be covering a **live mass-assignment vulnerability on the trading path**: `PUT /api/competitions/[id]` authenticated on token validity rather than section access, so any admin-token holder could rewrite `gameKey`, `status`, `prizePool` or `currentParticipants` on any contest, trading contests included. **Live-contest controls code-complete 7 Sep 2026** (`12` s3.2a): the plan named three routes and there were **seven**, five of which authenticated on admin-at-all rather than section access and one — `POST /api/finalize-old-competitions` — on **nothing at all** (**R40**, unauthenticated and live). **Pausing a provider contest did nothing** (**R41**): `isPaused` was never read by `round-launch.service.ts`, so an operator got a success toast, a PAUSED banner and a notification while players carried on — and the route is what `IncidentsSection.tsx` calls when an incident is raised. Resume was also extending `endTime`, which gates nothing a player plays inside. Cancelling now voids live rounds through a shared `contest-round-cleanup.ts`, and the operator's control panel — which said **seven trading-shaped things**, including "All positions will be closed at current prices" above the emergency-cancel confirm on a contest with no positions — takes its wording from a model-free `contest-control-copy.ts`. **A fourth defect was fixed 7 Sep 2026 while verifying the X6 mapping work (R42)**: `apps/admin`'s `finalizeCompetition` had **no provider dispatch at all**, so a provider contest reaching the admin cron was refused and left `active` - and since both apps run that cron every minute, whether one settled was a coin flip. Nothing was paid and nothing completed, which is worse than R26's missing stage. Still `NOT STARTED`: analytics by provider, GM creation API |
 | **X6.5** | **Admin wording pass** - brought forward from X8 so operators never work a games platform labelled "trading" | `14` | 0.5-1 week | `NOT STARTED` |
 | **X7** | Player UI + points, leaderboards, badges, levels, **profile and cross-game stats**, **per-game GM analytics** | `09` E6 + `13` + `05` + `19` | 3-4 weeks | `NOT STARTED` |
 | **X8** | Player wording, `tradingEnabled`, infrastructure gating | `14` + `15` | 1-1.5 weeks | `NOT STARTED` |
@@ -630,6 +632,316 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 7 Sep 2026 - R42 - THE ADMIN CRON REFUSED TO SETTLE PROVIDER CONTESTS
+
+**Shipped:** the six-line provider dispatch the main app has had since X5, added to
+`apps/admin/lib/actions/trading/competition-end.actions.ts`. 3 tests appended to
+`__tests__/services/admin-finalize-gamemaster-parity.test.ts` (8 total, all green), 4 probes
+in `tools/probe-admin-provider-dispatch.ps1`, all red on the expected test with exactly 1
+failure each. Full suite **1070 passing**, `check:mirrors` clean, admin typecheck **223,
+matching the baseline exactly**, main typecheck 15 with none in the changed files.
+
+**Found:** the admin app's `finalizeCompetition` had **no provider dispatch at all.** Its
+only game check was `routeToTradingSettlement`, which answers the narrow question *may
+trading settle this*, so a provider contest reaching it was refused and left `active`.
+**Both apps register `checkAndFinalizeCompetitions` on an every-minute cron**, so whether a
+provider contest settled was decided by which process claimed it first - no flag, no alert,
+no log line anyone reads on either branch.
+
+**How it was found, which is the part worth repeating.** Not by planned work. A mapping
+subagent asserted it in passing while surveying the lifecycle controls, and the claim was
+checked before being accepted. **Sixth instance of the aside-verification rule** after
+`challengeId`, the R7 severity, `billsPerRound`, the `participant.score` comment and the
+`walletMap` comment - and the first where the aside came from another agent rather than from
+our own documentation. The rule generalises without change: **an unverified claim is a
+claim whoever wrote it.**
+
+**Five things that generalise.**
+
+- **R26's shape one layer out, and stating the difference matters more than the similarity.**
+  R26 was a missing *stage* on this same cron: the contest settled, the players were paid, and
+  only the Game Master's commission was skipped. R42 was a missing *branch*: **nothing
+  happened at all.** The general rule now replaces both instances rather than sitting beside
+  them - **the four finalize functions are not four copies of one function, and a capability
+  added to one is not thereby added to the others.**
+- **A mirrored file is not a reachable one, and this is why `check:mirrors` was correctly
+  silent.** `provider-finalize.ts` and `provider-settlement.service.ts` were mirrored into
+  `apps/admin` during X5 **and imported by nothing.** The two copies agreed; only the call
+  site was missing. The guard has never had an opinion about callers, and the note in `11`
+  saying "the shared services exist in `apps/admin` now, so the fix is smaller" was true and
+  concealed exactly this.
+- **A heuristic that found the last defect is not evidence about the next one.** R26 surfaced
+  from a 34 KB file-size gap between the two copies. That gap is now 8 KB because the main app
+  shed code into shared services, and a six-line dispatch does not move it at all. The
+  conclusion is to extend the parity suite, not to re-measure the files - and the fixture gap
+  was the real one: **every test in that suite seeded a trading contest**, so a
+  provider-shaped one had never been handed to either finalizer.
+- **When two guards cover each other, neither can be probed alone - and the honest move is to
+  say so rather than ship a green probe.** Removing either game gate left the suite green,
+  because the other refuses an unknown label too; both had to be disabled in one edit, by
+  stubbing the shared import. The main app's answer to the same situation - assert `updatedAt`
+  never moved - **does not transfer**, because this path takes no optimistic lock, so there is
+  no `finalizing` state to strand a contest in and an aborted transaction is indistinguishable
+  from a never-opened one. The probe file **records the in-transaction gate as unprobed with
+  the reason**, rather than carrying a fifth probe that reports green and teaches the next
+  reader it is decoration.
+- **A terminal status is not evidence of a settlement, and a fixture bug proved it for free.**
+  The seeded participants passed `competitionId` as an ObjectId where
+  `CompetitionParticipant.competitionId` is declared `String`, and the raw driver does no
+  casting, so settlement's query matched nothing. It did not crash: it logged `Found 0
+  participants`, booked the whole pool as an unclaimed pool, recorded a platform fee, marked
+  the contest `completed` and **returned success.** Only the prize count disagreed. That is
+  the argument for asserting the money separately from the status - **the status assertion
+  passes either way.** Fourth instance of the fixture rule; two more fixture fields were wrong
+  in the same seed (`rank` not `position`, `username` not `userName`, `creditBalance` not
+  `balance`), each failing loudly at a different stage.
+
+**Also fixed:** the second gate's comment claimed to *be* the game dispatch, which was true
+when this app had no provider path and became wrong the moment one was added. Corrected in
+place with what it actually does, rather than the tense quietly adjusted.
+
+**Deferred:** the **challenge** path is still unexamined for the same divergence.
+`challenge-finalize.actions.ts` holds its own copy of all three settlement stages in both
+apps, 70 KB against 42 KB, and R26's note already recorded that the same shape sits there
+unchecked. That is X10, and two findings in one file pair is now a reason to look rather than
+a reason to assume.
+
+**Next chat should:** X6's analytics by provider, then the Game Master creation API, then X6.5.
+
+---
+
+### 7 Sep 2026 - X6 - LIVE-CONTEST CONTROLS, AND A ROUTE WITH NO AUTHENTICATION AT ALL
+
+**Shipped:** the operator lifecycle controls are game-aware and, more to the point,
+**authorized** (`12` **s3.2a**). 63 tests in `__tests__/admin/live-contest-controls.test.ts`,
+31 probes in `tools/probe-live-controls.ps1`, all red on the expected test. Admin typecheck at
+**223, the baseline exactly**; the full suite at **1067 passing**.
+
+**The plan named three routes and there were seven.** That is the counting rule again - after
+four entry paths, ten finalize sites, six raw inserts, seven subscription writers and one field
+with zero writers, a plan's list of routes is a hypothesis until `rg` answers it.
+
+**R40 is the finding, and it is the worst authorization defect in the programme.**
+`POST /api/finalize-old-competitions` had **no authentication of any kind.** Not a weak check -
+nothing. Any anonymous caller who knew the path could force-finalize every `completed`
+competition: closing `TradingPosition` rows at live prices, writing `TradeHistory`, recalculating
+PnL, and calling an external forex API once per position.
+
+Three things about it are load-bearing and easy to state wrongly.
+
+- **It was live, not latent.** Almost everything else in this register is latent. This was
+  reachable today by anybody.
+- **The severity is bounded, and saying so is not a defence.** It only touches contests already
+  in `completed`, so it cannot finalize a running contest, pay a prize or move wallet money -
+  `settleFeesAndGameMasters` is not on this path. The realistic harm is a corrupted trade history
+  and audit trail plus an unmetered API bill. **Do not let a summary round that up to "anyone
+  could pay themselves", and do not let it round down either.**
+- **There is no way to know whether it was ever called.** The route wrote no audit entry, because
+  it had no caller to attribute it to. **A route with no guard also has no attribution.**
+
+**The rule it produces, which is the reusable part: the routes with NO guard are not found by
+reading the ones with weak guards.** Every one of its six siblings had *something* -
+`verifyAdminToken`, `verifyAdminAuth` or `requireAdminAuth` - so a review pass over them would
+have skipped straight past this one. It surfaced from **enumerating the lifecycle routes and
+counting exported handlers against guards**, which is a different activity from reading each
+route, and which also catches the subtler shape: a file whose `POST` is guarded and whose `GET`
+is not passes any mention-based check while leaving a mutation open.
+
+All five weak siblings moved to `guardSection("competitions")`. That is the **sixth** instance of
+"admin-at-all is not authorization" after Prerequisite A, the internal-secret fallbacks, the
+unprotected suspicion-score route, the provider admin routes and `PUT` on the CRUD file, so it is
+now asserted across the whole set with an `it.each` rather than case by case. The list route also
+carried **its own inline copy** of the JWT verification, which is deleted - a route with a private
+auth helper is a route that will not receive the next fix to the shared one.
+
+**R41: pausing a provider contest did nothing.** `isPaused` is a trading-era field honoured by
+`order.actions.ts`; `round-launch.service.ts` never read it. So an operator got a success toast, a
+PAUSED banner and a notification to every participant while **players carried on starting and
+finishing rounds.** Worse than a dead control, because `IncidentsSection.tsx` pauses a contest
+when an operator raises an incident - the one moment they most need play to stop is the moment
+they were most confidently told it had. Latent, since no provider contest has run in production.
+
+Two siblings came with it, and a fix aimed only at the launch service would have left both.
+
+- **Resume compensated the wrong field, and it is the one called "end".** It extended `endTime`.
+  `createRound` gates on `playWindowEnd`, the launch service on `playWindowStart`; `endTime`
+  gates neither. So the contest ran longer while the window players actually play inside stayed
+  exactly as short - a two-hour pause simply consumed two hours of their playing time.
+- **The operator's control panel described a different game, in seven places.** The worst read
+  "All positions will be closed at current prices" above the emergency-cancel confirm button, on
+  a contest with no positions.
+
+**Cancelling now reaches into the rounds, and the sequence it replaces is the argument.** A
+provider contest leaves a live **round** where a trading contest leaves a position, and nothing
+was closing it: the player kept playing a contest that no longer existed, the provider's result
+was refused and audited as a late result, and the reconciliation net then polled, backed off, and
+after the grace window wrote the round `unresolved` with a **critical** alert. **The operator got
+a critical alert for the consequence of their own deliberate action**, which is the fastest way to
+teach a team to ignore critical alerts.
+
+**Files touched:** `lib/services/games/contest-round-cleanup.ts` (new, mirrored),
+`round-launch.service.ts`, `round-status.service.ts`, `components/games/RoundPreflight.tsx`,
+`components/games/play-state.ts`, `app/api/competitions/[id]/rounds/route.ts`,
+`lib/actions/trading/competition-cancel.actions.ts` (both copies),
+`apps/admin/lib/admin/contest-control-copy.ts` (new, admin-only),
+`apps/admin/components/admin/CompetitionAdminActions.tsx`,
+`apps/admin/app/competitions/view/[id]/page.tsx`, and six admin API routes.
+
+**Deviated from plan:** the plan's table asked for three routes and for `adjust-results` to write
+`score`. **Adjust-results was guarded and otherwise left alone**, because it has **no UI caller
+at all** - it is reachable only by API, so building game-aware score adjustment there would put a
+second score-writing door beside `applyResult`, which `02` s10 rule 3 forbids, on a screen nobody
+can reach. Recorded rather than hidden. The panel wording was also not in the plan: it is X6.5's
+subject, but leaving it would have meant shipping controls whose confirm dialogs describe a
+different game, so the seven sites in this one component were done here and the rest of the
+wording pass stays in X6.5.
+
+**Three probes came back green and each was a WEAK TEST, with the same shape all three times:
+the injected defect satisfied the assertion with a different string.** Restoring "All positions
+will be closed at current prices" passed a guard written against the phrase "open positions";
+deleting the mid-round resume line passed a bare `/resum/i`, because "extend the play window and
+the end time when resumed" contains it too; and replacing the pause list's mention of positions
+passed an assertion over the whole copy object, because the emergency list still said
+"positions". **A vocabulary guard must match the word, not a phrase copied out of one of the
+sites it polices; and a per-list claim must be asserted per list**, because one list covering for
+another is indistinguishable from the guard working.
+
+**And one claim was wrong rather than weak, in the same pass.** "No trading wording anywhere in
+the panel" is false: the emergency toast keeps "N positions closed" in its **trading** branch,
+because an operator running a trading contest still needs to be told what happened to their
+positions. The honest claim is narrower - no *unconditional* trading wording.
+
+**A fourth probe was green for the third reason - the guard is real but unreachable.** The
+transition check in the cleanup loop can never fire: `LIVE_ROUND_STATUSES` is `pending`/`launched`
+and `ROUND_TRANSITIONS` permits `voided` from both, so the query filter has already guaranteed a
+legal move. It is **kept as a tripwire** for the day `unresolved` is added to that list, and the
+comment now says so rather than claiming a fix - an overstated comment is a wrong fact. The probe
+and the test were re-aimed at the query filter, which is where the property actually lives.
+
+**Owner tested:** no. Code-complete, awaiting owner test.
+
+**Deferred:** analytics by provider and the Game Master creation API, both still X6. Two items
+recorded rather than fixed: `adjust-results` has no UI caller, and **`emergency_ended` is a
+status the model declares and nothing ever stores** - `emergencyCancelActiveCompetition` writes
+`"cancelled"` with an `emergencyEndedAt` alongside, while the panel reads `emergency_ended`. Both
+belong with X6.5.
+
+**Next chat should:** X6's analytics by provider, then the Game Master creation API, then X6.5.
+
+---
+
+### 7 Sep 2026 - X6 - PROVIDER CONTEST EDITING, AND THE TRADING ROUTE WAS WIDE OPEN
+
+**Shipped:** a provider contest is editable from the admin panel (`12` **s2.2**) - and the
+reason its Edit button had been deliberately withheld turned out to be a **live
+mass-assignment vulnerability in the trading path**, not a gap in the provider one.
+
+`PUT /api/competitions/[id]` did `Object.assign(competition, body)` on the parsed request
+body. Every field on `Competition` was writable by anyone holding an admin JWT: `gameKey`
+(immutable, the join key for every historical stat), `gameType`, `status`, `prizePool`,
+`currentParticipants`, `contentSeed`, `createdBy`. **This was not a provider problem.** Both
+`12` s3.1a and `09` E5 described the blind assign as a corruption risk *for provider
+contests*, which is true and is a third of the story - it was equally a hole on the trading
+contests the route was written for, and had been since long before this programme. (Those two
+are the only places it was written down. This entry first credited `13` s4.1a as well, which
+is wrong - `13` never mentions it. **Seventh instance of the aside-verification rule, caught
+by grepping the claim while writing it down.**)
+
+Its authentication compounded it. The route called **`verifyAdminToken`**, which asks only
+whether the caller holds a valid admin token, so an employee granted one unrelated section
+could rewrite any contest. That is the **fifth** instance of token-validity being mistaken for
+authorization, after Prerequisite A, the internal-secret fallbacks, the unprotected
+suspicion-score route and the provider admin routes. GET and DELETE in the same file had the
+same weakness, which is why the test **counts exported handlers against guards** rather than
+checking the file mentions `guardSection` once.
+
+| Built | Where |
+|---|---|
+| Trading allow-list + never-editable list | `apps/admin/lib/admin/competition-update-fields.ts` |
+| Freeze rules, model-free, shared with the UI | `apps/admin/lib/admin/provider-contest-edit-policy.ts` |
+| Provider edit service | `apps/admin/lib/services/game-providers/provider-contest-edit.service.ts` |
+| Provider edit API (GET, PATCH) | `apps/admin/app/api/games/contests/[competitionId]/route.ts` |
+| Provider editor UI | `apps/admin/components/admin/games/ProviderContestEditor.tsx` |
+| Page route | `apps/admin/app/competitions/edit-game/[id]/page.tsx` |
+| Edit link routes by game | `CompetitionsListSection.tsx` |
+
+34 tests in `__tests__/admin/provider-contest-edit.test.ts`, **16 probes all red on exactly
+the expected test** (`tools/probe-contest-edit.ps1`). **Nothing here is mirrored** -
+`apps/admin/lib/admin/` and the admin API routes are admin-only, so `check:mirrors` says
+nothing about any of it.
+
+**Findings that generalise.**
+
+- **An allow-list must REFUSE an unknown field, never drop it.** Dropping is tidier and it
+  means an operator's edit silently does nothing: the form posts, the route answers 200, the
+  screen re-renders the old value, and the operator assumes they misclicked. Same class as the
+  config-schema parser failing closed and as refusing a contest whose round settings are
+  absent - **reporting success while doing nothing is the failure mode this codebase keeps
+  producing.**
+- **A defence-in-depth list has to be tested by WHICH refusal fired, not by whether the field
+  was refused.** The probe removing `gameKey` from `NEVER_EDITABLE_FIELDS` **stayed green**:
+  `gameKey` is absent from the allow-list too, so it still fell through to the unknown-field
+  refusal, whose message also contains the word "gameKey". The assertion had to pin the
+  specific error text. Without that, a later edit adding a field to the allow-list quietly
+  removes its immutability while every test stays green. **Sixth "probe stayed green"
+  instance, and this one is the weak-test answer.**
+- **An allow-list held in a plain object is not an allow-list.** `ALLOWED[key]` walks the
+  prototype chain, so `"constructor"` is admitted - truthy, survives a `!allowed` test, and
+  fails later somewhere that reads nothing like the cause. A `Set` has no prototype chain, so
+  the check is total. **Second instance** after the round-inspector action map, so carry the
+  rule: **never look a request-supplied key up in an object.**
+- **A claim that sounded right was wrong and was corrected rather than left standing.** The
+  first version of that test asserted `for...in` would admit inherited keys where
+  `Object.keys` would not. Empirically, for a **JSON-parsed** body the two behave identically,
+  because `Object.prototype`'s members are non-enumerable. The real vulnerability was the
+  lookup, not the enumeration. **Seventh instance of the aside-verification rule** - and note
+  it was found by running the probe, not by reading.
+- **The freeze must key on PARTICIPANTS, not on status.** A `draft` with entrants is
+  impossible today; an `upcoming` contest with twenty paid seats is the normal case, and a
+  status-keyed freeze lets its entry fee change underneath them. Three tiers: nothing frozen
+  at zero participants; `name`, `description` and a *raising* `maxParticipants` once anyone has
+  entered; nothing editable at all once `finalizing`, `completed`, `cancelled` or
+  `emergency_ended`. **`finalizing` is the one that matters** - a change landing then may or
+  may not be counted depending purely on timing, exactly why X3 treats it as closed for late
+  results.
+- **An edit re-runs the pre-flight against the STORED record**, the same rule publishing
+  already follows. A draft outlives the switches that made it valid: the title can be
+  disabled, the provider disabled, the adapter uninstalled. Settings are re-validated against
+  the **live** `configSchema` and the **coerced** values stored, so `"7"` from an HTML input
+  never reaches the provider as a string.
+
+**Deviated from plan:** `12` section 2 asks for the game type to be changeable while a
+contest is still `draft` with zero participants. **It is not, at any point.** `gameKey` is
+immutable and a draft is cheap to delete and recreate, so the permission buys nothing and
+costs an immutability guarantee. Recorded here rather than by editing the target.
+
+**A test was flipped, not deleted.** `provider-contest-publish-ui.test.ts`'s "withholds the
+trading editor from provider contests" asserted that *no* Edit control was offered. The
+requirement did not change - the remedy did, from withholding to routing - so the assertion
+became "never THIS link", the original comment was kept verbatim above the new one, and a
+16th probe was added that **swaps the two destinations** rather than deleting one, because a
+test asserting only that the game editor is linked stays green on a swap.
+
+**Also closed:** the seven typecheck errors the 7 Sep e2e round test left in the main app,
+all of them `participant.score` against a bare `.lean()` union. Extracted into one typed
+reader with the caveat on record in the file - **an explicitly-typed `.lean<{...}>()` is
+checked against the annotation and not against the schema**, which is how R33's
+`scoreDirection` read survived two typechecks. Main app is back to its 15-error baseline;
+admin is unchanged at 223, with none in the changed files and none disappearing.
+
+**Deferred:** the trading editor still exposes fewer fields than the trading create form.
+`12` section 2 asks for that gap to be closed; it is a *trading* UI job with no provider
+dependency, and closing it inside a security fix would have destroyed the only evidence that
+no trading edit changed behaviour.
+
+**Owner tested:** no. Code-complete, and **not verified by clicking** - the admin app is
+behind sign-in and the automated browser has no session.
+
+**Next chat should:** X6's live-contest controls (`12` section 3, the lifecycle actions that
+must become game-aware).
 
 ---
 

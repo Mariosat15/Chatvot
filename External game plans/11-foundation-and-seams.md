@@ -241,6 +241,32 @@ the extraction commit would have shipped the wrong character in the wrong place.
 - **The `exclude` refund.** ~~Still `refundOwed: true`.~~ **Closed 4 September 2026** - see
   the note below, which also records the sibling gap this list did not know about.
 
+**A fourth thing it did not cover, found on 7 September 2026 in the same pair of files: the
+admin cron had no PROVIDER DISPATCH at all.** R42. This seam's whole argument is that the
+dispatch belongs in `finalizeCompetition` rather than at the call sites, so that every caller
+is correct by construction - and that argument was only ever implemented in the **main** app.
+`apps/admin`'s copy carried only `routeToTradingSettlement`, which answers the narrow question
+*may trading settle this*, so a provider contest reaching it was refused and left `active`.
+Both apps run the finalize cron every minute, so **whether a provider contest settled at all
+depended on which process claimed it first.**
+
+Three things about it belong in this seam specifically, because they qualify claims made
+above.
+
+- **This is the second entry in this list with the same shape, so the general form replaces
+  both instances**: the four finalize functions are not four copies of one function, and a
+  capability added to one is not thereby added to the others. R26 was a missing *stage* -
+  players were still paid. R42 was a missing *branch* - **nothing happened at all.**
+- **"The shared services exist in `apps/admin` now, so the fix is smaller" was true and
+  concealed this.** `provider-finalize.ts` and `provider-settlement.service.ts` were mirrored
+  here during X5 **and imported by nothing.** `check:mirrors` agreed, correctly - the two
+  copies did agree, and only the call site was absent. A mirrored file is not a reachable one.
+- **The size heuristic is now confirmed dead for this pair.** The note above records it
+  closing from 34 KB to 8 KB; a six-line dispatch does not move it at all. **A heuristic that
+  found the last defect is not evidence about the next one**, which is the argument for
+  extending the parity suite rather than re-measuring the files. It now seeds a
+  provider-shaped contest, which is the thing none of its earlier fixtures did.
+
 #### The unresolved-round policies, 4 September 2026 - and the stranding bug they found
 
 `exclude` and `hold_and_alert` are both honoured now, by

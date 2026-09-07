@@ -192,6 +192,22 @@ export async function cancelCompetitionAndRefund(
       );
     }
 
+    // A provider contest leaves a ROUND running where a trading contest leaves a position.
+    // Nothing was closing it, so a cancellation produced a critical unresolved-round alert
+    // for the operator's own deliberate action, and left the player inside a game for a
+    // contest that no longer existed. See `contest-round-cleanup.ts` for the full sequence.
+    //
+    // Inside the transaction on purpose: if the refund rolls back, the rounds must still be
+    // live. It is a no-op for a trading contest, which has none.
+    const { endLiveRoundsForContest } = await import(
+      "@/lib/services/games/contest-round-cleanup"
+    );
+    const voided = await endLiveRoundsForContest({
+      contestId: competitionId,
+      reason: `Competition cancelled: ${reason}`,
+      session,
+    });
+
     // Reason: the status, reason and prize pool were already set by the claiming update at
     // the top of this transaction, which is what makes a second caller a no-op. Setting them
     // again here would be harmless but misleading - it would read as though the lock were
@@ -203,6 +219,11 @@ export async function cancelCompetitionAndRefund(
     console.log(`✅ Competition "${competition.name}" cancelled successfully`);
     console.log(`   Refunded: ${refundedCount} participants`);
     console.log(`   Total refunded: ${totalRefunded} credits`);
+    if (voided.ended > 0 || voided.skipped > 0) {
+      console.log(
+        `   Voided rounds: ${voided.ended} (${voided.skipped} already terminal)`,
+      );
+    }
 
     // Revalidate pages to show updated status
     revalidatePath(`/competitions/${competitionId}`);
@@ -300,6 +321,8 @@ export async function emergencyCancelActiveCompetition(
   success: boolean;
   message: string;
   closedPositions?: number;
+  /** Live provider rounds voided by the cancellation. Zero on a trading contest. */
+  voidedRounds?: number;
   refundedCount?: number;
   totalRefunded?: number;
 }> {
@@ -610,6 +633,20 @@ export async function emergencyCancelActiveCompetition(
       refundedCount++;
     }
 
+    // Step 3b: end the rounds. Step 2 closed trading POSITIONS, which is the whole of what a
+    // trading contest leaves running; a provider contest leaves a live ROUND, and nothing was
+    // closing it. Without this the operator receives a critical unresolved-round alert as a
+    // direct consequence of their own emergency action - the fastest way to teach a team to
+    // ignore critical alerts.
+    const { endLiveRoundsForContest } = await import(
+      "@/lib/services/games/contest-round-cleanup"
+    );
+    const voided = await endLiveRoundsForContest({
+      contestId: competitionId,
+      reason: `Emergency cancellation: ${reason}`,
+      session: mongoSession,
+    });
+
     // Step 4: Update competition status
     await Competition.findByIdAndUpdate(
       competitionId,
@@ -634,6 +671,7 @@ export async function emergencyCancelActiveCompetition(
       `✅ [EMERGENCY CANCEL] Competition "${competition.name}" cancelled successfully`,
     );
     console.log(`   Closed positions: ${closedPositions}`);
+    console.log(`   Voided rounds: ${voided.ended} (${voided.skipped} already terminal)`);
     console.log(`   Refunded: ${refundedCount} participants`);
     console.log(`   Total refunded: ${totalRefunded} credits`);
 
@@ -644,8 +682,9 @@ export async function emergencyCancelActiveCompetition(
 
     return {
       success: true,
-      message: `Emergency cancellation complete. Closed ${closedPositions} positions, refunded ${refundedCount} participants (${totalRefunded} credits total).`,
+      message: `Emergency cancellation complete. Closed ${closedPositions} positions, voided ${voided.ended} live round(s), refunded ${refundedCount} participants (${totalRefunded} credits total).`,
       closedPositions,
+      voidedRounds: voided.ended,
       refundedCount,
       totalRefunded,
     };

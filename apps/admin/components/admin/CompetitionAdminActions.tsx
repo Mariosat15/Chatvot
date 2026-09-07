@@ -10,7 +10,6 @@ import {
   Pause,
   Play,
   ShieldAlert,
-  Settings2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -25,7 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
+import { contestControlCopy } from "@/lib/admin/contest-control-copy";
 
 interface CompetitionAdminActionsProps {
   competitionId: string;
@@ -36,6 +35,15 @@ interface CompetitionAdminActionsProps {
   participantCount: number;
   isPaused?: boolean;
   pauseReason?: string;
+  /**
+   * Derived server-side from the stored game label by `hasProviderGameLabel`.
+   *
+   * Defaults to false so an unlabelled contest gets the trading wording, which is what
+   * invariant 5 says an absent label means. Passing the game *type* string instead would let
+   * this component decide what a provider contest is, and there would then be two answers to
+   * that question in the admin app.
+   */
+  isProviderGame?: boolean;
 }
 
 export default function CompetitionAdminActions({
@@ -47,8 +55,10 @@ export default function CompetitionAdminActions({
   participantCount,
   isPaused: initialIsPaused = false,
   pauseReason: initialPauseReason = "",
+  isProviderGame = false,
 }: CompetitionAdminActionsProps) {
   const router = useRouter();
+  const copy = contestControlCopy(isProviderGame);
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -166,7 +176,7 @@ export default function CompetitionAdminActions({
         throw new Error(data.error || "Failed to pause competition");
       }
 
-      toast.success("Competition paused! Trading is now frozen.");
+      toast.success(copy.pausedToast);
       setIsPaused(true);
       setPauseReason(newPauseReason);
       setPauseDialogOpen(false);
@@ -196,8 +206,14 @@ export default function CompetitionAdminActions({
         throw new Error(data.error || "Failed to resume competition");
       }
 
+      // The play window is named explicitly for a provider contest because extending only the
+      // end time was the defect: `endTime` gates nothing a player plays inside, so an operator
+      // told "end time extended" had no way to know whether the compensation had reached the
+      // window that actually matters.
       toast.success(
-        `Competition resumed! End time extended by ${Math.round(data.extensionMinutes)} minutes.`,
+        isProviderGame
+          ? `Competition resumed! Play window and end time extended by ${Math.round(data.extensionMinutes)} minutes.`
+          : `Competition resumed! End time extended by ${Math.round(data.extensionMinutes)} minutes.`,
       );
       setIsPaused(false);
       setPauseReason("");
@@ -235,8 +251,13 @@ export default function CompetitionAdminActions({
         throw new Error(data.error || "Failed to emergency cancel competition");
       }
 
+      // Reports what the action actually did to THIS contest. "0 positions closed" on a puzzle
+      // contest reads as though the action failed - the same reason the round dialog reports
+      // whether settlement was really released rather than announcing that it was.
       toast.success(
-        `Competition emergency cancelled! ${data.details?.closedPositions || 0} positions closed, ${data.details?.refundedCount || 0} participants refunded.`,
+        isProviderGame
+          ? `Competition emergency cancelled! ${data.details?.voidedRounds || 0} rounds voided, ${data.details?.refundedCount || 0} participants refunded.`
+          : `Competition emergency cancelled! ${data.details?.closedPositions || 0} positions closed, ${data.details?.refundedCount || 0} participants refunded.`,
       );
       setEmergencyCancelDialogOpen(false);
       router.refresh();
@@ -331,7 +352,7 @@ export default function CompetitionAdminActions({
               <DialogDescription className="text-gray-400">
                 Are you sure you want to cancel{" "}
                 <span className="text-white font-semibold">
-                  "{competitionName}"
+                  &ldquo;{competitionName}&rdquo;
                 </span>
                 ?
               </DialogDescription>
@@ -419,7 +440,7 @@ export default function CompetitionAdminActions({
                 </span>
               </div>
               <p className="text-xs text-yellow-300/70">
-                {pauseReason || "Trading is frozen"}
+                {pauseReason || copy.pausedBannerFallback}
               </p>
             </div>
           )}
@@ -443,7 +464,7 @@ export default function CompetitionAdminActions({
                     Pause Competition
                   </DialogTitle>
                   <DialogDescription className="text-gray-400">
-                    Temporarily freeze all trading activity in this competition.
+                    {copy.pauseDialogDescription}
                   </DialogDescription>
                 </DialogHeader>
 
@@ -453,10 +474,9 @@ export default function CompetitionAdminActions({
                       <strong>This will:</strong>
                     </p>
                     <ul className="mt-2 space-y-1 text-sm text-yellow-300/80 list-disc list-inside">
-                      <li>Prevent any new orders from being placed</li>
-                      <li>Prevent any positions from being closed</li>
-                      <li>Notify all participants</li>
-                      <li>Extend end time when resumed</li>
+                      {copy.pauseConsequences.map((consequence) => (
+                        <li key={consequence}>{consequence}</li>
+                      ))}
                     </ul>
                   </div>
 
@@ -544,8 +564,7 @@ export default function CompetitionAdminActions({
                   Emergency Cancel Competition
                 </DialogTitle>
                 <DialogDescription className="text-gray-400">
-                  This is for critical situations only. All positions will be
-                  closed at current prices.
+                  {copy.emergencyDialogDescription}
                 </DialogDescription>
               </DialogHeader>
 
@@ -555,14 +574,9 @@ export default function CompetitionAdminActions({
                     <strong>⚠️ CRITICAL ACTION:</strong> This will:
                   </p>
                   <ul className="mt-2 space-y-1 text-sm text-red-300/80 list-disc list-inside">
-                    <li>
-                      Immediately close ALL open positions at current market
-                      prices
-                    </li>
-                    <li>Calculate and record all P&L</li>
-                    <li>Refund all participants their FULL entry fees</li>
-                    <li>Mark competition as emergency cancelled</li>
-                    <li>This action CANNOT be undone</li>
+                    {copy.emergencyConsequences.map((consequence) => (
+                      <li key={consequence}>{consequence}</li>
+                    ))}
                   </ul>
                 </div>
 

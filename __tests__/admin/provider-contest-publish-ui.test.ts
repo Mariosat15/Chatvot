@@ -195,30 +195,43 @@ describe("the competitions list understands a draft provider contest", () => {
     expect(code).toMatch(/onPublished=\{fetchCompetitions\}/);
   });
 
-  it("withholds the trading editor from provider contests", () => {
-    // `PUT /api/competitions/[id]` blindly `Object.assign`s the trading form's body, so this
-    // link is a corruption path for a provider contest, not merely a confusing screen.
+  it("keeps the trading editor away from provider contests - now by ROUTING, not withholding", () => {
+    // FLIPPED, NOT DELETED, on 7 September 2026 when the provider editor was built. This
+    // test used to assert that no Edit control was offered at all, which was correct while
+    // `PUT /api/competitions/[id]` blindly `Object.assign`ed the trading form's body: the
+    // link was a corruption path for a provider contest, not merely a confusing screen.
     //
-    // Asserted by position in the ternary rather than by scanning a fixed number of
-    // characters backwards: the first version of this test used a 300-character window, which
-    // began mid-identifier and reported the guard missing when it was present. A window whose
-    // size is a guess fails for reasons that have nothing to do with the code under test.
+    // What changed is the remedy, not the requirement. A provider contest now has its own
+    // editor at `/competitions/edit-game/[id]`, the trading route refuses a provider contest
+    // outright, and the blind assign is gone. So the property to pin is no longer "no link"
+    // but "never THIS link" - which is the same guarantee reached from the other side.
+    //
+    // The reason the original comment is kept verbatim above is that it explains why the
+    // guard exists at all, and that is the most valuable part of a defect test.
+    //
+    // Asserted by position rather than by scanning a fixed number of characters backwards:
+    // the first version of this test used a 300-character window, which began mid-identifier
+    // and reported the guard missing when it was present. A window whose size is a guess
+    // fails for reasons that have nothing to do with the code under test.
     const code = readCode(LIST_PATH);
 
-    const guardIndex = code.indexOf("hasProviderGameLabel(competition) ? (");
-    const editIndex = code.indexOf("/competitions/edit/");
+    const guardIndex = code.indexOf("hasProviderGameLabel(competition)");
+    const gameEditIndex = code.indexOf("/competitions/edit-game/");
+    const tradingEditIndex = code.indexOf("/competitions/edit/");
 
     expect(guardIndex).toBeGreaterThan(-1);
-    expect(editIndex).toBeGreaterThan(-1);
+    expect(gameEditIndex).toBeGreaterThan(-1);
+    expect(tradingEditIndex).toBeGreaterThan(-1);
 
-    // The link must sit in the ELSE branch, so the branch separator has to fall between the
-    // condition and the link. Without this, a guard placed after the link would still pass.
-    const elseIndex = code.indexOf(") : (", guardIndex);
-    expect(elseIndex).toBeGreaterThan(guardIndex);
-    expect(editIndex).toBeGreaterThan(elseIndex);
+    // The condition comes first, then the provider destination, then the trading one. A
+    // ternary written the other way round would send provider contests to the trading form.
+    expect(gameEditIndex).toBeGreaterThan(guardIndex);
+    expect(tradingEditIndex).toBeGreaterThan(gameEditIndex);
 
-    // And exactly one edit link, so a second unguarded one cannot hide behind the first.
-    expect(code.split("/competitions/edit/").length - 1).toBe(1);
+    // Exactly one of each, so a second unguarded trading link cannot hide behind the first.
+    // `edit-game` contains `edit`, so the trading count is taken from the full segment.
+    expect(code.split("/competitions/edit-game/").length - 1).toBe(1);
+    expect(code.split("/competitions/edit/${").length - 1).toBe(1);
   });
 
   it("badges a provider contest so it is not read as a trading one", () => {

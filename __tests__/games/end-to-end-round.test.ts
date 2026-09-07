@@ -440,6 +440,30 @@ async function seat(
   await Competition.updateOne({ _id: competitionId }, { $inc: { currentParticipants: 1 } });
 }
 
+/**
+ * Reads back the one field this suite exists to observe.
+ *
+ * `CompetitionParticipant` is declared without a document generic, so a bare `.lean()` widens
+ * to a union that includes an array and `participant.score` fails to typecheck - seven errors,
+ * all of them noise, none of them a real disagreement with the schema.
+ *
+ * `score` IS declared on both copies of the model (X1 added it), which is the only reason a
+ * hand-written generic is acceptable here: an explicitly-typed `.lean<{...}>()` is checked
+ * against the annotation and NOT against the schema, so it is exactly the place an invented
+ * field looks real. That is how R33's `scoreDirection` read survived two typechecks. Keep this
+ * to fields that have been confirmed present, and never add one to make a read compile.
+ */
+async function readSeatScore(
+  competitionId: mongoose.Types.ObjectId,
+  userId: string,
+): Promise<number | undefined> {
+  const seatRow = await CompetitionParticipant.findOne({
+    competitionId,
+    userId,
+  }).lean<{ score?: number } | null>();
+  return seatRow?.score;
+}
+
 beforeAll(async () => {
   mongoUri = await startTestMongo();
   await ensureCollections([
@@ -577,10 +601,7 @@ describe("X4a: a real round travels between the platform and the game service", 
     expect(typeof finished?.rawScore).toBe("number");
     expect(finished?.rawScore).toBeGreaterThan(0);
 
-    const participant = await CompetitionParticipant.findOne({
-      competitionId: contestId,
-      userId: winner,
-    }).lean();
+    const participantScore = await readSeatScore(contestId, winner);
 
     /*
      * R32's seam, observed rather than asserted from a fixture. Every settlement suite in this
@@ -588,12 +609,12 @@ describe("X4a: a real round travels between the platform and the game service", 
      * structurally silent on whether one ever arrives - and for a day, none did. This is the one
      * assertion in the codebase that starts on the far side of that seam.
      */
-    expect(participant?.score).toBe(finished?.rawScore);
+    expect(participantScore).toBe(finished?.rawScore);
 
     // The raw score, never a negated one. A persisted negative would show a race time as minus
     // something on every screen and poison any cross-game total; direction is applied at
     // comparison, inside ranking, and nowhere else.
-    expect(participant!.score).toBeGreaterThan(0);
+    expect(participantScore!).toBeGreaterThan(0);
 
     // Exactly one event stored, and it carries the raw delivery for the admin round inspector.
     const events = await ProviderEvent.find({ providerKey: PROVIDER_KEY }).lean();
@@ -622,11 +643,8 @@ describe("X4a: a real round travels between the platform and the game service", 
     // Accepted, because inviting a retry a day later achieves nothing except a second alert.
     expect(replay.accepted).toBe(true);
 
-    const afterReplay = await CompetitionParticipant.findOne({
-      competitionId: contestId,
-      userId: winner,
-    }).lean();
-    expect(afterReplay?.score).toBe(participant?.score);
+    const afterReplay = await readSeatScore(contestId, winner);
+    expect(afterReplay).toBe(participantScore);
   }, 180_000);
 
   it("ranks a lower-is-better title by the faster player, not the higher number", async () => {
@@ -668,18 +686,12 @@ describe("X4a: a real round travels between the platform and the game service", 
       return count === 2;
     });
 
-    const quickSeat = await CompetitionParticipant.findOne({
-      competitionId: contestId,
-      userId: quick,
-    }).lean();
-    const slowSeat = await CompetitionParticipant.findOne({
-      competitionId: contestId,
-      userId: slow,
-    }).lean();
+    const quickScore = await readSeatScore(contestId, quick);
+    const slowScore = await readSeatScore(contestId, slow);
 
     // Both stored raw, both positive, and the deliberate delay is visible in the numbers.
-    expect(quickSeat!.score).toBeGreaterThan(0);
-    expect(slowSeat!.score).toBeGreaterThan(quickSeat!.score);
+    expect(quickScore!).toBeGreaterThan(0);
+    expect(slowScore!).toBeGreaterThan(quickScore!);
 
     // The direction came from the catalogue the SERVICE published, not from a fixture.
     const { resolveScoreDirection } = await import(

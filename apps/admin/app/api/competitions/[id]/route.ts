@@ -1,35 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import mongoose from "mongoose";
 import { auditLogService } from "@/lib/services/audit-log.service";
-import { getAdminJwtSecret } from "@/lib/admin/jwt-secret";
+import { guardSection } from "@/lib/admin/section-route-guard";
+import { hasProviderGameLabel } from "@/lib/admin/contest-game-label";
+import { filterTradingCompetitionUpdate } from "@/lib/admin/competition-update-fields";
 
-const JWT_SECRET = getAdminJwtSecret();
-
-async function verifyAdminToken(request: NextRequest) {
-  try {
-    const token = request.cookies.get("admin_token")?.value;
-    if (!token) return null;
-
-    const payload = jwt.verify(token, JWT_SECRET) as { email: string };
-    return payload;
-  } catch {
-    return null;
-  }
-}
+/**
+ * Read, edit and delete one competition.
+ *
+ * GUARDED ON `competitions`, NOT MERELY ON "IS AN ADMIN". This file used to carry its own
+ * `verifyAdminToken`, which verified the JWT signature and nothing else. Every employee is
+ * issued an `admin_token`, so a support employee granted only `messaging` could delete any
+ * contest and rewrite any field on it. That hand-rolled check also skipped the four
+ * revocations `verifyAdminAuth` performs - deleted admin, disabled admin, locked-out admin
+ * and force-logout - so a sacked employee's cookie kept working until it expired.
+ *
+ * `guardSection` is the same helper the provider and round-inspector routes use, and it maps
+ * the two refusals to different statuses: 401 not signed in, 403 signed in without the
+ * grant.
+ */
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const admin = await verifyAdminToken(request);
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("competitions");
+    if (!guard.ok) return guard.response;
+    const admin = guard.admin;
 
     const { id } = await params;
 
@@ -77,10 +78,10 @@ export async function DELETE(
     try {
       await auditLogService.logCompetitionDeleted(
         {
-          id: "admin",
+          id: admin.id,
           email: admin.email,
-          name: admin.email.split("@")[0],
-          role: "admin",
+          name: admin.name ?? admin.email.split("@")[0],
+          role: admin.role ?? "admin",
         },
         id,
         competition.name,
@@ -107,10 +108,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const admin = await verifyAdminToken(request);
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("competitions");
+    if (!guard.ok) return guard.response;
 
     const { id } = await params;
 
@@ -145,15 +144,28 @@ export async function GET(
   }
 }
 
+/**
+ * Edit a TRADING competition.
+ *
+ * A provider contest is refused here and edited through `PATCH /api/games/contests/[id]`
+ * instead. The refusal is the server-side half of the withheld Edit button on the
+ * competitions list: this route's body shape is the trading editor's, so applying it to a
+ * provider contest would write `startingCapital` and `leverageAllowed` onto a puzzle and
+ * leave the provider settings unreviewed.
+ *
+ * The check is `hasProviderGameLabel` - the label alone - deliberately, and NOT the stricter
+ * `isProviderContest`. A provider contest whose keys are missing cannot launch a round, but
+ * it is still not a trading contest, and it is precisely the row an operator would try to
+ * "fix" by saving it through this form.
+ */
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const admin = await verifyAdminToken(request);
-    if (!admin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("competitions");
+    if (!guard.ok) return guard.response;
+    const admin = guard.admin;
 
     const { id } = await params;
 
@@ -174,6 +186,16 @@ export async function PUT(
       );
     }
 
+    if (hasProviderGameLabel(competition)) {
+      return NextResponse.json(
+        {
+          error:
+            "This is a provider-game contest. Edit it from the game contest editor, not the trading form.",
+        },
+        { status: 400 },
+      );
+    }
+
     // Don't allow editing if competition has started and has participants
     if (
       competition.status === "active" &&
@@ -185,10 +207,16 @@ export async function PUT(
       );
     }
 
-    const updateData = await request.json();
+    const body = await request.json();
 
-    // Update the competition
-    Object.assign(competition, updateData);
+    // Named allow-list, never a blind assign. See `competition-update-fields.ts` for why
+    // unknown keys are refused rather than dropped.
+    const filtered = filterTradingCompetitionUpdate(body);
+    if (!filtered.ok) {
+      return NextResponse.json({ error: filtered.error }, { status: 400 });
+    }
+
+    Object.assign(competition, filtered.update);
     await competition.save();
 
     console.log(`✅ Competition updated: ${competition.name} (ID: ${id})`);
@@ -197,14 +225,14 @@ export async function PUT(
     try {
       await auditLogService.logCompetitionUpdated(
         {
-          id: "admin",
+          id: admin.id,
           email: admin.email,
-          name: admin.email.split("@")[0],
-          role: "admin",
+          name: admin.name ?? admin.email.split("@")[0],
+          role: admin.role ?? "admin",
         },
         id,
         competition.name,
-        updateData,
+        filtered.update,
       );
     } catch (auditError) {
       console.error("Failed to log audit action:", auditError);

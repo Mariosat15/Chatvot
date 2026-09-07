@@ -517,31 +517,32 @@ export default function CompetitionsListSection() {
                     />
                   )}
 
-                {/* Edit is deliberately withheld from provider contests, with the reason
-                    given rather than the button merely greyed out.
-                    `/competitions/edit/[id]` renders the trading editor, and `PUT
-                    /api/competitions/[id]` does a blind `Object.assign` of whatever that
-                    form submits - so saving a provider contest through it would write
-                    trading fields onto it and leave the provider settings unreviewed. A
-                    provider editor is still unbuilt; until it exists, cancel and recreate is
-                    the honest instruction. */}
-                {hasProviderGameLabel(competition) ? (
-                  <p className="text-xs text-gray-500 leading-snug max-w-[11rem]">
-                    Editing a provider contest is not built yet. Recreate it to
-                    change its settings.
-                  </p>
-                ) : (
-                  <Link href={`/competitions/edit/${competition._id}`}>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full border-yellow-500 text-yellow-400 hover:bg-yellow-500 hover:text-gray-900"
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit
-                    </Button>
-                  </Link>
-                )}
+                {/* Edit routes by game, and the two destinations are genuinely different
+                    forms rather than one form with a flag.
+                    `/competitions/edit/[id]` is the trading editor: fourteen fields
+                    including starting capital and leverage, which a provider game does not
+                    have. `/competitions/edit-game/[id]` is the provider editor, whose
+                    settings step is generated from the title's `configSchema`.
+                    Sending a provider contest to the trading form used to be a corruption
+                    path - `PUT /api/competitions/[id]` blind-assigned that form's body - so
+                    that route now refuses a provider contest outright. This link is the
+                    convenience; the refusal is the guarantee. */}
+                <Link
+                  href={
+                    hasProviderGameLabel(competition)
+                      ? `/competitions/edit-game/${competition._id}`
+                      : `/competitions/edit/${competition._id}`
+                  }
+                >
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full border-yellow-500 text-yellow-400 hover:bg-yellow-500 hover:text-gray-900"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                </Link>
 
                 {/* Cancel Button - Only for upcoming competitions */}
                 {competition.status === "upcoming" && (

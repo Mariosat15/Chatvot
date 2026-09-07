@@ -45,6 +45,9 @@ export type LaunchRefusal =
   | "not_provider_contest"
   | "not_a_participant"
   | "contest_not_open"
+  // Separate from `contest_not_open` on purpose: the contest is open and the player will be
+  // able to play, so the UI must offer "come back shortly" rather than a dead end.
+  | "contest_paused"
   | "play_window_not_started"
   | "title_unavailable"
   | "misconfigured"
@@ -165,7 +168,15 @@ export async function launchContestRound(
     await connectToDatabase();
 
     const contest = await Competition.findById(competitionId).lean<
-      (ProviderContestFields & { _id: mongoose.Types.ObjectId; status: string; playWindowStart?: Date; gameKey?: string }) | null
+      | (ProviderContestFields & {
+          _id: mongoose.Types.ObjectId;
+          status: string;
+          playWindowStart?: Date;
+          gameKey?: string;
+          isPaused?: boolean;
+          pauseReason?: string;
+        })
+      | null
     >();
 
     if (!contest) {
@@ -188,6 +199,32 @@ export async function launchContestRound(
         contest.status === "upcoming"
           ? "This competition has not started yet."
           : "This competition is no longer accepting rounds.",
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // THE PAUSE GATE. Live defect until 7 Sep 2026: this was missing entirely.
+    //
+    // `isPaused` is a trading-era field and `order.actions.ts` has honoured it since long
+    // before this programme. Nothing honoured it here, so an operator who paused a provider
+    // contest got a success response, a paused badge on the admin screen and notifications
+    // sent to every participant - while players carried on starting rounds, spending paid
+    // attempts, and running up per-round provider charges. The control appeared to work and
+    // did nothing, which is the failure this codebase keeps producing.
+    //
+    // It sits BEFORE the seat lookup and before any write, deliberately: a refusal must not
+    // consume an attempt, and an attempt is spent the moment `createRound` inserts.
+    //
+    // It is also its own refusal code rather than `contest_not_open`, because the contest IS
+    // open and the player needs a different sentence and a different affordance - come back
+    // shortly, not "you cannot play this". Same reasoning that kept the three lifecycle
+    // refusals out of `contest_not_open` when this type was first written.
+    if (contest.isPaused) {
+      return refuse(
+        "contest_paused",
+        contest.pauseReason
+          ? `This competition is paused: ${contest.pauseReason}`
+          : "This competition is paused. Please try again shortly.",
       );
     }
 

@@ -42,6 +42,11 @@ function statusFor(refusal: LaunchRefusal): number {
     case "not_provider_contest":
       return 400;
     case "contest_not_open":
+    // A pause is 409 like the other lifecycle refusals rather than 503: the request conflicts
+    // with the contest's current state, which is exactly what 409 means, and nothing about the
+    // platform is unavailable. It stays a distinct refusal CODE for the client, though, because
+    // the affordance differs - a paused contest resumes, so the UI offers "come back shortly".
+    case "contest_paused":
     case "play_window_not_started":
     case "play_window_closed":
     case "play_window_too_short":

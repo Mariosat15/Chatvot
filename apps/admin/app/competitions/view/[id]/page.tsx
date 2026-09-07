@@ -21,7 +21,18 @@ import { unstable_noStore as noStore } from "next/cache";
 import { connectToDatabase } from "@/database/mongoose";
 import AppSettings from "@/database/models/app-settings.model";
 import CompetitionAdminActions from "@/components/admin/CompetitionAdminActions";
+import { hasProviderGameLabel } from "@/lib/admin/contest-game-label";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+
+// Derived from the actions rather than hand-written. Reason: a hand-written row interface is
+// where an invented field survives a typecheck - the compiler checks the annotation, not the
+// data - and this page had seven `any`s standing in for exactly these two shapes.
+type LeaderboardRow = Awaited<
+  ReturnType<typeof getCompetitionLeaderboard>
+>[number];
+type PrizeSlice = NonNullable<
+  Awaited<ReturnType<typeof getCompetitionById>>["prizeDistribution"]
+>[number];
 
 interface AdminCompetitionViewPageProps {
   params: Promise<{ id: string }>;
@@ -37,9 +48,10 @@ const AdminCompetitionViewPage = async ({
 
   // Get dynamic currency settings
   await connectToDatabase();
-  const appSettings = (await AppSettings.findById(
-    "app-settings",
-  ).lean()) as any;
+  const appSettings = await AppSettings.findById("app-settings").lean<{
+    credits?: { name?: string; symbol?: string };
+    currency?: { symbol?: string; code?: string };
+  } | null>();
   const creditName = appSettings?.credits?.name || "Credits";
   const _creditSymbol = appSettings?.credits?.symbol || "⚡";
   const currencySymbol = appSettings?.currency?.symbol || "€";
@@ -50,21 +62,27 @@ const AdminCompetitionViewPage = async ({
     const competition = await getCompetitionById(id);
     const leaderboard = await getCompetitionLeaderboard(id, 100);
 
+    // The LABEL alone, deliberately not the stricter `isProviderContest`. A provider contest
+    // with no resolvable keys cannot launch a round, but it is still not a trading contest -
+    // and the strict helper would hand its operator the emergency-cancel dialog promising to
+    // close positions it does not have. A test pins the two helpers to disagree on that case.
+    const isProviderGame = hasProviderGameLabel(competition);
+
     const isActive = competition.status === "active";
     const _isUpcoming = competition.status === "upcoming";
     const isCompleted = competition.status === "completed";
     const isCancelled = competition.status === "cancelled";
 
     // Get actual prizes won from database (WalletTransaction)
-    const prizeTransactions = (await WalletTransaction.find({
+    const prizeTransactions = await WalletTransaction.find({
       competitionId: id,
       transactionType: "competition_win",
       status: "completed",
-    }).lean()) as any[];
+    }).lean<{ userId: string; amount: number }[]>();
 
     // Create a map of userId -> prize amount
     const prizeMap = new Map<string, number>();
-    prizeTransactions.forEach((tx: any) => {
+    prizeTransactions.forEach((tx) => {
       prizeMap.set(tx.userId, tx.amount);
     });
 
@@ -83,11 +101,13 @@ const AdminCompetitionViewPage = async ({
       string,
       { gmId: string; gmEmail: string; gmEarning: number }
     >();
-    gmEarnings.forEach((earning: any) => {
-      gmMap.set(earning.referredUserId, {
-        gmId: earning.gameMasterId,
-        gmEmail: earning.gameMasterEmail,
-        gmEarning: earning.netEarning || earning.grossEarning || 0,
+    gmEarnings.forEach((earning) => {
+      gmMap.set(earning.referredUserId as string, {
+        gmId: earning.gameMasterId as string,
+        gmEmail: earning.gameMasterEmail as string,
+        gmEarning: (earning.netEarning ??
+          earning.grossEarning ??
+          0) as number,
       });
     });
 
@@ -370,7 +390,7 @@ const AdminCompetitionViewPage = async ({
                 {(() => {
                   // Count qualified participants
                   const qualifiedParticipants = leaderboard.filter(
-                    (p: any) => p.qualificationStatus === "qualified",
+                    (p: LeaderboardRow) => p.qualificationStatus === "qualified",
                   );
                   const qualifiedCount = qualifiedParticipants.length;
                   const disqualifiedCount = leaderboard.length - qualifiedCount;
@@ -380,7 +400,7 @@ const AdminCompetitionViewPage = async ({
                     <>
                       {leaderboard.length > 0 ? (
                         <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                          {leaderboard.map((participant: any) => {
+                          {leaderboard.map((participant: LeaderboardRow) => {
                             // Use qualificationStatus from ranking service
                             const isDisqualified =
                               participant.qualificationStatus ===
@@ -556,6 +576,7 @@ const AdminCompetitionViewPage = async ({
                   participantCount={competition.currentParticipants || 0}
                   isPaused={competition.isPaused}
                   pauseReason={competition.pauseReason}
+                  isProviderGame={isProviderGame}
                 />
               </div>
 
@@ -577,7 +598,7 @@ const AdminCompetitionViewPage = async ({
 
                 <div className="space-y-2">
                   {competition.prizeDistribution?.map(
-                    (prize: any, index: number) => {
+                    (prize: PrizeSlice, index: number) => {
                       const prizePool =
                         competition.prizePool ||
                         competition.prizePoolCredits ||

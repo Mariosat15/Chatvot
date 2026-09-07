@@ -56,6 +56,9 @@ chapter covers risks to the programme and to the application.
 | R37 | **The provider leaderboard ranked on nothing.** Both `getCompetitionLeaderboard` copies were written for trading: the main app's projection listed only trading metrics so `score` was never selected, and neither app's `participantData` mapping carried `score` or `scoreDirection`. So every provider participant reached `calculateRankings` with `score` undefined, `getProviderRankingValue` read `score ?? 0`, **the whole field tied on zero, and the board rendered in whatever order the tie-breakers or the documents happened to give.** A lower-is-better title was worse than wrong - it was *reversed on the board and correct at settlement*, so a player could lead a race-time contest all week and be paid last | High | **CLOSED 6 Sep 2026, found by writing a test for something else** - a reproduction of the owner's live error page, which this was not. Latent for payouts: settlement resolves both fields itself (R32/R33), so **no prize has ever been misapplied and nothing was backfilled.** Not latent for players: the board is a live read, so any provider contest entered before this date displayed a meaningless order. **This is R32/R33 one layer out** - the write path was fixed on 5 Sep and the two READ paths were never examined, which is the "count the callers" rule applied to a seam rather than to a writer | `resolveScoreDirection` extracted to `lib/services/games/score-direction.service.ts` (mirrored) and now used by **settlement and both leaderboards**, so the live board and the payout cannot disagree. 11 tests in `__tests__/services/provider-contest-lobby-shape.test.ts`, `tools/probe-leaderboard-score.ps1` (5 probes, all red). **`scoreDirection` is still not stored per row** - `05` s2 forbids it, because per-row storage lets two rows in one board disagree, which is incoherent rather than merely wrong |
 | R38 | **A warning no operator could ever clear.** `provider_game.lastSuccessfulRoundAt` was declared in X2 and **read** by the contest wizard's pre-flight checklist, which warns when a title's sandbox looks stale - but **nothing has ever written it.** So the field was `null` on every title however many rounds had scored, and every operator creating or publishing a provider contest was shown a stale-sandbox caution that no amount of successful play could remove. The harm is not the wording: an advisory that is always on is an advisory nobody reads, so the *next* warning in that list - one that matters - is skipped with it | Low | **CLOSED 6 Sep 2026, found while building the provider health panel** by grepping for the field's writer before displaying it. Latent for money and **live for operators** from the day the wizard shipped. **Nothing was backfilled**: the timestamp is a freshness signal, and inventing one from `game_round` history would assert a fact about a sandbox nobody observed | Stamped at the sibling of gate 11b in `result-ingestion.service.ts`, the single ingestion door, and **only for `completed`** - `abandoned`, `expired` and `voided` are terminal too, so stamping them would make the signal mean "a round ended recently", which is true of a provider failing every round. The write is wrapped so its failure cannot fail the ingestion: the score is money-bearing and a cosmetic timestamp must never be able to reject it. 3 tests in `__tests__/services/round-lifecycle.test.ts`, 2 probes in `tools/probe-provider-health.ps1`. **The sibling fields are worse and were handled differently** - `game_provider.healthStatus` and `lastHealthCheckAt` have the same no-writer defect *and* `healthStatus` defaults to `"down"`, so the provider list could render a working provider as down. They were removed from the admin DTOs rather than given a writer; see `12` s4.2b for why health is derived instead |
 | R39 | **The trading lobby was completely unavailable in production**, for every trading contest, from the design-kit deploy until the fix. Not degraded - the error boundary, on the platform's busiest player screen. One prop caused it: the kit's accordion is the only `"use client"` file in it, and it took `icon: LucideIcon`, so a **React component - a function - was being passed across the server/client boundary**. The runtime error names `{$$typeof, render, displayName}`, a `forwardRef` object, which reads as nothing recognisable | High | **CLOSED 6 Sep 2026, reported by the owner from a live screen** - the only entry here found that way rather than by us. **Nothing was backfilled and nothing could be:** the page threw on render, so there is no bad data, only failed requests. The fix is a deploy, not a migration | The icon is now handed in already rendered, exactly as the sibling `content` prop always was. **Three things nothing in the pipeline could have caught:** `next build` was green twice through this bug, because a dynamic route is never prerendered and **a green build is not evidence that a dynamic page renders**; the typecheck is happy, because `LucideIcon` is a fine prop type and **no type in this codebase means "serialisable"**; and every other guard on this screen is structural, so none of them render anything. **The first guard written for it was green on the reintroduced bug** - `typeof !== "function"` and "has `$$typeof`" are both satisfied by a lucide icon, since a `forwardRef` is an object carrying `Symbol.for("react.forward_ref")`. `isValidElement` is the check. 2 tests, 2 probes |
+| R40 | **An admin route with NO authentication at all.** `POST /api/finalize-old-competitions` checked nothing - not a weak check, not a token-validity check that should have been a section check. Any anonymous caller who knew the path could force-finalize every `completed` competition: closing `TradingPosition` rows at live prices, writing `TradeHistory`, recalculating PnL, and hitting an external forex API once per position | Critical | **CLOSED 7 Sep 2026. Unauthenticated and LIVE, so unlike almost everything else here it was reachable today** - but scoped to contests already `completed`, so no prize, no wallet movement, no running contest. The realistic harm is a corrupted trade history and audit trail plus an unmetered API bill. **Do not round that up to "anyone could pay themselves" or down to "it only touches completed contests".** No backfill, and **no way to know whether it was ever called** - a route with no guard also has no attribution | `guardSection("competitions")`, placed **before `connectToDatabase()`** so a refusal opens no connection and reaches no query. **Second unauthenticated route in this programme** after Prerequisite A's `/api/simulator/*`, and the general rule is why both are recorded: **the routes with NO guard are not found by reading the ones with weak guards.** Every sibling had *something*. Found by enumerating the lifecycle routes and **counting guards against exported handlers**, which is a different activity from reading each route. Pinned by position, not presence - a guard at the bottom of the handler satisfies any mention-based check after every write has landed. `__tests__/admin/live-contest-controls.test.ts`, `tools/probe-live-controls.ps1` |
+| R41 | **Pausing a provider contest did nothing.** `isPaused` is a trading-era field honoured by `order.actions.ts`; `round-launch.service.ts` never read it. So an operator got a success toast, a PAUSED banner and a notification to every participant while **players carried on starting and finishing rounds.** Worse than a dead control because `IncidentsSection.tsx` pauses a contest when an operator raises an incident - the one moment they most need play to stop is the moment they were most confidently told it had | High | **CLOSED 7 Sep 2026.** Latent: no provider contest has run in production, so nobody has played through a pause and **nothing was backfilled** - the defect is an absent check, not a stored value. Two siblings found with it: **resume compensated `endTime`, which gates nothing a player plays inside**, so a two-hour pause silently ate two hours of playing time; and the operator's control panel said **seven trading-shaped things**, the worst being "All positions will be closed at current prices" above the emergency-cancel confirm on a contest with no positions | A gate in `round-launch.service.ts` before any seat lookup or round creation, with its own `contest_paused` refusal rather than a generic `contest_not_open` - the contest IS open, so the UI must offer "come back shortly". Resume extends `playWindowEnd` and, only while still future, `playWindowStart`. Panel wording moved to `apps/admin/lib/admin/contest-control-copy.ts`. **The general rule, and the reason this is R-series not X-series: a capability the platform already has does not extend to a new game by itself, and the way it fails is silence.** When adding a game, **enumerate the operator controls that already exist and ask which code path enforces each one** - not whether the field is set. 63 tests, 31 probes |
+| R42 | **The admin cron refused to settle provider contests, so whether one paid out at all was a coin flip.** `apps/admin`'s `finalizeCompetition` had no provider dispatch - only `routeToTradingSettlement`, which answers "may *trading* settle this" - so a provider contest reaching it was refused and left `active`. **Both apps register `checkAndFinalizeCompetitions` on an every-minute cron**, so the contest settled correctly or never settled at all depending on which process claimed it first. Not a missing stage: **nobody was paid anything**, and the contest sat finished-looking and unsettled with no error a person sees | Critical | **CLOSED 7 Sep 2026.** Latent - no provider contest has settled in production, so **nothing was backfilled** and there is nothing to backfill, the defect being an absent branch rather than a stored value. **Do not describe it as "the admin app paid less"** - it paid nothing and completed nothing | The same six-line dispatch the main app has had since X5, placed **before `startSession()`**: `finalizeProviderCompetition` opens its own session and takes its own lock, so dispatching after would nest a transaction inside one the caller owns. **R26's shape one layer out, so the general rule replaces the two instances: the four finalize functions are not four copies of one function, and a capability added to one is not thereby added to the others.** Two silent instruments here - `provider-finalize.ts` and `provider-settlement.service.ts` were **already mirrored into `apps/admin` and imported by nothing**, so `check:mirrors` agreed and the file-size heuristic that found R26 raises nothing, because only the *call site* was absent. 3 tests in `__tests__/services/admin-finalize-gamemaster-parity.test.ts`, 4 probes in `tools/probe-admin-provider-dispatch.ps1` |
 | R24 | Scope creep before anything ships | Medium | **High** | All |
 | R25 | Round write contention under load | Medium | Medium | X12 |
 | X15 | "Challenge any user" harassment surface - no report-user feature exists | Medium | Medium | X10 |
@@ -1002,6 +1005,142 @@ already-rendered output, exactly as the sibling `content` prop already did.
 
 **Nothing was backfilled and nothing could be:** the page threw on render, so there is no bad
 data, only requests that failed. The fix is a deploy, not a migration.
+
+### R40 - An admin money-adjacent route with no authentication at all - **CLOSED, 7 September 2026**
+
+`POST /api/finalize-old-competitions` in `apps/admin` had **no authentication of any kind**. Not a
+weak check, not a token-validity check that should have been a section check - nothing. Any
+anonymous caller who knew the path could force-finalize every `completed` competition in the
+database: the handler closes each contest's open `TradingPosition` rows at live prices, writes
+`TradeHistory` rows, recalculates participant PnL, and fetches forex prices from an external API
+once per position.
+
+**This is the second unauthenticated route found in this programme**, after Prerequisite A's
+`/api/simulator/*` accepting a plain `X-Simulator-Mode: true` header. The two together are why the
+rule is stated as a class rather than as two incidents: **the routes with no guard are not found
+by reading the ones with weak guards.** Every other route in this sweep - list, pause, cancel,
+emergency-cancel, adjust-results - had *something*, and reviewing them would never have surfaced
+this one. It was found by enumerating the lifecycle routes and counting guards against exported
+handlers, which is a different activity from reading each route.
+
+**Severity, stated precisely, because two facts pull in opposite directions.** It is
+**unauthenticated and live**, which is as bad as this register gets. But it is scoped to contests
+already in `completed`, so it cannot finalize a running contest, cannot pay a prize, and cannot
+move wallet money - `settleFeesAndGameMasters` is not on this path. The realistic harm is a
+corrupted trade history and audit trail on historical contests, plus an unmetered external API
+bill, both triggerable by anyone. **Do not let a summary round that up to "anyone could pay
+themselves", and do not let it round down to "it only touches completed contests" either.**
+
+**Nothing was backfilled and there is no way to know whether it was ever called.** The route wrote
+no audit entry, because it had no caller to attribute it to. Its writes are indistinguishable from
+a legitimate operator sweep. That absence of evidence is itself the finding: **a route with no
+guard also has no attribution, so the question "did this happen" cannot be answered afterwards.**
+
+Fixed by `guardSection("competitions")`, placed **before `connectToDatabase()`** so a refusal
+opens no connection and reaches no query - the same before-any-work ordering that
+`checkAccountStanding` follows. Pinned by position, not by presence, because a guard added at the
+bottom of the handler satisfies any mention-based check while every write has already landed.
+
+### R41 - Pausing a provider contest did nothing - **CLOSED, 7 September 2026**
+
+`Competition.isPaused` is a trading-era field, honoured by `order.actions.ts` since long before
+games existed. `lib/services/games/round-launch.service.ts` never read it. So an operator pausing a
+provider contest got a success toast, a PAUSED banner, a notification sent to every participant -
+and **players carried on starting and finishing rounds throughout.**
+
+**The failure shape is the one this programme keeps meeting: the control reported success while
+doing nothing.** Same as the trading-shaped `matchmaking.service.ts`, a provider enabled with no
+adapter, and a `rankingMethod` a provider game ignores. What makes this one worse than a dead
+control is that it was used *during incidents*: `IncidentsSection.tsx` calls the pause route when
+an operator raises an incident on a contest, so the one moment an operator most needs play to stop
+is the moment they were most confidently told it had.
+
+**Two things were wrong beyond the missing gate, and both would have survived a fix aimed only at
+the launch service.**
+
+- **Resume compensated the wrong field.** It extended `endTime` by the pause duration.
+  `createRound` gates on `playWindowEnd` and the launch service gates on `playWindowStart`;
+  `endTime` gates neither. So the contest ran longer while the window players actually play inside
+  stayed exactly as short - a two-hour pause simply consumed two hours of their playing time. It
+  reads as correct because the field being extended is the one called "end".
+- **The operator's control panel described a different game.** `CompetitionAdminActions.tsx` said
+  seven trading-shaped things, the worst being "All positions will be closed at current prices"
+  above the emergency-cancel confirm button on a contest with no positions, and "Trading is now
+  frozen" on a pause that was not being enforced. See `12` s3.2a.
+
+**Latent, and say so.** No provider contest has run in production, so no player ever kept playing
+through a pause and no operator has been misled by the panel yet. **Nothing was backfilled** -
+there is nothing to backfill, since the defect is an absent check rather than a stored value.
+
+**The general rule, which is the reason this is an R-series entry and not an X-series one:** a
+capability the platform already has does not automatically extend to a new game, and the way it
+fails is silence. `isPaused` was not missing, not undocumented and not broken - it was simply not
+read by the new code path, and every screen above it kept saying it worked. **When adding a game,
+enumerate the operator controls that already exist and ask of each one which code path enforces
+it**, rather than asking whether the field is set.
+
+---
+
+### R42 - The admin cron refused to settle provider contests - **CLOSED, 7 September 2026**
+
+`apps/admin/lib/actions/trading/competition-end.actions.ts` had no provider dispatch. Its only
+game check was `routeToTradingSettlement`, which answers the narrow question *may trading settle
+this* - so a provider contest reaching this function was refused outright and left `active`.
+
+**Both apps register `checkAndFinalizeCompetitions` on an every-minute cron** (`lib/inngest/functions.ts`
+and `apps/admin/lib/inngest/functions.ts`). Whether a provider contest settled therefore depended
+on **which cron process claimed it first**. There is no flag, no alert and no log line a person
+looks at on either branch.
+
+**State the harm precisely, because the neighbouring entry invites the wrong summary.** R26 was a
+*missing stage* on this same cron - the contest settled, the players were paid, and only the Game
+Master's commission was skipped. This is not that. Here **nothing happened at all**: no ranking,
+no prizes, no fees, no completion. The contest simply stayed `active` past its end time, looking
+finished to every screen and to the operator.
+
+**Latent, and nothing was backfilled.** No provider contest has settled in production. There is
+also nothing that *could* be backfilled: the defect is an absent branch, not a stored value.
+
+**The general rule, which now replaces both instances rather than sitting beside them.** After
+R26, this is the second capability the main app had and the admin app did not, in the same pair of
+files. So carry the form: **the four finalize functions are not four copies of one function, and a
+capability added to one is not thereby added to the others.** The main app's dispatch was written
+in X5 and the admin app's absence was not a regression - it had never been there.
+
+**Two instruments were silent, and both are ones we would normally trust.**
+
+- **`check:mirrors` agreed, correctly.** `provider-finalize.ts` and `provider-settlement.service.ts`
+  were **already mirrored into `apps/admin`** during X5 and imported by nothing. The two copies did
+  agree; only the call site was missing. The guard compares models and files, never callers.
+- **The file-size heuristic that found R26 raises nothing here.** R26 surfaced because
+  `competition-end.actions.ts` was 72 KB against 38 KB. The pair is now 45 KB against 37 KB, and a
+  six-line dispatch does not move that needle. **A heuristic that found the last defect is not
+  evidence about the next one.**
+
+**Ordering is the load-bearing part of the fix.** The dispatch sits before `startSession()`.
+`finalizeProviderCompetition` opens its own session and takes its own optimistic lock, so
+dispatching after would nest a transaction inside one this function owns. It also has to precede
+any lock for the reason the main app records: refusing early leaves the contest untouched, whereas
+refusing after a lock strands it with nobody able to claim it again.
+
+**And a note on what the probes could and could not establish**, because it changed what got
+written. The two game gates - the new pre-session dispatch and the pre-existing in-transaction
+`routeToTradingSettlement` - each cover the other's end state, so **neither can be probed by
+removing it alone**; both had to be disabled in one edit, by stubbing the shared import. The
+main app's equivalent situation was resolved by asserting `updatedAt` never moved, and that does
+not transfer: **this path takes no optimistic lock**, so there is no `finalizing` state to strand a
+contest in, and an aborted transaction is indistinguishable from a never-opened one. The
+in-transaction gate is kept for a case this suite cannot construct - a label that changes between
+the two reads - and `tools/probe-admin-provider-dispatch.ps1` **records that as unprobed rather
+than carrying a fifth probe that reports green** and teaches the next reader it is decoration.
+
+**One fixture lesson, the same one this programme keeps paying for.** The seeded participants used
+`competitionId` as an ObjectId. `CompetitionParticipant.competitionId` is declared `String`, and
+the raw driver does no casting, so settlement's query matched nothing. It did not crash: it logged
+`Found 0 participants`, booked the whole pool as an unclaimed pool, recorded a platform fee, marked
+the contest `completed` and **returned success**. Only the prize count disagreed. That is the
+argument for asserting the money separately from the terminal status - **a status assertion passes
+either way.**
 
 ---
 

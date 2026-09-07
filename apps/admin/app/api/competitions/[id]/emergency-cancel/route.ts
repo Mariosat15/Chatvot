@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { emergencyCancelActiveCompetition } from "@/lib/actions/trading/competition-cancel.actions";
 
 /**
@@ -7,17 +7,20 @@ import { emergencyCancelActiveCompetition } from "@/lib/actions/trading/competit
  * Emergency cancel an active competition
  *
  * Body: { reason: string, useSnapshotId?: string }
+ *
+ * Guarded on the `competitions` SECTION. `verifyAdminAuth` answers only "is this an admin
+ * token", so an employee granted one unrelated section could close every position and refund
+ * every entrant of a live contest. Sixth instance of that class; see
+ * `finalize-old-competitions/route.ts` for the list.
  */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    // Verify admin authentication
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("competitions");
+    if (!guard.ok) return guard.response;
+    const admin = guard.admin;
 
     const { id } = await params;
     const body = await request.json();
@@ -35,7 +38,7 @@ export async function POST(
 
     console.log(`🚨 [API] Emergency cancel request for competition ${id}`);
     console.log(`   Reason: ${reason}`);
-    console.log(`   Admin: ${auth.adminId}`);
+    console.log(`   Admin: ${admin.email}`);
     console.log(
       `   Snapshot ID: ${useSnapshotId || "none (using current prices)"}`,
     );
@@ -55,7 +58,7 @@ export async function POST(
     const result = await emergencyCancelActiveCompetition(
       id,
       reason.trim(),
-      auth.adminId || "admin",
+      admin.id,
       snapshotPrices,
     );
 
@@ -65,6 +68,10 @@ export async function POST(
         message: result.message,
         details: {
           closedPositions: result.closedPositions,
+          // Reported so the confirmation can say what actually happened rather than
+          // announcing it. A provider contest closes no positions and voids rounds instead,
+          // and "0 positions closed" alone reads like the action failed.
+          voidedRounds: result.voidedRounds,
           refundedCount: result.refundedCount,
           totalRefunded: result.totalRefunded,
         },

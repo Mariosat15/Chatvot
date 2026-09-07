@@ -89,6 +89,51 @@ export function toRequestBody(draft: ContestDraft): Record<string, unknown> {
 }
 
 /**
+ * The edit payload, which is deliberately NOT `toRequestBody` minus a few keys.
+ *
+ * Once anyone has entered the contest, only the fields on `EDITABLE_ONCE_ENTERED` may be
+ * sent at all - the server refuses the whole request if a frozen field arrives, naming it.
+ * So this omits them rather than sending them unchanged: submitting `entryFee` with its
+ * existing value looks harmless and would be refused, and the operator would be told they
+ * had tried to change a fee they had not touched.
+ *
+ * `providerKey`, `gameCode` and the content seed are absent at every state, because game
+ * identity is never editable. That is not an omission to fix later - editing it is creating
+ * a different contest, which is what the wizard is for.
+ */
+export function toEditRequestBody(
+  draft: ContestDraft,
+  options: { entered: boolean },
+): Record<string, unknown> {
+  const always: Record<string, unknown> = {
+    name: draft.name,
+    description: draft.description,
+    maxParticipants: draft.maxParticipants,
+  };
+
+  if (options.entered) return always;
+
+  return {
+    ...always,
+    settings: draft.settings,
+    entryFee: draft.entryFee,
+    minParticipants: draft.minParticipants,
+    platformFeePercentage: draft.platformFeePercentage,
+    prizeDistribution: draft.prizeDistribution,
+    startTime: localToIso(draft.startTime),
+    endTime: localToIso(draft.endTime),
+    playWindowStart: localToIso(draft.playWindowStart),
+    playWindowEnd: localToIso(draft.playWindowEnd),
+    attemptsPolicy: draft.attemptsPolicy,
+    attemptsAllowed:
+      draft.attemptsPolicy === "single" ? undefined : draft.attemptsAllowed,
+    unresolvedRoundPolicy: draft.unresolvedRoundPolicy,
+    resultGracePeriodSeconds: draft.resultGracePeriodSeconds,
+    perRoundCostAcknowledged: draft.perRoundCostAcknowledged,
+  };
+}
+
+/**
  * Converts a `datetime-local` value to an absolute instant in the operator's zone.
  *
  * Returns the input unchanged when empty or unparseable, so the server produces the "this
@@ -98,4 +143,24 @@ function localToIso(value: string): string {
   if (!value) return value;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toISOString();
+}
+
+/**
+ * The inverse, for populating the edit form from stored dates.
+ *
+ * Builds the string from LOCAL getters rather than slicing `toISOString()`, which is the
+ * obvious version and is wrong by the operator's UTC offset: a contest starting at 09:00
+ * local would render as 07:00 in a UTC+2 browser, and an operator who saved without
+ * touching the field would silently move the start time two hours earlier.
+ */
+export function isoToLocal(value: string | Date | undefined | null): string {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
 }

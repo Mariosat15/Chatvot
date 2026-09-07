@@ -1,15 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { cancelCompetitionAndRefund } from "@/lib/actions/trading/competition-cancel.actions";
 import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
 
+/**
+ * POST /api/competitions/[id]/cancel - cancel an upcoming competition and refund everyone.
+ *
+ * Guarded on the `competitions` SECTION, not on `requireAdminAuth`. The latter asks only
+ * whether the caller is an admin at all, so an employee granted one unrelated section passed
+ * it and could refund every entrant of any contest. Sixth instance of that class; see
+ * `finalize-old-competitions/route.ts` for the list.
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await requireAdminAuth();
+    const guard = await guardSection("competitions");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     const { id } = await params;

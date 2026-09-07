@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { guardSection } from "@/lib/admin/section-route-guard";
+import { hasProviderGameLabel } from "@/lib/admin/contest-game-label";
 import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
@@ -11,17 +13,36 @@ import mongoose from "mongoose";
  * Admin API: FORCE finalize old completed competitions
  * This will close any open positions and create trade history
  * even if competition status is already "completed"
- * POST /api/admin/finalize-old-competitions
+ * POST /api/finalize-old-competitions
+ *
+ * THIS ROUTE HAD NO AUTHENTICATION AT ALL until 7 September 2026, and it is the most severe
+ * instance of a class already recorded five times in this programme (Prerequisite A, the
+ * internal-secret fallbacks, the unprotected suspicion-score route, the provider admin routes,
+ * and `PUT /api/competitions/[id]`). The others accepted a weak credential. This one accepted
+ * none: an anonymous POST closed every open position in every completed competition at live
+ * market prices and wrote a `TradeHistory` row with a `realizedPnl` for each.
+ *
+ * Why that matters beyond the write itself: `realizedPnl` on `TradeHistory` is what
+ * finalization reads by `positionId` to rank participants, so unauthenticated rows in that
+ * collection are unauthenticated inputs to a ranking. It also loops over every position
+ * calling the forex price API, which is an unmetered cost an anonymous caller could run up.
+ *
+ * Guarded on `competitions`, not `dev-zone` or `database`: forcing a contest to settle is
+ * contest administration, and the section grant is the only thing that keeps it apart from
+ * the credential-holding sections.
  */
 export async function POST(_request: Request) {
   try {
+    const guard = await guardSection("competitions");
+    if (!guard.ok) return guard.response;
+
     await connectToDatabase();
 
     // Find all completed competitions
     const completedCompetitions = await Competition.find({
       status: "completed",
       endTime: { $lt: new Date() }, // Already ended
-    }).select("_id name endTime");
+    }).select("_id name endTime gameType gameConfig");
 
     if (completedCompetitions.length === 0) {
       return NextResponse.json({
@@ -41,6 +62,26 @@ export async function POST(_request: Request) {
     let errors = 0;
 
     for (const comp of completedCompetitions) {
+      // Everything below this line is trading: it closes `TradingPosition` rows at forex
+      // prices and writes `TradeHistory`. A provider contest has none of that, so the loop
+      // body was already a no-op for one - by accident, via the empty-positions branch.
+      //
+      // Skipping it explicitly instead, because "no open positions found" is the wrong thing
+      // to report about a puzzle contest and would be read as a healthy result. This is the
+      // dispatch `12` section 3 asks for; there is nothing to dispatch TO, because a provider
+      // contest that reached `completed` has already been through
+      // `provider-settlement.service.ts` and has no positions to sweep.
+      if (hasProviderGameLabel(comp)) {
+        skipped++;
+        results.push({
+          competitionId: comp._id,
+          name: comp.name,
+          status: "skipped",
+          reason: "Provider-game contest - it has no trading positions to close",
+        });
+        continue;
+      }
+
       const session = await mongoose.startSession();
       session.startTransaction();
 

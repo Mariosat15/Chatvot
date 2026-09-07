@@ -75,8 +75,25 @@ export function RoundPreflight({
     ? new Date(state.playWindowStart) > new Date()
     : false;
 
+  /*
+    A PAUSE IS NOT A STATUS, which is the whole reason it needs its own line here. A paused
+    contest is still `active`, so every check above passes and this screen would offer a fully
+    enabled Play button that the launch service now refuses.
+
+    It blocks RESUME as well, deliberately. The launch service's pause gate sits before the
+    idempotent-resume path, for the same reason the status gate does - and more importantly, an
+    operator pauses a contest to stop play, so letting a player carry on inside a round they
+    already have open defeats the control while appearing to honour it.
+  */
+  const paused = state.isPaused === true;
+
   const blocked =
-    notStartedYet || noLongerOpen || windowNotOpen || windowClosed || exhausted;
+    notStartedYet ||
+    noLongerOpen ||
+    paused ||
+    windowNotOpen ||
+    windowClosed ||
+    exhausted;
 
   // Reason the order matters: a contest that has not started AND has a closed window should say
   // it has not started, because that is the fact the player can act on - they can come back.
@@ -84,13 +101,19 @@ export function RoundPreflight({
     ? "This competition has not started yet. Your seat is reserved - come back when it opens."
     : noLongerOpen
       ? "This competition is no longer accepting rounds."
-      : windowNotOpen
-        ? "Play has not opened for this competition yet."
-        : windowClosed
-          ? "The play window for this competition has closed."
-          : exhausted
-            ? "You have used all of your attempts for this competition."
-            : null;
+      : paused
+        ? // The operator's reason is shown when there is one. A pause with no explanation is
+          // what makes players assume the platform is broken rather than being worked on.
+          state.pauseReason
+          ? `Play is paused: ${state.pauseReason} Your attempts are safe - come back shortly.`
+          : "Play is paused while we sort something out. Your attempts are safe - come back shortly."
+        : windowNotOpen
+          ? "Play has not opened for this competition yet."
+          : windowClosed
+            ? "The play window for this competition has closed."
+            : exhausted
+              ? "You have used all of your attempts for this competition."
+              : null;
 
   const buttonLabel = launching
     ? "Opening the game…"
@@ -98,15 +121,17 @@ export function RoundPreflight({
       ? "Not started yet"
       : noLongerOpen
         ? "Closed"
-        : windowNotOpen
-          ? "Play has not opened"
-          : windowClosed
-            ? "Play has closed"
-            : exhausted
-              ? "No attempts left"
-              : resuming
-                ? "Resume your round"
-                : "Play";
+        : paused
+          ? "Paused"
+          : windowNotOpen
+            ? "Play has not opened"
+            : windowClosed
+              ? "Play has closed"
+              : exhausted
+                ? "No attempts left"
+                : resuming
+                  ? "Resume your round"
+                  : "Play";
 
   return (
     <div className="space-y-4 rounded-xl border border-gray-700 bg-gray-800/50 p-6">
@@ -137,7 +162,14 @@ export function RoundPreflight({
         </div>
       )}
 
-      {resuming && (
+      {/*
+        Suppressed while blocked, because the sentence is an offer. Telling a player their round
+        can be reopened for free, beside a disabled button, is worse than saying nothing - it
+        reads as the control being broken rather than deliberately withheld. The pause case is
+        the one that made this necessary: a live round plus a pause is exactly the combination
+        where both panels would otherwise render and contradict each other.
+      */}
+      {resuming && !blocked && (
         <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-3">
           <p className="text-xs text-blue-300">
             You have a round in progress (attempt {state.liveRound?.attemptNumber}).

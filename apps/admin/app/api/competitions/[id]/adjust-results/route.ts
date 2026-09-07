@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
@@ -35,9 +35,13 @@ export async function POST(
   mongoSession.startTransaction();
 
   try {
-    const auth = await verifyAdminAuth();
-    if (!auth.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Guarded per-section. `verifyAdminAuth` is token validity, so an employee granted one
+    // unrelated section could rewrite finalised ranks and pay prizes out of the platform's
+    // pocket. Sixth instance of that class; see `finalize-old-competitions/route.ts`.
+    const guard = await guardSection("competitions");
+    if (!guard.ok) {
+      await mongoSession.abortTransaction();
+      return guard.response;
     }
 
     const { id: competitionId } = await params;
@@ -88,7 +92,22 @@ export async function POST(
       );
     }
 
-    // Only completed or emergency_ended competitions can have results adjusted
+    /*
+      Only completed or emergency_ended competitions can have results adjusted.
+
+      A FINDING THAT IS RECORDED HERE RATHER THAN FIXED, because fixing it is a decision about
+      the trading path and not about games: **`emergency_ended` is written by nothing.**
+      `emergencyCancelActiveCompetition` sets `status: "cancelled"` while writing
+      `emergencyEndedAt`, `emergencyEndReason` and `emergencyEndedBy`. The enum value is
+      declared in both model copies and read in six places, and no writer produces it.
+
+      The consequence lands exactly here: after an emergency end - the one situation where an
+      operator most needs to correct a result - this gate refuses, because the contest is
+      `cancelled`. Changing the writer to produce `emergency_ended` would be the honest fix and
+      it moves every reader that tests `status === "cancelled"` on the trading path, so it is a
+      trading behaviour change that belongs with its own regression evidence, not inside a
+      games slice. `12` section 3.2a records it.
+    */
     if (!["completed", "emergency_ended"].includes(competition.status)) {
       await mongoSession.abortTransaction();
       return NextResponse.json(
@@ -187,7 +206,7 @@ export async function POST(
                     metadata: {
                       incidentId,
                       reason: adj.reason,
-                      adjustedBy: auth.adminId,
+                      adjustedBy: guard.admin.id,
                     },
                   },
                 ],
@@ -271,7 +290,7 @@ export async function POST(
                     previousPrize,
                     newPrize: adj.newPrize,
                     reason: adj.reason,
-                    adjustedBy: auth.adminId,
+                    adjustedBy: guard.admin.id,
                   },
                 },
               ],
@@ -355,8 +374,8 @@ export async function POST(
     incident.auditLog.push({
       timestamp: new Date(),
       action: "results_adjusted",
-      by: auth.adminId || "admin",
-      byEmail: auth.email,
+      by: guard.admin.id,
+      byEmail: guard.admin.email,
       details: `Adjusted ${resultAdjustments.length} participant results. Total prize adjustment: €${totalPrizeAdjustment.toFixed(2)}`,
       metadata: { competitionId, results },
     });

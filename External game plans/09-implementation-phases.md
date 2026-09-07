@@ -348,9 +348,17 @@ correct rather than a gap.
 **`PARTIALLY BUILT` 4 September 2026** - provider registration, credentials, the per-title
 enable switch (`12` s4.1a), and now contest creation with pre-flight validation (`12` s2.1)
 are code-complete. Taken out of order because E3 cannot start without a signed provider, and
-the owner's "admin first" instruction puts these screens ahead of any player screen. The
-remaining item is held back on purpose: the **live contest controls** are most useful once E3
-has produced real contests to control.
+the owner's "admin first" instruction puts these screens ahead of any player screen.
+
+> **The sentence that used to end this paragraph was that the live contest controls were "held
+> back on purpose", being most useful once E3 had produced real contests to control. They were
+> built on 7 September 2026 instead** (`12` s3.2a), and the reasoning reversed for a reason worth
+> keeping: the controls turned out not to be a feature waiting on content but a set of **existing**
+> controls that were quietly wrong. Waiting for real contests would have meant an operator's first
+> use of them was on a contest with paying players in it. Two defects came out of it, **R40** - a
+> route with no authentication of any kind - and **R41** - pausing a provider contest doing
+> nothing at all. Neither needed a real contest to find, and neither would have been found by
+> using one, because both report success.
 
 **The health paragraph that used to sit here was wrong about the design, not just the date.**
 It said health "wants the `provider_health_check` time series from `04` s3.5". It was built
@@ -367,15 +375,27 @@ and defaults to `"down"`. See `12` s4.2b.
 - [x] **Publish control on a draft provider contest** (5 Sep 2026, `12` s3.1a)
 - [x] **Round inspector** - status, score, raw provider events, integrity flags (5 Sep 2026, `12` s4.2a)
 - [x] **Manual round resolution**, with a mandatory reason and an audit entry (5 Sep 2026, `12` s4.2a). **It cannot enter a score, deliberately** - it ends a round, because scores go through the one ingestion function in the main app
-- [ ] Pause, extend and cancel controls on a live contest
+- [x] **Pause, extend and cancel controls on a live contest** (7 Sep 2026, `12` s3.2a). **They already existed and were wrong**, which is the finding: pausing a provider contest was cosmetic (**R41**), resume extended `endTime` rather than the play window that actually gates rounds, cancelling left live rounds running, and the force-finalize route had **no authentication at all** (**R40**)
+- [x] **The admin cron settles provider contests** (7 Sep 2026, **R42**). Listed here rather than under E4 because it was found while mapping *this* phase's controls, and because it is an admin-process defect: `apps/admin`'s `finalizeCompetition` had **no provider dispatch at all**, so a provider contest reaching the admin cron was refused and left `active`. Both apps run that cron every minute, so **whether a provider contest settled was decided by which process claimed it first.** Strictly worse than R26 in the same file pair - R26 skipped only the Game Master's commission, this paid nobody and completed nothing
 
 **Done when:** an admin can create, run, monitor and if necessary rescue a contest
-without a developer. **Not yet met, and the gap is now narrower and more precisely
-stated:** an operator can register a provider, choose which titles are live, create a
-contest on one with settings drawn from the game's own schema, **publish it so players
-can see and enter it, inspect and end a round that got stuck, and read a provider's health
-without believing a stored field** (6 Sep 2026). What remains is the pause/extend/cancel
-controls on a live contest.
+without a developer. **Now met for the contest lifecycle**, and the two things it excludes are
+named below rather than left to a reader to discover. An operator can register a provider, choose
+which titles are live, create a contest on one with settings drawn from the game's own schema,
+**publish it so players can see and enter it, edit it within a freeze policy that protects
+anybody who has already paid, pause, resume and cancel it while it runs, inspect and end a round
+that got stuck, and read a provider's health without believing a stored field.**
+
+**What E5 still does not cover, and neither belongs to the lifecycle:** revenue and activity
+**analytics by provider**, and the **Game Master contest creation API**. Both are X6.
+
+**And two items inside the lifecycle are recorded rather than closed.** `adjust-results` is now
+authorized but has **no UI caller at all**, so post-settlement correction is reachable only by
+API - building game-aware score adjustment there would put a second score-writing door beside
+`applyResult`, which `02` s10 rule 3 forbids, on a screen nobody can reach. And
+**`emergency_ended` is a status the model declares that nothing ever stores**:
+`emergencyCancelActiveCompetition` writes `"cancelled"` with an `emergencyEndedAt` field
+alongside, while the admin panel reads `emergency_ended`. Both belong with X6.5.
 
 **What "rescue works" excludes, said explicitly.** Manual resolution **ends** a round - void,
 abandoned or expired - and **cannot enter a score**, because `applyResult` is the single
@@ -388,14 +408,27 @@ E6** - so a published contest can now be entered, played and settled by clicking
 still excludes: the wizard covers **competitions only**, and challenges on a provider game are
 **E8**.
 
-**And editing is still not built, which the publish control makes more visible rather than
-less.** `/competitions/edit/[id]` renders the trading editor and `PUT
+~~**And editing is still not built, which the publish control makes more visible rather than
+less.**~~ **Editing was built 7 September 2026 - see `12` s2.2, which is authoritative.** The
+paragraph below is kept because its diagnosis was right and **understated**, and the
+understatement is the transferable part.
+
+`/competitions/edit/[id]` renders the trading editor and `PUT
 /api/competitions/[id]` does a blind `Object.assign` of whatever that form submits, so
 opening a provider contest in it writes trading fields onto it. The list therefore
 **withholds the Edit button from provider contests and says why**, rather than greying it
 out - the same reasoning as a provider switch that cannot work refusing with a reason. Until
 a provider editor exists, cancel and recreate is the honest instruction, and
 `CompetitionEditorForm.tsx`'s field gap - noted in `12` s2 - stays load-bearing.
+
+**What that description got wrong is the scope.** The blind assign was not a provider-contest
+hazard; it was a **mass-assignment vulnerability on every contest**, trading included, and the
+route authenticated on token validity rather than section access, so an employee granted one
+unrelated section could rewrite `gameKey`, `status`, `prizePool` or `currentParticipants` on
+anything. The Edit button now **routes by game** instead of being withheld. The
+`CompetitionEditorForm.tsx` field gap is **still outstanding** and is deliberately so: it is a
+trading UI job with no provider dependency, and closing it inside a security fix would have
+destroyed the only evidence that no trading edit changed behaviour.
 
 Remember the mirror: every model touched here exists twice.
 

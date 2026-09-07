@@ -33,6 +33,12 @@ export interface PlayerRoundView {
 
 export interface PlayState {
   contestStatus: string;
+  /**
+   * A paused contest is still `active`, so this cannot be derived from the status. See the
+   * service's copy for why that distinction matters to the Play button.
+   */
+  isPaused: boolean;
+  pauseReason?: string;
   gameKey?: string;
   attemptsPolicy: string;
   attemptsPermitted: number;

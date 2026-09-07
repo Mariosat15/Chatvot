@@ -535,3 +535,225 @@ describe("R26 - the admin app must pay Game Masters exactly as the main app does
     expect(afterSecond).toEqual(afterFirst);
   });
 });
+
+/**
+ * R42, the sibling defect found in the same pair of files a day later.
+ *
+ * R26 was a missing referral stage on the admin cron. This is the same shape one layer out
+ * and worse: the admin action had no PROVIDER DISPATCH at all, so `routeToTradingSettlement`
+ * - which answers only "may trading settle this" - refused every provider contest and left
+ * it `active`. Nobody was paid anything, not merely the Game Master.
+ *
+ * The reason it is a coin flip rather than a consistent failure is that BOTH apps register
+ * `checkAndFinalizeCompetitions` on an every-minute cron, so a provider contest settled
+ * correctly or not at all depending on which process claimed it first.
+ *
+ * Note what this suite could NOT have caught before, because it is the reusable part: every
+ * test above seeds a trading contest, so a provider-shaped one was never handed to either
+ * finalizer. `check:mirrors` was equally silent, and for a reason worth stating - both
+ * `provider-finalize.ts` and `provider-settlement.service.ts` were already mirrored into
+ * `apps/admin` and imported by nothing. The two copies agreed; only the call site was absent.
+ */
+describe("R42 - the admin app must settle a provider contest, not refuse it", () => {
+  const PROVIDER_GAME_KEY = "mock:mock-puzzle";
+
+  beforeAll(async () => {
+    await startTestMongo();
+    await ensureCollections([
+      "competitions",
+      "competitionparticipants",
+      "creditwallets",
+      "wallettransactions",
+      "platformtransactions",
+      "gamemasterearnings",
+      "gamemastersubscriptions",
+      "userreferrals",
+      "marketplaceitems",
+      "notifications",
+      "provider_game",
+      "game_round",
+    ]);
+  }, 120_000);
+
+  afterAll(async () => {
+    await stopTestMongo();
+  });
+
+  afterEach(async () => {
+    await clearTestMongo();
+  });
+
+  /**
+   * Seeded through the raw driver on purpose, matching `provider-settlement.test.ts`, and the
+   * collection name is explicit: these schemas set `provider_game` rather than the pluralised
+   * default, and writing to a guessed name has exactly the same symptom as writing a wrong value.
+   */
+  async function seedProviderContest(): Promise<string> {
+    const db = mongoose.connection.db;
+    const competitionId = new mongoose.Types.ObjectId();
+
+    await db?.collection("competitions").insertOne({
+      _id: competitionId,
+      name: "Provider Contest",
+      slug: `provider-contest-${competitionId.toString()}`,
+      description: "Seeded for the admin dispatch test",
+      gameType: "provider",
+      gameKey: PROVIDER_GAME_KEY,
+      providerGame: { providerKey: "mock", gameCode: "mock-puzzle" },
+      attemptsPolicy: "single",
+      unresolvedRoundPolicy: "score_zero",
+      entryFee: ENTRY_FEE,
+      prizePool: PLAYERS.length * ENTRY_FEE,
+      platformFeePercentage: PLATFORM_FEE_PERCENT,
+      status: "active",
+      createdBy: GM_ID,
+      startTime: new Date(Date.now() - 7_200_000),
+      endTime: new Date(Date.now() - 60_000),
+      registrationDeadline: new Date(Date.now() - 7_500_000),
+      maxParticipants: 100,
+      minParticipants: 2,
+      currentParticipants: PLAYERS.length,
+      // `rank`, not `position` - and the first draft used the latter. Worth the note because
+      // the raw driver accepts either happily and the failure surfaces two stages later, as a
+      // Mongoose validation error when settlement SAVES the document, by which point the log
+      // already shows a plausible-looking unclaimed pool and a platform fee.
+      prizeDistribution: [
+        { rank: 1, percentage: 60 },
+        { rank: 2, percentage: 30 },
+        { rank: 3, percentage: 10 },
+      ],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await db?.collection("provider_game").insertOne({
+      providerKey: "mock",
+      gameCode: "mock-puzzle",
+      gameKey: PROVIDER_GAME_KEY,
+      name: "Mock Puzzle",
+      scoreDirection: "higher_is_better",
+      providerStatus: "active",
+      chartvoltEnabled: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    /*
+      `competitionId` AS A STRING, and the first draft passed the ObjectId.
+
+      `CompetitionParticipant.competitionId` is declared `String`, so Mongoose casts the
+      ObjectId this test holds down to a string when settlement queries - and the raw driver
+      does no casting at all, so the seeded rows stayed ObjectIds and matched nothing.
+
+      What makes it worth a comment is the symptom. Settlement did not crash: it logged
+      `Found 0 participants`, booked the entire pool as an unclaimed pool, recorded a platform
+      fee, marked the contest `completed` and returned success. Only `prizeRows` disagreed. The
+      status assertion in the test above passes either way, which is the argument for asserting
+      the money separately rather than trusting a terminal status.
+
+      Scores descend so a real ranking is distinguishable from everybody tying on zero.
+    */
+    await db?.collection("competitionparticipants").insertMany(
+      PLAYERS.map((p, index) => ({
+        competitionId: competitionId.toString(),
+        userId: p.id,
+        username: p.name,
+        email: `${p.id}@example.test`,
+        gameKey: PROVIDER_GAME_KEY,
+        score: (PLAYERS.length - index) * 100,
+        status: "active",
+        enteredAt: new Date(Date.now() - 5_400_000 + index * 1000),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })),
+    );
+
+    await db?.collection("creditwallets").insertMany(
+      PLAYERS.map((p) => ({
+        userId: p.id,
+        creditBalance: START_BALANCE,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })),
+    );
+
+    return competitionId.toString();
+  }
+
+  it("settles a provider contest instead of refusing it", async () => {
+    // The defect in one assertion. Before the fix this returns `success: false` with the
+    // trading-gate error and the contest is still `active`, which is the whole bug: an
+    // operator sees a finished contest that never pays out and no error anywhere they look.
+    const competitionId = await seedProviderContest();
+
+    const result = (await finalizeInAdminApp(competitionId)) as {
+      success?: boolean;
+      error?: string;
+    };
+
+    expect(result.error).toBeUndefined();
+    expect(result.success).toBe(true);
+
+    const after = await mongoose.connection.db
+      ?.collection("competitions")
+      .findOne({ _id: new mongoose.Types.ObjectId(competitionId) });
+
+    expect(after?.status).toBe("completed");
+  });
+
+  it("pays the provider contest's winner, and pays the same as the main app", async () => {
+    // Asserted separately from the status above because it is the half a partial fix forgets:
+    // dispatching to the provider path and then failing inside it would leave the contest
+    // `completed` with nobody paid, and the status assertion alone cannot see that.
+    //
+    // The parity half is the point of the file - the two apps must agree - and it is what
+    // stops this being pinned to whatever the admin path happens to do today.
+    const adminContest = await seedProviderContest();
+    await finalizeInAdminApp(adminContest);
+    const adminMoney = await moneySnapshot(adminContest);
+
+    await clearTestMongo();
+
+    const mainContest = await seedProviderContest();
+    await finalizeInMainApp(mainContest);
+    const mainMoney = await moneySnapshot(mainContest);
+
+    expect(adminMoney.prizeRows).toBeGreaterThan(0);
+    expect(adminMoney).toEqual(mainMoney);
+  });
+
+  it("still refuses a game neither app can settle, and leaves the contest untouched", async () => {
+    // The fail-closed half. An unknown label must not fall through to the trading path now
+    // that a second branch exists beside it, and the refusal must write NOTHING - the reason
+    // the dispatch sits before the session rather than after the lock, since a refusal past
+    // the lock strands the contest in `finalizing` with nobody able to claim it again.
+    const competitionId = await seedProviderContest();
+    await mongoose.connection.db
+      ?.collection("competitions")
+      .updateOne(
+        { _id: new mongoose.Types.ObjectId(competitionId) },
+        { $set: { gameType: "chess" } },
+      );
+
+    const before = await mongoose.connection.db
+      ?.collection("competitions")
+      .findOne({ _id: new mongoose.Types.ObjectId(competitionId) });
+
+    const result = (await finalizeInAdminApp(competitionId)) as {
+      success?: boolean;
+      error?: string;
+    };
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBeTruthy();
+
+    const after = await mongoose.connection.db
+      ?.collection("competitions")
+      .findOne({ _id: new mongoose.Types.ObjectId(competitionId) });
+
+    expect(after?.status).toBe("active");
+    // Reason: asserting `updatedAt` never moved is what distinguishes "refused before the
+    // session" from "refused after taking the lock". The end status is identical either way.
+    expect(after?.updatedAt).toEqual(before?.updatedAt);
+  });
+});
