@@ -493,7 +493,7 @@ X12 pilot. All three are in `17` section 7.
 | 14 | **Does historical trading performance enter the new cross-game aggregates, or do they start at zero?** Backfilling makes trading players instantly dominant on a games platform; starting at zero discards real history and will be read as a bug by existing players. Neither is obviously right, and the migration is written once | Product | Before X7 - `18` needs it to write the backfill | `18` |
 | 15 | **Who may be challenged?** Anyone on the platform, only mutuals/friends, or anyone who has opted in per game? The owner asked for "challenge any user", which needs a decline path, a block list and a rate limit or it becomes a harassment vector | **Owner** | Before X10 | `20` s2 |
 | 16 | **Is declaring game interests part of registration or a later prompt?** Adding steps to registration measurably costs completions, and `20` is designed so the feature works without it | Product | Before X11.5 | `20` s1 |
-| 17 | **When NOBODY in a contest scores, are the entry fees refunded or kept?** R45 made "no score, no prize" true, and the pot currently routes to the existing `all_disqualified` unclaimed pool net of the platform fee, exactly as a trading contest with no qualified winner does. That is the *consistent* answer, not necessarily the right one: the entrants paid to play a contest that produced **no result at all**, which is not obviously the same as losing one, and the likeliest cause is a provider outage rather than ten players declining to play. **The tests assert what the platform does, not what it should do**, so changing this is a policy edit and not a rewrite | **Owner** | Before a provider contest runs with real money | `05` s9.2, R45 |
+| ~~17~~ | **ANSWERED 7 September 2026 - it is the operator's choice, per contest.** The owner's answer was neither of the two options as posed: rather than one platform-wide policy, the game wizard and editor now carry an **Unscored contest** control with two settings - keep the pot (the `unclaimed_pool` behaviour that already existed) or **refund the entry fees less the platform fee**, with the reason explained to the player. The reasoning is that the right answer differs by contest: a high-fee contest whose provider went down should return money, and a cheap one need not. Three related rules were settled at the same time and are **not** configurable, deliberately: a contest **cancelled for too few players refunds in full with no fee** (already true - R43), a contest that **fails** does the same, and a player **disqualified by a rule keeps nothing** - their fee goes to the unclaimed pool exactly as a trading contest's does. See the 7 Sep work-log entry and `05` s9.3 | **Owner** | ~~Before a provider contest runs with real money~~ | `05` s9.3, R45 |
 
 ---
 
@@ -640,6 +640,167 @@ Newest at the top.
 
 ---
 
+### 7 Sep 2026 - `13` s6.1a/s4.1h - A PLAYER'S OWN RECORD OF A GAME CONTEST
+
+**Shipped:** `components/games/ProviderResultsScreen.tsx` (new), the provider branch of
+`app/(root)/competitions/[id]/results/page.tsx`, `findUnscoredRefund` in
+`lib/services/settlement/unscored-refund.ts` (mirrored), and the prize table **moved** from
+`components/trading/lobby/TradingPrizeTable.tsx` to `components/competitions/PrizeTable.tsx` so
+the game lobby renders it too. `13` **s6.1a** (results) and **s4.1h** (the lobby panel). 17 new
+tests in `__tests__/games/provider-results-screen.test.ts` plus 3 appended to
+`provider-play-ui.test.ts`, **15 probes in `tools/probe-provider-results.ps1`, all red with
+exactly 1 failure each on the named test.** Full suite **1175 passed**. **Nothing here is
+mirrored except the settlement helper**, so `check:mirrors` says nothing about the screens.
+
+**Why it exists.** The owner asked for the game equivalent of two trading screens: the
+post-contest "see details" page, and the prize-distribution panel in the lobby sidebar. Both
+were genuinely absent. The results URL **redirected a provider player to the lobby** - which had
+stopped an earlier crash and left them with no record of their own rounds at all - and the game
+lobby showed a prize pool and an entry fee while never saying what second place was worth.
+
+**Five things that generalise.**
+
+- **A redirect that stops a crash is a fix for the error and not for the feature, and it reads
+  as done.** The provider branch here was added to stop the trading post-mortem throwing, which
+  it did; the player was then sent to a screen showing the *public* leaderboard and nothing
+  about their own attempts. **The work log recorded it as guarded, which was true, and the gap
+  it left was invisible for two days.** When a guard redirects rather than refusing, say where
+  it sends people and whether that destination answers the question they asked.
+- **The round-path money guard fired on the first run, and the right response was to move the
+  read rather than narrow the rule.** `contest-results.service.ts` lives in
+  `lib/services/games/`, where chapter 11 seam 4 bans **every** money import blocked-by-default,
+  and invariant 6 of `round-lifecycle.test.ts` scans the import strings. The refund lookup moved
+  to `findUnscoredRefund` beside the code that writes the row. **"Reads are fine" is not a
+  property a rule about imports can express** - an import grants writes as readily as reads - and
+  the alternative on offer was a read-shaped hole in a guard protecting a payout path.
+- **That move fixed a duplication nobody had noticed, which is the argument for obeying the
+  guard rather than the reason to.** `"no_score_recorded"` was a literal in the writer and again
+  in the reader: the **fifth** "one rule, two copies" instance after `referenceId`,
+  `failedReason`, `challengeId` and the Game Master `||`. Its drift direction is the worst
+  available - the writer keeps refunding correctly while the screen stops finding the row, so a
+  player who **was** refunded is told nothing. Now one exported constant, pinned by a test that
+  counts the literals.
+- **Moved, not copied, and the four money expressions travelled unchanged.** The prize table
+  computes real money - an unfilled paid position has its share split among the winners who did
+  finish, net of the platform fee - and **nothing in that calculation is about trading**: it
+  reads the pool, the configured shares, the participant count and the fee, all four of which a
+  provider contest carries in the same fields. The test that asserts those four expressions
+  character for character moved with the file and still passes, which is what makes the move
+  provably behaviour-free. A second copy would have been the same shape as the bullet above.
+- **The panel had to say the figures are a FLOOR, because the table cannot know what it does not
+  know.** It redistributes an unfilled *position*, which is a question about how many people
+  entered. It cannot see a player who entered and recorded **no result** - that is settled at
+  finalization by `hasResult` (R45) - so a contest with three entrants and one score pays
+  differently from what the panel shows. Teaching it otherwise would mean predicting a result
+  before the contest ends, so the honest fix is the caution line, the same one the admin sidebar
+  carries.
+
+**Harness lesson, eighth instance: an import is not a use, for the fourth time.** The probe for
+the humanized score breakdown reported **GREEN**, and the cause was the test rather than the
+guard - `toContain("humanizeMetric")` is satisfied by the **import line** on its own, so
+replacing the call with a raw-key object changed nothing it could see. Now matched as a call
+with its arguments. After `canTransitionRound`, `MIN_REASON_LENGTH` and the Edit guard, carry the
+rule and not the cases: **assert the operator, never the operand.**
+
+**Harness lesson, ninth instance, and a NEW cause: the probe was aimed at something the TYPE
+system owns.** Re-running `tools/probe-lobby-theme.ps1` after the prize table moved turned up one
+green - "the game lobby reverts to the 3D icon set" - which read as a hole in the icon guard. It
+is not. That guard had been **narrowed the same day** (`13` s4.1g) from a blanket ban on
+`GameIcon` to `<GameIcon name="`, because the blanket version had started failing correct code,
+and the probe was never re-aimed with it. Its mutation swapped `icon={Trophy}` for
+`icon={GameIcon}` - a component reference in a **prop**, which that pattern cannot match by
+construction. The mutation is genuinely refused, just not by a test: every `icon` prop in the kit
+is typed `LucideIcon` and `GameIcon` requires a `name`, so **the compiler rejects it**. Re-aimed
+at the shape the test actually claims - a `<GameIcon name="trophy" />` **element** injected as
+the screen's own chrome - it goes red on exactly the expected test, and all 23 now behave.
+
+Two rules come out of it, and the first is the general one. **When a guard is narrowed, re-aim
+its probe in the same edit**, or the pair silently starts describing different properties, and
+the probe is the half that looks broken. And the new cause to carry beside "weak test", "wrong
+claim", "missing test" and "unreachable guard": **a structural probe aimed at a defect the
+compiler already refuses reports GREEN and is indistinguishable from a guard that has stopped
+working.** Note the direction of the mistake, because it is the reassuring one - the codebase was
+never unprotected, only unclear about which mechanism was protecting it.
+
+**Two things deliberately not done.** The screen shows a `sum_of_n` contest's rounds
+individually rather than one breakdown, because that policy marks no single round as counted and
+picking one would misstate how the total was reached. And **the admin sidebar still shows
+configured shares** rather than the live redistribution this player-facing table performs -
+unchanged from R46, still filed against X6.5, along with `finalLeaderboard` being rendered by no
+admin screen.
+
+---
+
+### 7 Sep 2026 - X6 - THE UNSCORED CONTEST IS NOW THE OPERATOR'S DECISION (CLOSES QUESTION 17)
+
+**Shipped:** `unscoredContestPolicy` on both `competition.model.ts` copies (add-only, defaulting
+to the pre-existing behaviour), `lib/services/settlement/unscored-refund.ts` (new, mirrored),
+`UNSCORED_CONTEST_POLICY_COPY` in `round-types.ts` (mirrored), the shared
+`apps/admin/components/admin/games/UnscoredPolicyField.tsx` used by **both** the wizard and the
+editor, and the create/edit services and routes that carry the field. `05` **s9.3**. Tests in
+`__tests__/services/unscored-contest-refund.test.ts`, probes in
+`tools/probe-unscored-refund.ps1`.
+
+**The owner's answer to question 17 was neither option as posed.** The question offered "refund"
+or "keep"; the answer is **per contest**, because the right answer differs between a high-fee
+contest whose provider went down and a cheap one. Three sibling rules were settled with it and
+are deliberately **not** configurable: too few players refunds **in full with no fee** (already
+true - R43), a failed contest the same, and a player **disqualified by a rule keeps nothing**.
+
+**Four things that generalise.**
+
+- **The refund could not be decided by reading the disqualification reason, and that was the
+  whole design problem.** R45 puts the human string "No score recorded" beside "Liquidated" and
+  "Insufficient trades" in one free-text field. Matching on prose would mean **the first person
+  to reword a message silently changes who gets paid back.** The question is asked of the game
+  module instead - `hasResult`, over the whole set at once - which R45 had already added.
+- **That choice makes the behaviour provider-only BY CONSTRUCTION rather than by a game-type
+  branch.** `tradingGameModule.hasResult` returns `true` unconditionally, because a flat account
+  is a real result, so trading can never reach the refund path without any `if` saying so. This
+  is the inverse of every trading-shaped service in this codebase, and a future game inherits it
+  for free if it can express "no result".
+- **A refund that is NOT full needs its own explanation or it reads as a billing error.** This
+  contest ran - it was scheduled, hosted, rounds were launched - so the platform keeps its fee
+  and the entrants get the rest, which is a different event from a cancellation and must not be
+  "simplified" into one. The ledger row, the player's results screen and the operator's control
+  all say so in the same words.
+- **The fee stage had to learn about money that had already left.** `settleFeesAndGameMasters`
+  now takes `refundedToPlayers` and subtracts it from the unclaimed remainder. Without it the
+  same credits would be booked twice - once returned to players, once recorded as an unclaimed
+  pool - which is the general rule from R26 in a new place: **a new money row is an incomplete
+  fix until you have asked which existing row it was taken from.**
+
+**Two defaults that differ on purpose, which is the thing most likely to look like a bug.** The
+**schema** defaults to `unclaimed_pool`, so every contest written before today keeps behaving
+exactly as it did; the **wizard** defaults a new draft to `refund_entry_fees`, which is the
+owner's preferred answer going forward. A schema default fixes future rows only, and here we
+deliberately did not want it to speak for past ones.
+
+**Latent, and nothing backfilled.** No provider contest has settled in production, so no contest
+has taken either branch. The stale wizard label promising the `exclude` refund was "not
+automatic yet" was corrected in the same pass - **an operator-facing caution that has become
+false is worse than none**, since it either scares an operator off a working policy or invites a
+second refund by hand.
+
+**The commit hook caught the third instance of the object-lookup rule, and the hook is why.**
+`UNSCORED_CONTEST_POLICY_COPY` was written as a `Record` and read as
+`UNSCORED_CONTEST_POLICY_COPY[value]`, where `value` arrives from a **stored document**. That is
+the same shape as the round-inspector action map and `competition-update-fields.ts`: an object
+lookup walks the prototype chain, so `"__proto__"` returns `Object.prototype` - **truthy**,
+surviving the `!copy` test the code already had, and only reading as blank several lines later
+where nothing connects it to the key. Now a `ReadonlyMap` in both mirrored copies, read with
+`.get()`, which has no prototype chain and so is total.
+
+Two things worth carrying. **The lint gate found it, not review** - `security/detect-object-injection`
+at `--max-warnings=0` in the pre-commit hook, on a file that had passed a hand-run lint of the
+*touched* list minutes earlier because that list was assembled by hand and this file was in the
+admin app. **Lint the staged set, not the set you remember editing.** And note the fix was
+mechanical only because the rule already had two precedents: **the third instance of a class is
+where you stop deciding and start applying**, which is the whole value of having written the
+first two down.
+
+---
+
 ### 7 Sep 2026 - X6 - R46: THE SCREEN THAT MADE A CORRECT PAYOUT LOOK BROKEN
 
 **Shipped:** `apps/admin/lib/admin/contest-result-presentation.ts` (new, admin-only, **not
@@ -698,7 +859,9 @@ because more damage than the probe caused is not a report about the guard.
 to describe as non-retroactive. **Deliberately not done:** the sidebar still shows *configured*
 shares rather than recomputing the redistribution the way the player-facing `TradingPrizeTable`
 already does - a shared caution string says they are a floor, and making the admin figures live
-is a larger change that belongs with X6.5.
+is a larger change that belongs with X6.5. (**That file is now
+`components/competitions/PrizeTable.tsx`**, moved later the same day so the game lobby renders it
+too - `13` s4.1h. The deferral is unchanged.)
 
 ---
 
@@ -867,6 +1030,12 @@ and where an unclaimed rank's percentage goes. The redistribution logic exists i
 `distributePrizesWithTies` and is what `TradingPrizeTable` renders; whether it behaves as the
 owner described for a provider contest is **unverified**, and no player or admin screen
 explains it. **Do not summarise the prize rules as confirmed.**
+
+> **Both halves were closed later the same day and this paragraph is history, not a present
+> fact.** R45 answered the eligibility half; the unscored-contest policy answered the money
+> half (open question 17). The redistribution is now explained on **both** the player lobby and
+> the admin sidebar, and the component named above moved to
+> `components/competitions/PrizeTable.tsx` when the game lobby began rendering it - `13` s4.1h.
 
 **Next chat should:** verify unclaimed-rank redistribution, ties and the no-winner case for
 a provider contest against real settlement, then surface the answer on the lobby and in the
@@ -1511,7 +1680,9 @@ lint clean, `next build` green.
   the money calculation was extracted whole into `TradingPrizeTable.tsx` and four of its
   expressions are asserted **character for character**, with probes that change the denominator
   and drop the platform fee going red. A restyle of a screen that computes money needs an
-  assertion a rewrite cannot pass.
+  assertion a rewrite cannot pass. (**The file is now `components/competitions/PrizeTable.tsx`**
+  - moved on 7 Sep 2026 so the game lobby renders the same component; the four assertions moved
+  with it unchanged, which is what proved that move behaviour-free too.)
 - **A pairwise consistency guard does not survive a third screen, and the fix is a stronger claim
   rather than more comparisons.** s4.1c compared class strings between two files, which was right
   for two. The sheet covers seven screens; pairwise is twenty-one comparisons and the first one

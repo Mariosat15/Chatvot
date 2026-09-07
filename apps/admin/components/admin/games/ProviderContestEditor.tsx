@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -18,6 +18,7 @@ import {
 import type { ConfigField } from "@/lib/services/games/config-schema";
 import { ConfigSchemaFields } from "./ConfigSchemaFields";
 import { PrizeDistributionEditor } from "./PrizeDistributionEditor";
+import { UnscoredPolicyField } from "./UnscoredPolicyField";
 import {
   type ContestDraft,
   emptyDraft,
@@ -62,6 +63,7 @@ interface StoredContest {
   attemptsPolicy?: "single" | "best_of_n" | "sum_of_n";
   attemptsAllowed?: number;
   unresolvedRoundPolicy?: "score_zero" | "exclude" | "hold_and_alert";
+  unscoredContestPolicy?: "unclaimed_pool" | "refund_entry_fees";
   resultGracePeriodSeconds?: number;
   gameConfig?: {
     providerKey?: string;
@@ -454,6 +456,11 @@ export function ProviderContestEditor({
             disabled={entered}
             onChange={(v) => patch({ resultGracePeriodSeconds: v })}
           />
+          <UnscoredPolicyField
+            value={draft.unscoredContestPolicy}
+            disabled={entered}
+            onChange={(value) => patch({ unscoredContestPolicy: value })}
+          />
         </div>
       </section>
 
@@ -492,6 +499,10 @@ function draftFromStored(contest: StoredContest): ContestDraft {
     attemptsPolicy: contest.attemptsPolicy ?? "single",
     attemptsAllowed: contest.attemptsAllowed,
     unresolvedRoundPolicy: contest.unresolvedRoundPolicy ?? "score_zero",
+    // Falls back to the SCHEMA default, not the wizard's. A contest created before the field
+    // existed really will settle to the unclaimed pool, so showing the operator a refund here
+    // would misreport what the stored contest does.
+    unscoredContestPolicy: contest.unscoredContestPolicy ?? "unclaimed_pool",
     resultGracePeriodSeconds: contest.resultGracePeriodSeconds ?? 900,
     perRoundCostAcknowledged: false,
   };

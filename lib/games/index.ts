@@ -11,6 +11,11 @@ export type {
   GameScoring,
   GameEnabledResult,
   ScoreDirection,
+  // Added to the public surface 7 Sep 2026. It was already the parameter type of a public
+  // method (`hasResult`), so a caller could not use that method without either importing the
+  // internal path - which invariant 1 blocks, correctly - or casting, which defeats the point
+  // of the method being typed at all.
+  RankableParticipant,
 } from "./types";
 export { TRADING_GAME_TYPE, PROVIDER_GAME_TYPE } from "./types";
 export {

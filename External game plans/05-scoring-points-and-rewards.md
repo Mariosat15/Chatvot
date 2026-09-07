@@ -434,6 +434,59 @@ an open owner decision** - the entrants paid to play a contest that produced no 
 not obviously the same as losing one. Recorded here rather than decided, and the tests assert
 what the platform does rather than what it should do.
 
+> **Decided 7 September 2026 - it is the operator's choice per contest.** See s9.3. This
+> paragraph is correct as the position s9.2 shipped with and stale as a present fact.
+
+### 9.3 The unscored contest, and the three refund rules around it (7 September 2026)
+
+**Owner decision, closing open question 17.** The question offered two answers - refund the
+entrants, or keep the pot - and the owner chose **neither as a platform rule**: it is a per
+contest setting, because the right answer differs between a high-fee contest whose provider went
+down and a cheap one nobody bothered with.
+
+`unscoredContestPolicy` on `Competition` (add-only, **mirrored**), surfaced by
+`UnscoredPolicyField.tsx` in both the wizard and the editor.
+
+| Setting | What happens |
+|---|---|
+| `unclaimed_pool` | The pot goes where a trading contest's unclaimed prizes go, net of the platform fee. **The schema default**, so every contest written before this date behaves exactly as it did |
+| `refund_entry_fees` | Each entrant is returned their entry fee **less the platform fee**, with the reason recorded on the ledger row and explained on their results screen. **The wizard's default for a new draft** |
+
+#### The three sibling rules, which are NOT configurable
+
+Deliberately fixed, because each is about the platform failing rather than about a contest
+producing an unusual result.
+
+| Case | Rule | Where |
+|---|---|---|
+| Cancelled for too few players | **Full refund, no platform fee.** The contest never ran | `competition-cancel.actions.ts`; the sweep was fixed by **R43** |
+| Cancelled because it failed | Same - full refund, no fee | as above |
+| A player disqualified by a rule | **No refund.** Their fee stays with the contest and reaches the unclaimed pool, exactly as a trading contest's does | `fees.service.ts` |
+
+#### Four facts that drift easily
+
+- **The refund is decided by `hasResult`, never by the disqualification reason.** R45 puts the
+  human string "No score recorded" beside "Liquidated" and "Insufficient trades" in one
+  free-text field, so matching on prose would mean **the first person to reword a message
+  silently changes who gets paid back.** The question is asked of the game module, over the
+  whole participant set at once: *did anybody produce a result?*
+- **That makes it provider-only by construction rather than by a game-type branch.**
+  `tradingGameModule.hasResult` returns `true` unconditionally - a flat account is a real result
+  - so trading can never reach the refund path, with no `if` saying so. A future game inherits
+  the behaviour for free if it can express "no result". A document describing a `gameType` check
+  here is describing the trap section 10 exists to prevent.
+- **The refund is net of the fee, unlike a cancellation, and this must not be "simplified".** The
+  contest *ran*: it was scheduled, hosted, and rounds were launched. Returning the fee too would
+  silently reverse income the platform has already booked.
+- **The fee stage takes `refundedToPlayers` and subtracts it from the unclaimed remainder.**
+  Without it the same credits are booked twice - once returned to players, once recorded as an
+  unclaimed pool. R26's rule in a new place: **a new money row is an incomplete fix until you
+  have asked which existing row it was taken from.** Rounding dust from the per-player division
+  is absorbed into the unclaimed pool.
+
+**Latent, and nothing backfilled.** No provider contest has settled in production, so neither
+branch has ever run.
+
 ---
 
 ## 10. No aggregate may be trading-only

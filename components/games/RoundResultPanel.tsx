@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { CheckCircle2, Clock3, Loader2, Trophy, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { humanizeMetric } from "@/lib/utils/humanize-metric";
 import type { PlayState, PlayerRoundView } from "./play-state";
 
 /**
@@ -162,6 +163,11 @@ export function RoundResultPanel({
         a renderer that knows a game's field names is a renderer that has to change for every
         new game, which is exactly the "no additional coding" property this platform is built
         around. It is display only and never reaches ranking.
+
+        The keys used to be printed VERBATIM, so a player read "penaltyMs 2400". `humanizeMetric`
+        keeps the generic property - it knows no game's field names, and a test pins that - while
+        splitting the identifier and reading a unit off the suffix. The alternative, a table of
+        nice labels per metric, is what would have broken the property above.
       */}
       {round.scoreBreakdown && Object.keys(round.scoreBreakdown).length > 0 && (
         <div className="rounded-lg border border-gray-700 bg-gray-900/60 p-4">
@@ -169,12 +175,15 @@ export function RoundResultPanel({
             How you played
           </p>
           <dl className="space-y-1">
-            {Object.entries(round.scoreBreakdown).map(([key, value]) => (
-              <div key={key} className="flex justify-between text-xs">
-                <dt className="text-gray-400">{key}</dt>
-                <dd className="text-gray-200">{String(value)}</dd>
-              </div>
-            ))}
+            {Object.entries(round.scoreBreakdown).map(([key, value]) => {
+              const metric = humanizeMetric(key, value);
+              return (
+                <div key={key} className="flex justify-between text-xs">
+                  <dt className="text-gray-400">{metric.label}</dt>
+                  <dd className="text-gray-200">{metric.value}</dd>
+                </div>
+              );
+            })}
           </dl>
         </div>
       )}

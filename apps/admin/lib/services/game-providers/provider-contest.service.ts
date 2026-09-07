@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+﻿import { randomBytes } from "node:crypto";
 import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
 import GameProvider from "@/database/models/games/game-provider.model";
@@ -14,6 +14,7 @@ import type { PreflightResult } from "@/lib/services/games/contest-preflight";
 import type {
   AttemptsPolicy,
   UnresolvedRoundPolicy,
+  UnscoredContestPolicy,
 } from "@/lib/services/games/round-types";
 import { getProviderAdapter } from "./registry";
 
@@ -59,6 +60,8 @@ export interface CreateProviderContestInput {
   attemptsPolicy: AttemptsPolicy;
   attemptsAllowed?: number;
   unresolvedRoundPolicy: UnresolvedRoundPolicy;
+  /** Owner decision, 7 Sep 2026. See `UnscoredContestPolicy`. */
+  unscoredContestPolicy?: UnscoredContestPolicy;
   resultGracePeriodSeconds: number;
   perRoundCostAcknowledged?: boolean;
 
@@ -301,6 +304,10 @@ export async function createProviderContest(
       attemptsAllowed:
         input.attemptsPolicy === "single" ? undefined : input.attemptsAllowed,
       unresolvedRoundPolicy: input.unresolvedRoundPolicy,
+      // Reason for the fallback rather than leaving it absent: the schema default is
+      // `unclaimed_pool`, so omitting it on a NEW provider contest would silently give the
+      // operator the trading answer while the wizard showed them the refund selected.
+      unscoredContestPolicy: input.unscoredContestPolicy ?? "refund_entry_fees",
 
       entryFee: input.entryFee,
       minParticipants: input.minParticipants,

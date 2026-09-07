@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { ConfigSchemaFields, defaultConfigValues } from "./ConfigSchemaFields";
 import { PrizeDistributionEditor } from "./PrizeDistributionEditor";
+import { UnscoredPolicyField } from "./UnscoredPolicyField";
 import type { ContestableTitle } from "./contest-types";
 import {
   type ContestDraft,
@@ -449,7 +450,16 @@ function StepTiming({
             <SelectItem value="hold_and_alert">
               Hold settlement and alert an admin
             </SelectItem>
-            <SelectItem value="exclude">Remove the player (refund not automatic yet)</SelectItem>
+            {/*
+              The parenthetical used to read "refund not automatic yet" and was TRUE when it
+              was written. `exclusion-refund.ts` shipped with X5 and R44 gave it the input it
+              needed, so the caution became a false statement about the operator's own
+              platform - which is worse than no caution: it either scares an operator off a
+              policy that works, or has them refund by hand on top of the automatic payment.
+            */}
+            <SelectItem value="exclude">
+              Remove the player and refund their entry fee
+            </SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -458,6 +468,11 @@ function StepTiming({
         label="Result grace period (seconds)"
         value={draft.resultGracePeriodSeconds}
         onChange={(v) => patch({ resultGracePeriodSeconds: v })}
+      />
+
+      <UnscoredPolicyField
+        value={draft.unscoredContestPolicy}
+        onChange={(value) => patch({ unscoredContestPolicy: value })}
       />
     </div>
   );

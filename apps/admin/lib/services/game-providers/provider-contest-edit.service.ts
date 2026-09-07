@@ -1,4 +1,4 @@
-import { connectToDatabase } from "@/database/mongoose";
+﻿import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
 import ProviderGame from "@/database/models/games/provider-game.model";
 import {
@@ -8,6 +8,7 @@ import {
 import type {
   AttemptsPolicy,
   UnresolvedRoundPolicy,
+  UnscoredContestPolicy,
 } from "@/lib/services/games/round-types";
 // RELATIVE, NOT `@/lib/admin/...`, AND DO NOT "TIDY" IT BACK. `@` resolves to `apps/admin`
 // under the admin Next build but to the REPO ROOT under vitest, and the root has no
@@ -70,6 +71,7 @@ export interface EditProviderContestInput {
   attemptsPolicy?: AttemptsPolicy;
   attemptsAllowed?: number;
   unresolvedRoundPolicy?: UnresolvedRoundPolicy;
+  unscoredContestPolicy?: UnscoredContestPolicy;
   resultGracePeriodSeconds?: number;
   perRoundCostAcknowledged?: boolean;
 }
@@ -385,6 +387,9 @@ function applyEdit(
   }
   if (input.unresolvedRoundPolicy !== undefined) {
     competition.unresolvedRoundPolicy = input.unresolvedRoundPolicy;
+  }
+  if (input.unscoredContestPolicy !== undefined) {
+    competition.unscoredContestPolicy = input.unscoredContestPolicy;
   }
   if (input.resultGracePeriodSeconds !== undefined) {
     competition.resultGracePeriodSeconds = input.resultGracePeriodSeconds;

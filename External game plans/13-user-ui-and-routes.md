@@ -465,7 +465,7 @@ what replaced it.
 | The kit | `components/neon/tokens.ts`, `Cards.tsx`, `Hero.tsx`, `Buttons.tsx`, `Accordion.tsx`, `LeaderboardRow.tsx`, `banners.ts` | **None of it is mirrored.** `check:mirrors` says nothing about any of it |
 | The artwork | `public/assets/neon/banner-{circuit-sprint,circuit-perfect,trading,championship}.webp` | Generated, then converted PNG → WebP: **8.0 MB → 564 KB** |
 | The game lobby | `components/games/ProviderContestLobby.tsx`, `ProviderLeaderboard.tsx` | Rebuilt on the kit. `lobby-ui.tsx` **deleted** |
-| The trading lobby | `app/(root)/competitions/[id]/page.tsx` plus `components/trading/lobby/{TradingLobbyHero,TradingLobbySidebar,TradingPrizeTable,trading-lobby-accordions}.tsx` | The page went from **1,224 lines to 377** |
+| The trading lobby | `app/(root)/competitions/[id]/page.tsx` plus `components/trading/lobby/{TradingLobbyHero,TradingLobbySidebar,trading-lobby-accordions}.tsx` | The page went from **1,224 lines to 377**. The prize table was here as `TradingPrizeTable.tsx` until 7 Sep 2026 and is now `components/competitions/PrizeTable.tsx`, shared with the game lobby - s4.1h |
 | The trading board | `components/trading/CompetitionLeaderboard.tsx` | Row shell and column headings now come from the kit; its columns are unchanged |
 
 #### Six facts that drift easily
@@ -547,7 +547,9 @@ its place - and the reasoning generalises to any restyle of a screen that comput
   platform-fee deduction exactly as the page had them. A test pins four expressions verbatim,
   and two probes - changing the denominator, and dropping the fee - go red. **Extracting and
   restyling in one commit is normally forbidden**; where it is unavoidable, the calculation needs
-  an assertion that cannot pass a rewrite.
+  an assertion that cannot pass a rewrite. (**The file is `components/competitions/PrizeTable.tsx`
+  since 7 Sep 2026**, and those same four assertions are what proved the move behaviour-free -
+  see s4.1h.)
 - **The consistency guard changed shape, because the old one could not survive this.** Comparing
   class strings between two files works for two files. The sheet covers **seven** screens, and
   pairwise comparison of seven is twenty-one comparisons, the first missing one of which is
@@ -614,6 +616,58 @@ outright, because the kit draws ranks with `NeonRankBadge`.
 The general form: **a guard that fails on correct code is the fastest way to have it deleted
 wholesale**, which here would have cost the rank-medal half too. Narrow it to the property it
 actually holds.
+
+**And the half this section originally missed, found the same day by re-running the harness.**
+Narrowing the rule left its probe in `tools/probe-lobby-theme.ps1` aimed at the *old* property,
+so it reported **green** and read as a hole in the icon guard. The mutation it injected -
+`icon={Trophy}` becoming `icon={GameIcon}` - is a component reference in a **prop**, which
+`<GameIcon name="` cannot match by construction. It is still refused, just **by the compiler**:
+every `icon` prop in the kit is typed `LucideIcon` and `GameIcon` requires a `name`. Re-aimed at
+an injected `<GameIcon name="trophy" />` **element**, which is the screen choosing its own
+chrome and exactly what the narrowed rule claims, it goes red on the expected test.
+
+Two rules, the first general: **when you narrow a guard, re-aim its probe in the same edit**, or
+the two quietly describe different properties and the probe is the half that looks broken. The
+second joins the four causes of a green probe already on record - weak test, wrong claim, missing
+test, unreachable guard - with a fifth: **a structural probe aimed at a defect the compiler
+already refuses reports green and is indistinguishable from a guard that has stopped working.**
+
+### 4.1h The game lobby shows what each place is worth (7 September 2026)
+
+**Owner request**, from the trading lobby's sidebar: the prize-distribution panel. The game
+lobby showed a prize pool and an entry fee and **never said what second place was worth**.
+
+**The live code is `components/competitions/PrizeTable.tsx`**, rendered by
+`TradingLobbySidebar.tsx` and `ProviderContestLobby.tsx`. **Not mirrored.**
+
+#### Five facts that drift easily
+
+- **It was MOVED out of `components/trading/lobby/TradingPrizeTable.tsx`, not copied**, and the
+  move is the deliverable. A second copy of a payout calculation is the "one rule, two copies"
+  shape behind `referenceId`, `failedReason`, `challengeId` and the Game Master `||` - none of
+  which `check:mirrors` can see, since it compares models. A document naming the old path is
+  stale as a present fact though correct as history, so **say which**.
+- **Nothing in the calculation was ever about trading**, which is why the move needed no
+  generalisation: it reads the prize pool, the configured shares, the participant count and the
+  platform fee, and a provider contest carries all four in the same fields. The **four
+  expressions asserted character for character in `provider-play-ui.test.ts` moved with it
+  unchanged**, and that is what makes the move provably behaviour-free - a document describing
+  the move as a refactor with the tests rewritten is describing something else.
+- **The panel says the figures are a FLOOR, and that sentence is load-bearing rather than
+  cautious.** The table redistributes an unfilled *position*, which is a question about how many
+  people entered. It cannot see a player who entered and recorded **no result** - eligibility is
+  settled at finalization by `hasResult` (R45) - so a contest with three entrants and one score
+  pays differently from what the panel shows. Teaching the table to predict a result is not
+  possible before the contest ends, so the caution is the honest fix. It is the same caution the
+  admin sidebar carries.
+- **It is hidden when no shares are configured**, because a free or practice contest has none and
+  an empty panel headed "Prize distribution" reads as data that failed to load rather than as a
+  contest without prizes.
+- **One pre-existing quirk was deliberately left.** `bonusPerWinner` divides the unclaimed share
+  by the number of *filled* positions, so a contest with paid positions and no entrants at all
+  shows every row at its base percentage - correct - while the banner above still quotes the
+  whole unclaimed figure. Changing it during a move would be a payout-facing change smuggled
+  into a commit whose whole claim is that nothing moved.
 
 ---
 
@@ -693,6 +747,64 @@ per-game summary cards, and the mega-action split (R21). Those are the rest of t
 | Dispatch the performance breakdown to the module | Trading shows trades and PnL; a provider game shows the generic `scoreBreakdown` from `01` |
 | Show the replay link where the provider supplies one | This is what support quotes when a player disputes a prize - `06` |
 | Handle unresolved rounds honestly | If a round never reported, say so and say what the policy did. Silence here reads as theft |
+
+### 6.1a What was built - a player's own record of a game contest (7 September 2026)
+
+**Owner request:** the game equivalent of the trading "see details" screen, which is what a
+player who entered sees once the contest has ended.
+
+The three rows above are honoured, and the dispatch is a **branch to a separate screen** rather
+than a generalised page. That is the deliberate part: this page is the trading post-mortem and
+nothing else - capital, ROI, win rate, profit factor, trade-by-trade - and `05` s10's rule
+applies to a whole screen as readily as to one figure. Generalised, explicitly scoped, or
+absent; there is no fourth option.
+
+#### Files
+
+| Piece | File | Mirrored? |
+|---|---|---|
+| The screen | `components/games/ProviderResultsScreen.tsx` | No |
+| The reads | `lib/services/games/contest-results.service.ts` | No |
+| The refund read | `findUnscoredRefund` in `lib/services/settlement/unscored-refund.ts` | **Yes** |
+| The branch | `app/(root)/competitions/[id]/results/page.tsx` | No |
+
+#### How it maps onto the trading screen
+
+Kept deliberately parallel, so a player with one of each does not have to learn two products.
+
+| Trading | Here |
+|---|---|
+| Final Rank | Final rank, plus whether it is shared |
+| Total P&L | Final score, labelled with the contest's direction |
+| Win Rate | Rounds played, and how many scored |
+| Total Trades | Prize won |
+| Account Summary | How your score was worked out - the attempts policy, in words |
+| Trading Statistics | The counted round's own `scoreBreakdown`, humanized |
+| Trade History | Round history, with each attempt's outcome and time |
+
+#### Five facts that drift easily
+
+- **A redirect that stops a crash is not a feature.** This branch redirected a provider player
+  to the lobby for two days. That stopped the throw and left them with no record of their own
+  rounds - the lobby shows the *public* leaderboard. A document describing the guard as
+  sufficient is describing the crash fix, not this screen.
+- **The refund read is NOT in the results service, and cannot be.** Chapter 11 seam 4 bans every
+  money import from `lib/services/games/` blocked-by-default, and invariant 6 of
+  `__tests__/services/round-lifecycle.test.ts` enforces it by scanning import strings. It caught
+  this on the first run. The read lives beside its writer and the **page** composes the two. A
+  document showing `refundedAmount` on `ProviderContestResults` is describing the version the
+  guard rejected, and **"reads are fine" is not a property a rule about imports can express.**
+- **`"no_score_recorded"` is one exported constant**, `UNSCORED_REFUND_REASON`, because it is now
+  read as well as written. Two literals would drift in the worst direction available: refunds
+  keep being written correctly while the screen stops finding the row, so a player who **was**
+  refunded is told nothing.
+- **The refund explanation is driven by the ledger row, never by `unscoredContestPolicy`.** The
+  policy says what was configured; the row says what happened to this player. A contest
+  configured to refund whose players were paid a prize has no row.
+- **An absent score renders `-`, never `0`** - the read-side form of R45, for the fourth screen
+  in a row. And **a `sum_of_n` contest shows every scored round rather than one breakdown**,
+  because that policy marks nothing as counted and picking one would misstate how the total was
+  reached.
 
 ---
 

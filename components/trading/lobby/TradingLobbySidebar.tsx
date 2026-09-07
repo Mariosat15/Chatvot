@@ -5,7 +5,7 @@ import { NeonNote, NeonPanel, NeonRow } from "@/components/neon/Cards";
 import CompetitionEntryButton from "@/components/trading/CompetitionEntryButton";
 import LiveCountdown from "@/components/trading/LiveCountdown";
 import { buildTradingLobbySections } from "@/components/trading/lobby/trading-lobby-accordions";
-import TradingPrizeTable from "@/components/trading/lobby/TradingPrizeTable";
+import PrizeTable from "@/components/competitions/PrizeTable";
 
 /**
  * The trading lobby's right-hand column.
@@ -245,7 +245,7 @@ export default function TradingLobbySidebar({
           ) : undefined
         }
       >
-        <TradingPrizeTable competition={competition} currSymbol={currSymbol} />
+        <PrizeTable competition={competition} currSymbol={currSymbol} />
       </NeonPanel>
 
       {/* Read. */}

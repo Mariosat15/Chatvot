@@ -1,10 +1,12 @@
-/**
+﻿/**
  * The wizard's in-progress state, and the one place that turns it into a request.
  *
  * Kept out of the component so the shape is testable and so there is a single conversion
  * to the API's vocabulary. A form that builds its own payload inline is where a renamed
  * field goes unnoticed - it type-checks, posts, and the server reads `undefined`.
  */
+
+import type { UnscoredContestPolicy } from "@/lib/services/games/round-types";
 
 export interface ContestDraft {
   providerKey: string;
@@ -33,6 +35,7 @@ export interface ContestDraft {
   attemptsPolicy: "single" | "best_of_n" | "sum_of_n";
   attemptsAllowed?: number;
   unresolvedRoundPolicy: "score_zero" | "exclude" | "hold_and_alert";
+  unscoredContestPolicy: UnscoredContestPolicy;
   resultGracePeriodSeconds: number;
   perRoundCostAcknowledged: boolean;
 }
@@ -58,6 +61,10 @@ export const emptyDraft: ContestDraft = {
   ],
   attemptsPolicy: "single",
   unresolvedRoundPolicy: "score_zero",
+  // Defaults to the refund, which is NOT the schema default. The schema keeps
+  // `unclaimed_pool` so documents written before the field existed settle the way they always
+  // did; a new contest an operator is creating today gets the owner's preferred answer.
+  unscoredContestPolicy: "refund_entry_fees",
   resultGracePeriodSeconds: 900,
   perRoundCostAcknowledged: false,
 };
@@ -82,6 +89,7 @@ export function toRequestBody(draft: ContestDraft): Record<string, unknown> {
     attemptsAllowed:
       draft.attemptsPolicy === "single" ? undefined : draft.attemptsAllowed,
     unresolvedRoundPolicy: draft.unresolvedRoundPolicy,
+    unscoredContestPolicy: draft.unscoredContestPolicy,
     resultGracePeriodSeconds: draft.resultGracePeriodSeconds,
     perRoundCostAcknowledged: draft.perRoundCostAcknowledged,
   };
@@ -148,6 +156,7 @@ export function toEditRequestBody(
     attemptsAllowed:
       draft.attemptsPolicy === "single" ? undefined : draft.attemptsAllowed,
     unresolvedRoundPolicy: draft.unresolvedRoundPolicy,
+    unscoredContestPolicy: draft.unscoredContestPolicy,
     resultGracePeriodSeconds: draft.resultGracePeriodSeconds,
     perRoundCostAcknowledged: draft.perRoundCostAcknowledged,
   };

@@ -45,6 +45,23 @@ export interface SettleFeesInput {
   walletMap: Map<string, CreditWalletDoc>;
   /** A FRACTION (0-0.5), never a percentage. See the name. */
   platformFeeFraction: number;
+  /**
+   * Credits already returned to players from this pool before this stage ran.
+   *
+   * Non-zero only when the `refund_entry_fees` policy fired on a contest nobody scored in -
+   * see `unscored-refund.ts`. It is subtracted from the unclaimed pool so the same credit is
+   * never booked in two places.
+   *
+   * WHY A NUMBER AND NOT A FLAG. A boolean would say "somebody was refunded" and leave this
+   * stage to recompute how much, which is the arithmetic the refund already did and would be
+   * a second place to get it wrong. A number also keeps the residue honest: flooring each
+   * player's refund to two decimals leaves fractions of a credit behind, and the difference
+   * lands in the unclaimed pool where it belongs instead of vanishing.
+   *
+   * Defaulting to 0 makes this stage byte-for-byte what it was for every existing caller,
+   * which is the only reason the trading payout tests are still evidence of anything.
+   */
+  refundedToPlayers?: number;
 }
 
 export interface SettleFeesResult {
@@ -64,6 +81,7 @@ export async function settleFeesAndGameMasters({
   participants,
   walletMap,
   platformFeeFraction,
+  refundedToPlayers = 0,
 }: SettleFeesInput): Promise<SettleFeesResult> {
   // The fee is ONLY the percentage, never the whole pool. With winners it is whatever was
   // not distributed; with none it is still just the percentage, and the remainder becomes
@@ -84,7 +102,12 @@ export async function settleFeesAndGameMasters({
   // Only a contest where NOBODY was paid has an unclaimed pool. When some winners were
   // paid, the undistributed prize ranks were redistributed among them, so nothing is left.
   if (prizeWinnerCount === 0 && prizePool > 0) {
-    const unclaimedNet = prizePool * (1 - platformFeeFraction);
+    // Whatever the platform did not keep and the players were not given back. With no refund
+    // this is the whole net pool, exactly as before the `refundedToPlayers` parameter
+    // existed; with a full refund it is only the sub-credit residue that flooring left.
+    const unclaimedNet =
+      Math.round((prizePool * (1 - platformFeeFraction) - refundedToPlayers) *
+        100) / 100;
 
     let unclaimedReason:
       | "no_participants"
@@ -98,19 +121,30 @@ export async function settleFeesAndGameMasters({
       unclaimedReason = "no_qualified_winners";
     }
 
-    console.log(
-      `💰 Recording unclaimed pool: ${unclaimedNet.toFixed(2)} credits (${unclaimedReason})`,
-    );
+    // Reason for the threshold rather than `> 0`: a refunded contest leaves nothing, or a few
+    // hundredths of a credit that flooring could not divide. Recording a pool of 0.00 would
+    // put a row on the platform's books claiming it holds money it does not, and an operator
+    // reconciling unclaimed funds would chase it. Below one hundredth of a credit there is
+    // nothing to hold.
+    if (unclaimedNet >= 0.01) {
+      console.log(
+        `💰 Recording unclaimed pool: ${unclaimedNet.toFixed(2)} credits (${unclaimedReason})`,
+      );
 
-    await PlatformFinancialsService.recordUnclaimedPool({
-      competitionId: contest._id.toString(),
-      competitionName: contest.name,
-      poolAmount: unclaimedNet,
-      reason: unclaimedReason,
-      winnersCount: 0,
-      expectedWinnersCount: expectedWinners,
-      description: `Unclaimed pool from ${contest.name}: ${unclaimedReason.replace(/_/g, " ")} - No prizes awarded`,
-    });
+      await PlatformFinancialsService.recordUnclaimedPool({
+        competitionId: contest._id.toString(),
+        competitionName: contest.name,
+        poolAmount: unclaimedNet,
+        reason: unclaimedReason,
+        winnersCount: 0,
+        expectedWinnersCount: expectedWinners,
+        description: `Unclaimed pool from ${contest.name}: ${unclaimedReason.replace(/_/g, " ")} - No prizes awarded`,
+      });
+    } else {
+      console.log(
+        `💰 No unclaimed pool: ${refundedToPlayers.toFixed(2)} credits returned to players (${unclaimedReason})`,
+      );
+    }
   } else if (prizeWinnerCount > 0 && prizeWinnerCount < expectedWinners) {
     console.log(
       `📊 Prize redistribution: ${prizeWinnerCount} winners received ${expectedWinners} prize positions worth of prizes`,

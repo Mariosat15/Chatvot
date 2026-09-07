@@ -29,7 +29,8 @@ $TOKENS = 'components/neon/tokens.ts'
 $CARDS = 'components/neon/Cards.tsx'
 $HERO = 'components/trading/lobby/TradingLobbyHero.tsx'
 $SIDEBAR = 'components/trading/lobby/TradingLobbySidebar.tsx'
-$PRIZES = 'components/trading/lobby/TradingPrizeTable.tsx'
+# Moved out of `components/trading/lobby/` on 7 Sep 2026 - the game lobby renders it too.
+$PRIZES = 'components/competitions/PrizeTable.tsx'
 $TRADING_BOARD = 'components/trading/CompetitionLeaderboard.tsx'
 
 function Read-Source([string]$Path) {
@@ -131,10 +132,20 @@ $probes = @(
 
   # ---- The icon set is the sheet's, on every screen -----------------------------------------
   @{
+    # RE-AIMED 7 Sep 2026, and the reason is worth more than the probe. This used to swap
+    # `icon={Trophy}` for `icon={GameIcon}` and reported GREEN - read at the time as the guard
+    # not doing its job. It is not: the guard was deliberately narrowed the same day to
+    # `<GameIcon name="` (see the test's own comment), and a component reference in an `icon`
+    # PROP cannot match that pattern. The mutation is caught, just not here - every `icon` prop
+    # in the kit is typed `LucideIcon` and `GameIcon` requires a `name`, so the compiler refuses
+    # it. Aiming a structural probe at something the TYPE system owns is indistinguishable from
+    # a guard that has stopped working, and it is why this one read as a hole for a few minutes.
+    # A probe must inject the shape its test claims to catch: the screen choosing a 3D glyph as
+    # its own chrome, which is an ELEMENT, not a prop.
     Name = 'the game lobby reverts to the 3D icon set'
     File = $LOBBY
-    From = 'icon={Trophy}'
-    To   = 'icon={GameIcon}'
+    From = '<div className="grid grid-cols-2 gap-3 md:grid-cols-4 sm:gap-4">'
+    To   = '<GameIcon name="trophy" size={22} /><div className="grid grid-cols-2 gap-3 md:grid-cols-4 sm:gap-4">'
     Test = 'uses the flat icon set from the sheet'
   },
   @{
@@ -201,8 +212,8 @@ export function accentClasses('
   @{
     Name = 'the prize table is buried inside the accordion'
     File = $SIDEBAR
-    From = '<TradingPrizeTable competition={competition} currSymbol={currSymbol} />'
-    To   = '<span data-moved="TradingPrizeTable" />'
+    From = '<PrizeTable competition={competition} currSymbol={currSymbol} />'
+    To   = '<span data-moved="PrizeTable" />'
     Test = 'keeps the trading sidebar.s decisions open'
   },
   @{

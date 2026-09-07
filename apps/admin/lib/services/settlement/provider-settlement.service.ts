@@ -6,6 +6,7 @@ import { settleFeesAndGameMasters } from "./fees.service";
 import { completeContest } from "./contest-completion.service";
 import { assessUnresolvedRounds } from "./unresolved-rounds";
 import { refundExcludedParticipants } from "./exclusion-refund";
+import { isUnscoredContest, refundUnscoredContest } from "./unscored-refund";
 import type { SettlementLeaderboardEntry } from "./types";
 
 /**
@@ -71,6 +72,13 @@ interface ProviderCompetitionDoc {
   endTime?: Date;
   gameMasterId?: string | null;
   gameKey?: string;
+  /**
+   * The game TYPE, which is a different field from `gameKey` and not interchangeable with it.
+   * One module serves every provider title, so module resolution keys on this; the catalogue
+   * lookup in `resolveScoreDirection` keys on `gameKey`. Passing one where the other is
+   * wanted resolves no module and fails silently.
+   */
+  gameType?: string;
   rules?: Record<string, unknown>;
   /**
    * Drives the `exclude` refund and the `hold_and_alert` block. Read from the STORED
@@ -78,6 +86,15 @@ interface ProviderCompetitionDoc {
    * taking its game type from the stored label rather than from request input.
    */
   unresolvedRoundPolicy?: string;
+  /**
+   * Where the pot goes when nobody scored. Read from the STORED contest for the same reason
+   * as the policy above it.
+   *
+   * Typed to the two literals rather than `string` deliberately: the comparison against
+   * `"refund_entry_fees"` is then checked by the compiler, so a typo refuses to build instead
+   * of silently never matching and quietly settling every contest to the unclaimed pool.
+   */
+  unscoredContestPolicy?: "unclaimed_pool" | "refund_entry_fees";
   status: string;
   save(opts: { session: import("mongoose").ClientSession }): Promise<unknown>;
 }
@@ -307,6 +324,47 @@ export async function settleProviderCompetition(
     (p) => p.qualificationStatus === "qualified",
   );
 
+  /*
+    NOBODY SCORED: the owner's answer to open question 17, taken 7 September 2026.
+
+    Two conditions, and both matter. `prizeDistributions.length === 0` says no prize was paid,
+    which is also true when every player was disqualified for breaking a rule.
+    `isUnscoredContest` is what separates the two: it asks the game module whether ANY player
+    produced a result, so a contest where everyone was liquidated or fell short of a minimum
+    does not qualify and their fees stay with the contest exactly as in a trading contest.
+
+    The policy is read from the contest and defaults to `unclaimed_pool`, so a contest created
+    before the field existed settles the way it always did.
+
+    `rankedParticipants` rather than the raw `participants` read, deliberately: it is the exact
+    set the ranking engine judged, already carrying the direction and the defaults the engine
+    applied. Asking the refund question of a differently-built list is how the money decision
+    and the ranking decision come to disagree about who was in the contest.
+  */
+  let refundedToPlayers = 0;
+
+  if (
+    prizeDistributions.length === 0 &&
+    competition.unscoredContestPolicy === "refund_entry_fees" &&
+    isUnscoredContest(rankedParticipants, competition.gameType)
+  ) {
+    const refund = await refundUnscoredContest({
+      session,
+      contest: competition,
+      participants: rankedParticipants,
+      platformFeeFraction,
+    });
+
+    refundedToPlayers = refund.totalRefunded;
+
+    console.log(
+      `↩️ No player scored: returned ${refundedToPlayers.toFixed(2)} credits to ${refund.refundedUserIds.length} player(s)` +
+        (refund.alreadyRefundedUserIds.length > 0
+          ? `, ${refund.alreadyRefundedUserIds.length} already refunded`
+          : ""),
+    );
+  }
+
   await settleFeesAndGameMasters({
     session,
     contest: competition,
@@ -318,6 +376,9 @@ export async function settleProviderCompetition(
     participants: participants.map((p) => ({ userId: p.userId })),
     walletMap,
     platformFeeFraction,
+    // Reason: keeps the same credit from being booked twice. The fee stage subtracts this
+    // from the unclaimed pool it would otherwise record for the whole net pot.
+    refundedToPlayers,
   });
 
   await completeContest({

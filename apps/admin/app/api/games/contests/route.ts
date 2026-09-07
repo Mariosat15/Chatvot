@@ -6,9 +6,11 @@ import {
   listContestableTitles,
   preflightProviderContest,
 } from "@/lib/services/game-providers/provider-contest.service";
-import type {
-  AttemptsPolicy,
-  UnresolvedRoundPolicy,
+import {
+  UNSCORED_CONTEST_POLICIES,
+  type AttemptsPolicy,
+  type UnresolvedRoundPolicy,
+  type UnscoredContestPolicy,
 } from "@/lib/services/games/round-types";
 
 /**
@@ -42,6 +44,7 @@ interface ContestBody {
   attemptsPolicy?: AttemptsPolicy;
   attemptsAllowed?: number;
   unresolvedRoundPolicy?: UnresolvedRoundPolicy;
+  unscoredContestPolicy?: UnscoredContestPolicy;
   resultGracePeriodSeconds?: number;
   perRoundCostAcknowledged?: boolean;
 }
@@ -113,6 +116,14 @@ export async function POST(request: NextRequest) {
       prizeDistribution: body.prizeDistribution ?? [],
       startTime: dates.startTime,
       endTime: dates.endTime,
+      // Validated against the allowed list rather than passed through, because this decides
+      // where a whole prize pool goes. An unrecognised value falls back to the refund the
+      // wizard defaults to, so a stale client cannot silently redirect money to the platform.
+      unscoredContestPolicy: UNSCORED_CONTEST_POLICIES.includes(
+        body.unscoredContestPolicy as UnscoredContestPolicy,
+      )
+        ? body.unscoredContestPolicy
+        : "refund_entry_fees",
       createdBy: guard.admin.id,
     });
 

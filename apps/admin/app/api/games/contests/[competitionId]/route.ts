@@ -7,6 +7,10 @@ import ProviderGame from "@/database/models/games/provider-game.model";
 import { parseConfigSchema } from "@/lib/services/games/config-schema";
 import { hasProviderGameLabel } from "@/lib/admin/contest-game-label";
 import {
+  UNSCORED_CONTEST_POLICIES,
+  type UnscoredContestPolicy,
+} from "@/lib/services/games/round-types";
+import {
   editProviderContest,
   type EditProviderContestInput,
 } from "@/lib/services/game-providers/provider-contest-edit.service";
@@ -260,6 +264,26 @@ function parseEditBody(body: unknown): ParseOutcome {
     }
     input.unresolvedRoundPolicy =
       raw.unresolvedRoundPolicy as EditProviderContestInput["unresolvedRoundPolicy"];
+  }
+
+  if (raw.unscoredContestPolicy !== undefined) {
+    // REFUSED rather than coerced, unlike the create route's fallback. An edit is a change to
+    // a contest that already has a valid policy, so an unrecognised value means the client
+    // and the server disagree - and silently substituting a default would move a prize pool
+    // to a destination the operator did not pick while reporting the edit as saved.
+    if (
+      typeof raw.unscoredContestPolicy !== "string" ||
+      !UNSCORED_CONTEST_POLICIES.includes(
+        raw.unscoredContestPolicy as UnscoredContestPolicy,
+      )
+    ) {
+      return {
+        ok: false,
+        error: "That no-score policy is not recognised.",
+      };
+    }
+    input.unscoredContestPolicy =
+      raw.unscoredContestPolicy as EditProviderContestInput["unscoredContestPolicy"];
   }
 
   if (Array.isArray(raw.prizeDistribution)) {

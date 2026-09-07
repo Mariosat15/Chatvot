@@ -13,15 +13,33 @@ import { NeonRankBadge } from "@/components/neon/LeaderboardRow";
  * money computation buried in the middle of a four-hundred-line layout change, where nobody can
  * tell the two kinds of edit apart.
  *
+ * IT WAS `components/trading/lobby/TradingPrizeTable.tsx` UNTIL 7 SEP 2026, and the move is the
+ * whole point of the rename: nothing in the calculation is about trading. It reads the prize
+ * pool, the configured shares, the participant count and the platform fee, all four of which a
+ * provider contest has in exactly the same fields. **Moved rather than copied**, because a
+ * second copy of a payout calculation is the "one rule, two copies" shape behind four separate
+ * defects in this codebase - `referenceId`, `failedReason`, `challengeId` and the Game Master
+ * `||` - none of which `check:mirrors` can see, since it compares models. The four expressions
+ * that decide what a winner is paid are asserted character for character by a test, and they
+ * moved unchanged.
+ *
  * ONE THING IT DOES NOT FIX, deliberately. `bonusPerWinner` divides the unclaimed share by the
  * number of *filled* positions, so a contest with paid positions and no participants at all
  * shows every row at its base percentage - which is correct - while the "bonus available"
  * message above still quotes the whole unclaimed figure. That is the pre-existing behaviour and
- * it is left alone: changing it here would be a payout-facing change smuggled into a styling
- * commit, which is exactly the thing this file's separation is meant to prevent.
+ * it is left alone: changing it here would be a payout-facing change smuggled into a move,
+ * which is exactly the thing this file's separation is meant to prevent.
+ *
+ * WHAT IT DELIBERATELY DOES NOT KNOW, and why the caution line below matters. It redistributes
+ * an unfilled *position*, which is a question about how many people entered. It cannot see a
+ * player who entered and recorded no result: eligibility is settled at finalization by
+ * `hasResult` (R45), so a contest with three entrants and one score pays differently from what
+ * this table shows. Teaching it that would mean predicting a result before the contest has
+ * finished, so the honest fix is to say the figures are a floor - the same caution the admin
+ * sidebar carries.
  */
 
-export default function TradingPrizeTable({
+export default function PrizeTable({
   competition,
   currSymbol,
 }: {
@@ -110,7 +128,9 @@ export default function TradingPrizeTable({
       </div>
 
       <p className="mt-3 text-[11px] leading-relaxed text-gray-500">
-        Unclaimed positions are split equally among the winners.
+        Unclaimed positions are split equally among the winners. These figures
+        are a floor: a player who records no result holds no rank, so a share
+        left over is spread further.
       </p>
     </>
   );

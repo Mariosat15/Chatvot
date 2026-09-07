@@ -26,6 +26,62 @@ export const UNRESOLVED_ROUND_POLICIES: UnresolvedRoundPolicy[] = [
 ];
 
 /**
+ * Where the pot goes when a contest finishes and NOBODY recorded a score.
+ *
+ * Owner decision, 7 September 2026, answering open question 17. Distinct from
+ * `UnresolvedRoundPolicy` above, which is about ONE round that never reported - this is about
+ * the whole contest producing no result at all. A contest can hit this with every round
+ * resolved perfectly, if every player simply scored nothing.
+ *
+ * It is NOT the answer for a disqualification. A player who broke a rule has a result, so
+ * their fee stays with the contest and reaches the unclaimed pool exactly as in a trading
+ * contest. See `lib/services/settlement/unscored-refund.ts`.
+ */
+export type UnscoredContestPolicy = "unclaimed_pool" | "refund_entry_fees";
+
+export const UNSCORED_CONTEST_POLICIES: UnscoredContestPolicy[] = [
+  "unclaimed_pool",
+  "refund_entry_fees",
+];
+
+/**
+ * What each choice means for the operator, in one sentence each.
+ *
+ * Lives beside the type rather than in the component for the reason the round-resolution
+ * action list does: the wizard, the editor and the validator all need the same words, and a
+ * screen offering a consequence the server does not deliver is worse than no explanation.
+ * This module imports no models, so a `"use client"` component can read it.
+ *
+ * A `Map`, NOT an object, and for the same reason as the round-inspector action list and
+ * `competition-update-fields.ts`: the key arrives from a stored document, so an object lookup
+ * walks the prototype chain and `"__proto__"` or `"constructor"` returns something TRUTHY that
+ * survives a `!copy` test and only reads as blank several lines later. A `Map` makes the lookup
+ * total, so a value the type system does not really guarantee resolves to `undefined` and the
+ * caller's `?.` does what it looks like it does.
+ */
+export const UNSCORED_CONTEST_POLICY_COPY: ReadonlyMap<
+  UnscoredContestPolicy,
+  { label: string; consequence: string }
+> = new Map([
+  [
+    "refund_entry_fees",
+    {
+      label: "Refund entry fees, less the platform fee",
+      consequence:
+        "Every player gets their entry fee back minus the platform fee. The platform still keeps its fee because the contest was hosted and the rounds were launched. Players are told why the refund is smaller than what they paid.",
+    },
+  ],
+  [
+    "unclaimed_pool",
+    {
+      label: "Send the pot to the unclaimed pool",
+      consequence:
+        "Nobody is refunded and the whole pot, less the platform fee, is recorded as unclaimed platform funds. This is what a trading contest does when no player qualifies.",
+    },
+  ],
+]);
+
+/**
  * How long after the play window a late provider result is still welcome (chapter 04
  * section 2.1), when a contest does not name its own.
  *

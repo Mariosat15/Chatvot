@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   Clock,
   Gamepad2,
+  Gift,
   Info,
   Link2,
   LifeBuoy,
@@ -16,6 +17,7 @@ import CompetitionEntryButton from "@/components/trading/CompetitionEntryButton"
 import UTCClock from "@/components/trading/UTCClock";
 import InlineCountdown from "@/components/trading/InlineCountdown";
 import ProviderLeaderboard from "@/components/games/ProviderLeaderboard";
+import PrizeTable from "@/components/competitions/PrizeTable";
 import { NeonHero, NeonStatusBadge } from "@/components/neon/Hero";
 import { providerBanner } from "@/components/neon/banners";
 import { NeonPill } from "@/components/neon/Buttons";
@@ -364,6 +366,29 @@ export default async function ProviderContestLobby({
               title="This competition cannot start a round yet"
               detail="The game details needed to start a round are missing. Nothing has been charged for an attempt. Please contact support."
             />
+          )}
+
+          {/*
+            THE PRIZE TABLE, which this lobby did not have at all - a player could see the pool
+            and the entry fee and had no way to learn what finishing second was worth.
+
+            It is the SAME component the trading lobby's sidebar renders, moved out of
+            `components/trading/lobby/` rather than reimplemented. Nothing in the calculation is
+            about trading: it reads the pool, the configured shares, the participant count and
+            the platform fee, and a provider contest carries all four in the same fields. A
+            second copy of a payout calculation is the shape behind four defects here.
+
+            Rendered only when shares are configured. A contest with none is a legitimate free
+            or practice contest, and an empty panel headed "Prize distribution" reads as data
+            that failed to load.
+          */}
+          {(competition.prizeDistribution?.length ?? 0) > 0 && (
+            <NeonPanel icon={Gift} accent="prize" title="Prize distribution">
+              <PrizeTable
+                competition={competition}
+                currSymbol={currencySymbol}
+              />
+            </NeonPanel>
           )}
 
           {(playWindowStart || playWindowEnd) && (

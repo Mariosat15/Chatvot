@@ -874,7 +874,7 @@ describe("the two lobbies are built from one design kit", () => {
       "<CompetitionEntryButton",
       "<LiveCountdown",
       "Schedule (UTC)",
-      "<TradingPrizeTable",
+      "<PrizeTable",
     ]) {
       const at = sidebar.indexOf(open);
       expect(at).toBeGreaterThan(-1);
@@ -883,8 +883,51 @@ describe("the two lobbies are built from one design kit", () => {
     }
   });
 
+  it("shows the prize breakdown on BOTH lobbies, from one component", () => {
+    /*
+      The game lobby showed a prize pool and an entry fee and never said what second place was
+      worth. Pinned as the SAME import rather than "both files show prizes", because the point
+      of the move is that a change to the redistribution reaches both screens - a second copy
+      is the shape behind `referenceId`, `failedReason`, `challengeId` and the Game Master `||`.
+
+      The trailing character class matters: written `/<PrizeTable/` this passes against
+      `<PrizeTableOld`, which is the prefix-match trap that has now defeated a structural test
+      here five times.
+    */
+    for (const lobby of [PROVIDER_LOBBY, TRADING_SIDEBAR]) {
+      const code = readCode(lobby);
+      expect(code).toMatch(/<PrizeTable[\s>]/);
+      expect(code).toContain('from "@/components/competitions/PrizeTable"');
+    }
+  });
+
+  it("hides the prize panel on a contest with no configured shares", () => {
+    // A free or practice contest has no distribution, and an empty panel headed "Prize
+    // distribution" reads as data that failed to load rather than as a contest without prizes.
+    const code = readCode(PROVIDER_LOBBY);
+    const guard = code.indexOf("competition.prizeDistribution?.length");
+    const panel = code.indexOf('title="Prize distribution"');
+
+    expect(guard).toBeGreaterThan(-1);
+    expect(panel).toBeGreaterThan(guard);
+  });
+
+  it("tells the player the configured shares are a floor", () => {
+    /*
+      The table redistributes an unfilled POSITION, which is about how many people entered. It
+      cannot see a player who entered and recorded no result - that is settled at finalization
+      by `hasResult` (R45) - so the figures can be exceeded. Saying so is the honest fix;
+      teaching the table to predict a result is not possible before the contest ends.
+    */
+    const table = readCode("components/competitions/PrizeTable.tsx");
+    expect(table).toContain("no result");
+  });
+
   it("moves no money computation while restyling the prize table", () => {
-    const table = readCode("components/trading/lobby/TradingPrizeTable.tsx");
+    // Moved out of `components/trading/lobby/` on 7 Sep 2026 so the game lobby renders the
+    // same component rather than a second copy of a payout calculation. The four assertions
+    // below travelled with it unchanged, which is what makes the move provably behaviour-free.
+    const table = readCode("components/competitions/PrizeTable.tsx");
 
     /*
       The prize table was extracted from the page in the same commit that restyled it, which is

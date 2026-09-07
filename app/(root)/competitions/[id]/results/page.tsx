@@ -16,6 +16,10 @@ import {
 } from "lucide-react";
 import { GameIcon } from "@/components/ui/GameIcon";
 import { hasProviderGameLabel } from "@/lib/services/games/contest-config";
+import { getProviderContestResults } from "@/lib/services/games/contest-results.service";
+import { ProviderResultsScreen } from "@/components/games/ProviderResultsScreen";
+import { findUnscoredRefund } from "@/lib/services/settlement/unscored-refund";
+import AppSettingsModel from "@/database/models/app-settings.model";
 
 /*
   The two row shapes this page reduces over, named rather than annotated `any` at each call
@@ -59,9 +63,75 @@ const CompetitionResultsPage = async ({
     directly - from a bookmark, from history, or from the redirect the trading dashboard
     still issues - so the guard belongs here too. Two gates, because the failure is a
     server-rendered throw that shows the player an error boundary naming nothing.
+
+    UNTIL 7 SEP 2026 THIS BRANCH REDIRECTED TO THE LOBBY, which stopped the crash and left a
+    provider player with no record of their own contest at all - the lobby shows the public
+    leaderboard and nothing about their rounds. It now renders the provider equivalent, and the
+    reads live in a service rather than inline here for the reason the crash existed: this
+    page's `.lean()` with a hand-written generic is exactly where a field the schema does not
+    store looks real to the compiler.
   */
   if (hasProviderGameLabel(competition)) {
-    redirect(`/competitions/${competitionId}`);
+    /*
+      Three reads, composed here rather than in one service, and the split is a constraint
+      rather than a preference: the refund is a wallet-ledger read, and chapter 11 seam 4 bans
+      money imports from `lib/services/games/` where the rest of this comes from. The page is
+      the right place for the composition - it is already the layer that knows about currency
+      settings, which are nothing to do with a contest either.
+    */
+    const [providerResults, refundedAmount, appSettings] = await Promise.all([
+      getProviderContestResults(competition, session.user.id),
+      findUnscoredRefund(competitionId, session.user.id),
+      AppSettingsModel.findById("app-settings")
+        .lean<{ currency?: { symbol?: string } } | null>()
+        .catch(() => null),
+    ]);
+
+    // No seat means there is nothing personal to show. The lobby has the public leaderboard,
+    // which is the honest destination for someone who did not enter.
+    if (!providerResults) {
+      redirect(`/competitions/${competitionId}`);
+    }
+
+    return (
+      <div className="flex min-h-screen flex-col gap-4 overflow-x-hidden bg-gradient-to-br from-gray-900 via-gray-900 to-purple-900/20 p-3 sm:gap-6 sm:p-4 md:p-8">
+        <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
+          <Link href="/competitions">
+            <Button
+              variant="ghost"
+              className="min-h-[44px] w-fit gap-2 text-gray-400 hover:text-gray-100"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Back to Competitions</span>
+              <span className="sm:hidden">Back</span>
+            </Button>
+          </Link>
+          <Link href={`/competitions/${competitionId}`}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="min-h-[44px] gap-2 border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              <span className="hidden sm:inline">View Competition Details</span>
+              <span className="sm:hidden">Details</span>
+            </Button>
+          </Link>
+        </div>
+
+        <ProviderResultsScreen
+          results={providerResults}
+          contestId={competitionId}
+          contestName={competition.name}
+          description={competition.description}
+          startTime={new Date(competition.startTime).toISOString()}
+          endTime={new Date(competition.endTime).toISOString()}
+          gameCode={competition.gameCode}
+          currencySymbol={appSettings?.currency?.symbol || "€"}
+          refundedAmount={refundedAmount}
+        />
+      </div>
+    );
   }
 
   // PERF: Fetch participant + trade history in parallel (both only need competitionId)

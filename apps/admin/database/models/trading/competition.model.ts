@@ -110,6 +110,24 @@ export interface ICompetition extends Document {
     percentage: number;
   }[]; // e.g., [{ rank: 1, percentage: 70 }, { rank: 2, percentage: 20 }, ...]
 
+  /**
+   * Where the pot goes when the contest finishes and NOBODY recorded a score.
+   *
+   * Owner decision, 7 September 2026, answering open question 17. Only reachable for a game
+   * that can express "no result" - trading's module answers `hasResult` true unconditionally,
+   * so a trading contest can never take this branch whatever the field says. See
+   * `lib/services/settlement/unscored-refund.ts`.
+   *
+   * The default is `unclaimed_pool` because that is what every contest did before the field
+   * existed, and a default that changes the destination of money on documents already in the
+   * database is not a default, it is a migration. The provider wizard offers
+   * `refund_entry_fees` and defaults its own draft to it.
+   *
+   * It does NOT cover a disqualification: a player who broke a rule has a result, so their
+   * fee stays with the contest exactly as it does in a trading contest.
+   */
+  unscoredContestPolicy?: "unclaimed_pool" | "refund_entry_fees";
+
   // Competition Rules & Ranking
   rules: {
     rankingMethod:
@@ -440,6 +458,12 @@ const CompetitionSchema = new Schema<ICompetition>(
         percentage: { type: Number, required: true, min: 0, max: 100 },
       },
     ],
+    // Add-only. Default preserves the pre-7-Sep-2026 behaviour for every existing document.
+    unscoredContestPolicy: {
+      type: String,
+      enum: ["unclaimed_pool", "refund_entry_fees"],
+      default: "unclaimed_pool",
+    },
     rules: {
       rankingMethod: {
         type: String,

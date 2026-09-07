@@ -219,6 +219,52 @@ const SKIPPED_RESULT = (ip: string): IPDetectionResult => ({
 });
 
 /**
+ * How long each detector gets before we give up on it.
+ *
+ * Named rather than inline so the two are visibly the same number and so the log message can
+ * quote it. **Deliberately left at 5 seconds**, even though timeouts are what prompted this
+ * code being touched: both lookups sit in a request path a player is waiting on - account
+ * standing checks run on sign-up and on paid entry - so a longer wait buys better fraud data
+ * at the cost of making every slow lookup a slow page. The fallback already produces a usable
+ * answer. If these are raised, raise them because a measurement said the detector is worth the
+ * wait, not because the log looked untidy.
+ */
+const PROXYCHECK_TIMEOUT_MS = 5000;
+const IP_API_TIMEOUT_MS = 5000;
+
+/**
+ * A network failure in one short line.
+ *
+ * WHY THIS EXISTS AT ALL, because `console.warn("...", error)` looks perfectly reasonable.
+ * `AbortSignal.timeout()` rejects with a `DOMException`, and Node's inspector enumerates the
+ * legacy DOM error-code constants that live on its prototype - `INDEX_SIZE_ERR: 1`,
+ * `DOMSTRING_SIZE_ERR: 2`, and 23 more. So one proxycheck.io timeout printed a 28-line stack
+ * dump into production logs, for an event that is fully handled and falls back correctly.
+ *
+ * The cost was not disk space. A handled fallback that logs like an unhandled crash trains
+ * whoever reads the logs to skim past that shape of entry, which is where a real error goes
+ * unnoticed. Log the fact, at the severity the fact deserves.
+ */
+function describeNetworkFailure(error: unknown): string {
+  if (error instanceof Error) {
+    // `DOMException` sets `name` to `TimeoutError` or `AbortError`, which is the whole
+    // diagnosis - the stack is inside the fetch internals and names nothing useful.
+    return error.name && error.name !== "Error"
+      ? `${error.name}: ${error.message}`
+      : error.message;
+  }
+  return String(error);
+}
+
+/** A timeout or abort is expected traffic weather, not a defect. */
+function isExpectedTimeout(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === "TimeoutError" || error.name === "AbortError")
+  );
+}
+
+/**
  * Primary detector: proxycheck.io. Returns null when no key is configured or
  * the request fails, so the caller can fall back to ip-api.
  */
@@ -245,7 +291,7 @@ async function detectViaProxyCheck(
     const response = await fetch(url, {
       method: "GET",
       headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(PROXYCHECK_TIMEOUT_MS),
     });
     if (!response.ok) return null;
 
@@ -295,7 +341,20 @@ async function detectViaProxyCheck(
       rawData: node,
     };
   } catch (error) {
-    console.warn("⚠️ proxycheck.io lookup failed, falling back to ip-api:", error);
+    // Reason for splitting the two: a timeout means the fallback did its job and there is
+    // nothing to act on, so it is a log line rather than a warning. Anything else - a DNS
+    // failure, a TLS problem, a malformed response - is worth an operator's attention,
+    // because the platform is then paying for an intelligence key it is not getting value
+    // from and silently running on the weaker name-matching heuristics instead.
+    if (isExpectedTimeout(error)) {
+      console.log(
+        `📡 proxycheck.io timed out after ${PROXYCHECK_TIMEOUT_MS}ms; using ip-api for this lookup`,
+      );
+    } else {
+      console.warn(
+        `⚠️ proxycheck.io lookup failed, falling back to ip-api: ${describeNetworkFailure(error)}`,
+      );
+    }
     return null;
   }
 }
@@ -310,7 +369,7 @@ async function detectViaIpApi(ip: string): Promise<IPDetectionResult> {
       {
         method: "GET",
         headers: { Accept: "application/json" },
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(IP_API_TIMEOUT_MS),
       },
     );
 
@@ -360,7 +419,9 @@ async function detectViaIpApi(ip: string): Promise<IPDetectionResult> {
       rawData: data,
     };
   } catch (error) {
-    console.error(`Error detecting VPN/Proxy for ${ip}:`, error);
+    console.error(
+      `Error detecting VPN/Proxy for ${ip}: ${describeNetworkFailure(error)}`,
+    );
     // Fail safe — never block users because of an API error.
     return { ...SKIPPED_RESULT(ip), success: false, source: "error" };
   }
