@@ -140,6 +140,66 @@ Three things about it are load-bearing and easy to undo:
 `__tests__/games/provider-play-ui.test.ts` (28 tests) and `tools/probe-preflight-status.ps1`
 (7 probes, all red).
 
+### 1.1c The clock the screen runs on is the server's (7 September 2026)
+
+The owner's report was two sentences: the play screen showed a bare UTC timestamp where a
+countdown belonged, and **the Play button needed a page reload to appear.** Both are the same
+underlying gap - the screen had no notion of time passing - but they need two different
+mechanisms, and conflating them is how one of them ends up half-built.
+
+**`hooks/useServerClock.ts` is a ticking clock anchored to the server's `serverNow`**, added to
+the `PlayState` payload. Every gate on the pre-flight now compares against it.
+
+**Why not `Date.now()`, which is the obvious version.** Every gate the pre-flight mirrors is
+enforced on the server against the server's `new Date()`. Computed in the browser they disagree
+on any machine whose clock is off, and **both directions of the disagreement are bad**: a Play
+button offered against a closed window produces a refusal the player cannot act on, and one
+withheld against an open window hides a paid attempt they are entitled to. Neither logs
+anything, because neither is an error. A test bans `Date.now()` from the component outright,
+because importing the hook is trivially satisfied by a file that then computes the comparison
+the old way - which is exactly what it did.
+
+**The honest limitation, and why the error is in the safe direction.** `serverNow` was produced
+when the payload was generated, so transit and hydration have passed by the time the offset is
+computed - the hook counts that transit as clock skew and can read up to about a second *ahead*
+of the server. That is deliberate: a countdown running marginally early closes the window a
+moment before the server does, so the player is never offered a button the server is about to
+refuse. Re-anchoring on every fresh payload bounds the error to one round trip instead of
+letting it accumulate across an hour-long wait, which is why `serverNow` is generated per
+response rather than once per page.
+
+**An unparseable anchor falls back to the browser's clock rather than propagating.** An offset
+of `NaN` makes every comparison on the pre-flight false, so the countdown would freeze and
+every gate would **silently open** - the wrong direction for a screen that spends attempts.
+
+**A third gate came out of the same work: `tooLateToStart`.** `createRound` refuses when
+`now + maxDurationSeconds > playWindowEnd`, and it is right to - a round cut short by the window
+would be scored on a partial game. What was wrong was **where the player met it**: a red box
+after the click, beside a fully enabled button, which is the screen in the owner's report.
+`maxRoundSeconds` now travels on the payload, read from the catalogue title and **never from the
+caller** - a client-supplied round length would let a player claim a one-second round and be
+offered a button the server refuses, the same rule that keeps the market-hours gate off caller
+input. An **absent** duration applies no gate rather than guessing, because a guess that
+disables the button is worse than letting the server name the real reason.
+
+**And the second mechanism, which the clock cannot provide.** `PREFLIGHT_REFRESH_MS` (20s) in
+`ProviderRoundHost` re-reads the state while the player sits on the pre-flight, because three of
+the facts it gates on are **not time at all** - the contest's status moving to `active`, an
+operator pausing or resuming it, and a round of the player's own being resolved by the
+reconciliation net. None of those reach an open page. It is scoped to the pre-flight phase:
+during `playing` the iframe owns the screen, and during `confirming` the result poll is already
+running against the same endpoint, so a second timer would double the load and race it. It is
+deliberately **not** tied to the countdown reaching zero, because that would make the client's
+clock decide when to refresh, and the client's clock is the thing we do not trust.
+
+The generalisable sentence: **the host polls for the facts the clock cannot know; the clock
+handles everything that is purely the passage of time.** A single mechanism would either
+hammer the endpoint every second or leave the button stale for twenty of them.
+
+`__tests__/games/provider-play-ui.test.ts` (68 tests, 9 added) and
+`tools/probe-play-clock.ps1` (12 probes, **all red on exactly the expected test with exactly one
+failure each**).
+
 ### What it does not do
 
 - **No live leaderboard during play** (section 11's polling recommendation is unimplemented). A
@@ -505,6 +565,55 @@ families already recorded here: a `/<NeonHero/` match **passed while the compone
 swapped for `<NeonHeroReplacement`**, because a prefix match cannot distinguish a component from
 one whose name starts the same way; and `/neonRowClasses\(/` was satisfiable by the **import
 line** alone. Assert the call with an argument, and put a boundary character after a tag name.
+
+### 4.1f The lobby shows a joined player the clock (7 September 2026)
+
+The lobby *had* a countdown, and it was in the one place it could not be seen by the person who
+needed it. The hero's fourth tile counts down - but only for a player who has **not** entered.
+Once they do, it is replaced by "Your score". **So the countdown vanished at exactly the moment
+it started to matter**, and the player with the most reason to watch the clock was shown no
+clock at all.
+
+Fixed by a second `InlineCountdown` in the play-window panel, the same component the trading
+lobby and the hero tile use. A third implementation of "2d 4h" would be a third place for the
+wording to drift, which is the shape behind several defects here. **The test counts the
+countdowns rather than matching one**, because the hero's has been there all along and a bare
+`<InlineCountdown` match is green on the bug - and a probe removing the new one proves the count
+is what holds the property.
+
+**And a note that had become false was rewritten, not deleted.** The panel told players "the
+play window can be narrower than the competition itself, so check both." That was true when an
+operator set four separate dates; since `12` s2.3 derived the window from the contest clock it
+is false. **A player-facing caution that has become false is worse than none** - it sends
+somebody looking for a second pair of times that no longer exists, and it reads as though
+someone checked. Same duty as rewriting the operator's `exclude`-refund warning once the refund
+became automatic.
+
+It was replaced rather than removed because the fact players actually need in its place is the
+one the owner asked about: **every player gets the same window, and a round still open when it
+closes is closed with the competition.** See `11` seam 3 for the settlement half of that
+sentence.
+
+### 4.1g A design guard that had started failing correct code (7 September 2026)
+
+Worth recording because the failure was in the **guard**, not the code, and the fix narrowed a
+rule rather than deleting it.
+
+4.1d's rule banned the 3D `GameIcon` set from both lobbies, which was right about the screens'
+own iconography. Written as a blanket ban on the identifier it also forbade the provider
+leaderboard the **level badge** that `CompetitionLeaderboard` - the trading board this kit
+exists to match - has always rendered. A `userTitleIcon` is a piece of **user data**, no more
+chrome than the avatar or the username beside it.
+
+So the guard would have enforced exactly the inconsistency it was written to prevent. **The
+distinction that carries the rule is the `name` prop**: a literal (`name="trophy"`) is the
+screen choosing a glyph, which the sheet specifies as a flat lucide glyph in a tinted
+`IconTile`; a bound one (`name={row.userTitleIcon}`) is rendering data. Rank medals stay banned
+outright, because the kit draws ranks with `NeonRankBadge`.
+
+The general form: **a guard that fails on correct code is the fastest way to have it deleted
+wholesale**, which here would have cost the rank-medal half too. Narrow it to the property it
+actually holds.
 
 ---
 

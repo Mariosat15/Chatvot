@@ -2,6 +2,7 @@
 
 import { AlertCircle, Clock, Loader2, Play, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { formatRemaining, useServerClock } from "@/hooks/useServerClock";
 import type { PlayState } from "./play-state";
 
 /**
@@ -45,11 +46,55 @@ export function RoundPreflight({
   refusal,
   onLaunch,
 }: RoundPreflightProps) {
+  /*
+    THE SERVER'S CLOCK, NOT THE BROWSER'S, and every comparison below uses it.
+
+    Each of these gates mirrors one the launch service enforces against the server's
+    `new Date()`. Computed from `Date.now()` they disagree on any machine whose clock is off,
+    in both of the directions that matter: a Play button offered against a closed window
+    produces a refusal the player cannot act on, and one withheld against an open window hides
+    a paid attempt. Neither logs anything, because neither is an error.
+
+    It also makes this component re-render every second, which is what closes the second half
+    of the owner's report - the button used to need a page reload to notice that the window had
+    opened. The host polls for the facts the clock cannot know (a status change, an operator's
+    pause); the clock handles everything that is purely the passage of time.
+  */
+  const now = useServerClock(state.serverNow);
+
   const resuming = state.liveRound !== null;
   const exhausted = state.attemptsRemaining <= 0 && !resuming;
-  const windowClosed = state.playWindowEnd
-    ? new Date(state.playWindowEnd) <= new Date()
-    : false;
+  const windowEndMs = state.playWindowEnd
+    ? new Date(state.playWindowEnd).getTime()
+    : null;
+  const windowStartMs = state.playWindowStart
+    ? new Date(state.playWindowStart).getTime()
+    : null;
+  const windowClosed = windowEndMs !== null ? windowEndMs <= now : false;
+
+  /*
+    NO ROOM LEFT FOR A ROUND, which the player used to discover by pressing Play.
+
+    `createRound` refuses when `now + maxDurationSeconds > playWindowEnd`, and it is right to:
+    a round cut short by the window would be scored on a partial game. But the refusal arrived
+    as a red box after the click, next to a fully enabled button - the exact screen in the
+    owner's report. Stating it up front turns it from an error into an explanation, and the
+    countdown below says how long is left before it applies.
+
+    Only when we know the duration. An absent `maxRoundSeconds` applies no gate rather than
+    guessing, because a guess that disables the button is worse than leaving the server's
+    refusal to name the real reason.
+  */
+  const roundNeedsMs =
+    typeof state.maxRoundSeconds === "number"
+      ? state.maxRoundSeconds * 1000
+      : null;
+  const tooLateToStart =
+    !resuming &&
+    windowEndMs !== null &&
+    roundNeedsMs !== null &&
+    !windowClosed &&
+    now + roundNeedsMs > windowEndMs;
 
   /*
     THE CONTEST'S OWN STATE, which this screen used to ignore entirely - it read attempts and
@@ -71,9 +116,7 @@ export function RoundPreflight({
   const notStartedYet =
     state.contestStatus === "upcoming" || state.contestStatus === "draft";
   const noLongerOpen = !notStartedYet && state.contestStatus !== "active";
-  const windowNotOpen = state.playWindowStart
-    ? new Date(state.playWindowStart) > new Date()
-    : false;
+  const windowNotOpen = windowStartMs !== null ? windowStartMs > now : false;
 
   /*
     A PAUSE IS NOT A STATUS, which is the whole reason it needs its own line here. A paused
@@ -93,6 +136,7 @@ export function RoundPreflight({
     paused ||
     windowNotOpen ||
     windowClosed ||
+    tooLateToStart ||
     exhausted;
 
   // Reason the order matters: a contest that has not started AND has a closed window should say
@@ -111,9 +155,13 @@ export function RoundPreflight({
           ? "Play has not opened for this competition yet."
           : windowClosed
             ? "The play window for this competition has closed."
-            : exhausted
-              ? "You have used all of your attempts for this competition."
-              : null;
+            : // Ordered above `exhausted` because it is the more urgent fact and the one the
+              // player can still act on next time: there is time left, just not enough of it.
+              tooLateToStart
+              ? "There is not enough time left in this competition to finish a round, so no new round can be started."
+              : exhausted
+                ? "You have used all of your attempts for this competition."
+                : null;
 
   const buttonLabel = launching
     ? "Opening the game…"
@@ -127,11 +175,13 @@ export function RoundPreflight({
             ? "Play has not opened"
             : windowClosed
               ? "Play has closed"
-              : exhausted
-                ? "No attempts left"
-                : resuming
-                  ? "Resume your round"
-                  : "Play";
+              : tooLateToStart
+                ? "Too late to start a round"
+                : exhausted
+                  ? "No attempts left"
+                  : resuming
+                    ? "Resume your round"
+                    : "Play";
 
   return (
     <div className="space-y-4 rounded-xl border border-gray-700 bg-gray-800/50 p-6">
@@ -153,12 +203,62 @@ export function RoundPreflight({
         </div>
       )}
 
-      {state.playWindowEnd && !windowClosed && !noLongerOpen && (
+      {/*
+        A COUNTDOWN, NOT A TIMESTAMP, and the owner's report is the reason. This used to read
+        "Play closes Mon, 07 Sep 2026 05:46:00 GMT", which is precise and asks the player to
+        subtract two times in their head - one of them in a zone they do not live in. The
+        absolute time is kept underneath, because a player planning when to come back needs it,
+        but the figure that decides whether to press Play now is the remaining one.
+
+        It counts down to the window's OPEN while play has not started, and to its CLOSE once
+        it has, because those are the two questions in the two states. Both are anchored to the
+        server's clock, so the number agrees with the gate that will judge the click.
+      */}
+      {windowNotOpen && windowStartMs !== null && !noLongerOpen && (
         <div className="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-900/60 p-3">
           <Clock className="h-4 w-4 shrink-0 text-gray-400" />
           <p className="text-xs text-gray-300">
-            Play closes {new Date(state.playWindowEnd).toUTCString()}
+            Play opens in{" "}
+            <span className="font-semibold tabular-nums text-gray-100">
+              {formatRemaining(windowStartMs - now)}
+            </span>
+            <span className="ml-1 text-gray-500">
+              ({new Date(windowStartMs).toUTCString()})
+            </span>
           </p>
+        </div>
+      )}
+
+      {!windowNotOpen && windowEndMs !== null && !windowClosed && !noLongerOpen && (
+        <div className="flex items-start gap-2 rounded-lg border border-gray-700 bg-gray-900/60 p-3">
+          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+          <div className="space-y-1">
+            <p className="text-xs text-gray-300">
+              Play closes in{" "}
+              <span className="font-semibold tabular-nums text-gray-100">
+                {formatRemaining(windowEndMs - now)}
+              </span>
+              <span className="ml-1 text-gray-500">
+                ({new Date(windowEndMs).toUTCString()})
+              </span>
+            </p>
+            {/*
+              Stated only while a round still fits, because once it does not the blocked panel
+              above says so outright and two panels about the same clock contradict each other
+              in tone. The purpose of this line is to let a player see the cut-off approaching
+              while they can still do something about it.
+            */}
+            {roundNeedsMs !== null && !tooLateToStart && !resuming && (
+              <p className="text-xs text-gray-500">
+                A round needs up to {Math.max(1, Math.round(roundNeedsMs / 60000))}{" "}
+                min, so the last one can start{" "}
+                <span className="tabular-nums">
+                  {formatRemaining(windowEndMs - roundNeedsMs - now)}
+                </span>{" "}
+                from now.
+              </p>
+            )}
+          </div>
         </div>
       )}
 

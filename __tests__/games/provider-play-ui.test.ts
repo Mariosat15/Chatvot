@@ -647,7 +647,25 @@ describe("the two lobbies are built from one design kit", () => {
     for (const consumer of [PROVIDER_LOBBY, PROVIDER_BOARD, TRADING_HERO]) {
       const code = readCode(consumer);
       expect(code).toMatch(/from "lucide-react"/);
-      expect(code).not.toMatch(/GameIcon|RankIcon/);
+
+      // Rank medals are chrome outright - the kit draws ranks with `NeonRankBadge`.
+      expect(code).not.toMatch(/RankIcon/);
+
+      /*
+        NARROWED FROM A BLANKET BAN ON `GameIcon`, which was over-broad and had started
+        failing correct code. The rule is about the screen's OWN iconography, and the
+        distinction that carries it is the `name` prop: a literal (`name="trophy"`) is the
+        screen choosing a glyph, which the sheet now specifies as a flat lucide glyph in a
+        tinted `IconTile`; a bound one (`name={row.userTitleIcon}`) is rendering a piece of
+        USER DATA, no more chrome than the avatar or the username beside it.
+
+        Left as a blanket ban it forbade the provider board the level badge that
+        `CompetitionLeaderboard` - the trading board this kit exists to match - has always
+        rendered, so the guard would have enforced exactly the inconsistency it was written
+        to prevent. And a guard that fails on correct code is the fastest way to have it
+        deleted wholesale, which would have cost the rank-medal half too.
+      */
+      expect(code).not.toMatch(/<GameIcon\s+name="/);
     }
 
     // And the tiles are drawn in one place, so their size and tint cannot drift per screen.
@@ -988,5 +1006,186 @@ describe("the browser's copy of the play state matches the server's", () => {
     expect(fieldsOf(client, "PlayerRoundView")).toEqual(
       fieldsOf(server, "PlayerRoundView"),
     );
+  });
+});
+
+describe("the play screen counts down on the server's clock", () => {
+  const CLOCK = "hooks/useServerClock.ts";
+
+  it("formats a remaining duration the way a player reads one", async () => {
+    const { formatRemaining } = await import("../../hooks/useServerClock");
+
+    expect(formatRemaining(9_000)).toBe("9s");
+    // Seconds are zero-padded below the hour so the number does not jump width every tick.
+    expect(formatRemaining(11 * 60_000 + 3_000)).toBe("11m 03s");
+    expect(formatRemaining(2 * 3_600_000 + 5 * 60_000 + 7_000)).toBe("2h 5m 7s");
+    expect(formatRemaining(2 * 86_400_000 + 4 * 3_600_000)).toBe("2d 4h 0m");
+
+    /*
+      A PAST TARGET IS "0s", NEVER A NEGATIVE. This is the assertion that matters, because the
+      screen renders the difference between the window's end and now, and the two can cross
+      between a render and the next tick. Left unclamped a player watching the last second sees
+      "-1s", which reads as a broken page rather than as a closed window.
+    */
+    expect(formatRemaining(0)).toBe("0s");
+    expect(formatRemaining(-5_000)).toBe("0s");
+  });
+
+  it("anchors to the server's timestamp and fails closed on a bad one", () => {
+    const code = readCode(CLOCK);
+
+    /*
+      The offset is the whole hook: `serverNow - Date.now()`, applied to every tick. Asserting
+      the expression rather than the identifier, because `serverNowIso` appears in the signature
+      and in the dependency array, and neither is the calculation.
+    */
+    expect(code).toMatch(/parsed\s*-\s*Date\.now\(\)/);
+    expect(code).toMatch(/return\s+now\s*\+\s*offsetMs/);
+
+    /*
+      AN UNPARSEABLE ANCHOR MUST FALL BACK TO THE BROWSER'S CLOCK, not propagate. An offset of
+      `NaN` makes every comparison on the pre-flight false - so the countdown freezes and every
+      gate silently OPENS, which is the wrong direction for a screen that spends attempts.
+    */
+    expect(code).toMatch(/Number\.isNaN\(parsed\)/);
+  });
+
+  it("uses that clock for every gate rather than the browser's", () => {
+    const code = readCode(PREFLIGHT);
+
+    expect(code).toMatch(/useServerClock\(state\.serverNow\)/);
+
+    /*
+      THE NEGATIVE HALF IS THE LOAD-BEARING ONE. Importing the hook is trivially satisfied by a
+      file that then compares against `Date.now()` anyway - which is exactly what this component
+      did before, and the failure is silent in both directions: a Play button offered against a
+      closed window produces a refusal the player cannot act on, and one withheld against an
+      open window hides a paid attempt.
+
+      `new Date()` with no argument is banned for the same reason; the parameterised form is
+      what parses the window's own timestamps and must stay allowed.
+    */
+    expect(code).not.toMatch(/Date\.now\(\)/);
+    expect(code).not.toMatch(/new Date\(\s*\)/);
+  });
+
+  it("blocks Play when a round can no longer finish inside the window", () => {
+    const code = readCode(PREFLIGHT);
+
+    /*
+      Mirrors `createRound`'s refusal, which is right to exist - a round cut short by the window
+      would be scored on a partial game. What was wrong was WHERE the player met it: a red box
+      after the click, beside a fully enabled button.
+
+      Asserting the comparison, not the flag's name: `tooLateToStart` appears in the blocked
+      list, the reason chain and the button label, so a name-only match survives the arithmetic
+      being deleted.
+    */
+    expect(code).toMatch(/now\s*\+\s*roundNeedsMs\s*>\s*windowEndMs/);
+
+    // And it must not fire on a resume, which reopens the round the player already has and so
+    // needs no fresh room in the window.
+    expect(code).toMatch(/tooLateToStart\s*=\s*\n?\s*!resuming/);
+
+    // An unknown round length applies NO gate rather than guessing. A guess that disables the
+    // button is worse than letting the server name the real reason.
+    expect(code).toMatch(/typeof state\.maxRoundSeconds === "number"/);
+
+    // It reaches the disabled state and the label, not just a paragraph.
+    const blockedList = code.slice(
+      code.indexOf("const blocked ="),
+      code.indexOf("const blockedReason"),
+    );
+    expect(blockedList.length).toBeGreaterThan(40);
+    expect(blockedList).toMatch(/tooLateToStart/);
+  });
+
+  it("shows a countdown beside the absolute time, not instead of it", () => {
+    const code = readCode(PREFLIGHT);
+
+    // The remaining figure is what decides whether to press Play now; the absolute time is what
+    // a player planning to come back needs. The report was that only the second was shown.
+    expect(code).toMatch(/formatRemaining\(windowEndMs\s*-\s*now\)/);
+    expect(code).toMatch(/formatRemaining\(windowStartMs\s*-\s*now\)/);
+    expect(code).toMatch(/toUTCString\(\)/);
+  });
+
+  it("refreshes the pre-flight for the facts a clock cannot know", () => {
+    const code = readCode(HOST);
+
+    /*
+      A ticking clock closes half the owner's report. The other half is not time at all - the
+      contest's status moving to `active`, an operator pausing or resuming, a round resolved by
+      the reconciliation net. None of those reach an open page, so the screen stayed wrong until
+      somebody pressed F5.
+    */
+    expect(code).toMatch(/setInterval\([\s\S]{0,320}PREFLIGHT_REFRESH_MS/);
+    expect(code).toMatch(/clearInterval/);
+
+    /*
+      SCOPED TO THE PRE-FLIGHT, asserted by the guard rather than by the constant's presence.
+      During `confirming` the result poll is already running against this same endpoint, and a
+      second timer would double the load and race it.
+    */
+    const effect = code.slice(
+      code.indexOf('if (phase.name !== "preflight") return;'),
+    );
+    expect(effect.length).toBeGreaterThan(40);
+    expect(effect).toMatch(/setInterval/);
+  });
+
+  it("carries the server's clock and the round length across the wire", () => {
+    const service = readCode("lib/services/games/round-status.service.ts");
+
+    // `serverNow` is generated per response on purpose: re-anchoring on every poll bounds the
+    // clock's error to one round trip instead of letting it accumulate over an hour-long wait.
+    expect(service).toMatch(/serverNow:\s*new Date\(\)\.toISOString\(\)/);
+
+    /*
+      `maxRoundSeconds` comes from the catalogue title, never from the caller. A client-supplied
+      round length would let a player claim a one-second round and be offered a button the
+      server refuses - and it is the same rule that keeps the market-hours gate off caller input.
+    */
+    expect(service).toMatch(/maxDurationSeconds/);
+  });
+});
+
+describe("the game lobby shows a joined player the clock", () => {
+  it("counts down in the play-window panel, using the shared component", () => {
+    const code = readCode(PROVIDER_LOBBY);
+
+    /*
+      THE PLAYER WITH THE MOST REASON TO WATCH THE CLOCK WAS SHOWN NO CLOCK. The hero's fourth
+      tile counts down only for someone who has NOT entered - once they do, it is replaced by
+      their score. So the countdown vanished at exactly the moment it started to matter.
+
+      Asserting there are now TWO countdowns rather than merely one, because the hero's has been
+      there all along and a bare `<InlineCountdown` match is green on the bug.
+    */
+    const countdowns = code.match(/<InlineCountdown/g) ?? [];
+    expect(countdowns.length).toBe(2);
+
+    // Reused, not re-implemented. A third place that formats "2d 4h" is a third place for the
+    // wording to drift, which is the shape behind several defects here.
+    expect(code).toMatch(/from "@\/components\/trading\/InlineCountdown"/);
+  });
+
+  it("no longer tells players the play window can be narrower than the contest", () => {
+    const code = readCode(PROVIDER_LOBBY);
+
+    /*
+      TRUE UNTIL THE WINDOW BECAME DERIVED, and false the moment it did (`12` s2.3). A
+      player-facing caution that has become false is worse than none: it sends somebody looking
+      for a second pair of times that no longer exists, and it reads as though someone checked.
+
+      Same duty as rewriting the operator's `exclude`-refund warning once the refund became
+      automatic - and note the comments are stripped before matching, so the paragraph in the
+      component explaining WHY the note changed does not satisfy or break this.
+    */
+    expect(code).not.toMatch(/narrower than the/);
+
+    // Replaced rather than deleted: the fact players actually need is what happens to a round
+    // still open when the clock runs out, which is the owner's question about the universal cut-off.
+    expect(code).toMatch(/Every player gets the same window/);
   });
 });

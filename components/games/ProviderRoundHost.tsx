@@ -34,6 +34,26 @@ import type { PlayState, PlayerRoundView } from "./play-state";
 const POLL_INTERVAL_MS = 3000;
 const POLL_ATTEMPTS = 20;
 
+/**
+ * How often the pre-flight re-reads the state while the player is sitting on it.
+ *
+ * WHY IT EXISTS: the owner reported having to reload the page to see the Play button appear.
+ * The passage of time is handled by `useServerClock`, which ticks every second, but three of
+ * the facts this screen gates on are not time at all - the contest's status moving to
+ * `active`, an operator pausing or resuming it, and a round of the player's own being resolved
+ * by the reconciliation net. None of those reach an open page, so the screen stayed wrong
+ * until somebody pressed F5.
+ *
+ * WHY 20 SECONDS RATHER THAN SOMETHING TIGHTER. This is a lobby a player may leave open for an
+ * hour waiting for a contest to start, and the endpoint runs four indexed queries per call.
+ * The worst case a slower poll produces is a Play button appearing up to twenty seconds late,
+ * which is invisible against a countdown; the worst case a faster one produces is a
+ * self-inflicted load pattern that scales with idle players. It is deliberately NOT tied to
+ * the countdown reaching zero, because that would make the client's clock decide when to
+ * refresh and the client's clock is the thing we do not trust.
+ */
+const PREFLIGHT_REFRESH_MS = 20000;
+
 type Phase =
   | { name: "preflight" }
   | { name: "launching" }
@@ -79,6 +99,35 @@ export function ProviderRoundHost({
       return null;
     }
   }, [competitionId]);
+
+  /*
+    THE PRE-FLIGHT REFRESH. See `PREFLIGHT_REFRESH_MS` for why the second-by-second clock is
+    not enough on its own.
+
+    Scoped to the pre-flight phase deliberately. During `playing` the iframe owns the screen
+    and a state change behind it would be invisible; during `confirming` the result poll is
+    already running and a second timer against the same endpoint would double the load and race
+    it. `phase.name` in the dependency array is what starts and stops it, so leaving the
+    pre-flight tears the interval down without any explicit cleanup call.
+
+    It sets state unconditionally rather than diffing: `serverNow` changes on every read, which
+    is the point - a fresh anchor is how the clock corrects its own drift.
+  */
+  useEffect(() => {
+    if (phase.name !== "preflight") return;
+
+    const timer = setInterval(() => {
+      void (async () => {
+        const refreshed = await readState();
+        // A failed read is left alone on purpose. Showing the player an error because a
+        // background poll missed would replace a working screen with a broken-looking one for
+        // a condition that resolves itself on the next tick.
+        if (refreshed) setState(refreshed);
+      })();
+    }, PREFLIGHT_REFRESH_MS);
+
+    return () => clearInterval(timer);
+  }, [phase.name, readState]);
 
   const launch = useCallback(async () => {
     setRefusal(null);

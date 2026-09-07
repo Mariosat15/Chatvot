@@ -34,6 +34,18 @@ export interface PlayerRoundView {
 export interface PlayState {
   contestStatus: string;
   /**
+   * The server's clock when this payload was produced. Every countdown and every time-based
+   * gate on the client is anchored to it rather than to `Date.now()`, because the server is
+   * what actually enforces them. See `hooks/useServerClock.ts`.
+   */
+  serverNow: string;
+  /**
+   * The longest one round of this game may run. Used to disable Play before the click when
+   * there is no longer room for a round inside the window - the server refuses it either way,
+   * but a disabled button with a reason beats a red box after a wasted click.
+   */
+  maxRoundSeconds?: number;
+  /**
    * A paused contest is still `active`, so this cannot be derived from the status. See the
    * service's copy for why that distinction matters to the Play button.
    */

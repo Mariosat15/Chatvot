@@ -636,6 +636,93 @@ Newest at the top.
 
 ---
 
+### 7 Sep 2026 - X5/X6 - THE PLAY SCREEN RUNS ON THE SERVER'S CLOCK
+
+**Shipped:** `hooks/useServerClock.ts`, a `serverNow` anchor and a `maxRoundSeconds` figure on
+the `PlayState` payload, a `tooLateToStart` gate, real countdowns replacing bare UTC
+timestamps, a 20-second pre-flight refresh, and a countdown for the joined player in the
+lobby. `13` **s1.1c** and **s4.1f**. 68 tests in
+`__tests__/games/provider-play-ui.test.ts` (9 added), `tools/probe-play-clock.ps1` with **12
+probes, all red on exactly the expected test with exactly one failure each**.
+
+**Files touched:** `hooks/useServerClock.ts` (new), `components/games/RoundPreflight.tsx`,
+`ProviderRoundHost.tsx`, `ProviderContestLobby.tsx`, `play-state.ts`,
+`lib/services/games/round-status.service.ts`. **None of it is mirrored** - these are main-app
+screens and a main-app service, so `check:mirrors` says nothing about any of it.
+
+**The owner's report was two sentences and it needed two mechanisms, which is the part worth
+carrying.** "Show a countdown like the trading lobby" is the passage of time and belongs to a
+clock. "I have to reload to see the Play button" is **not time at all** - it is the contest's
+status moving to `active`, an operator pausing or resuming, or a round of the player's own
+being resolved by the reconciliation net, none of which reach an open page. A single mechanism
+would either hammer the endpoint every second or leave the button stale for twenty of them.
+**The host polls for the facts the clock cannot know; the clock handles everything that is
+purely the passage of time.**
+
+**The clock is the server's, and the negative half of the test is what holds that.** Every
+gate the pre-flight mirrors is enforced against the server's `new Date()`, and a browser that
+computes the same thing from `Date.now()` disagrees in **both** of the directions that matter:
+a Play button offered against a closed window produces a refusal the player cannot act on, and
+one withheld against an open window hides a paid attempt. Neither logs anything. Importing the
+hook is trivially satisfied by a component that then compares the old way - which is exactly
+what this one did - so `Date.now()` is banned from the file outright.
+
+**The anchor's error is deliberately in the safe direction.** `serverNow` was generated before
+transit and hydration, so the offset counts that as skew and can read up to a second *ahead*
+of the server; a countdown running marginally early closes the window a moment before the
+server does. Re-anchoring on every poll bounds the error to one round trip rather than letting
+it accumulate over an hour-long wait. An unparseable anchor falls back to the browser's clock,
+because an offset of `NaN` makes every comparison false and every gate would **silently open**.
+
+**A third defect surfaced from mapping the gates: the "not enough time left" refusal was
+server-side only.** `createRound` refuses when `now + maxDurationSeconds > playWindowEnd`, and
+it is right to - a round cut short by the window is scored on a partial game. What was wrong
+was where the player met it: a red box after the click, beside a fully enabled button, which
+is the screen in the report. `maxRoundSeconds` now travels on the payload, read from the
+catalogue title and **never from caller input**, the same rule that keeps the market-hours gate
+off it. An absent duration applies **no** gate rather than guessing.
+
+**The lobby's countdown existed and was invisible to the only person who needed it.** The
+hero's fourth tile counts down for a player who has not entered; once they do it is replaced
+by "Your score", so **the countdown vanished at exactly the moment it started to matter.** The
+test counts countdowns rather than matching one, because the hero's has been there all along
+and a bare `<InlineCountdown` match is green on the bug.
+
+**And a note that had become false was rewritten.** The play-window panel told players the
+window "can be narrower than the competition itself". True with four operator-set dates, false
+since s2.3 derived it. **A player-facing caution that has become false is worse than none** -
+it sends somebody hunting for a second pair of times that no longer exists, and it reads as
+though somebody checked. Replaced with the fact they actually need, which is the owner's own
+question: every player gets the same window, and a round still open when it closes is closed
+with the competition.
+
+**Deviated from plan:** nothing planned covered any of this; it is owner-reported defect work
+against `13` s1.1b and s4.1d.
+
+**One guard was narrowed because it had started failing correct code** (`13` s4.1g). s4.1d
+banned the 3D `GameIcon` set from both lobboards. Written as a blanket ban on the identifier it
+also forbade the provider board the **level badge** `CompetitionLeaderboard` has always
+rendered - and a `userTitleIcon` is user *data*, no more chrome than the avatar beside it. So
+the guard would have enforced exactly the inconsistency it exists to prevent. Narrowed on the
+`name` prop: a literal is the screen choosing a glyph, a bound one is rendering data. Rank
+medals stay banned outright. **A guard that fails on correct code is the fastest way to have
+it deleted wholesale**, which here would have cost the rank-medal half too.
+
+**Deferred, and it is the next thing:** the universal cut-off is **half-built**. A round cannot
+outlive the contest, because `createRound` clamps `expiresAt` to `playWindowEnd` and the window
+is now the contest clock - but **nothing voids a round still `launched` when the contest
+finalizes.** The consequence is not a wrong payout; it is that the reconciliation net polls a
+round belonging to a settled contest, backs off, writes it `unresolved` after the grace window
+and raises a **CRITICAL alert for the normal end of a competition**. `endLiveRoundsForContest`
+already does exactly the right thing on the cancellation path and is not called from
+settlement. **Do not summarise the universal clock as done.**
+
+**Next chat should:** call `endLiveRoundsForContest` from provider settlement, inside the
+transaction and before ranking, then answer the owner's remaining question - what a contest
+pays when nobody finished, and where the unclaimed ranks' percentages go.
+
+---
+
 ### 7 Sep 2026 - X6 - ONE CONTEST CLOCK, AND A PRIZE SPLIT AN OPERATOR COULD REACH
 
 **Shipped:** the play window derived from the contest clock in one function, a shared

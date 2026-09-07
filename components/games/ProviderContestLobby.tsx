@@ -375,10 +375,42 @@ export default async function ProviderContestLobby({
                 {playWindowEnd && (
                   <NeonRow label="Closes" value={playWindowEnd} />
                 )}
+                {/*
+                  A COUNTDOWN FOR A PLAYER WHO HAS ALREADY JOINED, which this lobby did not
+                  have. The hero's fourth tile counts down only for someone who has NOT
+                  entered - once they do, it is replaced by their score, so the player with
+                  the most reason to watch the clock was the one shown no clock at all.
+
+                  It is the same `InlineCountdown` the trading lobby and the hero tile use.
+                  A third implementation of "2d 4h" would be a third place for the wording to
+                  drift, which is the shape behind several defects here.
+                */}
+                {countdownTarget && !isCompleted && !isCancelled && (
+                  <NeonRow
+                    label={isActive ? "Closes in" : "Opens in"}
+                    accent="score"
+                    value={
+                      <InlineCountdown
+                        targetDate={new Date(countdownTarget).toISOString()}
+                        type={isActive ? "end" : "start"}
+                      />
+                    }
+                  />
+                )}
               </div>
+              {/*
+                THIS NOTE USED TO SAY THE PLAY WINDOW COULD BE NARROWER THAN THE COMPETITION,
+                and it was true when an operator set four separate dates. Since the window is
+                derived from the contest clock (`12` s2.3) it is false, and a player-facing
+                caution that has become false is worse than none - it sends somebody looking
+                for a second pair of times that no longer exists. Replaced rather than deleted,
+                because the fact players actually need is what happens to a round still open
+                when the clock runs out.
+              */}
               <NeonNote>
-                The play window can be narrower than the competition itself, so
-                check both.
+                Every player gets the same window. Any round still open when it
+                closes is closed with the competition, and the scores stand as
+                they were.
               </NeonNote>
             </NeonPanel>
           )}

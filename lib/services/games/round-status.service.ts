@@ -6,6 +6,7 @@ import GameRound, {
   LIVE_ROUND_STATUSES,
   type RoundStatus,
 } from "@/database/models/games/game-round.model";
+import ProviderGame from "@/database/models/games/provider-game.model";
 import { attemptsPermitted } from "./round.service";
 import { contestRoundConfig, isProviderContest } from "./contest-config";
 import type { ProviderContestFields } from "./contest-config";
@@ -65,6 +66,32 @@ export type PlayStateRefusal =
 
 export interface PlayState {
   contestStatus: string;
+  /**
+   * The server's clock, at the moment this state was read.
+   *
+   * EVERY GATE BELOW IS ENFORCED AGAINST THE SERVER'S `new Date()`, so a screen that decides
+   * the same thing from the browser's clock disagrees with us on any machine whose clock is
+   * off - and it disagrees silently, because neither answer is an error. The pre-flight panel
+   * offered a Play button the launch service then refused, or withheld one the player was
+   * entitled to press. Sending the anchor lets the client offset its own clock; see
+   * `hooks/useServerClock.ts`.
+   */
+  serverNow: string;
+  /**
+   * The longest a single round of this title may run, from the catalogue row.
+   *
+   * Sent so the pre-flight can refuse BEFORE the click. `createRound` will not start a round
+   * that cannot finish inside the play window (`now + maxDurationSeconds <= playWindowEnd`) -
+   * correct, because a round cut short would be scored on a partial game - but the player used
+   * to discover it by pressing Play and getting a red box. The button now disables itself with
+   * the reason, and a countdown says how long is left before it will.
+   *
+   * Absent when the catalogue row cannot be found, in which case the pre-flight applies no
+   * such gate and the server's refusal is still the authority. Reason it is not defaulted to
+   * the round service's 300s fallback: a guess that disables the button is worse than no gate,
+   * because the server's refusal at least names the real reason.
+   */
+  maxRoundSeconds?: number;
   /**
    * Whether an operator has paused the contest, and why.
    *
@@ -230,10 +257,33 @@ export async function getPlayState(
     // exactly as the round service defines it. Pinned by a test so the two cannot drift.
     const used = rounds.filter((round) => round.status !== "voided").length;
 
+    /*
+      The title's own maximum round length, read for the pre-flight's benefit only - the launch
+      service reads it again for the decision that matters, because a gate whose value came
+      from a screen is a gate a client can move. Same reasoning as never taking a capability
+      gate's deciding value from caller input.
+
+      `.select` is narrow deliberately: this is an extra query on a page that renders on every
+      poll, and the row carries operator-editable content we have no business shipping here.
+    */
+    const title = await ProviderGame.findOne({
+      providerKey: config.providerKey,
+      gameCode: config.gameCode,
+    })
+      .select("maxDurationSeconds")
+      .lean<{ maxDurationSeconds?: number } | null>();
+
     return {
       success: true,
       state: {
         contestStatus: contest.status,
+        // Read here rather than at the top of the function so it is as close as possible to
+        // the moment the payload leaves - the client treats the gap as clock skew.
+        serverNow: new Date().toISOString(),
+        maxRoundSeconds:
+          typeof title?.maxDurationSeconds === "number"
+            ? title.maxDurationSeconds
+            : undefined,
         isPaused: contest.isPaused === true,
         pauseReason: contest.pauseReason,
         gameKey: contest.gameKey,
