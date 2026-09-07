@@ -1240,6 +1240,192 @@ platform-wide view. `05` section 10 states the rule and lists the dispositions; 
 screen set is where an operator would first notice it being broken - and the failure is
 silent, because a trading-only total keeps computing and keeps rendering.
 
+### 5.1a What was built - 7 September 2026, analytics and game performance
+
+Two of the seven rows in the table above, plus the whole of **New: Game Performance**.
+`CompetitionAnalytics.tsx` became game-aware and grew a by-game and by-provider financial
+breakdown, which is `FinancialDashboard.tsx`'s row satisfied on the analytics screen rather
+than on the financial one - see the deviation at the end. **50 tests, 39 probes.** Still
+outstanding in this section: `AdminOverviewDashboard.tsx`, the hide-when-trading-off rows,
+the participation funnel on the analytics screen itself (it is on Game Performance instead),
+and the per-round provider cost the commercial question needs, which has no data source until
+X4 supplies a real contract.
+
+**The live code:**
+
+| File | What it is |
+|---|---|
+| `apps/admin/lib/admin/contest-analytics-presentation.ts` | Pure, model-free. Game badges, the per-player metric, share of pool, the by-game and by-provider arithmetic, the filter, the scope note |
+| `apps/admin/components/admin/competitions/GameRevenueBreakdown.tsx` | The two summary tables |
+| `apps/admin/components/admin/CompetitionAnalytics.tsx` | Filter, badges, game-aware columns, scope note |
+| `apps/admin/app/api/competition-analytics/route.ts` | Now section-guarded, and sends the catalogue names and `finalScore` |
+| `apps/admin/lib/services/games/game-performance.service.ts` | Derived per-title operational metrics |
+| `apps/admin/app/api/games/performance/route.ts` | `GET`, guarded on the new `game-performance` section |
+| `apps/admin/components/admin/games/GamePerformanceSection.tsx` | The screen |
+
+**Nothing here is mirrored.** `apps/admin/lib/admin/`, `apps/admin/lib/services/games/` and
+the admin API routes are admin-only, so `check:mirrors` says nothing about any of it.
+
+#### Four defects found on the analytics screen, and only one of them was the game gap
+
+The screen was opened to add a game filter. Three of the four things wrong with it had
+nothing to do with games, and **the same instrument found them: generalising code is a better
+bug-finding tool than looking for bugs**, which is the fifth instance of that after X5's
+second half turned up three pre-existing trading defects.
+
+- **The route authenticated with `verifyAdminToken`, which is token validity and not section
+  access.** Any employee holding an admin token could read every competition's entry-fee
+  volume, platform fee and payout list regardless of their grants. **Sixth instance of that
+  class**, after Prerequisite A, the internal-secret fallbacks, the unprotected
+  suspicion-score route, the provider admin routes and `PUT /api/competitions/[id]` - so carry
+  the rule and not the instances. Now `guardSection("analytics")`, pinned by a test that
+  **counts exported handlers against guards** rather than merely finding the helper named.
+- **"Prize %" had never worked, for any game, ever.** Nothing writes `metadata.percentage` on
+  a `competition_win` row - checked with `rg` across both apps and both copies of the payout
+  stage - so `metadata?.percentage || 0` rendered **0%** against every winner of every
+  competition ever settled. Replaced by the share of the pool the payment actually represents,
+  derived from two figures that do exist. That is not merely a substitute: **after
+  redistribution and ties the share paid at a rank is routinely not the share configured for
+  it** (R45), so the derived figure is the one an operator actually wants.
+- **"Final P&L" was rendered unconditionally, and it is R46 one screen along.**
+  `prize-payout.service.ts` writes `finalScore` for a provider contest and deliberately no
+  `finalPnl`, so the column read `+0.00` in green for every game winner while the number the
+  contest ranked on sat unread in the same document. Same read-side confusion of an absent
+  fact with a measured zero, one screen further out - and the fix reuses
+  `resolveResultMetric` from `12` s2.4 rather than restating the rule, because **two screens
+  disagreeing about whether an absent score is `0` or `-` is the defect, not the styling.**
+- **Every headline card was captioned as an all-time total and covered the last 50
+  competitions.** The route reads the 50 most recently finished and every card is a reduction
+  over that list, so "Total Platform Fees Earned" has always meant "of the last 50". That is
+  the binding rule above failing along the **window** axis rather than the game axis, and it
+  is equally unusable. **The arithmetic was deliberately not widened**: a behaviour change
+  made in the same edit as a labelling fix destroys the only evidence the labelling fix was
+  safe, which is the reasoning that kept the Game Master `||` defect verbatim while
+  settlement was being extracted. The limit is now **sent by the route** rather than
+  duplicated in the caption, so raising it cannot leave the caption naming the old one.
+
+#### Five things about the two summaries that drift easily
+
+- **Grouping is on `gameKey` and never on the display name.** The key is immutable and is the
+  join key for every historical figure; a display name is catalogue content an operator can
+  edit. Group by the name and renaming a title **silently splits one game's revenue into two
+  rows that each look complete**, with no error and totals that still add up.
+- **By game and by provider are two questions, not one with a redundancy.** Provider cost is
+  **per provider, not per title**, so the figure a commercial decision is made against is the
+  provider-level one while the figure an operator schedules against is the title-level one.
+- **Trading is a group in the provider comparison, not an exclusion.** A comparison with one
+  side missing is what made every earlier version of this screen misleading. It is the binding
+  rule read backwards: a total that silently means "all games added together" is as unusable
+  as one that silently means trading only, because the economics differ.
+- **A retired title keeps its row, labelled.** The fallback chain ends at the game code and
+  then at the key, **never at "Unknown"** - a row captioned "Unknown game" holding real
+  revenue is a row an operator cannot investigate. Same reason the filter is built from the
+  contests present rather than from the catalogue: a catalogue-built filter leaves a retired
+  title's rows in the list and unreachable by any selection, which reads as data loss.
+- **A non-finite figure in one contest is treated as absent, not added.** One bad row would
+  otherwise turn a whole game's revenue line into `NaN` along with every ratio derived from
+  it - a total that reads as a rendering bug rather than as a data problem in one row, so the
+  actual cause is invisible. Same instinct as `Number.isFinite` replacing `||` in R31.
+
+#### Game Performance, and why it carries no money
+
+- **It answers a different question from the analytics screen, and one of them can be healthy
+  while the other is not.** Analytics answers "what did we earn from each game"; this answers
+  "is the game working for the people playing it". **A title whose rounds are abandoned half
+  the time still books its entry fees**, so the money screen shows a profitable game and
+  nothing anywhere shows the problem. That is why `12` s5 calls rounds started versus
+  completed the single most useful number in the integration.
+- **No money on the screen, and that is an RBAC decision rather than a layout one.** It is
+  granted by a games section; entry-fee volume and platform revenue are granted today by
+  `analytics` and `financial`. Adding a revenue figure here would widen who can read it while
+  reviewing as a helpful addition - the same shape as the section merge s1.1 warns about.
+  Pinned by asserting **every field the component reads off a row**, not by forbidding the
+  word: the description deliberately names fee revenue in order to send an operator to the
+  screen that carries it, and a check on the word alone would forbid the signpost that makes
+  the omission a boundary rather than a gap.
+- **It is not a summary of provider health and must not be merged with it.** Health is per
+  **provider** over 24 hours and answers "who do I ring"; this is per **title** over weeks and
+  answers "which game should we keep running". Two questions, two granularities, two windows.
+- **The window is an allow-list, never a number from the query string.** An arbitrary `days`
+  is a full-collection scan anybody holding the grant can trigger by editing a URL, and it
+  looks like a legitimate request in the logs. Same rule as deriving the market-hours gate's
+  game type from the stored label rather than from caller input. The component reads the
+  window **back from the response** rather than trusting what it asked for, so an unrecognised
+  value cannot caption the figures with a window they were not measured over.
+- **Result latency is the number R44's grace window exists for, and nothing was measuring
+  it.** A latency approaching the window means results are about to start being refused as
+  late, and a player who finished inside the contest is then ranked on nothing. It is the
+  earliest warning available for that.
+- **Clock skew is held apart from latency rather than averaged in.** `completedAt` is the
+  provider's clock and `resultReceivedAt` is ours, so this is the only cross-clock figure on
+  the screen. A negative delay means the two disagree, which is a different problem from a
+  slow provider - and averaging a negative into the mean **hides both**, reporting a healthy
+  latency on a provider whose clock is minutes ahead.
+- **Abandonment is a share of finished rounds, never a bare count and never over all rounds.**
+  Two abandoned out of four is a game people cannot get on with and two out of four hundred is
+  nothing, so a count calls the first fine. And live rounds are excluded from the denominator,
+  or the rate improves every time somebody starts playing.
+- **A retired title keeps its row here too, badged.** A screen that dropped it would make the
+  abandonment its rounds recorded disappear the moment an operator switched the game off -
+  the read-side form of the retroactive subtraction R29 exists to prevent.
+- **`no_traffic` is its own verdict**, grey rather than green, for the reason
+  `ProviderHealthSection` records about its own: a title with no play is neither healthy nor
+  broken, and a green badge there is a guess presented as a measurement.
+- **The verdict and its sentence are returned together from the service**, so a badge reading
+  "problem" beside a sentence describing healthy traffic is unreachable. That combination is
+  worse than either being wrong alone, because it destroys an operator's confidence in the
+  whole screen.
+
+#### Two things about the funnel that were wrong in the first draft
+
+Both are recorded because both produced a plausible number rather than an error.
+
+- **The seat count was scoped to `gameKey` alone**, so the "never played" shortfall was every
+  seat the title had ever sold against the players of one window - a figure that grows for
+  ever. It is now scoped to the contests actually played in the window.
+- **The played set was taken from all ranked rounds, which includes challenges.** The
+  denominator is competition seats, so a challenge player counted as having played a
+  competition produces a shortfall that is wrong on any game and **negative** on a busy one.
+  Both sets now come from competition rounds only, and the difference is computed as a **set
+  difference rather than a subtraction of two counts** - the two sets come from different
+  collections, so a user in one and not the other is exactly the fact being measured, and a
+  plain subtraction silently improves whenever anyone appears in the round set who is not a
+  seat.
+
+And the boundary that has now caught a fixture and a query: **`game_round.contestId` is an
+ObjectId while `competition_participant.competitionId` is declared `String`, and the raw
+driver does no casting.** An unconverted `$in` matches nothing, logs nothing, and reports
+every entrant as having played - a number that is always reassuring and always wrong. Same
+trap as the R42 fixture, and it is pinned by its own test.
+
+#### Two deviations, recorded rather than absorbed
+
+- **The by-game and by-provider financial breakdown was built on the analytics screen, not on
+  `FinancialDashboard.tsx`** as the table above says. Reason: the figures are derived from the
+  contest list the analytics route already assembles, and the financial dashboard reads a
+  different set of sources entirely - putting it there means either a second aggregation that
+  can disagree with this one, or moving the analytics route's work under a different grant.
+  **Two screens disagreeing about one game's revenue is worse than the breakdown being on the
+  neighbouring screen.** A cross-link from the financial dashboard belongs with X6.5.
+- **The participation funnel asked for on `CompetitionAnalytics.tsx` is on Game Performance
+  instead.** It is a rounds-versus-seats figure, so it needs the round collection the
+  performance service already aggregates and the analytics route does not touch. Putting it on
+  the money screen would mean a second round aggregation behind the `analytics` grant.
+
+#### What is deliberately not fixed, and must not be summarised as done
+
+- **`_totalEntryFees` is computed from the ledger and unused.** `totalCollected` is derived as
+  `participants x entryFee` instead, so the two can disagree - a partially refunded contest is
+  the obvious case. The route now **flags `platformFeeEstimated`** when a fee figure was
+  inferred from settings rather than read from a ledger row, and the summary counts how many
+  of its figures are estimates, so the discrepancy is visible. **Changing the arithmetic is a
+  behaviour change and was kept out of a labelling fix**, for the reason given above.
+- **`finalLeaderboard` is still rendered by no admin screen**, so `isTied`, `prizeAmount` and
+  the stored `qualificationStatus` snapshot remain invisible outside the contest view screen
+  added in s2.6. That is X6.5.
+- **`AdminOverviewDashboard.tsx` is untouched**, so the platform's front page still counts
+  active contests and participants with no game dimension at all.
+
 ---
 
 ## 6. Settings that need a game dimension

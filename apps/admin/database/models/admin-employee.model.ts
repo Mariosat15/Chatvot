@@ -26,6 +26,12 @@ export const ADMIN_SECTIONS = [
   // renders no screen, and a grant mapping to no screen is where privilege widening starts.
   "game-providers",
   "provider-health",
+  // Per-game operational metrics (X6, `12` s5's "New: Game Performance"). A games grant and
+  // deliberately NOT a financial one - the screen carries rounds, abandonment and latency, and
+  // no money at all, because entry-fee volume and platform revenue are granted by `analytics`
+  // and `financial`. Putting revenue behind a games section would be a silent widening of who
+  // can read it, which is the trap `12` s1.1 records about merging sections.
+  "game-performance",
   // The round inspector (X6). A separate grant from `game-providers` on purpose: registering a
   // provider is a configuration job, while voiding a player's round is a decision about that
   // player's contest, and the two are not the same trust.

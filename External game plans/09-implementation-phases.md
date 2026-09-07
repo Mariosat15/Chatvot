@@ -432,8 +432,18 @@ which titles are live, create a contest on one with settings drawn from the game
 anybody who has already paid, pause, resume and cancel it while it runs, inspect and end a round
 that got stuck, and read a provider's health without believing a stored field.**
 
-**What E5 still does not cover, and neither belongs to the lifecycle:** revenue and activity
-**analytics by provider**, and the **Game Master contest creation API**. Both are X6.
+**What E5 still does not cover:** the **Game Master contest creation API**, which is X6.
+
+**Analytics by game and provider is now done** (7 Sep 2026, `12` s5.1a), together with the
+**Game Performance** screen `12` s5 asks for and calls the one that will be looked at daily.
+Three of the four defects it turned up on `CompetitionAnalytics.tsx` had nothing to do with
+games: the route authenticated on **token validity rather than section access**, "Prize %" had
+**never worked for any game** because nothing writes `metadata.percentage`, and every headline
+card was captioned as an all-time total while covering the last 50 contests. The fourth was
+the game gap - "Final P&L" rendered unconditionally, so a provider winner read `+0.00` while
+the ranking score sat unread, which is R46 one screen along. **Three items of `12` s5 remain:**
+`AdminOverviewDashboard.tsx`, the hide-when-trading-off rows, and the per-round provider cost
+the commercial question needs, which has no data source until X4 supplies a real contract.
 
 **And two items inside the lifecycle are recorded rather than closed.** `adjust-results` is now
 authorized but has **no UI caller at all**, so post-settlement correction is reachable only by

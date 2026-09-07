@@ -90,6 +90,7 @@ import PaymentProvidersSection from "@/components/admin/PaymentProvidersSection"
 import GameProvidersSection from "@/components/admin/games/GameProvidersSection";
 import RoundInspectorSection from "@/components/admin/games/RoundInspectorSection";
 import ProviderHealthSection from "@/components/admin/games/ProviderHealthSection";
+import GamePerformanceSection from "@/components/admin/games/GamePerformanceSection";
 import PendingPaymentsSection from "@/components/admin/PendingPaymentsSection";
 import FailedDepositsSection from "@/components/admin/FailedDepositsSection";
 import FraudMonitoringSection from "@/components/admin/FraudMonitoringSection";
@@ -347,6 +348,18 @@ const menuGroups: MenuGroup[] = [
         icon: <Activity className="h-5 w-5" />,
         color: "text-violet-400",
         bgColor: "bg-violet-500/10 hover:bg-violet-500/20",
+      },
+      // Game performance (X6, chapter 12 section 5's "New: Game Performance"). Beside Provider
+      // Health rather than merged with it: health is per provider over 24 hours and answers
+      // "who do I ring", this is per title over weeks and answers "which game should we keep
+      // running". Neither is a summary of the other. It carries no money, deliberately - fee
+      // revenue by game is on Competition Analytics, where the grant already covers it.
+      {
+        id: "game-performance",
+        label: "Game Performance",
+        icon: <BarChart3 className="h-5 w-5" />,
+        color: "text-cyan-400",
+        bgColor: "bg-cyan-500/10 hover:bg-cyan-500/20",
       },
     ],
   },
@@ -1159,6 +1172,8 @@ export default function AdminDashboard({
         return <RoundInspectorSection key={currentRefreshKey} />;
       case "provider-health":
         return <ProviderHealthSection key={currentRefreshKey} />;
+      case "game-performance":
+        return <GamePerformanceSection key={currentRefreshKey} />;
       case "server-monitor":
         return <ServerMonitorSection key={currentRefreshKey} />;
       case "server-fleet":

@@ -41,21 +41,39 @@ import {
 } from "lucide-react";
 import { creditsToEUR } from "@/lib/utils/credit-conversion";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
+import GameRevenueBreakdown from "./competitions/GameRevenueBreakdown";
+import {
+  ALL_GAMES,
+  filterByGame,
+  resolveGameBadge,
+  resolveGameFilterOptions,
+  resolvePlayerMetric,
+  resolveScopeNote,
+  resolveShareOfPool,
+} from "@/lib/admin/contest-analytics-presentation";
 
 interface Winner {
   userId: string;
   displayName: string;
   amount: number;
   rank: number;
-  percentage: number;
-  finalPnl: number;
+  /**
+   * Trading's final profit and loss, and a provider game's raw score.
+   *
+   * Both are optional and neither is defaulted, because `prize-payout.service.ts` writes
+   * whichever applies and omits the other on purpose. `resolvePlayerMetric` decides which to
+   * render; reading `finalPnl` directly here is what made every game winner show `+0.00`.
+   */
+  finalPnl?: number;
+  finalScore?: number;
 }
 
 interface DisqualifiedDetail {
   userId: string;
   displayName: string;
   reason: string;
-  finalPnl: number;
+  finalPnl?: number;
+  finalScore?: number;
 }
 
 interface RefundDetail {
@@ -77,8 +95,17 @@ interface CompetitionAnalytic {
   participants: number;
   prizePool: number;
   platformFeePercentage: number;
+  // The game label. Absent on contests created before X1, which the presentation module
+  // resolves to trading - see `resolveContestGameType` for why `.lean()` makes that necessary.
+  gameType?: string | null;
+  gameKey?: string | null;
+  providerKey?: string | null;
+  gameCode?: string | null;
+  gameDisplayName?: string | null;
+  providerDisplayName?: string | null;
   totalCollected: number;
   platformFeeEarned: number;
+  platformFeeEstimated?: boolean;
   expectedPlatformFee: number;
   totalWinnersPaid: number;
   totalRefunds: number;
@@ -188,13 +215,14 @@ export default function CompetitionAnalytics() {
     averageChallengeEntryFee: 0,
   });
   const [conversionRate, setConversionRate] = useState(100);
+  const [contestLimit, setContestLimit] = useState(50);
+  const [selectedGame, setSelectedGame] = useState<string>(ALL_GAMES);
   const [expandedComp, setExpandedComp] = useState<string | null>(null);
   const [expandedChallenge, setExpandedChallenge] = useState<string | null>(
     null,
   );
 
   // Get dynamic currency settings
-  const creditName = settings?.credits?.name || "Credits";
   const creditSymbol = settings?.credits?.symbol || "⚡";
   const currencySymbol = settings?.currency?.symbol || "€";
   const currencyCode = settings?.currency?.code || "EUR";
@@ -229,6 +257,9 @@ export default function CompetitionAnalytics() {
         },
       );
       setConversionRate(result.data.conversionRate);
+      if (typeof result.data.contestLimit === "number") {
+        setContestLimit(result.data.contestLimit);
+      }
     } catch (error) {
       toast.error("Failed to load competition analytics");
       console.error(error);
@@ -267,6 +298,10 @@ export default function CompetitionAnalytics() {
     );
   }
 
+  const gameOptions = resolveGameFilterOptions(competitions);
+  const visibleCompetitions = filterByGame(competitions, selectedGame);
+  const scopeNote = resolveScopeNote(competitions.length, contestLimit);
+
   return (
     <div className="space-y-6">
       {/* Header Section */}
@@ -300,6 +335,19 @@ export default function CompetitionAnalytics() {
               Refresh
             </Button>
           </div>
+        </div>
+        {/*
+          The scope of every figure on this screen, said out loud.
+
+          It reads the most recent competitions only and reduces the headline cards over that
+          same list, so "Platform Fees Earned" has always meant "of the last N" while being
+          captioned as a total. `12` s5's binding rule is that no operator-facing aggregate may
+          silently mean one thing while reading as another - the game axis is the obvious one and
+          the time window is the same failure. The arithmetic is deliberately unchanged: see
+          `resolveScopeNote` for why labelling and widening must not be the same edit.
+        */}
+        <div className="border-t border-cyan-500/30 bg-gray-900/60 px-8 py-3 text-xs text-gray-400">
+          {scopeNote}
         </div>
       </div>
 
@@ -476,6 +524,12 @@ export default function CompetitionAnalytics() {
         </Card>
       </div>
 
+      {/* By game and by provider - `12` s5's acceptance criterion */}
+      <GameRevenueBreakdown
+        contests={competitions}
+        creditSymbol={creditSymbol}
+      />
+
       {/* Competitions Table */}
       <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 shadow-xl">
         <CardHeader>
@@ -489,12 +543,39 @@ export default function CompetitionAnalytics() {
             Expand each competition to see winner distributions,
             disqualifications, and refunds
           </CardDescription>
+          {/*
+            The game filter. Built from the contests present rather than from the catalogue, so a
+            retired title's settled contests stay reachable - see `resolveGameFilterOptions`.
+            Only offered when there is more than one game, because a filter with one option is
+            furniture.
+          */}
+          {gameOptions.length > 2 && (
+            <div className="flex flex-wrap items-center gap-2 pt-3">
+              <span className="text-xs text-gray-500">Game:</span>
+              {gameOptions.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => setSelectedGame(option.key)}
+                  className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                    selectedGame === option.key
+                      ? "border-cyan-500/60 bg-cyan-500/20 text-cyan-300"
+                      : "border-gray-700 bg-gray-900/60 text-gray-400 hover:text-gray-200"
+                  }`}
+                >
+                  {option.label}{" "}
+                  <span className="text-gray-500">({option.contests})</span>
+                </button>
+              ))}
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {competitions.map((comp) => {
+            {visibleCompetitions.map((comp) => {
               const isExpanded = expandedComp === comp._id;
               const isCancelled = comp.status === "cancelled";
+              const badge = resolveGameBadge(comp);
 
               return (
                 <div
@@ -540,6 +621,26 @@ export default function CompetitionAnalytics() {
                             {comp.name}
                           </span>
                           {getStatusBadge(comp.status)}
+                          {/*
+                            Which game this row belongs to. Shown on every row including
+                            trading, deliberately: a badge that appears only on the unusual case
+                            leaves the reader to assume what the unbadged rows are, and the
+                            assumption is exactly the one this screen used to make for them.
+                          */}
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-xs font-medium border ${
+                              badge.isProviderGame
+                                ? "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                                : "bg-blue-500/20 text-blue-300 border-blue-500/30"
+                            }`}
+                            title={
+                              badge.provider
+                                ? `${badge.label} - supplied by ${badge.provider}`
+                                : "Trading"
+                            }
+                          >
+                            {badge.label}
+                          </span>
                         </div>
                         <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
                           <span className="flex items-center gap-1">
@@ -711,11 +812,26 @@ export default function CompetitionAnalytics() {
                                 <TableHead className="text-gray-400">
                                   User
                                 </TableHead>
+                                {/*
+                                  The column heading is per game, not fixed. A provider game has
+                                  no profit and loss, and `prize-payout.service.ts` deliberately
+                                  writes no `finalPnl` for one - so a fixed "Final P&L" heading
+                                  printed `+0.00` in green against every game winner while the
+                                  score they were ranked on sat unread in the same ledger row.
+                                */}
                                 <TableHead className="text-gray-400">
-                                  Final P&L
+                                  {badge.isProviderGame ? "Score" : "Final P&L"}
                                 </TableHead>
+                                {/*
+                                  "Share of pool" replaces a "Prize %" column that has read 0%
+                                  for every winner of every competition ever settled, because
+                                  nothing writes `metadata.percentage`. This is derived from the
+                                  payment and the pool, and it is the better figure: after ties
+                                  and redistribution the share paid at a rank is routinely not
+                                  the share configured for it.
+                                */}
                                 <TableHead className="text-gray-400">
-                                  Prize %
+                                  Share of pool
                                 </TableHead>
                                 <TableHead className="text-gray-400">
                                   Prize Amount
@@ -728,7 +844,16 @@ export default function CompetitionAnalytics() {
                             <TableBody>
                               {comp.winners
                                 .sort((a, b) => a.rank - b.rank)
-                                .map((winner) => (
+                                .map((winner) => {
+                                  const metric = resolvePlayerMetric(
+                                    winner,
+                                    badge.isProviderGame,
+                                  );
+                                  const share = resolveShareOfPool(
+                                    winner.amount,
+                                    comp.prizePool,
+                                  );
+                                  return (
                                   <TableRow
                                     key={winner.userId + winner.rank}
                                     className="border-gray-700"
@@ -754,17 +879,29 @@ export default function CompetitionAnalytics() {
                                     </TableCell>
                                     <TableCell
                                       className={
-                                        winner.finalPnl >= 0
+                                        metric.tone === "positive"
                                           ? "text-green-400"
-                                          : "text-red-400"
+                                          : metric.tone === "negative"
+                                            ? "text-red-400"
+                                            : "text-gray-300"
                                       }
+                                      title={metric.label}
                                     >
-                                      {winner.finalPnl >= 0 ? "+" : ""}
-                                      {creditSymbol}{" "}
-                                      {winner.finalPnl.toFixed(2)}
+                                      {/*
+                                        A score carries no currency symbol - it is not money -
+                                        and an absent one renders `metric.value` of `-` rather
+                                        than a zero. Both decisions live in the presentation
+                                        module so this screen and the contest view screen cannot
+                                        drift into describing a missing result differently.
+                                      */}
+                                      {metric.tone === "neutral"
+                                        ? metric.value
+                                        : `${creditSymbol} ${metric.value}`}
                                     </TableCell>
                                     <TableCell className="text-gray-400">
-                                      {winner.percentage}%
+                                      {share === null
+                                        ? "-"
+                                        : `${share.toFixed(1)}%`}
                                     </TableCell>
                                     <TableCell className="font-semibold text-green-400 tabular-nums">
                                       {creditSymbol}{" "}
@@ -778,7 +915,8 @@ export default function CompetitionAnalytics() {
                                       ).toFixed(2)}
                                     </TableCell>
                                   </TableRow>
-                                ))}
+                                  );
+                                })}
                             </TableBody>
                           </Table>
                         </div>
@@ -801,7 +939,7 @@ export default function CompetitionAnalytics() {
                                   User
                                 </TableHead>
                                 <TableHead className="text-gray-400">
-                                  Final P&L
+                                  {badge.isProviderGame ? "Score" : "Final P&L"}
                                 </TableHead>
                                 <TableHead className="text-gray-400">
                                   Reason
@@ -809,7 +947,12 @@ export default function CompetitionAnalytics() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {comp.disqualifiedDetails.map((dq) => (
+                              {comp.disqualifiedDetails.map((dq) => {
+                                const metric = resolvePlayerMetric(
+                                  dq,
+                                  badge.isProviderGame,
+                                );
+                                return (
                                 <TableRow
                                   key={dq.userId}
                                   className="border-gray-700"
@@ -819,19 +962,24 @@ export default function CompetitionAnalytics() {
                                   </TableCell>
                                   <TableCell
                                     className={
-                                      dq.finalPnl >= 0
+                                      metric.tone === "positive"
                                         ? "text-green-400"
-                                        : "text-red-400"
+                                        : metric.tone === "negative"
+                                          ? "text-red-400"
+                                          : "text-gray-300"
                                     }
+                                    title={metric.label}
                                   >
-                                    {dq.finalPnl >= 0 ? "+" : ""}
-                                    {creditSymbol} {dq.finalPnl.toFixed(2)}
+                                    {metric.tone === "neutral"
+                                      ? metric.value
+                                      : `${creditSymbol} ${metric.value}`}
                                   </TableCell>
                                   <TableCell className="text-red-400 text-sm">
                                     {dq.reason}
                                   </TableCell>
                                 </TableRow>
-                              ))}
+                                );
+                              })}
                             </TableBody>
                           </Table>
 
@@ -844,8 +992,8 @@ export default function CompetitionAnalytics() {
                                   {creditSymbol}{" "}
                                   {comp.unclaimedPool.toLocaleString()}
                                 </strong>{" "}
-                                from disqualified users' share went to the
-                                platform's unclaimed pool.
+                                from disqualified users&rsquo; share went to the
+                                platform&rsquo;s unclaimed pool.
                               </p>
                             </div>
                           )}
@@ -1483,7 +1631,7 @@ export default function CompetitionAnalytics() {
                               {creditSymbol}{" "}
                               {challenge.unclaimedPool?.toLocaleString()}
                             </strong>{" "}
-                            was added to the platform's unclaimed pool.
+                            was added to the platform&rsquo;s unclaimed pool.
                           </p>
                         </div>
                       )}
