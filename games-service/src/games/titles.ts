@@ -26,6 +26,7 @@
  */
 
 import { PuzzleShape } from "../engine/generate";
+import { howToPlayProse } from "./instructions";
 
 export type ScoreDirection = "higher_is_better" | "lower_is_better";
 export type ScoreType = "integer" | "decimal" | "duration_ms";
@@ -107,10 +108,9 @@ export const SPRINT: TitleDefinition = {
     "1,000 points for every board you complete, plus a speed bonus of up to 200 for solving " +
     "quickly. An unfinished board scores nothing. Highest total wins; ties are broken by the " +
     "time of your last completed board.",
-  howToPlay:
-    "Drag from one terminal to its matching pair to draw a path. Paths cannot cross each " +
-    "other or themselves, and every square on the grid must be used. Drag a path again to " +
-    "redraw it. The next board appears as soon as you complete one.",
+  // Composed from the shared rules, so the game page and the pre-round panel cannot disagree.
+  // See `instructions.ts` - they had already drifted when they were two hand-written copies.
+  howToPlay: howToPlayProse("The next board appears as soon as you complete one."),
   category: "puzzle",
   tags: ["puzzle", "logic", "fast", "mobile-friendly", "no-text"],
   family: "independent",
@@ -162,10 +162,10 @@ export const PERFECT: TitleDefinition = {
     "you leave unfinished adds a two-minute penalty to your time, so finishing all of them is " +
     "always better than rushing and giving up. Ties are broken by the number of boards " +
     "completed.",
-  howToPlay:
-    "Drag from one terminal to its matching pair to draw a path. Paths cannot cross each " +
-    "other or themselves, and every square on the grid must be used. The clock runs from your " +
-    "first move to your last, so a board you are still thinking about is still costing you.",
+  howToPlay: howToPlayProse(
+    "The clock runs from your first move to your last, so a board you are still thinking " +
+      "about is still costing you.",
+  ),
   category: "puzzle",
   tags: ["puzzle", "logic", "time-trial", "mobile-friendly", "no-text"],
   family: "independent",

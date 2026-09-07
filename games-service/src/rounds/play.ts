@@ -1,6 +1,7 @@
 import { generateForPlayer } from "../engine/generate";
 import { toClientPuzzle, type ClientPuzzle } from "../engine/puzzle";
 import { REFUSAL_MESSAGES, verifyAttempt, type AttemptRefusal } from "../engine/verify";
+import { BOARD_RULES } from "../games/instructions";
 import { findTitle, shapeFor, type PerfectConfig, type RoundConfig } from "../games/titles";
 import { Round, isTerminal, type RoundDocument } from "../store/round.model";
 import { ApiError, unknownRound } from "../http/errors";
@@ -38,6 +39,23 @@ export interface PlayState {
   gameCode: string;
   mode: "ranked" | "practice";
   status: RoundDocument["status"];
+  /**
+   * The title's own name, its rules and how it scores - the three things the pre-round panel
+   * needs and used to invent.
+   *
+   * WHY THEY TRAVEL WITH THE STATE. The frame kept its own map of display names, and the page
+   * hard-coded its own wording of the rules, so a title added to the catalogue would have
+   * appeared in the game as "Circuit" and a corrected rule would have been corrected in one
+   * place. `scoring` is the more valuable of the three and was missing outright: a player in a
+   * paid contest had no way to find out from inside the game whether a fast board was worth more
+   * than a finished one.
+   *
+   * NOTE WHAT IS STILL ABSENT, and must stay absent: a score, a rank and a prize. The client is
+   * an input device. See the header of this file.
+   */
+  title: string;
+  boardRules: readonly string[];
+  scoring: string;
   /** Absent once the round is terminal. */
   board?: ClientPuzzle;
   boardsSolved: number;
@@ -107,11 +125,22 @@ function stateFor(round: RoundDocument, board?: ClientPuzzle): PlayState {
   const config = round.config as unknown as RoundConfig;
   const endsAt = gameplayEndsAt(round);
 
+  /*
+   * A round whose title has vanished from the catalogue still has to render something. It is
+   * already being voided by `finishRound`, which is the outcome that matters, but the frame
+   * reaches here first and a thrown error would show the player a broken game instead of the
+   * cancellation notice that explains their attempt has been returned.
+   */
+  const title = findTitle(round.gameCode);
+
   const state: PlayState = {
     roundId: round.roundId,
     gameCode: round.gameCode,
     mode: round.mode,
     status: round.status,
+    title: title?.displayName ?? "Circuit",
+    boardRules: BOARD_RULES,
+    scoring: title?.rulesSummary ?? "",
     boardsSolved: solvedCount(round),
     boardTarget: boardTargetFor(config),
     returnUrl: round.returnUrl,

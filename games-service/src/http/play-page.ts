@@ -6,7 +6,7 @@ import type { Request, Response } from "express";
 import { sendError } from "./errors";
 
 /**
- * The document the platform's iframe loads, and its two assets.
+ * The document the platform's iframe loads, and its three assets.
  *
  * THREE NAMED ROUTES RATHER THAN `express.static`
  * ----------------------------------------------
@@ -54,10 +54,21 @@ if (!PLAY_ROOT) {
   );
 }
 
+/*
+ * EVERY FILE THE SURFACE LOADS HAS TO BE LISTED HERE, INCLUDING THE ONES ONLY JAVASCRIPT ASKS FOR.
+ *
+ * `app.css` is reached from a `<link>` in the markup, so the test that walks the document's own
+ * references covers it. `board.js` and `presentation.js` are ES module imports made by other
+ * scripts, which no amount of reading the HTML will find - so a module added without a line here
+ * is a 404 in the middle of the module graph, and the whole game fails to boot with a console
+ * message no player will ever send us. That is what `every module the play surface imports is
+ * served` exists for: it fetches each file and follows its imports.
+ */
 const ASSETS = new Map<string, { file: string; type: string }>([
   ["app.js", { file: "app.js", type: "text/javascript; charset=utf-8" }],
   ["app.css", { file: "app.css", type: "text/css; charset=utf-8" }],
   ["board.js", { file: "board.js", type: "text/javascript; charset=utf-8" }],
+  ["presentation.js", { file: "presentation.js", type: "text/javascript; charset=utf-8" }],
 ]);
 
 function commonHeaders(res: Response): void {

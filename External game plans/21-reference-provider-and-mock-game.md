@@ -510,6 +510,84 @@ purpose. The **spec-ambiguity log is still 14 entries, all `OPEN`** - nothing th
 this service choosing a behaviour, only by `01` and the requirements HTML being amended with a
 version bump.
 
+### 4.1f The play surface was unreadable, and two of its three defects were invisible to every test - 7 September 2026
+
+The owner's report was blunt: the board is small and ugly, there are no instructions, and the result
+screen's wording and graphics are bad. All three were true, and the interesting part is **why none
+of them could have been found by anything in this repository.**
+
+**The board was the size of a postage stamp for a reason nobody would guess, and it was a feedback
+loop.** The frame reported `document.documentElement.scrollHeight` to the platform, and the
+stylesheet sizes the page to `100dvh` - which inside an iframe is *the iframe's own height*. So the
+game measured the frame, the platform sized the frame to the measurement, and the two agreed on
+whatever the host had opened with: `MIN_FRAME_HEIGHT`, **320 pixels**. After the header and footer
+that left about 180 for the grid, so `boardCellPx` hit its floor of 34 and **every player on every
+screen got the smallest board the code can draw.** Nothing errored, no log line, and the arithmetic
+is correct in isolation - it was the *input* that was circular.
+
+The fix is that the height is now **derived from what the game needs and never from what it has**:
+rows of grid at a comfortable cell size plus the measured chrome. Requests are 533, 605 and 677
+pixels for a 5-, 6- and 7-row board, all comfortably inside the host's `[320, 2000]`. Measured in a
+real browser at 980x620 the cells went from 34 to **75 pixels**, and on a 390-wide phone to 59.
+
+**The property a test can hold is the one worth stating: the function ignores the current height
+entirely.** Feed it a `currentHeight` and the answer must not move. A reintroduction has to add the
+field back to the signature, and the assertion turns red the moment it is read.
+
+**The wording defect was a string, and it was insulting.** `completed` covers two genuinely
+different endings - a Sprint clock reaching zero and a Perfect player finishing the last of a fixed
+set - and the heading was a lookup on the status, so both said **"Time!"**. Circuit Perfect has no
+clock in its rules at all, so the one player who had done everything the game asked was
+congratulated for running out of time. Only the board count can tell the two apart. Every ending
+now has its own heading, and every branch says **what happens next**, because "your result is being
+confirmed" answered none of the questions a player has - does this count, do I get my attempt back,
+where do I see the score. A **void** in particular returns the attempt, which section 13 requires
+and which is the difference between a player who tries again and a player who opens a ticket.
+
+**The rules had two homes and had already drifted.** They were list items in `index.html` *and*
+prose inside each title's `howToPlay`: the page said "the two circles that share a number", the
+catalogue said "one terminal to its matching pair", and the page never mentioned that a path can be
+redrawn at all. That is the **"one rule, two copies"** shape behind five defects in the platform
+beside this service, and neither a typecheck nor `check:mirrors` can see a copy that lives in
+markup. `src/games/instructions.ts` now owns the four sentences, the catalogue composes its prose
+from them, and the play surface is **handed them in the round state** - so `PlayState` gained
+`title`, `boardRules` and `scoring`.
+
+**`scoring` was missing outright, and it is the most valuable of the three.** A player in a paid
+contest had no way to find out *from inside the game* whether a fast board was worth more than a
+finished one - which for a lower-is-better title is the difference between playing to win and
+playing to lose.
+
+Three things about how this was built are worth carrying:
+
+- **A module that cannot be imported is a module whose logic cannot be asserted.** All three
+  defects lived in `app.js`, which reaches for `document` at module scope, so no test could touch
+  it. The numbers and the wording moved into **`public/play/presentation.js`** - no imports, no
+  globals, plain values - and `tools/test-presentation.ts` runs it in Node with no DOM stub of any
+  kind. **24 tests, and the fix is the extraction as much as the arithmetic.**
+- **The page's own references are not its module graph.** The existing asset test walks `src` and
+  `href` attributes, which is `app.js` and `app.css`. `board.js` and `presentation.js` are reached
+  by `import` *inside* other scripts, so a module missing from the allowlist in `play-page.ts` is a
+  404 in the middle of the graph - the importer then fails to evaluate too, **the game does not
+  boot at all**, and the only evidence is a console message in a player's browser. A new test
+  follows the imports rather than listing the files.
+- **`aspect-ratio` and `flex: none` on an inline SVG are load-bearing, and leaving either out is
+  not a broken layout.** The new how-to-play diagram collapsed to a **hairline** of blue, because
+  an `<svg>` with `height: auto` has no definite height for a flex item to keep and a column flex
+  container shrinks it to nothing - and being a graphic, nothing inside pushes back. The screen
+  read perfectly well with no illustration on it. **Found by looking at it**, which is the point
+  of the section below.
+
+**Verified by eye, in a browser, on both titles**, at 980x620 and at 390x640: the intro with its
+animated diagram, a 6x6 board at 75-pixel cells with two paths drawn, and both result variants.
+That is a genuine difference from `13` s4.1d, where the platform's own lobbies are **behind
+sign-in** and could not be seen. **196 tests and 19 probes**, all red on exactly the expected test,
+with the two widest declaring their blast radius and the reason.
+
+**What this did not touch:** the score still never reaches the browser - `resultCopy` destructures
+the four fields it uses, so a score handed to it is ignored by construction, and the state carries
+no score, rank or prize on any status. Both halves are asserted, because they fail differently.
+
 ---
 
 ## 5. What this does NOT prove

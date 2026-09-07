@@ -3,11 +3,22 @@
  *
  * WHAT THE SERVER OWNS AND THIS FILE ONLY DISPLAYS
  * -----------------------------------------------
- * The board, the clock, whether a board is solved, whether the round is over, and the score.
- * This file draws them and sends the player's drags. It never computes a score, never sends one,
- * and never asks for one - the result screen deliberately has no number on it, because the score
- * reaches the platform from our servers over a signed callback and the player's browser is not a
- * link in that chain.
+ * The board, the clock, whether a board is solved, whether the round is over, the score, the
+ * title's name, its rules and how it scores. This file draws them and sends the player's drags.
+ * It never computes a score, never sends one, and never asks for one - the result screen
+ * deliberately has no number on it, because the score reaches the platform from our servers over
+ * a signed callback and the player's browser is not a link in that chain.
+ *
+ * The name and the rules joined that list on 7 September 2026. They used to live here, in a map of
+ * display names and a hard-coded list in the markup, which meant a new title showed up in the game
+ * as "Circuit" and a corrected rule had to be corrected twice. See `src/games/instructions.ts`.
+ *
+ * WHAT IS DECIDED IN `presentation.js` AND NOT HERE
+ * -----------------------------------------------
+ * Every number and every sentence: the height to ask the host for, the cell size, the result
+ * wording, the hint. This file reaches for `document` at module scope and so cannot be imported by
+ * a test; that one does not, and is covered by `tools/test-presentation.ts`. The split is what
+ * makes the two things that were wrong - the board's size and the result's wording - provable.
  *
  * STARTING IS A TAP, NOT A PAGE LOAD
  * ---------------------------------
@@ -23,6 +34,13 @@
  */
 
 import { createBoard } from "./board.js";
+import {
+  desiredFrameHeight,
+  hintCopy,
+  introCopy,
+  resultCopy,
+  HEIGHT_REPORT_THRESHOLD_PX,
+} from "./presentation.js";
 
 const REFUSAL_HOLD_MS = 2600;
 
@@ -49,6 +67,9 @@ const ui = {
   introTitle: document.getElementById("intro-title"),
   introRules: document.getElementById("intro-rules"),
   introLimit: document.getElementById("intro-limit"),
+  introScoring: document.getElementById("intro-scoring"),
+  introScoringPanel: document.getElementById("intro-scoring-panel"),
+  introNote: document.getElementById("intro-note"),
   start: document.getElementById("start"),
   clock: document.getElementById("clock"),
   progress: document.getElementById("progress"),
@@ -58,8 +79,11 @@ const ui = {
   hint: document.getElementById("hint"),
   submit: document.getElementById("submit"),
   clear: document.getElementById("clear"),
+  resultArt: document.getElementById("screen-result"),
   resultTitle: document.getElementById("result-title"),
-  resultDetail: document.getElementById("result-detail"),
+  resultStat: document.getElementById("result-stat"),
+  resultStatLabel: document.getElementById("result-stat-label"),
+  resultNext: document.getElementById("result-next"),
   done: document.getElementById("done"),
   errorDetail: document.getElementById("error-detail"),
   retry: document.getElementById("retry"),
@@ -101,9 +125,73 @@ function tellPlatform(type, extra) {
 
 let lastHeight = 0;
 
-function reportHeight() {
-  const height = Math.ceil(document.documentElement.scrollHeight);
-  if (Math.abs(height - lastHeight) < 24) return;
+function activeScreen() {
+  for (const screen of Object.values(screens)) {
+    if (screen && !screen.hidden) return screen;
+  }
+  return null;
+}
+
+function pixels(value) {
+  const parsed = parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/** The gaps and padding a flex column adds around its children. */
+function frameOf(element, visibleChildren) {
+  const style = window.getComputedStyle(element);
+  const gap = pixels(style.rowGap);
+  return (
+    pixels(style.paddingTop) +
+    pixels(style.paddingBottom) +
+    Math.max(0, visibleChildren - 1) * gap
+  );
+}
+
+/** What a panel screen's own content comes to, which no arithmetic could know in advance. */
+function contentHeightOf(screen) {
+  const children = [...screen.children].filter((child) => !child.hidden);
+  const content = children.reduce(
+    (total, child) => total + child.getBoundingClientRect().height,
+    0,
+  );
+  return content + frameOf(screen, children.length);
+}
+
+/** The header and footer bars around the board, measured rather than assumed. */
+function chromeHeightOf(screen) {
+  const bars = [...screen.querySelectorAll(":scope > .bar")];
+  const height = bars.reduce((total, bar) => total + bar.getBoundingClientRect().height, 0);
+  return height > 0 ? height + frameOf(screen, screen.children.length) : 0;
+}
+
+/**
+ * Ask the host for the height this screen needs.
+ *
+ * THE DEFECT THIS REPLACED. It used to report `document.documentElement.scrollHeight`, and the
+ * stylesheet sizes the page to `100dvh` - which inside an iframe is the iframe's own height. So
+ * the game measured the frame while the platform sized the frame to the measurement, and the two
+ * settled on whatever the platform had opened with: 320 pixels, its own minimum. The board then
+ * fitted itself into what was left after the bars, hit its floor, and every player on every screen
+ * size got the smallest board this code can draw. Nothing errored and nothing logged.
+ *
+ * So the height is now derived from what the game NEEDS. See `desiredFrameHeight` - the property
+ * that matters is that the answer cannot depend on the height we already have, which is what makes
+ * the loop impossible rather than merely unlikely.
+ */
+function requestHeight() {
+  const active = activeScreen();
+  if (!active) return;
+
+  const playing = active === screens.play;
+  const height = desiredFrameHeight({
+    screen: playing ? "play" : "panel",
+    gridHeight: state && state.board ? state.board.height : undefined,
+    chromeHeight: playing ? chromeHeightOf(active) : undefined,
+    contentHeight: playing ? undefined : contentHeightOf(active),
+  });
+
+  if (Math.abs(height - lastHeight) < HEIGHT_REPORT_THRESHOLD_PX) return;
   lastHeight = height;
   tellPlatform("resize", { height });
 }
@@ -145,7 +233,7 @@ function show(name) {
   for (const [key, screen] of Object.entries(screens)) {
     if (screen) screen.hidden = key !== name;
   }
-  reportHeight();
+  requestHeight();
 }
 
 function fail(message) {
@@ -153,41 +241,36 @@ function fail(message) {
   show("error");
 }
 
-/*
- * A `Map`, not an object literal, and the same for the result headings below.
- *
- * Both are looked up with a value that arrived over the network, and both object indexing and `in`
- * walk the prototype chain - so `"__proto__"` returns `Object.prototype`, which is truthy and
- * survives a falsy check before failing somewhere further away. The platform found exactly that in
- * its admin round inspector on 5 September 2026. A `Map` has no prototype chain to walk, so the
- * lookup is total and the fallback is reached for every unknown key.
- */
-const TITLE_NAMES = new Map([
-  ["circuit-sprint", "Circuit Sprint"],
-  ["circuit-perfect", "Circuit Perfect"],
-]);
-
-function titleName(gameCode) {
-  return TITLE_NAMES.get(gameCode) ?? "Circuit";
-}
-
 function renderIntro() {
-  ui.introTitle.textContent = titleName(state.gameCode);
+  const copy = introCopy(state);
 
-  if (state.boardTarget) {
-    ui.introLimit.textContent =
-      "Finish " + state.boardTarget + " boards. Your total time is your score - lower is better.";
-  } else if (state.durationSeconds) {
-    ui.introLimit.textContent =
-      "You have " +
-      state.durationSeconds +
-      " seconds. Solve as many boards as you can - higher is better.";
-  } else {
-    ui.introLimit.textContent = "";
-  }
+  ui.introTitle.textContent = copy.name;
+  ui.introLimit.textContent = copy.limit;
+  ui.introNote.textContent = copy.note;
+
+  /*
+   * The rules come from the round state and are written with `textContent`, one element at a
+   * time. Not `innerHTML`: these strings originate in our own catalogue rather than from a
+   * player, so nothing here is hostile today - but a rule that arrives over the network and is
+   * pasted into the document as markup is one refactor away from being a way to inject script
+   * into the frame, and the frame is same-origin with the platform under the proxy deployment.
+   */
+  ui.introRules.replaceChildren(
+    ...(state.boardRules ?? []).map((rule) => {
+      const item = document.createElement("li");
+      item.textContent = rule;
+      return item;
+    }),
+  );
+
+  // Hidden rather than left empty: a heading over nothing reads as a game that failed to load
+  // half of itself.
+  const scoring = typeof state.scoring === "string" ? state.scoring.trim() : "";
+  ui.introScoringPanel.hidden = scoring === "";
+  ui.introScoring.textContent = scoring;
 
   ui.start.disabled = false;
-  ui.start.textContent = state.mode === "practice" ? "Start practice" : "Start";
+  ui.start.textContent = copy.startLabel;
   show("intro");
 }
 
@@ -241,15 +324,16 @@ function renderResult() {
   board.lock();
 
   const finished = state.finished || { status: state.status, boardsSolved: state.boardsSolved };
-  const solved = finished.boardsSolved;
+  const copy = resultCopy({
+    status: finished.status,
+    boardsSolved: finished.boardsSolved,
+    boardTarget: state.boardTarget,
+    mode: state.mode,
+  });
 
-  const headings = new Map([
-    ["completed", "Time!"],
-    ["abandoned", "Round ended"],
-    ["expired", "Round expired"],
-    ["voided", "Round cancelled"],
-  ]);
-  ui.resultTitle.textContent = headings.get(finished.status) ?? "Round ended";
+  ui.resultTitle.textContent = copy.heading;
+  ui.resultStat.textContent = copy.statValue;
+  ui.resultStatLabel.textContent = copy.statLabel;
 
   /*
    * No score on this screen, and that is the point rather than an omission.
@@ -258,13 +342,14 @@ function renderResult() {
    * over a signed callback. Showing a number here would mean either sending one to the browser -
    * which the specification forbids for exactly this reason - or computing one in code the player
    * can edit. Either way the player would then have a number to argue with that nothing
-   * authoritative had agreed to.
+   * authoritative had agreed to. `resultCopy` takes four named fields, so there is no score to
+   * read even if one were added to the state.
    */
-  ui.resultDetail.textContent =
-    (solved === 1 ? "1 board solved." : solved + " boards solved.") +
-    (state.mode === "practice"
-      ? " Practice rounds are not scored."
-      : " Your result is being confirmed.");
+  ui.resultNext.textContent = copy.next;
+
+  // Which of the two pieces of artwork is shown. A trophy over a round that solved nothing reads
+  // as sarcasm, so the neutral mark is not a fallback - it is the honest one for that ending.
+  ui.resultArt.classList.toggle("won", copy.triumphant);
 
   ui.done.textContent = state.returnUrl || window.parent !== window ? "Back to contest" : "Close";
   show("result");
@@ -284,21 +369,15 @@ function renderHint(refusal) {
     return;
   }
 
-  const joined = board.joinedCount();
-  const pairs = board.pairCount();
-  const used = board.cellsUsed();
-  const cells = board.cellCount();
-
-  if (board.isComplete()) {
-    ui.hint.textContent = "Ready.";
-    ui.hint.className = "hint ready";
-  } else if (joined < pairs) {
-    ui.hint.textContent = "Join every pair: " + joined + " of " + pairs + ".";
-    ui.hint.className = "hint";
-  } else {
-    ui.hint.textContent = "Use every square: " + used + " of " + cells + ".";
-    ui.hint.className = "hint";
-  }
+  const copy = hintCopy({
+    joined: board.joinedCount(),
+    pairs: board.pairCount(),
+    used: board.cellsUsed(),
+    cells: board.cellCount(),
+    complete: board.isComplete(),
+  });
+  ui.hint.textContent = copy.text;
+  ui.hint.className = copy.tone ? "hint " + copy.tone : "hint";
 }
 
 function onBoardChange() {
@@ -402,7 +481,7 @@ async function submit() {
 }
 
 async function leave() {
-  if (!window.confirm("Leave the round? Boards you have already solved still count.")) return;
+  if (!window.confirm("Leave the round? Boards you have already finished still count.")) return;
   try {
     state = await call("/play/api/leave", { t: token });
     render();
@@ -441,7 +520,7 @@ ui.retry.addEventListener("click", () => {
 
 window.addEventListener("resize", () => {
   if (screens.play && !screens.play.hidden) fitBoard();
-  reportHeight();
+  requestHeight();
 });
 
 async function boot() {
@@ -458,7 +537,7 @@ async function boot() {
   // `ready` only once something is on the screen. It means "drop your loading state", so sending
   // it before the first paint hands the player a blank frame instead of a spinner.
   tellPlatform("ready");
-  reportHeight();
+  requestHeight();
 }
 
 boot();

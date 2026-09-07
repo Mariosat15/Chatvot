@@ -8,20 +8,46 @@
  * third party's game cannot import our design system. The one concession is a neutral dark
  * surface, which sits acceptably inside either a light or a dark host.
  *
+ * That decision SURVIVED the 7 September 2026 pass over the look of the game, and the distinction
+ * is the point: the owner asked for better graphics, which is not the same as asking for the
+ * platform's graphics. Copying `components/neon/tokens.ts` by hand would have been a second copy
+ * of somebody else's design system with no way to keep it in step, and it would have quietly
+ * ended the demonstration this phase exists for. So the game got a richer version of its OWN
+ * palette - depth, glow, a proper type scale - and still shares nothing.
+ *
  * No web fonts: a font request is a render-blocking round trip on a mobile connection, and on a
  * timed title the player's clock would pay for it.
  */
 
 :root {
-  --surface: #0b1220;
-  --panel: #131c2e;
-  --cell: #1c2740;
-  --cell-edge: #263252;
-  --text: #e8eefc;
-  --muted: #8fa0c0;
+  --surface: #080d18;
+  --surface-glow: #0e1a30;
+  --panel: #111a2c;
+  --panel-edge: #1e2a45;
+  --cell: #1b2740;
+  --cell-edge: #27334f;
+  --text: #eaf0fd;
+  --muted: #8b9dbd;
   --accent: #38bdf8;
+  --accent-deep: #0a5f86;
+  --accent-ink: #04121e;
   --danger: #fb7185;
   --ready: #4ade80;
+  --radius: 16px;
+  --radius-sm: 12px;
+
+  /*
+   * The translucent variants are written out as `rgba` literals rather than derived with
+   * `color-mix`, and the duplication is deliberate. An unsupported colour function makes the whole
+   * declaration invalid, so a panel loses its background entirely and the fallback is a
+   * transparent card on a dark page - legible enough to pass a glance and wrong on exactly the
+   * browsers we would never see. A literal cannot fail. They are kept next to the colours they
+   * are derived from so a palette change is one edit in one place.
+   */
+  --panel-soft: rgba(17, 26, 44, 0.82);
+  --accent-soft: rgba(56, 189, 248, 0.18);
+  --accent-faint: rgba(56, 189, 248, 0.1);
+  --accent-line: rgba(56, 189, 248, 0.35);
 }
 
 * {
@@ -32,8 +58,14 @@ html,
 body {
   margin: 0;
   height: 100%;
-  background: var(--surface);
   color: var(--text);
+  background: var(--surface);
+  /* A single soft light behind the board, so the surface is not a flat rectangle. Two radial
+     gradients cost nothing to paint once and are never repainted - unlike a box-shadow on the
+     board itself, which is re-composited on every drag. */
+  background-image:
+    radial-gradient(90% 60% at 50% -10%, var(--surface-glow) 0%, transparent 70%),
+    radial-gradient(70% 50% at 50% 110%, #0c1526 0%, transparent 70%);
   font-family:
     system-ui,
     -apple-system,
@@ -49,7 +81,11 @@ body {
 #app {
   /* `dvh` rather than `vh`: on a phone the address bar collapses on scroll, and `vh` keeps the
      old height, which pushes the Submit button under the browser chrome exactly when it is
-     needed. */
+     needed.
+
+     Inside an iframe this is the frame's own height, which is why the height REQUEST in
+     `presentation.js` must never be derived from a measurement of this page - see the note there
+     about the two sides agreeing on 320 pixels for ever. */
   height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -62,9 +98,31 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  padding: 20px;
+  gap: 18px;
+  padding: 22px 20px;
   text-align: center;
+}
+
+/*
+ * A panel screen that is taller than the space it was given scrolls rather than clipping.
+ *
+ * The auto margins are the load-bearing part. A centred flex column with overflow clips BOTH
+ * ends, so the title and the Start button would both be unreachable - and a host is entitled to
+ * clamp our height request to less than we asked for. Auto margins absorb the free space when
+ * there is any and collapse to nothing when there is not, which centres a short screen and
+ * scrolls a tall one with no media query and no measurement.
+ */
+.screen.scroll {
+  justify-content: flex-start;
+  overflow-y: auto;
+}
+
+.screen.scroll > :first-child {
+  margin-top: auto;
+}
+
+.screen.scroll > :last-child {
+  margin-bottom: auto;
 }
 
 .screen[hidden] {
@@ -73,21 +131,22 @@ body {
 
 .screen.play {
   justify-content: space-between;
-  gap: 8px;
-  padding: 10px;
+  gap: 10px;
+  padding: 12px 12px 14px;
 }
 
 h1 {
   margin: 0;
-  font-size: 1.5rem;
-  letter-spacing: -0.01em;
+  font-size: clamp(1.5rem, 5vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .lead {
   margin: 0;
-  max-width: 30rem;
+  max-width: 32rem;
   color: var(--text);
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .muted {
@@ -99,51 +158,183 @@ h1 {
   font-size: 0.8rem;
 }
 
+/* ------------------------------------------------------------------------------------------
+ * The pre-round panel
+ * ---------------------------------------------------------------------------------------- */
+
+.panels {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  max-width: 32rem;
+}
+
+.panel {
+  background: var(--panel-soft);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  text-align: left;
+}
+
+.panel-title {
+  margin: 0 0 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.panel-body {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
 .rules {
   margin: 0;
   padding: 0;
   list-style: none;
   display: grid;
   gap: 8px;
+  counter-reset: rule;
   color: var(--muted);
-  font-size: 0.95rem;
-  text-align: left;
-  max-width: 22rem;
+  font-size: 0.92rem;
+  line-height: 1.45;
 }
 
-.rules li::before {
-  content: "-";
-  margin-right: 8px;
-  color: var(--accent);
+.rules li {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 10px;
+  align-items: start;
 }
+
+/* Numbered from the markup's own order, so the list cannot disagree with itself when a rule is
+   added or removed server-side. */
+.rules li::before {
+  counter-increment: rule;
+  content: counter(rule);
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+/*
+ * The drawn rules. Sized against the type scale rather than the viewport, so it stays in
+ * proportion to the text it illustrates.
+ *
+ * `aspect-ratio` and `flex: none` are both load-bearing, and leaving either out collapses the
+ * artwork to a few pixels of blue while every other element on the screen looks correct. An
+ * `<svg>` with `height: auto` has no definite height for a flex item to keep, so a column flex
+ * container shrinks it to its minimum - and because it is a graphic rather than text, nothing
+ * inside pushes back. The symptom is not a broken layout, which is what makes it easy to ship:
+ * the screen reads perfectly well, it just has a hairline where the illustration should be.
+ */
+.diagram {
+  width: min(16rem, 72vw);
+  aspect-ratio: 180 / 100;
+  height: auto;
+  flex: 0 0 auto;
+}
+
+.diagram-grid rect {
+  fill: var(--cell);
+  stroke: var(--cell-edge);
+  stroke-width: 1;
+}
+
+.diagram-trace {
+  stroke: var(--accent);
+  stroke-width: 13;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* The path draws itself along the route a finger would take. `stroke-dasharray` has to be at
+     least the path length or the tail reappears at the start; 300 comfortably exceeds it. */
+  stroke-dasharray: 300;
+  animation: draw 3.4s ease-in-out infinite;
+}
+
+.diagram-terminals circle {
+  fill: var(--accent);
+}
+
+.diagram-terminals text {
+  fill: var(--accent-ink);
+  font-size: 15px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+@keyframes draw {
+  0% {
+    stroke-dashoffset: 300;
+  }
+  55%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ------------------------------------------------------------------------------------------
+ * Buttons and bars
+ * ---------------------------------------------------------------------------------------- */
 
 button {
   font: inherit;
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   border: 1px solid transparent;
   padding: 12px 20px;
   /* 44px is the smallest reliable touch target, and this is a timed game: a missed tap is the
      player's time. */
   min-height: 44px;
   cursor: pointer;
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 button.primary {
-  background: var(--accent);
-  color: #06121f;
-  font-weight: 650;
+  background: linear-gradient(180deg, var(--accent) 0%, #1b9fd8 100%);
+  color: var(--accent-ink);
+  font-weight: 700;
+  box-shadow: 0 6px 18px -8px var(--accent-deep);
+}
+
+button.primary.large {
+  min-width: 13rem;
+  padding: 14px 28px;
+  font-size: 1.02rem;
 }
 
 button.primary:disabled {
   background: var(--cell-edge);
   color: var(--muted);
+  box-shadow: none;
   cursor: default;
 }
 
 button.ghost {
   background: transparent;
-  border-color: var(--cell-edge);
+  border-color: var(--panel-edge);
   color: var(--muted);
+}
+
+button.small-btn {
+  min-height: 36px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
 }
 
 .bar {
@@ -166,15 +357,20 @@ button.ghost {
 }
 
 .clock {
-  font-size: 1.3rem;
-  font-weight: 650;
+  font-size: 1.45rem;
+  font-weight: 700;
   /* Tabular figures, so the countdown does not shift the layout every second. */
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }
 
 .clock.urgent {
   color: var(--danger);
 }
+
+/* ------------------------------------------------------------------------------------------
+ * The board
+ * ---------------------------------------------------------------------------------------- */
 
 .board-wrap {
   flex: 1;
@@ -191,8 +387,9 @@ svg#board {
   touch-action: none;
   display: block;
   background: var(--panel);
-  border-radius: 14px;
-  padding: 0;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 50px -30px #000;
 }
 
 svg#board .cell {
@@ -201,29 +398,45 @@ svg#board .cell {
   stroke-width: 1;
 }
 
-svg#board .trace {
+/* The unused-square marker. See `board.js` - it is how the coverage rule becomes visible instead
+   of being a number in the hint line. */
+svg#board .pip {
+  fill: var(--cell-edge);
   pointer-events: none;
+}
+
+svg#board .trace,
+svg#board .trace-halo {
+  pointer-events: none;
+}
+
+svg#board .trace-halo {
+  opacity: 0.22;
 }
 
 svg#board .terminal {
   pointer-events: none;
+  /* A ring in the surface colour between the fill and the stroke, so a terminal reads as a socket
+     rather than a blob - and so two adjacent terminals of similar hue stay countable. */
+  stroke-opacity: 0.35;
 }
 
 svg#board .terminal-label {
   pointer-events: none;
-  fill: #06121f;
-  font-weight: 700;
+  fill: var(--accent-ink);
+  font-weight: 800;
 }
 
 .hint {
   margin: 0;
   min-height: 1.25rem;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   color: var(--muted);
 }
 
 .hint.ready {
   color: var(--ready);
+  font-weight: 650;
 }
 
 .hint.refused {
@@ -234,11 +447,92 @@ svg#board .terminal-label {
   display: flex;
   gap: 10px;
   width: 100%;
+  max-width: 26rem;
 }
 
 .actions button {
   flex: 1;
 }
+
+/* ------------------------------------------------------------------------------------------
+ * The result panel
+ * ---------------------------------------------------------------------------------------- */
+
+.result-art {
+  width: 96px;
+  height: 96px;
+}
+
+.art {
+  width: 100%;
+  height: 100%;
+}
+
+/* One of the two is shown, chosen by `renderResult`. Both ship in the document so neither costs
+   a request, and the class lives on the screen rather than on the artwork so the whole panel can
+   respond to the outcome later without moving this rule. */
+.art-win {
+  display: none;
+}
+
+#screen-result.won .art-win {
+  display: block;
+}
+
+#screen-result.won .art-neutral {
+  display: none;
+}
+
+.art-halo {
+  fill: var(--accent-faint);
+  stroke: var(--accent-line);
+  stroke-width: 2;
+}
+
+.art-trace {
+  stroke: var(--accent);
+  stroke-width: 9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+#screen-result.won .art-trace {
+  stroke-dasharray: 120;
+  animation: draw 0.7s ease-out 1 both;
+}
+
+.art-neutral .art-trace {
+  stroke: var(--muted);
+}
+
+.stat {
+  display: grid;
+  gap: 2px;
+  padding: 12px 26px;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius);
+  background: var(--panel-soft);
+}
+
+.stat-value {
+  font-size: clamp(2rem, 9vw, 2.8rem);
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.stat-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------------------------------
+ * Loading
+ * ---------------------------------------------------------------------------------------- */
 
 .spinner {
   width: 28px;
@@ -258,5 +552,18 @@ svg#board .terminal-label {
 @media (prefers-reduced-motion: reduce) {
   .spinner {
     animation-duration: 3s;
+  }
+
+  /* The diagram is the one animation carrying information rather than decoration, so it is shown
+     finished rather than removed - a player who has asked for less motion still needs to see
+     which two circles the path runs between. */
+  .diagram-trace,
+  #screen-result.won .art-trace {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  button {
+    transition: none;
   }
 }

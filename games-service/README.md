@@ -46,10 +46,11 @@ It is enforced rather than trusted: **`npm run check:isolation`**.
 The platform's root `tsconfig.json` **excludes `games-service`**, alongside `apps`,
 `api-server` and `worker` - every other separate process. It has to, because the two configs
 disagree on purpose: the platform sets `allowJs: true` and this service does not.
-`tools/test-board.ts` imports the browser's `board.js` to drive it headlessly, so under this
-config the import needs a `@ts-expect-error` and under the platform's it is flagged as an
-unnecessary one. **The same file cannot satisfy both**, and the service's own config is the
-one that should win, because this is the config the service ships with.
+`tools/test-board.ts` and `tools/test-presentation.ts` import the browser's `board.js` and
+`presentation.js` to drive them headlessly, so under this config each import needs a
+`@ts-expect-error` and under the platform's it is flagged as an unnecessary one. **The same file
+cannot satisfy both**, and the service's own config is the one that should win, because this is
+the config the service ships with.
 
 Removing that exclusion is not silent - it surfaces immediately as one typecheck error - so
 there is no guard, only this note.
@@ -161,8 +162,20 @@ provider holding its own copy is a provider that keeps posting to a decommission
 ## The play surface
 
 The launch URL the platform is handed points at `GET /play?t={token}`, served from
-`public/play/` by `src/http/play-page.ts`. Four files, no build step and no framework: a phone on
+`public/play/` by `src/http/play-page.ts`. Five files, no build step and no framework: a phone on
 a bad connection is the target, and a bundler here would buy nothing.
+
+**`presentation.js` is where the layout numbers and every word of player-facing copy live, and
+that separation is the reason the surface is testable at all.** `app.js` touches `document` at
+module scope, so no test can import it; three real defects sat there unfindable until the
+decisions moved out (`21` s4.1f). Anything that computes a size or chooses a sentence belongs in
+`presentation.js`, which is pure and covered by `tools/test-presentation.ts` - `app.js` should
+only be reading state, calling those functions and writing to the DOM.
+
+**Adding a module means adding it to the `ASSETS` allowlist**, and forgetting is not a partial
+failure: the 404 lands mid-graph, so the importer fails to evaluate too and the game does not
+boot. `tools/test-play.ts` walks the import graph outward from `app.js` rather than listing the
+files, so a module added tomorrow is covered without anybody remembering this paragraph.
 
 **The path `/play` is not arbitrary and must not be changed casually.** `index.html` references
 `/play/app.css` and `/play/app.js` **absolutely**, so anything that mounts the page at a different
@@ -185,8 +198,19 @@ Three details are load-bearing rather than cosmetic, and each has a test:
 - **`Referrer-Policy: no-referrer`, as a header and a meta tag.** The launch token is in the
   query string, so any outbound request would otherwise carry a single-use credential in its
   referrer.
-- **An explicit three-entry allowlist of servable filenames**, not a path join. There is no
-  arithmetic to get wrong, so traversal is unreachable rather than defended against.
+- **An explicit allowlist of servable filenames**, not a path join. There is no arithmetic to
+  get wrong, so traversal is unreachable rather than defended against.
+- **The frame asks for the height the puzzle needs, never the height it currently has.** The
+  stylesheet sizes the page to `100dvh`, which inside an iframe is the iframe's own height, so
+  measuring `scrollHeight` to request a resize is circular - the platform sized the frame to the
+  measurement and both sides settled on the host's 320-pixel floor, giving every player the
+  smallest board the code can draw. `desiredFrameHeight` derives the answer from the grid, and a
+  test asserts it is unchanged for a current height of 320, 1000, 0 or -50.
+- **The rules and the scoring rule come from the round state, and the markup has none of its
+  own.** They are written once in `src/games/instructions.ts`, composed into each title's
+  `howToPlay` for the catalogue and delivered to the frame as `boardRules` and `scoring`. A
+  second copy in `index.html` had already drifted from the catalogue, and no typecheck or mirror
+  check can see prose in markup.
 
 The client enforces the puzzle's rules as it draws - no crossing, no routing through another
 pair's terminal, retraction when you drag back - but that is **feedback, not enforcement**. Every
@@ -236,13 +260,15 @@ the line being crossed.
 ## Tests
 
 ```
-npm test              # isolation, typecheck, then all five suites
-npm run probe:api     # break each guard, one at a time, and watch its test fail
-npm run probe:board   # the same, for the play surface and the browser module
+npm test                     # isolation, typecheck, then all seven suites
+npm run probe:api            # break each guard, one at a time, and watch its test fail
+npm run probe:board          # the same, for the browser module
+npm run probe:presentation   # the same, for the play surface's sizing and wording
 ```
 
-`npm test` runs **167 tests**: 15 config, 42 engine, 21 scoring, 40 API, 38 play and delivery,
-11 board client. (Any figure of 152 predates the config suite and is stale.)
+`npm test` runs **196 tests**: 15 config, 42 engine, 21 scoring, 41 API, 42 play and delivery,
+11 board client, 24 presentation. (Any figure of 167 predates the presentation suite, and 152
+predates the config suite; both are stale.)
 
 **Every one of them runs in-process against an in-memory MongoDB, so none can fail because the
 PLATFORM disagrees with this service.** That check lives on the other side, in the platform's

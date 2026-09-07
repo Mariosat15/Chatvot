@@ -16,6 +16,7 @@
 | **Status** | **SCENARIO DECIDED - EXTERNAL-ONLY** (2 Sep 2026). **X1, X2, X3 and X5 are code-complete; X6 is partially done - all five of its admin destinations now exist (provider health, 6 Sep 2026), but analytics by provider and the Game Master creation API do not.** A provider contest can be created, **published from the admin screen** (5 Sep 2026), entered, played and paid - and since 5 Sep 2026 it is paid **correctly**, which it was not before: two P0 defects meant every player tied on a score of zero and split the pool equally, and a lower-is-better game ranked backwards. A stuck round can now be **inspected and ended by an operator** (5 Sep 2026). **The whole lifecycle is now reachable by clicking** - the player round launch screen landed 5 Sep 2026 at `/competitions/[id]/play`, which also fixed a live defect: a provider-contest player was being sent to the forex trading workspace by a button labelled "Start Trading". **No provider selected**, which is what X4 needs |
 | **Player screens** | **R37 closed 6 Sep 2026, and it is the one to read first if a provider board looks odd.** Neither app's `getCompetitionLeaderboard` passed `score` or `scoreDirection` to the ranking engine, so **every provider participant tied on zero and the board rendered in tie-break order** - and a lower-is-better title was *reversed on screen while correct at settlement*, so a player could lead all week and be paid last. **Latent for money, live for players:** settlement resolves both fields itself, so no payout was ever wrong and **nothing was backfilled**. Fixed by moving `resolveScoreDirection` out of settlement into a shared mirrored module used by all three consumers. Same day, `RoundPreflight` stopped offering an enabled **Play** button on a contest that had not started, and **the lobby became game-aware** - `app/(root)/competitions/[id]/page.tsx` now branches to `ProviderContestLobby`, which shows the play window, attempts remaining and what happens if a round never finishes, with a score leaderboard instead of one whose columns are profit and loss. The trading path below the branch is **byte-identical**. Also 6 Sep 2026, **the dashboard contest cards became game-aware** (`13` s5.1a) - and the load-bearing part is that **the plan named the wrong components**: `ActiveCompetitionCard` and `CompetitionsTable` are both orphaned, and the live one is `ContestsSidebar`, which no chapter mentioned. Fixing only what the plan named would have closed the item with the defect still on screen. See `13` s4.1a and s5.1a for exactly what is and is not built - **the trading panels, the per-game summary cards and the mega-action split are still outstanding**. Finally, on **owner instruction 6 Sep 2026, BOTH lobbies were rebuilt on one design kit** (`13` s4.1d) - `components/neon/`, from a component sheet the owner supplied, with four generated hero banners. This **superseded s4.1c of the same morning, which had made the game lobby match the trading lobby**: the sheet is now the reference and the trading lobby is one of the two screens that moved to meet it, so a document citing s4.1c's gold hero or its 3D icon rule as current is stale. The trading page is **down from 1,224 lines to 377**, with its hero, sidebar, accordions and prize table extracted into `components/trading/lobby/`, and its nine always-open sidebar cards are now four open items and six accordions - **what stayed open is pinned by a test**, because burying a decision a trader acts on is the same class of error as an aggregate that quietly means trading only. The consistency guard changed shape with it: **one definition, and no screen has chrome of its own**, because pairwise class-string comparison does not survive the sheet's seven screens. The cost is stated rather than glossed - **the trading page is no longer byte-identical**, so the money calculation was extracted whole and four of its expressions are asserted character for character. **Neither lobby has been seen by eye**; both are behind sign-in and the automated browser has no session, so owner review is the remaining step |
 | **First round crossed the wall** | **7 September 2026.** A round now travels between the two halves: created by the platform, played by real moves, scored by the service, delivered back **signed over a real socket**, ingested through all eleven gates and **paid out as real prize money**. `__tests__/games/end-to-end-round.test.ts`, `npm run test:e2e-round`, three tests, three probes red. **This closes the gap 4.1a names** - the adapter's 49 tests run against a *stubbed* `fetch` and the service's 167 run in-process, so neither could ever fail because the other side disagreed. **Two things are substituted and must not be glossed:** the Next routing layer (the callback goes to a bare `node:http` server that does exactly what the real route does - read raw bytes, call the one ingestion function) and the browser. **It is still not the acceptance criterion**, which says *by clicking* - that needs two sessions this environment cannot create, so it is a runbook in `21` s4.1e. **And the finding is that there was no finding:** every earlier phase produced live defects on contact and the first real round produced none in the product. The three it did surface were in the new test driver and the map it was written from |
+| **The play surface itself** | **Rebuilt 7 Sep 2026** (`21` s4.1f) on the owner's report that the board was small and ugly, had no instructions, and had a bad result screen. All three were true and **none was findable by any test here**, because all three lived in `app.js`, which touches `document` at module scope and therefore cannot be imported. **The board was stuck at its minimum cell size by a feedback loop**: the frame reported its own `scrollHeight`, the stylesheet sizes the page to `100dvh` - inside an iframe, the iframe's own height - so the game measured the frame and the platform sized the frame to the measurement, agreeing on the host's 320-pixel floor. Cells went **34 -> 75** once the height became a request derived from the grid. **The result screen's heading was a lookup on the status**, and `completed` covers both a clock expiring and a Perfect player finishing every board, so **the player who had done everything the game asked was congratulated for running out of time**. And **the rules had two homes** - markup and each title's `howToPlay` - which had already drifted; they now live in `src/games/instructions.ts` and reach the frame in the round state, along with `title` and the previously-absent `scoring`, without which a player in a paid contest could not tell from inside the game whether a fast board beat a finished one. The numbers and wording moved into `public/play/presentation.js` so they could be asserted at all: **196 tests, 19 probes**, and **verified by eye on both titles** at desktop and phone sizes - which the platform's own lobbies could not be, being behind sign-in |
 | **Next action** | **First, an owner decision that is not technical: whether to compensate the players whose entry fees were kept by R43** (see the refunds row above). The affected contests are identifiable and the fix is not retroactive, so this is a real-money question waiting on a person, not on code. **Then technically: finish X4a** - pull and rebuild on the server, start `chartvolt-games`, register it through the admin screens, and drive one round end to end **by clicking** (`21` s4.1e has the six steps; start with `circuit-perfect`, which ends when the player finishes rather than when a 60-second clock does). **No DNS, nginx or certificate work is needed** since the play surface is proxied through the platform app (owner's choice, 6 Sep 2026). The game is **playable by a human in a browser**, **R34 is closed**, and the service is now **deployable** - PM2 entry, nginx block, `env.example` and a runbook in `deploy/README.md` (all 6 Sep 2026) - so nothing technical stands between the two halves. **Owner decided 6 Sep 2026 to deploy first and rehearse against the live site**, rather than complete the local rehearsal. Provider **health** - the last of X6's five admin destinations - **shipped 6 Sep 2026** (`12` s4.2b), so what remains of the player surface is the trading panels themselves and the per-game summary cards. **Commercially, in parallel: find and assess a provider using `08`** - X4 cannot start without one, and nothing in the programme is blocked on that search |
 | **Admin lifecycle controls** | **Code-complete 7 Sep 2026** (`12` s3.2a), and it found the worst authorization defect in the programme. `POST /api/finalize-old-competitions` had **no authentication of any kind** - **R40**, unauthenticated and reachable *today*, unlike almost everything else here. Any anonymous caller could force-finalize every `completed` competition: closing positions at live prices, writing trade history, and hitting an external forex API per position. Scoped to already-completed contests, so no prize and no wallet movement - **do not round that up, and do not round it down either.** No backfill, and **no way to know whether it was ever called**, because a route with no guard has no attribution. Five siblings authenticated on **admin-at-all rather than section access**, the sixth instance of that class. Separately, **pausing a provider contest did nothing at all** (**R41**): `isPaused` was never read by the launch service, so an operator got a success toast, a banner and a notification to every participant while play continued - and this is the route `IncidentsSection.tsx` calls when an incident is raised. Latent, since no provider contest has run in production. The rule from it: **a capability the platform already has does not extend to a new game by itself, and the way it fails is silence** |
 | **Admin provider settlement** | **Fixed 7 Sep 2026 (R42)**, found by verifying a mapping subagent's claim rather than by planned work. `apps/admin`'s `finalizeCompetition` had **no provider dispatch** - only `routeToTradingSettlement`, which answers "may *trading* settle this" - so a provider contest reaching the admin cron was refused and left `active`. **Both apps register `checkAndFinalizeCompetitions` on an every-minute cron**, so whether a provider contest settled was decided by which process claimed it first. **R26's shape one layer out and worse**: R26 skipped the Game Master's commission while still paying the players, this paid **nobody and completed nothing**. Latent - no provider contest has settled in production, **nothing backfilled**. Two instruments were silent and both are ones we trust: `provider-finalize.ts` and `provider-settlement.service.ts` were **already mirrored here and imported by nothing**, so `check:mirrors` agreed correctly, and the file-size gap that found R26 has closed to 8 KB so it raises nothing. The rule that now replaces both instances: **the four finalize functions are not four copies of one function, and a capability added to one is not thereby added to the others** |
@@ -637,6 +638,88 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 7 Sep 2026 - X4a / `21` s4.1f - THE PLAY SURFACE: A BOARD STUCK AT ITS FLOOR, A HEADING THAT INSULTED THE WINNER, AND RULES IN TWO PLACES
+
+**Shipped:** `games-service/public/play/presentation.js` (new, pure, no DOM) and
+`games-service/src/games/instructions.ts` (new, the rules written once). `PlayState` gained
+`title`, `boardRules` and `scoring`. `index.html`, `app.js`, `board.js` and `app.css` rebuilt
+around them. `tools/test-presentation.ts` (24 tests) and `tools/probe-presentation.ps1` (19
+probes, all red on exactly the expected test). Service total **196 tests**. `21` **s4.1f**.
+
+**Files touched:** `games-service/public/play/{presentation.js,index.html,app.js,board.js,app.css}`,
+`games-service/src/games/{instructions.ts,titles.ts}`, `games-service/src/rounds/play.ts`,
+`games-service/src/http/play-page.ts`, `games-service/tools/{test-presentation.ts,test-play.ts,test-api.ts,probe-presentation.ps1}`,
+`games-service/package.json`. **Nothing in the platform repository changed**, and
+`npm run check:isolation` still passes - this is a provider fixing its own game.
+
+**Three defects, and the reason none of them could have been caught:**
+
+1. **The board was a postage stamp because of a feedback loop.** The frame reported
+   `document.documentElement.scrollHeight`, and the stylesheet sizes the page to `100dvh` -
+   which inside an iframe is *the iframe's own height*. The game measured the frame; the
+   platform sized the frame to the measurement; the two agreed on whatever the host had opened
+   with, which is `MIN_FRAME_HEIGHT`, **320 pixels**. After the header and footer that left
+   ~180 for the grid, so `boardCellPx` hit its **floor of 34** and every player on every screen
+   got the smallest board the code can draw. The arithmetic was correct in isolation - the
+   *input* was circular. Fixed by deriving the request from the grid and never from the current
+   height: **533/605/677 pixels** for 5/6/7 rows, all inside the host's `[320, 2000]`. Measured
+   in a browser: cells **34 -> 75** at 980x620, and 59 on a 390-wide phone.
+2. **`completed` covers two different endings and the heading was a lookup on it.** Sprint's
+   clock reaching zero, and Perfect finishing the last of a fixed set. Both said **"Time!"** -
+   and Perfect has no clock in its rules at all, so **the one player who had done everything
+   the game asked was congratulated for running out of time.** Only the board count can tell
+   them apart. Every ending now has its own heading and every branch says what happens next,
+   because "your result is being confirmed" answered none of the player's actual questions -
+   and a **void returns the attempt**, which section 13 requires and which is the difference
+   between a retry and a support ticket.
+3. **The rules had two homes and had already drifted.** Markup in `index.html` said "the two
+   circles that share a number"; the catalogue said "one terminal to its matching pair"; the
+   page never mentioned redrawing a path at all. **"One rule, two copies", and no typecheck or
+   mirror check can see a copy that lives in markup.** Now one list, composed into each title's
+   `howToPlay` and delivered to the frame in the round state. **`scoring` was missing
+   outright** - a player in a paid contest could not learn from inside the game whether a fast
+   board beat a finished one, which for a lower-is-better title is the difference between
+   playing to win and playing to lose.
+
+**Deviated from plan:** nothing in `21` specified the play surface's presentation, so this is
+new rather than divergent. One structural choice is worth recording: the layout numbers and the
+wording were **extracted into a module rather than fixed in place**, because
+**a module that cannot be imported is a module whose logic cannot be asserted** - all three
+defects sat in a file no test can load. The extraction is as much the fix as the arithmetic.
+
+**Two lessons that generalise beyond this service:**
+
+- **A page's own references are not its module graph.** The existing asset test walks `src` and
+  `href`, so it sees `app.js` and `app.css` only. `board.js` and `presentation.js` are reached
+  by `import` *inside* other scripts, and a module missing from the allowlist is a 404 in the
+  middle of the graph: the importer fails to evaluate too, **the game does not boot at all**,
+  and the only evidence is a console message in a player's browser. The new test follows the
+  imports instead of listing the files, so tomorrow's module is covered without anybody
+  remembering it exists.
+- **`aspect-ratio` and `flex: none` on an inline SVG are load-bearing, and omitting them is not
+  a broken layout.** The new how-to-play diagram collapsed to a **hairline** - an `<svg>` with
+  `height: auto` has no definite height for a flex item to keep, a column flex container
+  shrinks it to nothing, and being a graphic nothing inside pushes back. The screen read
+  perfectly well with no illustration on it. **Found by looking at it**, not by any test.
+
+**Owner tested:** not yet, but **verified by eye in a browser on both titles**, at 980x620 and
+390x640 - the intro with its animated diagram, a 6x6 board at 75-pixel cells with two paths
+drawn, and both result variants. Worth contrasting with `13` s4.1d, where the platform's own
+lobbies are behind sign-in and **could not be seen at all**.
+
+**Deferred:** the sheet's **View Rules** surface for a provider title is still a link to
+`/help/competitions` - the rules now exist in the round state, so the player sees them inside
+the game, but the platform's game page still has nothing to render. And a **full solve was not
+performed by hand** in this pass: the win artwork was confirmed by forcing the class, and the
+"every board complete" heading is pinned by unit test and probe rather than by a played round.
+That belongs with the `21` s4.1e runbook, which needs two sessions this environment cannot
+create.
+
+**Next chat should:** carry on with the plan - analytics by provider, then the Game Master
+creation API, then X6.5.
 
 ---
 

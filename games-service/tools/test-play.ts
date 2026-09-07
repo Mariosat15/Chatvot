@@ -47,6 +47,9 @@ interface ClientBoard {
 interface PlayStateBody {
   roundId: string;
   status: string;
+  title?: string;
+  boardRules?: string[];
+  scoring?: string;
   board?: ClientBoard;
   boardsSolved: number;
   boardTarget?: number;
@@ -180,6 +183,75 @@ async function main(): Promise<number> {
     }
   });
 
+  await test("the page has no rules of its own to disagree with the catalogue", async () => {
+    /*
+     * The other half of the rules-drift fix. The four rules used to be list items in this
+     * document, and they had already drifted from the catalogue's wording - a player read one set
+     * on the game page and a different set inside the game, with nothing to notice it: markup is
+     * invisible to a typecheck, a lint and every mirror check.
+     *
+     * They arrive in the round state now, so the markup must contain none of them. Asserted
+     * against the shared list rather than against remembered phrases, because a literal here
+     * would be the copy this test exists to forbid.
+     */
+    const { BOARD_RULES } = await import("../src/games/instructions");
+    const page = await fetchRaw("/play");
+    assert.equal(page.status, 200);
+
+    for (const rule of BOARD_RULES) {
+      assert.ok(!page.text.includes(rule), `the page hard-codes the rule "${rule}"`);
+    }
+    // The container the state fills has to exist, or "no rules in the markup" would also be
+    // satisfied by a page that shows the player no rules at all.
+    assert.match(page.text, /id="intro-rules"/, "the page has nowhere to render the rules");
+  });
+
+  await test("every module the play surface imports is served", async () => {
+    /*
+     * The test above walks the DOCUMENT's references, which is `app.js` and `app.css` and nothing
+     * else. `board.js` and `presentation.js` are reached by `import` statements inside other
+     * scripts, so no amount of reading the HTML finds them - and a module missing from the
+     * allowlist in `play-page.ts` is a 404 in the middle of the module graph. The browser then
+     * fails to evaluate the importer too, so the game does not boot at all, and the only evidence
+     * is a console message in a player's browser that we will never see.
+     *
+     * Following the imports rather than listing the files is the point: a module added tomorrow is
+     * covered without anybody remembering this test exists.
+     */
+    const seen = new Set<string>();
+    const queue = ["/play/app.js"];
+
+    while (queue.length > 0) {
+      const path = queue.shift() as string;
+      if (seen.has(path)) continue;
+      seen.add(path);
+
+      const asset = await fetchRaw(path);
+      assert.equal(asset.status, 200, `${path} is imported but not served`);
+      assert.match(
+        asset.headers.get("content-type") ?? "",
+        /javascript/,
+        `${path} was not served as JavaScript`,
+      );
+
+      // Relative specifiers only - the surface loads nothing from a third party, deliberately, so
+      // a bare or absolute specifier appearing here is a finding in its own right.
+      for (const match of asset.text.matchAll(/(?:^|\n)\s*(?:import|export)[^;\n]*?from\s+"([^"]+)"/g)) {
+        const specifier = match[1];
+        assert.ok(
+          specifier.startsWith("./"),
+          `${path} imports "${specifier}", which is not a relative module in this directory`,
+        );
+        queue.push(`/play/${specifier.slice(2)}`);
+      }
+    }
+
+    assert.ok(
+      seen.has("/play/board.js") && seen.has("/play/presentation.js"),
+      `the walk did not reach the known modules, only ${[...seen].join(", ")}`,
+    );
+  });
+
   await test("an unknown asset is JSON, not an HTML error page", async () => {
     // Section 14's rule reaches here too. An HTML body from a path under `/play` would be the one
     // response the platform cannot read, and the framework's default for an unknown route is
@@ -285,6 +357,82 @@ async function main(): Promise<number> {
     // exactly when `endsAt` does not exist yet.
     assert.equal(state.body.durationSeconds, 90);
     assert.equal(state.body.endsAt, undefined);
+  });
+
+  await test("the state carries the title's own name, rules and scoring", async () => {
+    /*
+     * The three facts the pre-round panel used to invent.
+     *
+     * The frame kept its own map of display names, so a title added to the catalogue would have
+     * appeared inside the game as "Circuit" while the platform showed its real name - no error,
+     * just two names for one thing. The rules were hard-coded in the page, so the catalogue's
+     * wording and the game's wording had already drifted apart. And `scoring` was missing
+     * outright: a player in a paid contest could not find out from inside the game whether a fast
+     * board was worth more than a finished one, which for Circuit Perfect is the difference
+     * between playing to win and playing to lose.
+     *
+     * Asserted against the CATALOGUE's own strings rather than against literals, because a literal
+     * here would be the third copy of the wording and would drift the same way the first two did.
+     */
+    await clearRounds();
+    const { PERFECT, PERFECT_CODE } = await import("../src/games/titles");
+    const { BOARD_RULES } = await import("../src/games/instructions");
+
+    const { token } = await openRound({
+      gameCode: PERFECT_CODE,
+      config: { boardCount: 3, gridSize: "small", unfinishedPenaltyMs: 60_000 },
+    });
+    const state = await callPlay<PlayStateBody>(`/play/api/state?t=${token}`, undefined, "GET");
+
+    assert.equal(state.status, 200);
+    assert.equal(state.body.title, PERFECT.displayName);
+    assert.equal(state.body.scoring, PERFECT.rulesSummary);
+    assert.deepEqual(state.body.boardRules, [...BOARD_RULES]);
+    // Before the round starts is exactly when the player is reading them.
+    assert.equal(state.body.status, "created");
+  });
+
+  await test("the state carries no score, no rank and no prize, on any status", async () => {
+    /*
+     * Held by construction on the client - `resultCopy` destructures the four fields it uses - and
+     * held here as well, because the two guards fail differently. A field added to `PlayState`
+     * would be ignored by today's frame and rendered by tomorrow's, and by then nobody would
+     * remember that the browser is not a link in the scoring chain.
+     *
+     * The terminal state is the one that matters: it is the only moment a score exists at all, and
+     * the specification's rule is that it travels to the platform over a signed callback and
+     * nowhere else. A number on this screen is one the player could argue with that nothing
+     * authoritative had agreed to.
+     */
+    await clearRounds();
+    const { token } = await openRound();
+    await callPlay("/play/api/session", { t: token });
+    const live = await callPlay(`/play/api/state?t=${token}`, undefined, "GET");
+    const finished = await callPlay("/play/api/leave", { t: token });
+
+    for (const [label, response] of [
+      ["live", live],
+      ["finished", finished],
+    ] as const) {
+      const body = JSON.parse(response.raw) as Record<string, unknown>;
+      const state = (body.state ?? body) as Record<string, unknown>;
+      for (const forbidden of ["score", "rawScore", "scoreBreakdown", "rank", "prize", "points"]) {
+        assert.ok(
+          !(forbidden in state),
+          `the ${label} play state carries "${forbidden}"`,
+        );
+      }
+      // `finished` is the terminal report, and it is the likeliest place for a score to be added
+      // "just for the result screen".
+      const report = state.finished as Record<string, unknown> | undefined;
+      if (report) {
+        assert.deepEqual(
+          Object.keys(report).sort(),
+          ["boardsSolved", "status"],
+          "the terminal report grew a field",
+        );
+      }
+    }
   });
 
   await test("resuming returns the same board rather than a new one", async () => {

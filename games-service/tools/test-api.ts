@@ -159,6 +159,48 @@ async function main(): Promise<number> {
     assert.equal(byCode.get("circuit-perfect"), "lower_is_better");
   });
 
+  await test("every title's how-to-play carries the shared rules, word for word", async () => {
+    /*
+     * The rules of the puzzle had two homes - list items in `public/play/index.html` and prose
+     * inside each title's `howToPlay` - and they had already drifted: the page said "the two
+     * circles that share a number" where the catalogue said "one terminal to its matching pair",
+     * and the page never mentioned that a path can be redrawn at all. A player learned one set of
+     * rules on the game page and a different set inside the game.
+     *
+     * They now live in `instructions.ts` and both consumers compose from it. This is what holds
+     * that: the catalogue's own strings are compared against the shared list, so a title that
+     * reverts to a hand-written paragraph fails here rather than at a support desk.
+     *
+     * The play surface's half of the same property is asserted in `test-play.ts` - the state
+     * carries `boardRules`, and the page has no rules of its own to disagree with.
+     */
+    const { BOARD_RULES } = await import("../src/games/instructions");
+    const response = await callApi<{ games: { gameCode: string; howToPlay: string }[] }>(
+      "/v1/games",
+    );
+
+    for (const game of response.body.games) {
+      for (const rule of BOARD_RULES) {
+        assert.ok(
+          game.howToPlay.includes(rule),
+          `${game.gameCode}'s howToPlay does not contain "${rule}"`,
+        );
+      }
+      // The pacing sentence is the part a title genuinely owns, so the prose must be longer than
+      // the shared list alone - otherwise composing it would be indistinguishable from ignoring
+      // the argument.
+      assert.ok(
+        game.howToPlay.length > BOARD_RULES.join(" ").length,
+        `${game.gameCode}'s howToPlay adds nothing of its own`,
+      );
+    }
+
+    // And the two titles must not end up with the same paragraph, which is what a shared list
+    // plus a dropped pacing note would produce.
+    const prose = new Set(response.body.games.map((game) => game.howToPlay));
+    assert.equal(prose.size, response.body.games.length, "two titles share one how-to-play");
+  });
+
   await test("every advertised artwork URL actually resolves", async () => {
     // A catalogue that advertises images which 404 is a provider bug that presents as a broken
     // platform page, and the platform caches it.

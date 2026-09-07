@@ -20,6 +20,8 @@
  * nothing the player can see that the server will not check.
  */
 
+import { boardCellPx } from "./presentation.js";
+
 /** Eight pairs is the most any grid size produces (`large`: 5-8). */
 const PAIR_COLOURS = [
   "#38bdf8", // sky
@@ -300,22 +302,61 @@ export function createBoard(svg, onChange) {
             y: y * cellPx,
             width: cellPx,
             height: cellPx,
-            rx: Math.round(cellPx * 0.12),
+            rx: Math.round(cellPx * 0.16),
             class: "cell",
           }),
         );
+
+        /*
+         * A pip in every UNUSED square, and it is functional rather than decorative.
+         *
+         * Coverage is the rule players fail: every pair can be visibly joined with a square left
+         * over, and the hint line then says "use every square: 30 of 36" without saying WHICH.
+         * Counting squares on a 6x6 grid under a clock is not a puzzle anybody meant to set. The
+         * pips vanish as cells are taken, so the remaining work is the remaining dots.
+         *
+         * Drawn only where there is nothing, so the count falls as the board fills - which also
+         * means the most expensive frame is the one before the player has touched anything.
+         */
+        if (!owner.has(key([x, y]))) {
+          svg.appendChild(
+            element("circle", {
+              cx: centre(x),
+              cy: centre(y),
+              r: Math.max(1.5, Math.round(cellPx * 0.055)),
+              class: "pip",
+            }),
+          );
+        }
       }
     }
 
     for (const pair of puzzle.pairs) {
       const cells = pathOf(pair.id);
       if (cells.length < 2) continue;
+      const points = cells.map((cell) => centre(cell[0]) + "," + centre(cell[1])).join(" ");
+      const colour = colourFor(pair.id);
+
+      // Two strokes for one path: a wide translucent one under a narrower solid one, which reads
+      // as a lit wire rather than a felt-tip line. It is also the cheapest way to keep two
+      // adjacent paths legible where they run side by side, since the halo darkens the gap.
       svg.appendChild(
         element("polyline", {
-          points: cells.map((cell) => centre(cell[0]) + "," + centre(cell[1])).join(" "),
+          points,
           fill: "none",
-          stroke: colourFor(pair.id),
-          "stroke-width": Math.round(cellPx * 0.34),
+          stroke: colour,
+          "stroke-width": Math.round(cellPx * 0.56),
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round",
+          class: "trace-halo",
+        }),
+      );
+      svg.appendChild(
+        element("polyline", {
+          points,
+          fill: "none",
+          stroke: colour,
+          "stroke-width": Math.round(cellPx * 0.3),
           "stroke-linecap": "round",
           "stroke-linejoin": "round",
           class: "trace",
@@ -329,8 +370,10 @@ export function createBoard(svg, onChange) {
           element("circle", {
             cx: centre(cell[0]),
             cy: centre(cell[1]),
-            r: Math.round(cellPx * 0.3),
+            r: Math.round(cellPx * 0.34),
             fill: colourFor(pair.id),
+            stroke: colourFor(pair.id),
+            "stroke-width": Math.max(2, Math.round(cellPx * 0.08)),
             class: "terminal",
           }),
         );
@@ -339,7 +382,7 @@ export function createBoard(svg, onChange) {
           y: centre(cell[1]),
           "text-anchor": "middle",
           "dominant-baseline": "central",
-          "font-size": Math.round(cellPx * 0.34),
+          "font-size": Math.round(cellPx * 0.36),
           class: "terminal-label",
         });
         label.textContent = String(pair.id + 1);
@@ -348,12 +391,16 @@ export function createBoard(svg, onChange) {
     }
   }
 
-  /** Fit the grid to the space the layout gives it, leaving a comfortable tap target. */
+  /**
+   * Fit the grid to the space the layout gives it, leaving a comfortable tap target.
+   *
+   * The arithmetic is in `presentation.js` so it can be tested without a DOM, which is where the
+   * cap and the floor are explained. Before 7 September 2026 the floor was what every player got,
+   * because the frame never grew past its host's minimum.
+   */
   function resize(availableWidth, availableHeight) {
     if (!puzzle) return;
-    const byWidth = Math.floor(availableWidth / puzzle.width);
-    const byHeight = Math.floor(availableHeight / puzzle.height);
-    cellPx = Math.max(28, Math.min(84, Math.min(byWidth, byHeight)));
+    cellPx = boardCellPx(availableWidth, availableHeight, puzzle.width, puzzle.height);
     render();
   }
 
