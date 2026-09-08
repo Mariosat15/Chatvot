@@ -8,7 +8,13 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
+import ProviderGame from "@/database/models/games/provider-game.model";
 import { guardSection } from "@/lib/admin/section-route-guard";
+import {
+  TRADING_VOCABULARY,
+  providerVocabulary,
+  type ContestVocabulary,
+} from "@/lib/admin/ai-contest-vocabulary";
 
 interface AIConfig {
   apiKey: string | null;
@@ -27,7 +33,7 @@ async function getAIConfig(): Promise<AIConfig> {
         enabled: settings.openaiEnabled ?? false,
       };
     }
-  } catch (error) {
+  } catch {
     console.log("ℹ️ AI config not found in database, checking environment");
   }
 
@@ -36,6 +42,53 @@ async function getAIConfig(): Promise<AIConfig> {
     model: process.env.OPENAI_MODEL || "gpt-4o-mini",
     enabled: process.env.OPENAI_ENABLED === "true",
   };
+}
+
+/**
+ * Which vocabulary this request is answered in.
+ *
+ * `gameKey` FROM THE BODY IS A LOOKUP KEY AND NOTHING ELSE. Every word the model is given
+ * comes from the row that key finds, so a caller cannot name the game, its genre or its
+ * scoring - which would be arbitrary text in a system prompt, and would also let the wizard's
+ * own state drift from a catalogue an operator has since edited.
+ *
+ * NO KEY MEANS TRADING, because the trading wizard sends none and its prompt must not change.
+ * A key that finds NOTHING is refused rather than falling back to trading: silently writing
+ * trading copy for a game contest is the exact defect this resolves, and it would be invisible
+ * - the operator gets fluent, confident, wrong text.
+ */
+async function resolveVocabulary(
+  gameKey: unknown,
+): Promise<
+  { ok: true; vocabulary: ContestVocabulary } | { ok: false; error: string }
+> {
+  if (typeof gameKey !== "string" || gameKey.trim() === "") {
+    return { ok: true, vocabulary: TRADING_VOCABULARY };
+  }
+
+  await connectToDatabase();
+  const title = await ProviderGame.findOne({ gameKey: gameKey.trim() })
+    .select(
+      "displayName category description scoreDirection scoreType typicalDurationSeconds",
+    )
+    .lean<{
+      displayName: string;
+      category?: string;
+      description?: string;
+      scoreDirection: "higher_is_better" | "lower_is_better";
+      scoreType: "integer" | "decimal" | "duration_ms";
+      typicalDurationSeconds?: number;
+    }>();
+
+  if (!title) {
+    return {
+      ok: false,
+      error:
+        "That game is not in the catalogue, so its description cannot be written. Sync the provider's catalogue and try again.",
+    };
+  }
+
+  return { ok: true, vocabulary: providerVocabulary(title) };
 }
 
 export async function POST(request: NextRequest) {
@@ -59,7 +112,9 @@ export async function POST(request: NextRequest) {
   if (!guard.ok) return guard.response;
 
   try {
-    const { prompt, type } = await request.json();
+    // Three keys, and `gameKey` is the only one added: a lookup key, never vocabulary. See
+    // `resolveVocabulary` - nothing the model is told about the game comes from here.
+    const { prompt, type, gameKey } = await request.json();
 
     if (!prompt || typeof prompt !== "string") {
       return NextResponse.json(
@@ -90,19 +145,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const resolved = await resolveVocabulary(gameKey);
+    if (!resolved.ok) {
+      return NextResponse.json({ error: resolved.error }, { status: 400 });
+    }
+
     const openai = new OpenAI({ apiKey: config.apiKey });
 
-    const systemPrompt = `You are a creative marketing expert for a trading competition platform. 
-Generate engaging, exciting competition content that attracts traders.
-
-IMPORTANT RULES:
-- Keep the title catchy, max 60 characters
-- Keep the description concise, max 50 words
-- Match the theme/style requested by the user
-- Use exciting language that creates urgency and excitement
-- Make it sound professional yet fun
-- Include relevant emojis in the title if it fits the theme
-- Focus on the competitive/gaming aspect`;
+    const systemPrompt = resolved.vocabulary.systemPrompt;
 
     const userPrompt =
       type === "title"

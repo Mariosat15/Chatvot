@@ -34,7 +34,7 @@
  * explain the anti-patterns in prose and a test that reads prose fails in both directions.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it, expect } from "vitest";
 import {
@@ -51,6 +51,7 @@ import {
 
 const ADMIN = join(process.cwd(), "apps", "admin");
 const WIZARD = join(ADMIN, "components/admin/games/ProviderContestWizard.tsx");
+const WIZARD_STEPS = join(ADMIN, "components/admin/games/wizard");
 const EDITOR = join(ADMIN, "components/admin/games/ProviderContestEditor.tsx");
 const DRAFT = join(ADMIN, "components/admin/games/contest-draft.ts");
 
@@ -59,6 +60,28 @@ function code(file: string): string {
   return readFileSync(file, "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/^\s*\/\/.*$/gm, "");
+}
+
+/**
+ * The wizard SCREEN: its orchestrator plus every step file it renders.
+ *
+ * The wizard was one component until 8 September 2026, when the trading chrome was shared and
+ * the steps moved into `./wizard/`. A claim about what the operator can reach has to be
+ * asserted over the whole screen, or it goes green the moment the control it guards moves one
+ * file along - which is precisely the change that just happened to the prize editor.
+ *
+ * It throws on an empty folder: a walk that finds nothing would turn these into tests of "".
+ */
+function wizardScreen(): string {
+  const files = readdirSync(WIZARD_STEPS).filter(
+    (name) => name.endsWith(".ts") || name.endsWith(".tsx"),
+  );
+  if (files.length === 0) {
+    throw new Error(`No step files under ${WIZARD_STEPS}`);
+  }
+  return [code(WIZARD), ...files.map((name) => code(join(WIZARD_STEPS, name)))].join(
+    "\n",
+  );
 }
 
 function draftWith(overrides: Partial<ContestDraft> = {}): ContestDraft {
@@ -132,9 +155,9 @@ describe("the contest clock is the play window", () => {
       remaining field would restore the whole defect: the derivation would still run, then the
       operator's own value would overwrite it in the same payload.
     */
-    for (const file of [WIZARD, EDITOR]) {
-      expect(code(file)).not.toMatch(/value=\{draft\.playWindowStart\}/);
-      expect(code(file)).not.toMatch(/value=\{draft\.playWindowEnd\}/);
+    for (const source of [wizardScreen(), code(EDITOR)]) {
+      expect(source).not.toMatch(/value=\{draft\.playWindowStart\}/);
+      expect(source).not.toMatch(/value=\{draft\.playWindowEnd\}/);
     }
   });
 
@@ -174,7 +197,7 @@ describe("the prize distribution is editable", () => {
   });
 
   it("renders the prize editor and the platform fee on the wizard", () => {
-    const source = code(WIZARD);
+    const source = wizardScreen();
 
     // The element with its wiring, not the identifier: the import alone would satisfy a bare
     // name match while the step rendered nothing, which is the exact defect this pins.
@@ -299,6 +322,8 @@ describe("the wizard can publish what it creates", () => {
   });
 
   it("publishes after the create returns, using the publish route", () => {
+    // The orchestrator alone, deliberately: this is a claim about the file that owns the two
+    // network calls, and the ordering below is only meaningful inside one function body.
     const source = code(WIZARD);
 
     // Ordered: the id has to exist before it can be published, so the call is inside the

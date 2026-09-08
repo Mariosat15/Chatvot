@@ -779,6 +779,82 @@ still the right answer for a title where a shortened round means nothing.
 
 ---
 
+### 2.8 Two wizards that looked like two products - BUILT 8 September 2026
+
+The owner's report was about consistency, not a defect: side by side, the trading wizard and the
+game wizard did not look like the same platform. Trading had a seven-step progress rail with
+coloured step headers, a Quick Preview panel and an AI content generator; the game wizard had a
+plain breadcrumb, no preview and no assistant.
+
+**The chrome was extracted, not copied.** `components/admin/wizard/WizardShell.tsx` holds
+`WizardPageHeader`, `WizardShell`, `WizardStepRail`, `WizardPreview`, `WizardPreviewRow` and
+`WizardStepCard`, and `AiContentPanel.tsx` holds the AI banner and the per-field Generate
+button. A second copy of a progress rail is the "one rule, two copies" shape behind
+`referenceId`, `failedReason`, `challengeId` and the Game Master `||`, none of which
+`check:mirrors` can see. The guard is a **negative** assertion: the two sidebar headings
+("Creation Progress", "Quick Preview") must appear in the shell and in **no** consumer, because
+importing the shell is trivially satisfied by a screen that then hand-rolls a panel beside it.
+
+**`WizardPageHeader` takes `icon: ReactNode`, and that is R39's rule, not a preference.** The
+page that renders it is a server component, so an icon passed as `LucideIcon` would be a
+function crossing a server/client boundary - which is exactly what took the trading lobby down
+on 6 September. `WizardStep.icon` stays `LucideIcon` because `STEPS` is defined inside a client
+component and never crosses anything.
+
+**Six steps, which is a deviation from the four this chapter asked for.** Recorded rather than
+absorbed: four steps on a rail styled like trading's seven still reads as a cut-down form. The
+steps mirror trading's grouping one-for-one where the question is the same - basics, money,
+clock, prizes, launch - and replace its three trading-only steps with the two a game needs,
+which title and that title's own settings. **No trading field appears and there is no market
+card**, both of which are section 2's acceptance criteria; a puzzle does not care whether the
+forex market is open.
+
+**The assistant's prompt was one hard-coded string saying "trading competition platform".** Left
+alone on a game contest it produces fluent, confident copy about traders, markets and profit for
+a game that has none of those things - no error, nothing in a log, which is this codebase's
+recurring failure shape, and `05` s10's rule one layer out: **no platform-wide text may silently
+mean "trading only".** `apps/admin/lib/admin/ai-contest-vocabulary.ts` composes the prompt from
+the catalogue row instead.
+
+**The vocabulary is derived server-side from the stored row; `gameKey` in the body is a lookup
+key and nothing else.** A caller-supplied game name or genre would be arbitrary text in a system
+prompt, and - more mundanely - a way for the wizard's own state to drift from a catalogue an
+operator has since edited. Three properties are load-bearing and each is pinned:
+
+- **Trading's prompt is unchanged character for character.** It is the screen operators use
+  daily, and the only evidence this change does not alter what it produces is that its prompt
+  did not change. Same reasoning that kept the Game Master `||` intact while settlement was
+  extracted.
+- **An absent key means trading; a key that finds nothing is refused.** Falling back to trading
+  copy for a game contest is the exact defect being fixed, and it would be invisible.
+- **Nothing enumerates games.** Every sentence is composed from declared fields
+  (`displayName`, `category`, `description`, `scoreDirection`, `scoreType`,
+  `typicalDurationSeconds`), because a `switch` on game code is the one failure mode of the "no
+  additional coding" claim - the first title needing a special case makes it quietly false while
+  every existing test still passes.
+
+**`duration_ms` is read together with the direction, not instead of it.** A title reporting
+milliseconds and scoring higher-is-better is measuring endurance, not speed, so "the fastest
+time wins" would be exactly backwards. And the trading words are **banned by name** in the game
+prompt rather than hoped against: a model told it is writing about a puzzle will still reach for
+"traders" and "markets", because almost every other sentence on this platform uses them.
+
+**What was built.** `WizardShell.tsx`, `AiContentPanel.tsx`, `ai-contest-vocabulary.ts`, the
+`gameKey` lookup in `app/api/ai/generate-competition/route.ts`, `gameKey` / `subjectLabel` on
+`AIGeneratorDialog.tsx`, `ProviderContestWizard.tsx` reduced to state plus order plus two
+network calls, and six step bodies under `components/admin/games/wizard/` with the shared field
+primitives in `fields.tsx`. **25 new tests, 17 probes all red on exactly the expected test**;
+the two existing wizard suites were re-pointed at a `readWizardScreen()` helper that
+concatenates the orchestrator with every step file, or moving code out of the monolith would
+have left them passing vacuously.
+
+**Still outstanding, and not to be summarised as done:** the trading form has **not** been
+switched onto the shell - that is a separate commit so it can be reverted on its own without
+losing the game wizard's look - and the client-side market block on trading creation is still
+there, which is the 4 September decision that was never applied to the screen.
+
+---
+
 ## 3. Contest list and detail screens
 
 | Screen | Change |

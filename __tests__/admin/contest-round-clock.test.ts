@@ -20,7 +20,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describeRoundFit } from "../../apps/admin/components/admin/games/contest-draft";
 
@@ -28,6 +28,7 @@ const ROOT = join(__dirname, "..", "..");
 
 const NOTE = "apps/admin/components/admin/games/RoundClockNote.tsx";
 const WIZARD = "apps/admin/components/admin/games/ProviderContestWizard.tsx";
+const WIZARD_STEPS = "apps/admin/components/admin/games/wizard";
 const EDITOR = "apps/admin/components/admin/games/ProviderContestEditor.tsx";
 const DRAFT = "apps/admin/components/admin/games/contest-draft.ts";
 const PREFLIGHT = "lib/services/games/contest-preflight.ts";
@@ -45,6 +46,31 @@ const CONFIG_FIELDS = "apps/admin/components/admin/games/ConfigSchemaFields.tsx"
 function readCode(relative: string): string {
   const raw = readFileSync(join(ROOT, relative), "utf8");
   return raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+}
+
+/**
+ * The wizard SCREEN: its orchestrator plus every step file it renders.
+ *
+ * The wizard was one 711-line component until 8 September 2026 and is now a state owner with
+ * its step bodies in `./wizard/`. Every claim below is about what the operator sees, so it has
+ * to be asserted over the whole screen - pinned to the orchestrator alone, each one would go
+ * green the moment the thing it guards moved into a step file, which is exactly the change
+ * that just happened.
+ *
+ * IT THROWS RATHER THAN RETURNING NOTHING when the folder is empty. A walk that silently finds
+ * no files turns every assertion below into a test of the empty string.
+ */
+function readWizardScreen(): string {
+  const files = readdirSync(join(ROOT, WIZARD_STEPS)).filter(
+    (name) => name.endsWith(".ts") || name.endsWith(".tsx"),
+  );
+  if (files.length === 0) {
+    throw new Error(`No step files under ${WIZARD_STEPS}`);
+  }
+  return [
+    readCode(WIZARD),
+    ...files.map((name) => readCode(`${WIZARD_STEPS}/${name}`)),
+  ].join("\n");
 }
 
 describe("describeRoundFit - turning the reserved ceiling into a moment", () => {
@@ -150,8 +176,7 @@ describe("the clock explanation is one definition, on both screens", () => {
       an explanation is not exempt: two copies eventually describe two different rules and the
       operator cannot tell which screen is lying.
     */
-    for (const screen of [WIZARD, EDITOR]) {
-      const code = readCode(screen);
+    for (const code of [readWizardScreen(), readCode(EDITOR)]) {
       expect(code).toMatch(/import \{ RoundClockNote \}/);
       expect(code).toMatch(/<RoundClockNote/);
     }
@@ -161,8 +186,7 @@ describe("the clock explanation is one definition, on both screens", () => {
     // Both questions get an answer where they are asked. An operator reading the settings step
     // wants to know what these fields are for; one on the timing step wants to know when
     // people can actually play.
-    for (const screen of [WIZARD, EDITOR]) {
-      const code = readCode(screen);
+    for (const code of [readWizardScreen(), readCode(EDITOR)]) {
       expect(code).toMatch(/variant="settings"/);
       expect(code).toMatch(/variant="timing"/);
     }
@@ -176,8 +200,7 @@ describe("the clock explanation is one definition, on both screens", () => {
     */
     expect(readCode(DRAFT)).toMatch(/export function describeRoundFit/);
 
-    for (const screen of [WIZARD, EDITOR, NOTE]) {
-      const code = readCode(screen);
+    for (const code of [readWizardScreen(), readCode(EDITOR), readCode(NOTE)]) {
       // The subtraction that produces the cut-off must appear nowhere but the helper.
       expect(code).not.toMatch(/maxDurationSeconds \* 1000/);
     }
@@ -302,7 +325,7 @@ describe("the wizard's closing note", () => {
       is worse than none: this one sent them looking for a missing feature instead of pressing
       a button that was already there.
     */
-    const code = readCode(WIZARD);
+    const code = readWizardScreen();
     expect(code).toMatch(/Publish/);
     expect(code).not.toMatch(/Publishing arrives with/);
 
@@ -419,8 +442,8 @@ describe("the round-start policy - the gate became the contest's choice", () => 
   it("is one control, shared by the wizard and the editor", () => {
     // Same reasoning as `UnscoredPolicyField` and `RoundClockNote`: a rule about where money
     // and play time go, offered twice, eventually offers two different sets of options.
-    for (const screen of [WIZARD, EDITOR]) {
-      expect(readCode(screen)).toMatch(/<RoundStartPolicyField/);
+    for (const code of [readWizardScreen(), readCode(EDITOR)]) {
+      expect(code).toMatch(/<RoundStartPolicyField/);
     }
 
     // And the option ids and consequence sentences come from the module the SERVER reads, so
@@ -466,8 +489,7 @@ describe("the round-start policy - the gate became the contest's choice", () => 
 
     // Both screens pass the policy in. A note that always read the default would describe the
     // reserving rule on a permissive contest and nobody would see the two disagree.
-    for (const screen of [WIZARD, EDITOR]) {
-      const code = readCode(screen);
+    for (const code of [readWizardScreen(), readCode(EDITOR)]) {
       const notes = code.match(/roundStartPolicy=\{draft\.roundStartPolicy\}/g) ?? [];
       // Twice per screen: the settings variant and the timing variant.
       expect(notes.length).toBeGreaterThanOrEqual(2);

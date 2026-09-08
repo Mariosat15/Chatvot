@@ -3,56 +3,133 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlertTriangle, ArrowLeft, ArrowRight, Loader2, Check } from "lucide-react";
+import {
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Coins,
+  FileText,
+  Gamepad2,
+  Loader2,
+  SlidersHorizontal,
+  Trophy,
+  Users,
+  Zap,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { useAppSettings } from "@/contexts/AppSettingsContext";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { ConfigSchemaFields, defaultConfigValues } from "./ConfigSchemaFields";
-import { PrizeDistributionEditor } from "./PrizeDistributionEditor";
-import { UnscoredPolicyField } from "./UnscoredPolicyField";
-import { RoundClockNote } from "./RoundClockNote";
-import { RoundStartPolicyField } from "./RoundStartPolicyField";
+  WizardPreview,
+  WizardPreviewRow,
+  WizardShell,
+  WizardStepCard,
+  WizardStepRail,
+  type WizardStep,
+} from "@/components/admin/wizard/WizardShell";
+import { defaultConfigValues } from "./ConfigSchemaFields";
 import type { ContestableTitle } from "./contest-types";
+import { type ContestDraft, emptyDraft, toRequestBody } from "./contest-draft";
+import { StepChooseGame } from "./wizard/StepChooseGame";
 import {
-  type ContestDraft,
-  emptyDraft,
-  toRequestBody,
-} from "./contest-draft";
+  DESCRIPTION_WORD_LIMIT,
+  StepBasics,
+  countWords,
+} from "./wizard/StepBasics";
+import { StepSettings } from "./wizard/StepSettings";
+import { StepSchedule } from "./wizard/StepSchedule";
+import { StepPrizes } from "./wizard/StepPrizes";
+import { StepReview } from "./wizard/StepReview";
 
 /**
  * Creating a competition on a provider game.
  *
- * FOUR STEPS, NOT THE TRADING FORM'S SEVEN, because three of those seven are trading
- * instruments, starting capital and leverage - none of which a provider game has. The
- * acceptance criterion in chapter 12 is that a provider contest is creatable "without a
- * single trading field appearing", and the honest way to meet it is a form that has none.
+ * SIX STEPS ON THE TRADING FORM'S CHROME, WHICH IS A DEVIATION FROM THE FOUR THIS SCREEN HAD
+ * AND FROM THE FOUR CHAPTER 12 ASKED FOR, recorded rather than absorbed. The owner's report
+ * was that the two wizards looked like two different products, and the fix for that is the
+ * shared shell in `components/admin/wizard/` - but four steps on a seven-step rail still
+ * reads as a cut-down form. The steps below mirror trading's grouping one-for-one where the
+ * question is the same (basics, money, clock, prizes, launch) and replace its three
+ * trading-only steps with the two a game needs: which title, and that title's own settings.
  *
- * IT SAVES A DRAFT. Players cannot see drafts, and that is required rather than cautious -
- * the player-facing side of a provider contest is X7, and the entry path still copies
- * trading starting capital onto a participant. Publishing waits for X5.
+ * NO TRADING FIELD APPEARS, which is chapter 12's acceptance criterion and the reason this is
+ * a separate wizard rather than a branch inside the 2,900-line trading form. There is also no
+ * market card in the sidebar: a puzzle does not care whether the forex market is open.
+ *
+ * THE STEP BODIES LIVE IN `./wizard/`. This file owns the state, the order, the two network
+ * calls and the navigation; that split keeps every file under the 500-line limit and means a
+ * step can be reordered without touching what it renders.
  */
 
 interface ProviderContestWizardProps {
   titles: ContestableTitle[];
 }
 
-const STEPS = ["Game", "Settings", "Timing & prizes", "Review"] as const;
+/**
+ * Defined here, in a client component, and it must stay that way: `icon` is a React
+ * component, and handing a function across a server/client boundary is what took the trading
+ * lobby down on 6 September (R39). Nothing server-rendered may build this list.
+ */
+const STEPS: readonly WizardStep[] = [
+  {
+    title: "Game",
+    description: "Choose the title",
+    icon: Gamepad2,
+    accent: "purple",
+  },
+  {
+    title: "Basic Info",
+    description: "Name and description",
+    icon: FileText,
+    accent: "blue",
+  },
+  {
+    title: "Game Settings",
+    description: "The game's own options",
+    icon: SlidersHorizontal,
+    accent: "orange",
+  },
+  {
+    title: "Schedule & Entry",
+    description: "Clock, fee and players",
+    icon: Calendar,
+    accent: "green",
+  },
+  {
+    title: "Prizes & Rules",
+    description: "Distribution and edge cases",
+    icon: Trophy,
+    accent: "yellow",
+  },
+  {
+    title: "Launch",
+    description: "Review and create",
+    icon: Zap,
+    accent: "green",
+  },
+];
+
+const STEP_GAME = 0;
+const STEP_BASICS = 1;
+const STEP_SETTINGS = 2;
+const STEP_SCHEDULE = 3;
+const STEP_PRIZES = 4;
+const STEP_REVIEW = 5;
 
 export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
   const router = useRouter();
-  const [step, setStep] = useState(0);
+  const { settings } = useAppSettings();
+  const [step, setStep] = useState<number>(STEP_GAME);
   const [draft, setDraft] = useState<ContestDraft>(emptyDraft);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
+
+  const currencySymbol = settings?.credits?.symbol ?? "";
+  // Reason: `.at()` rather than STEPS[step] so the lookup is total. A computed index into an
+  // array is also what the object-injection lint rule flags, and silencing that rule here
+  // would silence it for whatever is added beside this line later.
+  const currentStep = STEPS.at(step) ?? STEPS[0];
 
   const selected = titles.find(
     (t) => t.providerKey === draft.providerKey && t.gameCode === draft.gameCode,
@@ -94,7 +171,7 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
       }
       setErrors(data.errors ?? []);
       setWarnings(data.warnings ?? []);
-      setStep(3);
+      setStep(STEP_REVIEW);
     } catch {
       toast.error("Something went wrong. Please contact support.");
     } finally {
@@ -182,530 +259,179 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
     }
   }
 
+  /** Why the operator cannot move on yet, or null when they can. */
+  function blockedReason(): string | null {
+    if (step === STEP_GAME && !selected) return "Choose a game first.";
+    if (step === STEP_BASICS) {
+      if (!draft.name.trim()) return "The contest needs a name.";
+      if (countWords(draft.description) > DESCRIPTION_WORD_LIMIT)
+        return `The description is over ${DESCRIPTION_WORD_LIMIT} words.`;
+    }
+    if (step === STEP_SETTINGS && selected && !selected.schema.ok)
+      return "This game's settings cannot be read.";
+    return null;
+  }
+
+  const blocked = blockedReason();
+
+  const nav = (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => {
+          if (step > STEP_GAME) setStep((s) => s - 1);
+          else router.push("/?activeTab=competitions");
+        }}
+        disabled={submitting}
+        className="border-gray-600 hover:bg-gray-700"
+      >
+        <ChevronLeft className="h-4 w-4 mr-2" />
+        {step === STEP_GAME ? "Cancel" : "Previous"}
+      </Button>
+
+      {step < STEP_PRIZES && (
+        <Button
+          type="button"
+          onClick={() => setStep((s) => s + 1)}
+          disabled={blocked !== null}
+          title={blocked ?? undefined}
+          className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-gray-900 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Next Step
+          <ChevronRight className="h-4 w-4 ml-2" />
+        </Button>
+      )}
+
+      {step === STEP_PRIZES && (
+        <Button
+          type="button"
+          onClick={runPreflight}
+          disabled={submitting}
+          className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-gray-900 font-semibold"
+        >
+          {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          Check and review
+          <ChevronRight className="h-4 w-4 ml-2" />
+        </Button>
+      )}
+
+      {step === STEP_REVIEW && (
+        <Button
+          type="button"
+          onClick={submit}
+          disabled={submitting || errors.length > 0}
+          className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-gray-900 font-bold"
+        >
+          {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          {draft.publishOnSave ? "Create and publish" : "Create draft"}
+        </Button>
+      )}
+    </>
+  );
+
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <ol className="flex items-center gap-2 text-sm">
-        {STEPS.map((label, index) => (
-          <li
-            key={label}
-            className={`flex items-center gap-2 ${
-              index === step ? "text-yellow-400" : "text-gray-500"
-            }`}
-          >
-            <span
-              className={`h-6 w-6 rounded-full grid place-items-center text-xs ${
-                index < step
-                  ? "bg-green-600 text-white"
-                  : index === step
-                    ? "bg-yellow-500 text-gray-900"
-                    : "bg-gray-700"
-              }`}
-            >
-              {index < step ? <Check className="h-3 w-3" /> : index + 1}
-            </span>
-            {label}
-            {index < STEPS.length - 1 && (
-              <span className="text-gray-700 ml-1">/</span>
-            )}
-          </li>
-        ))}
-      </ol>
+    <WizardShell
+      sidebar={
+        <>
+          <WizardStepRail steps={STEPS} currentIndex={step} />
 
-      <div className="bg-gray-800/50 border border-gray-700 rounded-2xl p-6">
-        {step === 0 && (
-          <StepGame titles={titles} selected={selected} onSelect={selectTitle} />
-        )}
-
-        {step === 1 && selected && (
-          <div className="space-y-5">
-            <h3 className="text-lg font-semibold text-white">
-              {selected.displayName} settings
-            </h3>
-            <RoundClockNote
-              variant="settings"
-              startTime={draft.startTime}
-              endTime={draft.endTime}
-              maxDurationSeconds={selected.maxDurationSeconds}
-              roundStartPolicy={draft.roundStartPolicy}
+          {/*
+            THE PREVIEW SHOWS GAME FACTS, NOT TRADING ONES. The trading form's card reports
+            starting capital and leverage, neither of which exists here; the equivalent
+            questions for a game are which title, how long an attempt can run and how many
+            attempts a player gets. Every value comes off the catalogue row or the draft, so
+            a title nobody has seen yet fills this in with its own numbers.
+          */}
+          <WizardPreview>
+            <WizardPreviewRow
+              icon={Gamepad2}
+              iconClassName="text-purple-400"
+              label="Game"
+              value={selected?.displayName ?? "Not chosen"}
             />
-            {selected.schema.ok ? (
-              <ConfigSchemaFields
-                fields={selected.schema.fields}
-                values={draft.settings}
-                onChange={(name, value) =>
-                  patch({ settings: { ...draft.settings, [name]: value } })
-                }
-              />
-            ) : (
-              <Problem
-                title="This game's settings cannot be read"
-                lines={[selected.schema.error]}
-              />
-            )}
-          </div>
-        )}
+            <WizardPreviewRow
+              icon={Users}
+              label="Participants"
+              value={`${draft.minParticipants} - ${draft.maxParticipants}`}
+            />
+            <WizardPreviewRow
+              icon={Coins}
+              iconClassName="text-green-400"
+              label="Entry Fee"
+              value={`${currencySymbol}${draft.entryFee}`}
+            />
+            <WizardPreviewRow
+              icon={Trophy}
+              iconClassName="text-yellow-400"
+              label="Prize ranks"
+              value={draft.prizeDistribution.length}
+            />
+            <WizardPreviewRow
+              icon={Clock}
+              iconClassName="text-blue-400"
+              label="Attempt length"
+              value={
+                selected?.maxDurationSeconds
+                  ? `up to ${selected.maxDurationSeconds}s`
+                  : "-"
+              }
+            />
+          </WizardPreview>
 
-        {step === 2 && (
-          <StepTiming
-            draft={draft}
-            patch={patch}
-            maxDurationSeconds={selected?.maxDurationSeconds}
+          {selected && (
+            <div className="rounded-xl border border-gray-700 bg-gray-800/50 p-4">
+              <p className="text-xs text-gray-400">
+                Settings, scoring and round length all come from{" "}
+                <strong className="text-gray-200">
+                  {selected.providerName}
+                </strong>
+                &apos;s catalogue, so this form changes with the game.
+              </p>
+            </div>
+          )}
+        </>
+      }
+    >
+      <WizardStepCard step={currentStep} footer={nav}>
+        {step === STEP_GAME && (
+          <StepChooseGame
+            titles={titles}
+            selected={selected}
+            onSelect={selectTitle}
           />
         )}
 
-        {step === 3 && (
+        {step === STEP_BASICS && (
+          <StepBasics draft={draft} patch={patch} title={selected} />
+        )}
+
+        {step === STEP_SETTINGS && selected && (
+          <StepSettings draft={draft} patch={patch} title={selected} />
+        )}
+
+        {step === STEP_SCHEDULE && (
+          <StepSchedule
+            draft={draft}
+            patch={patch}
+            maxDurationSeconds={selected?.maxDurationSeconds}
+            currencySymbol={currencySymbol}
+          />
+        )}
+
+        {step === STEP_PRIZES && <StepPrizes draft={draft} patch={patch} />}
+
+        {step === STEP_REVIEW && (
           <StepReview
             draft={draft}
             patch={patch}
             title={selected}
             errors={errors}
             warnings={warnings}
+            currencySymbol={currencySymbol}
           />
         )}
-      </div>
-
-      <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          onClick={() => setStep((s) => Math.max(0, s - 1))}
-          disabled={step === 0 || submitting}
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-
-        {step < 2 && (
-          <Button
-            onClick={() => setStep((s) => s + 1)}
-            disabled={!selected || (step === 1 && !selected.schema.ok)}
-          >
-            Next
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
-        )}
-
-        {step === 2 && (
-          <Button onClick={runPreflight} disabled={submitting}>
-            {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Check and review
-          </Button>
-        )}
-
-        {step === 3 && (
-          <Button
-            onClick={submit}
-            disabled={submitting || errors.length > 0}
-            className="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold"
-          >
-            {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {draft.publishOnSave ? "Create and publish" : "Create draft"}
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function StepGame({
-  titles,
-  selected,
-  onSelect,
-}: {
-  titles: ContestableTitle[];
-  selected?: ContestableTitle;
-  onSelect: (title: ContestableTitle) => void;
-}) {
-  if (titles.length === 0) {
-    return (
-      <Problem
-        title="No games are available yet"
-        lines={[
-          "A game appears here once its provider is enabled, its catalogue is synced, and the title is switched on in the provider's game list.",
-        ]}
-      />
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      <h3 className="text-lg font-semibold text-white">Choose the game</h3>
-      {titles.map((title) => {
-        const isSelected =
-          selected?.providerKey === title.providerKey &&
-          selected?.gameCode === title.gameCode;
-        return (
-          <button
-            key={`${title.providerKey}:${title.gameCode}`}
-            onClick={() => onSelect(title)}
-            disabled={!title.supportsCompetition}
-            className={`w-full text-left p-4 rounded-xl border transition ${
-              isSelected
-                ? "border-yellow-500 bg-yellow-500/10"
-                : "border-gray-700 hover:border-gray-600"
-            } disabled:opacity-40 disabled:cursor-not-allowed`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-white">{title.displayName}</span>
-              <span className="text-xs text-gray-400">{title.providerName}</span>
-            </div>
-            <p className="text-xs text-gray-400 mt-1">
-              {title.scoreDirection === "lower_is_better"
-                ? "Lower score wins"
-                : "Higher score wins"}
-              {title.maxDurationSeconds
-                ? ` / up to ${title.maxDurationSeconds}s a round`
-                : ""}
-              {!title.supportsCompetition && " / does not support competitions"}
-            </p>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function StepTiming({
-  draft,
-  patch,
-  maxDurationSeconds,
-}: {
-  draft: ContestDraft;
-  patch: (changes: Partial<ContestDraft>) => void;
-  maxDurationSeconds?: number;
-}) {
-  return (
-    <div className="space-y-5">
-      <h3 className="text-lg font-semibold text-white">Timing, entry and prizes</h3>
-
-      <div className="space-y-2">
-        <Label className="text-gray-200">Name</Label>
-        <Input
-          value={draft.name}
-          onChange={(e) => patch({ name: e.target.value })}
-          className="bg-gray-900 border-gray-700 text-white"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label className="text-gray-200">Description</Label>
-        <Textarea
-          value={draft.description}
-          onChange={(e) => patch({ description: e.target.value })}
-          className="bg-gray-900 border-gray-700 text-white"
-          rows={3}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <DateField
-          label="Contest starts"
-          value={draft.startTime}
-          onChange={(v) => patch({ startTime: v })}
-        />
-        <DateField
-          label="Contest ends"
-          value={draft.endTime}
-          onChange={(v) => patch({ endTime: v })}
-        />
-      </div>
-      {/*
-        THE PLAY WINDOW USED TO BE TWO MORE DATE FIELDS HERE, AND IT IS NOT A SIMPLIFICATION TO
-        REMOVE THEM - it is the fix for a contest that could not do what a contest is for.
-
-        Four dates let an operator open play at a different moment from the contest, which
-        sounds like flexibility and is really a way to build a contest nobody can win fairly:
-        players who started earlier got a longer run at it, and the field named "ends" gated
-        nothing a player played inside. The owner's requirement is one clock for everybody -
-        the contest opens, every player has exactly the same window, it closes, every round
-        closes with it and settlement runs.
-
-        So the window is now DERIVED from the contest, in `contest-draft.ts`, and there is
-        nothing to set. Entry is not squeezed by this: registration closes at `startTime`, so
-        an operator who wants five minutes of sign-up time creates the contest five minutes
-        before it starts. That is what the trading wizard already does.
-
-        THE PARAGRAPH THAT USED TO SIT HERE said most of this and stopped short of the fact the
-        owner was missing - that an attempt cannot be started in the final stretch, because the
-        platform reserves the game's longest possible round. It is now `RoundClockNote`, shared
-        with the editor, so the two screens cannot describe the clock differently.
-      */}
-      <RoundClockNote
-        variant="timing"
-        startTime={draft.startTime}
-        endTime={draft.endTime}
-        maxDurationSeconds={maxDurationSeconds}
-        roundStartPolicy={draft.roundStartPolicy}
-      />
-
-      {/*
-        Placed with the dates rather than with the round settings, because the question it
-        answers is about the contest's clock - "when can people actually play?" - and it
-        changes what the note directly above says. Two screens apart, an operator would read
-        a cut-off, scroll, change the policy, and never see the note stop mentioning one.
-      */}
-      <RoundStartPolicyField
-        value={draft.roundStartPolicy}
-        onChange={(value) => patch({ roundStartPolicy: value })}
-      />
-
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <NumberField
-          label="Entry fee"
-          value={draft.entryFee}
-          onChange={(v) => patch({ entryFee: v })}
-        />
-        <NumberField
-          label="Min players"
-          value={draft.minParticipants}
-          onChange={(v) => patch({ minParticipants: v })}
-        />
-        <NumberField
-          label="Max players"
-          value={draft.maxParticipants}
-          onChange={(v) => patch({ maxParticipants: v })}
-        />
-        {/*
-          Missing until now, and silently: the draft carried `platformFeePercentage: 10` and
-          the wizard never rendered it, so every provider contest took ten per cent whatever
-          the operator wanted. The editor has always exposed it, which is the worse version of
-          the bug - the setting appears once the contest exists, so it reads as a field the
-          operator forgot rather than one they were never offered.
-        */}
-        <NumberField
-          label="Platform fee %"
-          value={draft.platformFeePercentage}
-          onChange={(v) => patch({ platformFeePercentage: v })}
-        />
-      </div>
-      <p className="text-xs text-gray-500">
-        Below the minimum the contest auto-cancels and every entry fee is
-        refunded in full.
-      </p>
-
-      <div className="space-y-2">
-        <Label className="text-gray-200">Prize distribution</Label>
-        <PrizeDistributionEditor
-          value={draft.prizeDistribution}
-          onChange={(v) => patch({ prizeDistribution: v })}
-          platformFeePercentage={draft.platformFeePercentage}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label className="text-gray-200">Attempts</Label>
-          <Select
-            value={draft.attemptsPolicy}
-            onValueChange={(v) =>
-              patch({ attemptsPolicy: v as ContestDraft["attemptsPolicy"] })
-            }
-          >
-            <SelectTrigger className="bg-gray-900 border-gray-700 text-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="single">One attempt each</SelectItem>
-              <SelectItem value="best_of_n">Best of several</SelectItem>
-              <SelectItem value="sum_of_n">Total of several</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {draft.attemptsPolicy !== "single" && (
-          <NumberField
-            label="How many attempts"
-            value={draft.attemptsAllowed}
-            onChange={(v) => patch({ attemptsAllowed: v })}
-          />
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <Label className="text-gray-200">
-          If a player&apos;s result never arrives
-        </Label>
-        <Select
-          value={draft.unresolvedRoundPolicy}
-          onValueChange={(v) =>
-            patch({
-              unresolvedRoundPolicy: v as ContestDraft["unresolvedRoundPolicy"],
-            })
-          }
-        >
-          <SelectTrigger className="bg-gray-900 border-gray-700 text-white">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="score_zero">Score it zero and settle on time</SelectItem>
-            <SelectItem value="hold_and_alert">
-              Hold settlement and alert an admin
-            </SelectItem>
-            {/*
-              The parenthetical used to read "refund not automatic yet" and was TRUE when it
-              was written. `exclusion-refund.ts` shipped with X5 and R44 gave it the input it
-              needed, so the caution became a false statement about the operator's own
-              platform - which is worse than no caution: it either scares an operator off a
-              policy that works, or has them refund by hand on top of the automatic payment.
-            */}
-            <SelectItem value="exclude">
-              Remove the player and refund their entry fee
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <NumberField
-        label="Result grace period (seconds)"
-        value={draft.resultGracePeriodSeconds}
-        onChange={(v) => patch({ resultGracePeriodSeconds: v })}
-      />
-
-      <UnscoredPolicyField
-        value={draft.unscoredContestPolicy}
-        onChange={(value) => patch({ unscoredContestPolicy: value })}
-      />
-    </div>
-  );
-}
-
-function StepReview({
-  draft,
-  patch,
-  title,
-  errors,
-  warnings,
-}: {
-  draft: ContestDraft;
-  patch: (changes: Partial<ContestDraft>) => void;
-  title?: ContestableTitle;
-  errors: string[];
-  warnings: string[];
-}) {
-  return (
-    <div className="space-y-5">
-      <h3 className="text-lg font-semibold text-white">Review</h3>
-
-      {errors.length > 0 && (
-        <Problem title="This contest cannot be created yet" lines={errors} />
-      )}
-
-      {warnings.length > 0 && (
-        <div className="rounded-xl border border-amber-600/50 bg-amber-500/10 p-4">
-          <div className="flex items-center gap-2 text-amber-300 font-semibold text-sm mb-2">
-            <AlertTriangle className="h-4 w-4" />
-            Worth knowing
-          </div>
-          <ul className="text-sm text-amber-200/90 space-y-1 list-disc list-inside">
-            {warnings.map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {errors.length === 0 && (
-        <div className="rounded-xl border border-gray-700 bg-gray-900/60 p-4 text-sm text-gray-300 space-y-1">
-          <p>
-            <span className="text-gray-500">Game:</span>{" "}
-            {title?.displayName ?? "-"} ({title?.providerName})
-          </p>
-          <p>
-            <span className="text-gray-500">Name:</span> {draft.name || "-"}
-          </p>
-          <p>
-            <span className="text-gray-500">Entry fee:</span> {draft.entryFee}
-          </p>
-          <p>
-            <span className="text-gray-500">Players:</span>{" "}
-            {draft.minParticipants} to {draft.maxParticipants}
-          </p>
-          {/*
-            CORRECTED 7 SEP 2026, TWICE. It first ended "Publishing arrives with the
-            player-facing game screens", which was true when written and false from 5
-            September. It then described an unconditional draft, which stopped being true the
-            moment publishing became a checkbox - and a review step that describes the wrong
-            outcome is worse than one that describes none, because it is read as confirmation.
-          */}
-          <label className="mt-2 flex cursor-pointer items-start gap-3 rounded-lg border border-gray-700 bg-gray-800/60 p-3">
-            <input
-              type="checkbox"
-              checked={draft.publishOnSave}
-              onChange={(e) => patch({ publishOnSave: e.target.checked })}
-              className="mt-0.5 h-4 w-4 accent-yellow-500"
-            />
-            <span className="text-xs text-gray-300">
-              <strong className="text-white">
-                Publish immediately, so players can enter it
-              </strong>
-              <span className="mt-1 block text-gray-400">
-                {draft.publishOnSave
-                  ? "The contest is checked once more against what was actually saved, then made visible. If that second check refuses it, the contest is kept as a draft and the reasons are shown here."
-                  : "The contest is saved as a draft. Players cannot see or join a draft - press Publish on the contest list when you are ready."}
-              </span>
-            </span>
-          </label>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Problem({ title, lines }: { title: string; lines: string[] }) {
-  return (
-    <div className="rounded-xl border border-red-600/50 bg-red-500/10 p-4">
-      <div className="flex items-center gap-2 text-red-300 font-semibold text-sm mb-2">
-        <AlertTriangle className="h-4 w-4" />
-        {title}
-      </div>
-      <ul className="text-sm text-red-200/90 space-y-1 list-disc list-inside">
-        {lines.map((line) => (
-          <li key={line}>{line}</li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function DateField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="space-y-2">
-      <Label className="text-gray-200">{label}</Label>
-      <Input
-        type="datetime-local"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="bg-gray-900 border-gray-700 text-white"
-      />
-    </div>
-  );
-}
-
-function NumberField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number | undefined;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <div className="space-y-2">
-      <Label className="text-gray-200">{label}</Label>
-      <Input
-        type="number"
-        value={value === undefined ? "" : String(value)}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="bg-gray-900 border-gray-700 text-white"
-      />
-    </div>
+      </WizardStepCard>
+    </WizardShell>
   );
 }

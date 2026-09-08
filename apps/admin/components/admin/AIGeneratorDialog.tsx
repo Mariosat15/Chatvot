@@ -36,6 +36,17 @@ interface AIGeneratorDialogProps {
   generateType?: "both" | "title" | "description";
   currentTitle?: string;
   currentDescription?: string;
+  /**
+   * The catalogue title this contest is played on, when it is not a trading contest.
+   *
+   * A LOOKUP KEY, NOT VOCABULARY. The route derives every word it tells the model from the
+   * `provider_game` row this finds; the game's name, genre and scoring deliberately do not
+   * travel from the browser. Absent means trading, which is what keeps the trading wizard's
+   * output unchanged.
+   */
+  gameKey?: string;
+  /** What the game is called, for this dialog's own copy only. Never sent. */
+  subjectLabel?: string;
 }
 
 // Pre-made theme suggestions
@@ -92,6 +103,8 @@ export default function AIGeneratorDialog({
   generateType = "both",
   currentTitle = "",
   currentDescription = "",
+  gameKey,
+  subjectLabel,
 }: AIGeneratorDialogProps) {
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
@@ -113,7 +126,14 @@ export default function AIGeneratorDialog({
       const response = await fetch("/api/ai/generate-competition", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: prompt.trim(), type: generateType }),
+        body: JSON.stringify({
+          prompt: prompt.trim(),
+          type: generateType,
+          // Omitted entirely for a trading contest, rather than sent as "" or "trading" - the
+          // route reads an absent key as trading, and a magic string here would be a second
+          // place that decides what trading is called.
+          ...(gameKey ? { gameKey } : {}),
+        }),
       });
 
       const data = await response.json();
@@ -142,6 +162,14 @@ export default function AIGeneratorDialog({
       setLoading(false);
     }
   };
+
+  // Reason: scoped to the fields Apply will actually write, so a dialog opened for the
+  // description alone does not warn about a name it leaves untouched.
+  const replacesExistingCopy =
+    ((generateType === "both" || generateType === "title") &&
+      currentTitle.trim() !== "") ||
+    ((generateType === "both" || generateType === "description") &&
+      currentDescription.trim() !== "");
 
   const handleApply = () => {
     const result: { title?: string; description?: string } = {};
@@ -196,8 +224,9 @@ export default function AIGeneratorDialog({
             </span>
           </DialogTitle>
           <DialogDescription className="text-gray-400">
-            Describe your competition theme and let AI create engaging content
-            for you.
+            {subjectLabel
+              ? `Describe your competition theme and let AI write it for ${subjectLabel}.`
+              : "Describe your competition theme and let AI create engaging content for you."}
           </DialogDescription>
         </DialogHeader>
 
@@ -307,6 +336,20 @@ export default function AIGeneratorDialog({
                     </div>
                   </div>
                 )}
+
+              {/*
+                The two `current*` props exist for this line and had been accepted and
+                ignored since the dialog was written, so the trading form has always passed
+                content the dialog then said nothing about. Applying REPLACES what is in the
+                form, and the operator has scrolled past their own text to get here - the
+                same reasoning that puts the consequence above the confirm button on the
+                round-resolution dialog rather than in a toast afterwards.
+              */}
+              {replacesExistingCopy && (
+                <p className="text-xs text-amber-300/90">
+                  This replaces what you have already written.
+                </p>
+              )}
 
               {/* Apply Button */}
               <Button

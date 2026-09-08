@@ -4,6 +4,7 @@ import { TrendingUp, Gamepad2 } from "lucide-react";
 import { requireSectionAccess } from "@/lib/admin/auth";
 import { listContestableTitles } from "@/lib/services/game-providers/provider-contest.service";
 import { ProviderContestWizard } from "@/components/admin/games/ProviderContestWizard";
+import { WizardPageHeader } from "@/components/admin/wizard/WizardShell";
 import type { ContestableTitle } from "@/components/admin/games/contest-types";
 
 /**
@@ -50,19 +51,25 @@ export default async function NewContestPage({
 
   if (params.game === "provider") {
     return (
-      <div className="min-h-screen bg-gray-900 p-6">
-        <div className="max-w-3xl mx-auto mb-6">
-          <Link
-            href="/competitions/new"
-            className="text-sm text-gray-400 hover:text-white"
-          >
-            &larr; Choose a different game
-          </Link>
-          <h1 className="text-2xl font-bold text-white mt-2">
-            New contest on a provider game
-          </h1>
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-gray-800">
+        {/*
+          THE SAME BANNER AS THE TRADING WIZARD, from the shared shell. The owner's report was
+          that the two creation screens looked like two different products; the header is half
+          of what made that true, so it cannot stay a local one-off here.
+
+          `icon` is passed as a rendered element rather than as `Gamepad2` itself: this page is
+          a server component, and a component is a function, which cannot cross that boundary.
+        */}
+        <WizardPageHeader
+          title="Create Game Competition"
+          subtitle="Configure and launch a new competition on a provider game"
+          icon={<Gamepad2 />}
+          backHref="/competitions/new"
+          backLabel="Choose a different game"
+        />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <ProviderContestWizard titles={titles} />
         </div>
-        <ProviderContestWizard titles={titles} />
       </div>
     );
   }
