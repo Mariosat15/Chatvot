@@ -34,6 +34,7 @@
 | **Who is eligible for a prize?** | **R45 shipped the gate on 7 Sep 2026 and R50 made it work the same day.** `providerHasResult` is `Number.isFinite(participant.score)` and was written correctly - **an absent score was simply unreachable in production.** Three places supplied a nought before a player had played: `buildParticipantSeat` wrote `score: 0` at join, both schema copies declared `required: true, default: 0`, and the play state read `?? 0`. **Every entrant therefore qualified from the moment they paid**, so in the owner's own example - three ranks at 70/20/10, two players who played and one who never launched a round - the non-player ranked third on a phantom zero and took 10% of the pot instead of the rank being redistributed. **A schema default IS a stored value**, the same rule behind `entryBlockThreshold` and `canEnterChallenges`. **Latent for money, live for the screen**: nothing has settled in production, but the lobby's hero tile showed `0` rather than a dash, under a comment insisting on the dash. **A migration is needed even so** - a default fixes future rows only, so every existing seat holds a real `0` and an *open* contest would still settle the old way; `tools/games/clear-phantom-participant-scores.ts` is report-only and **has not been run**. R45's own suite passed throughout because it builds participants as **object literals omitting `score`, a shape no production writer could produce**. **`ChallengeParticipant` still defaults deliberately** (E8), pinned by a test - **the first provider challenge will reproduce this exactly** |
 | **How long is a game, and who decides?** | **Code-complete 8 Sep 2026** (`12` s2.9), from an owner report that a contest refused every attempt *from the moment it opened* - the same sentence `12` s2.7 had already made configurable, arriving again because s2.7 fixed the **rule** and never checked the **arithmetic**. The gate reserved the title's `maxDurationSeconds`, a catalogue **ceiling** no operator sets, rather than the playing time this contest grants. With the sprint's ceiling at 300 seconds and a wizard offering no way to change it, a five-minute reservation stood in front of every contest. **Two things made it invisible**: the ceiling and the configured length were **equal** for the one title that existed, and the platform had **no way to learn** which setting is the play clock without hard-coding a field name, which would have broken the no-developer-needed claim. Fixed by having titles declare it: **`format: "duration-seconds"`**, issued to providers as **version 1.3** of the requirements HTML (`01` s3.2). The gate now reads that; **`expiresAt` still reads the ceiling**, and the separation is load-bearing - the gate asks how much to reserve, expiry asks how long a round may live, and reading the configured value there would cut a player off mid-board. Shipped with a **play-time dropdown** (1/5/10/20/30/60 minutes plus custom, filtered against the title's own declared range), a **derived** result grace period, and a **blocking** refusal in the wizard naming both durations. **`reserve_full_round` is now the wizard's default** for new drafts, on the owner's instruction, which it could not sensibly have been while the reservation was five times the configured length; the **schema default is deliberately unchanged**. **45 tests, 20 probes red on exactly the expected test** |
 | **The games have no rounds, and never really did** | **8 Sep 2026** (`21` s4.1g). The owner's instruction was no fixed board count and no per-round restriction: a player gets a time budget, solves as many boards as they can, and is scored on count and speed. **The finding is that this was already Circuit Sprint, exactly** - so the work was the platform's clock (the row above), not the game's. **`circuit-perfect` was retired**, being the one title scored on finishing a fixed set - **`status: "deprecated"`, not deleted**, because `gameKey` is the join key for every stat it produced and the pre-flight already refuses a non-`active` title, so the deprecation *is* the enforcement. **What retiring it costs is recorded rather than glossed:** it was the only `lower_is_better` / `duration_ms` title, built precisely so a ranking sign error could not pass every test, and that direction now rests on unit tests and the golden regression rather than an end-to-end round. Sprint's play time widened to **1-60 minutes** (default 10) with its score range widened to match, because a range that truncates the best player's score is a payout defect wearing a validation message. **And most of the instruction needed no code at all:** ties, unclaimed shares, players who never scored and disqualification are decided by `05` s9.2/s9.3 and the ranking engine, none of it per-title, and registration has always closed at `startTime`. **204 tests in `games-service`**, up from 196 |
+| **When does entry close?** | **When playing stops being possible, since 8 Sep 2026** (`12` s2.10) - and before that, **the instant the contest opened**. `createProviderContest` wrote `registrationDeadline: new Date(input.startTime)`, so a player arriving one minute into a one-hour contest could not join at all. The owner asked for the opposite: join at any point before the end. **Taken literally that sells a seat that cannot play**, which is the part to carry: under `reserve_full_round` the gate refuses an attempt that would not fit in what remains, so entry open to the final second means a player pays, is refused every attempt, ranks on nothing, and since **R50** is not even eligible for the redistribution. So it closes at the window end under the permissive policy and **one whole attempt** before it under the reserving one - a fraction is forbidden by a test, because it would admit a player the gate then refuses. **The table row in `03` s1.2 saying registration closes before play opens is now wrong for a provider contest, and the owner overrode its reasoning knowingly** - a late joiner *can* see the leaderboard before paying; what makes that acceptable here and not in trading is that a game score is not actionable intelligence, so the residue is an informed *entry* decision rather than an informed *play* one. **Three places already derived this instant independently** and now delegate to one mirrored producer, `lib/services/games/entry-deadline.ts`; the two a player sees sit either side of a decision to travel to another screen, so a rounding's disagreement is a player told they have time and refused on arrival. **Two defects found on the way, both silent**: the create service resolved the policy fallback **twice**, so a probe changing either copy stayed green while a contest could store one policy and close entry under the other, and the edit service **loaded the title only when settings changed**, so moving just the end time recomputed the deadline against no play clock. **Nothing backfilled** - no provider contest has run in production |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
 | **Phase in progress** | **X4a - STARTED 6 Sep 2026. The two halves connected 7 Sep 2026** - see the row above and `21` s4.1d. What remains is the *clicking* half: the provider has still never been registered through the admin screens, and nothing has been deployed. `games-service/` (the provider) and the `chartvolt-games` adapter (the platform) are both code-complete. **The game is playable by a human**: the launch URL serves a real board, verified in a browser on both titles, which also fixed a live defect - an unstarted round reported itself as `finished`, so the first screen a paying player saw was a result screen for a round they had not played. It also **found and then closed a defect in the platform's own published auth scheme** (**R34**): there was no `callbackToken` field anywhere, so a provider implementing `Bearer {CALLBACK_TOKEN}` exactly was rejected and logged as a probable attack. Latent throughout, so nothing was backfilled. **Nothing technical now stands between the two halves** - what remains is deploying the service and registering it. It is now **deployable**: a PM2 entry, an nginx block for a `games.` subdomain, `env.example` and a `deploy/README.md` runbook, plus **two production-only boot guards** for the play origin and the frame allowlist, both of which previously failed invisibly. Writing the runbook also found that the admin panel **could not register a loopback provider at all**. See the three 6 Sep work-log entries |
 | **Next phase, scope decided** | **X4a - ChartVolt as a first-party provider, with a real playable game** (`21`), **3.5-5 weeks**, starting before the provider health panel. It exists because **the review gate the programme is sequenced around cannot currently be held**: `mock.adapter.ts` returns a hostname that does not resolve, so the play screen's iframe fails to load and the final step has never been performed by a person. **Owner decided 5 Sep 2026 that it is both** the reference implementation *and* open question 10's hedge game - which **modifies the 2 Sep "no in-house game is built" decision** and is recorded in the decision log rather than by editing that entry. **No commercial dependency.** Two things not to misread: **risk X8 is reduced when it ships, not now**, and X4a **shrinks X4 without replacing it** - a provider we control cannot rehearse a real partner's auth, error shapes, latency or pricing |
@@ -660,6 +661,86 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 8 Sep 2026 - X6 / `12` s2.10 - ENTRY CLOSED THE INSTANT THE CONTEST OPENED
+
+**Shipped:** entry to a provider contest now closes at **the last moment playing is still
+possible** rather than at the contest's own start. **17 tests in
+`__tests__/services/contest-entry-deadline.test.ts`, 18 probes red on exactly the expected test
+with exactly one failure each**, 1564 across the platform, both typechecks at baseline
+(**198** main, **223** admin) with nothing in the changed files and nothing disappearing,
+`check:mirrors` green.
+
+**The defect:** `createProviderContest` wrote `registrationDeadline: new Date(input.startTime)`.
+A player arriving one minute into a one-hour contest could not join it at all. The owner's
+instruction, given alongside s2.9, was the opposite: *"the player can join the competition any
+time before the competition ends."*
+
+**Taken literally the instruction sells a seat that cannot play, and that is the design.**
+Under `reserve_full_round` - which s2.9 made the wizard's default hours earlier - the gate in
+`round.service.ts` refuses an attempt that would not fit in what remains. Entry open to the
+final second therefore means a player pays an entry fee, is **refused every attempt**, ranks on
+nothing, and since **R50** is not even eligible for the redistribution. Nothing errors and
+nothing logs. So the deadline is the window end under `until_window_closes` and **one whole
+attempt** before it under `reserve_full_round`, which is the same subtraction the gate performs.
+
+**Three rules that were decisions rather than implementation details.** A **fraction** of an
+attempt is forbidden by a test, because it admits a player the gate then refuses - the original
+defect in different clothes. **No attempt length at all means no reservation**, matching the
+gate's own `attemptSeconds ?? maxDurationSeconds ?? 0`; guessing would close entry against a
+rule nothing enforces. And **the start is a floor** - a contest exactly one attempt long
+subtracts to its own start, and a deadline before the start is not a short entry window, it is
+a contest nobody can enter.
+
+**One producer, three consumers, a net reduction from three to one.** The play screen's
+pre-flight, the wizard's clock note and now the stored deadline all answer the same question,
+and **the two a player sees sit either side of a decision to travel to another screen** - so a
+disagreement of even a rounding is a player told they have time and refused on arrival. That is
+the "one rule, two copies" shape behind `referenceId`, `failedReason`, `challengeId`, the Game
+Master `||` and the score direction R37 closed, **none of which `check:mirrors` can see**. The
+guarantee is a byte-for-byte mirror test plus a **negative** assertion per consumer, which is
+the load-bearing half: importing the module is trivially satisfied by a file that imports it and
+does the sum again five lines later, exactly what `RoundPreflight` did before `round-window.ts`
+was extracted.
+
+**Two further defects found on the way, both silent.** The create service resolved
+`input.roundStartPolicy ?? "reserve_full_round"` in **two** places, so a contest could store one
+policy while closing entry under the other - and **a probe changing either copy stayed green**,
+because the assertion found the other one. Resolved once; the test now **counts** the
+occurrences. Separately the edit service **loaded the title only inside the settings branch**,
+so an edit moving just the end time recomputed the deadline against no play clock and left entry
+open to the last second - **a conditional read feeding an unconditional write**, and the
+condition reads perfectly sensibly.
+
+**Four things that generalise:**
+
+- **An edit must recompute a derived field LAST, from the merged document.** Four values feed
+  this deadline and an operator may move any subset, so its old home inside the start-time
+  branch was wrong the moment the window moved instead. Reading `input` is the same bug from the
+  other side: stale for every field left untouched. Both pinned by **position**, not presence.
+- **A shared pure module's real requirement is "no runtime import", not "no import".**
+  `RoundPreflight` is `"use client"` and the lobby is a server component, so a value import of a
+  model here fails the client build one screen away with an error naming Mongoose. The guard
+  permits `import type` deliberately - a blanket ban forbids exactly the de-duplication it is
+  there to protect, and an older test asserting *no imports at all* had to be **narrowed** with
+  the reason recorded rather than loosened.
+- **Check the clamp direction before assuming a change is visible.**
+  `resolveRegistrationDeadline` clamps against `startTime`, and it is a **floor**. Written as a
+  ceiling it would have pulled every new deadline back to the start, making the entire change
+  invisible on the one screen that matters **with every test still green**.
+- **A flipped test needs the right mutation, and the expected value must not be derived the way
+  the code derives it.** `provider-contest-edit.test.ts` asserted `deadline === startTime`,
+  which *was* the rule; the reason it existed still holds, so it was flipped rather than
+  deleted. Its load-bearing assertion is now that entry **survives the start**, because
+  recomputing the exact instant in the test would pass against any arithmetic the service used.
+
+**Deferred:** nothing. **Nothing backfilled** - no provider contest has run in production, and
+the defect was an absent derivation rather than a stored value.
+
+**Next chat should:** carry on with X6's remaining `12` s5 item (per-round provider cost, which
+is blocked on X4 for a data source), then X6.5.
 
 ---
 

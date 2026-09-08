@@ -1120,6 +1120,103 @@ disabled game's rows rather than removing them.
 
 ---
 
+### 2.10 Entry closed the instant the contest opened - BUILT 8 September 2026
+
+The owner's instruction, given with 2.9: *"the player can join the competition any time
+before the competition ends."* A provider contest was doing the exact opposite.
+`createProviderContest` wrote **`registrationDeadline: new Date(input.startTime)`**, so a
+player arriving one minute into a one-hour contest could not join it at all. **17 tests in
+`__tests__/services/contest-entry-deadline.test.ts`, 18 probes red on exactly the expected
+test with exactly one failure each**, 1564 tests across the platform, both typechecks at
+baseline (198 main, 223 admin) with nothing in the changed files and nothing disappearing.
+
+| File | What changed |
+|---|---|
+| `lib/services/games/entry-deadline.ts` (**new**, mirrored) | `resolveContestEntryDeadline` and `entryDeadlineMs` - the one producer |
+| `apps/admin/lib/services/game-providers/provider-contest.service.ts` | Derives the deadline; resolves the policy fallback **once** |
+| `apps/admin/lib/services/game-providers/provider-contest-edit.service.ts` | Recomputes the deadline last, from the document; loads the title unconditionally |
+| `components/games/round-window.ts` | `fullRoundCutoffMs` forwards to the producer |
+| `apps/admin/components/admin/games/contest-draft.ts` | `describeRoundFit` forwards to the producer |
+
+#### Taken literally the instruction sells a seat that cannot play
+
+This is the part a summary will flatten, and it is the whole design. Under
+`reserve_full_round` - which 2.9 made the wizard's default - the gate in `round.service.ts`
+refuses an attempt that would not fit in what remains. Entry open to the final second
+therefore means a player pays an entry fee, is **refused every attempt**, ranks on
+nothing, and since **R50** is not even eligible for the redistribution. Nothing errors and
+nothing logs.
+
+So the deadline is **the last moment playing is still possible**: the window end under
+`until_window_closes`, and one whole attempt before it under `reserve_full_round`. Three
+further rules, each of which was a decision rather than an implementation detail.
+
+- **A fraction of an attempt is not admissible.** Reserving half would let in a player the
+  gate then refuses, which is the original defect wearing different clothes. A test forbids
+  it.
+- **No attempt length at all means no reservation**, matching the gate's own
+  `attemptSeconds ?? maxDurationSeconds ?? 0`. Guessing a length here would close entry
+  against a rule nothing enforces.
+- **The start is a floor.** A contest exactly as long as one attempt subtracts to its own
+  start; a longer attempt than window subtracts to a moment already past. A deadline before
+  the start is not a short entry window, it is a contest nobody can enter.
+
+#### One producer, three consumers, and it is a net reduction
+
+Three places were already deriving this instant independently - the play screen's
+pre-flight, the wizard's clock note, and now the stored deadline. **The two a player sees
+sit either side of a decision to travel to another screen**, so a disagreement of even a
+rounding is a player told they have time and then refused on arrival. That is the "one
+rule, two copies" shape behind `referenceId`, `failedReason`, `challengeId`, the Game
+Master `||` and the score direction R37 closed - **none of which `check:mirrors` can see,
+because it compares models.** The guarantee here is a byte-for-byte test plus a negative
+assertion per consumer, and the negative half is the load-bearing one: importing the module
+is trivially satisfied by a file that imports it and does the sum again five lines later,
+which is exactly what `RoundPreflight` did before `round-window.ts` was extracted.
+
+**The module stays importable by a client component**, which is what makes one producer
+possible at all: `RoundPreflight` is `"use client"` and the provider lobby is a server
+component, so a value import of a model here would fail the client build one screen away
+with an error naming Mongoose. The guard permits `import type` and forbids runtime imports,
+rather than forbidding imports outright - a blanket ban would forbid exactly the
+de-duplication that removes the second copy.
+
+#### Four things that generalise
+
+- **An edit must RECOMPUTE the deadline, last, from the document.** Four values feed it and
+  an operator may move any subset, so the old placement - inside the start-time branch - is
+  wrong the moment the play window or the settings move instead. Reading `input` rather than
+  the merged document is the same bug from the other direction: stale for every field the
+  operator did not touch. Both are pinned by **position**, not by presence.
+- **A fallback written twice is a contest that stores one policy and closes entry under the
+  other.** The create service briefly had `input.roundStartPolicy ?? "reserve_full_round"`
+  in two places, and a probe changing either one **stayed green** because the assertion
+  found the other. It is now resolved once and the test **counts** the occurrences. Sixth
+  "probe stayed green" instance; answer: weak test.
+- **The edit service loaded the title only when settings changed**, so an edit moving just
+  the end time recomputed the deadline against no play clock and left entry open to the last
+  second. It is now loaded unconditionally. **A conditional read feeding an unconditional
+  write is a silent hole**, and the condition reads perfectly sensibly.
+- **A test that asserted the defect was flipped, not deleted, and the mutation matters.**
+  `provider-contest-edit.test.ts` asserted `deadline === startTime`, which *was* the rule.
+  The reason it was written still holds - leaving the old deadline behind after moving the
+  schedule is silently wrong - so it now asserts the derived instant plus, as the
+  load-bearing half, that entry **survives the start**. Deriving the expected value the way
+  the service does would have been tautological.
+
+#### What did NOT change
+
+**The registration clamp in `lib/utils/registration-deadline.ts` is a floor, not a
+ceiling**, so the later deadline reaches the player's gate and countdown untouched. Worth
+checking rather than assuming: written as a ceiling it would have clamped every new deadline
+back to `startTime` and the whole change would have been invisible on the only screen that
+matters, with every test still green.
+
+**Trading is untouched.** Its `registrationDeadline` is operator-chosen and may legitimately
+be absent, which `resolveRegistrationDeadline` already reads as "limited only by status".
+
+---
+
 ## 3. Contest list and detail screens
 
 | Screen | Change |

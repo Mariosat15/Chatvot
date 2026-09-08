@@ -1538,7 +1538,27 @@ describe("the last moment to start an attempt has one producer", () => {
     */
     const producer = readCode(ROUND_WINDOW);
     expect(producer).not.toMatch(/"use client"/);
-    expect(producer).not.toMatch(/^import /m);
+
+    /*
+      NARROWED 8 September 2026, and the reason is worth keeping. This asserted the file had
+      no imports AT ALL, which held while it owned the subtraction and stopped holding the
+      moment it started forwarding to `lib/services/games/entry-deadline` - the shared producer
+      the two admin writers also read, so that the deadline a player is shown and the deadline
+      stored on the contest cannot disagree.
+
+      "No imports" was only ever a proxy for the real requirement, so state that instead: this
+      file may reach for pure modules and must never reach for a model or for Mongoose. A
+      blanket ban is the wrong guard here - it forbids exactly the de-duplication that removes
+      a second copy of the rule, which is the failure shape behind `referenceId`,
+      `failedReason`, `challengeId` and the Game Master `||`.
+    */
+    const imports = [...producer.matchAll(/^import[^;]+from\s+"([^"]+)"/gm)].map(
+      (m) => m[1],
+    );
+    expect(imports).toEqual(["@/lib/services/games/entry-deadline"]);
+    for (const specifier of imports) {
+      expect(specifier).not.toMatch(/mongoose|database\/models/);
+    }
   });
 
   it("shows the lobby countdown only where a cut-off really exists", () => {

@@ -639,9 +639,17 @@ describe("editProviderContest", () => {
     expect(result.error).toContain("no fields");
   });
 
-  it("moves the registration deadline with the start time", async () => {
-    // Leaving the old deadline behind would silently keep registration open past the start,
-    // or closed before it.
+  it("recomputes the registration deadline instead of pinning it to the start time", async () => {
+    // FLIPPED 8 September 2026. This test asserted `deadline === startTime`, which was the
+    // rule until the owner's instruction that a player may join at any point before the
+    // contest ends. Kept rather than deleted, because the reason it was written still holds:
+    // leaving the OLD deadline behind after moving the schedule is silently wrong.
+    //
+    // What replaces it: the deadline is the last moment an attempt could still be started,
+    // which here is the play window end less the title's 300-second clock, because the seeded
+    // `configSchema` declares no `duration-seconds` field and the contest reserves a full
+    // round. Deriving it in the test the way the service does would be tautological, so the
+    // load-bearing assertion is the second one - it is nowhere near the start time.
     const contest = await seedContest();
     const newStart = new Date(Date.now() + 3 * HOUR);
     const result = await editProviderContest(String(contest._id), {
@@ -652,7 +660,15 @@ describe("editProviderContest", () => {
     expect(result.success, result.error).toBe(true);
     const saved = await Competition.findById(contest._id).lean<{
       registrationDeadline: Date;
+      playWindowEnd: Date;
     } | null>();
-    expect(saved?.registrationDeadline.getTime()).toBe(newStart.getTime());
+
+    expect(saved?.registrationDeadline.getTime()).toBe(
+      saved!.playWindowEnd.getTime() - 300_000,
+    );
+    // The defect this replaces, stated as a behaviour: entry survives the start.
+    expect(saved!.registrationDeadline.getTime()).toBeGreaterThan(
+      newStart.getTime(),
+    );
   });
 });

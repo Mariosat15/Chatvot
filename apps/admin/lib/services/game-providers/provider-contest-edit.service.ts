@@ -1,10 +1,13 @@
-﻿import { connectToDatabase } from "@/database/mongoose";
+import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
 import ProviderGame from "@/database/models/games/provider-game.model";
 import {
   parseConfigSchema,
+  resolveAttemptSeconds,
   validateConfigValues,
 } from "@/lib/services/games/config-schema";
+import type { ConfigField } from "@/lib/services/games/config-schema";
+import { resolveContestEntryDeadline } from "@/lib/services/games/entry-deadline";
 import type {
   AttemptsPolicy,
   RoundStartPolicy,
@@ -159,6 +162,28 @@ export async function editProviderContest(
   const providerKey = competition.gameConfig?.providerKey;
   const gameCode = competition.gameConfig?.gameCode;
 
+  // The title is loaded whether or not the settings are being edited, because the entry
+  // deadline written at the end of `applyEdit` needs its declared play clock and its ceiling.
+  // Loading it only when settings change is how an edit that merely moves the end time would
+  // recompute the deadline against no clock at all and leave entry open to the last second.
+  const title =
+    providerKey && gameCode
+      ? await ProviderGame.findOne({ providerKey, gameCode }).lean()
+      : null;
+
+  let schemaFields: ConfigField[] = [];
+  if (title) {
+    const parsed = parseConfigSchema(title.configSchema);
+    if (!parsed.ok) {
+      // Fail closed, same as create: settings nothing has checked must not be saved.
+      return {
+        success: false,
+        error: `This game's settings schema is not supported: ${parsed.error}`,
+      };
+    }
+    schemaFields = parsed.fields;
+  }
+
   if (input.settings !== undefined) {
     if (!providerKey || !gameCode) {
       return {
@@ -168,7 +193,6 @@ export async function editProviderContest(
       };
     }
 
-    const title = await ProviderGame.findOne({ providerKey, gameCode }).lean();
     if (!title) {
       return {
         success: false,
@@ -176,16 +200,7 @@ export async function editProviderContest(
       };
     }
 
-    const parsed = parseConfigSchema(title.configSchema);
-    if (!parsed.ok) {
-      // Fail closed, same as create: settings nothing has checked must not be saved.
-      return {
-        success: false,
-        error: `This game's settings schema is not supported: ${parsed.error}`,
-      };
-    }
-
-    const validated = validateConfigValues(parsed.fields, input.settings);
+    const validated = validateConfigValues(schemaFields, input.settings);
     if (!validated.ok) {
       return {
         success: false,
@@ -242,7 +257,10 @@ export async function editProviderContest(
   }
 
   try {
-    applyEdit(competition, input, coercedSettings);
+    applyEdit(competition, input, coercedSettings, {
+      schemaFields,
+      maxDurationSeconds: title?.maxDurationSeconds,
+    });
     await competition.save();
     return { success: true, warnings };
   } catch (error) {
@@ -350,6 +368,7 @@ function applyEdit(
   competition: any,
   input: EditProviderContestInput,
   coercedSettings: Record<string, unknown> | undefined,
+  title: { schemaFields: ConfigField[]; maxDurationSeconds?: number },
 ): void {
   if (input.name !== undefined) competition.name = input.name.trim();
   if (input.description !== undefined) {
@@ -368,13 +387,7 @@ function applyEdit(
   if (input.prizeDistribution !== undefined) {
     competition.prizeDistribution = input.prizeDistribution;
   }
-  if (input.startTime !== undefined) {
-    competition.startTime = input.startTime;
-    // Registration closes when the contest starts, which is how create writes it. Leaving
-    // the old deadline behind would silently keep registration open past the start, or
-    // closed before it.
-    competition.registrationDeadline = new Date(input.startTime);
-  }
+  if (input.startTime !== undefined) competition.startTime = input.startTime;
   if (input.endTime !== undefined) competition.endTime = input.endTime;
   if (input.playWindowStart !== undefined) {
     competition.playWindowStart = input.playWindowStart;
@@ -417,5 +430,26 @@ function applyEdit(
     };
     competition.markModified("gameConfig");
   }
+
+  // ALWAYS LAST, AND ALWAYS RECOMPUTED FROM THE DOCUMENT rather than from `input`.
+  //
+  // Four separate fields feed the entry deadline - the play window end, the policy, the
+  // settings carrying the play clock, and the start it is floored against - and an edit may
+  // move any subset of them. Recomputing it inside each of those branches would be four
+  // copies of one rule and would still be wrong when two moved at once. Reading the document
+  // after every other assignment is the only version that cannot go stale, and it is why this
+  // block sits below the settings write rather than beside the start time.
+  competition.registrationDeadline = resolveContestEntryDeadline({
+    playWindowEnd: competition.playWindowEnd ?? competition.endTime,
+    attemptSeconds: resolveAttemptSeconds(
+      title.schemaFields,
+      competition.gameConfig?.settings,
+      title.maxDurationSeconds,
+    ),
+    // Falls back to the schema's rule, never the wizard's, for the same reason the pre-flight
+    // above does: a contest created before this field existed keeps the rule it was made under.
+    roundStartPolicy: competition.roundStartPolicy ?? "reserve_full_round",
+    startTime: competition.startTime,
+  });
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */

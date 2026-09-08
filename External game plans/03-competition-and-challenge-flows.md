@@ -143,6 +143,41 @@ its `configSchema`. Chapter `01` section 2.4 carries the provider-facing require
 A title declaring none falls back to `maxDurationSeconds`, which is never shorter than
 the truth, so the fallback over-reserves and therefore still fails closed.
 
+**AND THE REGISTRATION ROW IS NOW WRONG TOO, BY OWNER DECISION OF 8 SEPTEMBER 2026.**
+"Closes at or before the play window opens" no longer describes a provider contest. The
+owner's instruction was that a player may join at any point before the contest ends, and
+`createProviderContest` was doing the opposite in its strictest possible form -
+`registrationDeadline: new Date(input.startTime)` - so arriving one minute into a
+one-hour contest meant not being able to join it at all. `External game plans/12`
+section 2.10 is the authoritative account of what was built.
+
+Four things about this third amendment, and the first is the one a summary will get wrong.
+
+- **Taken literally, the instruction sells a seat that cannot play.** Under
+  `reserve_full_round` the gate above refuses an attempt that would not fit in what
+  remains, so entry open to the final second means a player pays, is refused every
+  attempt, ranks on nothing, and - since R50 - is not even eligible for the
+  redistribution. The honest reading is **"for as long as playing is still possible"**,
+  so entry closes at the window end under the permissive policy and one whole attempt
+  before it under the reserving one. That is the same subtraction the gate performs, and
+  it is now performed in **one** place that both the gate's screen and the stored
+  deadline read.
+- **The "Why" in the table was a real concern and the owner overrode it knowingly**, so
+  do not record this as the concern having evaporated. A late joiner *can* now see the
+  leaderboard before deciding to pay. What makes that acceptable here rather than in
+  trading is that a game score is **not actionable intelligence**: knowing the leader
+  solved nine boards does not help anybody solve ten, where knowing which positions are
+  winning a trading contest plainly does. The residue is an informed *entry* decision,
+  not an informed *play* decision.
+- **A late joiner is not short-changed under the reserving policy**, which is the second
+  reason it is the right default. Everyone gets the same play budget whenever they arrive;
+  what a late joiner loses is the chance to use more than one attempt, which is a matter
+  for `attemptsPolicy` rather than for the clock.
+- **The deadline is recomputed, never carried.** Four values feed it - the window end, the
+  configured attempt, the policy and the start - and an edit may move any subset, so
+  computing it inside the start-time branch is wrong the moment the window moves instead,
+  with no error when it happens.
+
 ### 1.3 Attempts policy - a required per-contest setting
 
 | Policy | Behaviour | Best for |

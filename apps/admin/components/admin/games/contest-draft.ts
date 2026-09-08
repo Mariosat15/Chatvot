@@ -9,6 +9,7 @@
 import type { ConfigField } from "@/lib/services/games/config-schema";
 import { resolveAttemptSeconds } from "@/lib/services/games/config-schema";
 import { RESULT_GRACE_MARGIN_SECONDS } from "@/lib/services/games/contest-preflight";
+import { resolveContestEntryDeadline } from "@/lib/services/games/entry-deadline";
 import type {
   RoundStartPolicy,
   UnscoredContestPolicy,
@@ -278,8 +279,16 @@ export function describeRoundFit(input: {
 
   return {
     reservedSeconds: attemptSeconds,
+    // Delegated rather than subtracted here: this is the same instant the contest stores as
+    // its `registrationDeadline` and the same one the play screen counts down to, and the
+    // wizard is where an operator forms their expectation of it.
     lastAttemptStart: reservesFullRound
-      ? new Date(end.getTime() - attemptSeconds * 1000)
+      ? resolveContestEntryDeadline({
+          playWindowEnd: end,
+          attemptSeconds,
+          roundStartPolicy: input.roundStartPolicy,
+          startTime: start,
+        })
       : undefined,
     reservesFullRound,
     windowTooShort: windowSeconds < attemptSeconds,

@@ -1,4 +1,4 @@
-﻿import { randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
 import GameProvider from "@/database/models/games/game-provider.model";
@@ -6,10 +6,12 @@ import ProviderGame from "@/database/models/games/provider-game.model";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import {
   parseConfigSchema,
+  resolveAttemptSeconds,
   validateConfigValues,
 } from "@/lib/services/games/config-schema";
 import type { ConfigField } from "@/lib/services/games/config-schema";
 import { runPreflight } from "@/lib/services/games/contest-preflight";
+import { resolveContestEntryDeadline } from "@/lib/services/games/entry-deadline";
 import type { PreflightResult } from "@/lib/services/games/contest-preflight";
 import type {
   AttemptsPolicy,
@@ -284,6 +286,20 @@ export async function createProviderContest(
 
   const slug = await uniqueSlug(input.name);
 
+  // Resolved once, because it decides two things that must never disagree: the rule stored on
+  // the contest, and how much of the play window the entry deadline holds back. Two copies of
+  // the fallback is how a contest ends up storing one policy and closing entry under the other.
+  //
+  // The fallback used to be `until_window_closes`, matching a wizard that defaulted to the
+  // permissive option. The owner reversed that on 8 September 2026, so it now agrees with both
+  // the wizard and the schema again.
+  const roundStartPolicy = input.roundStartPolicy ?? "reserve_full_round";
+  const attemptSeconds = resolveAttemptSeconds(
+    parsed.fields,
+    validated.values,
+    title.maxDurationSeconds,
+  );
+
   try {
     const competition = await Competition.create({
       name: input.name.trim(),
@@ -316,10 +332,12 @@ export async function createProviderContest(
       // `unclaimed_pool`, so omitting it on a NEW provider contest would silently give the
       // operator the trading answer while the wizard showed them the refund selected.
       unscoredContestPolicy: input.unscoredContestPolicy ?? "refund_entry_fees",
-      // Same reasoning as the line above, one field along: the schema default reserves a full
-      // round, so omitting it would give a new contest the gate the owner asked us to stop
-      // applying by default while the wizard showed the permissive option selected.
-      roundStartPolicy: input.roundStartPolicy ?? "until_window_closes",
+      // The fallback used to be `until_window_closes`, to match a wizard that defaulted to the
+      // permissive option. The owner reversed that on 8 September 2026, so the fallback now
+      // agrees with both the wizard and the schema again. Kept explicit rather than dropped:
+      // a caller omitting it should get the same contest the wizard would have produced, and
+      // reading that off the schema means reading a second file.
+      roundStartPolicy,
 
       entryFee: input.entryFee,
       minParticipants: input.minParticipants,
@@ -327,7 +345,15 @@ export async function createProviderContest(
       currentParticipants: 0,
       startTime: input.startTime,
       endTime: input.endTime,
-      registrationDeadline: new Date(input.startTime),
+      // Entry stays open for as long as playing is still possible, which is the owner's
+      // 8 September 2026 instruction read honestly - see `resolveContestEntryDeadline`. It was
+      // `startTime`, so a player one minute late could not join a contest running for an hour.
+      registrationDeadline: resolveContestEntryDeadline({
+        playWindowEnd: input.playWindowEnd,
+        attemptSeconds,
+        roundStartPolicy,
+        startTime: input.startTime,
+      }),
 
       // DRAFT. Invisible to the player lobby, which queries only upcoming, active,
       // completed and cancelled. See the file header for why that is required, not cautious.
