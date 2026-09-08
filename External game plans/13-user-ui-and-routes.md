@@ -413,6 +413,62 @@ test with a blast radius of one** (`tools/probe-confirming-exit.ps1`).
 
 ---
 
+### 1.1h The standings scrolled sideways, and the board was in the wrong column (8 September 2026)
+
+The owner's words were **"the standings are not showing correctly"**, with a screenshot of the
+arena's left-hand rail: player names cut off, a horizontal scrollbar under the rows, and no score
+visible on any of them. Two separate faults, one of which is worse than it looks.
+
+**Fault one: a board with a fixed minimum width inside a narrower column.**
+`ProviderLeaderboard` declared `min-w-[320px]` inside an `overflow-x-auto` wrapper - a sensible
+pattern for a table on a phone, written when the only place that rendered it was the lobby's main
+column. The arena gives it a 260px rail. So the board overflowed by sixty-odd pixels and offered a
+scrollbar, and **what fell off the right-hand edge was the score column** - the one number the
+board exists to show, on a screen a player refreshes to see exactly that. The row also carried
+`flex-wrap`, so each entry became three stacked lines with the avatar on its own.
+
+It now compresses instead. The rank marker and the score are fixed, the name column is
+`minmax(0,1fr)` and truncates, and the row does not wrap. **`minmax(0,1fr)` rather than `1fr` is
+load-bearing**: a bare `1fr` track is floored by its content's minimum size, so a long name widens
+the grid and the row overflows again with no `min-w-` anywhere to blame. The rail went to 280px in
+the same edit, because the rail and the board are two halves of one bargain and only one of them
+had been stated.
+
+**Fault two, and the general rule is worth more than the instance: grid auto-placement follows
+ORDER-MODIFIED document order, so an `order` rule that fires at one breakpoint only leaves every
+narrower layout arranged by DOM order alone.** `GameArenaLayout` set `xl:order-1/2/3` and nothing
+else, with the standings first in the DOM. The comment beside it said the ordering existed so that
+"on a phone the board must come first" - and on a phone it did the exact opposite, because below
+`xl` the order classes are not applied at all. Worse at `lg`, where the grid is two columns: the
+standings took the wide one and **the board was placed in the 320px sidebar column**.
+
+All three children now carry an order at all three widths. Board first everywhere - phone: board,
+standings, facts; laptop: board beside the facts with the standings full width beneath; desktop:
+standings, board, facts.
+
+**Three things about the guards.**
+
+- **The order test COUNTS.** A test that merely finds `order-1` somewhere is green on a file where
+  two of the three children still rely on DOM order, which is precisely the state that shipped.
+- **The column-template test counts too, and a probe is what proved it had to.** The template is
+  written twice, once for the heading row and once for the player rows, so restoring the bare
+  `1fr` on the heading alone left `toMatch` satisfied and the probe came back **green**. Fifth
+  instance of *the same identifier appearing twice defeats a structural test*.
+- **The positional test is not redundant with the counting one.** A file can give every child an
+  order and still put the board second at `lg`; only slicing back from `{stage}` to the tag that
+  renders it can see that. Probe 6 exists for exactly that mutation.
+
+7 probes in `tools/probe-arena-layout.ps1`, all red on exactly the expected test. **Never verified
+by eye** - the play screen is behind sign-in and the automated browser has no session.
+
+**A dead guard was repaired alongside it.** `tools/probe-lobby-theme.ps1` still aimed its two
+money probes at `components/competitions/PrizeTable.tsx`, and the arithmetic had moved into
+`lib/utils/prize-projection.ts` the previous day; the test name it passed to `-t` was stale too.
+Both reported `DID NOT APPLY`, **which is indistinguishable from a test that does not work**. Now
+23 of 23 red.
+
+---
+
 ## 2. Provider scoping - the mistake that must not be made
 
 Six React context providers are mounted on the two trade pages today:

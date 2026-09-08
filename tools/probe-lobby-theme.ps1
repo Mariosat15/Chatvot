@@ -29,8 +29,10 @@ $TOKENS = 'components/neon/tokens.ts'
 $CARDS = 'components/neon/Cards.tsx'
 $HERO = 'components/trading/lobby/TradingLobbyHero.tsx'
 $SIDEBAR = 'components/trading/lobby/TradingLobbySidebar.tsx'
-# Moved out of `components/trading/lobby/` on 7 Sep 2026 - the game lobby renders it too.
-$PRIZES = 'components/competitions/PrizeTable.tsx'
+# Moved out of `components/trading/lobby/` on 7 Sep 2026 - the game lobby renders it too, and
+# the ARITHMETIC moved again the same day into the projection module, which the admin prize
+# sidebar also reads. Both probes below aim at the calculation, so they follow it.
+$PRIZES = 'lib/utils/prize-projection.ts'
 $TRADING_BOARD = 'components/trading/CompetitionLeaderboard.tsx'
 
 function Read-Source([string]$Path) {
@@ -228,14 +230,14 @@ export function accentClasses('
     File = $PRIZES
     From = 'filledPositions > 0 ? unclaimedPercentage / filledPositions : 0'
     To   = 'filledPositions > 0 ? unclaimedPercentage / (filledPositions + 1) : 0'
-    Test = 'moves no money computation while restyling the prize table'
+    Test = 'moves no money computation while restyling or relocating the prize table'
   },
   @{
     Name = 'the platform fee stops being deducted from a prize'
     File = $PRIZES
     From = '(1 - platformFeePercentage)'
     To   = '(1 - 0)'
-    Test = 'moves no money computation while restyling the prize table'
+    Test = 'moves no money computation while restyling or relocating the prize table'
   }
 )
 

@@ -92,13 +92,19 @@ export function GameArenaLayout({
         </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[260px_minmax(0,1fr)_320px]">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[280px_minmax(0,1fr)_320px]">
         {/*
-          `order` rather than DOM order for the standings: on a phone the board must come
-          first, and on a wide screen the standings sit to its left. Putting standings first
-          in the DOM instead would push the board below the fold on every phone.
+          EVERY BREAKPOINT SETS AN ORDER, and the reason is that grid auto-placement follows
+          order-modified document order, so a rule that only fires at `xl` leaves the other two
+          layouts arranged by DOM order alone. Written that way, the standings came first on a
+          phone - pushing the board below the fold, the exact thing the ordering exists to
+          prevent - and at `lg`, where there are only two columns, the standings took the wide
+          one and the BOARD was placed in the 320px sidebar column.
+
+          Board first everywhere. Phone: board, standings, facts. Laptop: board beside the
+          facts, standings full width beneath. Desktop: standings, board, facts.
         */}
-        <div className="xl:order-1">
+        <div className="order-2 lg:order-3 xl:order-1">
           <div className={`${NEON_PANEL} overflow-hidden`}>
             <div className="flex items-center justify-between gap-2 border-b border-[#161E36] px-4 py-3">
               <div className="flex items-center gap-2">
@@ -121,9 +127,9 @@ export function GameArenaLayout({
           </div>
         </div>
 
-        <div className="xl:order-2">{stage}</div>
+        <div className="order-1 lg:order-1 xl:order-2">{stage}</div>
 
-        <div className="space-y-5 xl:order-3">{sidebar}</div>
+        <div className="order-3 space-y-5 lg:order-2 xl:order-3">{sidebar}</div>
       </div>
 
       <div className="mt-5">{highlights}</div>

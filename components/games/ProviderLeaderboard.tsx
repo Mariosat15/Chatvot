@@ -76,15 +76,27 @@ export default function ProviderLeaderboard({
     );
   }
 
+  /*
+    NO MINIMUM WIDTH AND NO SIDEWAYS SCROLL. This board is rendered in two places whose widths
+    are nothing like each other - the lobby's main column, and the arena's 260px standings rail -
+    and it used to force `min-w-[320px]` inside a horizontal scroller. In the rail that produced
+    exactly what a scrollbar always produces on a leaderboard: the score column pushed out of
+    sight, so the one number the board exists to show was the one thing a player could not see
+    without dragging.
+
+    It compresses instead. The rank marker and the score are fixed, the name column takes what is
+    left and truncates, and the row never wraps - a wrapping row is what turned the rail into a
+    stack of three-line entries with the avatar on its own line.
+  */
   return (
-    <div className="-mx-3 overflow-x-auto px-3 sm:mx-0 sm:px-0">
-      <div className="min-w-[320px]">
+    <div>
+      <div>
         <div
-          className={`grid grid-cols-[auto_1fr_auto] gap-3 px-3 pb-2 md:px-4 ${NEON_TABLE_HEAD}`}
+          className={`grid grid-cols-[auto_minmax(0,1fr)_auto] gap-2 px-3 pb-2 md:gap-3 md:px-4 ${NEON_TABLE_HEAD}`}
         >
           <div className="w-8 shrink-0">#</div>
           <div className="min-w-0">Player</div>
-          <div className="min-w-[80px] shrink-0 text-right">{scoreLabel}</div>
+          <div className="shrink-0 text-right">{scoreLabel}</div>
         </div>
 
         <div className="space-y-2 pt-2">
@@ -94,7 +106,7 @@ export default function ProviderLeaderboard({
             return (
               <div
                 key={row.userId}
-                className={`grid grid-cols-[auto_1fr_auto] items-center gap-3 p-3 md:px-4 ${neonRowClasses(
+                className={`grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 p-3 md:gap-3 md:px-4 ${neonRowClasses(
                   { rank: row.currentRank, isCurrentUser: isYou },
                 )}`}
               >
@@ -106,7 +118,7 @@ export default function ProviderLeaderboard({
                 */}
                 <NeonRankBadge rank={row.currentRank} />
 
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <div className="flex min-w-0 flex-nowrap items-center gap-2">
                   <NeonAvatar name={row.username || "Anonymous"} />
                   {/*
                     `userTitleIcon` is TWO different things depending on the level, which is
@@ -148,7 +160,7 @@ export default function ProviderLeaderboard({
                   the read-side form of the `score ?? 0` that made every provider participant
                   tie in R37.
                 */}
-                <div className="min-w-[80px] shrink-0 self-center text-right">
+                <div className="shrink-0 self-center text-right tabular-nums">
                   {row.score === undefined || row.score === null ? (
                     <span className="text-sm text-gray-600">-</span>
                   ) : (

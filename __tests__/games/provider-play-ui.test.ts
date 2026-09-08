@@ -1800,3 +1800,89 @@ describe("a player is told how long they have left to join", () => {
     expect(isRegistrationClosed({ startTime })).toBe(false);
   });
 });
+
+const ARENA_LAYOUT = "components/games/arena/GameArenaLayout.tsx";
+
+describe("the arena puts the board first at every width", () => {
+  /*
+    Grid auto-placement follows ORDER-MODIFIED document order, so an `order` rule that only fires
+    at one breakpoint leaves every narrower layout arranged by DOM order alone. That is what went
+    wrong: the standings were first in the DOM with `xl:order-1`, so on a phone they came first
+    and pushed the board below the fold - the exact thing the ordering was written to prevent -
+    and at `lg`, where the grid is two columns, the standings took the wide one and the BOARD was
+    placed in the 320px sidebar column.
+
+    Counting is the load-bearing part. A test that merely finds `order-1` somewhere is green on a
+    file where two of the three children still rely on DOM order, which is the state that caused
+    this. Three children, three orders, at all three widths.
+  */
+  const code = readCode(ARENA_LAYOUT);
+
+  it("gives all three columns an order at every breakpoint", () => {
+    // The base class only, so `lg:order-3` is not counted twice.
+    const base = code.match(/(?:^|["\s])order-\d/g) ?? [];
+    const lg = code.match(/lg:order-\d/g) ?? [];
+    const xl = code.match(/xl:order-\d/g) ?? [];
+
+    expect(base).toHaveLength(3);
+    expect(lg).toHaveLength(3);
+    expect(xl).toHaveLength(3);
+  });
+
+  it("puts the board first on a phone and on a laptop", () => {
+    /*
+      Position within the construct, not presence in the file: `order-1` appears three times
+      across the three breakpoints, so asserting the file contains it says nothing about which
+      child carries it. Slice back from `{stage}` to the tag that renders it.
+    */
+    const stageAt = code.indexOf("{stage}");
+    expect(stageAt).toBeGreaterThan(0);
+
+    const tag = code.slice(code.lastIndexOf("<div", stageAt), stageAt);
+    expect(tag.length).toBeGreaterThan(0);
+    expect(tag).toMatch(/(?:^|["\s])order-1\b/);
+    expect(tag).toMatch(/lg:order-1\b/);
+  });
+
+  it("keeps the standings rail wide enough for the board it holds", () => {
+    /*
+      The rail and the board's own minimum have to agree, and they did not: a 260px rail around
+      a board that demanded 320px is a horizontal scrollbar by construction. This pins the rail;
+      the test below pins the board's side of the bargain.
+    */
+    const rail = code.match(/xl:grid-cols-\[(\d+)px_/);
+    expect(rail).not.toBeNull();
+    expect(Number(rail![1])).toBeGreaterThanOrEqual(280);
+  });
+});
+
+describe("the standings board fits the column it is given", () => {
+  /*
+    It is rendered in two places whose widths are nothing like each other - the lobby's main
+    column and the arena's standings rail - and it used to force a fixed minimum width inside a
+    horizontal scroller. On the rail that pushed the score column out of sight, so the one number
+    the board exists to show was the one thing a player could not see without dragging sideways.
+  */
+  const board = readCode(PROVIDER_BOARD);
+
+  it("declares no fixed width and no sideways scroll", () => {
+    expect(board).not.toMatch(/min-w-\[\d+px\]/);
+    expect(board).not.toMatch(/overflow-x-auto/);
+  });
+
+  it("truncates the name rather than wrapping the row", () => {
+    /*
+      `minmax(0,1fr)` and not `1fr`: a bare `1fr` is floored by its content's minimum size, so a
+      long name widens the grid instead of truncating inside it and the row overflows again -
+      with no `min-w-` anywhere, which is why the assertion above cannot see it.
+
+      COUNTED, not merely found. The column template is written twice, once for the heading row
+      and once for the player rows, so `toMatch` is satisfied by either - a probe restoring the
+      bare `1fr` on the heading alone came back green until this counted them.
+    */
+    const template = board.match(/grid-cols-\[auto_minmax\(0,1fr\)_auto\]/g) ?? [];
+    expect(template).toHaveLength(2);
+    expect(board).not.toMatch(/grid-cols-\[auto_1fr_auto\]/);
+    expect(board).not.toMatch(/\bflex-wrap\b/);
+  });
+});
