@@ -848,10 +848,88 @@ the two existing wizard suites were re-pointed at a `readWizardScreen()` helper 
 concatenates the orchestrator with every step file, or moving code out of the monolith would
 have left them passing vacuously.
 
-**Still outstanding, and not to be summarised as done:** the trading form has **not** been
-switched onto the shell - that is a separate commit so it can be reverted on its own without
-losing the game wizard's look - and the client-side market block on trading creation is still
-there, which is the 4 September decision that was never applied to the screen.
+**Both items this section left outstanding were closed later the same day** - see 2.8a. Any
+document saying the trading form is not on the shell, or that the market block is still there,
+is correct as history and stale as a present fact.
+
+### 2.8a The trading form moved onto the shell, and the market refusal went - BUILT 8 September 2026
+
+Two changes to one file, both trading-only, kept out of 2.8's commit so a revert of either
+cannot take the game wizard's new look with it.
+
+**The chrome MOVED; it did not get a second copy.** The two-column frame, the seven-item
+progress rail, the Quick Preview card and seven hand-written accented step headers are now
+`WizardShell`,
+`WizardStepRail`, `WizardPreview` and seven `WizardStepCard`s reading the same `steps` array
+the rail is built from. That last part is the point rather than a tidy-up - seven headers
+written by hand is how a reordered wizard renders one step's body under another step's
+heading, and a test therefore asserts seven cards on **seven distinct indices**, because a
+copy-paste leaving two on `steps[0]` renders the same heading twice and reviews as correct.
+
+**The rail and the card legitimately say different things, so the shell accommodates that
+rather than flattening it.** `WizardStep` gained optional `heading` and `subheading`: the rail
+is a narrow column and has always been terse ("Basic Info", "Name and description") while the
+card has room for a sentence ("Basic Information", "Give your competition a name and
+description"). The alternative was to shorten trading's card copy to fit the rail's labels,
+which would have made an extraction whose whole claim is that nothing changed into a wording
+edit. Both fields are omitted by the game wizard, which falls back to `title` / `description`.
+
+**The market status card stayed in this file and was passed into the sidebar slot.** It is a
+real fact about a trading contest and means nothing to a puzzle, so a shell carrying it would
+be precisely the trading-shaped default this programme keeps finding. A test asserts
+`marketStatus` appears in the form and in **no** part of the shell.
+
+**The market refusal is gone, which is the owner's 4 September decision reaching the screen an
+operator actually uses.** `handleSubmit` returned early on `!marketStatus.isOpen`, so an
+operator scheduling Monday's competition on a Saturday was refused outright - the same gate the
+owner had already removed server-side, where `assertForexMarketOpenForCreate()` was deleted with
+it. The reasoning is unchanged: **creating a contest is scheduling it, not playing it**, and
+order placement still refuses trades against a closed market, so nothing is weakened.
+
+Three things about that removal are load-bearing, and each is pinned by its own probe:
+
+- **The wording is half the defect and would have outlived the code.** A card reading
+  "Competition creation is BLOCKED" beside a form that now submits happily is worse than the
+  refusal was - an operator reads it, believes it, and waits until Sunday. It now says the
+  competition can still be scheduled, and says where trading is actually gated.
+- **The information is kept.** `/api/market-status` returns warnings against the operator's
+  chosen dates, and a window straddling the weekend close is a genuine problem worth flagging.
+  Removing the refusal must not turn a wrong screen into a blind one. Asserted in **two** halves
+  - the gate and the render - because a probe proved a single `marketStatus.warnings` match is
+  green when the render condition alone is destroyed: the field is mentioned twice.
+- **A refusal removed from the handler must not reappear on the button.** That is the same
+  defect wearing a disabled attribute, and worse, because a disabled button names no reason.
+
+**What was built.** `CompetitionCreatorForm.tsx` on the shell with the refusal removed,
+`heading` / `subheading` on `WizardStep`, and `__tests__/admin/trading-wizard-shell.test.ts`
+(8 tests) with `tools/probe-trading-wizard-shell.ps1` (**11 probes, all red on exactly the
+expected test**). The test file is separate from `game-contest-wizard.test.ts` for the same
+reason the commit is: a revert should delete it rather than partially edit a file that has to
+survive. Admin typecheck at the **223** baseline exactly, with nothing new in the changed files
+and nothing disappearing; the 22 pre-existing `DifficultyLevel` errors moved line numbers only.
+
+**One thing to state precisely: this was never verified by eye.** The screen is behind an admin
+sign-in the automated browser has no session for. The class strings were extracted character for
+character and the accent map is identical, which is why a visual regression is unlikely - but
+unlikely is not checked, and the owner's review is what closes it.
+
+**Three pre-existing lint warnings had to be cleared to commit, and one of them was real.**
+The pre-commit hook runs ESLint at `--max-warnings=0` over staged files, so eight warnings this
+file had carried for months became blocking the moment it was touched. Five were dead imports
+and dead locals. One was `onChange={(newRules: any) => ...}`, now inferred from the prop rather
+than annotated away. The last is worth naming: `handlePrizeChange` copied the array and then
+wrote `newPrizes[index][field] = value` - **indexing a mutable array with a caller-supplied
+number**, the fourth appearance of the object-injection shape after the round-inspector action
+map, `competition-update-fields.ts` and the Game Master limits allow-list. Rebuilt with `.map`,
+which needs no index write at all. It was not reachable as a defect here (the index comes from
+the component's own render, not from a request), which is exactly why it had survived - but a
+guard that only fires on the dangerous instances is not a guard.
+
+**And a figure not to overstate: the file is 2,716 lines, down from 2,781.** Deleting 310 lines
+of chrome and adding the shell's sidebar composition plus the step list's new copy nets 65. This
+form remains far over the 500-line limit, and splitting it is **not** what this commit did - a
+document implying the monolith is dealt with is wrong. Section 2's other outstanding item is
+unchanged too: the trading **editor** still exposes fewer fields than the trading create form.
 
 ---
 

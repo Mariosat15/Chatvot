@@ -11,11 +11,9 @@ import {
   Minus,
   Loader2,
   CheckCircle,
-  XCircle,
   FileText,
   DollarSign,
   Calendar,
-  Settings,
   Trophy,
   ChevronRight,
   ChevronLeft,
@@ -38,11 +36,16 @@ import { toast } from "sonner";
 import CompetitionRulesSection from "@/components/admin/CompetitionRulesSection";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import AIGeneratorDialog from "@/components/admin/AIGeneratorDialog";
-import {
-  calculateCompetitionDifficulty,
-  DifficultyLevel,
-} from "@/lib/utils/competition-difficulty";
+import { calculateCompetitionDifficulty } from "@/lib/utils/competition-difficulty";
 import { TITLE_LEVELS } from "@/lib/constants/levels";
+import {
+  WizardShell,
+  WizardStepRail,
+  WizardPreview,
+  WizardPreviewRow,
+  WizardStepCard,
+  type WizardStep,
+} from "@/components/admin/wizard/WizardShell";
 
 export default function CompetitionCreatorForm() {
   const router = useRouter();
@@ -53,8 +56,6 @@ export default function CompetitionCreatorForm() {
   const [currentStep, setCurrentStep] = useState(1);
 
   // Get dynamic currency settings
-  const creditName = settings?.credits?.name || "Credits";
-  const creditSymbol = settings?.credits?.symbol || "⚡";
   const currencySymbol = settings?.currency?.symbol || "€";
   const currencyCode = settings?.currency?.code || "EUR";
 
@@ -330,9 +331,14 @@ export default function CompetitionCreatorForm() {
     field: "rank" | "percentage",
     value: number,
   ) => {
-    const newPrizes = [...prizeDistribution];
-    newPrizes[index][field] = value;
-    setPrizeDistribution(newPrizes);
+    // Rebuilt by position rather than assigned into a copy: indexing a mutable array with a
+    // caller-supplied number is the object-injection shape this codebase has already been
+    // bitten by three times, and `.map` needs no index write at all.
+    setPrizeDistribution((current) =>
+      current.map((prize, i) =>
+        i === index ? { ...prize, [field]: value } : prize,
+      ),
+    );
   };
 
   const addPrizeRank = () => {
@@ -450,13 +456,16 @@ export default function CompetitionCreatorForm() {
       return;
     }
 
-    // BLOCK competition creation when market is closed
-    if (!marketStatus.isOpen) {
-      toast.error(
-        "❌ Cannot create competition: Forex market is currently closed. Please wait until market opens (Sunday 10pm - Friday 10pm UTC).",
-      );
-      return;
-    }
+    /*
+      There is deliberately no market-hours gate here.
+      // Reason: creating a contest is SCHEDULING it, not playing it. The owner removed the
+      equivalent server-side refusal on 4 September 2026 (`assertForexMarketOpenForCreate`
+      was deleted with it), because it refused an operator scheduling a Monday competition
+      on a Saturday. Order placement still refuses trades against a closed market, so
+      nothing is weakened by drafting one while the market is shut. The card in the sidebar
+      still reports the market's state, and the warnings still flag a window that overlaps
+      a closure - reporting is the useful half; the refusal never was.
+    */
 
     setSubmitted(true);
     setLoading(true);
@@ -530,70 +539,76 @@ export default function CompetitionCreatorForm() {
     }
   };
 
-  // Step definitions
-  const steps = [
+  /*
+    The step list, in the shared shell's shape.
+
+    `currentStep` IS 1-BASED HERE AND THE RAIL IS 0-BASED. Left that way on purpose: the
+    seven `currentStep === N` gates and every validation branch below read 1-based, and
+    renumbering them would be a behaviour change inside a commit whose only claim is that
+    nothing moved. The single conversion lives at the rail's `currentIndex` prop.
+
+    The titles, descriptions, icons and colours are the ones this screen already used - a
+    colour name became `accent` and `number` was dropped because the array's own order is
+    the number. Nothing was restyled.
+  */
+  const steps: readonly WizardStep[] = [
     {
-      number: 1,
       title: "Basic Info",
       icon: FileText,
       description: "Name and description",
-      color: "blue",
+      accent: "blue",
+      heading: "Basic Information",
+      subheading: "Give your competition a name and description",
     },
     {
-      number: 2,
       title: "Financial",
       icon: DollarSign,
       description: "Entry fees and capital",
-      color: "green",
+      accent: "green",
+      heading: "Financial Settings",
+      subheading: "Configure entry fees and capital",
     },
     {
-      number: 3,
       title: "Schedule",
       icon: Calendar,
       description: "Start and end times",
-      color: "purple",
+      accent: "purple",
+      heading: "Schedule",
+      subheading: "Set start and end times",
     },
     {
-      number: 4,
       title: "Trading",
       icon: TrendingUp,
       description: "Assets and leverage",
-      color: "orange",
+      accent: "orange",
+      heading: "Trading Settings",
+      subheading: "Configure assets and leverage",
     },
     {
-      number: 5,
       title: "Prizes",
       icon: Trophy,
       description: "Distribution rules",
-      color: "yellow",
+      accent: "yellow",
+      heading: "Prize Distribution",
+      subheading: "Set winner payouts",
     },
     {
-      number: 6,
       title: "Rules",
       icon: Shield,
       description: "Competition rules",
-      color: "red",
+      accent: "red",
+      heading: "Competition Rules",
+      subheading: "Configure ranking and tie-breaking rules",
     },
     {
-      number: 7,
       title: "Launch",
       icon: Zap,
       description: "Review and launch",
-      color: "green",
+      accent: "green",
+      heading: "Review & Launch",
+      subheading: "Final review before launching your competition",
     },
   ];
-
-  const getStepColor = (color: string) => {
-    const colors = {
-      blue: "from-blue-500 to-blue-600",
-      green: "from-green-500 to-green-600",
-      purple: "from-purple-500 to-purple-600",
-      orange: "from-orange-500 to-orange-600",
-      yellow: "from-yellow-500 to-yellow-600",
-      red: "from-red-500 to-red-600",
-    };
-    return colors[color as keyof typeof colors] || colors.blue;
-  };
 
   if (success) {
     return (
@@ -618,130 +633,49 @@ export default function CompetitionCreatorForm() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      {/* Progress Sidebar */}
-      <div className="lg:col-span-1">
-        <div className="sticky top-8 space-y-6">
-          {/* Progress Steps */}
-          <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700/50 rounded-2xl p-6 shadow-2xl">
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-6">
-              Creation Progress
-            </h3>
-            <div className="space-y-4">
-              {steps.map((step, index) => {
-                const Icon = step.icon;
-                const isActive = currentStep === step.number;
-                const isCompleted = currentStep > step.number;
+    <WizardShell
+      sidebar={
+        <>
+          {/*
+            The rail, the preview card and the two-column frame all came out of this file
+            and now live in `components/admin/wizard/WizardShell.tsx`, shared with the game
+            wizard. The rows below stay here because the FACTS differ per game - starting
+            capital and leverage are trading's and belong to no other game, which is why the
+            shell owns the card and not its contents.
+          */}
+          <WizardStepRail steps={steps} currentIndex={currentStep - 1} />
 
-                return (
-                  <div key={step.number}>
-                    <div
-                      className={`flex items-start gap-4 p-3 rounded-xl transition-all duration-300 ${
-                        isActive
-                          ? `bg-gradient-to-r ${getStepColor(step.color)} shadow-lg`
-                          : isCompleted
-                            ? "bg-gray-700/50 hover:bg-gray-700"
-                            : "bg-gray-800/50"
-                      }`}
-                    >
-                      <div
-                        className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${
-                          isActive
-                            ? "bg-white/20"
-                            : isCompleted
-                              ? "bg-green-500/20"
-                              : "bg-gray-700/50"
-                        }`}
-                      >
-                        {isCompleted ? (
-                          <CheckCircle className="h-5 w-5 text-green-400" />
-                        ) : (
-                          <Icon
-                            className={`h-5 w-5 ${
-                              isActive ? "text-white" : "text-gray-400"
-                            }`}
-                          />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div
-                          className={`text-sm font-semibold ${
-                            isActive
-                              ? "text-white"
-                              : isCompleted
-                                ? "text-gray-300"
-                                : "text-gray-400"
-                          }`}
-                        >
-                          {step.title}
-                        </div>
-                        <div
-                          className={`text-xs mt-0.5 ${
-                            isActive ? "text-white/80" : "text-gray-500"
-                          }`}
-                        >
-                          {step.description}
-                        </div>
-                      </div>
-                    </div>
-                    {index < steps.length - 1 && (
-                      <div className="ml-8 h-4 w-px bg-gray-700"></div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <WizardPreview>
+            <WizardPreviewRow
+              icon={Users}
+              label="Participants"
+              value={`${formData.minParticipants} - ${formData.maxParticipants}`}
+            />
+            <WizardPreviewRow
+              icon={DollarSign}
+              iconClassName="text-green-400"
+              label="Entry Fee"
+              value={`${currencySymbol}${formData.entryFeeCredits}`}
+            />
+            <WizardPreviewRow
+              icon={Target}
+              iconClassName="text-purple-400"
+              label="Starting Capital"
+              value={`$${formData.startingTradingPoints.toLocaleString()}`}
+            />
+            <WizardPreviewRow
+              icon={Zap}
+              iconClassName="text-yellow-400"
+              label="Max Leverage"
+              value={`1:${formData.leverageAllowed}`}
+            />
+          </WizardPreview>
 
-          {/* Quick Stats Preview */}
-          <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700/50 rounded-2xl p-6 shadow-2xl">
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
-              Quick Preview
-            </h3>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-700/30">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-blue-400" />
-                  <span className="text-xs text-gray-400">Participants</span>
-                </div>
-                <span className="text-sm font-bold text-gray-200">
-                  {formData.minParticipants} - {formData.maxParticipants}
-                </span>
-              </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-700/30">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-green-400" />
-                  <span className="text-xs text-gray-400">Entry Fee</span>
-                </div>
-                <span className="text-sm font-bold text-gray-200">
-                  {currencySymbol}
-                  {formData.entryFeeCredits}
-                </span>
-              </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-700/30">
-                <div className="flex items-center gap-2">
-                  <Target className="h-4 w-4 text-purple-400" />
-                  <span className="text-xs text-gray-400">
-                    Starting Capital
-                  </span>
-                </div>
-                <span className="text-sm font-bold text-gray-200">
-                  ${formData.startingTradingPoints.toLocaleString()}
-                </span>
-              </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-gray-700/30">
-                <div className="flex items-center gap-2">
-                  <Zap className="h-4 w-4 text-yellow-400" />
-                  <span className="text-xs text-gray-400">Max Leverage</span>
-                </div>
-                <span className="text-sm font-bold text-gray-200">
-                  1:{formData.leverageAllowed}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Market Status Indicator */}
+          {/*
+            The market card is deliberately NOT in the shell. A puzzle does not care whether
+            the forex market is open, so a shell that carried this would be the same
+            trading-shaped default that this whole programme keeps finding.
+          */}
           <div
             className={`p-4 rounded-xl border ${
               marketStatus.loading
@@ -783,12 +717,13 @@ export default function CompetitionCreatorForm() {
                 : marketStatus.message}
             </p>
             {!marketStatus.loading && !marketStatus.isOpen && (
-              <div className="mt-3 p-2 bg-red-500/20 rounded-lg">
-                <p className="text-xs text-red-300 font-semibold">
-                  ❌ Competition creation is BLOCKED
+              <div className="mt-3 p-2 bg-gray-900/50 rounded-lg">
+                <p className="text-xs text-gray-300 font-semibold">
+                  You can still schedule a competition
                 </p>
-                <p className="text-xs text-red-400 mt-1">
-                  Market hours: Sun 10pm - Fri 10pm UTC
+                <p className="text-xs text-gray-400 mt-1">
+                  Market hours: Sun 10pm - Fri 10pm UTC. Trading is gated at order
+                  placement, not at creation.
                 </p>
               </div>
             )}
@@ -806,12 +741,10 @@ export default function CompetitionCreatorForm() {
               </div>
             )}
           </div>
-        </div>
-      </div>
-
-      {/* Main Form Content */}
-      <div className="lg:col-span-2">
-        <form
+        </>
+      }
+    >
+      <form
           onSubmit={(e) => {
             e.preventDefault();
             // Only allow submission on final step (step 7)
@@ -830,24 +763,8 @@ export default function CompetitionCreatorForm() {
         >
           {/* Step 1: Basic Info */}
           {currentStep === 1 && (
-            <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-blue-500/50 rounded-2xl shadow-2xl shadow-blue-500/10 overflow-hidden">
-              <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6">
-                <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                    <FileText className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-white">
-                      Basic Information
-                    </h2>
-                    <p className="text-blue-100 text-sm">
-                      Give your competition a name and description
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-8 space-y-6">
+            <WizardStepCard step={steps[0]}>
+              <>
                 {/* AI Generator Section */}
                 <div className="p-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl">
                   <div className="flex items-center justify-between">
@@ -1024,30 +941,14 @@ export default function CompetitionCreatorForm() {
                     </div>
                   </div>
                 )}
-              </div>
-            </div>
+              </>
+            </WizardStepCard>
           )}
 
           {/* Step 2: Financial Settings */}
           {currentStep === 2 && (
-            <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-green-500/50 rounded-2xl shadow-2xl shadow-green-500/10 overflow-hidden">
-              <div className="bg-gradient-to-r from-green-500 to-green-600 p-6">
-                <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                    <DollarSign className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-white">
-                      Financial Settings
-                    </h2>
-                    <p className="text-green-100 text-sm">
-                      Configure entry fees and capital
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-8 space-y-6">
+            <WizardStepCard step={steps[1]}>
+              <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="md:col-span-2 p-6 bg-green-500/10 border border-green-500/30 rounded-xl">
                     <div className="flex items-start gap-3">
@@ -1255,28 +1156,14 @@ export default function CompetitionCreatorForm() {
                     </p>
                   </div>
                 </div>
-              </div>
-            </div>
+              </>
+            </WizardStepCard>
           )}
 
           {/* Step 3: Schedule */}
           {currentStep === 3 && (
-            <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-purple-500/50 rounded-2xl shadow-2xl shadow-purple-500/10 overflow-hidden">
-              <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6">
-                <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                    <Calendar className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-white">Schedule</h2>
-                    <p className="text-purple-100 text-sm">
-                      Set start and end times
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-8 space-y-6">
+            <WizardStepCard step={steps[2]}>
+              <>
                 {/* Current UTC Time Display */}
                 <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
                   <div className="flex items-center justify-between">
@@ -1656,30 +1543,14 @@ export default function CompetitionCreatorForm() {
                     </p>
                   </div>
                 </div>
-              </div>
-            </div>
+              </>
+            </WizardStepCard>
           )}
 
           {/* Step 4: Trading Settings */}
           {currentStep === 4 && (
-            <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-orange-500/50 rounded-2xl shadow-2xl shadow-orange-500/10 overflow-hidden">
-              <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6">
-                <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                    <TrendingUp className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-white">
-                      Trading Settings
-                    </h2>
-                    <p className="text-orange-100 text-sm">
-                      Configure assets and leverage
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-8 space-y-6">
+            <WizardStepCard step={steps[3]}>
+              <>
                 <div>
                   <Label className="text-gray-300 mb-4 flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-orange-400" />
@@ -1932,30 +1803,14 @@ export default function CompetitionCreatorForm() {
                     )}
                   </div>
                 </div>
-              </div>
-            </div>
+              </>
+            </WizardStepCard>
           )}
 
           {/* Step 5: Prize Distribution */}
           {currentStep === 5 && (
-            <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-yellow-500/50 rounded-2xl shadow-2xl shadow-yellow-500/10 overflow-hidden">
-              <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 p-6">
-                <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                    <Trophy className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-white">
-                      Prize Distribution
-                    </h2>
-                    <p className="text-yellow-100 text-sm">
-                      Set winner payouts
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-8 space-y-6">
+            <WizardStepCard step={steps[4]}>
+              <>
                 <div className="flex items-center justify-between p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
                   <div>
                     <div className="text-sm text-gray-400">
@@ -2058,30 +1913,14 @@ export default function CompetitionCreatorForm() {
                     </div>
                   ))}
                 </div>
-              </div>
-            </div>
+              </>
+            </WizardStepCard>
           )}
 
           {/* Step 6: Competition Rules */}
           {currentStep === 6 && (
-            <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-red-500/50 rounded-2xl shadow-2xl shadow-red-500/10 overflow-hidden">
-              <div className="bg-gradient-to-r from-red-500 to-red-600 p-6">
-                <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                    <Shield className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-white">
-                      Competition Rules
-                    </h2>
-                    <p className="text-red-100 text-sm">
-                      Configure ranking and tie-breaking rules
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-8 space-y-6">
+            <WizardStepCard step={steps[5]}>
+              <>
                 {/* Competition Rules */}
                 <div className="p-6 bg-gray-800/50 border border-gray-600 rounded-xl">
                   <h3 className="text-lg font-semibold text-gray-100 mb-2 flex items-center gap-2">
@@ -2094,7 +1933,7 @@ export default function CompetitionCreatorForm() {
                   </p>
                   <CompetitionRulesSection
                     rules={competitionRules}
-                    onChange={(newRules: any) => setCompetitionRules(newRules)}
+                    onChange={setCompetitionRules}
                   />
                 </div>
 
@@ -2567,30 +2406,14 @@ export default function CompetitionCreatorForm() {
                     )}
                   </div>
                 </div>
-              </div>
-            </div>
+              </>
+            </WizardStepCard>
           )}
 
           {/* Step 7: Launch Competition */}
           {currentStep === 7 && (
-            <div className="bg-gradient-to-br from-gray-800 to-gray-900 border border-green-500/50 rounded-2xl shadow-2xl shadow-green-500/10 overflow-hidden">
-              <div className="bg-gradient-to-r from-green-500 to-green-600 p-6">
-                <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                    <Zap className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-white">
-                      Review & Launch
-                    </h2>
-                    <p className="text-green-100 text-sm">
-                      Final review before launching your competition
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-8 space-y-6">
+            <WizardStepCard step={steps[6]}>
+              <>
                 {/* Competition Summary */}
                 <div className="p-6 bg-gray-800/50 border border-gray-600 rounded-xl">
                   <h3 className="text-lg font-semibold text-gray-100 mb-4 flex items-center gap-2">
@@ -2695,8 +2518,8 @@ export default function CompetitionCreatorForm() {
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
+              </>
+            </WizardStepCard>
           )}
 
           {/* Navigation Buttons */}
@@ -2885,8 +2708,7 @@ export default function CompetitionCreatorForm() {
                 </div>
               )}
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </WizardShell>
   );
 }

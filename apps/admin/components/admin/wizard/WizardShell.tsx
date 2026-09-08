@@ -38,12 +38,26 @@ export type WizardAccent =
   | "red";
 
 export interface WizardStep {
-  /** Shown in the rail and as the step card's heading. */
+  /** Shown in the rail, and on the step card unless `heading` overrides it. */
   title: string;
-  /** One line under the title. The rail shows it too, so keep it short. */
+  /** One line under the title in the rail, so keep it short. */
   description: string;
   icon: LucideIcon;
   accent: WizardAccent;
+  /*
+    THE RAIL AND THE CARD LEGITIMATELY SAY DIFFERENT THINGS, which is why these exist.
+    The rail is a narrow column and has always been terse ("Basic Info", "Name and
+    description"); the card has the width for a sentence ("Basic Information", "Give your
+    competition a name and description"). Trading's screen already read that way, and the
+    only evidence this extraction changed nothing is that its copy survived it character
+    for character - so the shell accommodates the difference rather than flattening it.
+
+    Omit both and the card uses `title` / `description`, which is what the game wizard does.
+  */
+  /** The step card's heading, when it should read longer than the rail's label. */
+  heading?: string;
+  /** The step card's sub-heading, likewise. */
+  subheading?: string;
 }
 
 // Kept as whole class strings rather than composed from a colour name, because Tailwind
@@ -312,8 +326,12 @@ export function WizardStepCard({
             <Icon className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-white">{step.title}</h2>
-            <p className={`${accent.sub} text-sm`}>{step.description}</p>
+            <h2 className="text-2xl font-bold text-white">
+              {step.heading ?? step.title}
+            </h2>
+            <p className={`${accent.sub} text-sm`}>
+              {step.subheading ?? step.description}
+            </p>
           </div>
         </div>
       </div>
