@@ -527,6 +527,7 @@ X12 pilot. All three are in `17` section 7.
 | 15 | **Who may be challenged?** Anyone on the platform, only mutuals/friends, or anyone who has opted in per game? The owner asked for "challenge any user", which needs a decline path, a block list and a rate limit or it becomes a harassment vector | **Owner** | Before X10 | `20` s2 |
 | 16 | **Is declaring game interests part of registration or a later prompt?** Adding steps to registration measurably costs completions, and `20` is designed so the feature works without it | Product | Before X11.5 | `20` s1 |
 | 18 | **Does a contest need a "shape" per game family - and does the wizard change with it?** Raised by the owner, 8 Sep 2026. Everything built so far assumes **independent play with staggered starts**: a player joins whenever, starts an attempt whenever the policy allows, and is ranked on their own score. That is right for a puzzle and **wrong for a race**, where every player must start and finish together - which is not a wizard field but a different contract, touching entry (closes *before* the start, not at the last playable moment - the rule `12` s2.10 just deliberately moved), the round lifecycle (one synchronised launch rather than a per-player one), and the reconciliation net (a player who does not appear at the gun is a no-show, not an unresolved round). **DESIGNED 8 Sep 2026 in `22-contest-shape-and-synchronisation.md`, which carries three owner decisions and a recommendation. Still open, because the decisions are the answer.** Three findings from that pass change the question. **`provider_game.family` (`independent` / `head_to_head`) already exists, is required, is validated on ingest and is read by nothing** - and it is the *wrong axis*, because it describes whether a game needs an **opponent**, so **a race is `independent`**; what a race needs is a shared *moment*, which no field describes. (This paragraph used to guess `category` was the mechanism - it is not, and the field that looked like it is about something else.) Second, **five of the seven things a simultaneous contest changes are already expressible** with `attemptsPolicy: "single"`, the derived window, the existing `playWindowStart` refusal and R45/R50's no-score handling - what is genuinely missing is a synchronised launch and anything stopping an operator configuring a race as a staggered contest. Third, **whether entry closes before the start is a separate question from synchronisation** (s2.1) - they coincide for a race, which is why merging them is convenient and wrong. **What must not happen is a `switch` on game code** - that is the one failure mode of the no-developer-needed claim. **Same question again for challenges** (X10 / E8), which have an extra problem a competition does not: nobody chooses the gun, because a challenge is accepted at an unknown later moment (`22` s5). **ANSWERED 8 Sep 2026, all three parts** - see the decision log. **Build deferred to X4** with the design on record; the entry-close reasoning stays **separate** from synchronisation; and a simultaneous title is **not challengeable**, because nobody chooses the gun and `supportsOneVsOne` already says so for free. The question stays listed rather than struck through because **the design is unbuilt and the spec bump is unpaid**, both deliberately | **Product / Owner** | ~~Before X4~~ **Answered.** The build lands with X4 | **`22`**, `05` s2.1, `07`, `12` s2, `13` |
+| ~~19~~ | **ANSWERED 8 September 2026 - the rule stays as it is.** The owner's answer, having seen the arithmetic: a prize remains a share of the **gross** pot, every entry fee stays in the pot including the winner's own, and no stake is returned separately. **Do not "fix" this later** - it was investigated as a suspected payout defect and is not one, and the reasoning below is why. The question was: should a prize be the winner's stake back plus a share of the REST? Raised by the owner, 8 Sep 2026, as a suspected defect in provider payouts. **It is not a defect, and there is no difference between trading and games to fix** - both call the same `distributePrizesWithTies()` in `competition-ranking.service.ts` with the same arguments, so whatever is decided applies to **every trading contest ever run** as well. The rule today is `grossPool × (rank% + redistributed%) ÷ 100 × (1 − platformFee)`: the pot is gross, every entry fee is in it including the winner's own, and nobody's stake is returned separately. **The owner's own figure confirms the code rather than contradicting it** - €20 pot, 50/30/20 over three ranks, two entrants, so rank 3's 20% is unclaimed and split between the two winners at +10% each, giving rank 1 sixty per cent: `20 × 0.60 × 0.90 = 10.80`, exactly the number reported. So `10.80` is the unclaimed-position redistribution and a 10% fee, **not** the winner's contribution being counted twice. The owner's alternative - return the €10 stake, take the fee, share the remainder - is a **coherent and different product**, much closer to a wager than a prize pool, and it changes who wins how much in every existing contest, the meaning of the percentages an operator has already configured, the projection on both lobbies and the admin prize panel, and the regulatory framing (a returned stake reads as a bet refunded). **Nothing has been changed.** Needed: a decision on whether the rule changes, and if so whether it changes for trading too or only for games - and if only for games, that is a second payout rule to maintain for ever, which is the shape behind four defects in this codebase already. **The owner chose to leave it**, so the alternative is recorded here and nowhere else - no field, no flag and no dead code was added for it | **Owner** | ~~Before the rule is touched~~ **Answered - nothing to build** | `05` s9.1, `prize-projection.ts` |
 | ~~17~~ | **ANSWERED 7 September 2026 - it is the operator's choice, per contest.** The owner's answer was neither of the two options as posed: rather than one platform-wide policy, the game wizard and editor now carry an **Unscored contest** control with two settings - keep the pot (the `unclaimed_pool` behaviour that already existed) or **refund the entry fees less the platform fee**, with the reason explained to the player. The reasoning is that the right answer differs by contest: a high-fee contest whose provider went down should return money, and a cheap one need not. Three related rules were settled at the same time and are **not** configurable, deliberately: a contest **cancelled for too few players refunds in full with no fee** (already true - R43), a contest that **fails** does the same, and a player **disqualified by a rule keeps nothing** - their fee goes to the unclaimed pool exactly as a trading contest's does. See the 7 Sep work-log entry and `05` s9.3 | **Owner** | ~~Before a provider contest runs with real money~~ | `05` s9.3, R45 |
 
 ---
@@ -672,6 +673,112 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 8 Sep 2026 - X6 / `12` s6 + X7 / `13` s7 - THE GAME ARENA, AND WHO WRITES ITS WORDS
+
+**Shipped:** two halves of one idea. An operator can now edit the title, tagline, genre,
+description, logo, banner and feature highlights of any catalogue title; and the player's play
+screen is no longer a grey shell around an iframe but an arena that renders those words beside the
+contest's own facts, the live standings and the prize table. **21 tests** in
+`__tests__/admin/game-content-editor.test.ts`, **10 probes** in `tools/probe-game-content.ps1`,
+all red on exactly the expected test.
+
+**Files touched:** `database/models/games/provider-game.model.ts` and its admin mirror (three new
+fields); `apps/admin/lib/admin/game-content-fields.ts`, `game-artwork-storage.ts`,
+`apps/admin/lib/services/game-providers/game-content.service.ts`, the `content` and `artwork`
+routes under `apps/admin/app/api/games/providers/[providerKey]/games/`,
+`GameContentDialog.tsx`, `GameArtworkField.tsx`, `ProviderCatalogueDialog.tsx`,
+`provider-types.ts`; `lib/services/games/game-presentation.service.ts`,
+`components/games/arena/` (`arena-facts.ts`, `ArenaIdentity.tsx`, `ArenaContestPanel.tsx`,
+`ArenaHighlights.tsx`, `GameArenaLayout.tsx`), `app/(root)/competitions/[id]/play/page.tsx`.
+
+**The provider/operator split is the whole design, and it is the thing a later edit will undo.**
+A provider declares what its game *can do* - `family`, `scoreType`, `scoreDirection`, the
+capability flags, `configSchema` - and every catalogue sync rewrites those. An operator declares
+how the game *reads*. So the three new fields are absent from the sync's named allow-list, and
+`NEVER_EDITABLE_CONTENT_FIELDS` refuses a capability flag through the content door with a message
+saying why. Adding these fields to the sync "for completeness" would overwrite an operator's
+wording on the next run, silently, with no error and nothing in a log.
+
+**`chartvoltEnabled` is operator-owned and still refused here**, which looks inconsistent until
+you notice what it does: it is the switch that puts a title in front of paying players, it has its
+own control, its own audit line, and `setProviderEnabled` refuses to raise it while the provider
+has no adapter or callback secret. Accepting it on the content route would let an operator go live
+as a side effect of fixing a typo, with the audit trail recording a content edit.
+
+**An unknown field is refused with its name, never dropped.** Dropping is tidier and it is the
+failure mode this codebase keeps having to undo - the request succeeds, the screen says saved, the
+value is not there, and the operator concludes they misclicked. Same rule as
+`competition-update-fields.ts`.
+
+**And the same trap in that file caught this one too, one probe later.** The prototype-key test
+first asserted only `result.ok === false`, and the probe swapping the `Set` for an object lookup
+came back **GREEN**: a key admitted by the allow-list lands in no field, so validation refuses at
+the `Nothing to update.` guard at the bottom instead. The key *was* accepted and the assertion
+could not tell. **A refusal test must pin which refusal fired** - second instance after `gameKey`
+on the contest-edit list, so carry the rule rather than the two cases.
+
+**An empty string CLEARS, and that is the opposite of the credentials dialog on purpose.** The
+difference is whether the operator can see what is already stored: a blank secret means keep,
+because the UI can never show it back; a blank tagline means remove. The clear becomes `$unset`
+rather than a stored `""`, because every consumer treats an **absent** value as "say less" and
+falls back - `banners.ts` answers from the game code, the arena omits the line entirely - and a
+stored `""` satisfies `!== undefined`, so those fallbacks stop firing and the screen renders an
+empty slot where it should have rendered nothing. Same distinction as `entryBlockThreshold`.
+
+**A plain http image is refused, and this one is invisible rather than broken.** An http image on
+an https page is blocked by the browser as mixed content and draws nothing at all - no console
+error an operator would look for, just a logo that is missing on the live site. The upload route's
+own relative paths are the normal case.
+
+**Artwork is written to disk AND mirrored into `WhiteLabel.brandingFiles`**, following the existing
+branding uploads, because the platform runs on more than one server and a file written to one is a
+404 on the other. SVG is refused outright: it is a script-bearing document, and this one is served
+back to browsers. Keys go through `lib/utils/branding-file-key.ts`, because Mongoose refuses a map
+key containing a dot and the failure is a silently discarded write.
+
+**Every handler under `apps/admin/app/api/games/providers/` is behind `guardSection`, and the test
+COUNTS handlers against guards rather than naming the files.** Eight admin routes in this codebase
+have now been found authorising on admin-at-all or on nothing, and not one was found by reading
+routes - every neighbour having *something* is exactly what sends a reader past the file that has
+none. The tenth probe creates a new unguarded route, because a hard-coded list of files is green on
+the day the next one appears.
+
+**The arena branches on no game identifier, and that is asserted rather than intended.** Every
+descriptive chip is derived from a field the catalogue *declares*: `family` gives the interaction
+chip, the contest's own range gives the player count, `scoreType` **with** `scoreDirection` gives
+the scoring line. Reading either of the last two alone is wrong in a way that looks right - a
+`duration_ms` title scoring higher-is-better is measuring endurance, so "fastest time wins" is
+exactly backwards, the same pairing rule as the AI prompt vocabulary. A test asserts no game code,
+provider key or game key appears anywhere in `components/games/arena/`. Without it, the first title
+needing a special case makes the no-developer-needed claim quietly false while every existing test
+still passes.
+
+**`family` is NOT a statement about simultaneity, and the wording is careful about it.** It says
+whether the game needs an opponent, so a race is `independent`. The interaction chip therefore says
+nothing about everyone playing at once - promising a starting gun the platform does not fire is
+open question 18, not a label.
+
+**An absent score renders `-`, never `0`** - the read-side form of R50, now on a fifth screen.
+
+**Deviated from plan:** `12` s5 puts operator content on the provider dialog; it was built as a
+separate **Edit content** dialog per title, because the fields are per-title and the provider
+dialog is already the credentials-and-enable screen. The arena layout is `13` s7's player profile
+work brought forward for the play screen only - the dashboard and the games hub are untouched.
+
+**Owner tested:** nothing. **Never verified by eye** - the play screen is behind sign-in and the
+admin dialog behind an admin sign-in, and the automated browser has no session for either. The
+graphics work in `21` s4.1m was screenshotted; this was not.
+
+**Deferred:** the game details page the owner asked to be able to reach by clicking a logo on the
+dashboard. The **content it would render now exists**, which was the point of doing this half
+first, but no route, no hub tile and no link were built - the owner said to stop at title, logo and
+details and to be asked before more.
+
+**Next chat should:** get the owner's answer on items 2 and 3 before writing anything. Item 2 - the
+prize arithmetic - has a real finding waiting and is recorded below.
 
 ---
 

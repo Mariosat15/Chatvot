@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, Gamepad2, Info } from "lucide-react";
+import { Loader2, RefreshCw, Gamepad2, Info, Sparkles } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ import type {
   ProviderTitleRow,
   CatalogueSyncSummary,
 } from "./provider-types";
+import GameContentDialog from "./GameContentDialog";
 
 /**
  * One provider's game catalogue, with our own enable switch per title.
@@ -50,6 +51,7 @@ export default function ProviderCatalogueDialog({
   const [syncing, setSyncing] = useState(false);
   const [pendingCode, setPendingCode] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<CatalogueSyncSummary | null>(null);
+  const [editing, setEditing] = useState<ProviderTitleRow | null>(null);
 
   const providerKey = provider?.providerKey;
 
@@ -202,6 +204,7 @@ export default function ProviderCatalogueDialog({
                   <th className="px-3 py-2">Formats</th>
                   <th className="px-3 py-2">Provider says</th>
                   <th className="px-3 py-2">Live on ChartVolt</th>
+                  <th className="px-3 py-2">Player-facing content</th>
                 </tr>
               </thead>
               <tbody>
@@ -256,12 +259,50 @@ export default function ProviderCatalogueDialog({
                         </div>
                       )}
                     </td>
+                    <td className="px-3 py-2.5">
+                      {/*
+                        Editable whatever the provider's status is, unlike the switch beside
+                        it. A deprecated title keeps its history and its contest pages, so
+                        being able to correct its wording is useful; putting it back in front
+                        of players is not.
+                      */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditing(title)}
+                      >
+                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                        {title.tagline || title.bannerUrl || title.highlights?.length
+                          ? "Edit content"
+                          : "Add content"}
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
+
+        <GameContentDialog
+          providerKey={provider.providerKey}
+          title={editing}
+          open={editing !== null}
+          onOpenChange={(next) => {
+            if (!next) setEditing(null);
+          }}
+          onSaved={(content) => {
+            // Reason: merged into the local row rather than refetching, so the Edit/Add
+            // label and the operator's own copy update without a round trip. `onChanged`
+            // is not called - the provider list above counts titles and enabled titles,
+            // neither of which a content edit can change.
+            setTitles((current) =>
+              current.map((row) =>
+                row.gameCode === editing?.gameCode ? { ...row, ...content } : row,
+              ),
+            );
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

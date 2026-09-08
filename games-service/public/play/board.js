@@ -20,7 +20,7 @@
  * nothing the player can see that the server will not check.
  */
 
-import { boardCellPx, spaceForGrid } from "./presentation.js";
+import { boardCellPx, newlyJoined, spaceForGrid } from "./presentation.js";
 
 /** Eight pairs is the most any grid size produces (`large`: 5-8). */
 const PAIR_COLOURS = [
@@ -91,6 +91,15 @@ function colourFor(pairId) {
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";
+
+/**
+ * How long a join pulse lives before it is taken out of the document.
+ *
+ * It must be at least as long as the `join-pulse` animation in `app.css`, or the ring is removed
+ * mid-flight and the pulse looks like a rendering glitch. It is not much longer either: these are
+ * the only nodes on the board that accumulate, and a Sprint round joins a pair every few seconds.
+ */
+const JOIN_PULSE_MS = 520;
 
 function key(cell) {
   return cell[0] + "," + cell[1];
@@ -170,8 +179,10 @@ export function createBoard(svg, onChange) {
   let cellPx = 48;
   let dragging = null;
   let locked = false;
-  /** @type {{cells:Node,traces:Node,marks:Node,sockets:Node}|null} Set by `build`. */
+  /** @type {{cells:Node,traces:Node,marks:Node,sockets:Node,flashes:Node}|null} Set by `build`. */
   let layers = null;
+  /** @type {Map<number, number[][]>} pairId -> the two terminal centres, for the join pulse. */
+  let terminalCentres = new Map();
 
   function rebuildOwnership() {
     owner = new Map();
@@ -199,6 +210,12 @@ export function createBoard(svg, onChange) {
   function joinedCount() {
     if (!puzzle) return 0;
     return puzzle.pairs.filter(isJoined).length;
+  }
+
+  /** Which pairs are joined right now, so a caller can compare two moments. */
+  function joinedIds() {
+    if (!puzzle) return [];
+    return puzzle.pairs.filter(isJoined).map((pair) => pair.id);
   }
 
   /**
@@ -346,13 +363,22 @@ export function createBoard(svg, onChange) {
     onChange();
   }
 
+  /*
+   * The one handler that can newly join a pair, which is why the transition is only computed here.
+   *
+   * Pressing cannot: starting on a terminal sets the path to that single cell, and pressing part
+   * way along a path truncates it. Releasing mutates nothing. So a "which pairs just landed"
+   * check in the other three would be dead code that reads as thoroughness.
+   */
   function onPointerMove(event) {
     if (locked || dragging === null) return;
     const cell = cellAt(event);
     if (!cell) return;
+    const before = joinedIds();
     if (walkTowards(dragging, cell)) {
-      paint();
-      onChange();
+      const arrived = newlyJoined(before, joinedIds());
+      paint(arrived);
+      onChange({ justJoined: arrived, complete: isComplete() });
     }
     event.preventDefault();
   }
@@ -401,11 +427,21 @@ export function createBoard(svg, onChange) {
     const traces = element("g", { class: "layer-traces" });
     const marks = element("g", { class: "layer-marks" });
     const sockets = element("g", { class: "layer-terminals" });
+    /*
+     * A fifth layer for the join pulses, and it is the only one `paint` does not clear.
+     *
+     * That is the whole reason it exists. A pulse appended to the traces layer would be wiped by
+     * the very next pointer move - about sixteen milliseconds later if the finger is still
+     * travelling - so the confirmation that a wire landed would appear only to a player who
+     * happened to stop. Put here it plays out, and it is removed by its own timer.
+     */
+    const flashes = element("g", { class: "layer-flashes" });
     svg.appendChild(cells);
     svg.appendChild(traces);
     svg.appendChild(marks);
+    svg.appendChild(flashes);
     svg.appendChild(sockets);
-    layers = { cells, traces, marks, sockets };
+    layers = { cells, traces, marks, sockets, flashes };
 
     /*
      * Two rects per cell: a face carrying a wide soft edge, and a thin bright outline over it.
@@ -470,10 +506,59 @@ export function createBoard(svg, onChange) {
     }
     if (stars) cells.appendChild(element("path", { d: stars, class: "junction" }));
 
+    terminalCentres = new Map();
     for (const pair of puzzle.pairs) {
+      const centres = [];
       for (const cell of [pair.a, pair.b]) {
-        sockets.appendChild(socket(pair.id, centre(cell[0]), centre(cell[1])));
+        const cx = centre(cell[0]);
+        const cy = centre(cell[1]);
+        centres.push([cx, cy]);
+        sockets.appendChild(socket(pair.id, cx, cy));
       }
+      // Recorded here rather than recomputed on a join: `cellPx` moves with a resize, so a pulse
+      // drawn from a stale figure would appear beside the terminal instead of on it.
+      terminalCentres.set(pair.id, centres);
+    }
+  }
+
+  /**
+   * A ring expanding out of each end of a pair that has just been joined.
+   *
+   * WHY THESE ARE FRESH NODES RATHER THAN A CLASS ON THE SOCKET. Re-triggering a CSS animation on
+   * an element that already carries the class needs the class removed, a layout read to flush it,
+   * and the class added again - and that layout read would land in the middle of a drag, which is
+   * the one thing the layer split exists to keep cheap. A node created with the class on it
+   * animates once, on its own, with nothing forced.
+   *
+   * Under `prefers-reduced-motion` the stylesheet hides them outright: the sound and the wire's
+   * own colour already say the pair is connected, so nothing is lost but the movement.
+   */
+  function pulseTerminals(pairId) {
+    if (!layers) return;
+    const layer = layers.flashes;
+    for (const [cx, cy] of terminalCentres.get(pairId) || []) {
+      const ring = element("circle", {
+        cx,
+        cy,
+        r: cellPx * 0.32,
+        fill: "none",
+        stroke: colourFor(pairId),
+        "stroke-width": Math.max(2, cellPx * 0.07),
+        class: "join-pulse",
+      });
+      layer.appendChild(ring);
+      setTimeout(() => {
+        try {
+          layer.removeChild(ring);
+        } catch {
+          /*
+           * The board was rebuilt between the pulse starting and this firing - the next board
+           * arrived, or the window was resized - so the ring went with its layer. The real DOM
+           * throws when asked to remove a node that is no longer a child, and a rebuild is a
+           * completely ordinary thing to happen inside half a second.
+           */
+        }
+      }, JOIN_PULSE_MS);
     }
   }
 
@@ -537,17 +622,30 @@ export function createBoard(svg, onChange) {
     return group;
   }
 
-  /** The two layers that change as the player draws: the wires, and the pips still to be covered. */
-  function paint() {
+  /**
+   * The two layers that change as the player draws: the wires, and the pips still to be covered.
+   *
+   * `arrived` is the pairs that landed on THIS repaint, and it decides one thing: whether their
+   * wire is drawn carrying the class that makes it surge once. It defaults to empty so that
+   * `render` - a resize, or the next board - redraws a finished wire without re-celebrating it.
+   *
+   * The surge is deliberately interruptible. A pointer move recreates these nodes, so a player
+   * whose finger is still travelling loses it after a frame and pays nothing for it; the pulse
+   * rings in the layer above are the signal that always plays.
+   */
+  function paint(arrived) {
     if (!layers) return;
     clear(layers.traces);
     clear(layers.marks);
+
+    const landed = new Set(Array.isArray(arrived) ? arrived : []);
 
     for (const pair of puzzle.pairs) {
       const cells = pathOf(pair.id);
       if (cells.length < 2) continue;
       const points = cells.map((cell) => centre(cell[0]) + "," + centre(cell[1])).join(" ");
       const colour = colourFor(pair.id);
+      const flash = landed.has(pair.id) ? " arrived" : "";
 
       // Three strokes for one wire: a wide translucent bloom, the conductor, and a pale core down
       // the middle. Two of them read as a lit wire rather than a felt-tip line; the third is what
@@ -560,7 +658,7 @@ export function createBoard(svg, onChange) {
           "stroke-width": Math.round(cellPx * 0.6),
           "stroke-linecap": "round",
           "stroke-linejoin": "round",
-          class: "trace-halo",
+          class: "trace-halo" + flash,
         }),
       );
       layers.traces.appendChild(
@@ -582,10 +680,12 @@ export function createBoard(svg, onChange) {
           "stroke-width": Math.max(1, Math.round(cellPx * 0.07)),
           "stroke-linecap": "round",
           "stroke-linejoin": "round",
-          class: "trace-core",
+          class: "trace-core" + flash,
         }),
       );
     }
+
+    for (const pairId of landed) pulseTerminals(pairId);
 
     /*
      * A pip in every UNUSED square, and it is functional rather than decorative.

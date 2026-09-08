@@ -147,11 +147,33 @@
             <span class="readout-label">Time left</span>
             <span id="clock" class="readout-value clock" aria-live="off"></span>
           </div>
+          <!--
+            The label, the title and `aria-pressed` are all written by `renderSoundControl` from
+            one call to `soundControlCopy`, so the button cannot announce one state and show
+            another. It ships with the label of its DEFAULT state rather than empty: the script
+            replaces it within a frame, but a button that is briefly nameless is a button a screen
+            reader may reach and read as "button".
+          -->
+          <button
+            id="mute"
+            class="ghost small-btn sound-btn"
+            type="button"
+            aria-pressed="false"
+            aria-label="Mute sound"
+            title="Mute sound"
+          >
+            &#128266;
+          </button>
           <button id="leave" class="ghost small-btn" type="button">Leave</button>
         </header>
 
         <div id="board-wrap" class="board-wrap">
-          <div class="board-stage">
+          <!--
+            The reactions - the solved sweep and the refusal shake - are classes on this element
+            and not on the `<svg>`. Accepting a board replaces the whole grid with the next one in
+            the same tick, so an animation started on the SVG is discarded before a frame is drawn.
+          -->
+          <div id="board-stage" class="board-stage">
             <!--
               The bezel is a SIBLING of the grid rather than part of it, and overhangs it by
               `--board-art-overhang`. Drawn inside the `<svg>` it would sit in the element that

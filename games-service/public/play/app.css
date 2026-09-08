@@ -764,6 +764,202 @@ svg#board .terminal-art {
 }
 
 /* ------------------------------------------------------------------------------------------
+ * Movement
+ *
+ * EVERY ANIMATION DECLARED BELOW IS SWITCHED OFF IN THE `prefers-reduced-motion` BLOCK AT THE
+ * FOOT OF THIS FILE, and a test compares the two lists. Adding one here and forgetting the other
+ * half is invisible to everybody who has not asked for reduced motion, which is almost everybody
+ * who would review it - so the pairing is asserted rather than remembered.
+ *
+ * They are all CSS, and that is a constraint rather than a preference. A drag repaints the wires
+ * on every pointer move, so a JavaScript animation on this screen would be competing with the
+ * board for the same frames on the one screen where dropping them is felt.
+ * ---------------------------------------------------------------------------------------- */
+
+/*
+ * Screens rise into place rather than appearing.
+ *
+ * Keyed on `:not([hidden])` and nothing else. A screen is shown by clearing `hidden`, which takes
+ * it out of `display: none` and restarts its animations for free - so this needs no class to add,
+ * no class to remove, and cannot be left switched on by a path that forgot to clean up.
+ */
+.screen:not([hidden]) {
+  animation: screen-in 220ms ease-out 1 both;
+}
+
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/*
+ * The clock breathes in the last ten seconds.
+ *
+ * Scaled and dimmed rather than blinked. A hard blink on a countdown means the number is absent
+ * for part of every second, and the number is the thing the player is reading.
+ */
+.clock.urgent {
+  animation: clock-pulse 1s ease-in-out infinite;
+}
+
+@keyframes clock-pulse {
+  50% {
+    transform: scale(1.09);
+    opacity: 0.72;
+  }
+}
+
+/*
+ * A ring out of each end of a pair that has just landed. Created by `pulseTerminals` in
+ * `board.js` and removed by its own timer.
+ *
+ * `transform-box: fill-box` is load-bearing: without it an SVG transform is measured against the
+ * whole viewBox, so the ring scales away from the corner of the board instead of out of the
+ * terminal - which looks like a stray graphic rather than a confirmation.
+ */
+svg#board .join-pulse {
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: join-pulse 480ms ease-out 1 both;
+}
+
+@keyframes join-pulse {
+  from {
+    transform: scale(0.5);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+/*
+ * The wire brightens once as it lands, then settles to its resting strength.
+ *
+ * The end of each keyframe pair is the value the plain rule already carries, so the animation
+ * finishing looks identical to it never having run - which matters because these nodes are
+ * recreated on the next pointer move and a mid-drag join would otherwise flicker back.
+ */
+svg#board .trace-halo.arrived {
+  animation: halo-surge 360ms ease-out 1 both;
+}
+
+svg#board .trace-core.arrived {
+  animation: core-surge 360ms ease-out 1 both;
+}
+
+@keyframes halo-surge {
+  from {
+    opacity: 0.7;
+  }
+  to {
+    opacity: 0.2;
+  }
+}
+
+@keyframes core-surge {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.42;
+  }
+}
+
+/*
+ * A light sweeping over a board that was accepted, and a shake for one that was refused.
+ *
+ * Both live on the stage rather than on the `<svg>`, because accepting a board replaces the grid
+ * with the next one in the same tick - an animation started on the SVG is discarded before a
+ * single frame of it is drawn. The stage survives.
+ */
+.board-stage.solved::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: 6px;
+  background: linear-gradient(
+      105deg,
+      transparent 38%,
+      rgba(190, 235, 255, 0.55) 50%,
+      transparent 62%
+    )
+    0 0 / 300% 100% no-repeat;
+  animation: board-sweep 520ms ease-out 1 both;
+}
+
+@keyframes board-sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+    opacity: 0;
+  }
+}
+
+.board-stage.refused {
+  animation: board-shake 420ms ease-in-out 1 both;
+}
+
+/* The rim goes red for as long as the class is on, with no animation of its own - so a player who
+   has asked for less motion still gets the signal, just without the movement. */
+.board-stage.refused svg#board {
+  box-shadow:
+    0 30px 60px -34px #000,
+    0 0 0 2px var(--danger);
+}
+
+@keyframes board-shake {
+  15% {
+    transform: translateX(-6px);
+  }
+  30% {
+    transform: translateX(5px);
+  }
+  45% {
+    transform: translateX(-4px);
+  }
+  60% {
+    transform: translateX(3px);
+  }
+  80% {
+    transform: translateX(-2px);
+  }
+}
+
+/* A press the finger can feel it landed. The transition is already declared on `button`; this is
+   only the target, so it costs no new property to animate. */
+button.primary:active:not(:disabled) {
+  transform: translateY(2px) scale(0.985);
+  filter: brightness(1.18);
+}
+
+/*
+ * The mute control.
+ *
+ * Dimmed while muted, which is the state `aria-pressed="true"` describes - see `soundControlCopy`.
+ * A glyph alone would leave a sighted player squinting at two similar speaker icons, so the
+ * opacity is the fast signal and the icon is the confirmation.
+ */
+.sound-btn {
+  min-width: 42px;
+  padding: 6px 10px;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.sound-btn[aria-pressed="true"] {
+  opacity: 0.62;
+}
+
+/* ------------------------------------------------------------------------------------------
  * Loading
  * ---------------------------------------------------------------------------------------- */
 
@@ -798,5 +994,43 @@ svg#board .terminal-art {
 
   button {
     transition: none;
+  }
+
+  /*
+   * Everything added by the arcade pass, switched off in one place.
+   *
+   * SWITCHED OFF, NOT SLOWED. Each of these is a flourish over information the player already
+   * has: the wire is drawn in the pair's colour, the clock's figures are already red, the board
+   * is already replaced, the figure is already correct. Nothing here is the only way to learn
+   * anything, so removing the movement removes nothing.
+   *
+   * The refusal's red rim is deliberately NOT in this list - it is a static box-shadow, and it
+   * is the one part of that reaction carrying the signal rather than decorating it.
+   */
+  .screen:not([hidden]),
+  .clock.urgent,
+  svg#board .join-pulse,
+  svg#board .trace-halo.arrived,
+  svg#board .trace-core.arrived,
+  .board-stage.solved::after,
+  .board-stage.refused {
+    animation: none;
+  }
+
+  /*
+   * These two are DRAWN by the animation rather than merely moved by it, so "no animation" would
+   * leave a ring frozen on the board and a pale bar across the grid until their timers removed
+   * them - a stuck graphic reads as a broken game, which is a worse outcome than the movement
+   * this block exists to remove. `flashBoard` refuses outright as well; `pulseTerminals` does
+   * not, deliberately, because `board.js` has no business reading a media query mid-drag.
+   */
+  svg#board .join-pulse,
+  .board-stage.solved::after {
+    display: none;
+  }
+
+  button.primary:active:not(:disabled) {
+    transform: none;
+    filter: none;
   }
 }

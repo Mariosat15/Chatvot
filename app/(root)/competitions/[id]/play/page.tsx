@@ -10,9 +10,16 @@ import {
 import { auth } from "@/lib/better-auth/auth";
 import { connectToDatabase } from "@/database/mongoose";
 import Competition from "@/database/models/trading/competition.model";
-import ProviderGame from "@/database/models/games/provider-game.model";
+import AppSettingsModel from "@/database/models/app-settings.model";
 import { getPlayState } from "@/lib/services/games/round-status.service";
+import { getGamePresentation } from "@/lib/services/games/game-presentation.service";
+import { getCompetitionLeaderboard } from "@/lib/actions/trading/competition.actions";
 import { ProviderRoundHost } from "@/components/games/ProviderRoundHost";
+import ProviderLeaderboard from "@/components/games/ProviderLeaderboard";
+import PrizeTable from "@/components/competitions/PrizeTable";
+import { GameArenaLayout } from "@/components/games/arena/GameArenaLayout";
+import { ArenaContestPanel } from "@/components/games/arena/ArenaContestPanel";
+import { ArenaHighlights } from "@/components/games/arena/ArenaHighlights";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -113,43 +120,103 @@ export default async function PlayPage({ params }: PlayPageProps) {
 
   await connectToDatabase();
 
+  // The contest's own facts, so a player who has pressed Play can still see what they are
+  // playing for. Every field here is one the lobby already reads; none is new data.
   const contest = await Competition.findById(competitionId)
-    .select("name gameKey gameConfig")
+    .select(
+      "name gameKey gameConfig entryFee prizePool prizePoolCredits currentParticipants maxParticipants minParticipants prizeDistribution platformFeePercentage",
+    )
     .lean<{
       name?: string;
       gameKey?: string;
       gameConfig?: { providerKey?: string; gameCode?: string };
+      entryFee?: number;
+      prizePool?: number;
+      // Reason: `projectPrizeDistribution` falls back to this when `prizePool` is absent, so
+      // omitting it from the projection would show every prize as zero on a credits contest.
+      prizePoolCredits?: number;
+      currentParticipants?: number;
+      maxParticipants?: number;
+      minParticipants?: number;
+      prizeDistribution?: { percentage: number; rank?: number }[];
+      platformFeePercentage?: number;
     } | null>();
 
-  // The player-facing name of the game comes from the catalogue, which is the editable content
-  // layer - never from the provider key, and never from `gameKey`, which is an internal join key
-  // that happens to be human-readable and would leak our own naming into a player screen.
-  const title = await ProviderGame.findOne({
-    providerKey: contest?.gameConfig?.providerKey,
-    gameCode: contest?.gameConfig?.gameCode,
-  })
-    .select("displayName")
-    .lean<{ displayName?: string } | null>();
+  // The player-facing identity of the game comes from the catalogue, which is the editable
+  // content layer an operator owns - never from the provider key, and never from `gameKey`,
+  // which is an internal join key that happens to be human-readable and would leak our own
+  // naming into a player screen.
+  const [presentation, leaderboard, settings] = await Promise.all([
+    getGamePresentation(contest?.gameConfig?.providerKey, contest?.gameConfig?.gameCode),
+    // The standings are rendered from the server and refreshed when a round settles, which
+    // `ProviderRoundHost` already triggers. They are NOT polled on a timer: a live ticker
+    // needs an endpoint that does not exist yet, and a board that silently goes stale is
+    // better than one that appears live and is not.
+    getCompetitionLeaderboard(competitionId, 25),
+    AppSettingsModel.findOne()
+      .select("currency.symbol")
+      .lean<{ currency?: { symbol?: string } } | null>(),
+  ]);
 
   const competitionName = contest?.name ?? "this competition";
-  const gameName = title?.displayName ?? "this game";
+  const currencySymbol = settings?.currency?.symbol ?? "$";
+  const rows = Array.isArray(leaderboard) ? leaderboard : [];
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      <Link
-        href={`/competitions/${competitionId}`}
-        className="mb-6 inline-flex items-center gap-2 text-sm text-gray-400 hover:text-gray-200"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        {competitionName}
-      </Link>
-
-      <ProviderRoundHost
-        competitionId={competitionId}
-        competitionName={competitionName}
-        gameName={gameName}
-        initialState={outcome.state}
-      />
-    </div>
+    <GameArenaLayout
+      competitionId={competitionId}
+      competitionName={competitionName}
+      presentation={presentation}
+      minParticipants={contest?.minParticipants}
+      maxParticipants={contest?.maxParticipants}
+      standingsCount={rows.length}
+      standings={
+        rows.length === 0 ? (
+          <p className="px-2 py-6 text-center text-xs text-gray-500">
+            No scores yet. Be the first.
+          </p>
+        ) : (
+          <ProviderLeaderboard
+            rows={rows}
+            currentUserId={session.user.id}
+            scoreLabel="Score"
+          />
+        )
+      }
+      stage={
+        <ProviderRoundHost
+          competitionId={competitionId}
+          competitionName={competitionName}
+          gameName={presentation.gameName}
+          initialState={outcome.state}
+        />
+      }
+      sidebar={
+        <>
+          <ArenaContestPanel
+            facts={{
+              prizePool: contest?.prizePool,
+              entryFee: contest?.entryFee,
+              currentParticipants: contest?.currentParticipants,
+              maxParticipants: contest?.maxParticipants,
+              currencySymbol,
+            }}
+            state={outcome.state}
+            presentation={presentation}
+          />
+          {/*
+            The ONE implementation of what each place is paid, shared with both lobbies. It is
+            not reimplemented here, and it must not be: the four expressions inside it have
+            survived two moves character for character, which is the only evidence that no
+            payout figure has changed.
+          */}
+          {Array.isArray(contest?.prizeDistribution) &&
+            contest.prizeDistribution.length > 0 && (
+              <PrizeTable competition={contest} currSymbol={currencySymbol} />
+            )}
+        </>
+      }
+      highlights={<ArenaHighlights highlights={presentation.highlights} />}
+    />
   );
 }

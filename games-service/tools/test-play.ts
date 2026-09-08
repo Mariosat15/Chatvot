@@ -122,6 +122,48 @@ function contentFingerprint(board: ClientBoard): string {
   return `${dims.join("x")}|${board.pairs.length}|${distances.join(",")}`;
 }
 
+/** A file from the play surface, read off disk. */
+function playFile(name: string): string {
+  return fs.readFileSync(path.resolve(__dirname, "..", "public", "play", name), "utf8");
+}
+
+/**
+ * The same text with its comments removed.
+ *
+ * Every structural test in this codebase needs this, and the reason is worth restating: these
+ * files explain their own anti-patterns in prose. A test that reads the comments flags a correct
+ * file for DISCUSSING a mistake, and passes a broken one whose only mention of the right thing is
+ * in a comment. Both failures are worse than no test.
+ */
+function withoutComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+}
+
+/**
+ * The bodies of every block opened by `opener`, brace-matched.
+ *
+ * Brace-matched rather than regexed, because a regex for "a try block" either stops at the first
+ * inner `}` - which is any nested block - or runs to the end of the file. Either way it reports
+ * on something other than the block it was aimed at, which is indistinguishable from a test that
+ * does not work.
+ */
+function blockBodies(source: string, opener: RegExp): string[] {
+  const bodies: string[] = [];
+  for (const match of source.matchAll(opener)) {
+    let at = source.indexOf("{", (match.index ?? 0) + match[0].length - 1);
+    if (at < 0) continue;
+    let depth = 0;
+    const from = at + 1;
+    for (; at < source.length; at++) {
+      const ch = source.charAt(at);
+      if (ch === "{") depth++;
+      else if (ch === "}" && --depth === 0) break;
+    }
+    bodies.push(source.slice(from, at));
+  }
+  return bodies;
+}
+
 async function openRound(overrides: Record<string, unknown> = {}) {
   const { callbackUrl } = await import("./api-harness");
   const body = createBody({ resultCallbackUrl: callbackUrl, ...overrides });
@@ -249,8 +291,14 @@ async function main(): Promise<number> {
       }
     }
 
+    /*
+     * `sound.js` joined this list on 8 September 2026 and is the proof the walk works as
+     * advertised: it was added to the surface, reached only by an `import` in `app.js`, and
+     * needed no change here to be covered. Naming the three explicitly is the tripwire for a walk
+     * that stops early - a broken crawler visits `app.js`, finds nothing, and reports success.
+     */
     assert.ok(
-      seen.has("/play/board.js") && seen.has("/play/presentation.js"),
+      seen.has("/play/board.js") && seen.has("/play/presentation.js") && seen.has("/play/sound.js"),
       `the walk did not reach the known modules, only ${[...seen].join(", ")}`,
     );
   });
@@ -307,6 +355,192 @@ async function main(): Promise<number> {
       Number(declared[1]),
       presentation.BOARD_ART_OVERHANG,
       "the stylesheet and presentation.js disagree about the bezel",
+    );
+  });
+
+  /*
+   * The arcade pass - the animations and the synthesised sound.
+   *
+   * Everything below is a property that fails SILENTLY. A browser refusing storage takes the game
+   * down with no message; an awaited audio call puts a sound device between a tap and the POST
+   * that starts a paid clock; an animation missing from the reduced-motion block is invisible to
+   * everybody who has not asked for reduced motion, which is everybody likely to review it.
+   *
+   * The pitches, the volumes and the count-up arithmetic are asserted in `test-presentation.ts`,
+   * which can import them. These are the ones only the source text can answer.
+   */
+  await test("the mute preference survives a browser that refuses storage", async () => {
+    /*
+     * `localStorage` THROWS rather than returning null when a browser refuses it - Safari in
+     * private browsing, and any page loaded with third-party storage blocked, which an iframe on
+     * somebody else's domain very much is.
+     *
+     * The read happens while `app.js` is being evaluated, so an unhandled throw takes the whole
+     * module graph down: no board, no error, and the platform's opaque overlay left in front of a
+     * page that never ran. That is the same total failure as a module that 404s, arriving from a
+     * setting the player cannot see and we cannot reproduce.
+     *
+     * Counted rather than merely found. A file where the read is guarded and the WRITE is not
+     * passes any "is there a try/catch" check while still throwing the first time somebody
+     * presses mute.
+     */
+    const source = withoutComments(playFile("sound.js"));
+    const uses = [...source.matchAll(/localStorage/g)].length;
+    assert.ok(uses >= 2, `expected a read and a write, found ${uses} mentions of localStorage`);
+
+    const guarded = blockBodies(source, /\btry\s*\{/g)
+      .map((body) => [...body.matchAll(/localStorage/g)].length)
+      .reduce((total, count) => total + count, 0);
+
+    assert.equal(guarded, uses, `${uses - guarded} of ${uses} storage calls are outside a catch`);
+  });
+
+  await test("nothing on the gameplay path ever waits for a sound", async () => {
+    /*
+     * On a timed title the clock IS the score, and it starts on the SERVER when the player taps
+     * Start. An `await` on `AudioContext.resume()` - which returns a promise, and is the obvious
+     * thing to await before playing a sound - puts an audio device between the tap and that
+     * request. It costs the player time they paid for, it varies by handset, and it produces no
+     * error on any device where it is slow rather than broken.
+     *
+     * Asserted as an absence in `sound.js` rather than as a rule about call sites, because that
+     * is the version a caller cannot get wrong: there is nothing to await.
+     */
+    const sound = withoutComments(playFile("sound.js"));
+    assert.ok(!/\basync\b/.test(sound), "sound.js declares an async function");
+    assert.ok(!/\bawait\b/.test(sound), "sound.js awaits something");
+
+    // And the other side of it: no caller may await one either, nor chain onto it.
+    const app = withoutComments(playFile("app.js"));
+    assert.ok(!/await\s+sound\./.test(app), "app.js awaits a sound");
+    assert.ok(!/sound\.[A-Za-z]+\([^)]*\)\s*\.then/.test(app), "app.js chains onto a sound");
+
+    /*
+     * The unlock must be the first thing `start` does. Moved below the `await` on the session
+     * POST it is no longer inside the click as far as the browser is concerned, so the context is
+     * created suspended and the game is silent for the whole round with nothing in any log.
+     */
+    const [body] = blockBodies(app, /async function start\(\)\s*\{/g);
+    assert.ok(body, "start() is no longer a function this test can find");
+    const unlockAt = body.indexOf("sound.unlock()");
+    const awaitAt = body.indexOf("await ");
+    assert.ok(unlockAt >= 0, "start() no longer opens the audio context");
+    assert.ok(awaitAt < 0 || unlockAt < awaitAt, "the audio context is opened after an await");
+  });
+
+  await test("every animation the stylesheet adds is switched off under reduced motion", async () => {
+    /*
+     * The accessibility requirement, held by comparing two lists rather than by remembering.
+     *
+     * Adding an animation and forgetting the reduced-motion half changes nothing for anybody who
+     * has not set the preference - so it passes every review, every screenshot and every manual
+     * pass, and is only wrong for the players who asked not to be moved. There is no symptom to
+     * notice and nothing in a log.
+     *
+     * Selectors are compared as written. That is stricter than necessary - a broader selector in
+     * the media block would also do the job - and deliberately so: the failure mode of a clever
+     * comparison here is a test that quietly stops covering things.
+     */
+    // Comments first, or a rule's "selector" is the prose block above it and every comparison is
+    // against a paragraph. The same trap as every structural test in this codebase.
+    let css = withoutComments(playFile("app.css"));
+
+    // `@keyframes` bodies hold nested blocks, which defeats the flat rule scan below - and they
+    // are not rules that can be switched off, they are the definitions being switched off.
+    for (const body of blockBodies(css, /@keyframes\s+[\w-]+\s*\{/g)) css = css.replace(body, " ");
+
+    const [reduced] = blockBodies(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{/g);
+    assert.ok(reduced, "app.css has no prefers-reduced-motion block at all");
+    css = css.replace(reduced, " ");
+
+    const animated: string[] = [];
+    for (const rule of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!/animation(?:-name)?\s*:\s*(?!none)/.test(rule[2])) continue;
+      for (const selector of rule[1].split(",")) animated.push(selector.trim());
+    }
+    assert.ok(animated.length >= 6, `only found ${animated.length} animated rules to check`);
+
+    /*
+     * WHAT THE REDUCED RULE DOES, NOT MERELY THAT THE SELECTOR APPEARS IN THE BLOCK.
+     *
+     * A probe caught this: the first version only asked whether the selector was mentioned, so a
+     * rule setting a colour would have satisfied it, and removing a selector from the
+     * `animation: none` list still passed because it was named again in a rule beside it. The
+     * three endings that genuinely stop movement are the whole list - the animation switched off,
+     * its duration overridden, or the element taken off the screen because it is DRAWN by the
+     * animation rather than merely moved by it.
+     */
+    const covered = new Map<string, string>();
+    for (const rule of reduced.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      for (const selector of rule[1].split(",")) {
+        covered.set(selector.trim(), (covered.get(selector.trim()) ?? "") + rule[2]);
+      }
+    }
+
+    for (const selector of animated) {
+      const body = covered.get(selector);
+      assert.ok(body, `"${selector}" animates and is not in the reduced-motion block at all`);
+      assert.match(
+        body,
+        /animation\s*:\s*none|animation-duration\s*:|display\s*:\s*none/,
+        `"${selector}" is in the reduced-motion block but nothing there stops it moving`,
+      );
+    }
+  });
+
+  await test("the score counts up from a value that is already correct", async () => {
+    /*
+     * The final figure is written BEFORE the animation starts, and the first step then rewinds
+     * it. It costs one frame showing the answer and buys the property that matters: a browser
+     * that never fires the interval again - a backgrounded tab, a phone throttling a hidden
+     * frame, a device suspending timers on lock - leaves the right number on screen.
+     *
+     * Written the natural way round, a stalled count-up freezes at "2" on a round that solved
+     * five. Nothing errors, nothing logs, and the player has been told they lost.
+     */
+    const [body] = blockBodies(withoutComments(playFile("app.js")), /function countUpStat\(/g);
+    assert.ok(body, "countUpStat is no longer a function this test can find");
+
+    const finalAt = body.indexOf("ui.resultStat.textContent = statValue;");
+    const firstStepAt = body.indexOf("withCountUpValue");
+    assert.ok(finalAt >= 0, "the final value is never written directly");
+    assert.ok(firstStepAt >= 0, "the count-up never rewinds to a starting figure");
+    assert.ok(finalAt < firstStepAt, "the animation starts before the correct value is on screen");
+
+    // And it must be abandonable. Two results in one round - a refusal then a finish - would
+    // otherwise leave two intervals writing to the same element, which reads as a flickering score.
+    assert.match(body, /clearInterval/, "a second count-up cannot cancel the first");
+  });
+
+  await test("the mute control ships announcing the state it is actually in", async () => {
+    /*
+     * The button carries a label in the markup so that a screen reader reaching it before the
+     * script has run does not announce a bare "button". That label is a second copy of something
+     * `soundControlCopy` owns, so it can disagree - and a control that announces "unmute" on a
+     * game already making a noise is wrong in the way nobody sighted can see.
+     *
+     * Compared against the DEFAULT state rather than against a remembered phrase, so changing the
+     * wording in one place turns this red rather than drifting.
+     */
+    // @ts-expect-error - untyped browser module, deliberately; see `test-board.ts` for why.
+    const p = (await import("../public/play/presentation.js")) as Record<string, unknown>;
+    const soundEnabledFrom = p.soundEnabledFrom as (stored: string | null) => boolean;
+    const soundControlCopy = p.soundControlCopy as (on: boolean) => {
+      label: string;
+      pressed: string;
+    };
+    const initial = soundControlCopy(soundEnabledFrom(null));
+
+    const page = await fetchRaw("/play");
+    const button = /<button\b[^>]*id="mute"[\s\S]*?>/.exec(page.text);
+    assert.ok(button, "the play screen has no mute control");
+    assert.ok(
+      button[0].includes(`aria-label="${initial.label}"`),
+      `the markup's label disagrees with soundControlCopy: ${button[0]}`,
+    );
+    assert.ok(
+      button[0].includes(`aria-pressed="${initial.pressed}"`),
+      `the markup's aria-pressed disagrees with soundControlCopy: ${button[0]}`,
     );
   });
 

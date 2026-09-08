@@ -283,3 +283,201 @@ export function hintCopy(input) {
   }
   return { text: `Use every square: ${used || 0} of ${cells || 0}.`, tone: "" };
 }
+
+/* ------------------------------------------------------------------------------------------
+ * Sound: every number about it, and none of the plumbing
+ * ---------------------------------------------------------------------------------------- */
+
+/**
+ * WHY THE SOUNDS ARE SYNTHESISED AND THERE ARE NO AUDIO FILES.
+ *
+ * Three independent reasons, any one of which would decide it.
+ *
+ * The play surface is served from a directory listing filtered by an extension allowlist in
+ * `src/http/play-page.ts`, on an unauthenticated route, and a test asserts that table is the whole
+ * of the remaining protection there. Adding `.mp3` to it widens the only guard that route has, for
+ * decoration.
+ *
+ * The round's clock starts on the SERVER when Start is pressed, so every byte fetched after that
+ * comes out of the player's paid time - the same reason the board's artwork is warmed at boot.
+ *
+ * And a sound file that 404s is silent AND invisible: nothing errors, nothing logs, and the game
+ * looks exactly like a game somebody muted. This platform has lost days to that class twice
+ * already (R52, R54). An oscillator cannot 404.
+ *
+ * So every sound is an `OscillatorNode` shaped by a `GainNode`, and everything deciding what it
+ * sounds like is here, where it can be asserted. `sound.js` holds only the Web Audio calls.
+ */
+
+/** The `localStorage` key holding the player's mute choice. */
+export const SOUND_PREFERENCE_KEY = "circuit-sound";
+
+/** The longest an ordinary sound may last. The board-complete flourish is the one exception. */
+export const SOUND_MAX_MS = 300;
+
+/** The flourish's budget, and the window the celebratory sweep on the board is drawn over. */
+export const BOARD_COMPLETE_MS = 520;
+
+/**
+ * Decode the stored mute preference.
+ *
+ * ONLY THE EXACT STRING FOR "OFF" MUTES. An absent value, a corrupt one, or one written by some
+ * future version all read as sound on - which is the opposite reading to `entryBlockThreshold`
+ * on the platform, and deliberately so. The question to ask is which way the failure falls: a
+ * bad write here would otherwise take the feature away permanently and silently, and a player
+ * who never turned sound off has no reason to look for a control that would give it back. A
+ * wrongly-unmuted game is audible, and the player can mute it in one tap.
+ */
+export function soundEnabledFrom(stored) {
+  return stored !== soundPreferenceValue(false);
+}
+
+/** The value written back, so the decode and the encode cannot drift apart. */
+export function soundPreferenceValue(enabled) {
+  return enabled ? "on" : "off";
+}
+
+/**
+ * The mute control's label and `aria-pressed`.
+ *
+ * `pressed` describes MUTED, not "sound is on", because the button is named for the action it
+ * performs. Getting that backwards is invisible on screen and tells a screen-reader user the
+ * opposite of the truth, which is the one failure mode of this control that nobody would file.
+ */
+export function soundControlCopy(enabled) {
+  return enabled
+    ? { label: "Mute sound", pressed: "false", icon: "\u{1F50A}" }
+    : { label: "Unmute sound", pressed: "true", icon: "\u{1F507}" };
+}
+
+/**
+ * A pair's note, so a finished board is a chord rather than a list of beeps.
+ *
+ * Major pentatonic degrees over A3: any combination of them is consonant, so the board stays
+ * musical whatever order the player joins the pairs in and however many a grid size produces.
+ *
+ * EIGHT DEGREES, WHICH IS THE MOST PAIRS ANY GRID PRODUCES (`large`: 5-8), for the same reason
+ * `TERMINAL_ART` has eight entries. The modulo is the fallback if a ninth ever appears - and
+ * unlike the artwork, where a modulo would paint a "1" on pair 9 and look deliberate, a repeated
+ * note costs nothing.
+ */
+const PENTATONIC_SEMITONES = [0, 2, 4, 7, 9, 12, 14, 16];
+const NOTE_BASE_HZ = 220;
+
+export function pairNoteHz(pairId) {
+  const at =
+    Number.isFinite(pairId) && pairId >= 0
+      ? Math.floor(pairId) % PENTATONIC_SEMITONES.length
+      : 0;
+  return Math.round(NOTE_BASE_HZ * Math.pow(2, PENTATONIC_SEMITONES.at(at) / 12));
+}
+
+/** The whole sound a joined pair makes: its own note, sliding up a fifth as the wire lands. */
+export function pairNoteRecipe(pairId) {
+  const hz = pairNoteHz(pairId);
+  return { type: "triangle", fromHz: hz, toHz: Math.round(hz * 1.5), ms: 170, gain: 0.075 };
+}
+
+/*
+ * A `Map` rather than an object literal, and the reason is the same one that put a `Map` behind
+ * the round-inspector's action list and the contest edit's field list: an object lookup walks the
+ * prototype chain, so `toneRecipe("constructor")` would return something truthy. Nothing hands
+ * this a value from a request today, which is exactly when a lookup like this gets reused.
+ *
+ * Quiet on purpose. This plays inside an iframe on somebody's phone, very possibly in public, and
+ * a game that announces itself at the volume of a notification is a game the player mutes once
+ * and never unmutes.
+ */
+const TONE_RECIPES = new Map([
+  ["press", { type: "triangle", fromHz: 320, toHz: 240, ms: 70, gain: 0.05 }],
+  ["start", { type: "triangle", fromHz: 330, toHz: 660, ms: 180, gain: 0.07 }],
+  ["refused", { type: "sawtooth", fromHz: 150, toHz: 90, ms: 190, gain: 0.05 }],
+  ["clear", { type: "triangle", fromHz: 220, toHz: 130, ms: 130, gain: 0.045 }],
+  ["tick", { type: "square", fromHz: 760, toHz: 700, ms: 45, gain: 0.035 }],
+]);
+
+/**
+ * One of the fixed sounds, or `null`.
+ *
+ * FAILS CLOSED TO SILENCE. An unknown name is a typo or a sound somebody removed, and inventing
+ * a default tone for it would mean the wrong noise in the right place - which reads as the game
+ * being broken rather than as a missing case. Silence reads as a sound nobody added yet.
+ */
+export function toneRecipe(name) {
+  return TONE_RECIPES.get(name) ?? null;
+}
+
+/**
+ * The board-complete flourish: the tonic, the third, the fifth and the octave, close together.
+ *
+ * `delayMs` is carried on the recipe rather than being scheduled by four timers, because Web
+ * Audio can start a note at a time in the future far more accurately than `setTimeout` can - and
+ * an arpeggio whose notes wobble is worse than a chord.
+ */
+const ARPEGGIO_SEMITONES = [0, 4, 7, 12];
+const ARPEGGIO_GAP_MS = 70;
+
+export function boardCompleteNotes() {
+  return ARPEGGIO_SEMITONES.map((semitones, at) => {
+    const hz = Math.round(NOTE_BASE_HZ * 2 * Math.pow(2, semitones / 12));
+    return {
+      type: "triangle",
+      fromHz: hz,
+      toHz: hz,
+      ms: 200,
+      gain: 0.06,
+      delayMs: at * ARPEGGIO_GAP_MS,
+    };
+  });
+}
+
+/* ------------------------------------------------------------------------------------------
+ * Motion: the two decisions that are arithmetic rather than CSS
+ * ---------------------------------------------------------------------------------------- */
+
+/**
+ * Which pairs are joined now that were not a moment ago.
+ *
+ * The transition is the event, not the state: a pair that is already joined must not re-light and
+ * re-sound on every pointer move while the finger travels back along a finished wire, which is
+ * both the obvious implementation and a machine gun.
+ */
+export function newlyJoined(before, after) {
+  const had = new Set(Array.isArray(before) ? before : []);
+  return (Array.isArray(after) ? after : []).filter((id) => !had.has(id));
+}
+
+/** How many ticks the result screen's figure counts through, and how long each one holds. */
+export const COUNT_UP_MAX_STEPS = 14;
+export const COUNT_UP_STEP_MS = 45;
+
+/**
+ * The figures to show on the way to `target`, or nothing at all.
+ *
+ * CAPPED, because a Sprint player who solved forty boards would otherwise sit through forty ticks
+ * before being told their round is over - and the count-up is a flourish, not information. It is
+ * also EMPTY for a target of one or less: counting to one is a flicker, and counting to zero on
+ * the screen that tells a player they scored nothing is tactless as well as pointless.
+ */
+export function countUpSteps(target) {
+  if (!Number.isFinite(target) || target <= 1) return [];
+  const whole = Math.floor(target);
+  const count = Math.min(whole, COUNT_UP_MAX_STEPS);
+  const steps = [];
+  for (let step = 1; step <= count; step++) steps.push(Math.round((whole * step) / count));
+  return steps;
+}
+
+/**
+ * `("4 / 5", 2)` -> `"2 / 5"`. The leading figure only.
+ *
+ * `resultCopy` renders either `"4"` or `"4 / 5"`, and the target is not the player's achievement -
+ * counting it up too would animate the number of boards the contest asked for, which never
+ * changed. A value with no leading figure passes through untouched rather than being replaced,
+ * so a future wording is left alone instead of being mangled.
+ */
+export function withCountUpValue(statValue, value) {
+  if (typeof statValue !== "string") return "";
+  if (!Number.isFinite(value)) return statValue;
+  return statValue.replace(/^\d+/, String(Math.max(0, Math.round(value))));
+}

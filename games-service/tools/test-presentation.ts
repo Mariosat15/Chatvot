@@ -66,6 +66,32 @@ interface Presentation {
     triumphant: boolean;
   };
   hintCopy(input: Record<string, unknown>): { text: string; tone: string };
+
+  SOUND_PREFERENCE_KEY: string;
+  SOUND_MAX_MS: number;
+  BOARD_COMPLETE_MS: number;
+  COUNT_UP_MAX_STEPS: number;
+  COUNT_UP_STEP_MS: number;
+  soundEnabledFrom(stored: string | null): boolean;
+  soundPreferenceValue(enabled: boolean): string;
+  soundControlCopy(enabled: boolean): { label: string; pressed: string; icon: string };
+  pairNoteHz(pairId: number): number;
+  pairNoteRecipe(pairId: number): Recipe;
+  toneRecipe(name: string): Recipe | null;
+  boardCompleteNotes(): Recipe[];
+  newlyJoined(before: number[], after: number[]): number[];
+  countUpSteps(target: number): number[];
+  withCountUpValue(statValue: string, value: number): string;
+}
+
+/** One synthesised note, as `sound.js` consumes it. */
+interface Recipe {
+  type: string;
+  fromHz: number;
+  toHz: number;
+  ms: number;
+  gain: number;
+  delayMs?: number;
 }
 
 /**
@@ -405,6 +431,195 @@ async function main(): Promise<void> {
     const ready = p.hintCopy({ joined: 4, pairs: 4, used: 36, cells: 36, complete: true });
     assert.equal(ready.tone, "ready");
     assert.match(ready.text, /submit/i);
+  });
+
+  console.log("");
+  console.log("Whether the game makes a noise");
+
+  test("an absent preference means sound is on, and only the stored word turns it off", () => {
+    /*
+     * THE DIRECTION OF THE DEFAULT, WHICH IS THE ONLY WAY THIS DECISION FAILS SILENTLY.
+     *
+     * Written as `stored === "on"` the game would be mute for every player who has never touched
+     * the control, which is all of them - and a game that makes no noise is indistinguishable
+     * from a game whose audio is broken, so nobody would report it as a preference bug.
+     *
+     * The unrecognised values matter for the same reason. A key left behind by an older build, or
+     * one a host page wrote into the same origin, must not silently mute the game.
+     */
+    assert.equal(p.soundEnabledFrom(null), true);
+    assert.equal(p.soundEnabledFrom(""), true);
+    assert.equal(p.soundEnabledFrom("yes"), true);
+    assert.equal(p.soundEnabledFrom("ON"), true);
+    assert.equal(p.soundEnabledFrom("off"), false);
+  });
+
+  test("what is written back is what the reader recognises", () => {
+    // The encode and the decode are two functions, so they can disagree - and if they do, the
+    // control appears to work, the choice appears to save, and it is forgotten on every reload.
+    assert.equal(p.soundEnabledFrom(p.soundPreferenceValue(true)), true);
+    assert.equal(p.soundEnabledFrom(p.soundPreferenceValue(false)), false);
+  });
+
+  test("the control is pressed when MUTED, which is the opposite of sound being on", () => {
+    /*
+     * `aria-pressed` describes the button's own action, and the button mutes. Getting this
+     * backwards changes nothing on screen and tells a screen-reader user the exact opposite of
+     * the truth - the one failure of this control that no sighted reviewer can see.
+     */
+    const on = p.soundControlCopy(true);
+    assert.equal(on.pressed, "false");
+    assert.match(on.label, /^Mute/);
+
+    const off = p.soundControlCopy(false);
+    assert.equal(off.pressed, "true");
+    assert.match(off.label, /^Unmute/);
+
+    // Two states, two glyphs. One icon for both is a control that cannot be read at a glance.
+    assert.notEqual(on.icon, off.icon);
+  });
+
+  test("a pair's note is stable, in range, and never NaN however odd the pair id", () => {
+    // Stable because the note is the player's only cue that a wire landed: a pitch that moved
+    // between two joins of the same pair would read as a different event.
+    assert.equal(p.pairNoteHz(0), p.pairNoteHz(0));
+    assert.notEqual(p.pairNoteHz(0), p.pairNoteHz(1));
+
+    for (const id of [0, 1, 5, 7, 8, 40, -1, 2.7, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const hz = p.pairNoteHz(id);
+      assert.ok(Number.isFinite(hz), `pair ${id} produced ${hz}`);
+      // Inside the range a phone speaker actually reproduces. A note below this is a thud the
+      // player feels rather than hears; above it, it is a whistle they will mute the game over.
+      assert.ok(hz >= 180 && hz <= 1200, `pair ${id} produced ${hz}Hz`);
+    }
+
+    // A negative or fractional id is folded rather than refused: it is a pair number arriving
+    // from a generator, and a silent join is worse than a note shared with another pair.
+    assert.equal(p.pairNoteHz(-1), p.pairNoteHz(0));
+    assert.equal(p.pairNoteHz(2.7), p.pairNoteHz(2));
+  });
+
+  test("every named tone is short and quiet, and an unknown name is silence", () => {
+    /*
+     * The budget is the constraint the owner set: this runs in an iframe on a phone, quite
+     * possibly in public. A recipe that creeps past it is not a visible defect - it is a game
+     * somebody mutes once and never unmutes, which shows up as nothing at all.
+     */
+    for (const name of ["press", "start", "refused", "clear", "tick"]) {
+      const recipe = p.toneRecipe(name);
+      assert.ok(recipe, `no recipe for ${name}`);
+      assert.ok(recipe.ms > 0 && recipe.ms <= p.SOUND_MAX_MS, `${name} lasts ${recipe.ms}ms`);
+      assert.ok(recipe.gain > 0 && recipe.gain <= 0.12, `${name} peaks at ${recipe.gain}`);
+      assert.ok(Number.isFinite(recipe.fromHz) && Number.isFinite(recipe.toHz));
+    }
+
+    const joined = p.pairNoteRecipe(3);
+    assert.ok(joined.ms <= p.SOUND_MAX_MS);
+    assert.ok(joined.gain > 0 && joined.gain <= 0.12);
+  });
+
+  test("a tone name from the prototype chain is not a tone", () => {
+    /*
+     * `TONE_RECIPES` is a `Map` for this reason. An object lookup walks the prototype chain, so
+     * `ACTIONS["constructor"]` returns something truthy that survives a `!recipe` test and fails
+     * later somewhere unrelated. Nothing hands this a value from a request today, which is
+     * precisely when a lookup like this gets reused for something that does.
+     */
+    for (const name of ["constructor", "__proto__", "toString", "hasOwnProperty", "nope"]) {
+      assert.equal(p.toneRecipe(name), null, `${name} resolved to a recipe`);
+    }
+  });
+
+  test("the board flourish fits the window the sweep is drawn over", () => {
+    const notes = p.boardCompleteNotes();
+    assert.ok(notes.length >= 3, "a flourish of two notes is a beep");
+
+    // The animation and the arpeggio are two independent numbers, so they can drift apart - and
+    // the failure is a light sweeping over a board in silence, or a chord over a still board.
+    for (const note of notes) {
+      const ends = (note.delayMs ?? 0) + note.ms;
+      assert.ok(ends <= p.BOARD_COMPLETE_MS, `a note ends at ${ends}ms of ${p.BOARD_COMPLETE_MS}`);
+      assert.ok(note.gain > 0 && note.gain <= 0.12);
+    }
+
+    // Rising, because a falling flourish is what every piece of software plays when it has failed.
+    const pitches = notes.map((note) => note.fromHz);
+    assert.deepEqual(pitches, [...pitches].sort((a, b) => a - b));
+
+    // Offsets, not four timers: `setTimeout` cannot place a note accurately enough for a chord.
+    assert.ok(notes.some((note) => (note.delayMs ?? 0) > 0));
+  });
+
+  test("only a pair that was not joined a moment ago counts as newly joined", () => {
+    /*
+     * This is what stops a note sounding sixty times a second. A drag repaints on every pointer
+     * move, so "which pairs are joined" is true for the whole rest of the drag - only the
+     * transition is the event. Derived from the current state alone, the board would scream.
+     */
+    assert.deepEqual(p.newlyJoined([], [2]), [2]);
+    assert.deepEqual(p.newlyJoined([2], [2]), []);
+    assert.deepEqual(p.newlyJoined([2], [2, 5]), [5]);
+
+    // Retracting and rejoining IS a new join - the wire genuinely landed again.
+    assert.deepEqual(p.newlyJoined([], [2]), [2]);
+
+    // A pair 0 must survive. Written with a truthiness filter anywhere in the chain, the first
+    // pair on every board is the one that never makes a sound, which reads as a flaky game.
+    assert.deepEqual(p.newlyJoined([], [0]), [0]);
+  });
+
+  test("the count-up stops short of being a wait, and refuses to count to one", () => {
+    /*
+     * CAPPED, because a Sprint player who solved forty boards would otherwise watch forty ticks
+     * before being told the round is over - and this is a flourish, not information.
+     *
+     * EMPTY below two, because counting to one is a flicker and counting to zero is a round that
+     * scored nothing being animated, which reads as the screen mocking the player.
+     */
+    assert.deepEqual(p.countUpSteps(0), []);
+    assert.deepEqual(p.countUpSteps(1), []);
+    assert.deepEqual(p.countUpSteps(Number.NaN), []);
+
+    const five = p.countUpSteps(5);
+    assert.equal(five.at(-1), 5, "the count must arrive at the value");
+    assert.equal(five.length, 5);
+
+    const many = p.countUpSteps(40);
+    assert.ok(many.length <= p.COUNT_UP_MAX_STEPS, `${many.length} steps is a wait`);
+    assert.equal(many.at(-1), 40);
+
+    // Monotonic. A step that goes backwards is a number the player watches count DOWN.
+    let previous = many[0];
+    for (const step of many.slice(1)) {
+      assert.ok(step >= previous, `${step} follows ${previous}, so the number counts down`);
+      previous = step;
+    }
+
+    // The whole animation has to be over before a player looks away from it.
+    assert.ok(many.length * p.COUNT_UP_STEP_MS <= 900);
+  });
+
+  test("the count-up rewrites the achievement and never the target beside it", () => {
+    /*
+     * `resultCopy` renders either "4" or "4 / 5". The 5 is what the contest asked for and never
+     * changed, so animating it would count up a number that was already true - and on the last
+     * step the two would briefly read the same, which is a player told they finished.
+     */
+    assert.equal(p.withCountUpValue("4 / 5", 2), "2 / 5");
+    assert.equal(p.withCountUpValue("4", 2), "2");
+    assert.equal(p.withCountUpValue("12 / 40", 3), "3 / 40");
+
+    // A value with no leading figure passes through untouched rather than being replaced: the
+    // result panel has endings whose figure is a dash, and "0" there is a claim, not a blank.
+    assert.equal(p.withCountUpValue("-", 2), "-");
+    assert.equal(p.withCountUpValue("4 / 5", Number.NaN), "4 / 5");
+  });
+
+  test("the storage key is namespaced, because the frame may share an origin with the host", () => {
+    // Under the proxy deployment the play surface is served from the platform's own domain, so
+    // `localStorage` is shared with it. A key called "sound" is a collision waiting to happen,
+    // and the symptom would be a player's mute choice changing when they used something else.
+    assert.match(p.SOUND_PREFERENCE_KEY, /circuit/i);
   });
 
   console.log("");

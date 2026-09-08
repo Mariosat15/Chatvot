@@ -264,4 +264,143 @@ $results += Invoke-Probe -Name 'a module reached only by import goes missing' `
   -Replace 'from "./presentation-v2.js";' `
   -ExpectRed 'every module the play surface imports is served'
 
+Write-Host ""
+Write-Host "The arcade pass - movement and sound" -ForegroundColor Cyan
+
+$srcSound = 'public/play/sound.js'
+$srcStyles = 'public/play/app.css'
+
+# The default, which is the only way this decision fails without anybody noticing. Written as
+# `stored === "on"`, the game is mute for every player who has never touched the control - which
+# is all of them - and a silent game is indistinguishable from broken audio, so it is reported as
+# a fault or not at all, never as a preference bug.
+$results += Invoke-Probe -Name 'sound defaults to off for a player who never chose' `
+  -Suite $SuitePresentation -File $srcPresentation `
+  -Find '  return stored !== soundPreferenceValue(false);' `
+  -Replace '  return stored === soundPreferenceValue(true);' `
+  -ExpectRed 'an absent preference means sound is on, and only the stored word turns it off'
+
+# `aria-pressed` describes the button's own action, and the button MUTES. Swapped, nothing changes
+# on screen and a screen-reader user is told the exact opposite of the truth - the one failure of
+# this control that no sighted reviewer can see.
+#
+# Declared at 3: the markup carries the default state's label so a screen reader reaching the
+# button before the script runs does not announce a bare "button", and that copy is compared
+# against this function. One rule, three observable consequences.
+$results += Invoke-Probe -Name 'the mute control reports pressed when sound is ON' `
+  -Suite $SuitePresentation -File $srcPresentation `
+  -Find '    ? { label: "Mute sound", pressed: "false", icon: "\u{1F50A}" }' `
+  -Replace '    ? { label: "Mute sound", pressed: "true", icon: "\u{1F50A}" }' `
+  -ExpectRed 'the control is pressed when MUTED, which is the opposite of sound being on' `
+  -MaxRed 3
+
+# An object lookup walks the prototype chain, so `toneRecipe("constructor")` returns something
+# truthy that survives the `!recipe` test in `playRecipe` and fails later somewhere unrelated.
+# Nothing hands this a value from a request today, which is exactly when a lookup gets reused.
+$results += Invoke-Probe -Name 'the tone table becomes an object literal again' `
+  -Suite $SuitePresentation -File $srcPresentation `
+  -Find '  return TONE_RECIPES.get(name) ?? null;' `
+  -Replace '  return Object.fromEntries(TONE_RECIPES)[name] ?? null;' `
+  -ExpectRed 'a tone name from the prototype chain is not a tone'
+
+# Derived from "is this pair joined" rather than from the transition, a note sounds on every
+# pointer move for the rest of the drag - sixty times a second while the finger keeps travelling.
+# The board does not fail; it screams.
+$results += Invoke-Probe -Name 'a joined pair counts as newly joined for ever' `
+  -Suite $SuitePresentation -File $srcPresentation `
+  -Find '  const had = new Set(Array.isArray(before) ? before : []);' `
+  -Replace '  const had = new Set();' `
+  -ExpectRed 'only a pair that was not joined a moment ago counts as newly joined'
+
+# Uncapped, a Sprint player who solved forty boards watches forty ticks before being told their
+# round is over. It reads as the result screen hanging, which is the complaint that arrives.
+$results += Invoke-Probe -Name 'the count-up runs one step per board, however many' `
+  -Suite $SuitePresentation -File $srcPresentation `
+  -Find '  const count = Math.min(whole, COUNT_UP_MAX_STEPS);' `
+  -Replace '  const count = whole;' `
+  -ExpectRed 'the count-up stops short of being a wait, and refuses to count to one'
+
+# The write, not the read. A file where the read is guarded and the write is not passes any "is
+# there a try/catch here" check while still throwing the first time somebody presses mute - and
+# `localStorage` throws rather than returning null when a browser refuses it, which an iframe on
+# somebody else's domain very much can be.
+$results += Invoke-Probe -Name 'the mute choice is written outside a catch' `
+  -Suite $SuitePlayRoutes -File $srcSound `
+  -Find '  try {
+    window.localStorage.setItem(SOUND_PREFERENCE_KEY, soundPreferenceValue(enabled));
+  } catch {' `
+  -Replace '  window.localStorage.setItem(SOUND_PREFERENCE_KEY, soundPreferenceValue(enabled));
+  try {' `
+  -ExpectRed 'the mute preference survives a browser that refuses storage'
+
+# `AudioContext.resume()` returns a promise, and awaiting it before playing the Start sound is the
+# obvious thing to write. It puts an audio device between the player's tap and the POST that
+# starts their clock - on a timed title the clock IS the score, and a slow handset costs them time
+# they paid for with nothing in any log to say so.
+$results += Invoke-Probe -Name 'the start sound waits for the audio hardware' `
+  -Suite $SuitePlayRoutes -File $srcSound `
+  -Find '  function resume() {' `
+  -Replace '  async function resume() {
+    await Promise.resolve();' `
+  -ExpectRed 'nothing on the gameplay path ever waits for a sound'
+
+# Moved below the `await`, the unlock is no longer inside the click as far as the browser is
+# concerned. The context is created suspended, never produces a sound, and the game is silent for
+# the whole round with nothing anywhere to say why.
+$results += Invoke-Probe -Name 'the audio context is opened after the round has started' `
+  -Suite $SuitePlayRoutes -File $srcClient `
+  -Find '  sound.unlock();
+  sound.play("start");' `
+  -Replace '  sound.play("start");' `
+  -ExpectRed 'nothing on the gameplay path ever waits for a sound'
+
+# An animation added without its reduced-motion half changes nothing for anybody who has not set
+# the preference, so it passes every review and every screenshot. There is no symptom to notice.
+#
+# AIMED AT `.board-stage.refused` RATHER THAN THE FIRST SELECTOR IN THE LIST, and the reason is a
+# finding rather than a detail. The first attempt removed `svg#board .join-pulse` and reported
+# GREEN - correctly, because that selector is named again three rules below under `display: none`,
+# which stops it moving just as thoroughly. The probe had not restored a defect. It did expose a
+# weak test, which now asserts what the reduced rule DOES rather than that the selector is
+# mentioned; this selector appears exactly once, so the mutation is a real omission.
+$results += Invoke-Probe -Name 'an animation is added and the reduced-motion half is forgotten' `
+  -Suite $SuitePlayRoutes -File $srcStyles `
+  -Find '  .board-stage.solved::after,
+  .board-stage.refused {' `
+  -Replace '  .board-stage.solved::after {' `
+  -ExpectRed 'every animation the stylesheet adds is switched off under reduced motion'
+
+# The other half of the same guard, and the one the first version of this test could not see: the
+# selectors all present, under a rule that changes something else entirely. It reads as covered on
+# any scan that looks for the name, which is what the first version of this test did.
+$results += Invoke-Probe -Name 'a reduced-motion rule is present but stops nothing moving' `
+  -Suite $SuitePlayRoutes -File $srcStyles `
+  -Find '  .board-stage.refused {
+    animation: none;
+  }' `
+  -Replace '  .board-stage.refused {
+    opacity: 1;
+  }' `
+  -ExpectRed 'every animation the stylesheet adds is switched off under reduced motion'
+
+# The count-up written the natural way round. A browser that never fires the interval again - a
+# backgrounded tab, a phone throttling a hidden frame - freezes the figure at "2" on a round that
+# solved five, and the player has been told they lost.
+$results += Invoke-Probe -Name 'the count-up starts before the correct figure is on screen' `
+  -Suite $SuitePlayRoutes -File $srcClient `
+  -Find '  ui.resultStat.textContent = statValue;
+
+  const steps' `
+  -Replace '  const steps' `
+  -ExpectRed 'the score counts up from a value that is already correct'
+
+# The markup's label is a second copy of something `soundControlCopy` owns, so it can disagree.
+# A control announcing "unmute" on a game already making a noise is wrong in the way nobody
+# sighted can see, and nothing else in this repository compares the two.
+$results += Invoke-Probe -Name 'the markup announces the opposite of the default state' `
+  -Suite $SuitePlayRoutes -File $srcMarkup `
+  -Find '            aria-label="Mute sound"' `
+  -Replace '            aria-label="Unmute sound"' `
+  -ExpectRed 'the mute control ships announcing the state it is actually in'
+
 Write-ProbeSummary $results

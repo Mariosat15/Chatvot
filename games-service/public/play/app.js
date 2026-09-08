@@ -35,12 +35,18 @@
 
 import { BOARD_ART, createBoard } from "./board.js";
 import {
+  BOARD_COMPLETE_MS,
+  COUNT_UP_STEP_MS,
+  countUpSteps,
   desiredFrameHeight,
   hintCopy,
   introCopy,
   resultCopy,
+  soundControlCopy,
+  withCountUpValue,
   HEIGHT_REPORT_THRESHOLD_PX,
 } from "./presentation.js";
+import { createSound } from "./sound.js";
 
 /*
  * "The code arrived and started running." Read by the boot watchdog in `index.html`, which shows
@@ -54,6 +60,9 @@ import {
 window.__circuitLoaded = true;
 
 const REFUSAL_HOLD_MS = 2600;
+
+/** How long the board's refusal shake runs. Must match `board-refused` in `app.css`. */
+const REFUSAL_SHAKE_MS = 420;
 
 /**
  * The token from the launch URL.
@@ -87,6 +96,8 @@ const ui = {
   leave: document.getElementById("leave"),
   board: document.getElementById("board"),
   boardWrap: document.getElementById("board-wrap"),
+  boardStage: document.getElementById("board-stage"),
+  mute: document.getElementById("mute"),
   hint: document.getElementById("hint"),
   submit: document.getElementById("submit"),
   clear: document.getElementById("clear"),
@@ -104,6 +115,16 @@ let state = null;
 let clockTimer = null;
 let refusalTimer = null;
 let announcedFinished = false;
+let countUpTimer = null;
+/** The whole second the tick last sounded for, so a four-times-a-second repaint ticks once. */
+let tickedSecond = -1;
+
+/*
+ * Constructing this reads the stored preference and nothing else - no `AudioContext` exists until
+ * the player taps Start. That ordering is the whole reason sound is a separate module: a browser
+ * builds a suspended context if you ask before a gesture, and a suspended context never plays.
+ */
+const sound = createSound();
 
 /* ------------------------------------------------------------------------------------------
  * Talking to the platform
@@ -237,6 +258,66 @@ async function call(path, body, method) {
 }
 
 /* ------------------------------------------------------------------------------------------
+ * Movement and sound
+ * ---------------------------------------------------------------------------------------- */
+
+/**
+ * Whether the player has asked their device for less movement.
+ *
+ * Asked on every use rather than resolved once at boot. The setting is a live system preference:
+ * a phone switching to a battery saver turns it on mid-round, and that is precisely the moment an
+ * animation is worth dropping. A value captured at boot would honour it only for players who had
+ * already decided before they opened the game.
+ *
+ * The stylesheet is the primary enforcement - every animation this file adds is declared in
+ * `app.css` behind `@media (prefers-reduced-motion: reduce)`. This exists for the two effects CSS
+ * cannot switch off, because they are driven by a timer rather than a keyframe: the result
+ * screen's count-up, and the board's reaction classes, which would otherwise keep adding and
+ * removing a class that paints nothing.
+ */
+function prefersReducedMotion() {
+  try {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches === true;
+  } catch {
+    // A browser with no `matchMedia` gets the animations. Refusing them on a failed feature
+    // detection would silently strip the movement from every browser that threw for any reason.
+    return false;
+  }
+}
+
+/**
+ * Play one of the board's short reactions.
+ *
+ * Added if absent and removed by a timer, never removed-then-re-added. Re-triggering a CSS
+ * animation requires a forced layout read between the two, and the refusal reaction can arrive
+ * while a finger is still on the board - a synchronous layout in the middle of a drag is the one
+ * cost the build/paint split exists to avoid. Letting a running reaction finish is the better
+ * answer anyway: two overlapping shakes read as a rendering fault rather than as feedback.
+ */
+function flashBoard(name, ms) {
+  const stage = ui.boardStage;
+  if (!stage || prefersReducedMotion() || stage.classList.contains(name)) return;
+  stage.classList.add(name);
+  window.setTimeout(() => stage.classList.remove(name), ms);
+}
+
+/**
+ * Label and press-state for the sound toggle.
+ *
+ * The button is `aria-pressed` on MUTE rather than on sound, because the control is a mute button
+ * - a screen reader announcing "sound on, pressed" for a game that is making no noise is worse
+ * than no announcement. `soundControlCopy` decides both, so the two cannot disagree.
+ */
+function renderSoundControl() {
+  if (!ui.mute) return;
+  const copy = soundControlCopy(sound.isEnabled());
+  ui.mute.textContent = copy.icon;
+  ui.mute.setAttribute("aria-label", copy.label);
+  ui.mute.setAttribute("title", copy.label);
+  ui.mute.setAttribute("aria-pressed", copy.pressed);
+}
+
+/* ------------------------------------------------------------------------------------------
  * Screens
  * ---------------------------------------------------------------------------------------- */
 
@@ -347,7 +428,20 @@ function renderClock() {
   const minutes = Math.floor(seconds / 60);
   const rest = seconds % 60;
   ui.clock.textContent = minutes + ":" + String(rest).padStart(2, "0");
-  ui.clock.classList.toggle("urgent", remaining <= 10_000);
+  const urgent = remaining <= 10_000;
+  ui.clock.classList.toggle("urgent", urgent);
+
+  /*
+   * The tick is keyed on the SECOND changing, not on this function running. It runs four times a
+   * second, and four ticks a second is not a countdown, it is an alarm - and the only way a
+   * player could stop it would be to mute the whole game in the last ten seconds of a round.
+   *
+   * Not awaited, like every other sound: the clock's job is to be accurate.
+   */
+  if (urgent && seconds > 0 && seconds !== tickedSecond) {
+    tickedSecond = seconds;
+    sound.play("tick");
+  }
 
   /*
    * At zero we ASK the server rather than deciding. The clock here is a display of `endsAt`, and
@@ -363,6 +457,9 @@ function renderClock() {
 
 function startClock() {
   stopClock();
+  // A fresh board inside the same round restarts this. Without the reset, a round that reaches
+  // the last ten seconds, solves a board and carries on would never tick again for that second.
+  tickedSecond = -1;
   renderClock();
   clockTimer = window.setInterval(renderClock, 250);
 }
@@ -372,6 +469,42 @@ function stopClock() {
     window.clearInterval(clockTimer);
     clockTimer = null;
   }
+}
+
+/**
+ * Count the result screen's figure up to its value.
+ *
+ * THE FINAL VALUE IS WRITTEN BEFORE THE ANIMATION STARTS, and the first step then rewinds it. It
+ * costs one frame showing the answer, and it buys the property that matters: a browser that never
+ * fires the interval again - a backgrounded tab, a phone throttling a hidden frame, a device that
+ * suspends timers on lock - leaves the correct figure on screen instead of a partial one. A
+ * count-up frozen at "2" on a round that solved five is a player told they lost.
+ *
+ * The same reason the interval writes `statValue` itself on the last step rather than the last
+ * computed number: `countUpSteps` rounds, so the two are only usually equal.
+ */
+function countUpStat(statValue) {
+  if (countUpTimer !== null) {
+    window.clearInterval(countUpTimer);
+    countUpTimer = null;
+  }
+  ui.resultStat.textContent = statValue;
+
+  const steps = countUpSteps(parseInt(statValue, 10));
+  if (steps.length === 0 || prefersReducedMotion()) return;
+
+  let at = 0;
+  ui.resultStat.textContent = withCountUpValue(statValue, steps[0]);
+  countUpTimer = window.setInterval(() => {
+    at += 1;
+    if (at >= steps.length) {
+      ui.resultStat.textContent = statValue;
+      window.clearInterval(countUpTimer);
+      countUpTimer = null;
+      return;
+    }
+    ui.resultStat.textContent = withCountUpValue(statValue, steps.at(at));
+  }, COUNT_UP_STEP_MS);
 }
 
 function renderResult() {
@@ -387,7 +520,7 @@ function renderResult() {
   });
 
   ui.resultTitle.textContent = copy.heading;
-  ui.resultStat.textContent = copy.statValue;
+  countUpStat(copy.statValue);
   ui.resultStatLabel.textContent = copy.statLabel;
 
   /*
@@ -435,13 +568,25 @@ function renderHint(refusal) {
   ui.hint.className = copy.tone ? "hint " + copy.tone : "hint";
 }
 
-function onBoardChange() {
+/**
+ * @param {{justJoined?:number[], complete?:boolean}} [change] What the board did, when it knows.
+ *
+ * `justJoined` is only ever populated by the drag - the one interaction that can complete a pair -
+ * so the note sounds once, as the wire lands. Derived here instead, from "is this pair joined
+ * now", it would sound again on every pointer move that kept it joined, which is sixty times a
+ * second for as long as the finger keeps travelling.
+ *
+ * Nothing here is awaited. A sound that failed to play must cost the drag nothing.
+ */
+function onBoardChange(change) {
   if (refusalTimer !== null) {
     window.clearTimeout(refusalTimer);
     refusalTimer = null;
   }
   renderHint(null);
   ui.submit.disabled = !board.isComplete();
+
+  for (const pairId of (change && change.justJoined) || []) sound.playPair(pairId);
 }
 
 const board = createBoard(ui.board, onBoardChange);
@@ -485,6 +630,16 @@ async function refresh() {
 }
 
 async function start() {
+  /*
+   * THE GESTURE. A browser will not let a page make a noise until the player has touched it, so
+   * this is where the audio hardware is actually opened - synchronously, inside the click
+   * handler, before the `await` below. Moved after the network call it stops being "inside a
+   * gesture" as far as the browser is concerned, and the game is silent for the whole round with
+   * nothing in any log to say why.
+   */
+  sound.unlock();
+  sound.play("start");
+
   ui.start.disabled = true;
   ui.start.textContent = "Starting...";
   try {
@@ -497,6 +652,7 @@ async function start() {
 
 async function submit() {
   if (!board.isComplete()) return;
+  sound.play("press");
   ui.submit.disabled = true;
   ui.submit.textContent = "Checking...";
 
@@ -511,6 +667,14 @@ async function submit() {
     ui.submit.textContent = "Submit";
 
     if (outcome.accepted) {
+      /*
+       * Celebrate BEFORE re-rendering, and note that the class goes on the stage rather than on
+       * anything `render` touches. `render` replaces the whole board - the next puzzle, or the
+       * result screen - so a sweep started on the SVG would be thrown away in the same tick and
+       * the player would never see the one moment in the round worth marking.
+       */
+      sound.playBoardComplete();
+      flashBoard("solved", BOARD_COMPLETE_MS);
       render();
       return;
     }
@@ -525,6 +689,8 @@ async function submit() {
      */
     render();
     if (screens.play && !screens.play.hidden) {
+      sound.play("refused");
+      flashBoard("refused", REFUSAL_SHAKE_MS);
       renderHint(outcome.message || "That board was not accepted.");
       refusalTimer = window.setTimeout(() => renderHint(null), REFUSAL_HOLD_MS);
     }
@@ -565,9 +731,44 @@ function done() {
 
 ui.start.addEventListener("click", start);
 ui.submit.addEventListener("click", submit);
-ui.clear.addEventListener("click", () => board.clear());
+ui.clear.addEventListener("click", () => {
+  sound.play("clear");
+  board.clear();
+});
 ui.leave.addEventListener("click", leave);
 ui.done.addEventListener("click", done);
+
+if (ui.mute) {
+  ui.mute.addEventListener("click", () => {
+    /*
+     * Unlocked here as well as on Start, because this is the other gesture that reaches the play
+     * screen. A player who muted a previous round arrives with sound off, never presses anything
+     * that opens a context, and then unmutes - so without this the button would report itself on
+     * and produce nothing until the round after next.
+     */
+    sound.unlock();
+    sound.setEnabled(!sound.isEnabled());
+    renderSoundControl();
+    // After the toggle, so unmuting is confirmed by a noise and muting is confirmed by silence.
+    sound.play("press");
+  });
+}
+renderSoundControl();
+
+/*
+ * The third gesture, and the only one a RESUMED round offers.
+ *
+ * A player whose connection dropped mid-round comes back straight onto the board - there is no
+ * intro and no Start button, so the tap that can open the audio hardware has to be the first
+ * touch of the grid. Without this, reconnecting silently costs the player sound for the rest of
+ * the round, which reads as the game breaking rather than as a browser policy.
+ *
+ * This sits on the drag path, so it must stay trivial: once a context exists it reads one
+ * property and returns. `pointerdown` only - never `pointermove` - and passive, so it cannot
+ * delay or cancel the drag `board.js` starts on the same event.
+ */
+ui.board.addEventListener("pointerdown", () => sound.unlock(), { passive: true });
+
 ui.retry.addEventListener("click", () => {
   show("loading");
   refresh().catch((error) => fail(error.message));

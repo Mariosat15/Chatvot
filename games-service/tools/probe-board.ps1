@@ -106,12 +106,17 @@ $results += Invoke-Probe -Name "a token is chosen by position instead of by pair
 # The whole point of the build/paint split. Repainting everything on every pointer move means
 # re-decoding eight images and rebuilding ~100 nodes per frame - which does not fail, it just makes
 # a drag stutter on the phones most players are holding.
+#
+# RE-AIMED on 8 September 2026. `paint()` gained an argument - the pairs that landed on this
+# repaint, which is what decides whether their wire surges - so the two-line anchor stopped
+# matching and the probe reported DID NOT APPLY. That reads like a broken harness rather than a
+# moved target, and it is the same failure as a probe pointed at the wrong test: a result that
+# means nothing while looking like one that does. The property is unchanged, so only the anchor
+# moved. `paint(arrived)` appears exactly once, inside the drag handler.
 $results += Invoke-Probe -Name 'a drag rebuilds the whole board again' `
   -Suite $SuiteBoard -File $srcBoard `
-  -Find '    if (walkTowards(dragging, cell)) {
-      paint();' `
-  -Replace '    if (walkTowards(dragging, cell)) {
-      render();' `
+  -Find '      paint(arrived);' `
+  -Replace '      render();' `
   -ExpectRed 'a drag repaints the wires and leaves the cells and terminals standing'
 
 # Resizing must do the opposite: the artwork is sized in grid units, so a repaint alone leaves

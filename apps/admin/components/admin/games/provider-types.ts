@@ -52,6 +52,15 @@ export interface ProviderTitleRow {
   supportsPractice?: boolean;
   scoreDirection?: string;
   scoreType?: string;
+  // Operator presentation content. Every one is optional and must stay so: a title synced
+  // before these fields existed has none of them, and the screens that read them fall back
+  // rather than printing a blank. See the model comment on `tagline`.
+  tagline?: string;
+  description?: string;
+  category?: string;
+  thumbnailUrl?: string;
+  bannerUrl?: string;
+  highlights?: { title: string; detail: string }[];
 }
 
 export interface CatalogueSyncSummary {

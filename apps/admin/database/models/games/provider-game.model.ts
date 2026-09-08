@@ -22,6 +22,9 @@ export interface IProviderGame extends Document {
   description?: string;
   thumbnailUrl?: string;
   category?: string;
+  tagline?: string;
+  bannerUrl?: string;
+  highlights?: { title: string; detail: string }[];
   family: "independent" | "head_to_head";
   supportsCompetition: boolean;
   supportsOneVsOne: boolean;
@@ -80,6 +83,40 @@ const ProviderGameSchema = new Schema<IProviderGame>(
     thumbnailUrl: { type: String },
     category: { type: String },
 
+    // Presentation content the OPERATOR writes, and which no provider ever supplies.
+    //
+    // The distinction from `description` and `thumbnailUrl` above is worth stating, because
+    // all five read like the same kind of field and two of them are not. Those two appear in
+    // the provider contract, so the catalogue sync SEEDS them on the first sync and never
+    // touches them again (`firstSyncOnlyFields`). These three are in no contract at all, so
+    // they are in neither sync allow-list and cannot be seeded, overwritten or cleared by a
+    // provider. That is deliberate rather than incidental: a spread of a provider payload
+    // over this document would revert an operator's wording on the next sync with nothing
+    // raising an error, which is the failure `catalogue.service.ts` is written to prevent.
+    //
+    // Nothing here may become required. A title synced before these existed, or supplied by
+    // a provider whose operator has not written copy yet, must still render - so every
+    // consumer treats an absent value as "say less", never as an empty string to print.
+    tagline: { type: String, trim: true },
+    // Reason: the WIDE hero art, distinct from `thumbnailUrl`, which is the square logo. Two
+    // fields because the two shapes crop differently and a single URL used for both makes one
+    // of the two look broken. Until this is set, `components/neon/banners.ts` still answers
+    // from the game code, so an unset banner is a generic trophy rather than a gap.
+    bannerUrl: { type: String, trim: true },
+    // Reason: the short "why this game is fun" cards. An array rather than four fields so a
+    // title can carry two or six, and `_id: false` because these are content, not entities -
+    // nothing joins to them and an id per row would be stored, transported and never read.
+    highlights: {
+      type: [
+        {
+          _id: false,
+          title: { type: String, required: true, trim: true },
+          detail: { type: String, required: true, trim: true },
+        },
+      ],
+      default: undefined,
+    },
+
     // Capability declarations from the catalogue.
     //
     // CORRECTION, 8 Sep 2026: this comment claimed `family` drives which contest formats the
@@ -95,7 +132,6 @@ const ProviderGameSchema = new Schema<IProviderGame>(
     // `family` is also NOT the axis that decides whether players must play at the same
     // moment: it describes whether a game needs an opponent, and a race is `independent`.
     // Open question 18 and `22` s1.
-    
     family: {
       type: String,
       enum: ["independent", "head_to_head"],
