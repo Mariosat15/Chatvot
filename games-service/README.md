@@ -324,8 +324,20 @@ npm run probe:boot-watchdog  # the same, for the watchdog that names a module wh
 > failing closed if storage throws. **A stale 200 is not covered and cannot be** - it looks
 > healthy - which is why `deploy/README.md` asks for a Cloudflare cache rule on `/play*`.
 
-`npm test` runs **217 tests**: 15 config, 42 engine, 28 scoring, 41 API, 56 play and delivery,
-11 board client, 24 presentation. (Any figure of 216 predates the stale-cache recovery, 213
+> **And it takes TWO witnesses to declare the game dead, because the first one took down a working
+> game.** This document is never cached - its URL carries a single-use token - while `app.js` is
+> cached for four hours, so a player can load today's markup around a four-hour-old script that
+> works perfectly but predates the boot flag. The watchdog saw an unset flag and wiped a live
+> board mid-round. It now also checks whether the game has **painted**: `#screen-loading` is
+> hidden the instant anything renders, which is proof of life whatever build produced it. Each
+> witness covers the other's blind spot - the flag for a round that is merely slow to fetch, the
+> painted screen for a build too old to set it. **An absent signal is evidence only if the thing
+> that would have sent it was definitely present.** A test pins the markup's side of that bargain:
+> exactly one screen ships visible, and it is the loading screen.
+
+`npm test` runs **219 tests**: 15 config, 42 engine, 28 scoring, 41 API, 58 play and delivery,
+11 board client, 24 presentation. (Any figure of 217 predates the watchdog's second witness, 216
+predates the stale-cache recovery, 213
 predates the boot watchdog, 209 predates the directory-derived asset set, 204 predates the
 deploy-drift audit, 167 predates the presentation suite, and 152 predates the config suite; all
 six are stale.)

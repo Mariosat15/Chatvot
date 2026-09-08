@@ -165,6 +165,27 @@ Invoke-Probe "12 the recovery is not conditional on a real failure" "html" `
   "if (claimRetry()) {" `
   "a stale refusal in the browser's own cache is cured, not merely reported"
 
+# 13. Back to one witness. This is the defect that reached production: a player holding a
+#     four-hour-old `app.js` from before the flag existed has a working game wiped mid-round.
+Invoke-Probe "13 the deadline trusts the flag alone" "html" `
+  "if (window.__circuitLoaded || gameHasPainted()) return;" `
+  "if (window.__circuitLoaded) return;" `
+  "the watchdog never takes down a game that is running"
+
+# 14. The loading screen counts as painted, so the second witness always says "alive" and the
+#     watchdog can never fire at all - a guard that reads correctly and is switched off.
+Invoke-Probe "14 the loading screen counts as proof of life" "html" `
+  'if (screens[i].id !== "screen-loading" && !screens[i].hidden) return true;' `
+  "if (!screens[i].hidden) return true;" `
+  "the watchdog never takes down a game that is running"
+
+# 15. A screen ships visible. Nothing fails, nothing logs, and the watchdog is retired silently
+#     because `gameHasPainted` is true at zero seconds.
+Invoke-Probe "15 a second screen ships without hidden" "html" `
+  '<section id="screen-intro" class="screen scroll" hidden>' `
+  '<section id="screen-intro" class="screen scroll">' `
+  "the document starts on the loading screen and nothing else"
+
 # 7. A refused asset becomes cacheable again, so a 404 outlives the deploy that fixed it.
 Invoke-Probe "7 a 404 may be cached" "page" `
   '    res.setHeader("Cache-Control", "no-store");' `

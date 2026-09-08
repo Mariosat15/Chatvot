@@ -376,6 +376,76 @@ async function main(): Promise<number> {
     assert.match(watchdog, /location\.reload/, "the retry button would do nothing");
   });
 
+  await test("the watchdog never takes down a game that is running", async () => {
+    /*
+     * REACHED PRODUCTION, 8 September 2026, within an hour of the flag shipping. A player was
+     * mid-round when the board was replaced by "The game's code did not finish loading."
+     *
+     * `window.__circuitLoaded` is set by `app.js`, so an unset flag means *this build of app.js*
+     * did not run - which is a different fact from "the game did not start". Cloudflare gives
+     * every asset a four-hour lifetime in the browser (R54) while THIS document is never cached,
+     * its URL carrying a single-use token. So today's markup loads around a four-hour-old
+     * `app.js` from before the flag existed: the game works, the flag stays unset, and a watchdog
+     * trusting it alone destroys a working screen.
+     *
+     * The general form, and the reason this is not merely a missing condition: **an absent signal
+     * is evidence only if the thing that would have sent it was definitely present.**
+     */
+    const page = await fetchRaw("/play");
+    const start = page.text.indexOf("<script>");
+    const watchdog = page.text.slice(start, page.text.indexOf('<script type="module"'));
+
+    assert.match(
+      watchdog,
+      /if \(window\.__circuitLoaded \|\| gameHasPainted\(\)\) return;/,
+      "the deadline consults only one witness, so a stale app.js means a wiped board mid-round",
+    );
+
+    const paintedAt = watchdog.indexOf("function gameHasPainted");
+    assert.ok(paintedAt > 0, "there is no second witness at all");
+    const painted = watchdog.slice(paintedAt, watchdog.indexOf("function claimRetry"));
+    assert.ok(painted.length > 100, "the gameHasPainted slice found nothing, so it asserts nothing");
+
+    assert.match(
+      painted,
+      /getElementById\("screen-loading"\)[\s\S]{0,120}hidden\) return true/,
+      "a hidden loading screen is not treated as proof the game is alive",
+    );
+    assert.match(
+      painted,
+      /id !== "screen-loading"/,
+      "the loading screen counts as a painted screen, so the watchdog can never fire at all",
+    );
+  });
+
+  await test("the document starts on the loading screen and nothing else", async () => {
+    /*
+     * The coupling the test above depends on, asserted against the real markup rather than
+     * assumed. `gameHasPainted` reads "some screen other than loading is visible" as proof the
+     * game is running, so a new `<section class="screen">` added without `hidden` would make that
+     * true at zero seconds and **silently retire the whole watchdog** - no failure, no test, and
+     * the endless spinner is back the next time a module goes missing.
+     */
+    const page = await fetchRaw("/play");
+    const sections = [...page.text.matchAll(/<section[^>]*class="screen[^"]*"[^>]*>/g)].map(
+      (match) => match[0],
+    );
+
+    assert.ok(sections.length >= 4, `expected the screens in the markup, found ${sections.length}`);
+
+    const visible = sections.filter((tag) => !/\bhidden\b/.test(tag));
+    assert.equal(
+      visible.length,
+      1,
+      `exactly one screen may be visible in the document; found ${visible.length}: ${visible.join(" ")}`,
+    );
+    assert.match(
+      visible[0],
+      /id="screen-loading"/,
+      "the one visible screen is not the loading screen, so the watchdog is dead on arrival",
+    );
+  });
+
   await test("a stale refusal in the browser's own cache is cured, not merely reported", async () => {
     /*
      * MEASURED ON THE LIVE SITE, 8 September 2026. Cloudflare rewrites `Cache-Control` on

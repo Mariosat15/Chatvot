@@ -911,6 +911,52 @@ looks perfectly healthy and has nothing to detect. A Cloudflare cache rule for `
 respect origin headers removes the whole class. Recorded in `deploy/README.md` and as risk
 **R54**.
 
+### 4.1l The watchdog took down a working game - 8 September 2026
+
+**Within the hour, the owner was playing and the board was replaced by "The game's code did not
+finish loading."** The game had started, the round was live, nothing had failed. **The watchdog
+from s4.1j did this**, and the fault is a straight consequence of the caching finding in s4.1k
+rather than an unrelated bug.
+
+**The document is never cached and its assets are cached for four hours.** `/play?t=<token>`
+carries a single-use token, so every launch fetches fresh markup; `app.js` is one URL with
+Cloudflare's four-hour lifetime on it. So a player who had loaded the game earlier that afternoon
+got **today's `index.html` around a four-hour-old `app.js`** - a combination neither file has ever
+been tested against, and one that arises *only* because of the asymmetry. The old `app.js` works
+perfectly. It simply predates `window.__circuitLoaded`, so the flag was never set, and at eight
+seconds the watchdog concluded the code had not arrived and wiped the screen.
+
+**The general form, and it is worth more than the fix: an absent signal is evidence only if the
+thing that would have sent it was definitely present.** The flag answers "did *this build* of
+`app.js` run", and that was read as "did the game start". Every version-skew fault in this
+programme has the same shape - the R52 build-versus-directory split, `check:mirrors` proving two
+copies agree rather than either working - and this one **put a fresh guard in front of a stale
+subject**, which is the one arrangement the earlier lessons did not cover.
+
+**The fix is a second witness that does not depend on the module's cooperation.** The game hides
+`#screen-loading` the instant it renders anything, so a painted screen is proof of life whatever
+build produced it. The deadline now returns early if **either** witness says the game is running,
+and each covers the other's blind spot: the flag catches a round that is merely slow to fetch,
+where the loading screen is legitimately still up; the painted screen catches a build too old to
+carry a flag.
+
+**The residue, stated rather than glossed:** a pre-flag `app.js` *and* a boot slower than eight
+seconds still produces the generic panel on a game that would have loaded. It is bounded by the
+four-hour window, the message advises reloading, and reloading is harmless - a live round resumes.
+The Cloudflare rule in `deploy/README.md` ends it.
+
+**Reproduced and verified by eye before and after**, with a server handing out today's markup and
+an `app.js` with the flag stripped: at thirteen seconds - well past the deadline - the game's own
+error message is still on screen, where previously the watchdog would have overwritten it.
+
+**Two tests, 58 in the play suite, and 15 probes.** The second test is the one to keep: it asserts
+against the **real markup** that exactly one screen ships visible and that it is the loading
+screen. `gameHasPainted` reads "any other screen is visible" as proof of life, so a new
+`<section class="screen">` added without `hidden` would make that true at zero seconds and
+**silently retire the entire watchdog** - no failure, no log, and the endless spinner returns the
+next time a module goes missing. A guard whose subject lives in another file needs a test pinning
+the assumption it makes about that file.
+
 ---
 
 ## 5. What this does NOT prove

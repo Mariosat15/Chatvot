@@ -279,6 +279,32 @@
          * It FAILS CLOSED: if the write throws, we take no attempt at all. A browser that refuses
          * storage is exactly the one where a loop could not be detected.
          */
+        /**
+         * The SECOND witness, and the reason one is not enough.
+         *
+         * `window.__circuitLoaded` is set by `app.js`, so an unset flag means "*this* build of
+         * app.js did not run" - which is **not** the same fact as "the game did not start".
+         * Cloudflare gives every asset a four-hour lifetime in the browser (R54), while THIS
+         * document is never cached at all, because its URL carries a single-use token. So a
+         * player can hold a perfectly good `app.js` from before the flag existed and load today's
+         * markup around it: the game runs, the flag is never set, and a watchdog trusting the
+         * flag alone **wipes a working board out from under somebody mid-round**. That happened,
+         * in production, within an hour of the flag shipping.
+         *
+         * The game hides `#screen-loading` the moment it renders anything, so a painted screen is
+         * proof of life that does not depend on the module's cooperation. Two witnesses, each
+         * covering the other's blind spot: act only when both agree nothing is running.
+         */
+        function gameHasPainted() {
+          var loading = document.getElementById("screen-loading");
+          if (loading && loading.hidden) return true;
+          var screens = document.querySelectorAll(".screen");
+          for (var i = 0; i < screens.length; i += 1) {
+            if (screens[i].id !== "screen-loading" && !screens[i].hidden) return true;
+          }
+          return false;
+        }
+
         function claimRetry() {
           try {
             if (window.sessionStorage.getItem("circuit-cache-retry")) return false;
@@ -290,10 +316,11 @@
         }
 
         window.setTimeout(function () {
-          // Set at the top of `app.js`, so it means "the code arrived and began running" rather
-          // than "the game is playable". A round that is merely slow to fetch is the platform's
-          // 12-second panel to report, not ours.
-          if (window.__circuitLoaded) return;
+          // The flag is set at the top of `app.js`, so it means "the code arrived and began
+          // running" rather than "the game is playable" - a round that is merely slow to fetch is
+          // the platform's 12-second panel to report, not ours. `gameHasPainted` is the second
+          // witness; see its comment for why an unset flag is not on its own evidence of a fault.
+          if (window.__circuitLoaded || gameHasPainted()) return;
 
           var urls = failedResourceUrls();
 
