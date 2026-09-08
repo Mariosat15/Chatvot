@@ -943,6 +943,67 @@ Kept deliberately parallel, so a player with one of each does not have to learn 
 
 ---
 
+### 6.1b The button that went back to the page it was on (8 September 2026)
+
+**Owner report:** pressing **View Competition Details** on a finished game contest must open the
+competition details page - the lobby a player sees when they join - the way it does for trading.
+
+It did not. It did nothing at all, and the mechanism is worth stating precisely because the
+symptom was invisible.
+
+`/competitions/[id]` redirects a **participant of a completed contest** to `/results`, which is
+right: that is what they came back for. `?view=details` switches the redirect off so they can
+return to the lobby. The game results screen had **two** links to the lobby - the header button
+and the **Full leaderboard** button - and both were written **without the query string**. So the
+lobby redirected the player straight back to the results screen they were standing on. No error,
+no log line, no navigation they could perceive. The button looked broken because it was.
+
+**Trading's three links carried the query string, which is exactly why this survived** - the
+feature worked on the path everybody tests, and the string was composed by hand at each call
+site, so a new screen had no way to inherit it.
+
+#### Files
+
+| Piece | File | Mirrored? |
+|---|---|---|
+| The one definition | `lib/utils/competition-details-view.ts` | No |
+| The gate | `app/(root)/competitions/[id]/page.tsx` | No |
+| The two results links | `app/(root)/competitions/[id]/results/page.tsx` | No |
+| The Full leaderboard button | `components/games/ProviderResultsScreen.tsx` | No |
+
+`apps/admin` has no results screen and no such redirect, so there is nothing to mirror and
+`check:mirrors` correctly says nothing about it.
+
+#### Five facts that drift easily
+
+- **This is the "one rule, two copies" shape in its smallest form**, after `referenceId`,
+  `failedReason`, `challengeId` and the Game Master `||`. The gate read a literal and the links
+  wrote a literal, so they *could* disagree - and the failure mode when they did was a control
+  that silently does nothing, which is this codebase's recurring worst case. One module,
+  imported by both sides, cannot drift.
+- **The round trip is the load-bearing assertion, and neither half can substitute for it.** A
+  test on the gate passes against its own copy of the format; a test on a link passes because
+  the URL is valid. Only feeding what `competitionDetailsHref` produces into
+  `wantsCompetitionDetailsView` can fail - and it is the only probe of the six that no
+  single-sided assertion catches.
+- **The links are COUNTED, not merely found.** The results page has one in each branch, and a
+  test proving "a link through the helper exists" is green on precisely the bug that was here:
+  the trading branch correct and the provider branch dead.
+- **One bare `/competitions/[id]` link in that file is CORRECT and must not be forbidden.** A
+  visitor with no seat is redirected to the lobby, and the gate requires a seat, so that path
+  must not carry the override. A blanket structural ban would fail on correct code, which is
+  the fastest way to have a guard deleted.
+- **A repeated parameter now reads as a request for the details view.** Next.js types it as an
+  array, so `?view=details&view=x` was `["details", "x"]` and `=== "details"` was `false` - the
+  safe direction, but nobody chose it, and it silently loses the button on a malformed link.
+
+Pinned by `__tests__/games/competition-details-link.test.ts` (8 tests) and
+`tools/probe-competition-details-link.ps1` (**6 probes, all red with exactly 1 failure each**).
+Nothing about the lobby itself changed, so the game-agnostic lobby of s4.1b and s4.1d is what a
+player now actually reaches.
+
+---
+
 ## 7. Leaderboard, profile and cross-game stats
 
 ### 7.1 Leaderboard

@@ -26,6 +26,7 @@ import {
   isCompetitionIdShaped,
   logMalformedCompetitionId,
 } from "@/lib/utils/competition-id";
+import { wantsCompetitionDetailsView } from "@/lib/utils/competition-details-view";
 import { notFound, redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 import { auth } from "@/lib/better-auth/auth";
@@ -125,6 +126,12 @@ const CompetitionDetailsPage = async ({
       page by default. ?view=details bypasses this so users can revisit
       the competition detail view (leaderboard, chart, etc.) from results.
 
+      THE OVERRIDE IS READ THROUGH `wantsCompetitionDetailsView` RATHER THAN COMPARED TO A
+      LITERAL HERE, because the literal is what broke it. The game results screen's two links
+      to this page were written without the query string, so a provider player pressing "View
+      Competition Details" was bounced straight back to the results page they were already on -
+      a button that silently did nothing. The gate and the links now read one module.
+
       THIS USED TO EXCLUDE PROVIDER CONTESTS, AND THE EXCLUSION IS GONE BECAUSE THE REASON
       FOR IT IS. It was a crash fix: `/results` was the trading post-mortem and dereferenced
       `participant.startingCapital` and `participant.currentCapital` unguarded, which for a
@@ -140,7 +147,7 @@ const CompetitionDetailsPage = async ({
       competition!" about something that was over, and their own rounds were nowhere on the
       page. Trading players had been sent to a post-mortem all along.
     */
-    if (isCompleted && isUserIn && query.view !== "details") {
+    if (isCompleted && isUserIn && !wantsCompetitionDetailsView(query)) {
       redirect(`/competitions/${id}/results`);
     }
 

@@ -4,6 +4,7 @@ import {
   isCompetitionIdShaped,
   logMalformedCompetitionId,
 } from "@/lib/utils/competition-id";
+import { competitionDetailsHref } from "@/lib/utils/competition-details-view";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { getCompetitionById } from "@/lib/actions/trading/competition.actions";
@@ -121,7 +122,13 @@ const CompetitionResultsPage = async ({
               <span className="sm:hidden">Back</span>
             </Button>
           </Link>
-          <Link href={`/competitions/${competitionId}`}>
+          {/*
+            THE QUERY STRING IS THE WHOLE POINT OF THIS LINK, and it was missing. Without it
+            the lobby redirects a participant of a completed contest straight back here, so
+            this button navigated to the page it was already on and appeared to be broken.
+            Composed by `competitionDetailsHref` so it cannot drift from the gate that reads it.
+          */}
+          <Link href={competitionDetailsHref(competitionId)}>
             <Button
               variant="outline"
               size="sm"
@@ -266,7 +273,7 @@ const CompetitionResultsPage = async ({
             <span className="sm:hidden">Back</span>
           </Button>
         </Link>
-        <Link href={`/competitions/${competitionId}?view=details`}>
+        <Link href={competitionDetailsHref(competitionId)}>
           <Button
             variant="outline"
             size="sm"
@@ -592,7 +599,7 @@ const CompetitionResultsPage = async ({
 
       {/* Action Buttons */}
       <div className="flex flex-wrap gap-3 sm:gap-4 justify-center">
-        <Link href={`/competitions/${competitionId}?view=details`}>
+        <Link href={competitionDetailsHref(competitionId)}>
           <Button variant="outline" className="gap-2">
             <LayoutDashboard className="h-4 w-4" />
             View Competition Details

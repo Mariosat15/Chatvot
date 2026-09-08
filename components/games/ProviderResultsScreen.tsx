@@ -23,6 +23,7 @@ import { NeonHero, NeonStatusBadge } from "@/components/neon/Hero";
 import { providerBanner } from "@/components/neon/banners";
 import { NEON_TABLE_HEAD } from "@/components/neon/tokens";
 import { humanizeMetric } from "@/lib/utils/humanize-metric";
+import { competitionDetailsHref } from "@/lib/utils/competition-details-view";
 import type { ProviderContestResults } from "@/lib/services/games/contest-results.service";
 
 /**
@@ -434,7 +435,9 @@ export function ProviderResultsScreen({
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <NeonButton
-          href={`/competitions/${contestId}`}
+          // Same missing query string as the header link: without it the lobby sends a
+          // participant of a finished contest back to this screen, so the button did nothing.
+          href={competitionDetailsHref(contestId)}
           tone="outline"
           icon={ListOrdered}
           label="Full leaderboard"

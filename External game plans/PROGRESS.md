@@ -37,7 +37,7 @@
 | **Next phase, scope decided** | **X4a - ChartVolt as a first-party provider, with a real playable game** (`21`), **3.5-5 weeks**, starting before the provider health panel. It exists because **the review gate the programme is sequenced around cannot currently be held**: `mock.adapter.ts` returns a hostname that does not resolve, so the play screen's iframe fails to load and the final step has never been performed by a person. **Owner decided 5 Sep 2026 that it is both** the reference implementation *and* open question 10's hedge game - which **modifies the 2 Sep "no in-house game is built" decision** and is recorded in the decision log rather than by editing that entry. **No commercial dependency.** Two things not to misread: **risk X8 is reduced when it ships, not now**, and X4a **shrinks X4 without replacing it** - a provider we control cannot rehearse a real partner's auth, error shapes, latency or pricing |
 | **Owner instruction on record** | **External games only, no in-house game** (2 Sep 2026). **One step at a time, admin first, do not break the running app.** |
 | **Not owner-tested** | Everything after the 2 Sep navigation restructure. X1-X3, X5, the provider admin slice and the contest wizard are all **code-complete, awaiting owner test** - and "code-complete" here excludes the replay script and the label backfill, neither of which has been run against production |
-| **Last updated** | 7 September 2026 |
+| **Last updated** | 8 September 2026 |
 
 ### DEFERRED WORK, APPROVED BUT NOT SCHEDULED
 
@@ -655,6 +655,69 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 8 Sep 2026 - `13` s6.1b - VIEW COMPETITION DETAILS WENT BACK TO THE PAGE IT WAS ON
+
+**Shipped:** `lib/utils/competition-details-view.ts` as the one definition of the
+`?view=details` override, imported by the gate in `app/(root)/competitions/[id]/page.tsx` and by
+all three links that need it - the two on `results/page.tsx` and the **Full leaderboard** button
+in `components/games/ProviderResultsScreen.tsx`.
+
+**The defect, and it was live.** `/competitions/[id]` redirects a participant of a **completed**
+contest to `/results`, which is correct - that is what they came back for - and `?view=details`
+switches the redirect off so they can return to the lobby. The game results screen's **two**
+links to the lobby were written **without the query string**, so pressing *View Competition
+Details* on a finished game contest sent the player straight back to the screen they were
+standing on. **No error, no log line, no navigation the player could perceive** - the owner's
+report was simply that the button did nothing, and that was the whole of it.
+
+**Why it survived:** trading's three links carried the string, so the feature worked on the path
+everybody tests, and the string was **composed by hand at every call site**, so a new screen had
+no way to inherit it. This is the **"one rule, two copies"** shape in its smallest available
+form, after `referenceId`, `failedReason`, `challengeId` and the Game Master `||` - and as with
+every one of those, `check:mirrors` has no opinion, because it compares models.
+
+**Files touched:** `lib/utils/competition-details-view.ts` (new),
+`app/(root)/competitions/[id]/page.tsx`, `app/(root)/competitions/[id]/results/page.tsx`,
+`components/games/ProviderResultsScreen.tsx`,
+`__tests__/games/competition-details-link.test.ts` (new, 8 tests),
+`tools/probe-competition-details-link.ps1` (new, 6 probes). Nothing mirrored - `apps/admin` has
+no results screen and no such redirect.
+
+**Deviated from plan:** nothing. `13` section 6 always specified this destination; s6.1a built
+the screen and its link was wrong.
+
+**Four things worth carrying.**
+
+- **The round trip is the load-bearing assertion, and neither half substitutes for it.** A test
+  on the gate passes against its own copy of the format; a test on a link passes because the URL
+  is valid. Only feeding what `competitionDetailsHref` produces into
+  `wantsCompetitionDetailsView` can fail - and it is the one probe of the six that no
+  single-sided assertion catches.
+- **The links are counted, not merely found.** A test proving "a link through the helper exists"
+  is green on exactly the bug that was here: the trading branch correct and the provider branch
+  dead. Same lesson as the emergency-cancel copy lists, where one list covered for another.
+- **One bare `/competitions/[id]` link in the results file is CORRECT and must not be banned.** A
+  visitor with **no seat** is redirected to the lobby, and the gate requires a seat, so that path
+  must not carry the override. A blanket structural ban would fail on correct code, which is the
+  fastest way to have a guard deleted - the same trap as the `<ul>` slice that swallowed four
+  legitimate list items.
+- **A repeated parameter now reads as a request for the details view.** Next.js types it as an
+  array, so `?view=details&view=x` was `["details", "x"]` and `=== "details"` was `false`. The
+  safe direction, but nobody chose it, and it silently loses the button on a malformed link.
+
+**Owner tested:** not yet. Reachable by finishing a game contest and pressing the button on the
+results screen; it should now land on the lobby with the leaderboard and prize table, not bounce.
+
+**Deferred:** nothing in this slice. The **rules surface for a provider title** is still absent,
+so the lobby's help strip points at `/help/competitions` rather than a per-game how-to-play -
+recorded in `13` s4.1d and unchanged by this.
+
+**Next chat should:** X6.5, the admin wording pass - or the three outstanding `12` s5 items
+(`AdminOverviewDashboard.tsx`, the hide-when-trading-off rows, and the per-round provider cost,
+which has no data source until X4).
 
 ---
 
