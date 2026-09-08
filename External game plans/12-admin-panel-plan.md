@@ -1464,8 +1464,8 @@ what the derivation observed, never the current verdict.
 | `AdminOverviewDashboard.tsx` | Active contests and participants **per game**. Hide the price-feed panel when trading is off. **BUILT - s5.1b**, with the price-feed rule narrowed for the reason recorded there |
 | `CompetitionAnalytics.tsx` | Game filter, module-declared columns, participation funnel |
 | `FinancialDashboard.tsx` | Entry-fee volume, fee revenue, payout ratio and average pot **by game** - and by provider, since provider cost is per-provider |
-| `TradingHistorySection.tsx` | Leave as-is. Hide when trading disabled |
-| `PriceHealthWidget.tsx` | Hide when trading disabled |
+| `TradingHistorySection.tsx` | Leave as-is. Hide when trading disabled. **BUILT - s5.1c**, by withholding the destination they live in rather than the two components |
+| `PriceHealthWidget.tsx` | Hide when trading disabled. **BUILT - s5.1c**, same change |
 | Fraud monitoring | Extend to non-trading entries - risk **R9** |
 | **New: Game Performance** | Per-game operational metrics: rounds started versus completed, abandonment rate, unresolved-round count, average round duration, provider callback latency |
 
@@ -1754,13 +1754,83 @@ second test asserts the row set, and the probe names it.
 
 #### What is still outstanding in section 5
 
-- The hide-when-trading-off rows for `TradingHistorySection.tsx` and `PriceHealthWidget.tsx`.
-  The overview's own price-feed tile is done; those two screens are not.
 - The per-round provider cost the commercial question needs, which has **no data source until
   X4** supplies a real contract.
 - The participation funnel on the analytics screen itself - it is on Game Performance instead,
   for the reason recorded in s5.1a.
 - `finalLeaderboard` rendered outside the contest view screen. That is X6.5.
+
+---
+
+### 5.1c What was built - 8 September 2026, withholding trading's screens
+
+The last two rows of section 5's table, and **section 9's `tradingEnabled = false` acceptance
+criterion**, which turned out to be the same item. **18 tests, 11 probes red on exactly the
+expected test**, admin typecheck at the 223 baseline with nothing in the changed files and
+nothing disappearing.
+
+| File | What it does |
+|---|---|
+| `lib/admin/trading-surface.ts` | The rule and the fail-open default. Model-free, admin-only, **new** |
+| `lib/services/games/live-contest-overview.service.ts` | `getTradingSurfaceVisibility()` resolves the two facts; `shouldShowPriceFeed` becomes a delegation |
+| `lib/admin/game-sections.ts` | `TRADING_MENU_ID`, so the sidebar's filter does not spell the id as a literal |
+| `app/dashboard/page.tsx` | Resolves the facts server-side and passes one boolean in |
+| `components/admin/AdminDashboard.tsx` | Withholds the `trading-menu` parent from `filteredMenuGroups` |
+
+**The three rows are one change, and that is the finding worth keeping.** Section 5 names two
+components; section 9 names the group. `TradingHistorySection.tsx` and `PriceHealthWidget.tsx`
+are reached **only** through the TRADING destination - grep says they have no other caller
+anywhere in `apps/admin` - so withholding the destination satisfies both rows and the four
+screens neither of them named. Two components were never going to learn a flag.
+
+#### The deviation, and it is the same one as s5.1b
+
+**The rule is not `tradingEnabled` alone**, which is what both entries literally say. Switching
+trading off gates creation and entry; it does not close the contests already running, and an
+operator running one still needs symbols, market hours, risk limits and price health. Section 9's
+own criterion says as much in its second half - "and running trading contests still finish
+correctly" - so hiding those screens contradicts half the criterion while satisfying the other.
+The surfaces are withheld only once trading is off **and** has nothing live.
+
+**It is one rule with two consumers, not two conditions.** The overview's status tile and the
+sidebar ask the same question, and two copies of it is the "one rule, two copies" shape behind
+`referenceId`, `failedReason`, `challengeId` and the Game Master `||`. Worse than usual here,
+because the copies would disagree only in the state nobody tests. The guard is **behavioural**:
+a test compares `shouldShowPriceFeed` against the shared rule in all four combinations, because
+an assertion that the wrapper merely *imports* the rule is satisfied by one that imports it and
+then decides for itself.
+
+#### Four things that generalise
+
+- **Hiding is not revoking, and the negative assertion is the only half that can see the
+  difference.** The six section grants are untouched, so `?activeTab=price-health` still opens
+  the screen and the tab strip inside it still works. Gating the render on the same flag reads
+  as completing the job and locks an operator with a bookmark out of the screens that run a
+  contest still being played - the exact harm the OR exists to prevent, reintroduced one layer
+  down. The test counts the flag's occurrences (three: the prop, its default, the filter),
+  because a fourth is a gate somewhere it does not belong.
+- **A visibility default must fail OPEN, which is the opposite of a permission's.** The flag
+  travels through a prop and is derived from two database reads. Fail closed and an operator
+  loses six screens because a settings read timed out, silently, with nothing to click. Fail
+  open and the menu is untidy on a platform that has stopped trading. Same direction as
+  `getEnabledGameTypes()` answering trading when its own read throws.
+- **A liveness query must be written as "not the other game", never as "this game".**
+  `gameType: { $ne: "provider" }` matches a document with no label, and **invariant 5 resolves
+  an absent label to trading**. Written `gameKey: "trading"`, every contest predating X1 - and
+  any the backfill has not reached, since it has never been applied - stops counting, and the
+  screens vanish while one is still being played.
+- **Withholding a menu parent is safe precisely because it is not a permission.**
+  `trading-menu` is deliberately absent from `ADMIN_SECTIONS`, so there is nothing to revoke by
+  accident. A test asserts that absence, because the day somebody adds it is the day hiding the
+  parent starts widening or narrowing real access.
+
+#### A probing note
+
+The price-feed probe in `tools/probe-live-contest-overview.ps1` **had to be re-aimed** when the
+rule moved out of the service: mutating a one-line delegation proves only that a wrapper
+forwards. It now mutates the shared rule, which is the property that matters once there are two
+consumers. Left un-updated it would have reported `DID NOT APPLY`, which reads like a broken
+harness rather than a moved target.
 
 ---
 
@@ -1823,8 +1893,10 @@ without blocking anything.
 - [ ] A new provider title becomes bookable **with no code change** - the proof that
       `configSchema` works
 - [ ] Trading contest creation is unchanged
-- [ ] `tradingEnabled = false` hides the TRADING group, and running trading contests
-      still finish correctly
+- [x] `tradingEnabled = false` hides the TRADING group, and running trading contests
+      still finish correctly - **s5.1c**. Note the second half made the first conditional:
+      it is hidden once trading is off **and** has nothing live, because the screens that
+      operate a running trading contest are needed for as long as it runs
 - [ ] Analytics and financials filter by game **and by provider**
 - [ ] An employee can be granted every new section
 - [ ] An admin can resolve an unresolved round, with a reason recorded, without a

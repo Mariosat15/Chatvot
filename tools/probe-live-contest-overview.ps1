@@ -142,12 +142,18 @@ $results += Invoke-Probe `
 # 4. The price feed hidden on `tradingEnabled` alone - which is literally what `12` s5 asks
 #    for, and is wrong in the one direction that matters: switching trading off does not close
 #    the contests already running, and their open positions are still priced from that feed.
+#
+#    THE TARGET MOVED, and this is worth reading rather than "fixing" back. The rule left this
+#    service on 8 September 2026 for `lib/admin/trading-surface.ts`, because the sidebar asks
+#    the same question about the whole TRADING group. `shouldShowPriceFeed` is now a delegation,
+#    so mutating it would prove only that a one-line wrapper forwards. Mutating the shared rule
+#    proves both consumers change together - which is the property that matters now.
 # ---------------------------------------------------------------------------------------
 $results += Invoke-Probe `
     -Name "price feed hidden on the enabled flag alone" `
-    -File $SVC `
-    -From '  return overview.tradingEnabled || overview.tradingHasLiveContests;' `
-    -To '  return overview.tradingEnabled;' `
+    -File "apps/admin/lib/admin/trading-surface.ts" `
+    -From '  return facts.tradingEnabled || facts.tradingHasLiveContests;' `
+    -To '  return facts.tradingEnabled;' `
     -TestName "stays visible while trading has something live"
 
 # ---------------------------------------------------------------------------------------

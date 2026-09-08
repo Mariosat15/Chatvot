@@ -136,7 +136,8 @@ import GameMasterDashboardSection from "@/components/admin/GameMasterDashboardSe
 import GameMasterManagementSection from "@/components/admin/GameMasterManagementSection";
 import PriceHealthWidget from "@/components/admin/PriceHealthWidget";
 import TradingSectionTabs from "@/components/admin/trading/TradingSectionTabs";
-import { isTradingSection } from "@/lib/admin/game-sections";
+import { isTradingSection, TRADING_MENU_ID } from "@/lib/admin/game-sections";
+import { TRADING_SURFACE_VISIBLE_BY_DEFAULT } from "@/lib/admin/trading-surface";
 import VendorSubscriptionsSection from "@/components/admin/VendorSubscriptionsSection";
 import IncidentsSection from "@/components/admin/IncidentsSection";
 import VisitorAnalyticsSection from "@/components/admin/visitors/VisitorAnalyticsSection";
@@ -154,6 +155,14 @@ interface AdminDashboardProps {
   isSuperAdmin?: boolean;
   role?: string;
   allowedSections?: string[];
+  /**
+   * Whether trading's own six screens are still worth offering (`12` s9).
+   *
+   * Optional and defaulting to visible on purpose: the flag arrives through a prop, so a future
+   * caller can forget it, and losing the screens that operate a live trading contest is a far
+   * worse outcome than an untidy menu. See `lib/admin/trading-surface.ts`.
+   */
+  tradingSurfaceVisible?: boolean;
 }
 
 interface MenuItem {
@@ -798,6 +807,7 @@ export default function AdminDashboard({
   isSuperAdmin = false,
   role = "Employee",
   allowedSections = [],
+  tradingSurfaceVisible = TRADING_SURFACE_VISIBLE_BY_DEFAULT,
 }: AdminDashboardProps) {
   const router = useRouter();
 
@@ -913,6 +923,14 @@ export default function AdminDashboard({
           // Profile is always accessible for non-super-admin employees
           if (item.id === "profile") {
             return !isSuperAdmin;
+          }
+          // `12` s9: trading's own destination is withheld once trading is switched off and has
+          // nothing live. // Reason this hides rather than revokes: the six section grants are
+          // untouched, so `?activeTab=symbols` still opens the screen and the tab strip inside
+          // it still works. An operator with a bookmark is not locked out of a running contest
+          // — the menu simply stops advertising a game the platform no longer runs.
+          if (item.id === TRADING_MENU_ID && !tradingSurfaceVisible) {
+            return false;
           }
           // If item has children, check if any child is accessible
           if (item.children) {

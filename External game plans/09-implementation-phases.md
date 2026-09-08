@@ -454,12 +454,17 @@ games: the route authenticated on **token validity rather than section access**,
 **never worked for any game** because nothing writes `metadata.percentage`, and every headline
 card was captioned as an all-time total while covering the last 50 contests. The fourth was
 the game gap - "Final P&L" rendered unconditionally, so a provider winner read `+0.00` while
-the ranking score sat unread, which is R46 one screen along. **Two items of `12` s5 remain:**
-the hide-when-trading-off rows for `TradingHistorySection.tsx` and `PriceHealthWidget.tsx`, and
+the ranking score sat unread, which is R46 one screen along. **One item of `12` s5 remains:**
 the per-round provider cost the commercial question needs, which has no data source until X4
-supplies a real contract. `AdminOverviewDashboard.tsx` was the third and is **closed** - `12`
-s5.1b, 8 September 2026 - and the finding there is worth carrying: the row read as an aggregate
-needing a game dimension added, and **the page counted no contests at all, of any game.**
+supplies a real contract. `AdminOverviewDashboard.tsx` is **closed** - `12` s5.1b, 8 September
+2026 - and the finding there is worth carrying: the row read as an aggregate needing a game
+dimension added, and **the page counted no contests at all, of any game.** The
+hide-when-trading-off rows are **closed** too - `12` s5.1c, the same day - and the finding is
+the same shape: the two components named were reachable only through the TRADING destination, so
+**withholding the destination closed both rows and `12` s9's group criterion in one change**,
+covering four screens neither row named. It is withheld once trading is off **and** has nothing
+live, because the screens that operate a running trading contest are needed for as long as it
+runs.
 
 **And two items inside the lifecycle are recorded rather than closed.** `adjust-results` is now
 authorized but has **no UI caller at all**, so post-settlement correction is reachable only by

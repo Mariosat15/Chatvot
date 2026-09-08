@@ -37,6 +37,11 @@ import {
   resolveGameBadge,
   TRADING_GAME_KEY,
 } from "../../admin/contest-analytics-presentation";
+import {
+  isTradingSurfaceRelevant,
+  TRADING_SURFACE_VISIBLE_BY_DEFAULT,
+  type TradingSurfaceFacts,
+} from "../../admin/trading-surface";
 import { getEnabledGameTypes } from "@/lib/games";
 
 /**
@@ -90,23 +95,68 @@ interface LiveContestDoc {
 /**
  * Whether the price-feed status tile belongs on the overview.
  *
- * `12` s5 says to hide it when trading is off, and hiding it on that alone is wrong in the one
- * direction that matters. **A health indicator that disappears exactly when somebody needs it is
- * worse than one shown needlessly.** Switching trading off stops new trading contests being
- * created and entered; it does not close the ones already running, and every open position in
- * them is still priced, still marked to market and still settled from the same feed. An operator
- * whose feed dies mid-contest would be looking at a page that had removed the only tile telling
- * them so.
+ * The rule itself lives in `lib/admin/trading-surface.ts`, because the sidebar asks the same
+ * question about the whole TRADING group and two copies of it would disagree only in the state
+ * nobody tests - trading switched off with a contest still running. This function survives as
+ * the name the overview reads, and a test asserts the two answers can never differ.
  *
- * So it is withheld only when trading is off **and** has nothing live - which is the state the
- * plan's row is actually describing, a platform that has moved on from trading. Recorded as a
- * deviation in `12` s5.1b rather than silently widened.
+ * The reasoning for the rule being an OR rather than `tradingEnabled` alone is in that module.
+ * Recorded as a deviation in `12` s5.1b rather than silently widened.
  */
-export function shouldShowPriceFeed(overview: {
-  tradingEnabled: boolean;
-  tradingHasLiveContests: boolean;
-}): boolean {
-  return overview.tradingEnabled || overview.tradingHasLiveContests;
+export function shouldShowPriceFeed(overview: TradingSurfaceFacts): boolean {
+  return isTradingSurfaceRelevant(overview);
+}
+
+export interface TradingSurfaceVisibility extends TradingSurfaceFacts {
+  /** What the sidebar acts on. Derived, never stored. */
+  visible: boolean;
+}
+
+/**
+ * The same two facts, resolved cheaply enough to run on every dashboard page load.
+ *
+ * WHY NOT REUSE `getLiveContestOverview()`: it fetches every live contest, resolves catalogue
+ * titles and providers, and aggregates seats. The sidebar needs one boolean, and a nav
+ * decoration must not put five queries in front of the admin's landing page.
+ *
+ * WHY THE LIVENESS TEST IS `gameType: { $ne: "provider" }` RATHER THAN `gameKey: "trading"`:
+ * `$ne` matches a document that lacks the field, and **invariant 5 resolves an absent label to
+ * trading**. Written the other way, a contest predating the game label - which is every trading
+ * contest the platform ran before X1, and any the X1 backfill has not reached - reads as though
+ * it were not a trading contest, and the surfaces vanish while it is still being played.
+ *
+ * IT FAILS OPEN, and that direction is the point. See `TRADING_SURFACE_VISIBLE_BY_DEFAULT`:
+ * losing six screens because a settings read timed out is far worse than an untidy menu.
+ */
+export async function getTradingSurfaceVisibility(): Promise<TradingSurfaceVisibility> {
+  try {
+    await connectToDatabase();
+
+    const [enabledTypes, liveTradingContest] = await Promise.all([
+      getEnabledGameTypes(),
+      Competition.exists({
+        status: { $in: [...LIVE_CONTEST_STATUSES] },
+        gameType: { $ne: "provider" },
+      }),
+    ]);
+
+    const facts: TradingSurfaceFacts = {
+      tradingEnabled: enabledTypes.includes(TRADING_GAME_KEY),
+      tradingHasLiveContests: liveTradingContest !== null,
+    };
+
+    return { ...facts, visible: isTradingSurfaceRelevant(facts) };
+  } catch (error) {
+    console.warn(
+      "⚠️ Could not resolve trading surface visibility, showing the trading screens:",
+      error,
+    );
+    return {
+      tradingEnabled: TRADING_SURFACE_VISIBLE_BY_DEFAULT,
+      tradingHasLiveContests: false,
+      visible: TRADING_SURFACE_VISIBLE_BY_DEFAULT,
+    };
+  }
 }
 
 export async function getLiveContestOverview(): Promise<LiveContestOverview> {

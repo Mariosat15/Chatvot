@@ -37,6 +37,16 @@ export const TRADING_SECTION_IDS: readonly string[] = TRADING_SECTION_TABS.map(
   (tab) => tab.id,
 );
 
+/**
+ * The collapsible sidebar parent holding the six tabs above.
+ *
+ * **Deliberately not an `AdminSection`** - it renders nothing of its own, and a grant that maps
+ * to no screen is exactly where privilege widening starts. It is named here because the sidebar
+ * now has to withhold it (`12` s9), and a menu id spelled as a literal in two files is how a
+ * rename silently stops hiding anything.
+ */
+export const TRADING_MENU_ID = "trading-menu";
+
 export function isTradingSection(sectionId: string): boolean {
   return TRADING_SECTION_IDS.includes(sectionId);
 }
