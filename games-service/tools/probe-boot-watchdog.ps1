@@ -137,6 +137,34 @@ Invoke-Probe "8 the named file is not the one that failed" "html" `
   "entries[i].responseStatus >= 0" `
   "a module that never arrives names itself instead of spinning for ever"
 
+# 9. The re-fetch uses the cache mode that reads round the cache without REPLACING it, so the
+#    page reloads straight back into the same stale refusal. The plausible wrong choice.
+Invoke-Probe "9 the re-fetch does not replace the cached entry" "html" `
+  'cache: "reload"' `
+  'cache: "no-store"' `
+  "a stale refusal in the browser's own cache is cured, not merely reported"
+
+# 10. The single-attempt guard goes away, so the recovery reloads for ever on a file that really
+#     is missing - a round flickering in front of the player, worse than the panel.
+Invoke-Probe "10 the retry is not limited to one attempt" "html" `
+  "if (window.sessionStorage.getItem(`"circuit-cache-retry`")) return false;" `
+  "" `
+  "a stale refusal in the browser's own cache is cured, not merely reported"
+
+# 11. Storage refused now FAILS OPEN, which is the same loop by a different route: the browser
+#     that cannot record the attempt is exactly the one that cannot detect the loop.
+Invoke-Probe "11 a browser without storage may retry for ever" "html" `
+  "          } catch (ignored) {`r`n            return false;`r`n          }" `
+  "          } catch (ignored) {`r`n            return true;`r`n          }" `
+  "a stale refusal in the browser's own cache is cured, not merely reported"
+
+# 12. The recovery fires on any stalled boot rather than on a recorded failure, so a slow round
+#     is answered by reloading the page underneath the player.
+Invoke-Probe "12 the recovery is not conditional on a real failure" "html" `
+  "if (urls.length > 0 && claimRetry()) {" `
+  "if (claimRetry()) {" `
+  "a stale refusal in the browser's own cache is cured, not merely reported"
+
 # 7. A refused asset becomes cacheable again, so a 404 outlives the deploy that fixed it.
 Invoke-Probe "7 a 404 may be cached" "page" `
   '    res.setHeader("Cache-Control", "no-store");' `

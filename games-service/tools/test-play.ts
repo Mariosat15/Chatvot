@@ -376,6 +376,103 @@ async function main(): Promise<number> {
     assert.match(watchdog, /location\.reload/, "the retry button would do nothing");
   });
 
+  await test("a stale refusal in the browser's own cache is cured, not merely reported", async () => {
+    /*
+     * MEASURED ON THE LIVE SITE, 8 September 2026. Cloudflare rewrites `Cache-Control` on
+     * everything it serves to `max-age=14400`, **including 404s** - the service sends `no-store`
+     * on a refused asset and it does not survive the edge. So a file that was genuinely missing
+     * for ten minutes is remembered by every browser that asked as missing for FOUR HOURS, and
+     * no deploy can reach it, because the browser never asks again.
+     *
+     * That is the worst failure mode available: the server is fixed, every check on our side
+     * reports success, and the player still cannot play. `curl` from the server says 200 while
+     * the page says 404, which reads as a lie from one of the two.
+     */
+    const page = await fetchRaw("/play");
+    const start = page.text.indexOf('<script>');
+    const watchdog = page.text.slice(start, page.text.indexOf('<script type="module"'));
+
+    /*
+     * `cache: "reload"` is the whole fix and no other cache mode does this job. `no-store`
+     * bypasses the browser's copy without REPLACING it, so the page reloads into the same stale
+     * refusal; `reload` writes what the server says now into the cache, which is why the reload
+     * afterwards finds the file.
+     */
+    assert.match(
+      watchdog,
+      /fetch\([^)]*\{\s*cache:\s*"reload"\s*\}/,
+      "the watchdog never re-fetches past the browser's cache, so a stale 404 is permanent",
+    );
+
+    /*
+     * ONE ATTEMPT, GUARDED BY STORAGE THAT SURVIVES THE RELOAD. A counter in a variable resets
+     * as the page reloads, so the recovery becomes a loop - a round flickering for ever, which is
+     * worse than the panel. And it must FAIL CLOSED: a browser that refuses storage is exactly
+     * the one where a loop could not be detected, so it takes no attempt at all.
+     *
+     * Sliced to `claimRetry` rather than asserted over the whole watchdog. A bare match on
+     * `sessionStorage` is satisfied by the WRITE alone, so deleting the read - which is the whole
+     * limit, and turns the recovery into a reload loop - left this test green when probed.
+     */
+    const claimAt = watchdog.indexOf("function claimRetry");
+    assert.ok(claimAt > 0, "there is no single-attempt guard at all");
+    const claim = watchdog.slice(claimAt, watchdog.indexOf("window.setTimeout"));
+    assert.ok(claim.length > 100, "the claimRetry slice found nothing, so it asserts nothing");
+
+    assert.match(
+      claim,
+      /getItem\([\s\S]{0,60}return false/,
+      "the flag is written but never read, so every reload takes a fresh attempt - a loop",
+    );
+    assert.match(
+      claim,
+      /setItem\(/,
+      "the attempt is not recorded anywhere that survives the reload it triggers",
+    );
+    assert.match(
+      claim,
+      /catch[\s\S]{0,60}return false/,
+      "a browser that refuses storage would be allowed to retry, so it could loop",
+    );
+
+    /*
+     * The recovery is only attempted when a URL was recorded as failing. A boot that stalled for
+     * any other reason must not be answered by reloading the page underneath the player - and
+     * the reload must be the LAST thing, after every check has come back true, or a genuinely
+     * missing file produces a reload loop that reports nothing.
+     */
+    assert.match(
+      watchdog,
+      /urls\.length > 0 && claimRetry\(\)/,
+      "the recovery is not conditional on something having actually failed",
+    );
+
+    /*
+     * Sliced from `Promise.all` rather than scanned from the top of the watchdog, because
+     * `giveUp` contains a `location.reload()` of its own - the retry button's handler - and the
+     * first version of this assertion found that one and reported the order wrong on correct
+     * code. Locate the construct; do not scan towards it.
+     */
+    const checksAt = watchdog.indexOf("Promise.all");
+    assert.ok(checksAt > 0, "the watchdog does not wait for the re-fetches at all");
+    const afterChecks = watchdog.slice(checksAt);
+    const refusalAt = afterChecks.indexOf("giveUp(urls)");
+    const reloadAt = afterChecks.indexOf("window.location.reload();");
+    assert.ok(refusalAt > 0 && reloadAt > 0, "the recovery has no outcome for one of its cases");
+    assert.ok(
+      refusalAt < reloadAt,
+      "the reload is not the last resort - a file that is genuinely gone would reload for ever",
+    );
+
+    // And the give-up path must still be reachable: a failed re-fetch has to land on the panel,
+    // or a real outage becomes a silent reload instead of a message.
+    const failureHandlers = [...watchdog.matchAll(/giveUp\(urls\)/g)];
+    assert.ok(
+      failureHandlers.length >= 3,
+      `expected the panel on the rejected, the not-ok and the no-retry paths, found ${failureHandlers.length}`,
+    );
+  });
+
   await test("app.js records that it loaded before it does anything else", async () => {
     const app = await fetchRaw("/play/app.js");
     assert.equal(app.status, 200);

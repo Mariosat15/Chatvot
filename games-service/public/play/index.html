@@ -212,30 +212,28 @@
           true,
         );
 
-        function failedResourceName() {
-          if (!window.performance || !window.performance.getEntriesByType) return "";
+        function failedResourceUrls() {
+          var urls = [];
+          if (!window.performance || !window.performance.getEntriesByType) return urls;
           var entries = window.performance.getEntriesByType("resource");
-          for (var i = entries.length - 1; i >= 0; i -= 1) {
+          for (var i = 0; i < entries.length; i += 1) {
             if (typeof entries[i].responseStatus === "number" && entries[i].responseStatus >= 400) {
-              return String(entries[i].name).split("?")[0].split("/").pop();
+              urls.push(String(entries[i].name));
             }
           }
-          return "";
+          return urls;
         }
 
-        window.setTimeout(function () {
-          // Set at the top of `app.js`, so it means "the code arrived and began running" rather
-          // than "the game is playable". A round that is merely slow to fetch is the platform's
-          // 12-second panel to report, not ours.
-          if (window.__circuitLoaded) return;
+        function shortName(url) {
+          return String(url).split("?")[0].split("/").pop();
+        }
 
-          var name = failedResourceName();
-
+        function giveUp(urls) {
           var detail = document.getElementById("error-detail");
           if (detail) {
             detail.textContent =
-              (name
-                ? "The game could not load one of its files (" + name + ")."
+              (urls.length
+                ? "The game could not load one of its files (" + shortName(urls[0]) + ")."
                 : resourceFailed
                   ? "The game could not load one of its files."
                   : "The game's code did not finish loading.") +
@@ -268,6 +266,88 @@
           } catch (ignored) {
             /* No parent, or a parent we may not talk to. The panel above is still on screen. */
           }
+        }
+
+        /**
+         * Claim the single automatic recovery attempt, or refuse to take one.
+         *
+         * WHY THIS IS GUARDED BY STORAGE AND NOT BY A COUNTER. The recovery reloads the page, so
+         * a counter in a variable resets on the way and the reload becomes a loop - a player
+         * watching a round flicker for ever, which is worse than the panel. `sessionStorage`
+         * survives the reload and dies with the tab.
+         *
+         * It FAILS CLOSED: if the write throws, we take no attempt at all. A browser that refuses
+         * storage is exactly the one where a loop could not be detected.
+         */
+        function claimRetry() {
+          try {
+            if (window.sessionStorage.getItem("circuit-cache-retry")) return false;
+            window.sessionStorage.setItem("circuit-cache-retry", "1");
+            return true;
+          } catch (ignored) {
+            return false;
+          }
+        }
+
+        window.setTimeout(function () {
+          // Set at the top of `app.js`, so it means "the code arrived and began running" rather
+          // than "the game is playable". A round that is merely slow to fetch is the platform's
+          // 12-second panel to report, not ours.
+          if (window.__circuitLoaded) return;
+
+          var urls = failedResourceUrls();
+
+          /*
+           * WHY IT RE-FETCHES BEFORE GIVING UP, AND WHY THAT IS A FIX RATHER THAN A RETRY.
+           *
+           * Measured on the live site, 8 September 2026: Cloudflare rewrites `Cache-Control` on
+           * everything it serves to `max-age=14400`, INCLUDING our 404s - the service sends
+           * `no-store` on a refused asset and it does not survive the edge. So a file that was
+           * genuinely missing for ten minutes this morning is remembered by each player's browser
+           * as missing for FOUR HOURS, and no deploy can reach it: the browser never asks again.
+           * The server was fixed and the game stayed broken, which is the worst failure mode
+           * available because every check on our side reports success.
+           *
+           * `cache: "reload"` bypasses the browser's copy AND replaces it with what the server
+           * says now. So if the refusal was stale, this both proves it and cures it, and the
+           * reload afterwards finds the module present. If the file is genuinely gone the fetch
+           * fails again and we fall through to the panel, which is the honest outcome.
+           *
+           * Only attempted when a URL was actually recorded as failing: a boot that stalled for
+           * some other reason must not be answered by reloading the page underneath the player.
+           */
+          if (urls.length > 0 && claimRetry()) {
+            var checks = [];
+            for (var j = 0; j < urls.length; j += 1) {
+              checks.push(
+                fetch(urls[j], { cache: "reload" }).then(
+                  function (response) {
+                    return response.ok;
+                  },
+                  function () {
+                    return false;
+                  },
+                ),
+              );
+            }
+            Promise.all(checks).then(
+              function (results) {
+                for (var k = 0; k < results.length; k += 1) {
+                  if (!results[k]) {
+                    giveUp(urls);
+                    return;
+                  }
+                }
+                window.location.reload();
+              },
+              function () {
+                giveUp(urls);
+              },
+            );
+            return;
+          }
+
+          giveUp(urls);
         }, BOOT_DEADLINE_MS);
       })();
     </script>

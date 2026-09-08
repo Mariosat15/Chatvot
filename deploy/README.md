@@ -1021,21 +1021,31 @@ npm install && npm run build
 pm2 restart chartvolt-games
 ```
 
-> **`npm run build` is not optional here, and skipping it produces a game that never starts.**
-> The files under `games-service/public/play` arrive with the `git pull`. The allowlist that
-> authorises the service to serve them lives in TypeScript, so it only changes once you build.
-> Pull without building and the running service is old code serving a new front end: one module
-> is answered with a 404, and because an ES module that 404s takes its importer down with it,
-> **no script on the page evaluates at all**. The player watches a loading spinner, the platform
-> reports nothing, and no request has failed. That is exactly how **R52** reached production on
-> 8 September 2026.
+> **`npm run build` is still required, but a missed build no longer breaks the play surface.**
+> Until 8 September 2026 the allowlist authorising the service to serve `public/play` lived in
+> compiled TypeScript, so pulling without building left old code serving a new front end: one
+> module answered with a 404, and because an ES module that 404s takes its importer down with it,
+> **no script on the page evaluated at all** — a loading spinner, nothing in any log, and no
+> failed request anywhere our side. That was **R52**. The served set is now read from the
+> directory at boot, so the two halves cannot disagree; build for everything else in the service,
+> not for this.
 >
-> The service now checks its own two halves at boot, so `pm2 logs chartvolt-games` says so on the
-> first lines:
+> What the boot audit reports now is narrower — a file in `public/play` whose *extension* the
+> service does not recognise, which is the only remaining way to leave an asset unreachable:
 >
 > ```
-> ❌ [games-service] public/play holds presentation.js, which THIS BUILD will not serve.
+> ❌ [games-service] public/play holds board.mjs, whose file type this service will not serve.
 > ```
+>
+> **A play-surface change may not reach players for four hours.** Cloudflare rewrites
+> `Cache-Control` on everything under `/play` to `max-age=14400`, replacing the `no-cache` the
+> service sends, so a browser that loaded the game earlier keeps its copy and never asks again.
+> Set a **cache rule for `/play*` to respect origin headers** in the Cloudflare dashboard
+> (Caching → Cache Rules, or Browser Cache TTL → *Respect Existing Headers*) and this class
+> disappears. Until then, expect a fix to be invisible to anyone who played recently — and note
+> the same rewrite applies to **404s**, which is why R52 outlived the deploy that fixed it. The
+> play surface heals *that* half itself (`21` s4.1k), but a stale **success** cannot be detected,
+> because it looks perfectly healthy.
 >
 > **After changing which titles the service offers**, also press **Sync catalogue** on
 > Admin → Games → Game Providers. Retiring or renaming a title changes nothing the operator can

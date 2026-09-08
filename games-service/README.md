@@ -313,10 +313,22 @@ npm run probe:boot-watchdog  # the same, for the watchdog that names a module wh
 > module that 404s. It fires at 8 seconds, inside the platform's own 12-second timeout, or the
 > platform speaks first and this is dead code that still reads correctly.
 
-`npm test` runs **216 tests**: 15 config, 42 engine, 28 scoring, 41 API, 55 play and delivery,
-11 board client, 24 presentation. (Any figure of 213 predates the boot watchdog, 209 predates the
-directory-derived asset set, 204 predates the deploy-drift audit, 167 predates the presentation
-suite, and 152 predates the config suite; all five are stale.)
+> **Before it gives up it tries to cure the fault, because the commonest cause is a cached 404 in
+> the player's own browser.** Cloudflare rewrites `Cache-Control` on everything under `/play` to
+> `max-age=14400`, **including the 404s** - the `no-store` this service sends does not survive the
+> edge - so a file that was missing for ten minutes is remembered as missing for four hours by
+> every browser that asked, and no deploy can reach them. That is exactly how R52 outlived its own
+> fix. The watchdog re-fetches the recorded failures with `cache: "reload"`, which *replaces* the
+> stored copy rather than reading round it, and reloads once if they all now succeed. One attempt
+> only, recorded in `sessionStorage` so a genuinely missing file cannot produce a reload loop, and
+> failing closed if storage throws. **A stale 200 is not covered and cannot be** - it looks
+> healthy - which is why `deploy/README.md` asks for a Cloudflare cache rule on `/play*`.
+
+`npm test` runs **217 tests**: 15 config, 42 engine, 28 scoring, 41 API, 56 play and delivery,
+11 board client, 24 presentation. (Any figure of 216 predates the stale-cache recovery, 213
+predates the boot watchdog, 209 predates the directory-derived asset set, 204 predates the
+deploy-drift audit, 167 predates the presentation suite, and 152 predates the config suite; all
+six are stale.)
 
 **Every one of them runs in-process against an in-memory MongoDB, so none can fail because the
 PLATFORM disagrees with this service.** That check lives on the other side, in the platform's

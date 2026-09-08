@@ -839,6 +839,78 @@ Counting `<script>` in the page found **two**, because the watchdog's comment ex
 error event names the wrong file and to do that it writes the word. It failed on correct code.
 Anchored to a line of its own instead.
 
+### 4.1k The 404 outlived the deploy that fixed it, in the player's own browser - 8 September 2026
+
+**The owner reported the spinner a fourth time, and this time with proof that the server was
+right:** `curl https://chartvolt.com/play/presentation.js` returned **200** from both machines,
+while the watchdog from s4.1j - now live, and working exactly as designed - named
+`presentation.js` on screen as the file that could not be loaded. Two honest observations that
+contradict each other, which is the shape of a caching fault and nothing else.
+
+**Measured from the player's own browser rather than reasoned about**, and this is the step that
+ended four hours of arguing about which machine was stale:
+
+| Request | Status | `Cache-Control` received |
+|---|---|---|
+| `/play/presentation.js` | 200 | `max-age=14400` |
+| `/play/definitely-not-real.js` | 404 | `max-age=14400` |
+
+**The service sends `no-cache` on the 200 and `no-store` on the 404. Neither survives the
+edge.** Cloudflare - `server: cloudflare` on every response, and 14400 is exactly its default
+four-hour Browser Cache TTL - replaces the header with a four-hour lifetime **on errors as well
+as on successes**. Our own `deploy/nginx.conf` contains no such value anywhere, which is how the
+layer was identified rather than guessed at.
+
+**So the consequence, which is worse than the original defect.** A file that was genuinely
+missing for a few minutes on the morning of 8 September was recorded by every browser that asked
+as missing **for the next four hours**, and no deploy could reach them, because a browser holding
+a fresh cache entry does not ask again. The server was fixed within minutes. The game stayed
+broken for the rest of the morning. **Every check available to us reported success** - the files
+were on disk, the service served them, `curl` said 200, all 216 tests passed - and the only
+witness that disagreed was the player.
+
+**The general rule, and it is the reason this is written up rather than treated as an incident:
+an intermediary that rewrites `Cache-Control` converts a transient fault into a permanent one,
+and it does so silently.** A ten-minute deployment mistake becomes a four-hour outage for exactly
+the people who tried during the mistake. It also inverts the usual debugging instinct: the more
+recently a player tried and failed, the longer they stay broken.
+
+**The cure is in the page, because it is the only place with standing to act.** We cannot make
+Cloudflare respect a header from code, and no server-side change can reach a browser that has
+stopped asking. So before the watchdog gives up it re-fetches every URL the resource timeline
+recorded as failing, with `cache: "reload"`, and reloads the page if they all now succeed.
+
+| Decision | Why the alternative is worse |
+|---|---|
+| **`cache: "reload"`**, not `no-store` | `no-store` reads round the browser's copy without **replacing** it, so the reload lands straight back on the stale refusal. `reload` writes what the server says now into the cache, which is what makes the reload afterwards find the file. This is a cure, not a retry |
+| **One attempt, recorded in `sessionStorage`** | The recovery reloads the page, so a counter in a variable resets on the way and the reload becomes a loop - a round flickering in front of a paying player, which is worse than the panel. Session storage survives the reload and dies with the tab |
+| It **fails closed** when storage throws | A browser that refuses storage is exactly the one where a loop could not be detected, so it takes no attempt at all and goes straight to the panel |
+| Attempted **only when a URL was recorded as failing** | Otherwise any stalled boot is answered by reloading the page underneath the player, including a round that was merely slow |
+| The reload is the **last** step, after every re-fetch has come back ok | A file that is genuinely gone would otherwise reload for ever and report nothing. A failed re-fetch falls through to the panel, which is the honest outcome |
+
+**Verified by eye against a server that refuses the file once and then serves it** - the shape of
+a stale cached 404 whose cause has since been fixed. The page loaded nothing, the watchdog fired
+at 8 seconds, the server logged one refusal followed by two successful requests, and the game
+booted: `window.__circuitLoaded` true, the retry flag spent so no second attempt is possible, and
+the panel showing the game's *own* error about the round state rather than the watchdog's.
+
+**217 tests** (up from 216), and `tools/probe-boot-watchdog.ps1` is now **12 probes**, all red on
+exactly the expected test.
+
+**One of the four new probes exposed a weak assertion before it was ever committed.** Deleting the
+*read* of the retry flag - which is the whole limit, and turns the recovery into an endless reload
+loop - left the suite green, because the test asserted only that the word `sessionStorage`
+appeared and the surviving **write** satisfied it. Slicing to `claimRetry` and asserting that
+reading the flag *refuses* is what closes it. Same class as every other structural-test finding
+here: **assert the operator, not the operand.**
+
+**What is still owed to the owner, and it is a dashboard change rather than code.** The 200s carry
+`max-age=14400` too, so **a play-surface fix does not reach a player who loaded the game in the
+previous four hours** - the self-heal covers the refusal case only, because a stale *success*
+looks perfectly healthy and has nothing to detect. A Cloudflare cache rule for `/play*` set to
+respect origin headers removes the whole class. Recorded in `deploy/README.md` and as risk
+**R54**.
+
 ---
 
 ## 5. What this does NOT prove
