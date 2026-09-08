@@ -6,23 +6,51 @@
  * window play, and the two don't obviously relate."
  *
  * They do relate, through a third number that appeared on no form. The game's settings step
- * offers whatever the title's `configSchema` declares - `durationSeconds`, 60 to 300 for
- * Circuit Sprint - which is how long ONE attempt lasts. The timing step sets the contest's own
- * clock. The gate that decides whether an attempt may start reads `maxDurationSeconds` from the
- * CATALOGUE row, which is the title's ceiling and not this contest's setting.
+ * offers whatever the title's `configSchema` declares - which is how long ONE attempt lasts.
+ * The timing step sets the contest's own clock. The gate that decides whether an attempt may
+ * start reserves one attempt's worth of time at the end.
  *
- * THAT IS NOT A BUG AND THESE TESTS MUST NOT BE CHANGED TO MAKE IT ONE. Chapter 03 section 1.2
- * specifies `now + maxDurationSeconds <= playWindowEnd` precisely so an attempt can never be
- * admitted that the contest end would cut short - it fails closed. Reading the configured value
- * instead would trade a confusing message for a round that stops mid-play, which is the failure
- * the rule exists to prevent. So the fix is disclosure, and what is pinned below is that the
- * operator is told, in wall-clock terms, on both screens, with one shared explanation.
+ * THIS FILE USED TO OPEN BY DEFENDING THE CEILING, AND THAT PARAGRAPH IS NOW WRONG. It said:
+ * "the gate reads `maxDurationSeconds` from the CATALOGUE row, which is the title's ceiling and
+ * not this contest's setting. THAT IS NOT A BUG AND THESE TESTS MUST NOT BE CHANGED TO MAKE IT
+ * ONE... Reading the configured value instead would trade a confusing message for a round that
+ * stops mid-play." It is quoted rather than deleted because it was believed, it was argued
+ * from chapter 03 section 1.2, and it was half right.
+ *
+ * WHAT WAS RIGHT: a contest that promises a full attempt must reserve a FULL attempt. Reserving
+ * less would promise the player their whole session and then cut it short, which is worse than
+ * either policy on its own. That property is still pinned below.
+ *
+ * WHAT WAS WRONG: it assumed the ceiling was the only number the platform could know. So the
+ * gate reserved 300 seconds for a Circuit Sprint contest configured at 120 - refusing every
+ * round for the whole contest whenever the contest was under five minutes, and telling players
+ * "there is not enough time left in this competition" beside a countdown showing minutes. That
+ * is the owner's report, and the objection to fixing it ("a round that stops mid-play") does not
+ * apply: reserving the configured length reserves exactly as much as the player will be given.
+ *
+ * WHAT CHANGED TO MAKE THE FIX POSSIBLE, 8 September 2026: a title DECLARES which of its
+ * settings is its play clock, with `format: "duration-seconds"`, and `resolveAttemptSeconds`
+ * reads it. Platform code still learns no field name and still enumerates no game, so the
+ * "no developer needed for a new title" claim is intact - and a title declaring nothing falls
+ * back to the ceiling, which is never shorter than the truth, so the fallback still fails
+ * closed.
+ *
+ * The disclosure this file was originally written to pin is all still here and still required.
+ * The change is that the number being disclosed is now one the operator chose.
  */
 
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { describeRoundFit } from "../../apps/admin/components/admin/games/contest-draft";
+import {
+  deriveResultGraceSeconds,
+  describeRoundFit,
+  emptyDraft,
+} from "../../apps/admin/components/admin/games/contest-draft";
+import {
+  parseConfigSchema,
+  type ConfigField,
+} from "../../lib/services/games/config-schema";
 
 const ROOT = join(__dirname, "..", "..");
 
@@ -60,6 +88,31 @@ function readCode(relative: string): string {
  * IT THROWS RATHER THAN RETURNING NOTHING when the folder is empty. A walk that silently finds
  * no files turns every assertion below into a test of the empty string.
  */
+/**
+ * A title's settings schema whose play clock is declared under a DELIBERATELY ODD NAME.
+ *
+ * `playSeconds`, not `durationSeconds`, and that is the point of the fixture rather than a
+ * detail of it. The resolver must find the clock through the declared `format`, so a helper
+ * named after Circuit Sprint's own key would pass just as happily against an implementation
+ * that matched on the name - which is the per-game code this whole path forbids.
+ */
+function durationSchema(minimum: number, maximum: number): ConfigField[] {
+  const parsed = parseConfigSchema({
+    type: "object",
+    properties: {
+      playSeconds: {
+        type: "integer",
+        minimum,
+        maximum,
+        format: "duration-seconds",
+      },
+    },
+    required: ["playSeconds"],
+  });
+  if (!parsed.ok) throw new Error(`fixture schema rejected: ${parsed.error}`);
+  return parsed.fields;
+}
+
 function readWizardScreen(): string {
   const files = readdirSync(join(ROOT, WIZARD_STEPS)).filter(
     (name) => name.endsWith(".ts") || name.endsWith(".tsx"),
@@ -93,21 +146,76 @@ describe("describeRoundFit - turning the reserved ceiling into a moment", () => 
     expect(fit!.windowTooShort).toBe(false);
   });
 
-  it("reserves the game's ceiling, NOT the round length the operator configured", () => {
+  it("reserves the CONFIGURED playing time, not the game's ceiling", () => {
     /*
-      The owner's exact case: Circuit Sprint configured at 120 seconds, ceiling 300. The
-      deadline must be computed from 300, because that is what `round.service.ts` gates on.
-      A screen that promised 13:58 here would contradict a server that refuses from 13:55.
+      REVERSED ON 8 SEPTEMBER 2026, and it is the owner's exact case either way: Circuit Sprint
+      configured at 120 seconds against a ceiling of 300.
+
+      This test used to assert the deadline was NOT 13:58 - that the screen had to promise
+      13:55, because 13:55 was what the server enforced. Both the screen and the server now
+      use the configured length, so 13:58 is the correct answer and the old assertion was
+      pinning the defect in place. The inversion is deliberate and the reasoning is in the file
+      header; the important part is that the screen and the gate still agree, which is what the
+      original test was really protecting.
     */
     const fit = describeRoundFit({
       startTime: "2026-09-08T13:00",
       endTime: "2026-09-08T14:00",
+      schemaFields: durationSchema(60, 300),
+      settings: { playSeconds: 120 },
       maxDurationSeconds: 300,
     });
 
-    expect(fit!.lastAttemptStart!.getTime()).not.toBe(
+    expect(fit!.reservedSeconds).toBe(120);
+    expect(fit!.lastAttemptStart!.getTime()).toBe(
       new Date("2026-09-08T13:58").getTime(),
     );
+  });
+
+  it("falls back to the ceiling when the title declares no play clock", () => {
+    /*
+      THE FALLBACK IS NOT A LEFTOVER, it is what keeps the fix general. A provider title we
+      have never seen may declare no duration at all, and the ceiling is never SHORTER than
+      the real length - so the fallback over-reserves, which is the visible mistake rather
+      than the silent one.
+    */
+    const fit = describeRoundFit({
+      startTime: "2026-09-08T13:00",
+      endTime: "2026-09-08T14:00",
+      schemaFields: [],
+      settings: { somethingElse: 5 },
+      maxDurationSeconds: 300,
+    });
+
+    expect(fit!.reservedSeconds).toBe(300);
+    expect(fit!.lastAttemptStart!.getTime()).toBe(
+      new Date("2026-09-08T13:55").getTime(),
+    );
+  });
+
+  it("clamps a setting outside the declared range rather than trusting it", () => {
+    /*
+      An operator's stored value can be out of range - a schema whose bounds were tightened
+      after the contest was drafted, or a payload that never went through the form. Reserving
+      an hour on a title that allows five minutes would refuse every contest under an hour;
+      reserving thirty seconds on one that requires five minutes would promise a full session
+      and cut it short. Clamping is the only answer that cannot do either.
+    */
+    const tooLong = describeRoundFit({
+      startTime: "2026-09-08T13:00",
+      endTime: "2026-09-08T14:00",
+      schemaFields: durationSchema(60, 300),
+      settings: { playSeconds: 99_999 },
+    });
+    expect(tooLong!.reservedSeconds).toBe(300);
+
+    const tooShort = describeRoundFit({
+      startTime: "2026-09-08T13:00",
+      endTime: "2026-09-08T14:00",
+      schemaFields: durationSchema(60, 300),
+      settings: { playSeconds: 1 },
+    });
+    expect(tooShort!.reservedSeconds).toBe(60);
   });
 
   it("says nothing at all when the catalogue declares no duration", () => {
@@ -221,7 +329,14 @@ describe("the clock explanation is one definition, on both screens", () => {
     // when people may start one is set elsewhere.
     const code = readCode(NOTE);
     expect(code).toMatch(/one attempt/i);
-    expect(code).toMatch(/longest possible round/i);
+
+    /*
+      INVERTED, NOT UPDATED. This asserted that the note said "longest possible round", which
+      was the honest description of a ceiling the operator had not chosen. Now that the note
+      names the CONFIGURED playing time, that phrase would be a false statement about a number
+      the operator can see on the previous step - so its absence is the assertion.
+    */
+    expect(code).not.toMatch(/longest possible round/i);
   });
 
   it("warns about a contest too short for its own game before the review step", () => {
@@ -279,39 +394,333 @@ describe("no game is named on the settings path", () => {
 });
 
 describe("the refusal stops contradicting the operator's own setting", () => {
-  it("calls the reserved figure the game's longest possible round, in BOTH copies", () => {
+  it("names the configured playing time AND the contest length, in BOTH copies", () => {
     /*
       This is what the owner actually hit. The message used to say "shorter than one round of
       this game (300 seconds)" to an operator who had just typed 120 into that game's settings,
       so the platform appeared to be quoting a number they had not chosen and could not find.
+      The 7 September wording was honest about that and still unactionable.
+
+      BOTH SIDES OF THE COMPARISON, because "the playing time is longer than the contest" with
+      one number in it leaves the operator to work out which of the two to change - and they
+      live on different steps.
 
       Both copies, because the two apps' pre-flights are mirrored and a message that differs
       between them means the explanation an operator gets depends on which app served the form.
     */
     for (const copy of [PREFLIGHT, ADMIN_PREFLIGHT]) {
       const code = readCode(copy);
-      expect(code).toMatch(/longest possible round/);
-      // And it must say which number it is, or naming it differently is just new wording.
-      expect(code).toMatch(/rather than the length set in its own settings/);
+      expect(code).toMatch(/playing time you have set/);
+      expect(code).toMatch(/longer than the contest itself/);
+      // Both figures interpolated, and through the humanising helper - "the playing time you
+      // have set (300 seconds)" is the old problem in new words.
+      expect(code).toMatch(/describeSeconds\(roundSeconds\)/);
+      expect(code).toMatch(/describeSeconds\(Math\.floor\(windowSeconds\)\)/);
+      // The phrase that named an invisible ceiling must not come back.
+      expect(code).not.toMatch(/longest possible round/);
     }
   });
 
-  it("still gates on the ceiling rather than the configured value", () => {
+  it("gates on the DECLARED play clock, falling back to the ceiling", () => {
     /*
-      The guard against "fixing" the confusion in the wrong direction, and it survives the
-      7 September 2026 change rather than being softened by it.
+      REVERSED ON 8 SEPTEMBER 2026. This test asserted the opposite - literally
+      `const roundSeconds = input.title.maxDurationSeconds` - and forbade the pre-flight from
+      reading the operator's settings at all. The file header quotes the reasoning; the short
+      version is that the ceiling was defended as the only number the platform could know, and
+      it stopped being so.
 
-      NARROWED, BECAUSE THE ORIGINAL REASON IS NO LONGER THE WHOLE TRUTH. This used to say the
-      ceiling exists so an attempt can never be cut short, full stop. Since `RoundStartPolicy`
-      that is the RESERVING branch's promise, not the platform's - a contest may now choose to
-      permit a shortened round. What has not changed is that when a contest does reserve, it
-      must reserve the ceiling: reading the configured length there would promise a full round
-      and then cut one short, which is the worst of both settings.
+      THE FAIRNESS PROPERTY IT WAS PROTECTING IS PINNED IN THE NEXT TEST, not dropped. What is
+      forbidden here instead is the shape that would break generality: reaching into
+      `input.settings` by a field NAME. The resolver finds the clock through the `format`
+      keyword, so this file's other guard - that no game or config key is named anywhere on
+      the settings path - is what keeps the fix from becoming per-game code.
     */
     for (const copy of [PREFLIGHT, ADMIN_PREFLIGHT]) {
       const code = readCode(copy);
-      expect(code).toMatch(/const roundSeconds = input\.title\.maxDurationSeconds/);
+      expect(code).toMatch(/const roundSeconds = resolveAttemptSeconds\(/);
+      // The ceiling is still an input - the fallback for a title that declares no clock - so
+      // it must still be passed in. Its absence would mean such a title got no gate at all.
+      expect(code).toMatch(/input\.title\.maxDurationSeconds/);
+      // But never by naming one of the game's own keys.
       expect(code).not.toMatch(/input\.settings\[/);
+    }
+  });
+
+  it("reserves the WHOLE attempt, never a fraction of it", () => {
+    /*
+      The half of the old thesis that survived, and the one worth stating loudest: a contest
+      promising every player the full playing time must reserve the full playing time. Any
+      shortening here - reserving half, or a fixed minute, or the window remainder - promises
+      a complete session and then cuts one short, which is worse than either policy alone.
+
+      Asserted as an exact identity rather than by reading the arithmetic, because the failure
+      would be a plausible-looking factor slipped into a subtraction.
+    */
+    const fit = describeRoundFit({
+      startTime: "2026-09-08T13:00",
+      endTime: "2026-09-08T14:00",
+      schemaFields: durationSchema(60, 3600),
+      settings: { playSeconds: 900 },
+    });
+
+    expect(fit!.reservedSeconds).toBe(900);
+    expect(fit!.lastAttemptStart!.getTime()).toBe(
+      new Date("2026-09-08T13:45").getTime(),
+    );
+  });
+});
+
+describe("the playing time is chosen from a list, not typed in seconds", () => {
+  /*
+    THE OWNER'S REQUEST, and the report it answers. "It lets you set the duration like 120" -
+    a bare number box in seconds, which reads as two minutes only if you stop and divide. The
+    list is 1, 5, 10, 20, 30 and 60 minutes, plus a way out of the list.
+  */
+
+  it("keys the control on the declared format, never on a field name", () => {
+    /*
+      THE ONE FAILURE MODE OF THE "NO DEVELOPER NEEDED" CLAIM, on the smallest possible
+      surface. `field.name === "durationSeconds"` would have been shorter, would have worked,
+      and would have quietly made this Circuit Sprint's control rather than the platform's -
+      the next title's clock would render as a number box with no explanation of why.
+    */
+    const code = readCode(CONFIG_FIELDS);
+
+    expect(code).toMatch(/field\.format === "duration-seconds"/);
+    // The existing guard forbids `durationSeconds` outright; this is the positive half, that
+    // the branch exists at all and is reached from the field's declared role.
+    expect(code).toMatch(/<DurationControl/);
+  });
+
+  it("offers the lengths the owner asked for", () => {
+    const code = readCode(CONFIG_FIELDS);
+    expect(code).toMatch(/DURATION_PRESET_MINUTES = \[1, 5, 10, 20, 30, 60\]/);
+  });
+
+  it("filters the list against the title's OWN declared range", () => {
+    /*
+      A title may allow only two to five minutes. Offering an hour that the game then clamps
+      is worse than not offering it: the contest saves with a length the operator did not
+      choose, and the round gate reserves that clamped value rather than the one on screen.
+    */
+    const code = readCode(CONFIG_FIELDS);
+    const control = code.slice(code.indexOf("function DurationControl"));
+    expect(control.length).toBeGreaterThan(400);
+
+    expect(control).toMatch(/DURATION_PRESET_MINUTES\.filter\(/);
+    expect(control).toMatch(/seconds >= min/);
+    expect(control).toMatch(/seconds <= max/);
+  });
+
+  it("keeps a plain number box when no preset can fit", () => {
+    // A title allowing at most 45 seconds cannot be expressed in whole minutes. A dropdown
+    // with no usable options is a control that appears to work and offers nothing.
+    const control = readCode(CONFIG_FIELDS).slice(
+      readCode(CONFIG_FIELDS).indexOf("function DurationControl"),
+    );
+    expect(control).toMatch(/presets\.length === 0/);
+    expect(control).toMatch(/<NumberBox/);
+  });
+
+  it("stores seconds, so the game receives what its own schema declares", () => {
+    /*
+      The minutes are presentation. Storing minutes would mean the value on the wire disagreed
+      with the schema's `minimum`/`maximum`, so validation would reject a legal choice - and a
+      title whose clock is genuinely in seconds would need a special case at the other end.
+    */
+    const control = readCode(CONFIG_FIELDS).slice(
+      readCode(CONFIG_FIELDS).indexOf("function DurationControl"),
+    );
+    expect(control).toMatch(/onChange\(Number\(next\) \* 60\)/);
+    expect(control).toMatch(/Number\(raw\) \* 60/);
+  });
+
+  it("does not change the stored value merely because Custom was opened", () => {
+    // An operator who opens the box to look and changes their mind has not edited the
+    // contest. Writing a value on selecting Custom would be an edit they did not make.
+    const control = readCode(CONFIG_FIELDS).slice(
+      readCode(CONFIG_FIELDS).indexOf("function DurationControl"),
+    );
+    // Reason: slice FORWARDS from the handler. `indexOf` for the closing marker finds the
+    // earliest one in the whole function - which is inside the no-presets NumberBox above -
+    // producing an empty slice and a test that examines nothing while looking correct.
+    const opens = control.indexOf("onValueChange");
+    const onSelect = control.slice(
+      opens,
+      control.indexOf("disabled={disabled}", opens),
+    );
+    expect(onSelect.length).toBeGreaterThan(60);
+    expect(onSelect).toMatch(/if \(next === CUSTOM\)/);
+    expect(onSelect).toMatch(/return;/);
+  });
+});
+
+describe("the wizard refuses a contest nobody could start", () => {
+  /*
+    THE OWNER'S SECOND REQUEST on 8 September 2026, after choosing the reserving policy as the
+    default: "validation to prevent setting a playtime longer than the contest window". Under
+    that policy a contest shorter than one playing time never opens - every attempt is refused
+    from the first second - so saving it is never what the operator meant.
+
+    IT BLOCKS RATHER THAN WARNS, and that is the whole point. `RoundClockNote` already showed
+    the amber caution and an operator could read it, agree, and click Next anyway; the contest
+    then saves, publishes, sells seats and refuses every one of them.
+  */
+
+  it("blocks the schedule step, naming both durations", () => {
+    const code = readCode(WIZARD);
+    const guard = code.slice(code.indexOf("if (step === STEP_SCHEDULE)"));
+    expect(guard.length).toBeGreaterThan(200);
+
+    expect(guard).toMatch(/fit\?\.windowTooShort && fit\.reservesFullRound/);
+    // Both numbers, because "too short" without them sends the operator to guess which of the
+    // two fields to change - and the playing time is three steps back.
+    expect(guard).toMatch(/describeDurationSeconds\(\s*fit\.reservedSeconds,?\s*\)/);
+    expect(guard).toMatch(/describeDurationSeconds\(\s*fit\.windowSeconds,?\s*\)/);
+  });
+
+  it("blocks ONLY under the reserving policy", () => {
+    /*
+      Under `until_window_closes` a short contest is legitimate: a late starter is closed with
+      the contest and scored on what they managed, which is exactly what that policy is for.
+      Blocking there would forbid the one configuration that answers the problem.
+    */
+    const fit = describeRoundFit({
+      startTime: "2026-09-08T13:00",
+      endTime: "2026-09-08T13:05",
+      schemaFields: durationSchema(60, 3600),
+      settings: { playSeconds: 600 },
+      roundStartPolicy: "until_window_closes",
+    });
+    expect(fit!.windowTooShort).toBe(true);
+    expect(fit!.reservesFullRound).toBe(false);
+
+    const reserving = describeRoundFit({
+      startTime: "2026-09-08T13:00",
+      endTime: "2026-09-08T13:05",
+      schemaFields: durationSchema(60, 3600),
+      settings: { playSeconds: 600 },
+      roundStartPolicy: "reserve_full_round",
+    });
+    expect(reserving!.windowTooShort).toBe(true);
+    expect(reserving!.reservesFullRound).toBe(true);
+  });
+
+  it("routes the refusal through the shared blocking mechanism", () => {
+    // Not a second disabled attribute on the Next button. A refusal that only greys a control
+    // names no reason, which is the shape this programme keeps finding.
+    const code = readCode(WIZARD);
+    expect(code).toMatch(/const blocked = blockedReason\(\)/);
+  });
+});
+
+describe("the result grace period is derived from the playing time", () => {
+  /*
+    WHY THIS IS DERIVED RATHER THAN ASKED FOR. No screen offers it, because no operator has a
+    basis for choosing it - and `contest-preflight.ts` REFUSES a contest whose grace is
+    shorter than one attempt plus five minutes. Left at a fixed 900, every contest with more
+    than ten minutes of play would have been refused, naming a field the operator cannot see.
+  */
+
+  it("raises the floor to cover the chosen playing time", () => {
+    const draft = { ...emptyDraft, resultGracePeriodSeconds: 900 };
+
+    expect(deriveResultGraceSeconds(draft, 600)).toBe(900);
+    // Twenty minutes of play needs 25 minutes of grace, which 900 does not cover.
+    expect(deriveResultGraceSeconds(draft, 1200)).toBe(1200 + 300);
+    expect(deriveResultGraceSeconds(draft, 3600)).toBe(3600 + 300);
+  });
+
+  it("never LOWERS a grace period somebody set deliberately", () => {
+    // A stored contest whose operator allowed longer keeps it. Shortening a grace period
+    // retroactively is how a result that was going to be counted stops being counted.
+    const generous = { ...emptyDraft, resultGracePeriodSeconds: 7200 };
+    expect(deriveResultGraceSeconds(generous, 600)).toBe(7200);
+  });
+
+  it("leaves it alone when nothing declares a playing time", () => {
+    // Same rule as the rest of this path: an absent duration means no statement, never a
+    // guessed one.
+    const draft = { ...emptyDraft, resultGracePeriodSeconds: 900 };
+    expect(deriveResultGraceSeconds(draft, undefined)).toBe(900);
+  });
+
+  it("uses the SAME margin the pre-flight then demands, in one definition", () => {
+    /*
+      "One rule, two copies" in its most silent form. Two margins means the wizard derives a
+      number the server refuses, on a field no screen offers - so the contest simply cannot be
+      saved and the message names a setting that is not there.
+    */
+    expect(readCode(DRAFT)).toMatch(
+      /import \{ RESULT_GRACE_MARGIN_SECONDS \} from "@\/lib\/services\/games\/contest-preflight"/,
+    );
+    for (const copy of [PREFLIGHT, ADMIN_PREFLIGHT]) {
+      expect(readCode(copy)).toMatch(
+        /export const RESULT_GRACE_MARGIN_SECONDS = 5 \* 60/,
+      );
+      expect(readCode(copy)).toMatch(
+        /longestPossibleRound \+ RESULT_GRACE_MARGIN_SECONDS/,
+      );
+    }
+  });
+
+  it("is applied by the payload builders, so no caller can forget", () => {
+    /*
+      The derivation has to sit in the one place that turns the draft into a request. A wizard
+      that derived it in a handler would leave the editor sending the stored 900 - and the two
+      screens would disagree about whether a twenty-minute contest can be saved at all.
+    */
+    const draft = readCode(DRAFT);
+    const calls = draft.match(/resultGracePeriodSeconds: deriveResultGraceSeconds\(/g) ?? [];
+    // Twice: the create payload and the edit payload.
+    expect(calls.length).toBe(2);
+    expect(draft).not.toMatch(/resultGracePeriodSeconds: draft\.resultGracePeriodSeconds/);
+  });
+});
+
+describe("the three files that carry this rule are mirrored", () => {
+  /*
+    `check:mirrors` compares MODELS, so it has no opinion about any of these. Two copies of the
+    clock arithmetic that disagreed would make how much time a contest reserves depend on which
+    app answered - and both apps finalize, both apps run a cron, and both apps' pre-flights
+    refuse. It is the "one rule, two copies" shape behind `referenceId`, `failedReason`,
+    `challengeId` and the Game Master `||`, none of which the mirror guard can see.
+
+    Compared byte for byte, newlines normalised, because a difference in wording is as
+    dangerous here as a difference in arithmetic: the refusal text names two durations, and an
+    operator reading a different explanation from the one the server enforced is exactly the
+    confusion the whole slice exists to remove.
+  */
+  const pairs: [string, string][] = [
+    ["lib/services/games/config-schema.ts", "apps/admin/lib/services/games/config-schema.ts"],
+    [PREFLIGHT, ADMIN_PREFLIGHT],
+    [
+      "lib/services/games/round-types.ts",
+      "apps/admin/lib/services/games/round-types.ts",
+    ],
+  ];
+
+  it.each(pairs)("%s agrees with its admin copy", (main, admin) => {
+    const read = (p: string) => readFileSync(join(ROOT, p), "utf8").replace(/\r\n/g, "\n");
+    expect(read(admin)).toBe(read(main));
+  });
+
+  it("the round SERVICES are deliberately NOT mirrored", () => {
+    /*
+      `round.service.ts`, `round-launch.service.ts` and `round-status.service.ts` exist in the
+      main app only, and that is the same decision as `participant-score.service.ts`: creating
+      and launching a round is the one door, and a second copy in the app with the widest
+      privileges is a second door. Pinned so a later "consistency" sync does not open one.
+    */
+    for (const service of [
+      "round.service.ts",
+      "round-launch.service.ts",
+      "round-status.service.ts",
+    ]) {
+      expect(existsSync(join(ROOT, "lib/services/games", service))).toBe(true);
+      expect(
+        existsSync(join(ROOT, "apps/admin/lib/services/games", service)),
+      ).toBe(false);
     }
   });
 });

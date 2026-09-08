@@ -32,6 +32,8 @@ export function StepSettings({
         variant="settings"
         startTime={draft.startTime}
         endTime={draft.endTime}
+        schemaFields={title.schema.ok ? title.schema.fields : undefined}
+        settings={draft.settings}
         maxDurationSeconds={title.maxDurationSeconds}
         roundStartPolicy={draft.roundStartPolicy}
       />

@@ -28,6 +28,7 @@ import {
   test,
   tokenFromLaunchUrl,
 } from "./api-harness";
+import { SPRINT_DURATION } from "../src/games/titles";
 
 const FUTURE = () => new Date(Date.now() + 60 * 60_000).toISOString();
 
@@ -37,7 +38,10 @@ function createBody(overrides: Record<string, unknown> = {}) {
     gameCode: "circuit-sprint",
     mode: "ranked",
     player: { playerId: "cv_p_test", displayName: "Tester", locale: "en", country: "GR" },
-    config: { durationSeconds: 120, gridSize: "medium" },
+    // Deliberately the title's DEFAULT rather than a round number: the collision test below
+    // omits this key and relies on the applied default producing the same fingerprint, so a
+    // literal here that drifts from the schema turns that test red for an unrelated reason.
+    config: { durationSeconds: SPRINT_DURATION.default, gridSize: "medium" },
     contentSeed: "cv_ctst_000001",
     expiresAt: FUTURE(),
     resultCallbackUrl: "",
@@ -438,18 +442,21 @@ async function main(): Promise<number> {
   await test("clamps an out-of-range config rather than refusing the round", async () => {
     // The platform validates config against our own schema before sending it, so a bad value
     // arriving means the two sides disagree. Refusing a paid round mid-contest is worse than
-    // playing a 300-second board when 400 was asked for - but the disagreement is still recorded.
+    // playing a shorter board than was asked for - but the disagreement is still recorded.
     await clearRounds();
     const body = createBody({
       resultCallbackUrl: callbackUrl,
-      config: { durationSeconds: 9999, gridSize: "gigantic" },
+      config: { durationSeconds: SPRINT_DURATION.max + 1, gridSize: "gigantic" },
     });
     const response = await callApi("/v1/rounds", { method: "POST", body });
     assert.equal(response.status, 201);
 
     const { Round } = await import("../src/store/round.model");
     const stored = await Round.findOne({ roundId: body.roundId });
-    assert.equal((stored?.config as { durationSeconds: number }).durationSeconds, 300);
+    assert.equal(
+      (stored?.config as { durationSeconds: number }).durationSeconds,
+      SPRINT_DURATION.max,
+    );
     assert.deepEqual([...(stored?.configCorrections ?? [])].sort(), [
       "durationSeconds",
       "gridSize",

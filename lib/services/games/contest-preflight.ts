@@ -1,5 +1,5 @@
 import type { ConfigField } from "./config-schema";
-import { validateConfigValues } from "./config-schema";
+import { resolveAttemptSeconds, validateConfigValues } from "./config-schema";
 import type {
   AttemptsPolicy,
   RoundStartPolicy,
@@ -90,6 +90,43 @@ export interface PreflightResult {
 
 const SANDBOX_FRESHNESS_HOURS = 24;
 
+/**
+ * How much longer than the attempt itself a contest must keep accepting results.
+ *
+ * EXPORTED BECAUSE THE WIZARD DERIVES THE VALUE THIS CHECK THEN DEMANDS. The grace period is
+ * not an operator field - nobody has a basis for choosing it - so the wizard computes it from
+ * the playing time. Two copies of this margin is the one-rule-two-copies shape, and it fails
+ * in a way an operator cannot act on: the wizard would derive a number the pre-flight then
+ * refuses, on a field no screen offers, so the contest simply cannot be saved and the message
+ * names a setting that is not there.
+ */
+export const RESULT_GRACE_MARGIN_SECONDS = 5 * 60;
+
+/**
+ * A duration an operator can read without doing arithmetic.
+ *
+ * Reason this exists rather than interpolating the raw number: these refusals are about two
+ * clocks not fitting inside each other, and "3600 seconds is longer than 1800 seconds" makes
+ * the reader do the conversion that the message exists to save them. The owner's report of
+ * this area being confusing was about exactly that kind of sentence.
+ *
+ * It deliberately keeps seconds for anything under a minute and for a value that is not a
+ * whole number of minutes, because rounding "90 seconds" to "1 minute" in a message about
+ * whether something FITS would be wrong in the one direction that matters.
+ */
+function describeSeconds(seconds: number): string {
+  if (seconds < 60) return `${seconds} seconds`;
+  if (seconds % 3600 === 0) {
+    const hours = seconds / 3600;
+    return hours === 1 ? "1 hour" : `${hours} hours`;
+  }
+  if (seconds % 60 === 0) {
+    const minutes = seconds / 60;
+    return minutes === 1 ? "1 minute" : `${minutes} minutes`;
+  }
+  return `${seconds} seconds`;
+}
+
 export function runPreflight(input: PreflightInput): PreflightResult {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -165,21 +202,37 @@ export function runPreflight(input: PreflightInput): PreflightResult {
   }
 
   /*
-    THIS IS THE TITLE'S CEILING, NOT THE ROUND LENGTH THE OPERATOR CONFIGURED, and both
-    messages below now say so.
+    THIS IS THE LENGTH THIS CONTEST'S ATTEMPTS ACTUALLY RUN FOR, and every message below says
+    so in the operator's own numbers.
 
-    Chapter 03 section 1.2 specifies the gate as `now + maxDurationSeconds <= playWindowEnd` -
-    deliberately the catalogue maximum, so an attempt can never be admitted that the contest
-    end would cut short. It fails closed, refusing slightly more than strictly necessary.
+    IT USED TO BE THE CATALOGUE CEILING, and a long comment here defended that as failing
+    closed - "do not fix the gate to read the configured value instead". Two things retired
+    that argument on 8 September 2026 and the reasoning is worth keeping, because the old
+    version reads perfectly sensibly.
 
-    The wording used to call it "one round of this game", which reads as the number the
-    operator had just typed into the game's own settings - for Circuit Sprint they set 120 and
-    were refused in the name of 300. The owner reported exactly that as confusing. Naming it as
-    the game's longest possible round costs a few words and removes the contradiction; do not
-    shorten it back, and do not "fix" the gate to read the configured value instead, which
-    would trade a confusing message for a round that can be cut off mid-play.
+    The first is that the ceiling was never a fact about this contest. Circuit Sprint reserved
+    300 seconds whatever the operator configured, so a four-minute contest refused every
+    attempt from the instant it opened while a countdown beside it said minutes remained. That
+    was the owner's report, and no rewording fixes an arithmetic error.
+
+    The second is that the ceiling only worked as a proxy while it was CLOSE to the configured
+    length. Sprint's clock now runs to an hour, so a ten-minute contest would have had an hour
+    reserved against it - and, worse, `requiredGrace` below would have demanded 65 minutes of
+    result grace on a ten-minute contest and refused it outright. Widening the game without
+    fixing this would have broken creation for every provider contest.
+
+    What replaces it is not "read the setting", which would have meant platform code knowing
+    that Circuit Sprint calls its clock `durationSeconds`. The title DECLARES which of its
+    settings is the play clock (`CONFIG_FIELD_FORMATS`), and `resolveAttemptSeconds` reads it
+    generically, falling back to the ceiling for a title that declares nothing. The fail-closed
+    property survives in the fallback: the ceiling is never shorter than the real length, so
+    the mistake it can still make is over-reserving, which is the visible one.
   */
-  const roundSeconds = input.title.maxDurationSeconds;
+  const roundSeconds = resolveAttemptSeconds(
+    input.schemaFields,
+    input.settings,
+    input.title.maxDurationSeconds,
+  );
   const reservesFullRound = input.roundStartPolicy !== "until_window_closes";
   if (roundSeconds !== undefined) {
     if (windowSeconds > 0 && windowSeconds < roundSeconds) {
@@ -196,11 +249,11 @@ export function runPreflight(input: PreflightInput): PreflightResult {
       */
       if (reservesFullRound) {
         errors.push(
-          `The contest is shorter than this game's longest possible round (${roundSeconds} seconds), so no player could finish - and because this contest stops new rounds one full round before the end, nobody could start one either. That is the game's maximum rather than the length set in its own settings. Lengthen the contest, or let players start a round at any time until it ends.`,
+          `The playing time you have set (${describeSeconds(roundSeconds)}) is longer than the contest itself (${describeSeconds(Math.floor(windowSeconds))}), so nobody could ever start an attempt. Either shorten the playing time or lengthen the contest.`,
         );
       } else {
         warnings.push(
-          `The contest is shorter than this game's longest possible round (${roundSeconds} seconds), so every attempt will be cut short when the contest ends. Players are told how long they will get. That is fine if a partial run still scores meaningfully in this game.`,
+          `The playing time you have set (${describeSeconds(roundSeconds)}) is longer than the contest itself (${describeSeconds(Math.floor(windowSeconds))}), so every attempt will be cut short when the contest ends. Players are told how long they will actually get. That is fine if a partial run still scores meaningfully in this game.`,
         );
       }
     }
@@ -208,18 +261,17 @@ export function runPreflight(input: PreflightInput): PreflightResult {
     /*
       THE GRACE PERIOD ONLY HAS TO COVER A ROUND THAT CAN ACTUALLY HAPPEN. Under
       until-close, `resolveExpiry` clamps a round to the contest end, so no round can be
-      longer than the window however high the catalogue ceiling is. Demanding grace for the
-      full ceiling would refuse a short contest for a round length it cannot produce -
-      which is the ceiling-versus-configured confusion again, one field along.
+      longer than the window however long the configured playing time is. Demanding grace for
+      the full length would refuse a short contest for a round it cannot produce.
     */
     const longestPossibleRound =
       reservesFullRound || !(windowSeconds > 0)
         ? roundSeconds
         : Math.min(roundSeconds, Math.ceil(windowSeconds));
-    const requiredGrace = longestPossibleRound + 5 * 60;
+    const requiredGrace = longestPossibleRound + RESULT_GRACE_MARGIN_SECONDS;
     if (input.resultGracePeriodSeconds < requiredGrace) {
       errors.push(
-        `The result grace period must be at least ${requiredGrace} seconds - the longest round this contest can produce (${longestPossibleRound} seconds) plus five minutes - or a round started at the last moment is cut off before its result can arrive.`,
+        `The result grace period must be at least ${requiredGrace} seconds - the longest attempt this contest can produce (${describeSeconds(longestPossibleRound)}) plus five minutes - or a round started at the last moment is cut off before its result can arrive.`,
       );
     }
   }

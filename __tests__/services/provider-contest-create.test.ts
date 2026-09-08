@@ -127,6 +127,61 @@ describe("parseConfigSchema", () => {
     expect(result.ok).toBe(false);
   });
 
+  it("accepts a declared `format`, and fails closed on one it does not know", () => {
+    /*
+      WHY THE KEYWORD EXISTS. The platform needs to know which of a game's settings is its
+      play clock, in order to reserve the right amount of time at the end of a contest and to
+      offer a duration control rather than a number box. It cannot know the field's NAME
+      without becoming per-game code, so the title declares the field's ROLE instead.
+
+      FAIL CLOSED, exactly as the unimplemented-keyword rule does. A format we do not
+      understand and silently ignore leaves the platform quietly treating a declared clock as
+      an ordinary integer - the contest still saves, and the reservation is wrong.
+    */
+    const good = parseConfigSchema({
+      type: "object",
+      properties: {
+        playSeconds: { type: "integer", format: "duration-seconds" },
+      },
+    });
+    expect(good.ok).toBe(true);
+    expect(good.ok && good.fields[0].format).toBe("duration-seconds");
+
+    const unknown = parseConfigSchema({
+      type: "object",
+      properties: { when: { type: "integer", format: "unix-millis" } },
+    });
+    expect(unknown.ok).toBe(false);
+    expect(!unknown.ok && unknown.error).toMatch(/unix-millis/);
+  });
+
+  it("refuses a duration format on a field that is not a number", () => {
+    // A clock has to be arithmetic. Declared on a string, every reservation would be NaN -
+    // and NaN comparisons are all false, so every gate would silently OPEN.
+    const result = parseConfigSchema({
+      type: "object",
+      properties: { playSeconds: { type: "string", format: "duration-seconds" } },
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it("refuses two fields claiming to be the same clock", () => {
+    /*
+      Two duration fields is not a schema we can act on: whichever the resolver picked would
+      be arbitrary, so a contest's reserved time would depend on property order. Refusing
+      names the problem to whoever wrote the schema; picking one hides it until a payout.
+    */
+    const result = parseConfigSchema({
+      type: "object",
+      properties: {
+        playSeconds: { type: "integer", format: "duration-seconds" },
+        alsoPlaySeconds: { type: "integer", format: "duration-seconds" },
+      },
+    });
+    expect(result.ok).toBe(false);
+    expect(!result.ok && result.error).toMatch(/duration-seconds/);
+  });
+
   it("refuses a schema that is not an object type", () => {
     expect(parseConfigSchema({ type: "array" }).ok).toBe(false);
     expect(parseConfigSchema("nonsense").ok).toBe(false);
@@ -343,14 +398,116 @@ describe("runPreflight - the hard refusals", () => {
     expect(result.ok).toBe(false);
 
     /*
-      REWORDED 7 SEP 2026, and the assertion was updated deliberately rather than the message
-      being reverted. It used to read "shorter than one round of this game (300 seconds)",
-      which is the ceiling - and an operator who had just set Circuit Sprint's own
-      `durationSeconds` to 120 was refused in the name of a number appearing on no form. The
-      owner reported that as confusing. The figure is unchanged; only its description is.
+      REWORDED TWICE, AND THE SECOND TIME THE FIGURE CHANGED TOO. Both revisions are recorded
+      because the second one contradicts the first, and a reader who sees only the current
+      assertion cannot tell that the message was once believed correct.
+
+      Originally: "shorter than one round of this game (300 seconds)" - the CEILING, so an
+      operator who had just set Circuit Sprint's `durationSeconds` to 120 was refused in the
+      name of a number appearing on no form. The owner reported that as confusing.
+
+      7 Sep 2026: reworded to say the figure was the game's longest possible round rather than
+      the length they had set. Honest about the number, and it left the operator with nothing
+      to do about it.
+
+      8 Sep 2026: the number itself became the CONFIGURED playing time. A title now declares
+      which of its settings is its play clock, so the pre-flight compares the contest against
+      the length the operator actually chose - and both sides of the comparison are named, so
+      they can see which of the two to change.
     */
-    expect(result.errors.join(" ")).toMatch(/longest possible round/i);
-    expect(result.errors.join(" ")).toMatch(/300 seconds/);
+    const message = result.errors.join(" ");
+    expect(message).toMatch(/playing time you have set/i);
+    // Both numbers. Naming only one leaves the operator guessing which is too big.
+    expect(message).toMatch(/5 minutes/);
+    expect(message).toMatch(/2 minutes/);
+    // And the phrase that named a ceiling the operator could not see must not come back.
+    expect(message).not.toMatch(/longest possible round/i);
+  });
+
+  it("compares the contest against the CONFIGURED playing time, not the ceiling", () => {
+    /*
+      THE ARITHMETIC DEFECT BEHIND THE OWNER'S REPORT, pinned so it cannot return.
+
+      Circuit Sprint's catalogue ceiling is 300 seconds; a contest configured at 60 seconds of
+      play fits comfortably inside a two-minute window. The old gate reserved 300 either way
+      and refused it, telling players "there is not enough time left in this competition" from
+      the instant the contest opened.
+
+      The declared clock is what makes this general: platform code learns no field name, the
+      title says which setting is its duration.
+    */
+    const schema = parseConfigSchema({
+      type: "object",
+      properties: {
+        durationSeconds: {
+          type: "integer",
+          minimum: 30,
+          maximum: 300,
+          format: "duration-seconds",
+        },
+      },
+      required: ["durationSeconds"],
+    });
+    expect(schema.ok).toBe(true);
+
+    const fits = runPreflight(
+      preflightInput({
+        schemaFields: schema.ok ? schema.fields : [],
+        settings: { durationSeconds: 60 },
+        playWindowStart: new Date("2026-09-05T10:00:00Z"),
+        playWindowEnd: new Date("2026-09-05T10:02:00Z"),
+        // Grace must cover the configured length, not the ceiling, or this refuses for an
+        // unrelated reason and the test proves nothing about the window.
+        resultGracePeriodSeconds: 60 + 5 * 60,
+      }),
+    );
+
+    expect(fits.errors).toEqual([]);
+    expect(fits.ok).toBe(true);
+
+    // And the same window with the same title still refuses once the operator asks for more
+    // play than the contest has - so the gate did not simply stop checking.
+    const doesNot = runPreflight(
+      preflightInput({
+        schemaFields: schema.ok ? schema.fields : [],
+        settings: { durationSeconds: 300 },
+        playWindowStart: new Date("2026-09-05T10:00:00Z"),
+        playWindowEnd: new Date("2026-09-05T10:02:00Z"),
+      }),
+    );
+    expect(doesNot.ok).toBe(false);
+  });
+
+  it("asks for grace against the configured playing time, not the ceiling", () => {
+    /*
+      The half of the same defect that would have blocked creation outright once Sprint's clock
+      was widened to an hour. `requiredGrace` was ceiling + 5 minutes, so a ten-minute contest
+      on an hour-capable title would have demanded 65 minutes of result grace and refused every
+      contest an operator could build.
+    */
+    const schema = parseConfigSchema({
+      type: "object",
+      properties: {
+        durationSeconds: {
+          type: "integer",
+          minimum: 60,
+          maximum: 3600,
+          format: "duration-seconds",
+        },
+      },
+      required: ["durationSeconds"],
+    });
+
+    const result = runPreflight(
+      preflightInput({
+        schemaFields: schema.ok ? schema.fields : [],
+        settings: { durationSeconds: 600 },
+        title: { ...preflightInput().title, maxDurationSeconds: 3600 },
+        resultGracePeriodSeconds: 600 + 5 * 60,
+      }),
+    );
+
+    expect(result.errors).toEqual([]);
   });
 
   it("refuses a grace period below one round plus five minutes", () => {

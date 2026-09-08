@@ -24,6 +24,7 @@ import {
   PERFECT,
   PerfectConfig,
   SPRINT,
+  SPRINT_DURATION,
   SprintConfig,
   resolveConfig,
 } from "../src/games/titles";
@@ -239,16 +240,118 @@ console.log("\nConfiguration");
 
 test("defaults apply when the platform sends nothing", () => {
   const sprint = resolveConfig(SPRINT, undefined);
-  assert.deepEqual(sprint.config, { kind: "sprint", durationSeconds: 120, gridSize: "medium" });
+  assert.deepEqual(sprint.config, {
+    kind: "sprint",
+    durationSeconds: SPRINT_DURATION.default,
+    gridSize: "medium",
+  });
   assert.deepEqual(sprint.corrected, []);
 });
 
 test("an out-of-range setting is clamped and reported, not silently accepted", () => {
   // The platform validates against our configSchema before sending, so a value arriving out of
   // range means the two sides disagree about the schema. Playing on is right; hiding it is not.
-  const { config, corrected } = resolveConfig(SPRINT, { durationSeconds: 9999 });
-  assert.equal((config as SprintConfig).durationSeconds, 300);
+  const { config, corrected } = resolveConfig(SPRINT, {
+    durationSeconds: SPRINT_DURATION.max + 1,
+  });
+  assert.equal((config as SprintConfig).durationSeconds, SPRINT_DURATION.max);
   assert.deepEqual(corrected, ["durationSeconds"]);
+});
+
+/*
+  The two tests above deliberately read `SPRINT_DURATION` rather than repeating 600 and 3600,
+  because their subject is that the default is APPLIED and the ceiling is ENFORCED - not what
+  the numbers happen to be. That leaves the numbers themselves unguarded, which is exactly the
+  drift the constant was extracted to stop, so the three tests below guard them instead: the
+  schema an operator's form is generated from, the ceiling the specification holds us to, and
+  the clamp all have to agree, and none of them can be checked by looking at the others.
+*/
+
+test("the settings schema an operator sees is the range this service enforces", () => {
+  const properties = (SPRINT.configSchema as { properties: Record<string, Record<string, unknown>> })
+    .properties;
+  assert.equal(properties.durationSeconds.minimum, SPRINT_DURATION.min);
+  assert.equal(properties.durationSeconds.maximum, SPRINT_DURATION.max);
+  assert.equal(properties.durationSeconds.default, SPRINT_DURATION.default);
+});
+
+test("the declared maximum round length matches the longest session bookable", () => {
+  // The specification requires a round be impossible to extend beyond `maxDurationSeconds`.
+  // A schema offering more than the title admits is a promise we would then break, and the
+  // platform reserves time against the title's figure, so a mismatch either refuses attempts
+  // that would have fitted or admits ones that will not.
+  assert.equal(SPRINT.maxDurationSeconds, SPRINT_DURATION.max);
+});
+
+test("the play clock declares its role, so the platform never has to know its name", () => {
+  // Without this the platform's only generic answer for "how long is one attempt" is
+  // `maxDurationSeconds`, the ceiling - which reserved five minutes against a two-minute
+  // contest and refused every attempt from the moment it opened.
+  const properties = (SPRINT.configSchema as { properties: Record<string, Record<string, unknown>> })
+    .properties;
+  assert.equal(properties.durationSeconds.format, "duration-seconds");
+});
+
+test("the retired title is deprecated rather than removed from the catalogue", () => {
+  // Removing it would orphan every stat keyed on its game code while screens still render a
+  // key they cannot resolve. Deprecated is what stops NEW contests: the platform's pre-flight
+  // refuses any title the provider does not report as active.
+  assert.equal(PERFECT.status, "deprecated");
+  assert.equal(SPRINT.status, "active");
+});
+
+test("an exceptional score is reported as clamped rather than tying at the ceiling", () => {
+  // A clamp makes two different performances report one identical number, so the players tie
+  // and split a pot they did not earn equally - invisible in the score and invisible in a log.
+  // Reaching the ceiling means the ceiling is wrong, so it has to be visible somewhere.
+  const perBoardMax = 1200;
+  const boards: BoardOutcome[] = Array.from(
+    { length: Math.ceil(SPRINT.scoreRange.max / perBoardMax) + 5 },
+    (_, index) => ({
+      index,
+      issuedAt: new Date(index * 1000),
+      solvedAt: new Date(index * 1000),
+    }),
+  );
+
+  const result = scoreRound(SPRINT, { kind: "sprint", durationSeconds: 600, gridSize: "medium" }, boards);
+  assert.equal(result.score, SPRINT.scoreRange.max);
+  const clamped = result.breakdown.clamped as { raw: number; reported: number } | null;
+  assert.ok(clamped, "a clamped Sprint score must say so in its breakdown");
+  assert.equal(clamped.reported, SPRINT.scoreRange.max);
+  assert.ok(clamped.raw > SPRINT.scoreRange.max);
+});
+
+test("an ordinary score does not claim to have been clamped", () => {
+  const result = scoreRound(
+    SPRINT,
+    { kind: "sprint", durationSeconds: 600, gridSize: "medium" },
+    [{ index: 0, issuedAt: new Date(0), solvedAt: new Date(5_000) }],
+  );
+  assert.equal(result.breakdown.clamped, undefined);
+});
+
+test("an hour of brisk play stays inside the declared range", () => {
+  // The ceiling exists to keep an exceptional player inside the range rather than turning them
+  // into an unresolved round, so the realistic upper bound has to clear it comfortably: a full
+  // hour at four seconds a board, every board earning nearly the full speed bonus.
+  const boardsInAnHour = Math.floor((SPRINT_DURATION.max * 1000) / 4_000);
+  const boards: BoardOutcome[] = Array.from({ length: boardsInAnHour }, (_, index) => ({
+    index,
+    issuedAt: new Date(index * 4_000),
+    solvedAt: new Date(index * 4_000 + 4_000),
+  }));
+
+  const result = scoreRound(
+    SPRINT,
+    { kind: "sprint", durationSeconds: SPRINT_DURATION.max, gridSize: "medium" },
+    boards,
+  );
+  assert.equal(result.breakdown.clamped, undefined);
+  assert.ok(
+    result.score < SPRINT.scoreRange.max,
+    `an hour of four-second boards scored ${result.score}, at or above the ${SPRINT.scoreRange.max} ceiling`,
+  );
 });
 
 test("an unknown enum value falls back and is reported", () => {

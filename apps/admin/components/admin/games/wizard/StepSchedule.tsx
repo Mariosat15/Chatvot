@@ -4,6 +4,7 @@ import { Coins, Percent, Users } from "lucide-react";
 import { RoundClockNote } from "../RoundClockNote";
 import { RoundStartPolicyField } from "../RoundStartPolicyField";
 import type { ContestDraft } from "../contest-draft";
+import type { ContestableTitle } from "../contest-types";
 import { DateField, NumberField } from "./fields";
 
 /**
@@ -27,12 +28,21 @@ import { DateField, NumberField } from "./fields";
 export function StepSchedule({
   draft,
   patch,
-  maxDurationSeconds,
+  title,
   currencySymbol,
 }: {
   draft: ContestDraft;
   patch: (changes: Partial<ContestDraft>) => void;
-  maxDurationSeconds?: number;
+  /**
+   * The chosen catalogue row, needed only so the clock note can find the playing time.
+   *
+   * IT TAKES THE WHOLE TITLE RATHER THAN `maxDurationSeconds`, which is the change that
+   * fixed the note. The reserved time is the operator's own chosen playing length, found
+   * through the `format` keyword on the title's settings schema - so the note needs the
+   * schema and the draft's answers, and the ceiling only as a fallback for a title that
+   * declares no clock.
+   */
+  title?: { maxDurationSeconds?: number; schema: ContestableTitle["schema"] };
   currencySymbol: string;
 }) {
   return (
@@ -56,7 +66,9 @@ export function StepSchedule({
         variant="timing"
         startTime={draft.startTime}
         endTime={draft.endTime}
-        maxDurationSeconds={maxDurationSeconds}
+        schemaFields={title?.schema.ok ? title.schema.fields : undefined}
+        settings={draft.settings}
+        maxDurationSeconds={title?.maxDurationSeconds}
         roundStartPolicy={draft.roundStartPolicy}
       />
 

@@ -1,20 +1,27 @@
 "use client";
 
 import { Clock, TriangleAlert } from "lucide-react";
+import type { ConfigField } from "@/lib/services/games/config-schema";
 import type { RoundStartPolicy } from "@/lib/services/games/round-types";
-import { describeRoundFit } from "./contest-draft";
+import { describeDurationSeconds, describeRoundFit } from "./contest-draft";
 
 /**
- * Explains, on the screens where an operator sets them, how a game's own round length relates
- * to the contest's start and end.
+ * Explains, on the screens where an operator sets them, how the playing time relates to the
+ * contest's start and end.
  *
  * WHY THIS EXISTS. The owner reported the Circuit Sprint duration as confusing: "it lets you
  * set the duration like 120 but then you specify also time in the window play, and the two
  * don't obviously relate." They do relate, and nothing said how. See `describeRoundFit` for
  * the full mechanism; the short version is that the settings step configures how long ONE
  * attempt lasts, the timing step decides when attempts may be started at all, and the gate
- * between them reserves the title's MAXIMUM round length so no attempt can be cut short by
- * the contest ending.
+ * between them reserves the playing time so no attempt can be cut short by the contest ending.
+ *
+ * IT NAMES THE CONFIGURED PLAYING TIME, NEVER THE CATALOGUE CEILING, and that correction
+ * matters more than it reads. This note used to say "that is this game's longest possible
+ * round" beside a number the operator had not chosen and could not see - Circuit Sprint's
+ * ceiling was five times its default - so an operator who set two minutes was told the
+ * contest reserved five. The sentence was accurate about the gate and useless as an
+ * explanation, because the number in it appeared nowhere else on the screen.
  *
  * ONE COMPONENT FOR THE WIZARD AND THE EDITOR, for the same reason as `UnscoredPolicyField`
  * and `contest-control-copy.ts`: an explanation that exists twice is an explanation that will
@@ -22,25 +29,31 @@ import { describeRoundFit } from "./contest-draft";
  * lying. This one is also the only place that renders the derived deadline, so the wizard and
  * the editor cannot disagree about when the last attempt can start.
  *
- * IT STATES A WALL-CLOCK MOMENT, NOT A FORMULA. "Reserves 300 seconds" is the rule; "the last
- * attempt can start at 13:55" is the thing an operator can act on. The number that confused
- * the owner is the one the platform reserves, so it is named explicitly and separated from
- * whatever the game's own settings say.
+ * IT STATES A WALL-CLOCK MOMENT, NOT A FORMULA. "Reserves 10 minutes" is the rule; "the last
+ * attempt can start at 13:55" is the thing an operator can act on.
  *
- * NO GAME IS NAMED HERE AND NONE MAY BE. It reads `maxDurationSeconds` from the catalogue row,
- * which every title carries, so a title we have never seen gets the same explanation with its
- * own number. A `switch` on game code here would break the "no developer needed for a new
- * title" claim exactly as it would in `ConfigSchemaFields`.
+ * NO GAME IS NAMED HERE AND NONE MAY BE. The playing time is found through the `format`
+ * keyword the title declares on its own settings schema, so a title we have never seen gets
+ * the same explanation with its own number, and one that declares no clock falls back to the
+ * catalogue ceiling. A `switch` on game code here would break the "no developer needed for a
+ * new title" claim exactly as it would in `ConfigSchemaFields`.
  */
 export function RoundClockNote({
   startTime,
   endTime,
+  schemaFields,
+  settings,
   maxDurationSeconds,
   roundStartPolicy,
   variant,
 }: {
   startTime: string;
   endTime: string;
+  /** The title's parsed settings schema, which is where the play clock declares itself. */
+  schemaFields?: ConfigField[];
+  /** The operator's answers, which is where that clock's chosen value lives. */
+  settings?: Record<string, unknown>;
+  /** The catalogue ceiling, used only by a title that declares no play clock. */
   maxDurationSeconds?: number;
   /**
    * Which of the two cut-off rules this contest is on.
@@ -63,9 +76,14 @@ export function RoundClockNote({
   const fit = describeRoundFit({
     startTime,
     endTime,
+    schemaFields,
+    settings,
     maxDurationSeconds,
     roundStartPolicy,
   });
+
+  const reserved = fit ? describeDurationSeconds(fit.reservedSeconds) : "";
+  const contestLength = fit ? describeDurationSeconds(fit.windowSeconds) : "";
 
   if (variant === "settings") {
     return (
@@ -85,18 +103,16 @@ export function RoundClockNote({
             {fit &&
               (fit.reservesFullRound ? (
                 <p>
-                  Whatever you choose here, the contest reserves the last{" "}
-                  <strong className="text-gray-200">
-                    {fit.reservedSeconds} seconds
-                  </strong>{" "}
-                  before it ends, so no attempt can be cut short. That is this
-                  game&apos;s longest possible round.
+                  Every player gets the full{" "}
+                  <strong className="text-gray-200">{reserved}</strong> of play, so the contest
+                  stops accepting new attempts {reserved} before it ends.
                 </p>
               ) : (
                 <p>
-                  This contest lets players start an attempt at any time, so a length set
-                  here is the most an attempt can run - one started near the end is closed
-                  when the contest closes and scored on what the player managed.
+                  This contest lets players start an attempt at any time, so the{" "}
+                  <strong className="text-gray-200">{reserved}</strong> set here is the most an
+                  attempt can run - one started near the end is closed when the contest closes
+                  and scored on what the player managed.
                 </p>
               ))}
           </div>
@@ -119,10 +135,8 @@ export function RoundClockNote({
             </p>
             {fit && fit.reservesFullRound && fit.lastAttemptStart ? (
               <p>
-                An attempt may be started up to{" "}
-                <strong className="text-gray-200">{fit.reservedSeconds} seconds</strong> before
-                the end - this game&apos;s longest possible round - so the last attempt can
-                start at{" "}
+                Play lasts <strong className="text-gray-200">{reserved}</strong>, and everyone
+                gets all of it, so the last attempt can start at{" "}
                 <strong className="text-gray-200">
                   {fit.lastAttemptStart.toLocaleString()}
                 </strong>
@@ -148,24 +162,26 @@ export function RoundClockNote({
 
         Until-close, the contest is perfectly valid and this is only worth knowing. Both are
         surfaced while the operator is editing the dates rather than on the review step.
+
+        BOTH SIDES OF THE COMPARISON ARE NAMED. Telling an operator the contest is "shorter
+        than the playing time" without saying how long either one is leaves them to work out
+        which of the two numbers to change, on two different steps.
       */}
       {fit?.windowTooShort && (
         <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
           {fit.reservesFullRound ? (
             <p className="text-xs text-amber-200/90">
-              This contest is shorter than this game&apos;s longest possible round (
-              {fit.reservedSeconds} seconds), and it stops new rounds one full round
-              before the end - so <strong>nobody could start an attempt at all</strong>.
-              Lengthen the contest, pick a game with shorter rounds, or let players start
-              at any time.
+              Play is set to {reserved} but this contest only runs for {contestLength}, and
+              every player is promised the full {reserved} - so{" "}
+              <strong>nobody could start an attempt at all</strong>. Shorten the playing time,
+              lengthen the contest, or let players start at any time.
             </p>
           ) : (
             <p className="text-xs text-amber-200/90">
-              This contest is shorter than this game&apos;s longest possible round (
-              {fit.reservedSeconds} seconds), so every attempt will be cut short at the
-              end time and scored on what the player managed. Players are told how long
-              they have before they start.
+              Play is set to {reserved} but this contest only runs for {contestLength}, so
+              every attempt will be cut short at the end time and scored on what the player
+              managed. Players are told how long they have before they start.
             </p>
           )}
         </div>

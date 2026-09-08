@@ -178,9 +178,23 @@ export function scoreRound(
 ): ScoreResult {
   if (title.gameCode === SPRINT_CODE && config.kind === "sprint") {
     const result = scoreSprint(boards);
+    const score = Math.min(
+      SPRINT.scoreRange.max,
+      Math.max(SPRINT.scoreRange.min, result.score),
+    );
     return {
       ...result,
-      score: Math.min(SPRINT.scoreRange.max, Math.max(SPRINT.scoreRange.min, result.score)),
+      score,
+      // Reported rather than applied silently, which is how `scorePerfect` has always done it
+      // and is not symmetry for its own sake. A clamp at the ceiling makes two DIFFERENT
+      // performances report one identical number, so the players tie and split a pot they did
+      // not earn equally. That is invisible in the score and invisible in a log; the only
+      // place it can be noticed is here. If this ever appears in a real round the ceiling is
+      // wrong, not the player.
+      breakdown:
+        score === result.score
+          ? result.breakdown
+          : { ...result.breakdown, clamped: { raw: result.score, reported: score } },
     };
   }
 

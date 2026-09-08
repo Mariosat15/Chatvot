@@ -108,10 +108,15 @@ async function findLiveRound(
  * Chapter 03 section 1.2: startable only if `now + maxDurationSeconds <= playWindowEnd`.
  *
  * NOW THE CONTEST'S CHOICE RATHER THAN A LAW, and `RoundStartPolicy` carries the reasoning.
- * The short version is that the rule reserved the CATALOGUE ceiling, so a contest shorter
- * than that refused every round from the instant it opened - and its fairness premise, that a
- * cut-short round is scored on a partial game, stopped holding once partial performance
- * became the basis for winning.
+ *
+ * TWO SEPARATE THINGS WERE WRONG HERE AND ONLY ONE OF THEM WAS THE POLICY. The rule reserved
+ * the CATALOGUE ceiling rather than the length this contest was configured for, so a contest
+ * shorter than the title's maximum refused every round from the instant it opened. That was
+ * arithmetic, it was fixed on 8 September 2026 by reading `attemptSeconds`, and it would have
+ * been a defect under either policy. Separately, the rule's fairness premise - that a
+ * cut-short round is scored on a partial game and is therefore worthless - stopped holding
+ * once partial performance became the basis for winning, which is what made the policy a
+ * choice rather than a law.
  *
  * ABSENT MEANS THE OLD BEHAVIOUR, deliberately. A contest written before the field existed
  * must not silently change the rule its entrants signed up under, and the reserving branch is
@@ -125,8 +130,13 @@ async function findLiveRound(
 function roundFitsInWindow(config: RoundContestConfig, now: Date): boolean {
   if (config.roundStartPolicy === "until_window_closes") return true;
 
-  const maxDuration = (config.maxDurationSeconds ?? 0) * 1000;
-  return now.getTime() + maxDuration <= config.playWindowEnd.getTime();
+  // The length THIS contest's attempts run for, not the catalogue ceiling. Reserving the
+  // ceiling is what refused every attempt of a contest shorter than the title's maximum, from
+  // the instant it opened. `attemptSeconds` on `RoundContestConfig` carries the full reasoning
+  // and why the fallback direction is the safe one.
+  const attemptMs =
+    (config.attemptSeconds ?? config.maxDurationSeconds ?? 0) * 1000;
+  return now.getTime() + attemptMs <= config.playWindowEnd.getTime();
 }
 
 /**
@@ -134,6 +144,15 @@ function roundFitsInWindow(config: RoundContestConfig, now: Date): boolean {
  *
  * Reason for the Math.min: a round that can outlive its contest is a score that arrives
  * after settlement, which is the single most expensive failure in this whole integration.
+ *
+ * IT READS THE CEILING WHERE THE GATE ABOVE READS `attemptSeconds`, AND THAT IS DELIBERATE.
+ * They look like the same question and they are opposites. The gate asks "may this attempt
+ * start", where reserving too much refuses a player, so it wants the real length. This asks
+ * "by when is this round certainly over", where being too tight EXPIRES A PLAYER MID-GAME:
+ * the game's own clock starts when the browser loads the board, a second or two after the
+ * round is created, so an expiry set to the exact configured length lands just before the
+ * player's last board. Generous is correct for a safety net. Anyone tidying these into one
+ * field is choosing one of the two failures.
  */
 function resolveExpiry(config: RoundContestConfig, now: Date): Date {
   const maxDuration = (config.maxDurationSeconds ?? 300) * 1000;

@@ -136,7 +136,13 @@ export function ProviderContestEditor({
       const response = await fetch(`/api/games/contests/${competitionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(toEditRequestBody(draft, { entered })),
+        body: JSON.stringify(
+          toEditRequestBody(draft, {
+            entered,
+            schemaFields: schema?.ok ? schema.fields : undefined,
+            maxDurationSeconds,
+          }),
+        ),
       });
       const data = await response.json();
 
@@ -298,6 +304,8 @@ export function ProviderContestEditor({
           variant="settings"
           startTime={draft.startTime}
           endTime={draft.endTime}
+          schemaFields={schema?.ok ? schema.fields : undefined}
+          settings={draft.settings}
           maxDurationSeconds={maxDurationSeconds}
           roundStartPolicy={draft.roundStartPolicy}
         />
@@ -399,6 +407,8 @@ export function ProviderContestEditor({
           variant="timing"
           startTime={draft.startTime}
           endTime={draft.endTime}
+          schemaFields={schema?.ok ? schema.fields : undefined}
+          settings={draft.settings}
           maxDurationSeconds={maxDurationSeconds}
           roundStartPolicy={draft.roundStartPolicy}
         />

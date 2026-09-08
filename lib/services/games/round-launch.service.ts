@@ -5,6 +5,7 @@ import CompetitionParticipant from "@/database/models/trading/competition-partic
 import ProviderGame from "@/database/models/games/provider-game.model";
 import { createRound } from "./round.service";
 import { contestRoundConfig, isProviderContest } from "./contest-config";
+import { resolveAttemptSecondsFromSchema } from "./config-schema";
 import type { ProviderContestFields } from "./contest-config";
 import type { CreateRoundOutcome, CreateRoundRefusal } from "./round-types";
 
@@ -141,6 +142,7 @@ function publicBaseUrl(): string | null {
 interface StoredTitle {
   maxDurationSeconds?: number;
   displayName?: string;
+  configSchema?: unknown;
 }
 
 export async function launchContestRound(
@@ -267,14 +269,18 @@ export async function launchContestRound(
       );
     }
 
-    // `maxDurationSeconds` lives on the catalogue row, not the contest, so it is read here
+    // The title's clock lives on the catalogue row, not the contest, so it is read here
     // rather than in the bridge. It is what lets `createRound` refuse a round that could
     // not finish before the play window shuts.
+    //
+    // `configSchema` comes with it because the ceiling alone is not the answer: it tells us
+    // which of the contest's own settings the title declared as its play clock, which is how
+    // a ten-minute contest reserves ten minutes rather than the hour the catalogue permits.
     const title = await ProviderGame.findOne({
       providerKey: config.providerKey,
       gameCode: config.gameCode,
     })
-      .select("maxDurationSeconds displayName chartvoltEnabled providerStatus")
+      .select("maxDurationSeconds configSchema displayName chartvoltEnabled providerStatus")
       .lean<(StoredTitle & { chartvoltEnabled?: boolean; providerStatus?: string }) | null>();
 
     if (!title) {
@@ -305,7 +311,15 @@ export async function launchContestRound(
       contestType: "competition",
       contestId: contest._id,
       participantId: participant._id,
-      config: { ...config.config, maxDurationSeconds: title.maxDurationSeconds },
+      config: {
+        ...config.config,
+        maxDurationSeconds: title.maxDurationSeconds,
+        attemptSeconds: resolveAttemptSecondsFromSchema(
+          title.configSchema,
+          config.config.settings,
+          title.maxDurationSeconds,
+        ),
+      },
       returnUrl: `${baseUrl}/competitions/${competitionId}`,
       resultCallbackUrl: `${baseUrl}/api/games/providers/${config.providerKey}/events`,
       displayName: actor.displayName,

@@ -462,6 +462,74 @@ describe("RoundService - creation and attempts", () => {
     }
   });
 
+  it("gates on the CONFIGURED playing time, not the title's ceiling", async () => {
+    /*
+      THE DEFECT THIS PINS, reported by the owner on 8 September 2026: a contest was refusing
+      every attempt from the moment it opened. The gate reserved `maxDurationSeconds`, the
+      catalogue CEILING, so a title allowing up to an hour refused every round in a contest
+      shorter than an hour - whatever playing time the operator had actually chosen. It was
+      not a late-contest edge case; a 30-minute contest of 10-minute play never opened at all.
+
+      Chapter 03 section 1.2 does specify `maxDurationSeconds`, and it was amended rather than
+      overridden: reserving the whole attempt is still the rule, and `attemptSeconds` is what
+      that attempt is actually going to be.
+    */
+    const contestId = await seedCompetition();
+
+    // Twenty minutes of contest left; the title would allow up to an hour, but this contest
+    // is configured for ten minutes of play, which fits twice over.
+    const config = contestConfig({
+      playWindowEnd: new Date(Date.now() + 20 * 60 * 1000),
+      maxDurationSeconds: 3600,
+      attemptSeconds: 600,
+    });
+
+    const created = await launchRound(contestId, config);
+    expect(created.roundId).toBeTruthy();
+
+    // And the reservation is still a whole attempt: raise the configured time above the
+    // remaining window and the same contest refuses.
+    const refused = await createRound({
+      providerKey: MOCK_PROVIDER_KEY,
+      gameCode: GAME_CODE,
+      gameKey: GAME_KEY,
+      userId: new Types.ObjectId().toString(),
+      contestType: "competition",
+      contestId,
+      config: { ...config, attemptSeconds: 25 * 60 },
+      returnUrl: "https://chartvolt.test/return",
+      resultCallbackUrl: "https://chartvolt.test/cb",
+    });
+    expect(refused.success).toBe(false);
+    if (!refused.success) expect(refused.refusal).toBe("play_window_too_short");
+  });
+
+  it("still clamps expiresAt against the CEILING, which is a different question", async () => {
+    /*
+      The two fields answer two questions and merging them is the tempting mistake. The gate
+      asks "how much time must I reserve", which is the length this contest grants. Expiry
+      asks "how long may this round live", which is the most the game will ever run - a title
+      whose clock is declared per-contest may still be handed a longer ceiling, and expiring a
+      round early would cut a player off mid-board with a score the provider never sent.
+    */
+    const contestId = await seedCompetition();
+    const playWindowEnd = new Date(Date.now() + 60 * 60 * 1000);
+
+    const created = await launchRound(
+      contestId,
+      contestConfig({
+        playWindowEnd,
+        maxDurationSeconds: 900,
+        attemptSeconds: 120,
+      }),
+    );
+
+    const round = await GameRound.findOne({ roundId: created.roundId });
+    // 900s from the ceiling, not 120s from the configured attempt.
+    const lifetime = round!.expiresAt.getTime() - round!.createdAt.getTime();
+    expect(lifetime).toBeGreaterThan(600 * 1000);
+  });
+
   it("never sets expiresAt beyond the play window end", async () => {
     const contestId = await seedCompetition();
     const playWindowEnd = new Date(Date.now() + 4 * 60 * 1000);

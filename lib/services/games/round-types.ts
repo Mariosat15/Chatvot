@@ -95,9 +95,9 @@ export const UNSCORED_CONTEST_POLICY_COPY: ReadonlyMap<
  *
  * TWO THINGS BROKE THAT JUSTIFICATION.
  *
- * The first is arithmetic the rule never accounted for. The gate reserves the CATALOGUE
- * ceiling, not the length the operator configured, so Circuit Sprint reserves 300 seconds
- * whatever `durationSeconds` says. A contest shorter than 300 seconds therefore refused every
+ * The first is arithmetic the rule never accounted for. The gate reserved the CATALOGUE
+ * ceiling, not the length the operator configured, so Circuit Sprint reserved 300 seconds
+ * whatever `durationSeconds` said. A contest shorter than 300 seconds therefore refused every
  * round from the instant it opened, telling players "there is not enough time left in this
  * competition" while a countdown beside it said minutes remained. That is what the owner
  * reported, and no amount of rewording fixes it.
@@ -115,9 +115,19 @@ export const UNSCORED_CONTEST_POLICY_COPY: ReadonlyMap<
  * deliberately no minimum - inventing a floor would put back a hidden refusal of the same
  * shape, differing only in the number.
  *
- * The two defaults differ ON PURPOSE, exactly as `UnscoredContestPolicy`'s do: the schema
- * keeps `reserve_full_round` so contests already in the database behave as they always have,
- * while the wizard starts a new draft on `until_window_closes`.
+ * THE FIRST OF THOSE TWO REASONS WAS FIXED RATHER THAN LIVED WITH, on 8 September 2026, and
+ * that changed which policy is the sensible default. The gate now reserves the playing time
+ * the operator actually chose - a title declares which of its settings is its clock, and
+ * `resolveAttemptSeconds` reads it - so reserving costs a player only the time they were
+ * going to be given anyway, never a ceiling nobody set. `attemptSeconds` on
+ * `RoundContestConfig` carries the mechanism.
+ *
+ * SO THE OWNER'S ANSWER MOVED WITH IT: `reserve_full_round` is now the wizard's default too,
+ * and the two defaults AGREE. The reversal is recorded here rather than by rewriting the
+ * paragraphs above, because "the fairness rule was suspended while the arithmetic under it was
+ * wrong, then restored once it was right" is the fact a later reader needs - not a docstring
+ * that reads as though the rule had never moved. `until_window_closes` remains, and remains
+ * the right choice for a contest short enough that a full session cannot fit.
  */
 export type RoundStartPolicy = "reserve_full_round" | "until_window_closes";
 
@@ -138,19 +148,19 @@ export const ROUND_START_POLICY_COPY: ReadonlyMap<
   { label: string; consequence: string }
 > = new Map([
   [
-    "until_window_closes",
+    "reserve_full_round",
     {
-      label: "Players can start a round at any time until the contest ends",
+      label: "Everybody gets the full playing time",
       consequence:
-        "A round started near the end is closed when the contest closes, and scored on whatever the player achieved in the time they had. They are told how long they will get before they spend the attempt. Pick this unless a shortened round would make your game meaningless.",
+        "The contest stops accepting new attempts one full playing time before it ends, so no attempt is ever cut short and every player is scored over the same length of play. The cut-off reserves the playing time you configured, not some hidden maximum. The contest has to be longer than one playing time or nobody could start at all.",
     },
   ],
   [
-    "reserve_full_round",
+    "until_window_closes",
     {
-      label: "Stop new rounds one full round before the end",
+      label: "Players can start at any time until the contest ends",
       consequence:
-        "Nobody can start a round that the contest end would cut short, so every attempt gets the full time. The cut-off reserves this game's LONGEST possible round, not the length you configured, so it can close play well before the contest ends - and it refuses every round for the whole contest if the contest is shorter than that maximum.",
+        "A player who starts near the end is closed when the contest closes and scored on whatever they achieved in the time they had - so a late starter is ranked against players who had longer. They are told how long they will get before they spend the attempt. Pick this when the contest is too short to fit a full playing time, or when late entry matters more than equal time.",
     },
   ],
 ]);
@@ -190,8 +200,33 @@ export interface RoundContestConfig {
   playWindowEnd: Date;
   /** Shared by every round in the contest, so all players face identical content. */
   contentSeed?: string;
-  /** From the catalogue. Used to check the round can finish inside the play window. */
+  /**
+   * From the catalogue. The title's absolute ceiling for any round.
+   *
+   * STILL THE BASIS FOR `expiresAt`, deliberately, even though `attemptSeconds` below is the
+   * better estimate of how long the player will actually be playing. `expiresAt` is not a
+   * clock - the game owns the clock - it is the moment after which the reconciliation net may
+   * assume a round is over. Setting it to the exact configured length would make it fire while
+   * a player who loaded the board a few seconds after the round was created is still on their
+   * last board. Generous is the correct direction for a safety net, and tight is the correct
+   * direction for the fairness gate, which is why the two read different fields. Do not merge
+   * them.
+   */
   maxDurationSeconds?: number;
+  /**
+   * How long one attempt of THIS contest actually runs for.
+   *
+   * Resolved by `resolveAttemptSeconds` from the setting the title DECLARED as its play clock,
+   * falling back to `maxDurationSeconds` for a title that declares none. It is what the
+   * fairness gate reserves, so a contest configured for ten minutes reserves ten - not the
+   * hour the catalogue permits.
+   *
+   * ABSENT MEANS FALL BACK TO THE CEILING, which is what every caller did before this field
+   * existed. A caller that forgets it therefore over-reserves and refuses attempts that would
+   * have fitted: wrong, but wrong loudly, which is the direction a missed call site should
+   * fail in.
+   */
+  attemptSeconds?: number;
   /**
    * Whether a round may start that the contest end will cut short.
    *

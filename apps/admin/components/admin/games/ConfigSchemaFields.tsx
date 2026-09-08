@@ -68,7 +68,7 @@ export function ConfigSchemaFields({
             disabled={disabled}
           />
 
-          <RangeHint field={field} />
+          {field.format !== "duration-seconds" && <RangeHint field={field} />}
         </div>
       ))}
     </div>
@@ -137,11 +137,189 @@ function FieldControl({
     );
   }
 
+  if (field.format === "duration-seconds") {
+    return (
+      <DurationControl
+        id={id}
+        field={field}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+      />
+    );
+  }
+
   // integer and number.
-  //
-  // The empty string is passed through as "" rather than coerced to 0. Reason: an operator
-  // clearing the box means "I have not chosen", and 0 is a choice - one that would pass a
-  // `minimum: 0` check and silently become the stored setting.
+  return (
+    <NumberBox
+      id={id}
+      field={field}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+    />
+  );
+}
+
+/**
+ * The lengths an operator is offered for a contest's playing time.
+ *
+ * A LIST OF MINUTES, BECAUSE THE FIELD IS SECONDS AND NOBODY THINKS IN SECONDS. The owner
+ * asked for exactly these, and a free-text box in seconds is what produced the report that
+ * started this: "it lets you set the duration like 120" reads as two minutes only if you
+ * stop and divide.
+ *
+ * FILTERED AGAINST THE TITLE'S OWN DECLARED RANGE, never assumed. A title may allow only
+ * two to five minutes, and offering an hour that the game then clamps is worse than not
+ * offering it - the contest saves with a length the operator did not choose and the round
+ * gate reserves that clamped value instead.
+ */
+const DURATION_PRESET_MINUTES = [1, 5, 10, 20, 30, 60] as const;
+
+const CUSTOM = "custom";
+
+/**
+ * The playing-time control: a short list of sensible lengths, plus a way out of the list.
+ *
+ * KEYED ON THE DECLARED `format`, NOT ON A GAME CODE OR A FIELD NAME. A title says which of
+ * its settings is the play clock and this renders that one as a duration; every other integer
+ * still gets a plain number box. A `field.name === "durationSeconds"` check here would have
+ * been shorter and would have quietly made the control Circuit Sprint's rather than the
+ * platform's - the same failure as a `switch` on game code, one layer down.
+ *
+ * IT STORES SECONDS THROUGHOUT. The minutes are a presentation detail; converting on the way
+ * in and out means the stored setting is exactly what the game's schema declares, so a title
+ * whose clock happens to be in seconds needs no special case at the other end.
+ *
+ * IT FALLS BACK TO A PLAIN NUMBER BOX when no preset fits inside the declared range - a title
+ * allowing at most 45 seconds cannot be expressed in whole minutes, and a dropdown with no
+ * usable options is a control that appears to work and offers nothing.
+ */
+function DurationControl({
+  id,
+  field,
+  value,
+  onChange,
+  disabled,
+}: {
+  id: string;
+  field: ConfigField;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  disabled?: boolean;
+}) {
+  const min = field.minimum ?? 1;
+  const max = field.maximum;
+
+  const presets = DURATION_PRESET_MINUTES.filter((minutes) => {
+    const seconds = minutes * 60;
+    return seconds >= min && (max === undefined || seconds <= max);
+  });
+
+  const seconds = typeof value === "number" ? value : Number(value);
+  const usable = Number.isFinite(seconds) ? seconds : undefined;
+  const matched = presets.find((minutes) => minutes * 60 === usable);
+
+  if (presets.length === 0) {
+    return (
+      <NumberBox
+        id={id}
+        field={field}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+      />
+    );
+  }
+
+  const minMinutes = Math.max(1, Math.ceil(min / 60));
+  const maxMinutes = max === undefined ? undefined : Math.floor(max / 60);
+
+  return (
+    <div className="space-y-2">
+      <Select
+        value={matched ? String(matched) : CUSTOM}
+        onValueChange={(next) => {
+          if (next === CUSTOM) {
+            // Reason: switching to Custom must not silently change the stored value. The box
+            // opens on whatever is already set, so an operator who opens it to look and then
+            // changes their mind has not edited the contest.
+            return;
+          }
+          onChange(Number(next) * 60);
+        }}
+        disabled={disabled}
+      >
+        <SelectTrigger
+          id={id}
+          className="bg-gray-900 border-gray-700 text-white"
+        >
+          <SelectValue placeholder="Choose how long players get" />
+        </SelectTrigger>
+        <SelectContent>
+          {presets.map((minutes) => (
+            <SelectItem key={minutes} value={String(minutes)}>
+              {minutes === 1 ? "1 minute" : `${minutes} minutes`}
+            </SelectItem>
+          ))}
+          <SelectItem value={CUSTOM}>Custom</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {!matched && (
+        <div className="space-y-1">
+          <Input
+            aria-label="Playing time in minutes"
+            type="number"
+            inputMode="numeric"
+            step={1}
+            min={minMinutes}
+            max={maxMinutes}
+            value={usable === undefined ? "" : String(usable / 60)}
+            onChange={(event) => {
+              const raw = event.target.value;
+              onChange(raw === "" ? "" : Number(raw) * 60);
+            }}
+            disabled={disabled}
+            className="bg-gray-900 border-gray-700 text-white"
+          />
+          <p className="text-xs text-gray-500">
+            Minutes.{" "}
+            {maxMinutes === undefined
+              ? `At least ${minMinutes}.`
+              : `Between ${minMinutes} and ${maxMinutes}.`}
+          </p>
+        </div>
+      )}
+
+      <p className="text-xs text-gray-500">
+        Every player gets this long once they start, and the contest stops accepting new
+        attempts this far before it ends.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The plain numeric input, shared by ordinary number fields and the duration fallback.
+ *
+ * The empty string is passed through as "" rather than coerced to 0. Reason: an operator
+ * clearing the box means "I have not chosen", and 0 is a choice - one that would pass a
+ * `minimum: 0` check and silently become the stored setting.
+ */
+function NumberBox({
+  id,
+  field,
+  value,
+  onChange,
+  disabled,
+}: {
+  id: string;
+  field: ConfigField;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  disabled?: boolean;
+}) {
   return (
     <Input
       id={id}

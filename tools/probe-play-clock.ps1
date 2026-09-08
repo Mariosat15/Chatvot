@@ -1,381 +1,320 @@
-# Probes the server-anchored clock, the pre-flight gates and the lobby countdown.
+# Probes for the play-clock slice of 8 September 2026.
 #
-# Every recorded probing lesson is applied here, because each one has already produced a false
-# result in this repository at least once:
+# THE DEFECT AT THE CENTRE OF IT: the round-start gate reserved `maxDurationSeconds`, the
+# CATALOGUE CEILING, rather than the playing time the operator configured. A title allowing up
+# to an hour therefore refused every attempt in any contest shorter than an hour, from the
+# first second - which is what the owner reported as "as soon as the competition starts it says
+# there is not enough time left". It was correct code enforcing a rule nobody had chosen.
 #
-#   - `-LiteralPath` on the READ as well as the write. A Next.js dynamic route contains
-#     `[roundId]`, which PowerShell parses as a wildcard character class, so `Get-Content $File`
-#     returns nothing while `Set-Content` writes it back happily - emptying the file and
-#     reporting a confident RED on entirely the wrong grounds.
-#   - UTF-8 without a BOM, pinned explicitly. PowerShell 5.1's `Get-Content -Raw` decodes with
-#     the system ANSI codepage, so every emoji in a touched file comes back as mojibake and is
-#     written back that way. It surfaces two steps later as unexplained typecheck errors.
-#   - Refuse to write when the read came back empty, and assert the file actually changed. A
-#     probe that fails to apply is indistinguishable from a test that does not work.
+# The rest of the slice follows from fixing it: a schema keyword so a title can say WHICH of its
+# settings is the clock, a dropdown rather than a seconds box, a derived result grace period, and
+# blocking validation so a contest nobody could start cannot be saved.
+#
+# Each probe reintroduces one form of one defect and asserts the EXPECTED test goes red, alone.
+#
+# Harness rules, every one learned by getting it wrong:
+#   - Read via [System.IO.File] with UTF-8 and no BOM, on the read as well as the write.
+#   - Refuse to write when the read came back empty: a probe that empties a file reports far
+#     more damage than it caused, and the tell is the failure COUNT rather than the failure.
+#   - Confirm the replacement changed the file. A probe that fails to apply is
+#     indistinguishable from a test that does not work.
 #   - Run the expected test ALONE with `-t` and read the summary counts. Searching whole-suite
-#     output for the test's name reports RED for a passing test just as readily, because vitest
-#     prints the name either way.
-#   - Report the whole-suite failure count too. 5-7 tests red for a one-line change is the
-#     signal that the probe damaged the file rather than tripping the guard; the honest number
-#     is 1 or 2.
+#     output for a test's name finds it whether it passed or failed.
+#   - Parameterise on the SUITE as well as the test: run against the wrong file and the harness
+#     reports "no test ran", which reads like a broken harness rather than a missing guard.
 
 $ErrorActionPreference = 'Continue'
-$env:NODE_OPTIONS = ''
+$Root = Split-Path -Parent $PSScriptRoot
+$Utf8 = New-Object System.Text.UTF8Encoding $false
 
-$SUITE = '__tests__/games/provider-play-ui.test.ts'
-$Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+$CLOCK  = '__tests__/admin/contest-round-clock.test.ts'
+$CREATE = '__tests__/services/provider-contest-create.test.ts'
+$LIFE   = '__tests__/services/round-lifecycle.test.ts'
 
-function Relax([string]$literal) { [regex]::Escape($literal) -replace '\r?\n', '\r?\n' }
+function Read-File([string]$Rel) {
+  $text = [System.IO.File]::ReadAllText((Join-Path $Root $Rel), $Utf8)
+  if ([string]::IsNullOrEmpty($text)) { throw "PROBE ABORT: read $Rel came back empty" }
+  return $text
+}
 
-function Probe {
-  param([string]$Name, [string]$File, [string]$Find, [string]$Replace, [string]$ExpectRed)
+function Write-File([string]$Rel, [string]$Text) {
+  if ([string]::IsNullOrEmpty($Text)) { throw "PROBE ABORT: refusing to write empty $Rel" }
+  [System.IO.File]::WriteAllText((Join-Path $Root $Rel), $Text, $Utf8)
+}
 
-  $path = Join-Path (Get-Location) $File
-  $original = [System.IO.File]::ReadAllText($path, $Utf8NoBom)
+# Escapes the literal then relaxes every newline, so a CRLF pattern matches an LF file.
+function Relaxed([string]$Literal) {
+  return ([regex]::Escape($Literal) -replace '\\r\\n|\\n', '\r?\n')
+}
 
-  if ([string]::IsNullOrEmpty($original)) {
-    Write-Host "  [READ FAILED - REFUSING TO WRITE] $Name" -ForegroundColor Magenta
+function Invoke-Probe {
+  param(
+    [string]$Name,
+    [string]$File,
+    [string]$From,
+    [string]$To,
+    [string]$Suite,
+    [string]$ExpectTest
+  )
+
+  $original = Read-File $File
+  $mutated = [regex]::Replace($original, (Relaxed $From), { param($m) $To }, 1)
+
+  if ($mutated -eq $original) {
+    Write-Host "[$Name] PROBE DID NOT APPLY - pattern not found in $File" -ForegroundColor Magenta
     return
   }
 
-  $patched = [regex]::Replace($original, (Relax $Find), $Replace.Replace('$', '$$'), 1)
-  if ($patched -eq $original) {
-    Write-Host "  [PROBE DID NOT APPLY] $Name" -ForegroundColor Magenta
-    return
-  }
-
-  [System.IO.File]::WriteAllText($path, $patched, $Utf8NoBom)
   try {
-    $alone = npx vitest run $SUITE -t $ExpectRed --reporter=dot 2>&1 | Out-String
-    $aloneFailed = 0
-    if ($alone -match 'Tests\s+(\d+)\s+failed') { $aloneFailed = [int]$Matches[1] }
-    $ran = ($alone -match 'Tests\s+') -and ($alone -notmatch 'No test found')
+    Write-File $File $mutated
 
-    $whole = npx vitest run $SUITE --reporter=dot 2>&1 | Out-String
-    $wholeFailed = 0
-    if ($whole -match 'Tests\s+(\d+)\s+failed') { $wholeFailed = [int]$Matches[1] }
+    $out = & npx vitest run $Suite -t "$ExpectTest" 2>&1 | Out-String
+    $flat = ($out -replace '\s+', ' ')
+
+    $failed = 0
+    if ($flat -match 'Tests\s+(\d+)\s+failed') { $failed = [int]$Matches[1] }
+    $ran = ($flat -match 'Tests\s+') -and ($flat -notmatch 'No test found')
 
     if (-not $ran) {
-      Write-Host "  [EXPECTED TEST DID NOT RUN - wrong name or wrong suite] $Name" -ForegroundColor Magenta
-    } elseif ($aloneFailed -gt 0) {
-      Write-Host ("  [RED: expected test failed, {0} red in suite] {1}" -f $wholeFailed, $Name) -ForegroundColor Green
+      Write-Host "[$Name] NO TEST RAN - '$ExpectTest' matched nothing in $Suite" -ForegroundColor Magenta
+      Write-Host $flat
+    } elseif ($failed -ge 1) {
+      Write-Host "[$Name] RED ($failed failed) - '$ExpectTest'" -ForegroundColor Green
     } else {
-      Write-Host ("  [STILL GREEN - GUARD IS NOT WORKING, {0} red in suite] {1}" -f $wholeFailed, $Name) -ForegroundColor Red
+      Write-Host "[$Name] GREEN - '$ExpectTest' did not fail. Guard absent, test weak, probe aimed wrong, or the mutation changed no observable." -ForegroundColor Red
+      Write-Host $flat
     }
   } finally {
-    [System.IO.File]::WriteAllText($path, $original, $Utf8NoBom)
-    $restored = [System.IO.File]::ReadAllText($path, $Utf8NoBom)
-    if ($restored -ne $original) {
-      Write-Host "  !! RESTORE FAILED for $File - check git diff" -ForegroundColor Red
-    }
+    Write-File $File $original
+    if ((Read-File $File) -ne $original) { Write-Host "[$Name] RESTORE FAILED" -ForegroundColor Red }
   }
 }
 
-$CLOCK = 'hooks/useServerClock.ts'
-$PREFLIGHT = 'components/games/RoundPreflight.tsx'
-$HOST_FILE = 'components/games/ProviderRoundHost.tsx'
-$LOBBY = 'components/games/ProviderContestLobby.tsx'
+$SCHEMA   = 'lib/services/games/config-schema.ts'
+$ROUND    = 'lib/services/games/round.service.ts'
+$DRAFT    = 'apps/admin/components/admin/games/contest-draft.ts'
+$FIELDS   = 'apps/admin/components/admin/games/ConfigSchemaFields.tsx'
+$WIZARD   = 'apps/admin/components/admin/games/ProviderContestWizard.tsx'
+$NOTE     = 'apps/admin/components/admin/games/RoundClockNote.tsx'
 
-Write-Host "`n=== the clock itself ===" -ForegroundColor Cyan
+Write-Host '=== The gate: which duration is reserved ===' -ForegroundColor Cyan
 
-# The negative clamp is the one that reaches a player's eye: the window's end and now cross
-# between one tick and the next, so an unclamped difference renders "-1s".
-Probe -Name 'formatRemaining does not clamp a past target to zero' `
-  -File $CLOCK `
-  -Find '  if (ms <= 0) return "0s";' `
-  -Replace '  if (ms <= -999999999) return "0s";' `
-  -ExpectRed 'formats a remaining duration the way a player reads one'
+# 1. THE ORIGINAL DEFECT, VERBATIM. The gate goes back to the catalogue ceiling, so a contest
+#    shorter than the ceiling refuses every attempt for its whole life however short the
+#    operator set play to.
+Invoke-Probe -Name '1 gate reads the ceiling' -File $ROUND `
+  -From '(config.attemptSeconds ?? config.maxDurationSeconds ?? 0) * 1000;' `
+  -To '(config.maxDurationSeconds ?? 0) * 1000;' `
+  -Suite $LIFE -ExpectTest 'gates on the CONFIGURED playing time, not the title'
 
-Probe -Name 'the offset is never applied, so the clock is the browser again' `
-  -File $CLOCK `
-  -Find '  return now + offsetMs;' `
-  -Replace '  return now;' `
-  -ExpectRed "anchors to the server's timestamp and fails closed on a bad one"
+# 2. THE OPPOSITE, and the reason expiry was NOT changed with the gate. Expiry reads the
+#    configured attempt, so a round is killed at the moment the contest stopped reserving for
+#    it rather than when the game is actually finished - cutting a player off mid-board with a
+#    score the provider never sent.
+Invoke-Probe -Name '2 expiry reads the attempt' -File $ROUND `
+  -From 'const maxDuration = (config.maxDurationSeconds ?? 300) * 1000;' `
+  -To 'const maxDuration = (config.attemptSeconds ?? config.maxDurationSeconds ?? 300) * 1000;' `
+  -Suite $LIFE -ExpectTest 'still clamps expiresAt against the CEILING'
 
-# An offset of NaN makes every comparison on the pre-flight false, so the countdown freezes and
-# every gate silently OPENS - the wrong direction for a screen that spends attempts.
-Probe -Name 'an unparseable anchor propagates NaN instead of failing closed' `
-  -File $CLOCK `
-  -Find '    if (Number.isNaN(parsed)) return;' `
-  -Replace '    if (false) return;' `
-  -ExpectRed "anchors to the server's timestamp and fails closed on a bad one"
+# 3. The reservation becomes a fraction of the attempt. This is the tempting "fix" for the
+#    original report - it makes the message honest and quietly abandons the fairness rule that
+#    every player is scored over the same length of play.
+Invoke-Probe -Name '3 reserves half an attempt' -File $DRAFT `
+  -From @'
+    lastAttemptStart: reservesFullRound
+      ? new Date(end.getTime() - attemptSeconds * 1000)
+'@ `
+  -To @'
+    lastAttemptStart: reservesFullRound
+      ? new Date(end.getTime() - (attemptSeconds / 2) * 1000)
+'@ `
+  -Suite $CLOCK -ExpectTest 'reserves the WHOLE attempt, never a fraction of it'
 
-Write-Host "`n=== the pre-flight gates ===" -ForegroundColor Cyan
+Write-Host '=== Resolving which setting IS the clock ===' -ForegroundColor Cyan
 
-Probe -Name "the pre-flight goes back to the browser's clock" `
-  -File $PREFLIGHT `
-  -Find '  const now = useServerClock(state.serverNow);' `
-  -Replace '  const now = Date.now();' `
-  -ExpectRed 'uses that clock for every gate rather than'
+# 4. The resolver ignores the declared field and always answers with the ceiling, which is the
+#    original defect one layer up: every consumer - gate, pre-flight, note, preview, player
+#    pre-flight - goes back to reserving an hour for a ten-minute contest at once.
+Invoke-Probe -Name '4 resolver ignores the declared clock' -File $SCHEMA `
+  -From 'const field = fields.find((candidate) => candidate.format === "duration-seconds");' `
+  -To 'const field = fields.find(() => false);' `
+  -Suite $CLOCK -ExpectTest 'reserves the CONFIGURED playing time, not the game'
 
-# RE-AIMED 7 SEP 2026, second time. The arithmetic moved into `round-window.ts` so the lobby
-# could count down to the same instant, so the comparison here is now `now > cutoffMs`. Aimed at
-# the old inline expression this reported DID NOT APPLY, which reads like a broken harness.
-Probe -Name 'the too-late-to-start comparison is deleted' `
-  -File $PREFLIGHT `
-  -Find '    !resuming && cutoffMs !== null && !windowClosed && now > cutoffMs;' `
-  -Replace '    false;' `
-  -ExpectRed 'blocks Play when a round can no longer finish inside the window'
+# 5. The fallback goes. A title that declares no clock - every existing one until today, and
+#    any provider who never adopts the keyword - loses its reservation entirely, so the contest
+#    reserves nothing and an attempt can be admitted that the contest end will cut short.
+Invoke-Probe -Name '5 no fallback to the ceiling' -File $SCHEMA `
+  -From @'
+  return typeof catalogueMaxSeconds === "number" && catalogueMaxSeconds > 0
+    ? catalogueMaxSeconds
+    : undefined;
+'@ `
+  -To @'
+  return undefined;
+'@ `
+  -Suite $CLOCK -ExpectTest 'falls back to the ceiling when the title declares no play clock'
 
-# A resume reopens the round the player already has and needs no fresh room in the window.
-# Without this the gate would refuse to reopen a round the server would happily return.
+# 6. The clamp goes. The stored settings are operator input and the schema's own range is the
+#    only thing that says what the game will honour; unclamped, the platform reserves a length
+#    the game is about to refuse, so the screen and the round disagree.
+Invoke-Probe -Name '6 setting not clamped' -File $SCHEMA `
+  -From @'
+  const clamped = Math.min(
+    field.maximum ?? numeric,
+    Math.max(field.minimum ?? numeric, numeric),
+  );
+'@ `
+  -To @'
+  const clamped = numeric;
+'@ `
+  -Suite $CLOCK -ExpectTest 'clamps a setting outside the declared range rather than trusting it'
+
+Write-Host '=== The schema keyword fails closed ===' -ForegroundColor Cyan
+
+# 7. An unrecognised `format` is ignored rather than refused. Same reasoning as the
+#    unimplemented-keyword rule: the contest saves, and the platform treats a declared clock as
+#    an ordinary integer with nothing anywhere saying so.
+Invoke-Probe -Name '7 unknown format ignored' -File $SCHEMA `
+  -From @'
+        typeof rawField.format !== "string" ||
+        !CONFIG_FIELD_FORMATS.includes(rawField.format as ConfigFieldFormat)
+'@ `
+  -To @'
+        false
+'@ `
+  -Suite $CREATE -ExpectTest 'accepts a declared `format`, and fails closed on one it does not know'
+
+# 8. A duration on a string field is admitted. Every reservation is then NaN - and every NaN
+#    comparison is false, so every gate silently OPENS.
+Invoke-Probe -Name '8 duration on a string' -File $SCHEMA `
+  -From 'if (type !== "integer" && type !== "number") {' `
+  -To 'if (false) {' `
+  -Suite $CREATE -ExpectTest 'refuses a duration format on a field that is not a number'
+
+# 9. Two clocks are admitted, so which one is reserved depends on property order.
+Invoke-Probe -Name '9 two clocks admitted' -File $SCHEMA `
+  -From 'if (duplicateFormats.length > 0) {' `
+  -To 'if (false) {' `
+  -Suite $CREATE -ExpectTest 'refuses two fields claiming to be the same clock'
+
+Write-Host '=== The duration control ===' -ForegroundColor Cyan
+
+# 10. The control is keyed on the field NAME. It works, for exactly one title, and quietly makes
+#     this Circuit Sprint's control rather than the platform's - the one failure mode of the
+#     no-developer-needed claim.
+Invoke-Probe -Name '10 keyed on a field name' -File $FIELDS `
+  -From 'if (field.format === "duration-seconds") {' `
+  -To 'if (field.name === "durationSeconds") {' `
+  -Suite $CLOCK -ExpectTest 'keys the control on the declared format, never on a field name'
+
+# 11. The presets stop being filtered against the title's range, so an operator picks an hour on
+#     a title that allows five minutes; the game clamps it, and the contest reserves a length
+#     nobody chose.
+Invoke-Probe -Name '11 presets not filtered' -File $FIELDS `
+  -From 'return seconds >= min && (max === undefined || seconds <= max);' `
+  -To 'return true;' `
+  -Suite $CLOCK -ExpectTest 'filters the list against the title'
+
+# 12. The no-presets fallback goes. A title allowing at most 45 seconds gets a dropdown with
+#     nothing in it - a control that appears to work and offers nothing.
+Invoke-Probe -Name '12 no number-box fallback' -File $FIELDS `
+  -From 'if (presets.length === 0) {' `
+  -To 'if (false) {' `
+  -Suite $CLOCK -ExpectTest 'keeps a plain number box when no preset can fit'
+
+# 13. Opening Custom writes a value. An operator who looks and changes their mind has silently
+#     edited the contest.
+Invoke-Probe -Name '13 Custom edits the value' -File $FIELDS `
+  -From @'
+          if (next === CUSTOM) {
+'@ `
+  -To @'
+          if (false) {
+'@ `
+  -Suite $CLOCK -ExpectTest 'does not change the stored value merely because Custom was opened'
+
+# 14. Minutes reach the wire. The value then disagrees with the schema's own minimum and
+#     maximum, so validation rejects a legal choice.
+Invoke-Probe -Name '14 stores minutes' -File $FIELDS `
+  -From 'onChange(Number(next) * 60);' `
+  -To 'onChange(Number(next));' `
+  -Suite $CLOCK -ExpectTest 'stores seconds, so the game receives what its own schema declares'
+
+Write-Host '=== The derived result grace period ===' -ForegroundColor Cyan
+
+# 15. The derivation goes and the fixed 900 is sent. Every contest with more than ten minutes of
+#     play is then REFUSED by the pre-flight, naming a field no screen offers.
+Invoke-Probe -Name '15 grace not derived' -File $DRAFT `
+  -From @'
+  return Math.max(
+    draft.resultGracePeriodSeconds,
+'@ `
+  -To @'
+  return Math.min(
+    draft.resultGracePeriodSeconds,
+'@ `
+  -Suite $CLOCK -ExpectTest 'raises the floor to cover the chosen playing time'
+
+# 16. The derivation carries its own margin. Two margins is "one rule, two copies" in its most
+#     silent form: the wizard derives a number the server then refuses.
+Invoke-Probe -Name '16 grace has its own margin' -File $DRAFT `
+  -From 'import { RESULT_GRACE_MARGIN_SECONDS } from "@/lib/services/games/contest-preflight";' `
+  -To 'const RESULT_GRACE_MARGIN_SECONDS = 120;' `
+  -Suite $CLOCK -ExpectTest 'uses the SAME margin the pre-flight then demands'
+
+# 17. The edit payload forgets it. The two screens then disagree about whether a twenty-minute
+#     contest can be saved at all - creation works, editing refuses.
+Invoke-Probe -Name '17 edit payload forgets it' -File $DRAFT `
+  -From @'
+    resultGracePeriodSeconds: deriveResultGraceSeconds(
+      draft,
+      resolveAttemptSeconds(
+        options.schemaFields ?? [],
+'@ `
+  -To @'
+    resultGracePeriodSeconds: draft.resultGracePeriodSeconds,
+    unusedGrace: deriveResultGraceSeconds(
+      draft,
+      resolveAttemptSeconds(
+        options.schemaFields ?? [],
+'@ `
+  -Suite $CLOCK -ExpectTest 'is applied by the payload builders, so no caller can forget'
+
+Write-Host '=== The wizard blocks a contest nobody could start ===' -ForegroundColor Cyan
+
+# 18. The block becomes a warning again. The amber caution was already there and an operator
+#     could read it, agree and click Next; the contest then saves, publishes, sells seats and
+#     refuses every one of them.
+Invoke-Probe -Name '18 block removed' -File $WIZARD `
+  -From 'if (fit?.windowTooShort && fit.reservesFullRound) {' `
+  -To 'if (false) {' `
+  -Suite $CLOCK -ExpectTest 'blocks the schedule step, naming both durations'
+
+# 19. The message stops naming the playing time, so the operator is told the contest is too
+#     short and left to guess which of two fields three steps apart to change.
+Invoke-Probe -Name '19 message omits the play time' -File $WIZARD `
+  -From @'
+        return `Play is set to ${describeDurationSeconds(
+          fit.reservedSeconds,
+        )} but the contest only runs for ${describeDurationSeconds(
+'@ `
+  -To @'
+        return `This contest is too short: ${describeDurationSeconds(
+'@ `
+  -Suite $CLOCK -ExpectTest 'blocks the schedule step, naming both durations'
+
+Write-Host '=== The note stops contradicting the operator ===' -ForegroundColor Cyan
+
+# 20. The note goes back to the ceiling wording, in copy the operator actually reads. This is
+#     the sentence that made the original defect unreportable: it AGREED with the gate, so both
+#     were wrong together and the screen confirmed the refusal was correct.
 #
-# RE-AIMED 7 SEP 2026. The `!resuming` guard moved onto `fullRoundNoLongerFits` when the start
-# policy split the two facts apart; aimed at the old name this reported DID NOT APPLY, which
-# reads exactly like a broken harness rather than a moved guard.
-Probe -Name 'the gate fires on a resume as well as a fresh launch' `
-  -File $PREFLIGHT `
-  -Find '  const fullRoundNoLongerFits =
-    !resuming &&' `
-  -Replace '  const fullRoundNoLongerFits =
-    true &&' `
-  -ExpectRed 'blocks Play when a round can no longer finish inside the window'
+#     Aimed at the JSX rather than at a comment on purpose - `readCode` strips comments, so a
+#     probe that edits the prose explaining the mistake changes nothing the test can see and
+#     reports GREEN.
+Invoke-Probe -Name '20 note names the ceiling' -File $NOTE `
+  -From 'Shorten the playing time,' `
+  -To 'Shorten the longest possible round,' `
+  -Suite $CLOCK -ExpectTest 'separates the game'
 
-Probe -Name 'the gate no longer reaches the disabled state' `
-  -File $PREFLIGHT `
-  -Find '    tooLateToStart ||
-    exhausted;' `
-  -Replace '    exhausted;' `
-  -ExpectRed 'blocks Play when a round can no longer finish inside the window'
-
-# The report was a precise UTC timestamp asking the player to subtract two times in their head,
-# one of them in a zone they do not live in.
-Probe -Name 'the closing countdown reverts to a bare timestamp' `
-  -File $PREFLIGHT `
-  -Find '                {formatRemaining(windowEndMs - now)}' `
-  -Replace '                {new Date(windowEndMs).toUTCString()}' `
-  -ExpectRed 'shows a countdown beside the absolute time'
-
-Write-Host "`n=== the auto-refresh ===" -ForegroundColor Cyan
-
-Probe -Name 'the pre-flight refresh interval is removed' `
-  -File $HOST_FILE `
-  -Find '    }, PREFLIGHT_REFRESH_MS);' `
-  -Replace '    }, 0); clearInterval(timer);' `
-  -ExpectRed 'refreshes the pre-flight for the facts a clock cannot know'
-
-# Unscoped it runs during `confirming` too, racing the result poll against the same endpoint.
-Probe -Name 'the refresh is no longer scoped to the pre-flight' `
-  -File $HOST_FILE `
-  -Find '    if (phase.name !== "preflight") return;' `
-  -Replace '    if (false) return;' `
-  -ExpectRed 'refreshes the pre-flight for the facts a clock cannot know'
-
-Write-Host "`n=== the lobby ===" -ForegroundColor Cyan
-
-# The hero's countdown has been there all along, so a bare `<InlineCountdown` match is green on
-# the bug. This probe is what proves the test counts them.
-# Note the 22-space indent: the hero's copy sits at 18, so this pattern cannot match it. That
-# is deliberate - the first-match replacement would otherwise hit the wrong one and the probe
-# would report on a guard it never touched.
-Probe -Name "the joined player's countdown is removed, leaving only the hero's" `
-  -File $LOBBY `
-  -Find '                      <InlineCountdown
-                        targetDate={new Date(countdownTarget).toISOString()}
-                        type={isActive ? "end" : "start"}
-                      />' `
-  -Replace '                      new Date(countdownTarget).toUTCString()' `
-  -ExpectRed 'counts down in the play-window panel'
-
-# RE-AIMED 7 SEP 2026: the note became policy-aware, so the sentence this used to replace no
-# longer exists verbatim. The claim under test is unchanged - a false player-facing caution is
-# worse than none.
-Probe -Name 'the false play-window note comes back' `
-  -File $LOBBY `
-  -Find '                Every player gets the same window.{" "}' `
-  -Replace '                The play window can be narrower than the competition itself.{" "}' `
-  -ExpectRed 'no longer tells players the play window can be narrower'
-
-Write-Host "`n=== the round-start policy ===" -ForegroundColor Cyan
-
-# The gate left unconditional, which is the defect the owner reported: a contest shorter than
-# the catalogue ceiling withholding Play from the moment it opened.
-# RE-AIMED 7 SEP 2026: the comparison moved into `round-window.ts`, so the pre-flight now asks
-# rather than deciding. Same claim, one indirection along.
-Probe -Name 'the policy is ignored and every contest reserves a full round' `
-  -File $PREFLIGHT `
-  -Find '  const reservesFullRound = contestReservesFullRound(state.roundStartPolicy);' `
-  -Replace '  const reservesFullRound = true;' `
-  -ExpectRed 'offers a shortened round instead of refusing, when the contest allows it'
-
-# The disclosure dropped. This is the one that makes the permissive branch indefensible rather
-# than merely untidy: an attempt is consumed on creation and cannot be handed back, so a player
-# who is not told spends their only attempt on a game they could never finish.
-Probe -Name 'the player is not told the round will be shortened' `
-  -File $PREFLIGHT `
-  -Find '    fullRoundNoLongerFits && !reservesFullRound && windowEndMs !== null
-      ? windowEndMs - now
-      : null;' `
-  -Replace '    null;' `
-  -ExpectRed 'tells the player how long they will actually get'
-
-# It reaches the paragraph but not the button - the plausible half-fix, and the button is the
-# thing being pressed by somebody who skimmed the paragraph.
-Probe -Name 'the shortening never reaches the button label' `
-  -File $PREFLIGHT `
-  -Find '                      shortenedMs !== null
-                      ? "Play a shortened round"' `
-  -Replace '                      false
-                      ? "Play a shortened round"' `
-  -ExpectRed 'tells the player how long they will actually get'
-
-# Read straight off the contest document rather than the normalised config, so a bad stored
-# value offers a button `round.service.ts` refuses.
-Probe -Name 'the policy is read off the contest instead of the normalised config' `
-  -File 'lib/services/games/round-status.service.ts' `
-  -Find '          config.config.roundStartPolicy ?? "reserve_full_round",' `
-  -Replace '          contest.roundStartPolicy ?? "reserve_full_round",' `
-  -ExpectRed "takes the policy from the server's normalised config"
-
-# The client's own copy of PlayState losing the field, which the compiler would catch in the
-# component but not in the two field lists agreeing with each other.
-Probe -Name "the client's PlayState drops the policy" `
-  -File 'components/games/play-state.ts' `
-  -Find '  roundStartPolicy: "reserve_full_round" | "until_window_closes";' `
-  -Replace '  roundStartPolicyName?: string;' `
-  -ExpectRed "is a field on the client's own PlayState"
-
-Write-Host "`n=== the last moment to start, shared by two screens ===" -ForegroundColor Cyan
-
-$WINDOW = 'components/games/round-window.ts'
-
-# The arithmetic wrong in the direction that looks safe: reserving nothing means Play stays
-# offered right up to the close, and the server then refuses the click.
-Probe -Name 'the cut-off no longer subtracts the round length' `
-  -File $WINDOW `
-  -Find '  return playWindowEndMs - maxRoundSeconds * 1000;' `
-  -Replace '  return playWindowEndMs;' `
-  -ExpectRed 'computes the cut-off in one place, and does not know the policy'
-
-# The tempting simplification: fold the policy in and return null for the permissive case. It is
-# exactly when the play screen still needs the figure, in order to say how much time is left.
-Probe -Name 'the producer learns the policy and answers null for the permissive case' `
-  -File $WINDOW `
-  -Find '  return roundStartPolicy !== "until_window_closes";' `
-  -Replace '  return true;' `
-  -ExpectRed 'computes the cut-off in one place, and does not know the policy'
-
-# An absent duration must produce no cut-off rather than a guessed one. Treating it as zero
-# gives every contest a cut-off equal to its close, which reads correct and disables nothing.
-Probe -Name 'an unknown round length is guessed at rather than declined' `
-  -File $WINDOW `
-  -Find '  if (typeof maxRoundSeconds !== "number" || !Number.isFinite(maxRoundSeconds)) {
-    return null;
-  }' `
-  -Replace '  if (typeof maxRoundSeconds !== "number") {
-    maxRoundSeconds = 0;
-  }' `
-  -ExpectRed 'produces no cut-off when the round length is unknown'
-
-# The negative half of the extraction: the screen imports the producer and then does the
-# subtraction itself anyway, which is exactly what the pre-flight did before the extraction.
-Probe -Name 'the pre-flight recomputes the cut-off beside the shared one' `
-  -File $PREFLIGHT `
-  -Find '  const cutoffMs = fullRoundCutoffMs(windowEndMs, state.maxRoundSeconds);' `
-  -Replace '  const cutoffMs =
-    windowEndMs !== null && roundNeedsMs !== null ? windowEndMs - roundNeedsMs : null;' `
-  -ExpectRed 'is read by both screens and recomputed by neither'
-
-Write-Host "`n=== the lobby's second clock ===" -ForegroundColor Cyan
-
-# The row shown regardless of policy, so a permissive contest is given a deadline it does not
-# have and a player leaves believing they have missed it.
-Probe -Name "the last-attempt row ignores the contest's policy" `
-  -File $LOBBY `
-  -Find '                {isActive &&
-                  reservesFullRound &&' `
-  -Replace '                {isActive &&
-                  true &&' `
-  -ExpectRed 'shows the lobby countdown only where a cut-off really exists'
-
-# "Ended" instead of "Passed". The contest has NOT ended - only the chance to open a new round
-# has, and a player already inside a round may still finish it.
-Probe -Name 'the passed cut-off tells the player the contest has ended' `
-  -File $LOBBY `
-  -Find '                          zeroLabel="Passed"' `
-  -Replace '                          zeroLabel="Ended"' `
-  -ExpectRed 'shows the lobby countdown only where a cut-off really exists'
-
-# The note stating the permissive consequence under BOTH policies. Under `reserve_full_round` a
-# round cannot still be running at the close, so it promises an impossibility and a player
-# concludes they may start whenever they like.
-Probe -Name 'the play-window note says the same thing under either policy' `
-  -File $LOBBY `
-  -Find '                {reservesFullRound
-                  ? "An attempt has to begin early enough to finish inside it, so the last one starts before the window shuts."
-                  : "You can start an attempt at any time until it shuts, and anything still running then is closed with the competition and scored on what you managed."}' `
-  -Replace '                {"You can start an attempt at any time until it shuts, and anything still running then is closed with the competition and scored on what you managed."}' `
-  -ExpectRed 'tells a joined player what happens to a round still running at the close'
-
-Write-Host "`n=== how long is left to join ===" -ForegroundColor Cyan
-
-$ENTRY = 'components/trading/CompetitionEntryButton.tsx'
-
-# The deadline recomputed in the component. Identical today, and the clamp against `startTime`
-# is what keeps the legacy documents joinable - a copy that forgets it tells those players entry
-# closed before it opened, while the button stays open.
-Probe -Name 'the entry deadline is recomputed instead of shared' `
-  -File $ENTRY `
-  -Find '  const entryDeadline = resolveRegistrationDeadline(competition);' `
-  -Replace '  const entryDeadline = competition.registrationDeadline
-    ? new Date(competition.registrationDeadline)
-    : null;' `
-  -ExpectRed 'counts down to the same instant the gate compares against'
-
-# The countdown shown to somebody already through the door, beside the red panel saying entry
-# has closed - two statements about the same fact, contradicting each other.
-Probe -Name 'the countdown is shown after the door has already shut' `
-  -File $ENTRY `
-  -Find '    !isUserIn && !registrationClosed && (isActive || isUpcoming);' `
-  -Replace '    !isUserIn;' `
-  -ExpectRed 'is withheld from someone who has already joined or already missed it'
-
-# A deadline-free contest silently given no sentence at all. A player who saw a countdown on
-# another competition then assumes this one hides a deadline too.
-Probe -Name 'a contest with no deadline says nothing rather than saying so' `
-  -File $ENTRY `
-  -Find '                  Entry stays open for as long as this competition is running.' `
-  -Replace '                  {null}' `
-  -ExpectRed 'says something different when no deadline is set, rather than nothing'
-
-# `zeroLabel` dropped, so the countdown reaches zero and reads "Ended" - and this page is
-# server-rendered, so an open tab cannot learn that `registrationClosed` has flipped.
-Probe -Name 'the passed entry deadline reverts to the default wording' `
-  -File $ENTRY `
-  -Find '                    zeroLabel="Closed"' `
-  -Replace '                    className=""' `
-  -ExpectRed 'names the moment as well as the remaining time'
-
-# The absolute time removed, leaving a countdown a player cannot write down.
-Probe -Name 'the entry deadline loses its absolute time' `
-  -File $ENTRY `
-  -Find '                    ({entryDeadline.toUTCString()})' `
-  -Replace '                    ()' `
-  -ExpectRed 'names the moment as well as the remaining time'
-
-# The shared component's default wording changed for every existing caller, which is how an
-# additive prop stops being additive.
-Probe -Name "InlineCountdown's default zero wording is changed for everyone" `
-  -File 'components/trading/InlineCountdown.tsx' `
-  -Find '        setCountdown(zeroLabel ?? (type === "start" ? "Started" : "Ended"));' `
-  -Replace '        setCountdown(zeroLabel ?? "Closed");' `
-  -ExpectRed "keeps the countdown component's default wording for every existing caller"
-
-# The prop left out of the effect's dependencies, so the first render's word sticks.
-Probe -Name 'the zero label is not a dependency of the ticking effect' `
-  -File 'components/trading/InlineCountdown.tsx' `
-  -Find '  }, [targetDate, type, zeroLabel]);' `
-  -Replace '  }, [targetDate, type]);' `
-  -ExpectRed "keeps the countdown component's default wording for every existing caller"
-
-# `null` replaced by a substituted `startTime`, which silently gives every deadline-free contest
-# a door - and `isRegistrationClosed` would then close it.
-Probe -Name 'an absent deadline is substituted with the start time' `
-  -File 'lib/utils/registration-deadline.ts' `
-  -Find '  if (!contest.registrationDeadline) return null;' `
-  -Replace '  if (!contest.registrationDeadline) {
-    return contest.startTime ? new Date(contest.startTime) : null;
-  }' `
-  -ExpectRed 'resolves the deadline as a shared instant, with the clamp intact'
-
-Write-Host "`n=== done ===`n" -ForegroundColor Cyan
+Write-Host '=== Done ===' -ForegroundColor Cyan

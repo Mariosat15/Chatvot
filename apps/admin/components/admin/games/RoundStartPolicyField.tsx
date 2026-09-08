@@ -26,9 +26,15 @@ import {
  * competition" beside a countdown showing minutes remaining. The owner reported exactly that,
  * and it is not a wording problem.
  *
+ * THAT ARITHMETIC WAS FIXED ON 8 SEPTEMBER 2026 and the control stayed, which is the part
+ * worth understanding. The gate now reserves the playing time the operator chose rather than
+ * a catalogue ceiling, so reserving is once again a reasonable default and is once again the
+ * default. What remains genuinely optional is the trade the two policies make: equal playing
+ * time for everybody, or entry right up to the final whistle. A contest too short to fit one
+ * full session can only have the second.
+ *
  * `RoundStartPolicy` in `round-types.ts` carries the full reasoning, including why the
- * fairness argument the old rule rested on no longer holds now that partial performance is
- * what wins a contest.
+ * fairness argument the old rule rested on was suspended and then restored.
  *
  * ONE COMPONENT SHARED BY THE WIZARD AND THE EDITOR, and the option ids and consequence
  * sentences come from `round-types.ts` - which the gate in `round.service.ts` reads too, so
@@ -78,18 +84,24 @@ export function RoundStartPolicyField({
 
       {/*
         Stated on the reserving branch only, because it is the branch that surprises people.
-        An operator picks it expecting "no unfair short rounds" and gets a contest that can
-        refuse play for its entire duration - which reads as the platform being broken, not as
-        the setting doing what it says.
+        An operator picks it expecting "no unfair short rounds" and does not expect entry to
+        close before the contest does.
+
+        IT NO LONGER CLAIMS THE RESERVE IS A HIDDEN CATALOGUE MAXIMUM, which it said until the
+        gate was fixed on 8 September 2026. That sentence was true of the defect and is now
+        false, and a caution that has become false is worse than none - an operator who reads
+        it goes looking for a number that is not on any screen. The consequence it existed to
+        warn about is real and stayed: reserving closes entry early, and a contest shorter
+        than one session admits nobody.
       */}
       {value === "reserve_full_round" && (
         <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
           <p className="text-xs text-amber-200/90">
-            The reserved time is this game&apos;s{" "}
-            <strong>longest possible round</strong>, taken from the catalogue &mdash; not
-            the length you set in the game&apos;s own settings. If the contest is shorter
-            than that maximum, nobody will be able to start a round at any point.
+            Entry to play closes <strong>one full playing time</strong> before the contest
+            ends, so a player arriving after that cannot take part even though the contest
+            is still running. The contest must be longer than one playing time or nobody can
+            start at all.
           </p>
         </div>
       )}

@@ -9,6 +9,7 @@ import GameRound, {
 import ProviderGame from "@/database/models/games/provider-game.model";
 import { attemptsPermitted } from "./round.service";
 import { contestRoundConfig, isProviderContest } from "./contest-config";
+import { resolveAttemptSecondsFromSchema } from "./config-schema";
 import type { ProviderContestFields } from "./contest-config";
 
 /**
@@ -78,18 +79,24 @@ export interface PlayState {
    */
   serverNow: string;
   /**
-   * The longest a single round of this title may run, from the catalogue row.
+   * How long one attempt in THIS contest runs for.
    *
-   * Sent so the pre-flight can refuse BEFORE the click. `createRound` will not start a round
-   * that cannot finish inside the play window (`now + maxDurationSeconds <= playWindowEnd`) -
-   * correct, because a round cut short would be scored on a partial game - but the player used
-   * to discover it by pressing Play and getting a red box. The button now disables itself with
-   * the reason, and a countdown says how long is left before it will.
+   * Sent so the pre-flight can refuse BEFORE the click. `createRound` will not start an
+   * attempt the contest end would cut short, but the player used to discover that by pressing
+   * Play and getting a red box. The button now disables itself with the reason, and a
+   * countdown says how long is left before it will.
    *
-   * Absent when the catalogue row cannot be found, in which case the pre-flight applies no
-   * such gate and the server's refusal is still the authority. Reason it is not defaulted to
-   * the round service's 300s fallback: a guess that disables the button is worse than no gate,
-   * because the server's refusal at least names the real reason.
+   * IT IS THE CONFIGURED LENGTH, NOT THE CATALOGUE CEILING, since 8 September 2026. The name
+   * is still accurate - it is the longest an attempt here can run - but it is now this
+   * contest's number rather than the title's. Reading the ceiling meant a player was told the
+   * door closed an hour before the end of a contest whose attempts last ten minutes, and the
+   * server, which reads the same resolved value, would have disagreed with the screen.
+   *
+   * Absent when the catalogue row cannot be found AND the title declares no play clock, in
+   * which case the pre-flight applies no such gate and the server's refusal is still the
+   * authority. Reason it is not defaulted to the round service's 300s fallback: a guess that
+   * disables the button is worse than no gate, because the server's refusal at least names
+   * the real reason.
    */
   maxRoundSeconds?: number;
   /**
@@ -286,8 +293,19 @@ export async function getPlayState(
       providerKey: config.providerKey,
       gameCode: config.gameCode,
     })
-      .select("maxDurationSeconds")
-      .lean<{ maxDurationSeconds?: number } | null>();
+      .select("maxDurationSeconds configSchema")
+      .lean<{ maxDurationSeconds?: number; configSchema?: unknown } | null>();
+
+    // The length an attempt in THIS contest runs for, which is what the pre-flight has to
+    // count down to. Resolved from the setting the title declared as its play clock, falling
+    // back to the catalogue ceiling exactly as the launch service does - and it must come from
+    // the same function, or the button the player sees and the gate the server applies can
+    // disagree about when the last attempt may start.
+    const attemptSeconds = resolveAttemptSecondsFromSchema(
+      title?.configSchema,
+      config.config.settings,
+      title?.maxDurationSeconds,
+    );
 
     return {
       success: true,
@@ -296,10 +314,7 @@ export async function getPlayState(
         // Read here rather than at the top of the function so it is as close as possible to
         // the moment the payload leaves - the client treats the gap as clock skew.
         serverNow: new Date().toISOString(),
-        maxRoundSeconds:
-          typeof title?.maxDurationSeconds === "number"
-            ? title.maxDurationSeconds
-            : undefined,
+        maxRoundSeconds: attemptSeconds,
         // From the normalised config, never from `contest.roundStartPolicy` directly, so the
         // screen and the gate cannot resolve an unrecognised stored value differently.
         roundStartPolicy:

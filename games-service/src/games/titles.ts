@@ -16,6 +16,27 @@
  * and needs no code - because the second title reaches the platform through the same catalogue
  * response as the first.
  *
+ * CIRCUIT PERFECT IS RETIRED (owner, 8 September 2026) AND THAT COSTS US THE PARAGRAPH ABOVE
+ * ------------------------------------------------------------------------------------------
+ * The owner asked for one shape of game: unlimited boards inside one clock, scored on how many
+ * you solve and how fast you solve each one. That is Sprint exactly. Perfect is the opposite
+ * shape - a fixed set of boards, scored on total time, lowest wins - so it was retired rather
+ * than reshaped, because reshaping it would have produced a second Sprint differing only by
+ * grid size.
+ *
+ * It is `deprecated`, NOT deleted, and the distinction is the same one the platform applies to
+ * a provider it stops using: `gameKey` is the join key for every stat a title ever produced, so
+ * a removed row orphans history while every screen still renders a key it cannot resolve. The
+ * platform's contest pre-flight refuses a non-`active` title, so no new contest can be created
+ * on it, while rounds already played still read and score correctly. Its engine, config and
+ * scoring stay exactly where they are.
+ *
+ * THE CONSEQUENCE TO KEEP VISIBLE: nothing in the live catalogue is `lower_is_better` any more,
+ * so the ranking path the specification warns loudest about is no longer exercised by a real
+ * title. It is held by unit tests over `scoreRound` and by the platform's own direction
+ * resolver - which is weaker than a game somebody plays, and is the price of the decision
+ * rather than an oversight.
+ *
  * ONLY `en` IS DECLARED, DELIBERATELY
  * -----------------------------------
  * The specification requires that "text fields above must exist in every locale you declare",
@@ -83,6 +104,29 @@ export function shapeFor(size: GridSize): PuzzleShape {
 export const SPRINT_CODE = "circuit-sprint";
 export const PERFECT_CODE = "circuit-perfect";
 
+/**
+ * How long a Sprint session may be set to, in seconds.
+ *
+ * ONE DECLARATION, TWO READERS, AND THAT IS THE POINT. These bounds appear in the title's
+ * `configSchema`, which the platform validates an operator's answer against, and again in
+ * `resolveConfig`, which clamps whatever actually arrives. They used to be six literals in two
+ * places. Two copies of one range is the failure shape this codebase has hit repeatedly: the
+ * platform would accept a value its own form offered and this service would silently clamp it
+ * to something else, so an operator's 45 minutes would run for 5 and the contest would still
+ * report success.
+ *
+ * THE CEILING IS AN HOUR (owner, 8 September 2026), up from five minutes. The owner's example
+ * was a ten-minute session, which the old 60-300 range could not express at all. `maximum`
+ * here and `maxDurationSeconds` on the title must agree - the specification requires that a
+ * round be impossible to extend beyond the declared maximum, so a schema permitting more than
+ * the title admits is a promise this service would then break.
+ */
+export const SPRINT_DURATION = {
+  min: 60,
+  max: 3_600,
+  default: 600,
+} as const;
+
 /*
  * The JSON Schema subset used below is deliberately conservative: `type`, `properties`,
  * `integer`/`string`/`boolean`, `minimum`, `maximum`, `enum`, `default`, `required`. Nothing
@@ -120,20 +164,45 @@ export const SPRINT: TitleDefinition = {
   supportsContentSeed: true,
   scoreDirection: "higher_is_better",
   scoreType: "integer",
-  // Max is a generous ceiling rather than a tight one: the specification says scores outside
-  // the range are rejected, so an over-tight bound turns an exceptional player into an
-  // unresolved round.
-  scoreRange: { min: 0, max: 60_000 },
-  typicalDurationSeconds: 120,
-  maxDurationSeconds: 300,
+  /*
+    Max is a generous ceiling rather than a tight one: the specification says scores outside
+    the range are rejected, so an over-tight bound turns an exceptional player into an
+    unresolved round.
+
+    IT HAD TO GROW WITH THE CLOCK, AND THE OLD FIGURE WAS ALREADY REACHABLE. A board is worth
+    at most 1,200 points, so 60,000 is fifty boards. That was comfortably out of reach in a
+    five-minute session and is nothing in an hour - and `scoreRound` clamps rather than
+    refusing, so the failure would not have been an error. Every player past fifty boards
+    would have reported exactly 60,000, TIED at the top of the leaderboard, and the pot would
+    have been split between them by rounding rather than by skill. An hour at a brisk four
+    seconds a board is around 900 boards, so the ceiling is set well clear of any human.
+  */
+  scoreRange: { min: 0, max: 2_000_000 },
+  typicalDurationSeconds: SPRINT_DURATION.default,
+  maxDurationSeconds: SPRINT_DURATION.max,
   configSchema: {
     type: "object",
     properties: {
       durationSeconds: {
         type: "integer",
-        minimum: 60,
-        maximum: 300,
-        default: 120,
+        minimum: SPRINT_DURATION.min,
+        maximum: SPRINT_DURATION.max,
+        default: SPRINT_DURATION.default,
+        /*
+          THE PLATFORM NEEDS THIS NUMBER AND MUST NOT LEARN ITS NAME.
+
+          How long one attempt lasts decides when the last attempt of a contest may start, how
+          much result grace the contest needs, and what the operator is told about the contest
+          clock and the game clock relating. Without a declared role the platform's only
+          generic answer was `maxDurationSeconds`, the title's CEILING - so a contest set to
+          two minutes had five reserved against it and refused every attempt from the moment
+          it opened.
+
+          Declaring the role lets the platform read this field without a line of code that
+          knows the word "durationSeconds", which is what keeps a second provider's clock -
+          called whatever they call it - working with no release.
+        */
+        format: "duration-seconds",
       },
       gridSize: {
         type: "string",
@@ -206,7 +275,11 @@ export const PERFECT: TitleDefinition = {
   },
   locales: ["en"],
   platforms: ["desktop", "mobile"],
-  status: "active",
+  // Retired by the owner, 8 September 2026. `deprecated` rather than removed from `TITLES`,
+  // so history keyed on this game code still resolves and the platform's pre-flight refuses
+  // any NEW contest on it. See the note at the top of this file for the reasoning and for
+  // what retiring it costs.
+  status: "deprecated",
 };
 
 export const TITLES: TitleDefinition[] = [SPRINT, PERFECT];
@@ -281,7 +354,12 @@ export function resolveConfig(
   const corrected: string[] = [];
 
   if (title.gameCode === SPRINT_CODE) {
-    const duration = clampInteger(raw.durationSeconds, 60, 300, 120);
+    const duration = clampInteger(
+      raw.durationSeconds,
+      SPRINT_DURATION.min,
+      SPRINT_DURATION.max,
+      SPRINT_DURATION.default,
+    );
     if (duration.clamped) corrected.push("durationSeconds");
     const gridSize = asGridSize(raw.gridSize, "medium");
     if (raw.gridSize !== undefined && gridSize !== raw.gridSize) corrected.push("gridSize");

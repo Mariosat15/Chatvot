@@ -6,6 +6,9 @@
  * field goes unnoticed - it type-checks, posts, and the server reads `undefined`.
  */
 
+import type { ConfigField } from "@/lib/services/games/config-schema";
+import { resolveAttemptSeconds } from "@/lib/services/games/config-schema";
+import { RESULT_GRACE_MARGIN_SECONDS } from "@/lib/services/games/contest-preflight";
 import type {
   RoundStartPolicy,
   UnscoredContestPolicy,
@@ -78,11 +81,16 @@ export const emptyDraft: ContestDraft = {
   // `unclaimed_pool` so documents written before the field existed settle the way they always
   // did; a new contest an operator is creating today gets the owner's preferred answer.
   unscoredContestPolicy: "refund_entry_fees",
-  // Also NOT the schema default, and for the same reason as the line above: stored contests
-  // keep `reserve_full_round`, while a contest an operator starts today gets the behaviour the
-  // owner asked for - a player may start whenever, and a late round is shortened rather than
-  // refused. `RoundStartPolicy` in round-types.ts carries why the rule changed.
-  roundStartPolicy: "until_window_closes",
+  // Reason: the owner's answer, 8 September 2026, and it AGREES with the schema default -
+  // unlike the line above, these two are deliberately the same. Every player gets the same
+  // playing time or does not start at all, which is only fair once the playing time is the
+  // operator's own choice rather than a catalogue ceiling nobody set. The wizard used to
+  // default to `until_window_closes`, which was the right answer while the gate reserved a
+  // ceiling that could be five times the configured length; that arithmetic is fixed, so the
+  // reservation now costs a player only the time they were actually going to be given.
+  roundStartPolicy: "reserve_full_round",
+  // A floor, not the value sent. `deriveResultGraceSeconds` raises it to cover the playing
+  // time the operator chooses; this covers a ten-minute session, which is the default.
   resultGracePeriodSeconds: 900,
   perRoundCostAcknowledged: false,
   // Default on, per the owner: the common case is a contest meant to go live, and leaving it
@@ -90,7 +98,47 @@ export const emptyDraft: ContestDraft = {
   publishOnSave: true,
 };
 
-export function toRequestBody(draft: ContestDraft): Record<string, unknown> {
+/**
+ * How long the contest keeps accepting a late result, derived rather than asked for.
+ *
+ * NOBODY HAS A BASIS FOR CHOOSING THIS, which is why no screen offers it and why the draft's
+ * value is a floor rather than an answer. It has to cover the longest attempt the contest can
+ * produce plus a margin, or a round started at the last moment is cut off before its result
+ * can arrive - and `contest-preflight.ts` refuses a contest whose grace is short. Since the
+ * playing time is now an operator choice that can run to an hour, a fixed 900 seconds would
+ * have refused every contest with a playing time above ten minutes, naming a field the
+ * operator cannot see.
+ *
+ * IT ONLY EVER RAISES. A stored contest whose operator deliberately allowed longer keeps it;
+ * lowering a grace period retroactively is how a result that was going to be counted stops
+ * being counted.
+ */
+export function deriveResultGraceSeconds(
+  draft: ContestDraft,
+  attemptSeconds: number | undefined,
+): number {
+  if (attemptSeconds === undefined) return draft.resultGracePeriodSeconds;
+  return Math.max(
+    draft.resultGracePeriodSeconds,
+    attemptSeconds + RESULT_GRACE_MARGIN_SECONDS,
+  );
+}
+
+/**
+ * The facts about the chosen title that the request body cannot be built without.
+ *
+ * Passed in rather than read from the draft because they belong to the CATALOGUE, not to the
+ * operator's answers - the same reason `maxDurationSeconds` never became a draft field.
+ */
+export interface DraftTitleFacts {
+  schemaFields?: ConfigField[];
+  maxDurationSeconds?: number;
+}
+
+export function toRequestBody(
+  draft: ContestDraft,
+  title: DraftTitleFacts = {},
+): Record<string, unknown> {
   return {
     name: draft.name,
     description: draft.description,
@@ -112,7 +160,14 @@ export function toRequestBody(draft: ContestDraft): Record<string, unknown> {
     unresolvedRoundPolicy: draft.unresolvedRoundPolicy,
     unscoredContestPolicy: draft.unscoredContestPolicy,
     roundStartPolicy: draft.roundStartPolicy,
-    resultGracePeriodSeconds: draft.resultGracePeriodSeconds,
+    resultGracePeriodSeconds: deriveResultGraceSeconds(
+      draft,
+      resolveAttemptSeconds(
+        title.schemaFields ?? [],
+        draft.settings,
+        title.maxDurationSeconds,
+      ),
+    ),
     perRoundCostAcknowledged: draft.perRoundCostAcknowledged,
   };
 }
@@ -142,32 +197,39 @@ function deriveWindow(draft: ContestDraft): Record<string, string> {
 }
 
 /**
- * How the contest clock and the game's own round length relate - the one fact neither screen
- * used to state, and the reason the owner reported the sprint duration as confusing.
+ * How the contest clock and the game's playing time relate - the one fact neither screen used
+ * to state, and the reason the owner reported the sprint duration as confusing.
  *
- * THE OPERATOR MEETS TWO NUMBERS THAT BOTH LOOK LIKE "HOW LONG" AND A THIRD THEY NEVER SEE.
- * The game's settings step offers whatever the title's `configSchema` declares - for Circuit
- * Sprint that is `durationSeconds`, 60 to 300 - which is how long ONE attempt lasts and is
- * passed straight to the game. The timing step sets the contest's own start and end. Neither
- * mentions the other, and the gate that actually decides when an attempt may start reads
- * `maxDurationSeconds` from the CATALOGUE, which appears on no form.
+ * THE OPERATOR MEETS TWO NUMBERS THAT BOTH LOOK LIKE "HOW LONG". The game's settings step
+ * offers whatever the title's `configSchema` declares, one of which the title marks as its
+ * play clock - how long ONE attempt lasts. The timing step sets the contest's own start and
+ * end. Neither used to mention the other.
  *
- * That third number is not a bug and must not be "fixed" into the configured one. Chapter 03
- * section 1.2 specifies `now + maxDurationSeconds <= playWindowEnd`, deliberately the title's
- * ceiling rather than this contest's setting, so the platform can never admit an attempt that
- * the contest end would cut short - it fails closed, refusing slightly more than strictly
- * necessary. `round.service.ts` implements it and `contest-preflight.ts` checks it.
+ * IT USED TO READ A THIRD NUMBER THE OPERATOR NEVER SAW, and that was the defect rather than
+ * a subtlety. The gate reserved `maxDurationSeconds` from the CATALOGUE - the title's ceiling,
+ * which appears on no form - so a contest configured for two minutes had five reserved against
+ * it and refused every attempt from the instant it opened. A long comment here used to defend
+ * that as failing closed and warn against "fixing" it; see `contest-preflight.ts` for why that
+ * argument was retired on 8 September 2026, and note it became untenable rather than merely
+ * unhelpful once Sprint's clock could be set to an hour.
  *
- * So the fix is disclosure, not arithmetic: turn the ceiling into a wall-clock moment the
- * operator can read off, which is the single sentence that makes the two clocks relate.
+ * `resolveAttemptSeconds` replaces it WITHOUT platform code learning a game's field name: the
+ * title declares which setting is its clock, and a title that declares none still falls back
+ * to the ceiling. A `switch` on game code here would break the "no developer needed for a new
+ * title" claim exactly as it would in `ConfigSchemaFields`.
  *
  * ABSENT DURATION MEANS NO STATEMENT, never a guessed one. `RoundPreflight.tsx` applies no
- * gate when the catalogue does not declare a duration, so a screen that invented a deadline
- * here would contradict the server for the one class of title where nobody knows the answer.
+ * gate when nothing declares a duration, so a screen that invented a deadline here would
+ * contradict the server for the one class of title where nobody knows the answer.
  */
 export function describeRoundFit(input: {
   startTime: string;
   endTime: string;
+  /** The title's parsed `configSchema`. Empty is fine; it just means nothing is declared. */
+  schemaFields?: ConfigField[];
+  /** The operator's answers, which is where the declared clock's value lives. */
+  settings?: Record<string, unknown>;
+  /** The catalogue ceiling, used only when the title declares no play clock. */
   maxDurationSeconds?: number;
   /**
    * Absent means `reserve_full_round`, matching the schema, so a stored contest with no
@@ -176,6 +238,7 @@ export function describeRoundFit(input: {
   roundStartPolicy?: RoundStartPolicy;
 }):
   | {
+      /** How long one attempt runs for, and therefore how much time is reserved. */
       reservedSeconds: number;
       /**
        * Present only while the contest reserves a full round. Under `until_window_closes`
@@ -193,12 +256,16 @@ export function describeRoundFit(input: {
        * shortened and the contest is legitimate.
        */
       windowTooShort: boolean;
+      /** The contest's own length, so a caller can state both sides of the comparison. */
+      windowSeconds: number;
     }
   | undefined {
-  const { maxDurationSeconds } = input;
-  if (typeof maxDurationSeconds !== "number" || !(maxDurationSeconds > 0)) {
-    return undefined;
-  }
+  const attemptSeconds = resolveAttemptSeconds(
+    input.schemaFields ?? [],
+    input.settings,
+    input.maxDurationSeconds,
+  );
+  if (attemptSeconds === undefined) return undefined;
 
   const start = new Date(input.startTime);
   const end = new Date(input.endTime);
@@ -210,13 +277,38 @@ export function describeRoundFit(input: {
   const reservesFullRound = input.roundStartPolicy !== "until_window_closes";
 
   return {
-    reservedSeconds: maxDurationSeconds,
+    reservedSeconds: attemptSeconds,
     lastAttemptStart: reservesFullRound
-      ? new Date(end.getTime() - maxDurationSeconds * 1000)
+      ? new Date(end.getTime() - attemptSeconds * 1000)
       : undefined,
     reservesFullRound,
-    windowTooShort: windowSeconds < maxDurationSeconds,
+    windowTooShort: windowSeconds < attemptSeconds,
+    windowSeconds,
   };
+}
+
+/**
+ * A duration an operator can read without doing arithmetic.
+ *
+ * The admin copy of the same helper in `contest-preflight.ts`, and deliberately a copy rather
+ * than an import: that module is mirrored into both apps and this one is a browser component's
+ * dependency. What matters is that the two agree in FORM, not that they share a function -
+ * and neither decides anything, so a divergence is cosmetic rather than a rule with two
+ * answers. Seconds are kept for anything that is not a whole number of minutes, because
+ * rounding "90 seconds" to "1 minute" in a sentence about whether something FITS would be
+ * wrong in the one direction that matters.
+ */
+export function describeDurationSeconds(seconds: number): string {
+  if (seconds < 60) return `${Math.max(0, Math.round(seconds))} seconds`;
+  if (seconds % 3600 === 0) {
+    const hours = seconds / 3600;
+    return hours === 1 ? "1 hour" : `${hours} hours`;
+  }
+  if (seconds % 60 === 0) {
+    const minutes = seconds / 60;
+    return minutes === 1 ? "1 minute" : `${minutes} minutes`;
+  }
+  return `${Math.round(seconds)} seconds`;
 }
 
 /**
@@ -234,7 +326,7 @@ export function describeRoundFit(input: {
  */
 export function toEditRequestBody(
   draft: ContestDraft,
-  options: { entered: boolean },
+  options: { entered: boolean } & DraftTitleFacts,
 ): Record<string, unknown> {
   const always: Record<string, unknown> = {
     name: draft.name,
@@ -258,7 +350,14 @@ export function toEditRequestBody(
     unresolvedRoundPolicy: draft.unresolvedRoundPolicy,
     unscoredContestPolicy: draft.unscoredContestPolicy,
     roundStartPolicy: draft.roundStartPolicy,
-    resultGracePeriodSeconds: draft.resultGracePeriodSeconds,
+    resultGracePeriodSeconds: deriveResultGraceSeconds(
+      draft,
+      resolveAttemptSeconds(
+        options.schemaFields ?? [],
+        draft.settings,
+        options.maxDurationSeconds,
+      ),
+    ),
     perRoundCostAcknowledged: draft.perRoundCostAcknowledged,
   };
 }

@@ -25,6 +25,36 @@
 
 export type ConfigFieldType = "integer" | "number" | "string" | "boolean";
 
+/**
+ * The roles a setting may declare, so the platform can understand one of a title's own
+ * settings WITHOUT knowing its name.
+ *
+ * WHY THIS KEYWORD EXISTS AT ALL. The platform has to know how long one attempt lasts. It
+ * decides when the last attempt of a contest may start, what the operator is told about the
+ * two clocks relating, and how much result grace a contest needs. Until now it used
+ * `maxDurationSeconds` from the catalogue - the title's CEILING - because the alternative was
+ * reading a setting by name, and `durationSeconds` is Circuit Sprint's name for it. A platform
+ * that reads `durationSeconds` works for one provider's titles and silently does the wrong
+ * thing for the next one, which is the whole failure mode the schema-driven form exists to
+ * avoid. A test forbids that name appearing in platform code, and it should stay forbidden.
+ *
+ * The ceiling was not a free choice either: reserving 300 seconds on a contest configured for
+ * 120 refused every attempt of any contest shorter than five minutes, from the instant it
+ * opened, while a countdown beside it said minutes remained.
+ *
+ * A DECLARED ROLE RESOLVES BOTH. The provider says which of its settings is the play clock;
+ * the platform reads that field generically, exactly as the form already branches on a field's
+ * declared TYPE rather than its name. Neither side learns the other's vocabulary.
+ *
+ * `format` is real JSON Schema rather than an invented `x-` keyword, so a provider using a
+ * standard validator is not surprised by it - but the recognised VALUES are ours, and an
+ * unrecognised one is a refusal like every other unsupported construct here. A format we
+ * silently ignored would be worse than none: the provider would believe they had told us
+ * something load-bearing.
+ */
+export const CONFIG_FIELD_FORMATS = ["duration-seconds"] as const;
+export type ConfigFieldFormat = (typeof CONFIG_FIELD_FORMATS)[number];
+
 export interface ConfigField {
   name: string;
   type: ConfigFieldType;
@@ -36,6 +66,8 @@ export interface ConfigField {
   /** Present only for string fields with an enum. Renders as a select. */
   options?: string[];
   default?: unknown;
+  /** A declared role. See `CONFIG_FIELD_FORMATS`. */
+  format?: ConfigFieldFormat;
 }
 
 export type ParseResult =
@@ -59,6 +91,7 @@ const SUPPORTED_FIELD_KEYS = new Set([
   "default",
   "title",
   "description",
+  "format",
 ]);
 
 const SUPPORTED_TYPES = new Set<string>([
@@ -169,6 +202,30 @@ export function parseConfigSchema(raw: unknown): ParseResult {
       options = rawField.enum as string[];
     }
 
+    let format: ConfigFieldFormat | undefined;
+    if (rawField.format !== undefined) {
+      if (
+        typeof rawField.format !== "string" ||
+        !CONFIG_FIELD_FORMATS.includes(rawField.format as ConfigFieldFormat)
+      ) {
+        return {
+          ok: false,
+          error: `Setting "${name}" declares an unsupported format "${String(rawField.format)}".`,
+        };
+      }
+      // Reason: every recognised format so far describes a quantity, and the platform reads
+      // the value as a number. A `duration-seconds` on a string field would parse here and
+      // then produce `NaN` at the one place that matters - the gate deciding when the last
+      // attempt may start - which fails open rather than visibly.
+      if (type !== "integer" && type !== "number") {
+        return {
+          ok: false,
+          error: `Setting "${name}" declares the format "${rawField.format}" on a ${type} field, which is not supported.`,
+        };
+      }
+      format = rawField.format as ConfigFieldFormat;
+    }
+
     const minimum = numberOrUndefined(rawField.minimum);
     const maximum = numberOrUndefined(rawField.maximum);
     if (
@@ -193,7 +250,23 @@ export function parseConfigSchema(raw: unknown): ParseResult {
       maximum,
       options,
       default: rawField.default,
+      format,
     });
+  }
+
+  // Reason: a declared role has to identify ONE field or it identifies none. Two settings
+  // both claiming to be the play clock would leave the gate picking whichever the object
+  // happened to enumerate first - a coin flip that reads as working, and that could change
+  // between titles from the same provider. Refusing puts the question back where it can be
+  // answered.
+  const duplicateFormats = CONFIG_FIELD_FORMATS.filter(
+    (candidate) => fields.filter((field) => field.format === candidate).length > 1,
+  );
+  if (duplicateFormats.length > 0) {
+    return {
+      ok: false,
+      error: `The settings schema declares more than one field with the format: ${duplicateFormats.join(", ")}.`,
+    };
   }
 
   // Reason: a name in `required` with no matching property is a provider mistake that
@@ -296,6 +369,105 @@ export function validateConfigValues(
   }
 
   return { ok: errors.length === 0, errors, values };
+}
+
+/**
+ * How long one attempt lasts, according to the settings this contest was saved with.
+ *
+ * THE ONE READER OF A GAME'S OWN SETTING, AND IT NEVER NAMES ONE. The field is found by the
+ * role the title declared (`CONFIG_FIELD_FORMATS`), so a second provider whose clock is called
+ * `timeLimit` or `sessionLength` works with no release. Callers must go through this rather
+ * than reaching into `settings` themselves, or the name leaks back into platform code one
+ * screen at a time.
+ *
+ * UNDEFINED MEANS "THIS TITLE DID NOT SAY", NEVER A GUESS. A title with no declared clock -
+ * a puzzle you finish when you finish - has no answer here, and every caller falls back to
+ * the catalogue ceiling, which is the behaviour that existed before this function did. An
+ * invented default would put a deadline in front of players that no game enforces.
+ *
+ * THE VALUE IS CLAMPED TO THE DECLARED RANGE because that is what the provider will do with
+ * it. `resolveConfig` on the game side clamps rather than refusing, deliberately, so a stored
+ * setting that fell out of range when a schema narrowed produces a SHORTER round than the
+ * number says. Reserving the unclamped figure would then hold back time the attempt never
+ * uses; reserving the clamped one matches what actually runs.
+ */
+export function resolvePlayDurationSeconds(
+  fields: ConfigField[],
+  settings: Record<string, unknown> | undefined,
+): number | undefined {
+  const field = fields.find((candidate) => candidate.format === "duration-seconds");
+  if (!field) return undefined;
+
+  const submitted =
+    settings && Object.prototype.hasOwnProperty.call(settings, field.name)
+      ? settings[field.name]
+      : undefined;
+
+  const raw =
+    submitted === undefined || submitted === null || submitted === ""
+      ? field.default
+      : submitted;
+
+  const numeric = typeof raw === "number" ? raw : Number(String(raw ?? "").trim());
+  if (!Number.isFinite(numeric) || numeric <= 0) return undefined;
+
+  const clamped = Math.min(
+    field.maximum ?? numeric,
+    Math.max(field.minimum ?? numeric, numeric),
+  );
+  return clamped > 0 ? Math.ceil(clamped) : undefined;
+}
+
+/**
+ * How long one attempt of THIS contest lasts - the single question four different screens and
+ * two gates were each answering differently.
+ *
+ * The declared play clock when the title has one, and the catalogue ceiling when it does not.
+ *
+ * THE FALLBACK DIRECTION IS THE SAFE ONE AND IS NOT ARBITRARY. The ceiling is always greater
+ * than or equal to the configured length, so falling back to it RESERVES MORE time, never
+ * less. A caller that ends up on the fallback refuses an attempt that would in fact have
+ * fitted - which someone notices and complains about - where the opposite mistake admits an
+ * attempt the contest end cuts short, and nobody notices until a player disputes a prize.
+ *
+ * IT RETURNS UNDEFINED RATHER THAN A NUMBER WHEN NEITHER IS KNOWN, and callers must keep
+ * treating that as "apply no gate". A title whose length nobody can state is not a title with
+ * a length of zero, and a zero here produces a cut-off equal to the contest end: it reads
+ * correctly on screen and gates nothing.
+ */
+export function resolveAttemptSeconds(
+  fields: ConfigField[],
+  settings: Record<string, unknown> | undefined,
+  catalogueMaxSeconds: number | undefined,
+): number | undefined {
+  const declared = resolvePlayDurationSeconds(fields, settings);
+  if (declared !== undefined) return declared;
+  return typeof catalogueMaxSeconds === "number" && catalogueMaxSeconds > 0
+    ? catalogueMaxSeconds
+    : undefined;
+}
+
+/**
+ * The same answer, from a raw `configSchema` that has not been parsed yet.
+ *
+ * A convenience for the two services that read a `provider_game` row directly and have no
+ * other use for the parsed field list. It swallows a parse failure into the fallback ON
+ * PURPOSE: an unparseable schema is already refused at contest creation, so a contest holding
+ * one is a contest that predates the schema changing - and refusing to launch a round that a
+ * player has paid for, because of a provider's later edit, is the wrong end to fail at. The
+ * fallback over-reserves, which is the visible direction.
+ */
+export function resolveAttemptSecondsFromSchema(
+  rawSchema: unknown,
+  settings: Record<string, unknown> | undefined,
+  catalogueMaxSeconds: number | undefined,
+): number | undefined {
+  const parsed = parseConfigSchema(rawSchema);
+  return resolveAttemptSeconds(
+    parsed.ok ? parsed.fields : [],
+    settings,
+    catalogueMaxSeconds,
+  );
 }
 
 function numberOrUndefined(value: unknown): number | undefined {

@@ -340,12 +340,30 @@ describe("the game wizard wears the trading wizard's chrome", () => {
     const source = code(WIZARD);
 
     expect(source).toMatch(/label="Game"/);
-    expect(source).toMatch(/label="Attempt length"/);
+    expect(source).toMatch(/label="Play time"/);
     expect(source).toMatch(/label="Prize ranks"/);
 
     for (const field of ["startingCapital", "leverage", "assetClass"]) {
       expect(wizardScreen()).not.toContain(field);
     }
+  });
+
+  it("previews the play time the operator chose, not the title's ceiling", () => {
+    /*
+      THE LABEL CHANGED BECAUSE THE VALUE DID, and asserting only the caption would pass on
+      the bug. This row read "up to 300s" off `selected.maxDurationSeconds` while the operator
+      had set two minutes - a number that appears on no other screen and that nobody chose.
+
+      Pinned as "resolves, and does not read the ceiling directly", because the ceiling is
+      still a legitimate INPUT to the resolver: a title declaring no play clock falls back to
+      it. What must not happen is the preview reaching past `resolveAttemptSeconds` for it.
+    */
+    const source = code(WIZARD);
+
+    expect(source).toMatch(/resolveAttemptSeconds\(/);
+    expect(source).toMatch(/value=\{playTime \? describeDurationSeconds\(playTime\)/);
+    expect(source).not.toMatch(/up to \$\{/);
+    expect(source).not.toMatch(/value=\{[^}]*selected\?\.maxDurationSeconds/);
   });
 
   it("has no market card, because a puzzle does not care", () => {

@@ -27,9 +27,16 @@ import {
   WizardStepRail,
   type WizardStep,
 } from "@/components/admin/wizard/WizardShell";
+import { resolveAttemptSeconds } from "@/lib/services/games/config-schema";
 import { defaultConfigValues } from "./ConfigSchemaFields";
 import type { ContestableTitle } from "./contest-types";
-import { type ContestDraft, emptyDraft, toRequestBody } from "./contest-draft";
+import {
+  type ContestDraft,
+  describeDurationSeconds,
+  describeRoundFit,
+  emptyDraft,
+  toRequestBody,
+} from "./contest-draft";
 import { StepChooseGame } from "./wizard/StepChooseGame";
 import {
   DESCRIPTION_WORD_LIMIT,
@@ -135,6 +142,24 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
     (t) => t.providerKey === draft.providerKey && t.gameCode === draft.gameCode,
   );
 
+  /**
+   * The title's schema fields and the ceiling, in the shape the payload builders want.
+   *
+   * Built once here so the pre-flight request and the create request cannot disagree about
+   * which title they are describing - the grace period is derived from it, and two call sites
+   * assembling it separately is how one of them ends up sending the ceiling.
+   */
+  const titleFacts = {
+    schemaFields: selected?.schema.ok ? selected.schema.fields : undefined,
+    maxDurationSeconds: selected?.maxDurationSeconds,
+  };
+
+  const playTime = resolveAttemptSeconds(
+    titleFacts.schemaFields ?? [],
+    draft.settings,
+    titleFacts.maxDurationSeconds,
+  );
+
   function patch(changes: Partial<ContestDraft>) {
     setDraft((current) => ({ ...current, ...changes }));
   }
@@ -162,7 +187,10 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
       const response = await fetch("/api/games/contests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "preflight", ...toRequestBody(draft) }),
+        body: JSON.stringify({
+          action: "preflight",
+          ...toRequestBody(draft, titleFacts),
+        }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -234,7 +262,10 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
       const response = await fetch("/api/games/contests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "create", ...toRequestBody(draft) }),
+        body: JSON.stringify({
+          action: "create",
+          ...toRequestBody(draft, titleFacts),
+        }),
       });
       const data = await response.json();
 
@@ -269,6 +300,37 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
     }
     if (step === STEP_SETTINGS && selected && !selected.schema.ok)
       return "This game's settings cannot be read.";
+
+    /*
+      A CONTEST NOBODY COULD START AN ATTEMPT IN IS REFUSED HERE, not only by the pre-flight.
+
+      The server refuses it either way, so this is not the guard - it is the difference between
+      finding out on the step where both numbers live and finding out two steps later, on a
+      review screen, with no field to change. The owner hit exactly the shipped version of
+      this: the contest saved, opened, and refused every round.
+
+      ONLY WHILE THE CONTEST RESERVES THE FULL PLAYING TIME. Under `until_window_closes` a
+      short contest is legitimate - every attempt is simply cut short and scored on what the
+      player managed - so blocking it would refuse a contest the platform supports.
+    */
+    if (step === STEP_SCHEDULE) {
+      const fit = describeRoundFit({
+        startTime: draft.startTime,
+        endTime: draft.endTime,
+        schemaFields: titleFacts.schemaFields,
+        settings: draft.settings,
+        maxDurationSeconds: titleFacts.maxDurationSeconds,
+        roundStartPolicy: draft.roundStartPolicy,
+      });
+      if (fit?.windowTooShort && fit.reservesFullRound) {
+        return `Play is set to ${describeDurationSeconds(
+          fit.reservedSeconds,
+        )} but the contest only runs for ${describeDurationSeconds(
+          fit.windowSeconds,
+        )}, so nobody could start an attempt.`;
+      }
+    }
+
     return null;
   }
 
@@ -367,15 +429,18 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
               label="Prize ranks"
               value={draft.prizeDistribution.length}
             />
+            {/*
+              THE CHOSEN PLAYING TIME, NOT THE CATALOGUE CEILING. This row said "up to 300s"
+              while the operator had set two minutes, because it read the title's maximum -
+              a number that appears on no other screen and that nobody chose. The preview's
+              job is to reflect the draft back, so it reads the same resolved value the gate
+              and the clock note use.
+            */}
             <WizardPreviewRow
               icon={Clock}
               iconClassName="text-blue-400"
-              label="Attempt length"
-              value={
-                selected?.maxDurationSeconds
-                  ? `up to ${selected.maxDurationSeconds}s`
-                  : "-"
-              }
+              label="Play time"
+              value={playTime ? describeDurationSeconds(playTime) : "-"}
             />
           </WizardPreview>
 
@@ -414,7 +479,7 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
           <StepSchedule
             draft={draft}
             patch={patch}
-            maxDurationSeconds={selected?.maxDurationSeconds}
+            title={selected}
             currencySymbol={currencySymbol}
           />
         )}
