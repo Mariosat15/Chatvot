@@ -80,9 +80,21 @@ const ProviderGameSchema = new Schema<IProviderGame>(
     thumbnailUrl: { type: String },
     category: { type: String },
 
-    // Capability declarations from the catalogue. These drive what contest formats the
-    // admin panel may offer, so they are required rather than defaulted - a title whose
-    // family we did not receive is a title we cannot safely schedule.
+    // Capability declarations from the catalogue.
+    //
+    // CORRECTION, 8 Sep 2026: this comment claimed `family` drives which contest formats the
+    // admin panel offers. It does not, and nothing reads it - the formats are gated by
+    // `supportsCompetition` and `supportsOneVsOne` below. `family` is validated on ingest,
+    // stored, transported and rendered as a badge on the wizard's first step, and that badge
+    // is its only use. Left required because a title arriving without it is still a title we
+    // cannot describe, and because making it optional now would be a mirrored change for no
+    // gain. The sentence is corrected in place rather than deleted, because an unverified
+    // claim of enforcement is what let `supportsContentSeed` go unread for six days beside
+    // three comments asserting it gated paid entry - see `22` s3.
+    //
+    // `family` is also NOT the axis that decides whether players must play at the same
+    // moment: it describes whether a game needs an opponent, and a race is `independent`.
+    // Open question 18 and `22` s1.
     family: {
       type: String,
       enum: ["independent", "head_to_head"],

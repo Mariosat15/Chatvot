@@ -97,6 +97,7 @@ export interface ProviderContestOption {
   maxDurationSeconds?: number;
   supportsCompetition: boolean;
   supportsOneVsOne: boolean;
+  supportsContentSeed: boolean;
   /**
    * Parsed field list, or the reason the schema is unusable.
    *
@@ -151,6 +152,7 @@ export async function listContestableTitles(): Promise<ProviderContestOption[]> 
         maxDurationSeconds: title.maxDurationSeconds,
         supportsCompetition: Boolean(title.supportsCompetition),
         supportsOneVsOne: Boolean(title.supportsOneVsOne),
+        supportsContentSeed: Boolean(title.supportsContentSeed),
         schema: parsed.ok
           ? { ok: true as const, fields: parsed.fields }
           : { ok: false as const, error: parsed.error },
@@ -218,6 +220,7 @@ export async function preflightProviderContest(
       providerStatus: title.providerStatus,
       supportsCompetition: Boolean(title.supportsCompetition),
       supportsOneVsOne: Boolean(title.supportsOneVsOne),
+      supportsContentSeed: Boolean(title.supportsContentSeed),
       maxDurationSeconds: title.maxDurationSeconds,
     },
     provider: {

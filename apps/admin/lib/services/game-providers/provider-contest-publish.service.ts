@@ -151,6 +151,7 @@ export async function publishProviderContest(
         providerStatus: title.providerStatus,
         supportsCompetition: Boolean(title.supportsCompetition),
         supportsOneVsOne: Boolean(title.supportsOneVsOne),
+        supportsContentSeed: Boolean(title.supportsContentSeed),
         maxDurationSeconds: title.maxDurationSeconds,
       },
       provider: {

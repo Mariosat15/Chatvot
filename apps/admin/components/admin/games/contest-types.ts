@@ -19,5 +19,6 @@ export interface ContestableTitle {
   maxDurationSeconds?: number;
   supportsCompetition: boolean;
   supportsOneVsOne: boolean;
+  supportsContentSeed: boolean;
   schema: { ok: true; fields: ConfigField[] } | { ok: false; error: string };
 }

@@ -55,7 +55,7 @@ export function StepChooseGame({
             key={`${title.providerKey}:${title.gameCode}`}
             type="button"
             onClick={() => onSelect(title)}
-            disabled={!title.supportsCompetition}
+            disabled={!title.supportsCompetition || !title.supportsContentSeed}
             className={`w-full text-left p-4 rounded-xl border transition ${
               isSelected
                 ? "border-yellow-500 bg-yellow-500/10 shadow-lg shadow-yellow-500/10"
@@ -111,6 +111,18 @@ export function StepChooseGame({
                   {!title.supportsCompetition && (
                     <span className="rounded-md bg-red-500/15 px-2 py-1 text-red-300">
                       Does not support competitions
+                    </span>
+                  )}
+
+                  {/*
+                    Reason: greying the row out is not enough - an operator needs to know which
+                    of the two missing capabilities to ask the provider for, and this one is
+                    unlike the other refusals on this screen in that it is a fairness rule
+                    rather than a feature. `01` s4.3.
+                  */}
+                  {!title.supportsContentSeed && (
+                    <span className="rounded-md bg-red-500/15 px-2 py-1 text-red-300">
+                      No identical content for every player
                     </span>
                   )}
                 </div>

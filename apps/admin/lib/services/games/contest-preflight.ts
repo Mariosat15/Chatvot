@@ -36,6 +36,15 @@ export interface PreflightInput {
     providerStatus: "active" | "deprecated" | "maintenance";
     supportsCompetition: boolean;
     supportsOneVsOne: boolean;
+    /**
+     * Whether the provider guarantees identical content from one seed - `01` s4.3.
+     *
+     * Reason: this is required rather than optional even though it is the newest field here.
+     * It was declared, validated on ingest, stored, transported and rendered as a badge for
+     * six days while being read by nothing, and three separate comments asserted it gated
+     * paid entry. An optional field would let a caller omit it and fail open again.
+     */
+    supportsContentSeed: boolean;
     maxDurationSeconds?: number;
   };
 
@@ -173,6 +182,25 @@ export function runPreflight(input: PreflightInput): PreflightResult {
   }
   if (input.format === "challenge" && !input.title.supportsOneVsOne) {
     errors.push(`"${input.title.displayName}" does not support one-against-one challenges.`);
+  }
+
+  // Reason: `01` s4.3 - every player in one contest must face identical content, or they are
+  // ranked against each other having faced challenges of unknown relative difficulty. That is
+  // also what preserves the skill-not-chance position the regulatory defence pack rests on:
+  // if content difficulty varies per player, the outcome stops being decided purely by skill.
+  //
+  // Deliberately not scoped to `competition`, although that is the word `01` s4.3 and the
+  // model comment both use. A challenge ranks two players against each other for money on
+  // exactly the same basis, so the reasoning does not narrow to the many-player case. Today
+  // the challenge half is a tripwire - provider challenges are E8 and unbuilt - which is why
+  // it is written as one unconditional check rather than a branch per format. Both formats
+  // this function accepts are paid; practice never reaches it.
+  if (!input.title.supportsContentSeed) {
+    errors.push(
+      `"${input.title.displayName}" does not guarantee identical content for every player, ` +
+        `so scores could not be compared fairly. The provider must declare ` +
+        `supportsContentSeed before this title can take entry fees.`,
+    );
   }
 
   // No paid format is ever single-player. A competition is two or more; a challenge is

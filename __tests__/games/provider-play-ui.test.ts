@@ -135,6 +135,70 @@ describe("nothing the browser says decides a score", () => {
   });
 });
 
+describe("waiting for a result is never a dead end", () => {
+  /**
+   * THE OWNER'S REPORT WAS "WHEN I TRY TO LEAVE GAME IS STUCK", AND IT WAS ACCURATE.
+   *
+   * `handleExit` moves to `confirming`, which polls for `POLL_ATTEMPTS * POLL_INTERVAL_MS` -
+   * sixty seconds - before the amber panel with its Back button replaces it. For that minute the
+   * confirming panel offered a spinner and no control of any kind, to a player who had just
+   * pressed the one button meaning "get me out of here". Leaving early costs nothing: the result
+   * arrives by signed callback into our own database and is settled by the unresolved-round
+   * policy if it never does.
+   */
+  it("the confirming panel offers a way back to the contest", () => {
+    const code = readCode(RESULT);
+
+    // Locate the confirming branch by index rather than scanning towards it, and assert the link
+    // sits INSIDE it - the panel has always had a Back link in its other two branches, so a bare
+    // search for one is green on exactly the defect this pins.
+    const start = code.indexOf("if (confirming)");
+    expect(start).toBeGreaterThan(-1);
+    const end = code.indexOf("if (!round)", start);
+    expect(end).toBeGreaterThan(start);
+
+    const branch = code.slice(start, end);
+    expect(branch.length).toBeGreaterThan(120);
+    expect(branch).toMatch(/<Link\s+href=\{`\/competitions\/\$\{competitionId\}`\}/);
+  });
+
+  it("the wait does not tell the player they have to stay", () => {
+    // Both messages say so explicitly, because a spinner beside a Back button is ambiguous
+    // about whether leaving abandons the result. It does not.
+    const code = readCode(RESULT);
+    const occurrences = code.match(/do not need to wait here/g) ?? [];
+    expect(occurrences.length).toBe(2);
+  });
+
+  /**
+   * WHY THE TWO ROUTES INTO THIS STATE NEED TWO MESSAGES.
+   *
+   * A game that ended has a score coming. A player who left mostly did so because the game never
+   * started - "Leave the game" is the only affordance the stall panel offers - so "waiting for
+   * the game to confirm your score" describes something that does not exist. The count is what
+   * makes this fail: one shared message satisfies any assertion about either.
+   */
+  it("leaving and finishing are told apart, and worded apart", () => {
+    const host = readCode(HOST);
+    const result = readCode(RESULT);
+
+    expect(host).toMatch(/reason:\s*["']left["']/);
+    expect(host).toMatch(/reason:\s*["']finished["']/);
+    // The host must PASS it on; computing the reason and then not handing it over is the shape
+    // that leaves the panel unable to tell the two apart while every other assertion passes.
+    expect(host).toMatch(/confirmReason=\{/);
+
+    expect(result).toMatch(/reason\s*===\s*["']left["']/);
+    // Only the finished branch may promise a score. Asserting the absence of the phrase from the
+    // left branch is the load-bearing half - the file legitimately contains it once.
+    const left = result.indexOf('reason === "left"');
+    const ret = result.indexOf("return {", left);
+    const leftBranch = result.slice(left, result.indexOf("}", ret));
+    expect(leftBranch.length).toBeGreaterThan(80);
+    expect(leftBranch).not.toMatch(/your score/);
+  });
+});
+
 describe("the frame is hosted under supervision", () => {
   it("checks both the source window and the origin of every message", () => {
     const code = readCode(FRAME);

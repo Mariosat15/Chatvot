@@ -25,9 +25,38 @@ interface RoundResultPanelProps {
   competitionId: string;
   competitionName: string;
   confirming: boolean;
+  /** Why we are waiting. `null` when not confirming. See `ConfirmReason` on the host. */
+  confirmReason?: "finished" | "left" | null;
   round: PlayerRoundView | null;
   state: PlayState;
   onPlayAgain: () => void;
+}
+
+/**
+ * What to say while the signed result is still outstanding.
+ *
+ * TWO ROUTES REACH THIS STATE AND THEY ARE NOT THE SAME SITUATION. A game that ended has a score
+ * on its way. A player who pressed "Leave the game" mostly did so because the game never
+ * started - that button is the only affordance the stall panel offers - so promising to confirm
+ * "your score" describes something that does not exist, and the wait then reads as the site
+ * being broken rather than as the round being settled by rule.
+ */
+function confirmingCopy(reason: "finished" | "left" | null | undefined): {
+  heading: string;
+  detail: string;
+} {
+  if (reason === "left") {
+    return {
+      heading: "Checking how your round ended",
+      detail:
+        "You have left the game. Your attempt was already open, so the round stays open and this competition's rules decide the outcome - you do not need to wait here for it.",
+    };
+  }
+  return {
+    heading: "Confirming your result",
+    detail:
+      "We are waiting for the game to confirm your score with us. This usually takes a few seconds, and you do not need to wait here for it.",
+  };
 }
 
 /** The player-facing meaning of each terminal status. */
@@ -91,19 +120,31 @@ export function RoundResultPanel({
   competitionId,
   competitionName,
   confirming,
+  confirmReason,
   round,
   state,
   onPlayAgain,
 }: RoundResultPanelProps) {
   if (confirming) {
+    const { heading, detail } = confirmingCopy(confirmReason);
     return (
       <div className="space-y-3 rounded-xl border border-gray-700 bg-gray-800/50 p-8 text-center">
         <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-400" />
-        <h2 className="text-lg font-semibold text-gray-100">Confirming your result</h2>
-        <p className="text-sm text-gray-400">
-          We are waiting for the game to confirm your score with us. This usually takes a
-          few seconds.
-        </p>
+        <h2 className="text-lg font-semibold text-gray-100">{heading}</h2>
+        <p className="text-sm text-gray-400">{detail}</p>
+        {/*
+          THIS LINK IS THE FIX FOR A DEAD END, and the poll budget is why it is needed rather
+          than merely nice. Polling runs for sixty seconds before the panel below replaces this
+          one, so a player who pressed "Leave the game" was held on a spinner with no control of
+          any kind for a full minute - and they pressed it precisely because they had decided the
+          game was not working. Leaving early costs them nothing: the result is delivered by the
+          provider's signed callback into our own database, read back by the contest screens, and
+          settled by the unresolved-round policy if it never arrives. Nothing about it depends on
+          this page staying open, which is exactly what the copy above now says.
+        */}
+        <Link href={`/competitions/${competitionId}`} className="inline-block pt-2">
+          <Button variant="outline">Back to {competitionName}</Button>
+        </Link>
       </div>
     );
   }

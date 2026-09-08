@@ -54,11 +54,24 @@ const POLL_ATTEMPTS = 20;
  */
 const PREFLIGHT_REFRESH_MS = 20000;
 
+/**
+ * Why the screen is waiting, which is not the same question as what it is waiting for.
+ *
+ * Both routes into `confirming` poll the same endpoint for the same signed result, so it is
+ * tempting to treat them as one state. They are two different situations for the PLAYER.
+ * `finished` means the game ran and ended, so a score is genuinely on its way. `left` means the
+ * player pressed the button to walk out - which they mostly do when the game never started at
+ * all, since that is the only affordance the stall panel offers - and telling them we are
+ * "waiting for the game to confirm your score" is then simply false: there is no score, and the
+ * round will be settled by the contest's unresolved-round policy instead.
+ */
+type ConfirmReason = "finished" | "left";
+
 type Phase =
   | { name: "preflight" }
   | { name: "launching" }
   | { name: "playing"; launchUrl: string; roundId: string; resumed: boolean }
-  | { name: "confirming"; roundId: string }
+  | { name: "confirming"; roundId: string; reason: ConfirmReason }
   | { name: "settled"; round: PlayerRoundView | null };
 
 interface ProviderRoundHostProps {
@@ -212,7 +225,7 @@ export function ProviderRoundHost({
   const handleFinished = useCallback(() => {
     if (phase.name !== "playing") return;
     const roundId = phase.roundId;
-    setPhase({ name: "confirming", roundId });
+    setPhase({ name: "confirming", roundId, reason: "finished" });
     confirmResult(roundId);
   }, [phase, confirmResult]);
 
@@ -221,8 +234,14 @@ export function ProviderRoundHost({
     // NOT return the attempt, and a player who assumes it does will be surprised by their own
     // score. The round stays live until the provider reports or the reconciliation net resolves
     // it, so the honest screen to show is the one that says the result is still coming.
+    //
+    // It still polls, because a round the player walked out of can resolve either way - the game
+    // may report a partial score it had already computed, and since R48 a partial run counts.
+    // But the panel it lands on must offer a way out, and must not promise a score: leaving is
+    // overwhelmingly what a player does when the game never started, and there is nothing
+    // coming in that case.
     if (phase.name === "playing") {
-      setPhase({ name: "confirming", roundId: phase.roundId });
+      setPhase({ name: "confirming", roundId: phase.roundId, reason: "left" });
       confirmResult(phase.roundId);
     }
   }, [phase, confirmResult]);
@@ -251,6 +270,7 @@ export function ProviderRoundHost({
         competitionId={competitionId}
         competitionName={competitionName}
         confirming={phase.name === "confirming"}
+        confirmReason={phase.name === "confirming" ? phase.reason : null}
         round={phase.name === "settled" ? phase.round : null}
         state={state}
         onPlayAgain={() => setPhase({ name: "preflight" })}

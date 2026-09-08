@@ -294,6 +294,7 @@ function preflightInput(overrides: Partial<PreflightInput> = {}): PreflightInput
       providerStatus: "active",
       supportsCompetition: true,
       supportsOneVsOne: true,
+      supportsContentSeed: true,
       maxDurationSeconds: 300,
     },
     provider: { enabled: true, adapterInstalled: true },
@@ -373,6 +374,48 @@ describe("runPreflight - the hard refusals", () => {
       }),
     );
     expect(result.ok).toBe(false);
+  });
+
+  it("refuses either paid format on a title with no content seed, naming the capability", () => {
+    // Reason: `01` s4.3. Without an identical content guarantee, players are ranked against
+    // each other having faced challenges of unknown relative difficulty - and it is what
+    // preserves the skill-not-chance position, so it is a fairness gate rather than a
+    // feature flag. It was read by nothing for six days while THREE separate comments said
+    // it gated paid entry: the model, the ChartVolt Games adapter and the catalogue service.
+    for (const format of ["competition", "challenge"] as const) {
+      const result = runPreflight(
+        preflightInput({
+          format,
+          minParticipants: 2,
+          title: { ...preflightInput().title, supportsContentSeed: false },
+        }),
+      );
+      expect(result.ok).toBe(false);
+      // The refusal must name the missing capability. A generic "cannot be used" sends the
+      // operator to the provider without knowing what to ask for.
+      expect(result.errors.join(" ")).toContain("supportsContentSeed");
+    }
+  });
+
+  it("does not confuse the content-seed refusal with the two format refusals", () => {
+    // Reason: all three live in the same block and all three refuse. A probe removing the
+    // content-seed gate stayed green against an `ok === false` assertion alone, because a
+    // title lacking it in these fixtures also lacked nothing else - so this pins that a
+    // title supporting BOTH formats and lacking only the seed is still refused, and refused
+    // for the seed. Same trap as the `gameKey` allow-list probe in `12` s2.2.
+    const result = runPreflight(
+      preflightInput({
+        title: {
+          ...preflightInput().title,
+          supportsCompetition: true,
+          supportsOneVsOne: true,
+          supportsContentSeed: false,
+        },
+      }),
+    );
+    expect(result.ok).toBe(false);
+    expect(result.errors.join(" ")).not.toContain("does not support competitions");
+    expect(result.errors.join(" ")).toContain("identical content");
   });
 
   it("refuses a single-player paid contest, in both formats", () => {

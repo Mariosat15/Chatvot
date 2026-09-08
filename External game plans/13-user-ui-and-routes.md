@@ -335,6 +335,61 @@ case asserted only `null` and `undefined`, which a plain `!= null` check also re
 difference `typeof` actually buys is that **`RegExp.test` coerces**, so `String(["<24 hex>"])` is
 that hex string and a one-element array would pass the shape check and reach `findById`.
 
+### 1.1g Leaving the game led to a spinner with no way out (8 September 2026)
+
+The owner's words were **"when i try to leave game is stuck"**, and they were accurate.
+
+`handleExit` moves the host to `confirming`, which is right - **leaving does not hand the attempt
+back**, so a screen that returned straight to the contest would let a player believe it had. But
+`confirming` polls `POLL_ATTEMPTS × POLL_INTERVAL_MS`, **sixty seconds**, before the amber
+"still being confirmed" panel and its Back button replace it. For that minute the panel rendered a
+spinner, two sentences and **no control of any kind** - to a player who had just pressed the one
+button on the screen that means *get me out of here*.
+
+**The wait was already bounded, which is why this hid.** `1.1c` and the frame's twelve-second stall
+panel both fixed unbounded waits, and the review that produced them read this state as covered: it
+*does* terminate, it *does* end somewhere honest. **A bound is not an escape hatch, and the
+distinction is what the player experiences** - sixty seconds of no affordance is indistinguishable
+from a hang, and the player's own conclusion had already been recorded when they hit the button.
+
+**The second half is a false statement, and it is the worse of the two.** The panel said *"We are
+waiting for the game to confirm your score with us."* The overwhelming reason to press "Leave the
+game" is that **the game never started** - that button is the only affordance the stall panel
+offers - so there is no score, and there never was one. So the two routes into `confirming` are
+now two situations rather than one:
+
+| Route in | What is true | What it says |
+|---|---|---|
+| The frame reported `finished` | A score is genuinely on its way | *Confirming your result* |
+| The player pressed **Leave the game** | The round stays open and the contest's `unresolvedRoundPolicy` decides | *Checking how your round ended* |
+
+**It still polls on the leaving path, deliberately.** Since **R48** a partial run counts, so a
+game that had already computed a score may report it for a round the player walked out of. What
+changed is what the player is told and whether they are held there.
+
+**Three things worth carrying.**
+
+- **Leaving early costs nothing, and saying so is part of the fix.** The result arrives by the
+  provider's signed callback into our own database and is read back by the contest screens. Nothing
+  about it depends on this page staying open - so both messages now say so explicitly, because a
+  spinner beside a Back button is otherwise ambiguous about whether leaving abandons the result.
+- **The guard is positional, and that is not pedantry.** The panel's other two branches have always
+  had a Back link, so an assertion that the *file* contains one is green on exactly this defect.
+  The test slices the confirming branch by index - `if (confirming)` to `if (!round)` - and asserts
+  a length, because a slice that found nothing passes every assertion made of it.
+- **The count is what pins the wording.** One shared message satisfies any assertion about either
+  route, so the test counts the reassurance sentence and expects **two**, and separately asserts
+  the *absence* of "your score" from the left branch - the negative half being load-bearing,
+  since the file legitimately contains that phrase once.
+
+**And the host must hand the reason over, not merely derive it.** A version that computes
+`ConfirmReason` correctly and does not pass it to the panel satisfies every assertion about the
+host's own states while silently showing the finished wording to everyone, so `confirmReason={`
+is asserted at the call site.
+
+95 tests in `__tests__/games/provider-play-ui.test.ts`, **7 probes red on exactly the expected
+test with a blast radius of one** (`tools/probe-confirming-exit.ps1`).
+
 ### What it does not do
 
 - **No live leaderboard during play** (section 11's polling recommendation is unimplemented). A

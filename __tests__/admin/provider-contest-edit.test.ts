@@ -414,6 +414,10 @@ async function seedCatalogue() {
     maxDurationSeconds: 300,
     supportsCompetition: true,
     supportsOneVsOne: true,
+    // Reason: the model defaults this to `false`, so a seeded title omitting it is now
+    // correctly refused by the pre-flight's fairness gate (`01` s4.3) - which is the gate
+    // working, not a broken fixture. Same lesson as the comment above, one field along.
+    supportsContentSeed: true,
     chartvoltEnabled: true,
     providerStatus: "active",
     configSchema: {
