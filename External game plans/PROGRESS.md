@@ -35,6 +35,10 @@
 | **How long is a game, and who decides?** | **Code-complete 8 Sep 2026** (`12` s2.9), from an owner report that a contest refused every attempt *from the moment it opened* - the same sentence `12` s2.7 had already made configurable, arriving again because s2.7 fixed the **rule** and never checked the **arithmetic**. The gate reserved the title's `maxDurationSeconds`, a catalogue **ceiling** no operator sets, rather than the playing time this contest grants. With the sprint's ceiling at 300 seconds and a wizard offering no way to change it, a five-minute reservation stood in front of every contest. **Two things made it invisible**: the ceiling and the configured length were **equal** for the one title that existed, and the platform had **no way to learn** which setting is the play clock without hard-coding a field name, which would have broken the no-developer-needed claim. Fixed by having titles declare it: **`format: "duration-seconds"`**, issued to providers as **version 1.3** of the requirements HTML (`01` s3.2). The gate now reads that; **`expiresAt` still reads the ceiling**, and the separation is load-bearing - the gate asks how much to reserve, expiry asks how long a round may live, and reading the configured value there would cut a player off mid-board. Shipped with a **play-time dropdown** (1/5/10/20/30/60 minutes plus custom, filtered against the title's own declared range), a **derived** result grace period, and a **blocking** refusal in the wizard naming both durations. **`reserve_full_round` is now the wizard's default** for new drafts, on the owner's instruction, which it could not sensibly have been while the reservation was five times the configured length; the **schema default is deliberately unchanged**. **45 tests, 20 probes red on exactly the expected test** |
 | **The games have no rounds, and never really did** | **8 Sep 2026** (`21` s4.1g). The owner's instruction was no fixed board count and no per-round restriction: a player gets a time budget, solves as many boards as they can, and is scored on count and speed. **The finding is that this was already Circuit Sprint, exactly** - so the work was the platform's clock (the row above), not the game's. **`circuit-perfect` was retired**, being the one title scored on finishing a fixed set - **`status: "deprecated"`, not deleted**, because `gameKey` is the join key for every stat it produced and the pre-flight already refuses a non-`active` title, so the deprecation *is* the enforcement. **What retiring it costs is recorded rather than glossed:** it was the only `lower_is_better` / `duration_ms` title, built precisely so a ranking sign error could not pass every test, and that direction now rests on unit tests and the golden regression rather than an end-to-end round. Sprint's play time widened to **1-60 minutes** (default 10) with its score range widened to match, because a range that truncates the best player's score is a payout defect wearing a validation message. **And most of the instruction needed no code at all:** ties, unclaimed shares, players who never scored and disqualification are decided by `05` s9.2/s9.3 and the ranking engine, none of it per-title, and registration has always closed at `startTime`. **204 tests in `games-service`**, up from 196 |
 | **When does entry close?** | **When playing stops being possible, since 8 Sep 2026** (`12` s2.10) - and before that, **the instant the contest opened**. `createProviderContest` wrote `registrationDeadline: new Date(input.startTime)`, so a player arriving one minute into a one-hour contest could not join at all. The owner asked for the opposite: join at any point before the end. **Taken literally that sells a seat that cannot play**, which is the part to carry: under `reserve_full_round` the gate refuses an attempt that would not fit in what remains, so entry open to the final second means a player pays, is refused every attempt, ranks on nothing, and since **R50** is not even eligible for the redistribution. So it closes at the window end under the permissive policy and **one whole attempt** before it under the reserving one - a fraction is forbidden by a test, because it would admit a player the gate then refuses. **The table row in `03` s1.2 saying registration closes before play opens is now wrong for a provider contest, and the owner overrode its reasoning knowingly** - a late joiner *can* see the leaderboard before paying; what makes that acceptable here and not in trading is that a game score is not actionable intelligence, so the residue is an informed *entry* decision rather than an informed *play* one. **Three places already derived this instant independently** and now delegate to one mirrored producer, `lib/services/games/entry-deadline.ts`; the two a player sees sit either side of a decision to travel to another screen, so a rounding's disagreement is a player told they have time and refused on arrival. **Two defects found on the way, both silent**: the create service resolved the policy fallback **twice**, so a probe changing either copy stayed green while a contest could store one policy and close entry under the other, and the edit service **loaded the title only when settings changed**, so moving just the end time recomputed the deadline against no play clock. **Nothing backfilled** - no provider contest has run in production |
+| **Why the game would not start at all** | **R52, closed 8 Sep 2026** (`21` s4.1h) - and there was **no bug in any revision**, which is why nothing found it. `games-service/public/play` arrives with a `git pull`; the allowlist authorising those files is TypeScript that only exists after `npm run build`. A **6 September build was serving a 7 September surface**, so `presentation.js` was answered with a 404 - and **an ES module that 404s takes its importer down with it**, so no script evaluated, the page never got past its own boot markup, and the platform's twelve-second stall panel was the only component in the entire stack that noticed. **The same stale build explains the two symptoms that looked unrelated**: the wizard still offered retired Circuit Perfect and a 300s Sprint ceiling, because both are read from `provider_game` rows synced from that service. **The picker had no defect** - `listContestableTitles` already filters on `providerStatus: "active"` and had nothing to filter, so checking before building the guard the symptom suggested is what found the real cause. **No test could have caught it**: the existing walk of the import graph passed all day, because it tests **one revision** and the fault is a disagreement **between** revisions - `check:mirrors`' rule in a new place. So the deployment now audits its own two halves at boot, in both directions, naming the files and the remedy, and **logs rather than refusing to boot** because the sweeper must keep delivering results for rounds already in flight. Found beside it: the sweeper printed `failed 1` and **discarded the reason `attemptDelivery` had already computed**, so a rotated secret, a dead platform and a misrouted URL were one indistinguishable line while a player sat on "Confirming your result". **Live and player-visible, nothing backfilled** - but an attempt is spent on round **creation**, so the rounds it burned are real and settle under `unresolvedRoundPolicy`. **Two operational faults are the owner's to clear:** rebuild + restart + **re-sync the catalogue**, and `pm2 delete` the **duplicate `chartvolt-games` process** the logs reveal, which `ecosystem.config.js` warns will race the singleton sweeper. **209 tests, 7 probes** |
+| **"When I try to leave, the game is stuck"** | **Fixed 8 Sep 2026** (`13` s1.1g), and the report was accurate. Leaving moves to `confirming`, which is right - **leaving does not hand the attempt back**, so returning straight to the contest would let a player believe it had. But that state polls for **sixty seconds** before the panel with a Back button replaces it, and for that minute it rendered a spinner, two sentences and **no control of any kind**, to a player who had just pressed the one button meaning *get me out of here*. **The wait was already bounded, which is exactly why this hid** - `13` s1.1c and the frame's stall panel both fixed unbounded waits and this state read as covered, because it does terminate somewhere honest. **A bound is not an escape hatch**, and sixty seconds of no affordance is indistinguishable from a hang. **The worse half was a false statement:** it said "we are waiting for the game to confirm your score", and the overwhelming reason to press Leave is that **the game never started**, so there is no score and never was. The two routes in are now two situations - *Confirming your result* when the frame reported finished, *Checking how your round ended* when the player walked out - and **both say the player need not wait**, because the result arrives by signed callback into our own database and nothing about it needs the page open. It still polls on the leaving path, deliberately, since **R48** means a partial score may yet be reported. **The guard is positional**: the panel's other two branches always had a Back link, so asserting the file contains one is green on the defect; the test slices the branch by index and asserts a length, because a slice that found nothing passes everything. **95 tests, 7 probes red with a blast radius of one** |
+| **Does a contest need a "shape" per game family?** | **DESIGNED 8 Sep 2026 in the new chapter `22`. TWO OF THE THREE DECISIONS ARE NOW ANSWERED** (see the decision log) - the build is **deferred to X4** with the design on record, and the two subsidiary questions are settled: entry-close reasoning stays **separate** from synchronisation, and a simultaneous title is **not challengeable** at all. No code was written from `22` s4 and none should be until a real race title exists. Three findings reframe the owner's question. **`provider_game.family` already exists, is required, is validated on ingest and is read by nothing** - its comment claimed it drives which formats the wizard offers, which `supportsCompetition` / `supportsOneVsOne` actually do; corrected in place in both model copies. **It is the wrong axis anyway**, because it describes whether a game needs an *opponent*, so **a race is `independent`** - what a race needs is a shared *moment*, which no field describes. And **five of the seven things a simultaneous contest changes are already expressible** with `attemptsPolicy: "single"`, the derived window, the existing `playWindowStart` refusal and R45/R50's no-score handling, so what is missing is a synchronised launch plus anything stopping an operator configuring a race as a staggered contest - **the opposite of what the question implies**, and the reason the recommendation is to defer to X4 rather than build now. The finding most likely to be lost is s2.1: **a staggered race with a fixed content seed is not unfair**, since every player gets the same track and clock, so what is lost is the *event* rather than the comparability - a real product requirement and **not** a payout defect |
+| **The content-seed fairness gate** | **R53, closed 8 Sep 2026.** Found while mapping the row above. `supportsContentSeed` - which `01` s4.3 calls the most important single field in the specification, and which underwrites the skill-not-chance position - **was read by no gate in either app**, while **three separate comments in three files** asserted it gated paid entry. Fifth instance of a comment claiming a check that does not run, and the first repeated three times: **agreement between comments is not corroboration, because the second and third were written by reading the first.** What hid it is that its two siblings *are* enforced, in the pre-flight and in the wizard - **a partially-implemented pattern is more dangerous than an absent one.** **Latent, nothing backfilled**: every existing title declares it `true`, but it is exactly the flag a real provider sets `false` at X4, and the failure then is a paid contest where every player faces different content, ranked, settled and paid in silence. One unconditional check in both mirrored pre-flight copies, **required** on the input so a caller cannot fail open again, both writers counted with `rg` first, and the wizard disabling the title with the capability named. **Not scoped to `competition`** despite the spec's word, so the challenge half is a tripwire for E8. 4 tests, 4 probes |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
 | **Phase in progress** | **X4a - STARTED 6 Sep 2026. The two halves connected 7 Sep 2026** - see the row above and `21` s4.1d. What remains is the *clicking* half: the provider has still never been registered through the admin screens, and nothing has been deployed. `games-service/` (the provider) and the `chartvolt-games` adapter (the platform) are both code-complete. **The game is playable by a human**: the launch URL serves a real board, verified in a browser on both titles, which also fixed a live defect - an unstarted round reported itself as `finished`, so the first screen a paying player saw was a result screen for a round they had not played. It also **found and then closed a defect in the platform's own published auth scheme** (**R34**): there was no `callbackToken` field anywhere, so a provider implementing `Bearer {CALLBACK_TOKEN}` exactly was rejected and logged as a probable attack. Latent throughout, so nothing was backfilled. **Nothing technical now stands between the two halves** - what remains is deploying the service and registering it. It is now **deployable**: a PM2 entry, an nginx block for a `games.` subdomain, `env.example` and a `deploy/README.md` runbook, plus **two production-only boot guards** for the play origin and the frame allowlist, both of which previously failed invisibly. Writing the runbook also found that the admin panel **could not register a loopback provider at all**. See the three 6 Sep work-log entries |
 | **Next phase, scope decided** | **X4a - ChartVolt as a first-party provider, with a real playable game** (`21`), **3.5-5 weeks**, starting before the provider health panel. It exists because **the review gate the programme is sequenced around cannot currently be held**: `mock.adapter.ts` returns a hostname that does not resolve, so the play screen's iframe fails to load and the final step has never been performed by a person. **Owner decided 5 Sep 2026 that it is both** the reference implementation *and* open question 10's hedge game - which **modifies the 2 Sep "no in-house game is built" decision** and is recorded in the decision log rather than by editing that entry. **No commercial dependency.** Two things not to misread: **risk X8 is reduced when it ships, not now**, and X4a **shrinks X4 without replacing it** - a provider we control cannot rehearse a real partner's auth, error shapes, latency or pricing |
@@ -483,6 +487,10 @@ X12 pilot. All three are in `17` section 7.
 | **2 Sep 2026** | **The eight missing `ADMIN_SECTIONS` ids are deferred** | Owner decision: do later. It is a pre-existing defect unrelated to games work and the fix is add-only. Tracked under "Deferred work" in this file so it is not rediscovered as a new finding |
 | **2 Sep 2026** | **`Verif_Setup_help/` is never committed** | Owner decision, now enforced by a `.gitignore` rule rather than a judgement call per file. Setup-help screenshots routinely capture credentials and connection strings, and an image cannot be reviewed by a diff |
 | **2 Sep 2026** | **Smart onboarding and interest-based challenge matchmaking are in scope** | Owner requirement, and **entirely new** - it appears nowhere in `01`-`19`. A player declares which games they want to be challenged in; the system matches players by shared interest plus prerequisites; and for a player who declares nothing, interest is **inferred from what they actually play** so the feature works without onboarding. New chapter `20`, phase X11.5, 2-3 weeks |
+| **8 Sep 2026** | **Simultaneous-start contests are DESIGNED and DEFERRED to X4** | Owner answer to `22` s6 question A. The design is on record in chapter `22` and no code is written from it. Reasoning, from `22` s2: **five of the seven things a simultaneous contest changes are already expressible** with settings that exist, so the deferred cost is one catalogue field, one gate and a set of wizard defaults - while building it now means issuing provider spec **version 1.4** describing a field no title populates, to providers who may be mid-implementation. **The precedent it avoids is `family` itself**: a field declared by everyone and read by nothing. The spec bump is therefore **owed only if this is un-deferred** |
+| **8 Sep 2026** | **Why entry closes early and whether a contest is simultaneous are two separate questions** | Owner answer to `22` s6 question B, and it is the decision most likely to be quietly reversed because merging them is so convenient. They coincide for a race and nowhere else. Synchronisation forces the deadline mechanically - you cannot join a race that has started - while **"does seeing the target first help you"** is a per-title judgement: `12` s2.10 accepted a late joiner for a puzzle precisely because a game score is not actionable intelligence, and that reasoning weakens for a game where the target changes your strategy and fails completely for trading. **Do not fold one into the other**, or the puzzle rule that shipped on 8 September silently reverts the first time a race is configured |
+| **8 Sep 2026** | **A simultaneous title is not challengeable at all** | Owner answer to `22` s6 question C. A challenge has a scheduling problem a competition does not: **nobody chooses the gun**, because a challenge is created by one player and accepted by another at an unknown later moment. The two alternatives - accept-starts-the-clock, or a proposed fixture with reminders, a no-show rule and a refund rule - are both real work for demand that does not exist yet. **`supportsOneVsOne` already expresses this per title and costs nothing**, and a provider whose race cannot meaningfully be played one-against-one will say so. Revisit if a provider asks for it |
+| **8 Sep 2026** | **A decision on record is not a decision enforced** | Not an owner decision but a correction to this table, recorded here because the table is where the belief lived. *"Content seeding is mandatory for competitions"* has sat in these rows since **18 August 2026** and was enforced by **nothing** until R53 closed it on 8 September - three weeks in which the flag was demanded of providers, validated on arrival, stored, transported and badged while no gate consulted it. **Treat this table as a list of intentions, never as evidence of behaviour**, and check a decision against the code before citing it |
 
 ---
 
@@ -517,6 +525,7 @@ X12 pilot. All three are in `17` section 7.
 | 14 | **Does historical trading performance enter the new cross-game aggregates, or do they start at zero?** Backfilling makes trading players instantly dominant on a games platform; starting at zero discards real history and will be read as a bug by existing players. Neither is obviously right, and the migration is written once | Product | Before X7 - `18` needs it to write the backfill | `18` |
 | 15 | **Who may be challenged?** Anyone on the platform, only mutuals/friends, or anyone who has opted in per game? The owner asked for "challenge any user", which needs a decline path, a block list and a rate limit or it becomes a harassment vector | **Owner** | Before X10 | `20` s2 |
 | 16 | **Is declaring game interests part of registration or a later prompt?** Adding steps to registration measurably costs completions, and `20` is designed so the feature works without it | Product | Before X11.5 | `20` s1 |
+| 18 | **Does a contest need a "shape" per game family - and does the wizard change with it?** Raised by the owner, 8 Sep 2026. Everything built so far assumes **independent play with staggered starts**: a player joins whenever, starts an attempt whenever the policy allows, and is ranked on their own score. That is right for a puzzle and **wrong for a race**, where every player must start and finish together - which is not a wizard field but a different contract, touching entry (closes *before* the start, not at the last playable moment - the rule `12` s2.10 just deliberately moved), the round lifecycle (one synchronised launch rather than a per-player one), and the reconciliation net (a player who does not appear at the gun is a no-show, not an unresolved round). **DESIGNED 8 Sep 2026 in `22-contest-shape-and-synchronisation.md`, which carries three owner decisions and a recommendation. Still open, because the decisions are the answer.** Three findings from that pass change the question. **`provider_game.family` (`independent` / `head_to_head`) already exists, is required, is validated on ingest and is read by nothing** - and it is the *wrong axis*, because it describes whether a game needs an **opponent**, so **a race is `independent`**; what a race needs is a shared *moment*, which no field describes. (This paragraph used to guess `category` was the mechanism - it is not, and the field that looked like it is about something else.) Second, **five of the seven things a simultaneous contest changes are already expressible** with `attemptsPolicy: "single"`, the derived window, the existing `playWindowStart` refusal and R45/R50's no-score handling - what is genuinely missing is a synchronised launch and anything stopping an operator configuring a race as a staggered contest. Third, **whether entry closes before the start is a separate question from synchronisation** (s2.1) - they coincide for a race, which is why merging them is convenient and wrong. **What must not happen is a `switch` on game code** - that is the one failure mode of the no-developer-needed claim. **Same question again for challenges** (X10 / E8), which have an extra problem a competition does not: nobody chooses the gun, because a challenge is accepted at an unknown later moment (`22` s5). **ANSWERED 8 Sep 2026, all three parts** - see the decision log. **Build deferred to X4** with the design on record; the entry-close reasoning stays **separate** from synchronisation; and a simultaneous title is **not challengeable**, because nobody chooses the gun and `supportsOneVsOne` already says so for free. The question stays listed rather than struck through because **the design is unbuilt and the spec bump is unpaid**, both deliberately | **Product / Owner** | ~~Before X4~~ **Answered.** The build lands with X4 | **`22`**, `05` s2.1, `07`, `12` s2, `13` |
 | ~~17~~ | **ANSWERED 7 September 2026 - it is the operator's choice, per contest.** The owner's answer was neither of the two options as posed: rather than one platform-wide policy, the game wizard and editor now carry an **Unscored contest** control with two settings - keep the pot (the `unclaimed_pool` behaviour that already existed) or **refund the entry fees less the platform fee**, with the reason explained to the player. The reasoning is that the right answer differs by contest: a high-fee contest whose provider went down should return money, and a cheap one need not. Three related rules were settled at the same time and are **not** configurable, deliberately: a contest **cancelled for too few players refunds in full with no fee** (already true - R43), a contest that **fails** does the same, and a player **disqualified by a rule keeps nothing** - their fee goes to the unclaimed pool exactly as a trading contest's does. See the 7 Sep work-log entry and `05` s9.3 | **Owner** | ~~Before a provider contest runs with real money~~ | `05` s9.3, R45 |
 
 ---
@@ -588,6 +597,7 @@ several read as "does not exist" until you look.
 | `19-game-masters.md` | Game Masters on provider games: creation, referral earnings, tier limits, the per-round-cost problem |
 | `20-onboarding-and-matchmaking.md` | **New 2 Sep 2026.** Declared and inferred game interests, challenge matchmaking, opponent selection, and the abuse controls that "challenge any user" requires |
 | `21-reference-provider-and-mock-game.md` | **New 5 Sep 2026.** Phase **X4a** - a fake game company built strictly from the issued provider spec, with a real playable skill game on its own origin, so the lifecycle can be driven by a human before a real provider exists. **Carries an outstanding owner decision** (s8) on whether it doubles as open question 10's hedge game |
+| `22-contest-shape-and-synchronisation.md` | **New 8 Sep 2026. A PROPOSAL, not a description of anything built.** Answers open question 18 - how a contest differs when every player must start together, as a race does, rather than turning up whenever they like. Carries **three owner decisions** (s6) and a recommendation to defer most of it to X4 |
 | `ChartVolt-External-Games-Plan.html` | Illustrated internal version, for reading and sharing |
 | `ChartVolt-Game-API-Requirements.html` | **The document we send to game providers.** Same requirements as `01`, written for their engineers. Currently **version 1.1** - bump the version and the document-history table whenever `01` changes |
 
@@ -661,6 +671,281 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 8 Sep 2026 - `13` s1.1g - LEAVING THE GAME LED TO A SPINNER WITH NO WAY OUT
+
+**Shipped:** the `confirming` state has an exit, and the two routes into it say two different
+true things. **95 tests** in `__tests__/games/provider-play-ui.test.ts`, **7 probes** in
+`tools/probe-confirming-exit.ps1`, all red on exactly the expected test with a blast radius of
+one.
+
+**The report was "when i try to leave game is stuck", and it was accurate.** `handleExit` moves
+to `confirming`, which is the right destination - **leaving does not hand the attempt back**, so
+a screen that returned straight to the contest would let a player believe it had. But that state
+polls for **sixty seconds** before the amber panel and its Back button replace it, and for that
+minute it rendered a spinner, two sentences and **no control of any kind**.
+
+**Why it hid, and this is the transferable part.** `13` s1.1c and the frame's twelve-second stall
+panel both fixed *unbounded* waits, and the review that produced them read this state as already
+covered: it does terminate, and it does end somewhere honest. **A bound is not an escape hatch.**
+Sixty seconds with no affordance is indistinguishable from a hang - and the player pressing that
+button had *already* concluded the game was broken, so this is the worst possible moment to offer
+them nothing.
+
+**The second defect is a false statement and is the worse of the two.** The panel said *"We are
+waiting for the game to confirm your score with us."* The overwhelming reason to press "Leave the
+game" is that **the game never started** - it is the only affordance the stall panel offers - so
+there is no score and there never was one. `confirming` now carries a reason: *Confirming your
+result* when the frame reported `finished`, *Checking how your round ended* when the player walked
+out. **It still polls on the leaving path, deliberately**, because since **R48** a partial run
+counts and a game may yet report a score it had already computed.
+
+**Both messages now say the player need not wait**, and that sentence is load-bearing rather than
+reassurance: the result arrives by the provider's signed callback into our own database and is
+read back by the contest screens, so nothing about it depends on this page staying open - but a
+spinner beside a Back button is ambiguous about exactly that.
+
+**Three things about the guards.** The Back-link assertion is **positional**, because the panel's
+other two branches have always had one, so asserting the *file* contains a link is green on
+precisely this defect; the test slices `if (confirming)` to `if (!round)` and **asserts a length**,
+since a slice that found nothing passes everything asked of it. The wording is pinned by a
+**count** - one shared message satisfies any assertion about either route - plus the *absence* of
+"your score" from the left branch, the negative half being the load-bearing one since the file
+legitimately contains that phrase once. And the host must **hand the reason over**, not merely
+derive it: a version that computes it correctly and never passes it satisfies every assertion
+about the host's own states while showing the finished wording to everyone.
+
+**Deviated from plan:** nothing was planned; this was a live report.
+
+**Owner tested:** no. It is on the main app, which **is** current on the server - the stall panel
+in the owner's own screenshot is 7 Sep code - so this needs only the usual rebuild, not the
+games-service redeploy R52 needs.
+
+**Deferred:** nothing.
+
+**Next chat should:** the design question the owner raised alongside this - **contest shape per
+game family** (open question 18), then challenges.
+
+---
+
+### 8 Sep 2026 - X4a / `21` s4.1i - THE GUARD THAT SHIPPED INSIDE THE THING IT WAS GUARDING
+
+**Shipped:** the actual fix for R52, after the first one turned out to be unable to fire.
+
+**The owner rebuilt nothing, reopened the game, and it failed identically** - the same
+`/play/presentation.js` 404 in the console, no `ready`, the twelve-second stall panel. The boot
+audit shipped that morning detects exactly this drift and names the file. **It could never have
+fired, because it lives in the build it exists to warn about.**
+
+**That is the finding, and it generalises past this service: a guard shipped inside the artifact
+whose staleness it reports is absent in precisely the state it was written for.** The code was
+real, correct, unit-tested and probed - and not present on the machine where the condition held.
+Same class as a comment asserting a check that does not run, and harder to notice, because
+everything about it reviews as diligent. **Prefer deleting a coupling to detecting it**, and where
+that is impossible, put the detector on a *different* shipping schedule from the thing it checks.
+
+So the hand-written filename allowlist is gone. `readServableAssets` derives the served set from
+the directory listing at boot, so a module arriving with a `git pull` is servable with no build:
+**two things must ship together for a filename list, and one thing cannot disagree with itself.**
+Every security property the allowlist bought is unchanged, and they are the reason
+`express.static` is still refused on this route - the request string is only ever a **`Map` key**
+so traversal is impossible however encoded, top-level regular files only, and an **extension**
+allowlist which is now the whole of the remaining protection. Read **once at boot**, because a
+`readdirSync` on an unauthenticated route is a syscall an anonymous caller can repeat.
+
+The audit is **kept with its scope corrected in the file**: `unserved` now means one thing, a
+plausible asset whose extension is unrecognised, and `missing` is **structurally impossible** and
+kept as a documented **tripwire** for the day somebody reintroduces a list. An overstated guard is
+a wrong fact.
+
+**Probe 4 came back green - the third cause again, and it produced the better test.** The explicit
+`index.html` skip is real and **unreachable**, because `.html` was never in the content-type table,
+so the document was already refused a line later. The skip stays as a tripwire with the reason in
+the file; the probe was re-aimed at adding `.html` to the table, which is the realistic mutation
+since a rules page is how it would arrive; and **the test gained a second assertion pinning where
+the guarantee actually lives** - a test asserting only the observable behaviour credits the name
+check with a guarantee it does not provide.
+
+**Verified:** `games-service` **213 tests** (up from 209), 0 failed; `npm run build` succeeds and
+the compiled output contains the directory read; `tools/probe-play-assets.ps1` 6 probes all red on
+exactly the expected test, blast radius one or two; `tsc --noEmit` clean.
+
+**Deviated from plan:** the morning's fix is superseded rather than removed. `21` s4.1h keeps its
+original wording under a note, because **the reasoning that produced the wrong fix is the useful
+part** and rewriting it would hide the mistake this entry exists to record.
+
+**Owner tested:** no, and this is the important caveat. **The rebuild is still required**, because
+the change is *in* the build - it cannot repair the build that is running. After
+`cd games-service; npm run build`, a `pm2 restart`, deleting the duplicate `chartvolt-games`
+process and a catalogue re-sync, the class of fault is gone.
+
+**Deferred:** nothing.
+
+---
+
+### 8 Sep 2026 - `22` (new chapter) + R53 - CONTEST SHAPE DESIGNED, AND THE FAIRNESS GATE NOBODY RAN
+
+**Shipped:** two things, one of which is only a document.
+
+**`22-contest-shape-and-synchronisation.md` answers open question 18 and is a PROPOSAL - no code
+was written from it.** It carries three owner decisions (s6) and recommends deferring most of the
+work to X4. Three findings reframe the question the owner asked, and each is worth more than the
+proposal itself:
+
+- **`provider_game.family` already exists, is required, is validated on ingest, and is read by
+  nothing.** Its own comment claimed it drives which contest formats the admin panel offers; the
+  formats are actually gated by `supportsCompetition` / `supportsOneVsOne`, and `family`'s only
+  use is a badge on the wizard's first step. **Corrected in place in both model copies** rather
+  than deleted, on the R7/R31 precedent.
+- **It is the wrong axis anyway.** `family` describes whether a game needs an **opponent**, so
+  **a race is `independent`** - what a race needs is a shared *moment*, which no field describes.
+  The owner's instinct that a title should declare its type and the wizard should follow was
+  right, and the field that looks like the mechanism is about something else.
+- **Five of the seven things a simultaneous contest changes are already expressible** with
+  `attemptsPolicy: "single"`, the derived window, the existing `playWindowStart` refusal and
+  R45/R50's no-score handling. What is genuinely missing is a synchronised launch and anything
+  stopping an operator configuring a race as a staggered contest. **That is the opposite of what
+  the question implies**, and it is why the recommendation is to defer rather than build.
+
+A fourth finding is in s2.1 and is the one most likely to be lost: **a staggered race with a fixed
+content seed is not unfair** - every player gets the same track and the same clock, so the scores
+are comparable. What is lost is the *event*. That is a real product requirement and **not** a
+payout defect, and the genuinely sharp question underneath it - whether a later player benefits
+from seeing the target first - is a per-title judgement that merely *coincides* with
+synchronisation. Merging the two is convenient and wrong.
+
+**R53 is code, and it is closed.** Found while mapping the above. `supportsContentSeed` - the flag
+guaranteeing identical content, which `01` s4.3 calls the most important single field in the
+specification and which underwrites the skill-not-chance position - **was read by no gate in either
+app**, while **three separate comments in three files** asserted it gated paid entry. Fifth
+instance of a comment asserting a check that does not run, and the first repeated three times:
+**agreement between comments is not corroboration, because the second and third were written by
+reading the first.** Latent - every existing title declares it `true` - but it is exactly the flag
+a real provider sets `false` at X4, and the failure is a paid contest where every player faces
+different content, settled and paid in silence.
+
+Closed by one unconditional check in both mirrored `contest-preflight.ts` copies, the field made
+**required** on the input so a caller cannot omit it and fail open again, both writers updated
+(**counted with `rg` first** - `preflightProviderContest`, shared by create and edit, and the
+publish service), and the wizard's first step disabling the title with the missing capability
+named. **Deliberately not scoped to `competition`** despite that being the spec's word: a
+challenge ranks two players for money on the same basis, so the challenge half is a tripwire for
+E8. 4 tests, 4 probes red on exactly the expected test.
+
+**Two things about the tests generalise.** The second test exists because **all three format
+refusals live in one block**, so a fixture lacking the seed *and* a format capability is refused
+either way - it pins that a title supporting both formats and lacking only the seed is still
+refused, *for the seed*. And the change **immediately failed three tests in
+`provider-contest-edit.test.ts`**, whose seeded title omitted the field: **a gate added to a path
+with existing tests will fail them, and that failure is the gate working** - the thing to check is
+that the fixture was wrong, not the gate. That fixture's own comment, six lines above, warns about
+exactly this class.
+
+**Verified:** full suite **76 files, 1569 tests green**; `check:mirrors` OK (79 mirrored, 0
+drifted - note the documented figure of 75 pairs is stale); main typecheck **198**, admin **223**,
+both unchanged and **none in the changed files**.
+
+**Deviated from plan:** `22` is a new chapter, which the programme did not anticipate. Recorded as
+a proposal rather than folded into `07` or `12`, because it spans entry, rounds, the wizard, the
+player UI and the provider spec, and because **a design nobody has approved must not be filed
+where it reads as a description of the build.**
+
+**Owner tested:** no. R53 is latent by construction - no title has the flag off, so there is
+nothing to observe. The wizard badge can only be seen by setting the flag `false` on a title.
+
+**Deferred:** everything in `22` s4 pending the three decisions in s6. Also **not** done: the
+`01` / requirements-HTML version bump to 1.4, which is only owed if option A is answered "build
+now".
+
+**Next chat should:** get s6 answered, then challenges (X10 / E8) - and note `22` s5 found that
+challenges have a scheduling problem competitions do not, because nobody chooses the gun.
+
+---
+
+### 8 Sep 2026 - X4a / `21` s4.1h - R52: THE SERVICE AND ITS PLAY SURFACE WERE DEPLOYED APART
+
+**Shipped:** a boot-time audit of the games service's two halves against each other, and a
+sweeper that says *why* a delivery failed. **209 tests in `games-service`** (up from 204),
+**7 probes** in `tools/probe-deploy-drift.ps1`, all red on exactly the expected test with a
+blast radius of one or two.
+
+**The report:** the owner started Circuit Sprint, saw "Loading your round…" for ever, and
+separately saw the contest wizard still offering Circuit Perfect hours after it was retired,
+still advertising a 300-second ceiling that had been widened to 3600. The `/results` screen
+sat on "Confirming your result" while the sweeper logged `failed 1` every tick.
+
+**Root cause, and there is no bug in any revision.** `games-service/public/play` is plain
+files that arrive with a `git pull`. The allowlist in `src/http/play-page.ts` that authorises
+the service to serve them is TypeScript, and only changes once `npm run build` has run. The
+server was a **6 September** build serving a **7 September** surface, so `presentation.js` -
+introduced by the play-surface rebuild (`21` s4.1f) and imported by both `app.js` and
+`board.js` - was answered with a JSON 404. **An ES module that 404s takes its importer down
+with it**, so nothing evaluated at all: the page never got past the boot markup it ships with,
+never posted `ready`, and the platform's twelve-second stall panel - added the day before -
+was the only component in the whole stack that noticed. No request failed. No log line existed
+on either side.
+
+**All three symptoms are one cause**, which is why this is one entry. The wizard reads
+`provider_game` rows synced from that same stale service, so the retirement and the new
+ceiling had never crossed. **The picker had no defect at all** - `listContestableTitles`
+already filters on `providerStatus: "active"` and simply had nothing to filter. Checking that
+before building the guard the symptom suggested is what found the real cause; the alternative
+was a change that reviews as correct while the game still does not start.
+
+**Why no test could have caught it, which is the transferable part.** `every module the play
+surface imports is served` walks the real import graph and would catch a module committed
+without its allowlist line. It passed all day. It can only test **one revision**, and this
+fault is a disagreement **between** revisions - exactly the rule this programme already carries
+about `check:mirrors`: **a green guard proves two copies agree in the repository, never that
+the two halves of a running deployment agree with each other.** Only the deployment can answer
+that, so it now answers at boot.
+
+**Four load-bearing details of the audit.** It checks **both directions**, because code newer
+than the files is the same mistake with the halves swapped. It **excludes `index.html`**, which
+has its own route and is deliberately not in the allowlist - an audit that diffed the whole
+directory would error on **every boot**, and a guard that cries wolf at every start is the line
+everyone scrolls past, including on the day it is right. It **logs and does not refuse to
+start**, following `resolvePlayRoot`'s existing decision in the same file, because the sweeper
+must keep delivering results for rounds already in flight. And **both its inputs are
+parameters**: it first read `ASSETS` from module scope, and removing one entry turned **five**
+tests red, so none could say which rule had broken. **A pure function with one input injected
+and one read from module scope is only half pure, and the blast radius of a probe is what
+reveals it.**
+
+**The second finding, from reading the logs for the first.** The sweeper printed `failed 1`
+and nothing else, while `attemptDelivery` had already computed exactly why - `HTTP 401`,
+`HTTP 500`, a fetch error's own message - returned it, and had it dropped. A rotated callback
+secret, a platform that is down and a URL routed to nothing produced the identical line, while
+the player sat on "Confirming your result" and the contest could not settle behind them.
+**Classify a failure; never merely count it** - already a rule here from the concurrency tests,
+and this is its cost in production. The test asserts the **status**, not merely that something
+was logged: "delivery failed" would satisfy a bare check and leave the operator where
+`failed 1` left them.
+
+**Deviated from plan:** nothing was planned; this was a live report.
+
+**Owner tested:** no - and the remedy is the owner's to run. `npm run build` in
+`games-service`, `pm2 restart chartvolt-games`, then **Sync catalogue** on Admin → Games →
+Game Providers. After that the wizard drops Circuit Perfect and shows a 3600s ceiling.
+
+**Deferred:** the **duplicate PM2 process**. The logs show `4|chartvolt-games` and
+`5|chartvolt-games` while `ecosystem.config.js` declares `instances: 1, exec_mode: 'fork'` and
+its comment says why - "the callback sweeper is a singleton, and two copies would race to
+deliver the same result and double the provider's retry traffic". It is visible as one instance
+reporting `delivered 1` while the other reports `failed 1` on the same interval. No code can
+fix it; `pm2 delete` the duplicate.
+
+**Cost to players, precisely:** no money moved, no prize was paid, no stored value is wrong,
+**nothing was backfilled**. But an attempt is spent when a round is **created**, so a player
+whose game never booted has still used theirs, and those rounds settle under the contest's
+`unresolvedRoundPolicy` like any other.
+
+**Next chat should:** ask the owner to redeploy and re-sync, then confirm a round plays by
+clicking. After that, the open design question below - **contest shape per game family**
+(a puzzle where players join any time versus a race where everyone starts together) - and then
+challenges.
 
 ---
 

@@ -68,6 +68,8 @@ chapter covers risks to the programme and to the application.
 | R49 | **The dead null check under a noisy log line.** The reported symptom was three stack traces for one junk URL, because `/competitions/[id]` matches any segment under `/competitions/` and both of the lobby's reads threw inside one `Promise.all`. **The defect the chase found is that `getCompetitionById` threw for BOTH kinds of absence** - a malformed id and a missing document - and its catch re-wrapped both as one message, so **every caller's `if (!competition)` was unreachable.** Three authors independently wrote one: `/results` and `/trade` redirected to `/competitions` for a deleted contest and instead showed a server-error boundary, and `GET /api/competitions/[id]/status` - which is **polled** - answered 500 where its own code carefully answered 404. A deleted contest and a database outage produced the same message, so a page could not tell "this does not exist" from "we are broken" | Low | **CLOSED 7 Sep 2026.** **Live, and split precisely: the noise was harmless and the dead guard was not.** The player already got a 404 from the lobby, so no wrong screen was ever shown there; the two sibling pages showed an error boundary for a contest that had merely been deleted. No money, no payout, **nothing to backfill** - the defect is an unreachable branch rather than a stored value. A document calling this a logging fix is describing the symptom | `null` means it does not exist, a throw means something failed. Six routes refuse a junk id before any read, each writing **one** `warn` line naming the route and the value - a silent guard makes a bad link inside the application indistinguishable from a crawler. The pages' catch had to widen from `NEXT_REDIRECT` to the whole **`NEXT_`** family, because `notFound()` also throws, so the new 404 was caught, logged as a failure and re-issued. The shape test is ours rather than `ObjectId.isValid`'s **because that is a dependency's opinion about a URL**, which has already widened once; a test asserts the two agree today |
 | R50 | **The phantom zero that made every entrant a winner.** `providerHasResult` is `Number.isFinite(participant.score)`, and the module's own comment draws the distinction the fix rests on: a stored nought means "played and scored nothing" and is eligible, an absent score means no result and wins nothing. **Three writers each supplied a nought before the player had played** - `buildParticipantSeat` wrote `score: 0` into every seat at join, the schema declared the field `required: true, default: 0`, and the play state's `?? 0` did it again on the read. So every entrant held a finite score from the moment they paid, the "No score recorded" disqualification could not fire for anybody, and **R45's gate was dead on the day it shipped.** In the owner's own example - three ranks at 70/20/10, two players who played and one who never launched a round - the non-player ranked third on a phantom zero and was paid for it instead of the rank being redistributed | Medium | **CLOSED 7 Sep 2026.** **Latent for money, live for the screen.** No provider contest has settled in production, so no prize was paid on a phantom zero - but the lobby's hero tile has been showing `0` rather than a dash to every player who had not yet played, under a comment insisting it must show a dash. **A migration was needed even so, and that is the part a summary would drop:** a schema default fixes future rows only, so every seat already written holds a real `0` and an OPEN provider contest would still settle the old way. `tools/games/clear-phantom-participant-scores.ts` is report-only until `--apply` and **has not been run** | A default IS a stored value - the same rule that made `entryBlockThreshold` and `canEnterChallenges` defects. **Any one of the three writers is enough to reintroduce it**, so there is a probe per writer rather than a probe for the fix. R45's own suite passed throughout because it builds participants as plain objects and omits `score` to mean "never played" - **a shape no production writer could produce**, which is the third instance of a fixture testing the consumer instead of the producer and the first where the fixture supplied an *absence*. `ChallengeParticipant` deliberately still defaults, pinned by a test, because provider challenges are E8 |
 | R51 | **Five AI routes that answered to nobody.** Every route under `apps/admin/app/api/ai/` had no authorization of **any** kind - not a weak check, none - and the admin app has no middleware, so any caller reaching the origin could post an arbitrary prompt and be answered with the platform's own OpenAI key. **Two of the five WRITE**: `evaluate-balance`'s `fix` action and the whole gamification wizard rebalance badge thresholds and journey milestones, which is the reward economy every player is progressing through. The folder is what hid it - `evaluate-balance`'s own header advertises a local engine with no AI calls, so it reads as harmless | **High** | **CLOSED 8 Sep 2026.** Live and unauthenticated, **but say the exposure in both directions**: no money moved, no prize was paid and no wallet was touched, while metered spend on our account was unbounded and player-facing thresholds were writable. **There is no way to know whether it was ever called**, because a route with no guard records no attribution, and **nothing was backfilled** - the two write actions leave ordinary documents indistinguishable from an operator's own edits | Found by **counting exported handlers against guards**, not by reading routes - third instance after R40 and R47, and the only method that works, because every *other* admin route having something is what sends a reader past the ones with nothing. Each route is guarded by the section owning its **calling screen**, never a general "AI" grant, which is why `journey-map` and `gamification-wizard` had to become section ids (add-only; they rendered screens no grant could name, so only super admins reached them, and nobody's access changed) |
+| R52 | **A build and a static directory that must ship together, with nothing checking they did.** `games-service/public/play` arrives with a `git pull`; the allowlist authorising those files is TypeScript that only exists after `npm run build`. A 6 Sep build served a 7 Sep surface, so `presentation.js` 404'd - and an ES module that 404s takes its importer down with it, so **no script evaluated at all**: the page sat on its own boot spinner, never posted `ready`, and two players could not start a game. The same stale build is why the wizard still offered retired Circuit Perfect and a 300s Sprint ceiling, so **the picker had no defect** - it already filters on `providerStatus: "active"` and had nothing to filter | **High** | **CLOSED 8 Sep 2026.** Live and player-visible, **nothing to backfill** - no money moved and no stored value is wrong, the defect is an absent file on one side of an HTTP request. But the rounds it consumed are real: an attempt is spent when a round is **created**, so a player whose game never booted has still used it, and those rounds settle under `unresolvedRoundPolicy` like any other. Remedy is rebuild, restart, re-sync the catalogue - **and the owner must still rebuild once, because the fix is in the build** | **No test could have caught it**: the existing walk of the import graph passed all day, because it tests **one revision** and the fault is a disagreement **between** revisions. **The first fix - a boot audit - was WRONG and this row said it was the answer.** It could never fire: **a guard shipped inside the artifact whose staleness it reports is absent in exactly the state it was written for.** The coupling is now removed instead - the served set is read from the directory at boot, so **one thing cannot disagree with itself** - with the extension allowlist as the remaining protection and the audit reporting only that. General rule: **prefer deleting a coupling to detecting it**, and never let a detector ship on the same schedule as the thing it checks. Found alongside: the sweeper printed `failed 1` and dropped the reason - **classify a failure, never merely count it** |
+| R53 | **`supportsContentSeed` decided nothing, and three comments said it decided paid entry.** The flag guaranteeing every player in one contest faces identical content - *"the most important single field in the specification"*, `01` s4.3, and what preserves the skill-not-chance position - was declared, validated on ingest, stored, transported and badged, and read by **no gate in either app**. Its two siblings *are* enforced, in the pre-flight and in the wizard, which is what hid it: **a partially-implemented pattern is more dangerous than an absent one**, because the absent one prompts the question. Fifth instance of a comment asserting a check that does not run, and the first repeated in three files - **agreement between comments is not corroboration** | **High** | **CLOSED 8 Sep 2026. Latent, nothing to backfill** - every title that exists declares it `true`, so no unfair contest has run. It is the flag a real provider will set `false` at **X4**, and the failure then is a paid competition where every player faces different content, ranked, settled and paid, silently | One unconditional check in both mirrored pre-flight copies, the field **required** on the input so a caller cannot fail open again, both writers counted with `rg` first, and the wizard disabling the title with the capability named. **Not scoped to `competition`** despite the spec's wording - a challenge ranks two players for money on the same basis, so the challenge half is a tripwire for E8. 4 tests, 4 probes; the second test exists because all three format refusals share one block, so a fixture missing two things is refused either way |
 | R24 | Scope creep before anything ships | Medium | **High** | All |
 | R25 | Round write contention under load | Medium | Medium | X12 |
 | X15 | "Challenge any user" harassment surface - no report-user feature exists | Medium | Medium | X10 |
@@ -1781,6 +1783,168 @@ closing paren after the string, so the loop over the matches ran zero times and 
 vacuously. Fixed on both sides: a bare wrong literal in the probe, and a `length > 0` assertion
 in the test, because **an assertion inside a loop over an empty list is green**. Same family as
 the slice that found nothing and the `indexOf` that matched an import.
+
+---
+
+### R52 - A build and a static directory that must ship together, with nothing checking they did - **CLOSED, 8 September 2026**
+
+**Two players could not start a game at all, and every layer reported success.** The owner opened
+Circuit Sprint, watched "Loading your round…" until it gave up, and saw the stall panel the
+platform added the day before. The frame's document had loaded. Nothing had failed.
+
+**The cause is a split deployment, not a bug in any revision.** `games-service/public/play` is
+plain files that arrive with a `git pull`. The allowlist in `src/http/play-page.ts` that authorises
+them is TypeScript, and only exists once `npm run build` has run. The server was running a
+**6 September** build against a **7 September** surface, so `presentation.js` - added by the play-
+surface rebuild and imported by both `app.js` and `board.js` - was answered with a JSON 404. An ES
+module that 404s takes its importer down with it, so **no script evaluated at all**: the page sat
+on its own boot spinner, never posted `ready`, and the platform's twelve-second stall panel was the
+only thing in the entire stack that noticed.
+
+**The same stale build explains the two symptoms that looked unrelated**, which is why they are one
+entry. Circuit Perfect was still offered by the contest wizard although it was retired that
+morning, and Circuit Sprint still advertised "Up to 300s an attempt" against a new ceiling of 3600
+- because both facts are read from `provider_game` rows synced from a service that was still
+reporting the 6 September catalogue. `listContestableTitles` already filters on
+`providerStatus: "active"`, so **there was no defect in the picker**; there was nothing for it to
+filter. Rebuild, restart, and re-sync the catalogue and both symptoms go with it.
+
+**Why no test could have caught it, and this is the transferable part.**
+`every module the play surface imports is served` walks the real import graph and would catch a
+module committed without its allowlist line. It passed all day, because it can only ever test **one
+revision**, and the fault is a disagreement **between** revisions. This is the rule this programme
+already applies to `check:mirrors`, in a new place: **a green guard proves two copies agree in the
+repository, never that the two halves of a running deployment agree with each other.** Only the
+deployment can answer that, so it now answers at boot - `auditPlaySurface` compares the directory
+against the served set in both directions and prints an error naming the files and the remedy.
+
+**It logs and does not refuse to boot**, following `resolvePlayRoot`'s existing decision in the same
+file: creating rounds and, above all, the sweeper delivering results for rounds already in flight
+all work without these files. Refusing to start would convert a broken play surface into contests
+that cannot settle, which is the worse failure.
+
+**The second finding, found while reading the logs for the first.** The sweeper printed
+`failed 1` every tick and nothing else. `attemptDelivery` computes exactly why - `HTTP 401`,
+`HTTP 500`, a fetch error's own message - returns it, and the loop incremented a counter and
+**dropped it**. A rotated callback secret, a platform that is down and a callback URL routed to
+nothing produced the identical line, while the player sat on "Confirming your result" and the
+contest could not settle behind them. **Classify a failure; never merely count it** - already a rule
+here from the concurrency tests, and this is its cost in production. The reason and whether it will
+be retried are now logged per round.
+
+**CORRECTION, later on 8 September 2026: the boot audit above was not the fix, and this entry
+said it was.** The owner rebuilt nothing, reopened the game, and it failed identically -
+`/play/presentation.js` 404, no `ready`, the twelve-second stall panel. The audit detects this
+drift and names the file, and **it could never have fired, because it lives in the build it exists
+to warn about.** A guard shipped inside the artifact whose staleness it reports is absent in
+precisely the state it was written for. That is the same class as a comment asserting a check that
+does not run - except the code is real, correct, tested, probed, and unreachable.
+
+**So the coupling was removed rather than monitored.** `readServableAssets` derives the served set
+from the directory listing at boot, so a module arriving with a `git pull` is servable with no
+build at all: **two things must ship together for a filename list, and one thing cannot disagree
+with itself.** The security properties the old allowlist bought are unchanged and are the reason
+`express.static` is still refused here - the request string is only ever a `Map` key, never a path
+component, so traversal is impossible however it is encoded; top-level regular files only; and an
+**extension** allowlist rather than a filename one, which is now the whole of the remaining
+protection and the only way a file can still be present and unreachable. That is what the boot
+audit reports now, and its other half (`missing`) is **structurally impossible and kept as a
+tripwire**, documented as such, because it becomes reachable the moment anybody reintroduces a
+hand-written list.
+
+**The general rule, which is worth more than the incident:** when a guard's own correctness depends
+on the deployment step it is warning you about, it is not a guard. **Prefer deleting the coupling
+to detecting it** - and when you cannot, put the detector somewhere that ships on the *other*
+schedule from the thing it checks.
+
+4 new tests (213 in `games-service`, up from 209) and `tools/probe-play-assets.ps1`, 6 probes, all
+red on exactly the expected test. **Probe 4 came back green and taught the third cause again**: the
+explicit `index.html` skip is real and **unreachable**, because `.html` was never in the
+content-type table, so the document was already refused a line later. The skip is kept as a
+tripwire with the reason in the file, the probe was re-aimed at adding `.html` to the table - the
+realistic change, since a rules page is how it would arrive - and the test gained a second
+assertion pinning **where the guarantee actually lives**. A test asserting only the observable
+behaviour would have credited the name check with a guarantee it does not provide.
+
+**The owner must still rebuild once.** This change cannot fix the build that is running, because
+the change is in the build. Say that plainly rather than letting "fixed" imply the server is well.
+
+**One operational fault is the owner's to clear and no code can fix it:** the logs show
+`4|chartvolt-games` and `5|chartvolt-games`, two processes, while `ecosystem.config.js` declares
+`instances: 1, exec_mode: 'fork'` and its comment says exactly why - "the callback sweeper is a
+singleton, and two copies would race to deliver the same result and double the provider's retry
+traffic". That is visible in the logs as one instance reporting `delivered 1` while the other
+reports `failed 1` on the same tick interval. `pm2 delete` the duplicate.
+
+**Live, player-visible, and nothing to backfill.** No money moved, no prize was paid and no stored
+value is wrong - the defect is an absent file on one side of an HTTP request. The rounds it consumed
+are real, though: an attempt is spent when a round is **created**, so a player whose game never
+booted has still used it, and those rounds settle under the contest's `unresolvedRoundPolicy` like
+any other.
+
+Pinned by five tests in `games-service/tools/test-play.ts` and
+`tools/probe-deploy-drift.ps1` (7 probes, all red on exactly the expected test, blast radius one or
+two). **A probe is what exposed the guard's own design flaw:** `auditPlaySurface` first read
+`ASSETS` from module scope while taking the file list as a parameter, so removing one allowlist
+entry turned **five** tests red and none of them could say which rule had broken. **A pure function
+with one input injected and one read from module scope is only half pure, and the blast radius of a
+probe is what reveals it.** Both inputs are now parameters and the three unit tests pass their own
+served list.
+
+### R53 - The fairness gate that three comments claimed and nothing performed - **CLOSED, 8 September 2026**
+
+**`supportsContentSeed` decided nothing.** It is the flag that says a provider will give every
+player in one contest identical content, and `01` s4.3 calls it *"the most important single field
+in the specification"* - without it, two players are ranked against each other having faced
+challenges of unknown relative difficulty, and **it is also what preserves the skill-not-chance
+position** the regulatory defence pack rests on. It was declared on both `provider_game` copies,
+**validated on ingest** by the ChartVolt Games adapter, copied by the catalogue sync, carried in
+the admin DTO and rendered as a badge - and read by no gate, in either app.
+
+**Three separate comments in three files asserted that it gated paid entry:**
+`provider-game.model.ts` (*"required for competitions … the contest is not a fair comparison"*),
+`chartvolt-games.adapter.ts` (*"`supportsContentSeed` decides whether a title may take entry
+fees"*) and `games-service/src/http/catalogue.ts`. **This is the fifth instance of a comment
+asserting a check that does not run**, after Prerequisite A, the internal-secret fallbacks, the
+unprotected suspicion-score route and `requireAdminAuth` - and the first where the claim was
+repeated in three places, which is worth noticing on its own: **agreement between comments is not
+corroboration, because the second and third were written by reading the first.**
+
+**What hid it is that its two siblings are enforced properly.** `supportsCompetition` is refused
+by the pre-flight *and* disables the option in the wizard with the reason named - the pattern this
+programme keeps arriving at. Reading that code leaves a reader confident the capability flags are
+handled, because two of the three are. **A partially-implemented pattern is more dangerous than an
+absent one**, since the absent one prompts the question.
+
+**Latent, and nothing to backfill.** Every title that exists declares it `true` - both
+`chartvolt-games` titles and both mock titles - so no unfair contest has run. It is precisely the
+flag a real provider will set `false` on some titles at **X4**, and the failure then is a paid
+competition in which every player faces different content, ranked, settled and paid, with nothing
+in any log.
+
+**Closed by one unconditional check in both mirrored copies of `contest-preflight.ts`**, the field
+made **required** on `PreflightInput.title` so a caller cannot omit it and fail open again, both
+writers updated (`preflightProviderContest`, shared by create and edit, and the publish service -
+**counted with `rg` before changing anything**, per the rule that has now caught this seven times),
+and the wizard's first step disables the title with the missing capability named. **Deliberately
+not scoped to `competition`**, although that is the word both the spec and the model comment use: a
+challenge ranks two players against each other for money on exactly the same basis, so the
+reasoning does not narrow to the many-player case. The challenge half is a **tripwire** today,
+since provider challenges are E8 and unbuilt.
+
+Four tests in `__tests__/services/provider-contest-create.test.ts`, four probes red on exactly the
+expected test. **The second test exists because of a trap the first cannot catch:** all three
+format refusals live in one block, so a fixture lacking the seed *and* lacking a format capability
+is refused either way - the test pins that a title supporting **both** formats and lacking only the
+seed is still refused, and refused *for the seed*. Same shape as the `gameKey` allow-list probe in
+`12` s2.2, where a probe stayed green because a second refusal covered for the one being tested.
+
+**And the change immediately proved its own worth on a fixture**, which is the part to carry
+forward: three tests in `provider-contest-edit.test.ts` went red because its seeded title omitted
+the field, so the model's `default: false` refused the edit. The fixture's own comment, six lines
+above, warns about exactly this class. **A gate added to a path with existing tests will fail them,
+and that failure is the gate working** - the thing to check is that the fixture was wrong, not the
+gate.
 
 ---
 
