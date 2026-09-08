@@ -116,6 +116,33 @@ rather than replaced.
 clamps `expiresAt` to `playWindowEnd` under both policies, and a contest whose window has
 actually **closed** refuses under both.
 
+**AMENDED AGAIN 8 SEPTEMBER 2026, AND THIS TIME THE ARITHMETIC ITSELF WAS WRONG.** The
+sentence above says the gate reserves the **catalogue ceiling**, and it did - that was a
+defect, not a specification. It is now `now + attemptSeconds <= playWindowEnd`, where
+`attemptSeconds` is **the playing time this contest actually grants.** `External game
+plans/12` section 2.9 is the authoritative account of what was built.
+
+Three things about this second amendment, because it changes the reading of the first.
+
+- **The rule is unchanged; only the number is.** Reserving the *whole* attempt is still
+  the law under `reserve_full_round`, and a test forbids reserving a fraction of it. What
+  changed is that the attempt being reserved is the one the player is going to be given.
+- **`reserve_full_round` is now the wizard's default for new drafts**, which it was not
+  while the reservation could be five times the configured length. **The schema default
+  is deliberately unchanged**, so a contest created before today keeps the rule its
+  entrants signed up under - a schema default fixes future rows only.
+- **The ceiling still decides `expiresAt`**, and that separation is load-bearing. The
+  gate asks *how much time must I reserve*, which is what this contest grants. Expiry
+  asks *how long may this round live*, which is the most the game will ever run. Reading
+  the configured attempt there would cut a player off mid-board with a score the provider
+  never sent.
+
+**How the platform learns which setting is the play clock, without learning a field
+name.** A title declares it: `format: "duration-seconds"` on the relevant property of
+its `configSchema`. Chapter `01` section 2.4 carries the provider-facing requirement.
+A title declaring none falls back to `maxDurationSeconds`, which is never shorter than
+the truth, so the fallback over-reserves and therefore still fails closed.
+
 ### 1.3 Attempts policy - a required per-contest setting
 
 | Policy | Behaviour | Best for |

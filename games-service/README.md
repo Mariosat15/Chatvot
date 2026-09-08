@@ -59,7 +59,7 @@ there is no guard, only this note.
 
 ## The games
 
-One engine, two titles. **Circuit** is a non-crossing path puzzle: connect each pair of
+One engine, one title. **Circuit** is a non-crossing path puzzle: connect each pair of
 matching terminals so that no two paths cross. Chosen for reasons that are all constraints
 from the spec or the plan rather than taste:
 
@@ -71,22 +71,35 @@ from the spec or the plan rather than taste:
 | **Skill, not chance** | No randomness during play. The puzzle is fixed before the first move, and every player gets the same one |
 | **Mobile-native** | Drag to draw a path. Most players are on a phone |
 
-### The two titles, and why there are two
+### The title, and the one that was retired
 
-| | `circuit-sprint` | `circuit-perfect` |
-|---|---|---|
-| Score | Points, **higher is better** | Total time, **lower is better** (`duration_ms`) |
-| Format | Solve as many puzzles as possible in 120 seconds | Solve a fixed set of 5 puzzles as fast as possible |
+| | `circuit-sprint` |
+|---|---|
+| Score | Points, **higher is better** |
+| Format | Solve as many puzzles as you can inside the contest's playing time - **1 to 60 minutes**, chosen per contest, 10 by default |
+| Play clock | `durationSeconds`, declared `format: "duration-seconds"` so the platform can reserve the right amount of time. `01` section 3.2 |
 
-**The second title exists to make `scoreDirection` observable.** A `lower_is_better` game
-had never been exercised by anything real, and getting the direction wrong ranks the entire
-field backwards and pays the slowest player first. One engine serves both, which also
-demonstrates the thing the abstraction claims: one adapter, many titles.
+**Scoring is count and speed**, which is the whole point of the format: more boards is
+worth more, and solving each one faster is worth more. A player is never required to finish
+anything - the clock ends the round, and whatever they achieved is their score.
 
-**The rule that stops `circuit-perfect` being nonsense:** an unsolved puzzle adds a fixed
-penalty rather than being skipped. Without it, a player who solved two puzzles quickly would
-beat one who solved all five, because their total time is lower. This is stated in the
-title's `rulesSummary`, since it is exactly the kind of thing a player disputes a prize over.
+**`circuit-perfect` was retired on 8 September 2026**, on the owner's instruction that there
+be no fixed board count and no per-round restriction. It solved a fixed set of five puzzles
+as fast as possible, scored on total time (`lower_is_better`, `duration_ms`), and it existed
+to make `scoreDirection` observable - getting the direction wrong ranks the whole field
+backwards and pays the slowest player first.
+
+**It is `status: "deprecated"`, still in `TITLES`, and that is deliberate.** `gameKey` is
+the join key for every stat a title ever produced, so deleting the row orphans history
+while every screen still renders a key it cannot resolve - the same rule the platform
+applies to a provider it stops using. The platform's contest pre-flight refuses a
+non-`active` title, so the deprecation *is* the enforcement: no new contest can be created
+on it, and rounds already played still read and score correctly.
+
+**Retiring it has a real cost, recorded rather than glossed:** there is now no
+`lower_is_better` title anywhere, so that direction is covered by unit tests and the golden
+ranking regression rather than by an end-to-end round. `External game plans/21` section 4.1g
+carries the options for restoring it.
 
 ### Presentation is varied per player, and the spec asks for this
 
@@ -221,7 +234,7 @@ and `tools/test-board.ts` drives the browser module headlessly to assert the two
 
 ```
 npx tsx tools/smoke-play.ts                                  # circuit-sprint, medium
-npx tsx tools/smoke-play.ts circuit-perfect small 3 --reveal
+npx tsx tools/smoke-play.ts circuit-sprint small 3 --reveal
 ```
 
 Boots the service against an in-memory MongoDB, creates one round, prints a launch URL to open,
@@ -266,7 +279,7 @@ npm run probe:board          # the same, for the browser module
 npm run probe:presentation   # the same, for the play surface's sizing and wording
 ```
 
-`npm test` runs **196 tests**: 15 config, 42 engine, 21 scoring, 41 API, 42 play and delivery,
+`npm test` runs **204 tests**: 15 config, 42 engine, 28 scoring, 41 API, 43 play and delivery,
 11 board client, 24 presentation. (Any figure of 167 predates the presentation suite, and 152
 predates the config suite; both are stale.)
 

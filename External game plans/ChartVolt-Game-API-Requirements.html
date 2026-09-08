@@ -208,7 +208,7 @@
     <p class="lede">ChartVolt runs paid skill competitions. We handle the money, the ranking and the rewards. We are looking for partners who can supply the games and tell us what each player scored. This document specifies exactly what your API must do so that we can operate on top of it &mdash; three calls to you, one call back to us.</p>
     <div class="hero-meta">
       <div><b>Document</b><span>Integration requirements</span></div>
-      <div><b>Version</b><span>1.2</span></div>
+      <div><b>Version</b><span>1.3</span></div>
       <div><b>Audience</b><span>Your engineering team</span></div>
       <div><b>Required calls</b><span>3 out, 1 in</span></div>
       <div><b>Money handled by you</b><span>None, ever</span></div>
@@ -476,19 +476,20 @@
       "scoreRange":     { "min": 0, "max": 10000 },
 
       <span class="c">// ---- timing ----</span>
-      "typicalDurationSeconds": 180,
-      "maxDurationSeconds":     600,
+      "typicalDurationSeconds": 600,
+      "maxDurationSeconds":     3600,
 
       <span class="c">// ---- settings we may choose per contest (JSON Schema) ----</span>
       "configSchema": {
         "type": "object",
         "properties": {
-          "questionCount":      { "type": "integer", "minimum": 5, "maximum": 30, "default": 10 },
-          "secondsPerQuestion": { "type": "integer", "minimum": 5, "maximum": 60, "default": 15 },
-          "category":           { "type": "string", "enum": ["general","sport","science","film"] },
-          "difficulty":         { "type": "string", "enum": ["easy","mixed","hard"], "default": "mixed" }
+          "questionCount": { "type": "integer", "minimum": 5, "maximum": 30, "default": 10 },
+          "playSeconds":   { "type": "integer", "minimum": 60, "maximum": 3600, "default": 600,
+                             "format": "duration-seconds" },   <span class="c">// &lt;- see 3.2</span>
+          "category":      { "type": "string", "enum": ["general","sport","science","film"] },
+          "difficulty":    { "type": "string", "enum": ["easy","mixed","hard"], "default": "mixed" }
         },
-        "required": ["questionCount", "secondsPerQuestion"]
+        "required": ["questionCount", "playSeconds"]
       },
 
       <span class="c">// ---- availability ----</span>
@@ -511,7 +512,7 @@
       <tr><td><code>scoreType</code></td><td><span class="b req">Yes</span></td><td><code>integer</code>, <code>decimal</code> or <code>duration_ms</code></td></tr>
       <tr><td><code>scoreRange</code></td><td><span class="b req">Yes</span></td><td>We reject scores outside this range as a safety check against both cheating and bugs</td></tr>
       <tr><td><code>maxDurationSeconds</code></td><td><span class="b req">Yes</span></td><td>A round must be impossible to extend beyond this. We use it to schedule contests</td></tr>
-      <tr><td><code>configSchema</code></td><td><span class="b req">Yes</span></td><td>Valid JSON Schema describing every setting we may send in <code>config</code></td></tr>
+      <tr><td><code>configSchema</code></td><td><span class="b req">Yes</span></td><td>Valid JSON Schema describing every setting we may send in <code>config</code>. If the title's length is configurable, one property must carry <code>format: "duration-seconds"</code> &mdash; see 3.2</td></tr>
       <tr><td><code>status</code></td><td><span class="b req">Yes</span></td><td><code>active</code>, <code>deprecated</code> or <code>maintenance</code></td></tr>
       <tr><td><code>tagline</code></td><td><span class="b req">Yes</span></td><td>One line under 90 characters, for cards and search results</td></tr>
       <tr><td><code>description</code></td><td><span class="b req">Yes</span></td><td>Two to four sentences. Must say what the player actually <i>does</i> &mdash; this is what someone reads before paying to enter</td></tr>
@@ -551,6 +552,26 @@
     <div class="t">Why configSchema is worth doing properly</div>
     <p>We generate our admin settings form <b>directly from your <code>configSchema</code></b>. If it is accurate and complete, you can add a new game to your catalogue and we can start running contests on it <b>without writing or deploying any code</b>. If it is vague, every new title needs developer time on our side, which makes us slow to adopt your releases. This one field largely determines how quickly your catalogue reaches our players.</p>
   </div>
+
+  <h3 id="format">3.2 &nbsp;One <code>format</code> keyword &mdash; tell us which setting is the play clock</h3>
+  <p><b>New in version 1.3.</b> We read your <code>configSchema</code> generically, without knowing what any setting means. That is the property worth keeping. There is exactly one thing we nevertheless have to understand: <b>which setting is the length of play</b>. Mark that property with <code>format: "duration-seconds"</code>, as in the example above.</p>
+
+  <p><b>Why we cannot manage without it.</b> A competition must stop accepting new attempts far enough before its end time that nobody's attempt is cut short &mdash; otherwise two players are ranked against each other over different lengths of play, which we will not do. Working out that moment needs one number: how long an attempt of <i>this contest</i> runs for. Without the keyword the only figure available is <code>maxDurationSeconds</code>, your title's ceiling. Reserving a one-hour ceiling against a contest configured for ten minutes of play means <b>the contest refuses every attempt for its whole duration</b>. That was a real defect on our side, fixed on 8 September 2026, and it is why this keyword exists.</p>
+
+  <p><b>Why we do not simply hard-code your field's name.</b> Because it would then be your field name, in our code, for ever &mdash; and the next title, whose clock is called something else, would need a release from us. That is precisely what <code>configSchema</code> exists to avoid.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:290px">Rule</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td>Declared on an <code>integer</code> or <code>number</code></td><td>Required. On a <code>string</code> we <b>refuse the schema</b>. The value is arithmetic, and a non-numeric clock produces <code>NaN</code>, which makes every comparison false and would silently open the gate it exists to close</td></tr>
+      <tr><td>At most <b>one</b> property per schema</td><td>Two would leave the reservation depending on the order your properties happen to be listed in. We <b>refuse the schema</b> and tell the operator why</td></tr>
+      <tr><td>Any other <code>format</code> value</td><td><b>Refused.</b> We fail closed on schema keywords we do not implement. A format we quietly ignored would leave a declared clock treated as an ordinary integer, with nothing anywhere saying so</td></tr>
+      <tr><td>Not declared at all</td><td><b>Permitted.</b> We fall back to <code>maxDurationSeconds</code>. Correct but coarse &mdash; a contest shorter than your ceiling then cannot be scheduled with equal playing time for everyone. Declare it if your title's length is configurable</td></tr>
+      <tr><td>Units</td><td><b>Seconds</b>, matching the keyword's name and the <code>minimum</code> / <code>maximum</code> you declare</td></tr>
+    </tbody>
+  </table></div>
+
+  <p style="margin-bottom:0"><b>If your title's length is fixed rather than configurable</b>, declare nothing and set <code>maxDurationSeconds</code> to that fixed length. The fallback is then exactly right.</p>
 </section>
 
 <!-- ===== 7 ===== -->
@@ -1133,19 +1154,20 @@ $headers = [
   <div class="tw"><table>
     <thead><tr><th style="width:90px">Version</th><th style="width:130px">Date</th><th>Change</th></tr></thead>
     <tbody>
+      <tr><td><b>1.3</b></td><td>8 Sep 2026</td><td><b>One new <code>configSchema</code> keyword.</b> If a title's length of play is configurable, the property carrying it must be marked <code>format: "duration-seconds"</code> &mdash; section 3.2. Nothing else about <code>configSchema</code> changes, and a title whose length is fixed needs no change at all. We added it because a competition has to stop accepting attempts one full playing time before it ends, and without the keyword the only figure available is your <code>maxDurationSeconds</code> ceiling &mdash; which made short contests unplayable on our side</td></tr>
       <tr><td><b>1.2</b></td><td>30 Aug 2026</td><td><b>Two field renames.</b> <code>family: "solo_scored"</code> becomes <code>family: "independent"</code>, and the capability flag <code>supportsDuel</code> becomes <code>supportsOneVsOne</code>. Both were renamed because &ldquo;solo&rdquo; and &ldquo;duel&rdquo; were being misread as statements about contest size. Nothing else about either field changes. Added a note in section 4 making it explicit that every contest we run has at least two players, and that an independent-play game is used in contests of a hundred people</td></tr>
       <tr><td><b>1.1</b></td><td>30 Aug 2026</td><td>Page content per game promoted to a hard requirement &mdash; <code>tagline</code>, <code>description</code>, <code>rulesSummary</code>, <code>howToPlay</code>, <code>bannerUrl</code> &mdash; because each game now gets its own page on our site. Added artwork size minimums, localisation and unbranded-copy constraints. Added the rule that nothing sold may improve a score in a paid contest. Three product questions and one commercial question added; commercial questions renumbered from 21</td></tr>
       <tr><td><b>1.0</b></td><td>Initial</td><td>First issue &mdash; the four calls, authentication and signing, idempotency, content seeding, round states, error handling, sandbox, service levels</td></tr>
     </tbody>
   </table></div>
-  <p style="margin-bottom:0">If you have already begun work against version 1.0 or 1.1, almost nothing you have built is invalidated. The 1.1 additions are content fields on the catalogue response. The 1.2 changes are <b>two field renames on the same response</b> &mdash; tell us if you have already shipped the old names and we will accept both during your integration.</p>
+  <p style="margin-bottom:0">If you have already begun work against an earlier version, almost nothing you have built is invalidated. The 1.1 additions are content fields on the catalogue response. The 1.2 changes are <b>two field renames on the same response</b> &mdash; tell us if you have already shipped the old names and we will accept both during your integration. The 1.3 change is <b>one keyword on one property</b> of a schema you are already sending, and only for titles whose length of play is configurable.</p>
 </section>
 
 </main>
 </div>
 
 <div class="foot">
-  <div>ChartVolt &mdash; Game API Requirements &middot; Version 1.2 &middot; Requirements document for prospective game providers</div>
+  <div>ChartVolt &mdash; Game API Requirements &middot; Version 1.3 &middot; Requirements document for prospective game providers</div>
   <div>Questions on this specification: contact your ChartVolt commercial contact</div>
 </div>
 

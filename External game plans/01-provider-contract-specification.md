@@ -105,18 +105,19 @@ ChartVolt decide what contest formats each game can support.
       "scoreType": "integer",
       "scoreRange": { "min": 0, "max": 10000 },
 
-      "typicalDurationSeconds": 180,
-      "maxDurationSeconds": 600,
+      "typicalDurationSeconds": 600,
+      "maxDurationSeconds": 3600,
 
       "configSchema": {
         "type": "object",
         "properties": {
           "questionCount":     { "type": "integer", "minimum": 5,  "maximum": 30, "default": 10 },
-          "secondsPerQuestion":{ "type": "integer", "minimum": 5,  "maximum": 60, "default": 15 },
+          "playSeconds":       { "type": "integer", "minimum": 60, "maximum": 3600, "default": 600,
+                                 "format": "duration-seconds" },
           "category":          { "type": "string",  "enum": ["general","sport","science","film"] },
           "difficulty":        { "type": "string",  "enum": ["easy","mixed","hard"], "default": "mixed" }
         },
-        "required": ["questionCount", "secondsPerQuestion"]
+        "required": ["questionCount", "playSeconds"]
       },
 
       "locales": ["en", "es", "de", "el"],
@@ -137,7 +138,7 @@ ChartVolt decide what contest formats each game can support.
 | `supportsContentSeed` | Yes | See 4.3. **Required for competitions.** A game without it cannot be used for a fair multi-player contest |
 | `scoreDirection` | Yes | `higher_is_better` or `lower_is_better`. Speedruns and golf-style games are the latter. Getting this wrong ranks everyone backwards |
 | `scoreType` | Yes | `integer`, `decimal` or `duration_ms` |
-| `configSchema` | Yes | JSON Schema. **The admin panel renders its settings form directly from this**, so a new game needs no ChartVolt release |
+| `configSchema` | Yes | JSON Schema. **The admin panel renders its settings form directly from this**, so a new game needs no ChartVolt release. If the title's length is configurable, one property must carry `format: "duration-seconds"` - see 3.2 |
 | `typicalDurationSeconds` / `maxDurationSeconds` | Yes | Drives contest scheduling and the result grace period |
 | `status` | Yes | `active`, `deprecated` or `maintenance` |
 
@@ -194,6 +195,58 @@ score or ranking in a paid contest - no extra time, hints, retries, continues or
 paid unlocks affecting results. See `../New games plan/15-platform-transformation-and-gaps.md`
 section 3.2 for the reasoning. If a game's economics depend on such mechanics, it is
 the wrong game for this platform. Ask before evaluating anything else.
+
+### 3.2 One `format` keyword, and why it is required rather than optional
+
+Added 8 September 2026. **Version 1.3 of the provider-facing document**
+(`ChartVolt-Game-API-Requirements.html`), which is the version number to quote - this
+`.md` carries no version of its own.
+
+`configSchema` is rendered generically, which means ChartVolt reads a title's settings
+without knowing what any of them mean. That is the property worth keeping - and there is
+exactly one thing the platform must nevertheless understand: **which setting is the play
+clock.**
+
+**Declare it with `format: "duration-seconds"` on that property.**
+
+```json
+"configSchema": {
+  "type": "object",
+  "properties": {
+    "durationSeconds": {
+      "type": "integer",
+      "format": "duration-seconds",
+      "minimum": 60, "maximum": 3600, "default": 600
+    },
+    "difficulty": { "type": "string", "enum": ["easy", "hard"], "default": "easy" }
+  },
+  "required": ["durationSeconds"]
+}
+```
+
+**Why the platform cannot manage without it.** A competition has to stop accepting new
+attempts far enough before its end time that nobody's attempt is cut short - otherwise
+two players are ranked against each other over different lengths of play. Computing that
+moment needs one number: how long an attempt of *this contest* runs for. Without the
+keyword the only available figure is `maxDurationSeconds`, the title's ceiling, and
+reserving a ceiling of an hour against a contest configured for ten minutes of play means
+**the contest refuses every attempt for its entire duration.** That was a live ChartVolt
+defect, fixed on 8 September 2026, and it is the reason this keyword exists.
+
+**Why not just name the field.** Because then it is your field name, in our code, for
+ever - and the next provider's title, whose clock is called something else, needs a
+ChartVolt release. That is precisely the outcome `configSchema` exists to avoid.
+
+| Rule | Behaviour |
+|---|---|
+| Declared on an `integer` or `number` property | Required. On a `string` the schema is **refused** - the value is arithmetic, and a non-numeric clock produces `NaN`, which makes every comparison false and every gate silently open |
+| At most **one** property per schema may declare it | Two would leave the reservation depending on property order. The schema is **refused** |
+| Any other `format` value | **Refused.** ChartVolt fails closed on schema keywords it does not implement, so a format we silently ignored would leave a declared clock treated as an ordinary integer with nothing anywhere saying so |
+| Not declared at all | **Permitted.** ChartVolt falls back to `maxDurationSeconds`. Correct but coarse: a contest shorter than your ceiling cannot be scheduled with the reserving policy, so declare it if your title's length is configurable |
+| Units | **Seconds**, matching the keyword's name, and matching the `minimum` / `maximum` you declare |
+
+**If your title's length is fixed rather than configurable**, declare nothing and set
+`maxDurationSeconds` to that fixed length. The fallback is then exactly right.
 
 ---
 

@@ -544,13 +544,31 @@ button on. The visible consequences were a refusal quoting **300 seconds** to so
 just typed 120 into that game's settings, and a Play button going dead **three minutes**
 earlier than the configured round needed.
 
-**The ceiling is right and must not be "fixed" to the configured value.** Chapter 03 section
-1.2 specifies it deliberately: the gate fails closed, refusing slightly more than strictly
-necessary, so an attempt can never be admitted that the contest end would cut short. A round
-stopped mid-play would be scored on a partial game, which is the unfairness the rule exists to
-prevent. Reading the configured value would buy an honest-looking message and reintroduce
-exactly that. **A test pins the gate against this repair**, because it is the obvious one and
-it reads as a bug fix.
+**SUPERSEDED 8 SEPTEMBER 2026 - THE THREE PARAGRAPHS BELOW ARE KEPT AS HISTORY AND THE
+FIRST ONE IS NOW WRONG. See s2.9.** The gate reads the **configured** playing time, found
+through a `format: "duration-seconds"` keyword the title declares, and falls back to the
+ceiling only when a title declares no clock. The test that pinned the gate to the ceiling
+was inverted; the test forbidding a *fraction* of an attempt was kept, because that is the
+part of the rule below that was always right. The paragraph is left in place rather than
+rewritten, because "we deliberately reserve the ceiling" was believed for a day and the
+next reader needs to know it, and because everything it says about *why the whole attempt*
+is reserved still holds.
+
+~~**The ceiling is right and must not be "fixed" to the configured value.**~~ Chapter 03
+section 1.2 specifies it deliberately: the gate fails closed, refusing slightly more than
+strictly necessary, so an attempt can never be admitted that the contest end would cut
+short. A round stopped mid-play would be scored on a partial game, which is the unfairness
+the rule exists to prevent. ~~Reading the configured value would buy an honest-looking
+message and reintroduce exactly that. A test pins the gate against this repair, because it
+is the obvious one and it reads as a bug fix.~~
+
+**Where that reasoning went wrong, because it is a useful mistake.** It is sound about
+reserving a *whole* attempt and it silently assumed the ceiling *was* the attempt. It is
+not: the ceiling is the longest attempt the title could ever grant, and the configured
+value is the one this contest actually grants, so reserving the ceiling refuses time no
+player was ever going to be given. **A gate that fails closed is still wrong if it is
+failing closed against the wrong quantity** - and here it refused every attempt in every
+contest shorter than the ceiling, which the owner reported.
 
 **What was built is therefore an explanation, and one derived fact.**
 `RoundClockNote.tsx` is rendered by the wizard **and** the editor, in two variants - beside the
@@ -565,7 +583,10 @@ Four things about it are load-bearing.
 - **`maxDurationSeconds` is a catalogue field and `durationSeconds` is one game's config key**,
   and the note may read the first and never the second. A special case for the sprint's key
   here would break the "no developer needed for a new title" claim in the same way it would in
-  `ConfigSchemaFields`, and it is the obvious way to write this component.
+  `ConfigSchemaFields`, and it is the obvious way to write this component. **This rule
+  survived s2.9 intact and is the reason the fix took the shape it did**: the note now reads
+  the *configured* time, but it finds it through the `format` keyword the title declares,
+  never by naming `durationSeconds`. The forbidden-identifier test is unchanged.
 - **An absent duration states nothing**, matching `RoundPreflight.tsx`, which applies no gate
   when the catalogue declares none. An invented deadline would contradict the server for the
   one class of title where nobody knows the answer.
@@ -574,7 +595,10 @@ Four things about it are load-bearing.
   editing the thing that caused it.
 - **The refusal messages were reworded, not renumbered.** They now call the figure "this game's
   longest possible round" and say explicitly that it is the game's maximum rather than the
-  length set in its own settings. The number is unchanged.
+  length set in its own settings. The number is unchanged. **Superseded by s2.9**: the number
+  is now the configured playing time, both messages name it and the contest length together,
+  and a test forbids the phrase "longest possible round" - so a document quoting that wording
+  as current is stale, though it is correct as an account of 7 September.
 
 Also corrected in the same pass: the review step ended **"Publishing arrives with the
 player-facing game screens"**, true when written and false from 5 September. An
@@ -707,13 +731,26 @@ whoever is ahead when the bell goes. So the gate became the **contest's** choice
 
 | Setting | `RoundStartPolicy` | What it does |
 |---|---|---|
-| Reserve a full round | `reserve_full_round` | The old rule, unchanged. The last attempt can start one full ceiling before the end |
+| Reserve a full round | `reserve_full_round` | The old rule, unchanged. The last attempt can start one full ~~ceiling~~ **playing time** before the end |
 | Players may start at any time | `until_window_closes` | An attempt may start until the contest closes. `resolveExpiry`'s clamp shortens it, and the player is told by how much |
 
-**The schema defaults to reserving; the wizard defaults a new draft to permissive.** That pair
-is the thing most likely to be read as a bug and is deliberate: a schema default fixes future
-rows only, so every contest created before the field existed must keep the rule its entrants
-signed up under, while the setting an operator wants today is the one that does not refuse them.
+**AMENDED 8 SEPTEMBER 2026, AND THE AMENDMENT REVERSES THE WIZARD DEFAULT BELOW.** The
+reservation was never meant to be the ceiling - that was an arithmetic defect, fixed in
+**s2.9**, and it is the reason the permissive policy was made the wizard's default here.
+With the gate reserving the *configured* playing time, reserving costs a player only the
+time they were actually going to be given, so **`reserve_full_round` is now the wizard's
+default** and the owner chose it: one fixed play budget, the same for everybody. The
+paragraph below is correct as an account of 7 September and stale as a statement of the
+current default; the *schema* default it describes is unchanged and still the migration
+safety.
+
+~~**The schema defaults to reserving; the wizard defaults a new draft to permissive.**~~
+That pair is the thing most likely to be read as a bug and is deliberate: a schema default
+fixes future rows only, so every contest created before the field existed must keep the
+rule its entrants signed up under, while the setting an operator wants today is the one
+that does not refuse them. **Both defaults are now `reserve_full_round`**, and the two
+still differ in kind rather than in value - the schema's protects existing rows, the
+wizard's is a product decision.
 
 **The same fact is a refusal or a warning depending on the policy, and it has to be.** A
 contest shorter than the ceiling is reported by both `describeRoundFit` and both pre-flight
@@ -726,7 +763,10 @@ be refused for creating one.
 `Math.min(ceiling, window)` rather than the ceiling. Under until-close no round can be longer
 than the window however high the ceiling is, so demanding grace for the full ceiling refuses a
 short contest for a round length it **cannot produce** - the ceiling-versus-reality confusion
-again, one field along.
+again, one field along. **s2.9 went further and finished the thought**: the figure is the
+*configured* playing time, and the wizard now **derives** the grace period from it rather than
+sending a fixed 900 seconds, because that fixed value would have refused every contest with
+more than ten minutes of play - naming a field no screen offers.
 
 **Auto-publish is a checkbox, default on, and the flag never reaches the server.** Publishing
 re-runs the pre-flight against the **stored** record, which is the whole point of it - a draft
@@ -930,6 +970,153 @@ of chrome and adding the shell's sidebar composition plus the step list's new co
 form remains far over the 500-line limit, and splitting it is **not** what this commit did - a
 document implying the monolith is dealt with is wrong. Section 2's other outstanding item is
 unchanged too: the trading **editor** still exposes fewer fields than the trading create form.
+
+---
+
+### 2.9 The gate reserved a ceiling nobody had set - BUILT 8 September 2026
+
+The owner's report was that a contest refused every attempt from the moment it opened:
+*"as soon as the competition starts it says there is not enough time left in this
+competition to finish a round."* **45 tests in the clock suite, 20 probes red on exactly
+the expected test**, 1547 tests across the platform and 204 in `games-service`, both
+typechecks at baseline (198 main, 223 admin) with nothing in the changed files and nothing
+disappearing.
+
+| File | What changed |
+|---|---|
+| `lib/services/games/config-schema.ts` (mirrored) | The `format` keyword, `resolvePlayDurationSeconds`, `resolveAttemptSeconds`, `resolveAttemptSecondsFromSchema` |
+| `lib/services/games/round.service.ts` | The gate reads `attemptSeconds`; `resolveExpiry` still reads the ceiling |
+| `lib/services/games/round-launch.service.ts`, `round-status.service.ts` | Resolve the attempt from the title's schema and pass it on |
+| `lib/services/games/contest-preflight.ts` (mirrored) | Compares against the configured time; `RESULT_GRACE_MARGIN_SECONDS` exported |
+| `lib/services/games/round-types.ts` (mirrored) | `attemptSeconds` on `RoundContestConfig`; `ROUND_START_POLICY_COPY` rewritten |
+| `components/admin/games/contest-draft.ts` | `deriveResultGraceSeconds`; `describeRoundFit` reads the configured time; the default policy flips |
+| `components/admin/games/ConfigSchemaFields.tsx` | `DurationControl` - the minutes dropdown, keyed on the declared format |
+| `components/admin/games/ProviderContestWizard.tsx` | Blocking validation on the schedule step; the preview names the chosen play time |
+| `components/admin/games/RoundClockNote.tsx`, `RoundStartPolicyField.tsx` | Stop describing a ceiling |
+| `games-service/src/games/titles.ts`, `scoring.ts` | Circuit Perfect retired (`deprecated`, not deleted); Sprint widened to 1-60 minutes and declares its clock |
+
+#### The defect: correct code enforcing a rule nobody had chosen
+
+Chapter `03` section 1.2 specifies `now + maxDurationSeconds <= playWindowEnd`, and that
+is what the gate did. `maxDurationSeconds` is the **catalogue ceiling** - the longest a
+round of that title could ever run - and it is not the length the operator configured.
+Circuit Sprint's ceiling allowed an hour, so **every contest shorter than an hour refused
+every attempt for its entire duration**, whatever playing time was set.
+
+Three things about it are worth stating precisely, because a summary rounds each of them
+the wrong way.
+
+- **It was not a late-contest edge case.** The reservation is subtracted from the contest
+  *end*, so a 30-minute contest of 10-minute play had a cut-off 30 minutes before it
+  opened. It never opened at all. Section 2.7 built the policy that lets an operator opt
+  out of the reservation, and recorded the ceiling as the reason `until_window_closes` had
+  to be the default; that reason has now gone.
+- **The fairness rule is unchanged.** Reserving the *whole* attempt is still the law under
+  `reserve_full_round`, and a test forbids reserving a fraction of it. Only the number
+  changed. **Reading the configured value is not a relaxation** - it is the number the
+  rule was always about.
+- **`03` section 1.2 was amended, not overridden.** The chapter now carries both
+  amendments and says which part of the original sentence was a specification and which
+  was an arithmetic mistake.
+
+#### How the platform learns which setting is the clock
+
+`format: "duration-seconds"` on a property of the title's `configSchema`. **No platform
+code learns a field name and nothing enumerates a game**, which is the one failure mode of
+the no-developer-needed claim - and it is why naming `durationSeconds` directly was
+rejected even though it would have worked, for exactly one title.
+
+The keyword fails closed three ways, each for a different reason:
+
+| Refusal | Why |
+|---|---|
+| An unrecognised `format` | Same rule as every unimplemented keyword. Ignored, it would leave a declared clock treated as an ordinary integer with nothing anywhere saying so |
+| A duration on a non-number field | The value is arithmetic. On a string every reservation is `NaN`, and **every `NaN` comparison is false, so every gate silently OPENS** |
+| Two properties both declaring it | The reservation would depend on property order - a coin flip that reads as working and could differ between two titles from the same provider |
+
+**A title declaring nothing falls back to `maxDurationSeconds`**, which is never *shorter*
+than the truth, so the fallback over-reserves. That is the visible direction: it refuses
+something an operator can see and complain about, rather than admitting an attempt the
+contest end will cut short. Chapter `01` section 3.2 carries the provider-facing
+requirement, and the issued HTML is at **version 1.3**.
+
+#### The playing time is chosen, not typed in seconds
+
+1, 5, 10, 20, 30 and 60 minutes, plus **Custom**, which reveals a number box in minutes.
+Four things about it are load-bearing rather than cosmetic:
+
+- **The presets are filtered against the title's own declared range.** Offering an hour
+  that the game then clamps is worse than not offering it: the contest saves with a length
+  nobody chose, and the reservation is computed from the clamped value rather than the one
+  on screen.
+- **A title with no whole-minute option keeps a plain number box.** A dropdown with
+  nothing in it is a control that appears to work and offers nothing - the shape this
+  programme keeps finding.
+- **Seconds go on the wire.** Minutes are presentation. Storing minutes would put a value
+  on the wire that disagrees with the schema's own `minimum` and `maximum`, so validation
+  would reject a legal choice.
+- **Opening Custom writes nothing.** An operator who opens the box to look and changes
+  their mind has not edited the contest.
+
+#### The result grace period is derived, and had to be
+
+Nothing offers it, because no operator has a basis for choosing it - and the pre-flight
+**refuses** a contest whose grace is shorter than one attempt plus five minutes. Left at
+the fixed 900 seconds, every contest with more than ten minutes of play would have been
+refused, naming a field that is not on any screen. `deriveResultGraceSeconds` raises it to
+cover the chosen time, **only ever raises** (lowering it retroactively is how a result
+that was going to be counted stops being counted), and **imports the pre-flight's own
+margin** rather than restating it. Two margins would mean the wizard deriving a number the
+server then refuses.
+
+#### The wizard blocks rather than warns
+
+A contest shorter than one playing time under the reserving policy cannot be advanced past
+the schedule step, and the message **names both durations**. The amber caution was already
+there and an operator could read it, agree, and click Next; the contest then saved,
+published, sold seats and refused every one of them. "Too short" without the two numbers
+sends them to guess which of two fields, three steps apart, to change.
+
+#### `reserve_full_round` becomes the wizard's default, and the schema's does not
+
+The owner chose it: a fixed play budget, the same for everyone, with entry to play closing
+that long before the end. **The schema default is deliberately left alone**, because a
+schema default fixes future rows only and a contest created before today must keep the
+rule its entrants signed up under. Two different defaults in two places is the migration
+safety, not an inconsistency - the same shape as `unscoredContestPolicy` in `05` s9.3.
+
+#### Two things that generalise
+
+- **When a gate and the screen beside it agree, and both are wrong, the defect is
+  unreportable.** `RoundClockNote` explained the reservation in terms of the ceiling, so
+  an operator reading the refusal was *confirmed* in it by the very screen that should
+  have exposed the mistake. The disclosure and the arithmetic have to be derived from one
+  place or they will agree with each other rather than with the truth.
+- **The ceiling still decides `expiresAt`, and merging the two fields is the tempting
+  mistake.** The gate asks *how much must I reserve*; expiry asks *how long may this round
+  live*. Reading the configured attempt at expiry would cut a player off mid-board with a
+  score the provider never sent. A test pins the separation, and a probe that makes expiry
+  read the attempt goes red.
+
+#### What was retired
+
+**Circuit Perfect is retired**, per the owner: it was the one title in the catalogue whose
+scoring depended on finishing a fixed set of boards, which is the model the owner's
+instruction replaced. Circuit Sprint already worked the way the instruction describes -
+solve as many boards as you can inside a time budget, scored on count and speed - so
+widening its play time to 1-60 minutes and declaring its clock is the whole of the change
+on the game's side. **Nothing about ties, unclaimed shares or disqualification changed**,
+because none of it was ever per-title: those rules live in `05` s9.2, s9.3 and the ranking
+engine.
+
+**It is `status: "deprecated"`, not removed from the catalogue**, and the distinction
+matters to this chapter specifically: `gameKey` is immutable and is what every historical
+figure on the analytics and Game Performance screens joins on, so deleting the row would
+leave those screens rendering a key they cannot resolve. `contest-preflight.ts` already
+refuses a non-`active` title, so **the deprecation is the enforcement** - an operator
+cannot create a new contest on it, and the ones already played still report correctly.
+Same reasoning as a provider having a disable switch and no delete, and as R29 retiring a
+disabled game's rows rather than removing them.
 
 ---
 

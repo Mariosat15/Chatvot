@@ -208,9 +208,18 @@ missing half the real constraints and then validate against the half it understo
 turns an unstated assumption into a rejected integration.
 
 **Guessed:** the most conservative subset possible - `type`, `properties`, `integer`, `string`,
-`boolean`, `minimum`, `maximum`, `enum`, `default`, `required`. **Recommendation:** publish the
+`boolean`, `minimum`, `maximum`, `enum`, `default`, `required`, and since 8 September 2026
+`format` with exactly one permitted value. **Recommendation:** publish the
 supported keyword list in the spec, and say plainly that anything else refuses the title rather
 than being ignored. This is cheap to document and expensive to discover.
+
+**Partly addressed, 8 September 2026, and deliberately still `OPEN`.** Version 1.3 of the
+requirements document adds section 3.2, which states in provider-facing prose that ChartVolt
+**fails closed on schema keywords it does not implement**. That is the *behaviour* half of the
+recommendation, and it is the half that turns a silent surprise into a documented one. **The
+list itself is still unpublished**, so a provider still cannot tell which keywords are safe
+without trying them - which is the expensive half. Do not let a summary read this entry as
+closed.
 
 Related, and unstated: `configSchema` is described as required, but nothing says whether the
 platform will send settings the schema does not declare, or omit ones it does. This service

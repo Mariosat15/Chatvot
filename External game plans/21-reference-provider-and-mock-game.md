@@ -163,7 +163,7 @@ somebody else's round.
 | A second title, lower-is-better | A time trial or similar, to make `scoreDirection` observable - and, as a product, a second real thing to play |
 | A standalone service | Own port/hostname, own storage, own signing. Zero imports from this repo |
 | Spec-ambiguity log | Every question the implementer had to answer by guessing. **The most valuable output for the external programme** |
-| Content set | Tagline, description, rules, how-to-play, thumbnail, banner, for both titles, localised |
+| Content set | Tagline, description, rules, how-to-play, thumbnail, banner, per title, localised. **One title since s4.1g** |
 | Mobile support | Now in scope, because real players will use it on a phone |
 | A runbook | How to start it, register it, and drive each failure case on demand |
 
@@ -183,7 +183,7 @@ service's own smoke tool, never yet launched from a ChartVolt contest.
 |---|---|
 | The standalone service | **Built.** `games-service/` - own process, own port (4010 by default), own database, own `node_modules`, **zero imports from this repository**, enforced by `tools/check-isolation.ts` |
 | The engine | **Built.** A deterministic seeded non-crossing-path puzzle: `engine/{rng,puzzle,generate,verify}.ts`. Generation is reproducible from a `contentSeed` indefinitely, and the verifier validates a submission **against the rules**, not against the generator's own stored solution, because a board has several valid solutions |
-| Two titles | **Built.** `circuit-sprint` (higher-is-better, integer) and `circuit-perfect` (lower-is-better, `duration_ms`), from one engine. The second exists so a ranking sign error cannot pass every test |
+| Two titles | **Built, then ONE.** `circuit-sprint` (higher-is-better, integer) and `circuit-perfect` (lower-is-better, `duration_ms`), from one engine; the second existed so a ranking sign error could not pass every test. **`circuit-perfect` was retired on 8 September 2026** per the owner - see **s4.1g**, including what the retirement costs. A document describing two titles is correct as history and stale as a present fact |
 | The four spec endpoints | **Built.** Catalogue, create round, fetch round, void round, plus signed inbound auth with a rotation window, a retrying result callback, and a four-stage reconciliation sweeper |
 | Spec-ambiguity log | **Built and open.** `games-service/AMBIGUITY-LOG.md`. **Not yet resolved back into `01` and the requirements HTML** |
 | The platform adapter | **Built.** `chartvolt-games` registered in both registry copies, four files under `lib/services/game-providers/adapters/`, mirrored into `apps/admin` and verified byte-identical. 49 tests, 24 probes |
@@ -192,7 +192,7 @@ service's own smoke tool, never yet launched from a ChartVolt contest.
 | **Any end-to-end round** | **DONE BY TEST, NOT BY CLICKING - 7 September 2026.** A round now travels between the two halves: `__tests__/games/end-to-end-round.test.ts` starts a real `games-service` process, syncs its catalogue over signed HTTP, launches a round, plays it to completion, receives the service's own signed callback and settles the contest for real money. See **4.1d**. What is still NOT done is the acceptance criterion itself, which says *by clicking, in a browser* - that needs two sessions this environment cannot create, so it is a runbook for the owner (**4.1e**) |
 | **Production deployment** | **Prepared, not performed.** PM2 entry `chartvolt-games`, `games-service/env.example`, and a runbook in `deploy/README.md`. **Two exposure routes**: proxied through the platform app at `/play` (the default since 6 Sep 2026, owner's choice - no DNS, no nginx, no certificate) or its own `games.` subdomain (the nginx block is kept). Nothing has been deployed - see 4.1b for the two boot guards this work added and 4.1c for what the proxy route costs |
 | Mobile support | **Built for the game screen, not yet for the catalogue.** The board is sized from the viewport, uses `100dvh`, and sets `touch-action: none` so a drag does not scroll the page - which is the one CSS rule in the file that decides whether the game works on a phone at all |
-| Content set, localisation, runbook | **NOT STARTED.** Both titles declare `en` only, deliberately: declaring a locale and shipping English strings for it renders confident English copy on a Greek game page with nothing raising an error |
+| Content set, localisation, runbook | **NOT STARTED.** The title declares `en` only, deliberately: declaring a locale and shipping English strings for it renders confident English copy on a Greek game page with nothing raising an error |
 
 **Two claims to avoid making about what is built.** "Code-complete" for the service means its own
 suites pass in-process against `mongodb-memory-server`; it has never run against the platform. And
@@ -492,9 +492,11 @@ session, and this environment has neither. So it is the owner's run, and the ste
    pointing at the service. Paste the four credentials `setup:env` printed. **Check the display
    name before the first contest settles** - a provider row joined to contest history can never be
    renamed away from it.
-3. **Sync the catalogue**, and confirm both titles appear. **Enable `circuit-perfect` first**: it
+3. **Sync the catalogue**, and confirm the title appears. ~~**Enable `circuit-perfect` first**: it
    ends when the player finishes rather than when a clock does, so a full round takes under a
-   minute rather than the sprint's 60-second floor.
+   minute rather than the sprint's 60-second floor.~~ **Stale since 8 September 2026** - there is
+   only `circuit-sprint` now (s4.1g). **Set the contest's playing time to one minute**, which is
+   the dropdown's shortest option, and the round ends in a minute.
 4. **Create and publish a contest.** Draft first, then the Publish button - the checklist re-runs
    against the stored document.
 5. **Enter it from two different player accounts and play both**, with different completion times.
@@ -504,7 +506,7 @@ session, and this environment has neither. So it is the owner's run, and the ste
 **Four acceptance criteria remain untouched by today's work and are not scheduled**: all three
 unresolved-round policies observed by withholding a result; a score injected from the browser
 console being rejected (the frame protocol has no score field, which is proven, but not by
-attempting it from a console); the content set rendering on a game page for both titles, since
+attempting it from a console); the content set rendering on a game page, since
 **there is no rules surface for a provider title yet**; and localisation, which is `en` only on
 purpose. The **spec-ambiguity log is still 14 entries, all `OPEN`** - nothing there is closed by
 this service choosing a behaviour, only by `01` and the requirements HTML being amended with a
@@ -587,6 +589,59 @@ with the two widest declaring their blast radius and the reason.
 **What this did not touch:** the score still never reaches the browser - `resultCopy` destructures
 the four fields it uses, so a score handed to it is ignored by construction, and the state carries
 no score, rank or prize on any status. Both halves are asserted, because they fail differently.
+
+---
+
+### 4.1g Circuit Perfect retired, and the sprint declares its clock - 8 September 2026
+
+The owner's instruction: **no fixed set of boards and no per-round restriction.** A player
+gets a time budget, solves as many boards as they can inside it, and is scored on how many
+and how fast. **204 tests in `games-service`**, up from 196.
+
+**The finding is that this was already Circuit Sprint**, exactly. It asks how many boards
+you can solve in a fixed time, scores count and speed, and a perfect player never finishes
+it - the clock does. So the change on the game's side is small and the platform side is
+where the work was (`12` s2.9).
+
+| Change | Why |
+|---|---|
+| **`circuit-perfect` retired** | It was the one title whose scoring depended on **finishing a fixed board count**, which is the model the instruction replaced. It existed so a ranking sign error could not pass every test, being lower-is-better on `duration_ms` - that value is real and is recorded as a gap below |
+| It is **`status: "deprecated"`, not removed from `TITLES`** | The same rule the platform applies to a provider it stops using: `gameKey` is the join key for every stat a title ever produced, so deleting the row orphans history while every screen still renders a key it cannot resolve. `contest-preflight.ts` refuses a non-`active` title, so **no new contest can be created on it** while rounds already played still read and score correctly |
+| **Sprint's play time widened to 60-3600 seconds**, default 600 | It was 60-300, which is what made the ceiling defect bite: a five-minute ceiling reserved against contests of any length. The owner's example is ten minutes |
+| **Its score range widened** | More time means more boards, and a range that truncates the score of the best player is a payout defect wearing a validation message |
+| **`format: "duration-seconds"` declared on `durationSeconds`** | So the platform can reserve the *configured* playing time. `01` section 3.2 is the provider-facing requirement, issued at **version 1.3** |
+| Sprint's score clamp made visible | It clamps to its declared range and now says so, rather than silently reporting a lower number than the player earned |
+
+**"Retired" means deprecated, and the difference is the whole reason it is still in the
+file.** Deleting the row would orphan every stat joined to its `gameKey`, which is
+immutable - the same reasoning that gives a provider a disable switch and no delete, and
+that retires a disabled game's rows rather than removing them (R29). The pre-flight already
+refuses a non-`active` title, so the deprecation *is* the enforcement: no new contest can
+be created on it, and nothing that was already played changes. **A document saying the
+title was deleted is describing data loss nobody caused.**
+
+**What retiring a title costs, and it is not nothing.** `circuit-perfect` was the only
+`lower_is_better` / `duration_ms` title in the catalogue, and it was built for that reason:
+a sign error in the ranking direction cannot pass a suite where every title ranks the same
+way. That coverage now rests on unit tests of `resolveScoreDirection` and the golden
+ranking regression rather than on an end-to-end round. **Recorded rather than absorbed** -
+the honest options are a second sprint variant scored on total time, or accepting the
+narrower coverage until a real provider supplies a lower-is-better title. Neither is
+scheduled.
+
+**What did NOT change, because the instruction reads as though it should have.** Ties,
+unclaimed shares, players who never scored and disqualification are all decided by
+`05` s9.2 and s9.3 and the ranking engine, none of it per-title - so "ties apply the same,
+and all the rest apply the same" required no change at all. The same is true of joining:
+registration closes at `startTime` and always did, and a player may start an attempt at any
+point the policy allows. **A document presenting any of that as part of this work is
+describing something nobody built.**
+
+**And the runbook in 4.1e is now stale in one step.** Step 3 says to enable
+`circuit-perfect` first, because it ends when the player finishes rather than when a clock
+does, which made a full manual round quick. There is only one title now, so the sprint's
+clock is the floor - **set the contest's playing time to one minute** for a manual run and
+the round ends in a minute.
 
 ---
 
@@ -730,7 +785,7 @@ substitute for finding a provider.**
 - [ ] All three unresolved-round policies observed by withholding a result
 - [ ] An attempt is consumed on creation and a double-click does not consume two
 - [ ] A score injected from the browser console is rejected
-- [ ] The content set renders on the game page for both titles
+- [ ] The content set renders on the game page for every title
 - [ ] The spec-ambiguity log exists and every entry is resolved in
       `01-provider-contract-specification.md` **and** the HTML, with the version bumped
 - [ ] The game service cannot move money, demonstrated rather than asserted
