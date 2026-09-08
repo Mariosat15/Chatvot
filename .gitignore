@@ -135,3 +135,7 @@ eslint-output.txt
 # dashboard tokens, and an image cannot be reviewed by a diff. Keeping the whole folder
 # out means nobody has to make that judgement per file.
 /Verif_Setup_help/
+
+# Scratch output from the probe harnesses
+probe-out.txt
+probe-err.txt

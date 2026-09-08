@@ -303,6 +303,137 @@ async function main(): Promise<number> {
     );
   });
 
+  /*
+   * ── the fingerprinted asset URLs ──────────────────────────────────────────────────────────────
+   *
+   * These exist because of a third outage on 8 September 2026, and it was neither of the first
+   * two: nothing was missing and nothing 404ed. A browser held `presentation.js` from four hours
+   * earlier and ran it against that morning's `board.js`, which said
+   * `does not provide an export named 'newlyJoined'` and stopped the game dead. Half a build from
+   * the cache, half from the server, every response a 200.
+   */
+
+  await test("the document points at fingerprinted assets, and never at the bare ones", async () => {
+    /*
+     * The NEGATIVE half is the load-bearing one. A document that references both forms - a
+     * fingerprinted `app.js` beside a bare `app.css`, say - satisfies any assertion that a
+     * version appears somewhere while leaving the stylesheet exactly as cacheable as before, and
+     * the same is true of the whole module graph beneath a bare entry point.
+     */
+    const page = await fetchRaw("/play");
+    assert.equal(page.status, 200);
+
+    const references = [...page.text.matchAll(/(?:src|href)="(\/play\/[^"]+)"/g)].map(
+      (match) => match[1],
+    );
+    assert.ok(references.length >= 2, `expected asset references, saw ${references.join(", ")}`);
+
+    for (const reference of references) {
+      assert.match(
+        reference,
+        /^\/play\/v-[0-9a-f]{12}\//,
+        `${reference} is referenced without a fingerprint, so a stale copy is still addressable`,
+      );
+    }
+  });
+
+  await test("a module reached by relative import inherits the fingerprint", async () => {
+    /*
+     * This is the whole argument for a path segment over `?v=`, and it is the assertion a query
+     * string cannot pass. `board.js` reaches `presentation.js` through a literal
+     * `import ... from "./presentation.js"` - there is nowhere to put a query string and no way
+     * for that file to know the hash. A segment needs no cooperation: the browser resolves the
+     * specifier against the importing module's own URL.
+     *
+     * So the test walks the graph again, this time from the fingerprinted entry point, and
+     * requires every module to answer there. `presentation.js` is named explicitly because it is
+     * the file that actually broke.
+     */
+    const page = await fetchRaw("/play");
+    const entry = /src="(\/play\/v-[0-9a-f]{12}\/app\.js)"/.exec(page.text);
+    assert.ok(entry, "the document does not reference a fingerprinted app.js");
+
+    const prefix = (entry as RegExpExecArray)[1].replace(/\/app\.js$/, "");
+    const seen = new Set<string>();
+    const queue = [`${prefix}/app.js`];
+
+    while (queue.length > 0) {
+      const next = queue.shift() as string;
+      if (seen.has(next)) continue;
+      seen.add(next);
+
+      const asset = await fetchRaw(next);
+      assert.equal(asset.status, 200, `${next} is imported but not served at the versioned path`);
+
+      for (const match of asset.text.matchAll(
+        /(?:^|\n)\s*(?:import|export)[^;\n]*?from\s+"([^"]+)"/g,
+      )) {
+        queue.push(`${prefix}/${match[1].slice(2)}`);
+      }
+    }
+
+    assert.ok(
+      seen.has(`${prefix}/presentation.js`),
+      `the versioned walk never reached presentation.js, only ${[...seen].join(", ")}`,
+    );
+  });
+
+  await test("a fingerprinted asset is immutable and a bare one still revalidates", async () => {
+    /*
+     * `immutable` is only honest because the segment is a hash of the bytes, so a changed file is
+     * a changed address. It is also the payoff rather than a detail: the surface is then fetched
+     * once and never revalidated again mid-contest, on a phone, against a clock the player is
+     * being scored on.
+     *
+     * The bare route keeps `no-cache` and keeps working. Removing it would break a document
+     * already open in somebody's browser, and the artwork is referenced absolutely and
+     * deliberately unversioned - a stale picture is cosmetic, which is s4.1m's rule.
+     */
+    const page = await fetchRaw("/play");
+    const entry = /src="(\/play\/v-[0-9a-f]{12}\/app\.js)"/.exec(page.text);
+    assert.ok(entry, "the document does not reference a fingerprinted app.js");
+
+    const versioned = await fetchRaw((entry as RegExpExecArray)[1]);
+    assert.equal(versioned.status, 200);
+    assert.match(
+      versioned.headers.get("cache-control") ?? "",
+      /immutable/,
+      "a fingerprinted asset must be immutable, or the round trip is still paid every load",
+    );
+
+    const bare = await fetchRaw("/play/app.js");
+    assert.equal(bare.status, 200, "the bare route must keep working for a document already open");
+    assert.equal(bare.headers.get("cache-control"), "no-cache");
+  });
+
+  await test("the versioned route does not swallow the API the board polls", async () => {
+    /*
+     * THE REGRESSION THIS SHAPE INVITES, and it would have been a total outage rather than a
+     * cosmetic fault. `/play/:version/:asset` has exactly the same shape as `/play/api/state`,
+     * which the board polls throughout a round. Registered first and refusing what it does not
+     * recognise, it answers that poll with a 404 and the game stops - and whether it did so would
+     * depend purely on the order two lines appear in `app.ts`, so it would come back the next time
+     * somebody tidied the route list.
+     *
+     * The handler hands anything that is not a fingerprint straight back, which is what makes the
+     * ordering irrelevant. Asserted through the real route rather than by reading `app.ts`.
+     */
+    await clearRounds();
+    const { token } = await openRound();
+
+    const state = await fetchRaw(`/play/api/state?t=${token}`);
+    assert.equal(state.status, 200, "the state poll was captured by the versioned asset route");
+    assert.match(state.headers.get("content-type") ?? "", /json/);
+
+    // And a plausible-but-wrong fingerprint is a 404 from the asset route, not a fall-through to
+    // something that answers by accident.
+    const wrong = await fetchRaw("/play/v-000000000000/app.js");
+    assert.equal(wrong.status, 200, "a well-formed fingerprint serves the file it names");
+
+    const nonsense = await fetchRaw("/play/not-a-version/app.js");
+    assert.equal(nonsense.status, 404, "an unrecognised segment must not serve an asset");
+  });
+
   await test("every image the board names is served", async () => {
     /*
      * The artwork is NOT part of the module graph, so the walk above cannot see it: an `<image>`
@@ -975,6 +1106,72 @@ async function main(): Promise<number> {
       file: "somethingaddedtomorrow.js",
       type: "text/javascript; charset=utf-8",
     });
+  });
+
+  await test("the fingerprint follows the bytes, not the file dates or the listing order", async () => {
+    /*
+     * MTIME WAS THE OBVIOUS INPUT AND IT WOULD HAVE BEEN WRONG. A `git pull` gives the same bytes
+     * different timestamps on each machine, so two servers would publish different URLs for
+     * identical files - halving the cache benefit and, behind a balancer that alternates, making a
+     * player re-download the surface on almost every request. Content is the same everywhere by
+     * construction. The sort is what makes a directory's own ordering unable to change the answer.
+     */
+    const { fingerprintAssets } = await import("../src/http/play-page");
+
+    const one = { name: "app.js", bytes: Buffer.from("alpha") };
+    const two = { name: "board.js", bytes: Buffer.from("beta") };
+
+    assert.equal(fingerprintAssets([one, two]), fingerprintAssets([two, one]));
+    assert.notEqual(
+      fingerprintAssets([one, two]),
+      fingerprintAssets([one, { name: "board.js", bytes: Buffer.from("beta!") }]),
+      "a changed file must change the fingerprint, or the stale copy stays addressable",
+    );
+    // A rename with identical contents is a different surface too - `board.js` importing
+    // `./presentation.js` cares about the name, not just the bytes behind it.
+    assert.notEqual(
+      fingerprintAssets([one, two]),
+      fingerprintAssets([one, { name: "sound.js", bytes: Buffer.from("beta") }]),
+    );
+    assert.match(fingerprintAssets([one]), /^v-[0-9a-f]{12}$/);
+  });
+
+  await test("a document that stops naming an asset says so instead of failing quietly", async () => {
+    /*
+     * The rewrite FAILS OPEN: an unrecognised reference leaves the document loading perfectly well
+     * from the bare route, with only the guarantee lost. That is the right trade for the same
+     * reason `resolvePlayRoot` warns rather than throwing - rounds in flight still have to be
+     * delivered - but it means the boot log is the only thing that can report it, so `missing` has
+     * to be reported rather than inferred from the output being unchanged.
+     */
+    const { versionPlayDocument } = await import("../src/http/play-page");
+
+    const both = versionPlayDocument(
+      '<link href="/play/app.css"><script src="/play/app.js">',
+      "v-0123456789ab",
+    );
+    assert.deepEqual(both.missing, []);
+    assert.ok(both.html.includes('href="/play/v-0123456789ab/app.css"'));
+    assert.ok(both.html.includes('src="/play/v-0123456789ab/app.js"'));
+    assert.ok(!both.html.includes('"/play/app.js"'), "the bare reference survived the rewrite");
+
+    const reformatted = versionPlayDocument("<script src='./app.js'>", "v-0123456789ab");
+    assert.deepEqual(reformatted.missing, ["/play/app.css", "/play/app.js"]);
+    assert.equal(reformatted.html, "<script src='./app.js'>", "a failed rewrite must not mangle");
+  });
+
+  await test("a version segment is recognised by shape, so `api` can never be mistaken for one", async () => {
+    // The whole reason the state poll survives. Asserted on the predicate as well as through the
+    // route, because the route test would also pass if the two happened to be registered in a
+    // lucky order.
+    const { isAssetVersionSegment } = await import("../src/http/play-page");
+
+    assert.equal(isAssetVersionSegment("v-0123456789ab"), true);
+    assert.equal(isAssetVersionSegment("api"), false);
+    assert.equal(isAssetVersionSegment("assets"), false);
+    assert.equal(isAssetVersionSegment("app.js"), false);
+    assert.equal(isAssetVersionSegment("v-0123456789AB"), false, "the hash is lower-case hex");
+    assert.equal(isAssetVersionSegment("v-0123456789ab0"), false, "and a fixed length");
   });
 
   await test("the served set refuses everything except a recognised file type", async () => {

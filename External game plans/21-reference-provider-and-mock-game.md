@@ -1101,6 +1101,87 @@ make from a test run.
 
 ---
 
+### 4.1o The assets carry a fingerprint, so half a build can no longer load - 8 September 2026
+
+**READ THIS WITH s4.1k AND s4.1l. It is the third distinct cause of one reported symptom, and
+the first that is neither a missing file nor a stale detector.** The owner reported the game dead
+again, and the console named the fault precisely:
+
+```
+board.js:23 Uncaught SyntaxError: The requested module './presentation.js'
+            does not provide an export named 'newlyJoined'
+```
+
+**Nothing was missing and nothing 404ed.** The browser held `presentation.js` from four hours
+earlier - R54's cache lifetime - and ran that morning's `board.js` against it. `newlyJoined` had
+been added to the newer file hours before. Both halves were individually correct; the build was
+split down the middle.
+
+**This is exactly the half R54 recorded as undetectable, and it defeated the recovery written for
+it.** s4.1k re-fetches the URLs the resource timeline recorded as **failing** and reloads once.
+There were none to re-fetch. **A stale success has nothing to report** - which is why that entry
+filed it as an owner action requiring a Cloudflare rule.
+
+#### What was built
+
+The served set has been derived from the directory since s4.1i. It is now also **fingerprinted**:
+one sha256 over every servable file's name and contents, twelve hex characters, and the document's
+two entry points are rewritten at boot to `/play/v-<fingerprint>/app.css` and `.../app.js`. The
+asset route accepts the segment and serves the file with `immutable`.
+
+So a new build publishes URLs **no browser has ever cached**, and the four-hour-old copy of
+`presentation.js` sits at an address nothing asks for any more. We are no longer asking the edge to
+behave; we have removed its ability to serve the wrong thing.
+
+| File | What changed |
+|---|---|
+| `games-service/src/http/play-page.ts` | `fingerprintAssets`, `isAssetVersionSegment`, `versionPlayDocument`, the boot-time `ASSET_VERSION` and `PLAY_DOCUMENT`, and the version branch in `servePlayAsset` |
+| `games-service/src/app.ts` | `GET /play/:version/:asset` beside the bare route |
+| `games-service/tools/test-play.ts` | 6 tests; the play suite is 73 and the service is **249** |
+| `games-service/tools/probe-play-assets.ps1` | Probes 7-14, all red on the expected test; the harness is 14 |
+
+#### Five things that generalise
+
+- **A path segment, never a query string, and this is the part that would get "simplified".**
+  `?v=<hash>` is the familiar spelling and it versions only the two files the *document* names.
+  `board.js` reaches `presentation.js` through a literal `import ... from "./presentation.js"` -
+  nowhere to put a query string, and no way for that file to know the hash. **So a query string
+  leaves bare precisely the file that broke.** A segment costs nothing and needs no cooperation:
+  the browser resolves a relative specifier against the importing module's own URL. Probe 8 makes
+  the swap and the test that catches it is the relative-import walk, not the reference check.
+- **The fingerprint is of the content, and mtime was the obvious wrong input.** A `git pull` gives
+  identical bytes different timestamps on each server, so two servers would publish different URLs
+  for the same files - halving the cache benefit and, behind a balancer that alternates, making a
+  player re-download the surface on almost every request. The sort is what stops a directory's own
+  ordering doing the same thing.
+- **A well-formed but unrecognised fingerprint is SERVED, not refused, and the tighter-looking
+  choice is wrong.** Refusing manufactures 404s in the two situations that matter most - a rolling
+  deploy where a document from one server asks another for a prefix it does not have, and a player
+  mid-round on the previous document - **and R54's own finding is that the edge caches a 404 for
+  four hours exactly as it caches a 200**, with the page's recovery holding one attempt. The
+  segment is a cache key, not a claim about which build you are entitled to.
+- **The route shape invited an outage of its own, and the probe is what proved it rather than the
+  design review.** `/play/:version/:asset` has the same shape as `GET /play/api/state`, which the
+  board polls throughout a round, so the handler hands anything that is not a fingerprint back to
+  the next route. Probe 12 removes that recognition and turns **five** tests red - three of them
+  unrelated round-state tests - where the probe was written expecting two. That is the clearest
+  evidence available that the fall-through is a requirement and not defensiveness, and it is also
+  what makes the fix independent of the order two lines appear in `app.ts`.
+- **The harness now NAMES the failing tests rather than counting them.** Four probes came back over
+  their declared blast radius, reading as harness damage, and every extra failure was an honest
+  second face of the same rule. A count cannot tell those apart. The names are collapsed
+  **per line** rather than over the whole output, because `Out-String` wraps at the console width
+  and a single collapse glues one failure's message onto the next test's name.
+
+**One rebuild is required and then this class is self-maintaining.** The mechanism is TypeScript,
+so `npm run build` once. After that the fingerprint is computed at boot from the directory, exactly
+as the served set has been since s4.1i, so a play-surface change still needs only **pull and
+restart** - and now a player who loaded the game minutes earlier gets the new one anyway.
+
+**Not verified by eye.** The surface is reachable only with a signed launch token.
+
+---
+
 ## 5. What this does NOT prove
 
 Stating this matters, because a green harness invites the conclusion that X4 is a formality.

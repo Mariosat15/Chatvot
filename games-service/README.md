@@ -230,6 +230,34 @@ different schedules - the file with a `git pull`, its authorisation with `npm ru
 and separately pins the directory-derived set, so a module added tomorrow is covered without
 anybody remembering this paragraph.
 
+**Every asset is served under a fingerprint of the surface's contents, and that is what stops half
+a build loading.** The boot log prints it, which is also the quickest way to confirm a restart
+picked up new files:
+
+```
+🎮 [games-service] play surface v-0f44604e3af5
+```
+
+A browser held `presentation.js` for four hours - Cloudflare rewrites `Cache-Control` under
+`/play` to `max-age=14400` - and ran it against a fresh `board.js`, which stopped the game with
+`does not provide an export named 'newlyJoined'`. **Nothing was missing and nothing 404ed**, so the
+boot watchdog's recovery could not fire: it re-fetches URLs that *failed*. That is **R55**, and
+the fix is that a stale copy is no longer addressable - a new build publishes
+`/play/v-<fingerprint>/app.js`, which no browser has cached. Three properties are load-bearing:
+
+- **A path segment, never `?v=`.** `board.js` imports `./presentation.js` as a literal, with
+  nowhere to put a query string and no way to know the hash, so a query string leaves bare
+  **exactly the file that broke.** A segment is inherited by ordinary URL resolution.
+- **Fingerprinted by content, not by file dates.** A `git pull` gives identical bytes different
+  timestamps per server, so mtime would have two servers publish different URLs for the same
+  files.
+- **A well-formed but unrecognised fingerprint is served, not refused.** Refusing manufactures
+  404s during a rolling deploy and for anyone mid-round on the previous document, and the edge
+  caches a 404 for four hours exactly as it caches a 200.
+
+The mechanism is TypeScript, so it needs `npm run build` once; after that the fingerprint is
+computed at boot from the directory, so a surface change still needs only pull and restart.
+
 **The path `/play` is not arbitrary and must not be changed casually.** `index.html` references
 `/play/app.css` and `/play/app.js` **absolutely**, so anything that mounts the page at a different
 prefix serves a working document whose stylesheet and script both 404 - a blank white frame with
@@ -370,10 +398,12 @@ npm run probe:boot-watchdog  # the same, for the watchdog that names a module wh
 > that would have sent it was definitely present.** A test pins the markup's side of that bargain:
 > exactly one screen ships visible, and it is the loading screen.
 
-`npm test` runs **242 tests**: 15 config, 42 engine, 28 scoring, 41 API, 66 play and delivery,
-15 board client, 35 presentation. (Any figure of 226 or 225 predates the sound and animation
-layer - the two were the same commit and the total was misstated as 225 while the suites summed
-to 226, so both are stale for the same reason. 219 predates the board artwork, 217 predates the
+`npm test` runs **249 tests**: 15 config, 42 engine, 28 scoring, 41 API, 73 play and delivery,
+15 board client, 35 presentation. (Counted from the suite's own output. Any figure of 242 predates
+the fingerprinted asset URLs, and was itself understated - the suites summed to 246 at the time,
+so **do not hand-count these either; read the seven result lines**. 226 and 225 predate the sound
+and animation layer, the two were the same commit and the total was misstated as 225 while the
+suites summed to 226, so both are stale for the same reason. 219 predates the board artwork, 217 predates the
 watchdog's second witness, 216 predates the stale-cache recovery, 213
 predates the boot watchdog, 209 predates the directory-derived asset set, 204 predates the
 deploy-drift audit, 167 predates the presentation suite, and 152 predates the config suite.)

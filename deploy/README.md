@@ -1051,15 +1051,30 @@ pm2 restart chartvolt-games
 > ❌ [games-service] public/play holds board.mjs, whose file type this service will not serve.
 > ```
 >
-> **A play-surface change may not reach players for four hours.** Cloudflare rewrites
+> **A play-surface change used to take four hours to reach players, and no longer does — but this
+> is the one change that needs `npm run build` to take effect.** Cloudflare rewrites
 > `Cache-Control` on everything under `/play` to `max-age=14400`, replacing the `no-cache` the
-> service sends, so a browser that loaded the game earlier keeps its copy and never asks again.
-> Set a **cache rule for `/play*` to respect origin headers** in the Cloudflare dashboard
-> (Caching → Cache Rules, or Browser Cache TTL → *Respect Existing Headers*) and this class
-> disappears. Until then, expect a fix to be invisible to anyone who played recently — and note
-> the same rewrite applies to **404s**, which is why R52 outlived the deploy that fixed it. The
-> play surface heals *that* half itself (`21` s4.1k), but a stale **success** cannot be detected,
-> because it looks perfectly healthy.
+> service sends, so a browser that loaded the game earlier kept its copy and never asked again.
+> That was **R54**, and its worst form was **R55**: a browser running a four-hour-old
+> `presentation.js` against a fresh `board.js`, every response a 200, the game dead with
+> `does not provide an export named 'newlyJoined'` in the console.
+>
+> Since 8 September 2026 the assets are served under a fingerprint of their own contents —
+> `/play/v-0f44604e3af5/app.js` — so **a new build publishes addresses no browser has cached** and
+> the stale copy is simply never requested again (`21` s4.1o). The boot log prints the fingerprint,
+> which is the quickest way to confirm a restart actually picked up new files:
+>
+> ```
+> 🎮 [games-service] play surface v-0f44604e3af5
+> ```
+>
+> **The Cloudflare cache rule for `/play*` is therefore no longer needed** — it was recorded here
+> as an owner action and that is now history rather than an outstanding task. Setting it does no
+> harm. Anything the edge caches outside `/play` is unaffected either way.
+>
+> **After this one rebuild, a play-surface change still needs only pull and restart.** The
+> fingerprint is computed at boot from the directory, exactly as the served set has been since
+> `21` s4.1i, so the mechanism does not reintroduce the build coupling that caused R52.
 >
 > **After changing which titles the service offers**, also press **Sync catalogue** on
 > Admin → Games → Game Providers. Retiring or renaming a title changes nothing the operator can

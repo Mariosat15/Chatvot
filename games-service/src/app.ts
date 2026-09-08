@@ -129,6 +129,12 @@ export function createApp() {
   // authenticates with the launch token from the URL that browser was given.
   app.get("/play", servePlayPage);
   app.get("/play/:asset", servePlayAsset);
+  /*
+   * The fingerprinted form. Two segments, so it has the same shape as `GET /play/api/state` - the
+   * handler hands back anything that is not one of our fingerprints, which is what makes this
+   * safe to register here rather than depending on it being listed after the API routes.
+   */
+  app.get("/play/:version/:asset", servePlayAsset);
 
   app.post("/play/api/session", wrap(postSession));
   app.get("/play/api/state", wrap(getState));

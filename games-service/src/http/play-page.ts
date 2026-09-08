@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 
@@ -143,6 +144,99 @@ const ASSETS: Map<string, { file: string; type: string }> = PLAY_ROOT
   : new Map();
 
 /**
+ * THE ASSET URLS CARRY A FINGERPRINT OF THEIR OWN CONTENT, AND THE REASON IS A THIRD OUTAGE.
+ *
+ * On 8 September 2026 a player's browser ran a four-hour-old `presentation.js` against that
+ * morning's `board.js` and the console said
+ * `does not provide an export named 'newlyJoined'` - a build split down the middle, one half
+ * from the cache and one from the server. Nothing 404ed, so s4.1k's recovery could not fire: it
+ * re-fetches URLs that FAILED, and every one of these returned 200. That is exactly the half
+ * R54 recorded as undetectable, because a stale success looks perfectly healthy.
+ *
+ * Cloudflare rewrites `Cache-Control` on everything under `/play` to `max-age=14400`, so the
+ * `no-cache` below never reaches the browser. We cannot win an argument with an intermediary by
+ * sending headers - the lesson from R54 - so the fix is to stop the stale copy from being
+ * ADDRESSABLE. Each deploy produces a new fingerprint, the document names the new URLs, and a
+ * four-hour-old copy of `presentation.js` simply sits at a URL nothing asks for any more.
+ *
+ * A PATH SEGMENT, NEVER A QUERY STRING, AND THIS IS THE PART THAT WOULD GET "SIMPLIFIED".
+ * `?v=<hash>` is the familiar spelling and it fixes only the two files the document names.
+ * `board.js` reaches `presentation.js` through `import ... from "./presentation.js"` - a literal
+ * inside a file, with nowhere to put a query string and no way to know the hash. A path segment
+ * needs no cooperation at all: a module loaded from `/play/v-abc123/board.js` resolves its own
+ * relative imports to `/play/v-abc123/presentation.js` by ordinary URL resolution. **The file
+ * that broke here is precisely the one a query string would have left unversioned.**
+ *
+ * CONTENT, NOT MTIME. A `git pull` gives the same bytes different timestamps on each server, so
+ * an mtime fingerprint would have the two servers publish different URLs for identical files -
+ * halving the cache benefit and, behind a load balancer that alternates, re-downloading the
+ * surface on almost every request. A content hash is the same everywhere by construction.
+ *
+ * The artwork is deliberately left unversioned. `board.js` names it absolutely
+ * (`/play/token-1.webp`) and a stale image is cosmetic, which is s4.1m's rule: the pictures are
+ * decoration over vectors the board draws itself.
+ */
+export function fingerprintAssets(files: readonly { name: string; bytes: Buffer }[]): string {
+  const digest = crypto.createHash("sha256");
+
+  // Sorted, so the directory's own ordering cannot change the answer between two machines.
+  for (const file of [...files].sort((a, b) => a.name.localeCompare(b.name))) {
+    digest.update(file.name);
+    digest.update("\u0000");
+    digest.update(crypto.createHash("sha256").update(file.bytes).digest());
+  }
+
+  return `v-${digest.digest("hex").slice(0, 12)}`;
+}
+
+/** Does this URL segment look like one of our fingerprints, rather than `api` or a filename? */
+export function isAssetVersionSegment(segment: string): boolean {
+  return /^v-[0-9a-f]{12}$/.test(segment);
+}
+
+const ASSET_VERSION: string = PLAY_ROOT
+  ? fingerprintAssets(
+      [...ASSETS.values()].map((asset) => ({
+        name: asset.file,
+        bytes: fs.readFileSync(path.join(PLAY_ROOT, asset.file)),
+      })),
+    )
+  : "v-000000000000";
+
+/**
+ * Point the document at the fingerprinted copies of its stylesheet and its entry module.
+ *
+ * FAILS OPEN, and says so at boot. If a reference cannot be found - somebody reformats the tag,
+ * or switches to a relative `href` - the document is served unchanged, which loads perfectly
+ * well from the unversioned route. What is lost is the guarantee, silently, so the boot log is
+ * the only thing that can report it. Refusing to boot would be worse for the same reason
+ * `resolvePlayRoot` only warns: rounds already in flight still have to be delivered and settled.
+ *
+ * Only the two entry points are rewritten. Everything below them is reached by relative import
+ * and inherits the segment for free, which is the whole argument for a path segment.
+ */
+export function versionPlayDocument(
+  html: string,
+  version: string,
+): { html: string; rewritten: string[]; missing: string[] } {
+  const rewritten: string[] = [];
+  const missing: string[] = [];
+  let out = html;
+
+  for (const reference of ["/play/app.css", "/play/app.js"]) {
+    const versioned = `/play/${version}${reference.slice("/play".length)}`;
+    if (out.includes(reference)) {
+      out = out.split(reference).join(versioned);
+      rewritten.push(reference);
+    } else {
+      missing.push(reference);
+    }
+  }
+
+  return { html: out, rewritten, missing };
+}
+
+/**
  * Files that look like part of a front end, whether or not this service can serve them.
  *
  * Broader than the content-type table on purpose: the gap between the two is what the boot audit
@@ -260,6 +354,29 @@ function reportPlaySurfaceDrift(root: string): void {
 
 if (PLAY_ROOT) reportPlaySurfaceDrift(PLAY_ROOT);
 
+/**
+ * The document, with its two entry points pointed at the fingerprinted copies. Read and rewritten
+ * once at boot, alongside every other decision in this file.
+ */
+const PLAY_DOCUMENT: string | null = (() => {
+  if (!PLAY_ROOT) return null;
+
+  const raw = fs.readFileSync(path.join(PLAY_ROOT, "index.html"), "utf8");
+  const result = versionPlayDocument(raw, ASSET_VERSION);
+
+  if (result.missing.length > 0) {
+    console.error(
+      `❌ [games-service] the play document does not reference ${result.missing.join(", ")}, so ` +
+        "those files are served UNVERSIONED and a stale browser copy can be loaded against a " +
+        "newer one. See the fingerprint note in src/http/play-page.ts.",
+    );
+  } else {
+    console.log(`🎮 [games-service] play surface ${ASSET_VERSION}`);
+  }
+
+  return result.html;
+})();
+
 function commonHeaders(res: Response): void {
   res.setHeader("X-Content-Type-Options", "nosniff");
   /*
@@ -286,20 +403,56 @@ function commonHeaders(res: Response): void {
  * in a request body from then on, so it never appears in a second URL.
  */
 export function servePlayPage(_req: Request, res: Response): void {
-  if (!PLAY_ROOT) {
+  if (!PLAY_DOCUMENT) {
     sendError(res, 500, "INTERNAL", "The play surface is unavailable.", true);
     return;
   }
   commonHeaders(res);
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.sendFile(path.join(PLAY_ROOT, "index.html"));
+  /*
+   * `send`, not `sendFile`, because the fingerprinted references are substituted into the markup.
+   * Read once at boot like everything else here - the document is a few kilobytes and re-reading
+   * it per request would put a syscall on an unauthenticated route.
+   */
+  res.send(PLAY_DOCUMENT);
 }
 
-export function servePlayAsset(req: Request, res: Response): void {
+export function servePlayAsset(req: Request, res: Response, next?: () => void): void {
   if (!PLAY_ROOT) {
     sendError(res, 500, "INTERNAL", "The play surface is unavailable.", true);
     return;
   }
+
+  /*
+   * The version segment is optional, and an unrecognised one is HANDED BACK rather than refused.
+   *
+   * Reason: `/play/:version/:asset` has the same shape as `/play/api/state`, which the board polls
+   * throughout a round. Refusing here would answer that poll with a 404 and stop the game dead,
+   * and it would do so depending purely on which route was registered first - a bug that appears
+   * when somebody tidies the route list months from now. Calling `next()` makes the ordering
+   * irrelevant: anything that is not one of our fingerprints falls through to the route that
+   * really owns it.
+   */
+  const version = req.params.version === undefined ? null : String(req.params.version);
+  if (version !== null && !isAssetVersionSegment(version)) {
+    if (next) next();
+    else sendError(res, 404, "NOT_FOUND", "No such asset.");
+    return;
+  }
+
+  /*
+   * A WELL-FORMED FINGERPRINT IS SERVED WHETHER OR NOT IT IS THE CURRENT ONE, AND THAT IS
+   * DELIBERATE. The segment is a cache key, not a claim about which build you are entitled to.
+   *
+   * Refusing an unrecognised one looks like the tighter choice and it manufactures 404s in the two
+   * situations that matter most: a rolling deploy, where a document from server A asks server B
+   * for a prefix it does not have, and a player mid-round holding the previous document. **And
+   * Cloudflare caches a 404 for four hours exactly as it caches a 200** - that is the mechanism
+   * that made R52 outlive the deploy which fixed it, and the recovery in `index.html` has only one
+   * attempt to spend. Serving the file keeps those players working; the defect this whole scheme
+   * exists to kill - a URL whose bytes changed underneath it - is already impossible, because a
+   * new build publishes a new prefix that nothing has cached.
+   */
 
   const asset = ASSETS.get(String(req.params.asset));
   if (!asset) {
@@ -319,5 +472,21 @@ export function servePlayAsset(req: Request, res: Response): void {
 
   commonHeaders(res);
   res.setHeader("Content-Type", asset.type);
+  /*
+   * A FINGERPRINTED URL IS THE ONE CASE WHERE A LONG LIFETIME IS THE SAFE ANSWER, AND IT IS ALSO
+   * THE POINT OF DOING THIS.
+   *
+   * `no-cache` above is the right default for a URL whose contents can change underneath it.
+   * These cannot: the segment is a hash of the bytes, so a different file is a different address.
+   * `immutable` therefore says something true rather than something hopeful, and it buys the
+   * thing that actually matters to a player - the surface is fetched once and never revalidated
+   * again mid-contest, on a phone, while a clock they are being scored against is running.
+   *
+   * It also makes Cloudflare's four-hour rewrite (R54) harmless here instead of dangerous. We are
+   * not asking the intermediary to behave; we have removed its ability to serve the wrong thing.
+   */
+  if (version !== null) {
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+  }
   res.sendFile(path.join(PLAY_ROOT, asset.file));
 }
