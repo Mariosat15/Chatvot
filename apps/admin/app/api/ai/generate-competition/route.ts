@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 interface AIConfig {
   apiKey: string | null;
@@ -38,6 +39,25 @@ async function getAIConfig(): Promise<AIConfig> {
 }
 
 export async function POST(request: NextRequest) {
+  /*
+    Guarded 8 September 2026. This route, and the four beside it under `app/api/ai/`, had no
+    authorization of ANY kind - not a weak check, none - and the admin app has no middleware,
+    so anything able to reach the origin could post an arbitrary prompt and have it answered
+    with the platform's own OpenAI key. That is a spending route as much as a content one: an
+    unbounded model proxy on our account, with the prompt fully caller-controlled.
+
+    Found by counting exported handlers against guards rather than by reading the files, which
+    is the only method that finds these - every other route in the admin app has something, and
+    that is precisely what sends a reader past the ones that have nothing. Same technique as
+    R40's `finalize-old-competitions` and R47's `sync-referrals`.
+
+    The section is the one owning the SCREEN that calls it, not a general "AI" grant: an
+    operator trusted to write competition copy is not thereby trusted to rewrite the badge
+    economy.
+  */
+  const guard = await guardSection("competitions");
+  if (!guard.ok) return guard.response;
+
   try {
     const { prompt, type } = await request.json();
 

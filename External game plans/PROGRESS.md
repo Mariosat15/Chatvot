@@ -654,6 +654,58 @@ Newest at the top.
 
 ---
 
+### 8 Sep 2026 - X6 / R51 - FIVE AI ROUTES THAT ANSWERED TO NOBODY
+
+**Shipped:** a `guardSection` on every exported handler under `apps/admin/app/api/ai/`, each
+naming the section that owns the **calling screen** rather than a general "AI" grant, plus
+`journey-map` and `gamification-wizard` added to `ADMIN_SECTIONS` (add-only) because those two
+screens existed and no grant could name them. `__tests__/admin/ai-route-guards.test.ts`
+(19 tests) and `tools/probe-ai-route-guards.ps1` (6 probes, all red on exactly the expected
+test).
+
+**Files touched:** `apps/admin/app/api/ai/{generate-competition,generate-badges,evaluate-balance,gamification-wizard,generate-journey}/route.ts`,
+`apps/admin/database/models/admin-employee.model.ts`, and the two new test/probe files.
+
+**None of the five had authorization of any kind** - not a weak check, not the wrong helper -
+and the admin app has no middleware, so any caller reaching the origin could post an arbitrary
+prompt and be answered with the platform's own OpenAI key. **Two of them WRITE:**
+`evaluate-balance`'s `fix` action and the gamification wizard rebalance badge thresholds and
+journey milestones. **The folder name is what hid that** - `evaluate-balance` opens by
+advertising a local engine with no AI calls, which reads as harmless. Classify a route by its
+exported handler and what it does, never by the directory it sits in.
+
+**Found by counting exported handlers against guards, third instance after R40 and R47**, and
+it remains the only method that finds these: every *other* admin route has something, and that
+is exactly what sends a reader past the ones that have nothing. The test therefore **reads the
+directory** rather than naming five files, and the sixth probe creates a new unguarded route -
+a hard-coded list is green on the day one appears.
+
+**Deviated from plan:** the plan said "guard five routes". Two of them are called from screens
+that were **not section ids**, so there was nothing to name. Adding them is add-only and changes
+nobody's access - a super admin passed before and passes now, an employee was refused before and
+is refused now - and the alternative was issuing a grant that does not correspond to a screen.
+
+**Two test lessons re-earned.** These routes now explain their guard at length and **name
+`guardSection` in prose**, so the test strips comments first; without it, commenting the call out
+leaves the file still mentioning the helper. And one probe reported GREEN for the fourth cause -
+**the mutation was a shape the assertion could not see**: `guardSection("x" as never)` does not
+match a regex expecting the closing paren after the string, so the loop ran zero times and passed
+vacuously. Fixed on both sides.
+
+**Owner tested:** not yet. The five screens are reachable only by a signed-in admin, so the
+change is invisible unless a guard is wrong - worth clicking AI Generate once on the trading
+wizard and once on Badge & XP.
+
+**Deferred:** the 101 pre-existing lint warnings in those five files (`any` and object-injection,
+concentrated in the two 1,000-line gamification routes). Fixing them inside a security commit
+would destroy the only evidence the commit is behaviour-free, which is the same reasoning that
+kept the Game Master `||` verbatim during the settlement extraction.
+
+**Next chat should:** continue the wizard work - the game-aware AI prompt, then the shared
+wizard shell.
+
+---
+
 ### 7 Sep 2026 - X6 / `12` s2.7 - THE GATE THAT REFUSED EVERY ROUND, AND THE DRAFT NOBODY PUBLISHED
 
 **Shipped:** `RoundStartPolicy` - `ROUND_START_POLICIES` and `ROUND_START_POLICY_COPY` on both

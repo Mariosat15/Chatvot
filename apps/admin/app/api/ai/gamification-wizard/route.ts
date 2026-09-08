@@ -16,6 +16,7 @@ import JourneyMilestone from "@/database/models/journey-milestone.model";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
 import { evaluateSystem, generateFixes, type BadgeData, type MilestoneData, type MapData } from "@/lib/gamification-engine";
 import { isValidGameIconName } from "@/lib/constants/game-icons";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 // Allow up to 2 minutes for AI agents
 export const maxDuration = 120;
@@ -356,6 +357,13 @@ function parseAIJSON(content: string): any {
 
 // ─── MAIN HANDLER ────────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
+  // Guarded 8 September 2026 with the other four under `app/api/ai/`. See the note in
+  // `generate-competition/route.ts`. Like `evaluate-balance` this one writes - it creates and
+  // rebalances badges and milestones - so the folder name is the least reliable guide to what
+  // it does. `gamification-wizard` became a section id in the same commit.
+  const guard = await guardSection("gamification-wizard");
+  if (!guard.ok) return guard.response;
+
   try {
     await connectToDatabase();
     const body = await request.json();

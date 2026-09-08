@@ -67,6 +67,7 @@ chapter covers risks to the programme and to the application.
 | R48 | **The ending decided whether the play counted.** `syncParticipantScore` selected a player's rounds with `status: "completed"` alone, so a real partial score stored on `game_round` never reached `participant.score` and the player ranked on the seat default of nought. **Neither codebase ever had a rule about finishing** - `games-service` scores any board solved, and the provider spec asks twice for a partial score - so this was the platform discarding a correct result. **The row that made it urgent is `expired`**: `createRound` clamps a round's `expiresAt` to `playWindowEnd`, so under the universal cut-off it is the ORDINARY ending for anyone still playing at the final whistle, which means the better a contest was attended right to its end, the more of its players ranked at nought. Sibling on the read side: `findCountedAttempt` filtered on the presence of a score alone, already wrong for `voided`, whose rounds store `rawScore: 0` deliberately. Sibling in admin: **Game Performance counted every player caught by the cut-off as having abandoned the game**, on the screen an operator uses to decide whether to keep a title running | Medium | **CLOSED 7 Sep 2026.** **Latent - nothing backfilled**, because no provider contest has settled in production, so no prize was paid on the wrong ranking. Say it that way: the scores were never lost, they are on `game_round`, so a wrongly-settled contest could be recomputed - there simply is not one. A document describing this as a distribution bug is wrong; `distributePrizesWithTies` was correct throughout and the defect was upstream of it, in whether a score arrived at all | `SCORING_ROUND_STATUSES` is `completed`, `expired`, `abandoned`; `voided` and `unresolved` stay out for two DIFFERENT reasons - the first has no score by construction, the second is `unresolvedRoundPolicy`'s question and counting it here answers it twice. **The boundary is asserted in both directions**, because a widening with no upper bound is indistinguishable from having no rule. The read side **imports the predicate rather than restating it** and takes `status` as a REQUIRED parameter, so a caller cannot omit it and get a silent "nothing counted". Checked rather than assumed: an attempt is consumed on round **creation**, so there is no incentive to abandon deliberately, and every attempts policy makes a cut-short run helpful or neutral, never harmful |
 | R49 | **The dead null check under a noisy log line.** The reported symptom was three stack traces for one junk URL, because `/competitions/[id]` matches any segment under `/competitions/` and both of the lobby's reads threw inside one `Promise.all`. **The defect the chase found is that `getCompetitionById` threw for BOTH kinds of absence** - a malformed id and a missing document - and its catch re-wrapped both as one message, so **every caller's `if (!competition)` was unreachable.** Three authors independently wrote one: `/results` and `/trade` redirected to `/competitions` for a deleted contest and instead showed a server-error boundary, and `GET /api/competitions/[id]/status` - which is **polled** - answered 500 where its own code carefully answered 404. A deleted contest and a database outage produced the same message, so a page could not tell "this does not exist" from "we are broken" | Low | **CLOSED 7 Sep 2026.** **Live, and split precisely: the noise was harmless and the dead guard was not.** The player already got a 404 from the lobby, so no wrong screen was ever shown there; the two sibling pages showed an error boundary for a contest that had merely been deleted. No money, no payout, **nothing to backfill** - the defect is an unreachable branch rather than a stored value. A document calling this a logging fix is describing the symptom | `null` means it does not exist, a throw means something failed. Six routes refuse a junk id before any read, each writing **one** `warn` line naming the route and the value - a silent guard makes a bad link inside the application indistinguishable from a crawler. The pages' catch had to widen from `NEXT_REDIRECT` to the whole **`NEXT_`** family, because `notFound()` also throws, so the new 404 was caught, logged as a failure and re-issued. The shape test is ours rather than `ObjectId.isValid`'s **because that is a dependency's opinion about a URL**, which has already widened once; a test asserts the two agree today |
 | R50 | **The phantom zero that made every entrant a winner.** `providerHasResult` is `Number.isFinite(participant.score)`, and the module's own comment draws the distinction the fix rests on: a stored nought means "played and scored nothing" and is eligible, an absent score means no result and wins nothing. **Three writers each supplied a nought before the player had played** - `buildParticipantSeat` wrote `score: 0` into every seat at join, the schema declared the field `required: true, default: 0`, and the play state's `?? 0` did it again on the read. So every entrant held a finite score from the moment they paid, the "No score recorded" disqualification could not fire for anybody, and **R45's gate was dead on the day it shipped.** In the owner's own example - three ranks at 70/20/10, two players who played and one who never launched a round - the non-player ranked third on a phantom zero and was paid for it instead of the rank being redistributed | Medium | **CLOSED 7 Sep 2026.** **Latent for money, live for the screen.** No provider contest has settled in production, so no prize was paid on a phantom zero - but the lobby's hero tile has been showing `0` rather than a dash to every player who had not yet played, under a comment insisting it must show a dash. **A migration was needed even so, and that is the part a summary would drop:** a schema default fixes future rows only, so every seat already written holds a real `0` and an OPEN provider contest would still settle the old way. `tools/games/clear-phantom-participant-scores.ts` is report-only until `--apply` and **has not been run** | A default IS a stored value - the same rule that made `entryBlockThreshold` and `canEnterChallenges` defects. **Any one of the three writers is enough to reintroduce it**, so there is a probe per writer rather than a probe for the fix. R45's own suite passed throughout because it builds participants as plain objects and omits `score` to mean "never played" - **a shape no production writer could produce**, which is the third instance of a fixture testing the consumer instead of the producer and the first where the fixture supplied an *absence*. `ChallengeParticipant` deliberately still defaults, pinned by a test, because provider challenges are E8 |
+| R51 | **Five AI routes that answered to nobody.** Every route under `apps/admin/app/api/ai/` had no authorization of **any** kind - not a weak check, none - and the admin app has no middleware, so any caller reaching the origin could post an arbitrary prompt and be answered with the platform's own OpenAI key. **Two of the five WRITE**: `evaluate-balance`'s `fix` action and the whole gamification wizard rebalance badge thresholds and journey milestones, which is the reward economy every player is progressing through. The folder is what hid it - `evaluate-balance`'s own header advertises a local engine with no AI calls, so it reads as harmless | **High** | **CLOSED 8 Sep 2026.** Live and unauthenticated, **but say the exposure in both directions**: no money moved, no prize was paid and no wallet was touched, while metered spend on our account was unbounded and player-facing thresholds were writable. **There is no way to know whether it was ever called**, because a route with no guard records no attribution, and **nothing was backfilled** - the two write actions leave ordinary documents indistinguishable from an operator's own edits | Found by **counting exported handlers against guards**, not by reading routes - third instance after R40 and R47, and the only method that works, because every *other* admin route having something is what sends a reader past the ones with nothing. Each route is guarded by the section owning its **calling screen**, never a general "AI" grant, which is why `journey-map` and `gamification-wizard` had to become section ids (add-only; they rendered screens no grant could name, so only super admins reached them, and nobody's access changed) |
 | R24 | Scope creep before anything ships | Medium | **High** | All |
 | R25 | Round write contention under load | Medium | Medium | X12 |
 | X15 | "Challenge any user" harassment surface - no report-user feature exists | Medium | Medium | X10 |
@@ -1710,6 +1711,76 @@ result for a closed contest**, so no score ever landed and the players tied on n
 red, for a reason that had nothing to do with the defect. **A test failing for the wrong reason
 is worth no more than one passing for the wrong reason**, and only reading the failure told them
 apart.
+
+---
+
+### R51 - Five AI routes that answered to nobody - **CLOSED, 8 September 2026**
+
+**Every route under `apps/admin/app/api/ai/` had no authorization of any kind.** Not a weak
+check, not the wrong helper - nothing. The admin app has no middleware, so any caller able to
+reach the origin could post an arbitrary prompt and have it answered with the platform's own
+OpenAI key, and on two of the five have badge and journey configuration rewritten.
+
+| Route | Called by | What an unauthenticated caller could do |
+|---|---|---|
+| `generate-competition` | the trading contest wizard | spend our OpenAI credit on any prompt |
+| `generate-badges` | Badge & XP management | same, plus read the live badge configuration |
+| `evaluate-balance` | Badge & XP management | **`action: "fix"` WRITES** - rebalance badge thresholds and journey milestones |
+| `gamification-wizard` | Gamification Wizard | **writes** - create and rebalance badges and milestones |
+| `generate-journey` | Journey Map editor | read and reshape the journey players progress through |
+
+**Two of those are write routes, and the folder name is what hid it.** `evaluate-balance`'s own
+header says "LOCAL ENGINE - no AI calls", which reads as harmless; its `fix` action changes the
+reward economy every player is progressing through. **Classify a route by its exported handler
+and what that handler does, never by the directory it sits in** - the same mistake in a new
+shape as classifying an admin screen by the menu group it is filed under.
+
+**How they were found, which is the transferable part and now the third instance.** Not by
+reading routes. Every other route in the admin app has *something*, and that is exactly what
+sends a reader straight past the ones that have nothing - the same reason R40's
+`finalize-old-competitions` and R47's `sync-referrals` survived. All three surfaced from
+**counting exported handlers against guards**, which is a different activity from reading each
+file and which also catches the subtler shape: a route whose `POST` is guarded and whose `GET`
+is not passes any check that merely asks whether the file mentions a guard.
+
+**Say the exposure in both directions.** It moved no money, paid no prize and altered no wallet.
+But it could drain metered spend on our account without limit, and it could change the badge and
+milestone thresholds players are working towards - which is player-visible harm that no ledger
+records. And **there is no way to know whether any of it was ever called**, because a route with
+no guard writes no attribution. Do not let the absence of evidence read as reassurance.
+**Nothing was backfilled**: the two write actions leave ordinary badge and milestone documents
+behind, indistinguishable from an operator's own edits.
+
+**The section is the one owning the calling screen, never a general "AI" grant.** An operator
+trusted to write competition copy is not thereby trusted to rewrite the badge economy. That
+forced a real decision: `journey-map` and `gamification-wizard` render screens in `menuGroups`
+and **were not section ids at all**, so `hasAccessToSection` - `allowedSections.includes(id)`
+for anybody but a super admin - could never return true for them. That failed closed, so it was
+an inflexibility rather than a hole. Both were added to `ADMIN_SECTIONS`, **add-only**, because
+guarding by an adjacent section would have issued a grant that does not correspond to the
+screen - `12` s1.1's "a grant that maps to no screen" pointing the other way. **Nobody's access
+changed:** a super admin passed before and passes now, an employee was refused before and is
+refused now.
+
+Pinned by `__tests__/admin/ai-route-guards.test.ts` (19 tests) with
+`tools/probe-ai-route-guards.ps1` (6 probes, all red on exactly the expected test). **The test
+reads the directory rather than naming the five files**, and the sixth probe is the point of it:
+it creates a new unguarded route, which a hard-coded list of five would pass on the day it
+appears.
+
+**Two lessons from the test, both already paid for elsewhere and both re-earned here.** These
+routes now explain their guard at length and **name `guardSection` in prose**, so the test
+strips comments first - without it, commenting the call out leaves the file still mentioning the
+helper and the probe reports green. And the position assertion is separate from the presence
+one: a guard below `await request.json()` still refuses, but the route has already worked for an
+unauthenticated caller.
+
+**And one probe reported GREEN for the fourth cause - the mutation was a shape the assertion
+could not see.** `guardSection("ai-generation" as never)` does not match a regex expecting the
+closing paren after the string, so the loop over the matches ran zero times and passed
+vacuously. Fixed on both sides: a bare wrong literal in the probe, and a `length > 0` assertion
+in the test, because **an assertion inside a loop over an empty list is green**. Same family as
+the slice that found nothing and the `indexOf` that matched an import.
 
 ---
 

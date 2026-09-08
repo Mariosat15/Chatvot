@@ -42,6 +42,7 @@ import {
   calculateMapXPBudget,
 } from "@/lib/services/journey-sequence.service";
 import { MapTheme } from "@/database/models/journey-map-config.model";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 interface AIConfig {
   apiKey: string | null;
@@ -213,6 +214,13 @@ RESPONSE FORMAT: Return ONLY valid JSON with this structure:
 }`;
 
 export async function POST(request: NextRequest) {
+  // Guarded 8 September 2026 with the other four under `app/api/ai/`. See the note in
+  // `generate-competition/route.ts`. `journey-map` became a section id in the same commit:
+  // this screen has always existed and no grant could name it, so guarding by an adjacent
+  // section would have issued a grant that does not correspond to the screen.
+  const guard = await guardSection("journey-map");
+  if (!guard.ok) return guard.response;
+
   try {
     const body = await request.json();
     const {

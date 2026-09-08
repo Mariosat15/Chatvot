@@ -14,6 +14,7 @@ import OpenAI from "openai";
 import { connectToDatabase } from "@/database/mongoose";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
 import BadgeConfig from "@/database/models/badge-config.model";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 // Allow up to 2 minutes for AI operations
 export const maxDuration = 120;
@@ -107,6 +108,12 @@ BALANCE GUIDELINES:
 Return ONLY valid JSON array of badge objects. No markdown, no explanation.`;
 
 export async function POST(request: NextRequest) {
+  // Guarded 8 September 2026 with the other four under `app/api/ai/`. See the note in
+  // `generate-competition/route.ts` for how the five were found and why the section is the
+  // one owning the calling screen rather than a general "AI" grant.
+  const guard = await guardSection("badges");
+  if (!guard.ok) return guard.response;
+
   try {
     await connectToDatabase();
     const config = await getAIConfig();

@@ -16,8 +16,22 @@ import BadgeConfig from "@/database/models/badge-config.model";
 import JourneyMilestone from "@/database/models/journey-milestone.model";
 import JourneyMapConfig from "@/database/models/journey-map-config.model";
 import { evaluateSystem, generateFixes, type BadgeData, type MilestoneData, type MapData } from "@/lib/gamification-engine";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 export async function POST(request: NextRequest) {
+  /*
+    Guarded 8 September 2026, with the other four routes under `app/api/ai/`. None of the five
+    had authorization of any kind and the admin app has no middleware.
+
+    This one is the worst of the five and it does not look it, because the folder is called
+    `ai` and the header says the engine is local. Its `fix` action WRITES - it rebalances badge
+    thresholds and journey milestones - so an unauthenticated caller could reshape the reward
+    economy every player is progressing through. Read the exported handler and what it does,
+    never the directory it sits in.
+  */
+  const guard = await guardSection("badges");
+  if (!guard.ok) return guard.response;
+
   try {
     await connectToDatabase();
 

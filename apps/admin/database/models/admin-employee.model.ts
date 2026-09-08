@@ -39,6 +39,23 @@ export const ADMIN_SECTIONS = [
   // User Management
   "users",
   "badges",
+  /*
+    Both of these render screens in `AdminDashboard`'s `menuGroups` and NEITHER was a section
+    id until 8 September 2026, so `hasAccessToSection` - which is `allowedSections.includes(id)`
+    for anybody but a super admin - could never return true for them. That failed closed, so it
+    was an inflexibility rather than a hole: the screens existed and only a super admin could
+    reach them, and no grant could be issued because this array is the enum that would reject
+    the write.
+
+    They are added because the AI routes those two screens call now need a guard, and a guard
+    has to name a section. Naming an adjacent one instead - `badges` for the journey editor,
+    say - would issue a grant that does not correspond to the screen, which is the same class
+    of mistake as `12` s1.1's grant that maps to no screen, only pointing the other way.
+    Add-only, so no employee document is orphaned, and nobody's access changes: a super admin
+    passed before and passes now, an employee was refused before and is refused now.
+  */
+  "journey-map",
+  "gamification-wizard",
   "customer-assignment",
   // Finance
   "financial",
