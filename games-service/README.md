@@ -185,10 +185,15 @@ decisions moved out (`21` s4.1f). Anything that computes a size or chooses a sen
 `presentation.js`, which is pure and covered by `tools/test-presentation.ts` - `app.js` should
 only be reading state, calling those functions and writing to the DOM.
 
-**Adding a module means adding it to the `ASSETS` allowlist**, and forgetting is not a partial
-failure: the 404 lands mid-graph, so the importer fails to evaluate too and the game does not
-boot. `tools/test-play.ts` walks the import graph outward from `app.js` rather than listing the
-files, so a module added tomorrow is covered without anybody remembering this paragraph.
+**Adding a module means dropping the file in `public/play` and nothing else.** The served set is
+read from that directory at boot by `readServableAssets`, so there is no list to forget. It used
+to be a hand-maintained allowlist in TypeScript, and forgetting was not a partial failure: the 404
+lands mid-graph, so the importer fails to evaluate too and the game does not boot. That is **R52**,
+and the reason the list is gone rather than merely guarded is that the two halves shipped on
+different schedules - the file with a `git pull`, its authorisation with `npm run build`.
+`tools/test-play.ts` walks the import graph outward from `app.js` rather than listing the files,
+and separately pins the directory-derived set, so a module added tomorrow is covered without
+anybody remembering this paragraph.
 
 **The path `/play` is not arbitrary and must not be changed casually.** `index.html` references
 `/play/app.css` and `/play/app.js` **absolutely**, so anything that mounts the page at a different
@@ -211,8 +216,13 @@ Three details are load-bearing rather than cosmetic, and each has a test:
 - **`Referrer-Policy: no-referrer`, as a header and a meta tag.** The launch token is in the
   query string, so any outbound request would otherwise carry a single-use credential in its
   referrer.
-- **An explicit allowlist of servable filenames**, not a path join. There is no arithmetic to
-  get wrong, so traversal is unreachable rather than defended against.
+- **The request string is only ever a `Map` key**, never a path join. The map is built at boot
+  from the directory listing, so traversal is unreachable rather than defended against however
+  the request is encoded - and a `Map` rather than an object, because an object lookup on a
+  caller-supplied key walks the prototype chain and `"__proto__"` returns something truthy.
+  What the caller-supplied name *can* no longer do is add a file, so the remaining protection is
+  an **extension** allowlist: top-level regular files with a recognised content type, and never
+  `index.html`, which has its own route.
 - **The frame asks for the height the puzzle needs, never the height it currently has.** The
   stylesheet sizes the page to `100dvh`, which inside an iframe is the iframe's own height, so
   measuring `scrollHeight` to request a resize is circular - the platform sized the frame to the
@@ -277,11 +287,25 @@ npm test                     # isolation, typecheck, then all seven suites
 npm run probe:api            # break each guard, one at a time, and watch its test fail
 npm run probe:board          # the same, for the browser module
 npm run probe:presentation   # the same, for the play surface's sizing and wording
+npm run probe:deploy-drift   # the same, for the boot audit and the sweeper's failure log
+npm run probe:play-assets    # the same, for the disk-derived asset set - probe 1 reinjects R52
 ```
 
-`npm test` runs **204 tests**: 15 config, 42 engine, 28 scoring, 41 API, 43 play and delivery,
-11 board client, 24 presentation. (Any figure of 167 predates the presentation suite, and 152
-predates the config suite; both are stale.)
+> **A new front-end file no longer needs a build**, and that is deliberate. Until 8 September 2026
+> the files under `public/play` arrived with a `git pull` while the allowlist authorising them only
+> existed once `npm run build` had run, so pulling without building left old code serving a new
+> front end - a module 404s in the middle of the import graph, nothing evaluates, and the player
+> watches a loading spinner for ever. That reached production (**R52**). The first fix was a boot
+> audit comparing the two halves, and **it could not fire, because it shipped inside the stale
+> build it was meant to report on.** The served set is now derived from the directory, so the two
+> halves cannot disagree. The audit is kept for the narrower job of naming a file whose extension
+> nothing recognises. **Still build when you change `src/`** - `pm2 deploy` does, a hand-rolled pull
+> does not.
+
+`npm test` runs **213 tests**: 15 config, 42 engine, 28 scoring, 41 API, 52 play and delivery,
+11 board client, 24 presentation. (Any figure of 209 predates the directory-derived asset set, 204
+predates the deploy-drift audit, 167 predates the presentation suite, and 152 predates the config
+suite; all four are stale.)
 
 **Every one of them runs in-process against an in-memory MongoDB, so none can fail because the
 PLATFORM disagrees with this service.** That check lives on the other side, in the platform's

@@ -1021,6 +1021,32 @@ npm install && npm run build
 pm2 restart chartvolt-games
 ```
 
+> **`npm run build` is not optional here, and skipping it produces a game that never starts.**
+> The files under `games-service/public/play` arrive with the `git pull`. The allowlist that
+> authorises the service to serve them lives in TypeScript, so it only changes once you build.
+> Pull without building and the running service is old code serving a new front end: one module
+> is answered with a 404, and because an ES module that 404s takes its importer down with it,
+> **no script on the page evaluates at all**. The player watches a loading spinner, the platform
+> reports nothing, and no request has failed. That is exactly how **R52** reached production on
+> 8 September 2026.
+>
+> The service now checks its own two halves at boot, so `pm2 logs chartvolt-games` says so on the
+> first lines:
+>
+> ```
+> ❌ [games-service] public/play holds presentation.js, which THIS BUILD will not serve.
+> ```
+>
+> **After changing which titles the service offers**, also press **Sync catalogue** on
+> Admin → Games → Game Providers. Retiring or renaming a title changes nothing the operator can
+> see until those `provider_game` rows are refreshed — a retired game keeps appearing in the
+> contest wizard, correctly, because the platform is still storing the catalogue it last read.
+>
+> **And check you have exactly one process.** `pm2 list` must show a single `chartvolt-games`.
+> Two of them race to deliver the same result and double the retry traffic, which the config's
+> own comment warns about; in the logs it looks like one instance reporting `delivered 1` while
+> another reports `failed 1` on the same interval. `pm2 delete <id>` the duplicate.
+
 ### If something is wrong
 
 ```bash

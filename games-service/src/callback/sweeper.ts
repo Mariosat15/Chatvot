@@ -127,6 +127,26 @@ export async function sweepOnce(now = new Date()): Promise<SweepSummary> {
     if (outcome.sent) summary.delivered++;
     else if (outcome.reason !== "suppressed" && outcome.reason !== "not_reportable") {
       summary.deliveryFailures++;
+      /*
+       * CLASSIFY THE FAILURE; DO NOT MERELY COUNT IT.
+       *
+       * `attemptDelivery` works out exactly why - `HTTP 401`, `HTTP 500`, a fetch error's own
+       * message - and returns it. Until 8 September 2026 this loop incremented a counter and
+       * threw the reason away, so the only trace of a result that could not be delivered was
+       * `failed 1` on the summary line below, repeated every tick for as long as it kept
+       * failing. That is unactionable: a rotated callback secret, a platform that is down and a
+       * URL routed to nothing all produce the identical line, while the player sits on
+       * "Confirming your result" and the contest cannot settle behind them.
+       *
+       * `gave_up` is excluded because it already logs its own error with the attempt count and
+       * the event id; a second line would only bury it.
+       */
+      if (outcome.reason !== "gave_up") {
+        console.warn(
+          `⚠️ [sweeper] ${round.roundId}: delivery failed - ${outcome.reason}` +
+            (outcome.retryable ? "; will retry" : "; not retrying"),
+        );
+      }
     }
   }
 

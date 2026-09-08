@@ -596,7 +596,7 @@ no score, rank or prize on any status. Both halves are asserted, because they fa
 
 The owner's instruction: **no fixed set of boards and no per-round restriction.** A player
 gets a time budget, solves as many boards as they can inside it, and is scored on how many
-and how fast. **204 tests in `games-service`**, up from 196.
+and how fast. **204 tests in `games-service`** at the time, up from 196 - **209 since 4.1h**.
 
 **The finding is that this was already Circuit Sprint**, exactly. It asks how many boards
 you can solve in a fixed time, scores count and speed, and a perfect player never finishes
@@ -632,16 +632,151 @@ scheduled.
 **What did NOT change, because the instruction reads as though it should have.** Ties,
 unclaimed shares, players who never scored and disqualification are all decided by
 `05` s9.2 and s9.3 and the ranking engine, none of it per-title - so "ties apply the same,
-and all the rest apply the same" required no change at all. The same is true of joining:
-registration closes at `startTime` and always did, and a player may start an attempt at any
-point the policy allows. **A document presenting any of that as part of this work is
-describing something nobody built.**
+and all the rest apply the same" required no change at all. **A document presenting any of
+that as part of this work is describing something nobody built.**
+
+> **Superseded later the same day, and only on the joining half.** This section originally
+> said "registration closes at `startTime` and always did", which was true when it was
+> written and is false now: `12` s2.10 moved entry to the last moment playing is still
+> possible. Corrected here rather than deleted, because the sentence was the *reason* the
+> owner's "join any time before it ends" instruction looked already-satisfied when it was
+> not.
 
 **And the runbook in 4.1e is now stale in one step.** Step 3 says to enable
 `circuit-perfect` first, because it ends when the player finishes rather than when a clock
 does, which made a full manual round quick. There is only one title now, so the sprint's
 clock is the floor - **set the contest's playing time to one minute** for a manual run and
 the round ends in a minute.
+
+### 4.1h The service and its play surface were deployed apart - 8 September 2026
+
+**R52.** The owner opened Circuit Sprint, watched a spinner, and gave up. So did the retry.
+The platform's twelve-second stall panel - added the day before - was the only component in
+the entire stack that noticed anything was wrong. **209 tests**, 7 probes in
+`tools/probe-deploy-drift.ps1`, all red on exactly the expected test.
+
+> **SUPERSEDED IN ITS CONCLUSION, later the same day - see 4.1i.** Everything below about the
+> cause is right. The **fix** was not: a boot audit cannot report a stale build, because it ships
+> **inside** the stale build. The owner reopened the game and it failed identically. The coupling
+> was then removed rather than monitored, and **213 tests** is the current figure. This section is
+> kept as written because the reasoning that produced the wrong fix is the useful part.
+
+**There was no bug in any revision, which is why nothing found it.** `public/play` is plain
+files that arrive with a `git pull`. The allowlist in `src/http/play-page.ts` authorising
+them is TypeScript, and only exists once `npm run build` has run. The server was a
+**6 September** build serving a **7 September** surface, so `presentation.js` - introduced by
+4.1f and imported by both `app.js` and `board.js` - was answered with a JSON 404.
+
+**An ES module that 404s takes its importer down with it.** That is the part worth carrying,
+because it turns a missing file into a total failure rather than a degraded one: nothing
+evaluated, so the page never got past its own boot markup, never posted `ready`, and the
+player saw the loading state the document ships with. No request failed from the platform's
+side. Nothing appeared in any log on either side.
+
+| Symptom the owner reported | Cause |
+|---|---|
+| Neither title would start | `presentation.js` 404, module graph dead |
+| Circuit Perfect still offered, a morning after being retired | The catalogue rows were synced from a service still reporting the 6 Sep catalogue |
+| Sprint advertising "Up to 300s an attempt" against a 3600s ceiling | The same stale catalogue |
+| "Confirming your result" for ever, and `failed 1` in the sweeper log | A real delivery failure whose reason was being discarded - see below |
+
+**The picker had no defect, and checking that mattered.** `listContestableTitles` already
+filters on `providerStatus: "active"`, so the obvious fix - "hide deprecated titles" - was
+already the behaviour. There was simply nothing for it to filter, because no sync had brought
+the deprecation across. **Do not build the guard a symptom suggests before checking whether
+it exists**, or the real cause survives behind a change that reviews as correct.
+
+**Why no test could have caught it.** `every module the play surface imports is served`
+walks the real import graph and would catch a module committed without its allowlist line.
+It passed all day. It can only ever test **one revision**, and this fault is a disagreement
+**between** revisions - the same rule this programme already carries about `check:mirrors`:
+**a green guard proves two copies agree in the repository, never that the two halves of a
+running deployment agree with each other.** Only the deployment can answer that.
+
+So `auditPlaySurface` runs at boot and compares the directory against the served set in both
+directions, naming the files and the remedy. Four things about it are load-bearing:
+
+- **Both directions.** Code newer than the files is the same deploy mistake with the halves
+  swapped, and it produces the same dead page.
+- **`index.html` is excluded**, because it has its own route and is deliberately not in the
+  allowlist. An audit that diffed the whole directory would print an error on **every boot**,
+  and a guard that cries wolf at every start is the line everyone learns to scroll past -
+  including on the day it is right.
+- **It logs and does not refuse to start**, following `resolvePlayRoot`'s existing decision in
+  the same file. Creating rounds and, above all, the sweeper delivering results for rounds
+  already in flight all work without these files; refusing to boot would turn a broken play
+  surface into contests that cannot settle.
+- **Both its inputs are parameters.** It first read `ASSETS` from module scope, and removing
+  one entry turned **five** tests red - so no test could say which rule had broken. **A pure
+  function with one input injected and one read from module scope is only half pure, and the
+  blast radius of a probe is what reveals it.**
+
+**The second finding, from reading the logs for the first.** The sweeper printed `failed 1`
+every tick and nothing else, while `attemptDelivery` had already computed exactly why -
+`HTTP 401`, `HTTP 500`, a fetch error's own message - returned it, and had it dropped on the
+floor. A rotated callback secret, a platform that is down and a URL routed to nothing all
+produce that identical line. **Classify a failure; never merely count it** - already a rule
+here from the concurrency tests, and this is what it costs in production.
+
+**One fault is operational and no code can fix it.** The logs show `4|chartvolt-games` and
+`5|chartvolt-games` - two processes - while `ecosystem.config.js` declares `instances: 1`
+and its comment says why: "the callback sweeper is a singleton, and two copies would race to
+deliver the same result and double the provider's retry traffic." That race is visible in the
+logs as one instance reporting `delivered 1` while the other reports `failed 1` on the same
+interval. `pm2 delete` the duplicate.
+
+**What it cost players, stated precisely.** No money moved, no prize was paid, no stored value
+is wrong, and **nothing was backfilled**. But an attempt is spent when a round is **created**,
+so a player whose game never booted has still used theirs, and those rounds settle under the
+contest's `unresolvedRoundPolicy` like any other. The remedy is `npm run build` in
+`games-service`, a restart, and a catalogue re-sync from the Game Providers screen.
+
+### 4.1i The guard that shipped inside the thing it was guarding - 8 September 2026
+
+**The owner reopened the game and it failed identically**, with the same
+`/play/presentation.js` 404 in the console. The audit in 4.1h detects that drift precisely and
+names the file. **It could never have fired, because it lives in the build it exists to warn
+about.**
+
+That is the whole lesson and it generalises well beyond this service. **A guard shipped inside
+the artifact whose staleness it reports is absent in exactly the state it was written for.** The
+code is real, correct, unit-tested and probed; it is simply not present on the machine where the
+condition holds. It is the same shape as a comment asserting a check that does not run - and
+harder to spot, because everything about it reviews as diligent.
+
+**So the coupling was deleted rather than monitored.** `readServableAssets` builds the served set
+from the directory listing at boot. A module arriving with a `git pull` is servable immediately,
+with no build: **two things must ship together for a filename list, and one thing cannot disagree
+with itself.**
+
+| Rule | Why it is not the obvious alternative |
+|---|---|
+| The request string is only ever a **`Map` key** | The path handed to `sendFile` comes from `readdirSync`, so `../` and its encoded forms cannot become a path however they arrive. This is the property the old allowlist bought and it is unchanged - it is also why `express.static` is still refused on this route |
+| Still a `Map`, never an object literal | `in` and object indexing walk the prototype chain, so `"__proto__"` returns something truthy. Found in the admin round inspector on 5 September and twice since |
+| **Top-level regular files only** | No recursion, so nothing nested is reachable and a directory cannot be mistaken for a file. `/play/assets/...` is a real path a browser asks for, because the platform's own artwork rewrite uses it |
+| An **extension** allowlist, not a filename one | The whole of the remaining protection, so a stray `.env`, `.ts` or editor backup is unservable. It is also the only way a file can still be present and unreachable, which is what the boot audit now reports |
+| Read **once at boot**, not per request | A `readdirSync` on an unauthenticated route is a syscall an anonymous caller can repeat. Picking up a new file needs a restart, which every deploy does - the point is that it no longer needs a **build** |
+
+**The audit is kept, with its scope corrected in the file.** `unserved` now means one thing: a
+plausible asset whose extension is not recognised. `missing` is **structurally impossible** and is
+kept as a **tripwire**, documented as such, because it becomes reachable the moment anybody
+reintroduces a hand-written list - which is exactly the change this file now argues against. An
+overstated guard is a wrong fact, the same duty as correcting a risk downward.
+
+**Probe 4 came back green and taught the third cause of a green probe again.** The explicit
+`index.html` skip is real and **unreachable**: `.html` was never in the content-type table, so the
+document was already refused a line later. Three consequences, and the middle one is the
+transferable part - the skip is kept as a tripwire with the reason in the file; **the test gained a
+second assertion pinning where the guarantee actually lives**, because a test asserting only the
+observable behaviour credits the name check with a guarantee it does not provide; and the probe was
+re-aimed at adding `.html` to the table, which is the realistic mutation, since a rules page is how
+`.html` would arrive.
+
+**213 tests** (up from 209), `tools/probe-play-assets.ps1`, 6 probes, all red on exactly the
+expected test with a blast radius of one or two.
+
+**The owner must still rebuild once.** This change cannot repair the build that is running,
+because the change is *in* the build. After that rebuild the class of fault is gone.
 
 ---
 

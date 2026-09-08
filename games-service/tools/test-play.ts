@@ -18,10 +18,13 @@
  */
 
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 
 import { generateForPlayer } from "../src/engine/generate";
 import type { Cell } from "../src/engine/puzzle";
 import { shapeFor, type GridSize } from "../src/games/titles";
+import { auditPlaySurface, readServableAssets, servedFileNames } from "../src/http/play-page";
 import {
   callApi,
   callPlay,
@@ -250,6 +253,144 @@ async function main(): Promise<number> {
       seen.has("/play/board.js") && seen.has("/play/presentation.js"),
       `the walk did not reach the known modules, only ${[...seen].join(", ")}`,
     );
+  });
+
+  /*
+   * The boot audit, which exists because the test above CANNOT catch the failure that actually
+   * reached players.
+   *
+   * That test walks the import graph of one revision and passes whenever the allowlist and the
+   * files agree. On 8 September 2026 they agreed in git and disagreed on the server: `public/play`
+   * had been updated by a pull, the compiled allowlist had not been rebuilt, so `presentation.js`
+   * was imported and answered with a 404 and no game booted. A single-revision test has no way to
+   * express that, so the deployment has to check itself.
+   */
+  /*
+   * The three unit tests below pass their OWN served list rather than the real allowlist, so each
+   * one holds exactly one rule. Written against `ASSETS`, removing a single entry turned all three
+   * red at once - which the probe harness reports as a suspected harness fault, and rightly: a
+   * test that fails for a reason other than the rule it names cannot tell you which rule broke.
+   */
+  const SERVED = ["app.js", "app.css", "board.js", "presentation.js"];
+
+  await test("a file this build will not serve is reported, and named", async () => {
+    const audit = auditPlaySurface([...SERVED, "newmodule.js"], SERVED);
+
+    assert.deepEqual(audit.unserved, ["newmodule.js"]);
+    assert.deepEqual(audit.missing, []);
+  });
+
+  await test("an allowlisted file that is not on disk is reported the other way round", async () => {
+    // The reverse split: the code is newer than the files. Same deploy mistake, opposite halves.
+    const audit = auditPlaySurface(["app.js", "app.css", "board.js"], SERVED);
+
+    assert.deepEqual(audit.missing, ["presentation.js"]);
+    assert.deepEqual(audit.unserved, []);
+  });
+
+  await test("index.html is not reported, because it has its own route", async () => {
+    /*
+     * The trap this pins. `index.html` is served by `servePlayPage` and is deliberately absent
+     * from the allowlist, so an audit that simply diffed the directory against the served set
+     * would print an error on every single boot. A guard that cries wolf at every start is worse
+     * than no guard: it is the line everyone learns to scroll past, including on the day it is
+     * right. This is the only test here that puts the document in the list.
+     */
+    const audit = auditPlaySurface(["index.html", ...SERVED], SERVED);
+
+    assert.deepEqual(audit.unserved, []);
+    assert.deepEqual(audit.missing, []);
+  });
+
+  await test("a new module needs no code change to be served - the R52 regression", async () => {
+    /*
+     * THE TEST THAT WOULD HAVE PREVENTED THE OUTAGE, and it could not have existed before the
+     * design changed. `presentation.js` was added to `public/play` on 7 September and the running
+     * service refused it, because the list authorising it was compiled into a build nobody had
+     * remade. The served set is now derived from the directory, so a file arriving with a `git
+     * pull` is servable with no build at all.
+     *
+     * Asserted through `readServableAssets` rather than by hitting the HTTP route, because the
+     * point is what happens to a file this repository does not contain.
+     */
+    const entries = [
+      { name: "app.js", isFile: () => true },
+      { name: "presentation.js", isFile: () => true },
+      { name: "somethingaddedtomorrow.js", isFile: () => true },
+    ];
+
+    const assets = readServableAssets(entries);
+
+    assert.equal(assets.has("somethingaddedtomorrow.js"), true);
+    assert.deepEqual(assets.get("somethingaddedtomorrow.js"), {
+      file: "somethingaddedtomorrow.js",
+      type: "text/javascript; charset=utf-8",
+    });
+  });
+
+  await test("the served set refuses everything except a recognised file type", async () => {
+    /*
+     * The extension allowlist is what replaced the filename allowlist, so it is the whole of the
+     * remaining protection. A directory listing is not a permission: `.env` and `.ts` are the two
+     * that would actually be present in a mistaken deploy, and `..` is there because a name is
+     * only ever a `Map` key here - it can never become a path component - so this pins that the
+     * lookup would miss rather than relying on that being obvious.
+     */
+    const assets = readServableAssets([
+      { name: "app.js", isFile: () => true },
+      { name: ".env", isFile: () => true },
+      { name: "server.ts", isFile: () => true },
+      { name: "app.js.map", isFile: () => true },
+      { name: "index.html", isFile: () => true },
+      { name: "assets", isFile: () => false },
+      { name: "..", isFile: () => false },
+    ]);
+
+    assert.deepEqual([...assets.keys()], ["app.js"]);
+  });
+
+  await test("index.html is not in the served set, because it has its own route", async () => {
+    /*
+     * It would otherwise be reachable as `/play/index.html` as well as `/play`, by a route that
+     * sets a content type from a table rather than the one `servePlayPage` sets.
+     *
+     * THE PROPERTY IS HELD BY THE EXTENSION TABLE, NOT BY THE NAME CHECK, and finding that out is
+     * why there are two assertions here. A probe deleting the explicit `index.html` skip stayed
+     * green: `.html` is not a servable type, so the document was already refused one line later.
+     * The name check is kept as a tripwire - see the note on `readServableAssets` - but a test
+     * asserting only the observable behaviour would have credited it with a guarantee it does not
+     * provide. So the second assertion pins where the guarantee actually lives, and it is the one
+     * that fails if somebody adds `.html` to the table for a rules page.
+     */
+    const assets = readServableAssets([
+      { name: "index.html", isFile: () => true },
+      { name: "app.css", isFile: () => true },
+    ]);
+
+    assert.deepEqual([...assets.keys()], ["app.css"]);
+
+    // Any HTML file, not just the document, must be unservable through the asset route.
+    const other = readServableAssets([{ name: "rules.html", isFile: () => true }]);
+    assert.equal(other.size, 0, "an .html file must not be servable as an asset");
+  });
+
+  await test("a directory is never served, however plausibly it is named", async () => {
+    // Reason: `sendFile` on a directory does not fail usefully, and the platform's own artwork
+    // rewrite means `/play/assets/...` is a path a browser will genuinely ask for.
+    const assets = readServableAssets([{ name: "assets.js", isFile: () => false }]);
+
+    assert.equal(assets.size, 0);
+  });
+
+  await test("this checkout's own play surface agrees with this build", async () => {
+    // The in-repo instance of the same question, and the only one wired to reality. It cannot see
+    // a stale deployment - that is what the boot audit is for - but it does catch a module
+    // committed without its allowlist line before it ever reaches a server.
+    const root = path.resolve(__dirname, "..", "public", "play");
+    const audit = auditPlaySurface(fs.readdirSync(root), servedFileNames());
+
+    assert.deepEqual(audit.unserved, [], "files are on disk that the service will not serve");
+    assert.deepEqual(audit.missing, [], "the allowlist names files that are not on disk");
   });
 
   await test("a failure inside the game still tells the platform to stop loading", async () => {
@@ -781,6 +922,46 @@ async function main(): Promise<number> {
     assert.equal(stored?.delivery.gaveUpAt, undefined, "gave up on the first failure");
     assert.ok(stored!.delivery.nextAttemptAt!.getTime() > Date.now(), "retry scheduled in the past");
     assert.match(String(stored?.delivery.lastError), /500/);
+  });
+
+  await test("a delivery failure says WHY in the log, not merely that one happened", async () => {
+    /*
+     * The reason is stored on the round, which the test above checks - and nobody triaging a live
+     * contest is reading documents in MongoDB. Until 8 September 2026 the only thing an operator
+     * saw was `failed 1` on the sweeper's summary line, repeated every tick. A rotated callback
+     * secret, a platform that is down and a callback URL routed to nothing all produce that
+     * identical line, while the player sits on "Confirming your result" and the contest cannot
+     * settle behind them.
+     *
+     * Asserting the STATUS rather than just that something was logged is the load-bearing half: a
+     * line reading "delivery failed" would satisfy a bare "did we log" check and would leave the
+     * operator exactly where they started.
+     */
+    await clearRounds();
+    receiverBehaviour.status = 503;
+
+    const lines: string[] = [];
+    const realWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
+    };
+
+    try {
+      const { token, roundId } = await openRound();
+      await callPlay("/play/api/session", { t: token });
+      await callPlay("/play/api/leave", { t: token });
+
+      await waitFor(
+        () => lines.some((line) => line.includes(roundId)),
+        "a logged delivery failure",
+      );
+
+      const line = lines.find((entry) => entry.includes(roundId)) as string;
+      assert.match(line, /503/, `the log did not name the failure: ${line}`);
+      assert.match(line, /will retry/, `the log did not say what happens next: ${line}`);
+    } finally {
+      console.warn = realWarn;
+    }
   });
 
   await test("the retry backoff is capped inside the 24-hour window", async () => {
