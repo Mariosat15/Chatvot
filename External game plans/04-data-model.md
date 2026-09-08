@@ -127,7 +127,8 @@ depend on a live provider call.
 | `providerKey`, `gameCode` | Compound unique index |
 | `gameKey` | Derived: `provider:{providerKey}:{gameCode}` |
 | `displayName`, `description`, `thumbnailUrl`, `category` | Presentation |
-| `family` | `independent` \| `head_to_head` |
+| `family` | `independent` \| `head_to_head`. Does the game need an **opponent**? Read only as a fallback by `resolvePlayMode` and rendered as a badge - nothing else branches on it |
+| `playMode` | `anytime` \| `scheduled`, defaulting to `anytime`. Does everybody play at **one appointed moment**? A **different axis from `family`** - a race is `independent` and `scheduled`. Provider-owned, rewritten by every catalogue sync, and on `NEVER_EDITABLE_CONTENT_FIELDS`. Resolved by `lib/services/games/play-shape.ts`, never read raw. See `22` s8 |
 | `supportsCompetition`, `supportsOneVsOne`, `supportsPractice`, `supportsContentSeed` | Capability flags |
 | `scoreDirection`, `scoreType`, `scoreRange` | Ranking |
 | `typicalDurationSeconds`, `maxDurationSeconds` | Scheduling and grace periods |

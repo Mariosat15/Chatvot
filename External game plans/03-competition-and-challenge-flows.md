@@ -178,6 +178,35 @@ Four things about this third amendment, and the first is the one a summary will 
   computing it inside the start-time branch is wrong the moment the window moves instead,
   with no error when it happens.
 
+> **FOURTH AMENDMENT, 8 September 2026 - a `scheduled` title closes entry at the START, and
+> the three amendments above describe the `anytime` case only.**
+>
+> A title may now declare `playMode: "scheduled"`, meaning everybody plays at one appointed
+> moment - a race, a live quiz. Such a contest closes entry at `startTime`, which is what the
+> **original** row in the table said and what the third amendment moved away from.
+> `External game plans/22` section 8 is the authoritative account of what was built.
+>
+> Four things about this fourth amendment, and the first is the one that reads like a
+> contradiction.
+>
+> - **It does not reverse the third amendment, it scopes it.** The third amendment's rule -
+>   entry stays open for as long as playing is still possible - is unchanged and still governs
+>   every title in the live catalogue, all of which are `anytime`. A scheduled contest is a
+>   different shape, not a change of mind about this one.
+> - **The reason is physical, not informational, and merging the two is the mistake `22`
+>   section 2.1 exists to prevent.** Entry closes at the gun because **you cannot join a race
+>   that has begun** - everyone runs one clock from one instant, so a seat sold afterwards can
+>   only ever record a worse result than the field. It is *not* because knowing the target is
+>   worth something. That question is separate, still open, still per-title, and still answered
+>   the way the third amendment answered it for `anytime` games.
+> - **It is decided by the title and never by the operator or the caller**, resolved by
+>   `resolvePlayShape` from the stored catalogue row. An operator- or client-supplied shape is
+>   a way to keep entry open after a race has started, which is the same rule as the
+>   market-hours gate and `maxRoundSeconds`.
+> - **A player who entered in time and presses Play late gets a shortened round, not a
+>   refusal.** `resolveExpiry` already clamps to `playWindowEnd`. They paid, starting late
+>   cannot help them, and refusing them buys nothing.
+
 ### 1.3 Attempts policy - a required per-contest setting
 
 | Policy | Behaviour | Best for |

@@ -8,6 +8,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  playShapeRules,
+  type PlayMode,
+} from "@/lib/services/games/play-shape";
 import { PrizeDistributionEditor } from "../PrizeDistributionEditor";
 import { UnscoredPolicyField } from "../UnscoredPolicyField";
 import type { ContestDraft } from "../contest-draft";
@@ -25,10 +29,15 @@ import { NumberField } from "./fields";
 export function StepPrizes({
   draft,
   patch,
+  title,
 }: {
   draft: ContestDraft;
   patch: (changes: Partial<ContestDraft>) => void;
+  /** Needed only for the play shape, which decides whether "attempts" is a real question. */
+  title?: { playMode?: PlayMode };
 }) {
+  const shape = playShapeRules(title?.playMode ?? "anytime");
+
   return (
     <>
       <div className="space-y-2">
@@ -40,35 +49,50 @@ export function StepPrizes({
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label className="text-gray-200">Attempts</Label>
-          <Select
-            value={draft.attemptsPolicy}
-            onValueChange={(v) =>
-              patch({ attemptsPolicy: v as ContestDraft["attemptsPolicy"] })
-            }
-          >
-            <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-100 h-12">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="single">One attempt each</SelectItem>
-              <SelectItem value="best_of_n">Best of several</SelectItem>
-              <SelectItem value="sum_of_n">Total of several</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      {/*
+        WITHHELD WITH ITS REASON on a simultaneous title, matching the round-start control on
+        the previous step. You cannot re-run a race: "best of three" over a contest everybody
+        plays at one moment is not a harder version of the same thing, it is two further
+        attempts with no field to run against. The create service forces `single`, so leaving
+        the select here would be three options with one behaviour - the same failure as a
+        `rankingMethod` a provider game ignores.
+      */}
+      {shape.requiresSingleAttempt ? (
+        <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-gray-400">
+          Everyone plays this game at the same moment, so there is one attempt each. A race
+          cannot be re-run against a field that has already finished.
+        </p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label className="text-gray-200">Attempts</Label>
+            <Select
+              value={draft.attemptsPolicy}
+              onValueChange={(v) =>
+                patch({ attemptsPolicy: v as ContestDraft["attemptsPolicy"] })
+              }
+            >
+              <SelectTrigger className="bg-gray-800 border-gray-600 text-gray-100 h-12">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="single">One attempt each</SelectItem>
+                <SelectItem value="best_of_n">Best of several</SelectItem>
+                <SelectItem value="sum_of_n">Total of several</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-        {draft.attemptsPolicy !== "single" && (
-          <NumberField
-            label="How many attempts"
-            value={draft.attemptsAllowed}
-            onChange={(v) => patch({ attemptsAllowed: v })}
-            min={2}
-          />
-        )}
-      </div>
+          {draft.attemptsPolicy !== "single" && (
+            <NumberField
+              label="How many attempts"
+              value={draft.attemptsAllowed}
+              onChange={(v) => patch({ attemptsAllowed: v })}
+              min={2}
+            />
+          )}
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label className="text-gray-200">

@@ -1,6 +1,10 @@
 "use client";
 
 import { Coins, Percent, Users } from "lucide-react";
+import {
+  playShapeRules,
+  type PlayMode,
+} from "@/lib/services/games/play-shape";
 import { RoundClockNote } from "../RoundClockNote";
 import { RoundStartPolicyField } from "../RoundStartPolicyField";
 import type { ContestDraft } from "../contest-draft";
@@ -42,23 +46,31 @@ export function StepSchedule({
    * schema and the draft's answers, and the ceiling only as a fallback for a title that
    * declares no clock.
    */
-  title?: { maxDurationSeconds?: number; schema: ContestableTitle["schema"] };
+  title?: {
+    maxDurationSeconds?: number;
+    schema: ContestableTitle["schema"];
+    playMode?: PlayMode;
+  };
   currencySymbol: string;
 }) {
+  // Resolved from the chosen title, and `anytime` before one is chosen - which is the same
+  // answer the whole live catalogue gives, so the step reads identically until it needs not to.
+  const shape = playShapeRules(title?.playMode ?? "anytime");
+
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2">
         <DateField
-          label="Contest starts"
+          label={shape.copy.startLabel}
           value={draft.startTime}
           onChange={(v) => patch({ startTime: v })}
-          hint="Registration closes at this moment."
+          hint={shape.copy.startHint}
         />
         <DateField
-          label="Contest ends"
+          label={shape.copy.endLabel}
           value={draft.endTime}
           onChange={(v) => patch({ endTime: v })}
-          hint="Everything still running is closed here."
+          hint={shape.copy.endHint}
         />
       </div>
 
@@ -77,11 +89,23 @@ export function StepSchedule({
         answers is about the contest's clock - "when can people actually play?" - and it
         changes what the note directly above says. Two screens apart, an operator would read
         a cut-off, scroll, change the policy, and never see the note stop mentioning one.
+
+        WITHHELD WITH ITS REASON on a simultaneous title, rather than greyed out or silently
+        absent. The create service forces the policy for such a contest, so leaving the control
+        here would be a setting an operator can change that changes nothing - the shape this
+        codebase keeps finding, after a provider with no adapter and a `rankingMethod` a
+        provider game ignores.
       */}
-      <RoundStartPolicyField
-        value={draft.roundStartPolicy}
-        onChange={(value) => patch({ roundStartPolicy: value })}
-      />
+      {shape.offersRoundStartPolicy ? (
+        <RoundStartPolicyField
+          value={draft.roundStartPolicy}
+          onChange={(value) => patch({ roundStartPolicy: value })}
+        />
+      ) : (
+        <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-gray-400">
+          {shape.copy.roundStartWithheld}
+        </p>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <NumberField

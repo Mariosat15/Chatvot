@@ -44,8 +44,6 @@ export interface GameCapabilities {
   scoreUpdates: boolean;
   /** Can be played as a 1v1 challenge, not only a competition. */
   supportsChallenges: boolean;
-  /** Both players must be present at the same time. */
-  requiresSyncPlay: boolean;
 }
 
 /** Which way is better. Some games rank on lowest score - a race time, a stroke count. */

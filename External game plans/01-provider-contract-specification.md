@@ -96,6 +96,7 @@ ChartVolt decide what contest formats each game can support.
       ],
 
       "family": "independent",
+      "playMode": "anytime",
       "supportsCompetition": true,
       "supportsOneVsOne": true,
       "supportsPractice": true,
@@ -134,6 +135,7 @@ ChartVolt decide what contest formats each game can support.
 |---|---|---|
 | `gameCode` | Yes | Stable, permanent identifier. **Must never be reused or renamed** |
 | `family` | Yes | `independent` or `head_to_head`. Determines which contest formats are possible - see `00-README.md` |
+| `playMode` | No, defaults to `anytime` | `anytime` or `scheduled`. **A different question from `family`**: `family` asks whether the game needs an *opponent*, this asks whether everybody plays at *one appointed moment*. A race is `independent` and `scheduled`; a puzzle is `independent` and `anytime`. A `head_to_head` title is treated as `scheduled` whatever it declares, because an opponent implies a shared moment. Omitting it means `anytime`, which is why it is optional - see 3.2a |
 | `supportsCompetition` / `supportsOneVsOne` | Yes | ChartVolt hides formats a game cannot support |
 | `supportsContentSeed` | Yes | See 4.3. **Required for competitions.** A game without it cannot be used for a fair multi-player contest |
 | `scoreDirection` | Yes | `higher_is_better` or `lower_is_better`. Speedruns and golf-style games are the latter. Getting this wrong ranks everyone backwards |
@@ -247,6 +249,51 @@ ChartVolt release. That is precisely the outcome `configSchema` exists to avoid.
 
 **If your title's length is fixed rather than configurable**, declare nothing and set
 `maxDurationSeconds` to that fixed length. The fallback is then exactly right.
+
+### 3.2a `playMode` - does everybody play at once?
+
+**Most providers can ignore this section.** If your players can pick up your game whenever
+they like, omit the field: `anytime` is the default and describes every title in the live
+catalogue today.
+
+Declare `"playMode": "scheduled"` when your title only makes sense played **simultaneously** -
+a race, a live quiz, anything where the field runs one clock together.
+
+**This is not the same question as `family`, and merging them is the mistake to avoid.**
+`family` asks whether your game needs an **opponent**. A race does not: every runner runs
+their own track and gets their own time, so a race is `independent`. What a race needs is for
+everyone to run at the same **moment**, which is a separate property no other field carries.
+
+| | `anytime` | `scheduled` |
+|---|---|---|
+| `independent` | A puzzle, a solo time trial | **A race, a live quiz** |
+| `head_to_head` | *(impossible)* | Chess, checkers |
+
+Three rules follow, and each is a consequence rather than a choice:
+
+- **`head_to_head` is treated as `scheduled` whatever you declare**, because two people cannot
+  play each other at different times. You do not need to declare both.
+- **Omitting the field means `anytime`.** It is optional precisely so that a catalogue written
+  against version 1.3 keeps working unchanged.
+- **A value we do not recognise is treated as `anytime` and logged.** This is the one place
+  ChartVolt deliberately fails towards the *less* constrained answer: a simultaneous title
+  wrongly run as staggered still produces comparable, payable scores, whereas a staggered
+  title wrongly run as simultaneous shuts entry at the start and turns away players who could
+  have played and paid.
+
+**What declaring `scheduled` changes on our side**, so you can see it is a shape and not a
+feature you must implement:
+
+| | `anytime` | `scheduled` |
+|---|---|---|
+| When entry closes | At the last moment an attempt still fits | **At the contest's start time** - you cannot join a race that has begun |
+| Attempts | The operator's choice, 1..n | **Exactly one** |
+| A player who opens their board late | Normal | Gets a **shortened** round, not a refusal. They paid, and starting late cannot help them |
+| A player who never turns up | Their round is resolved by policy | A no-show: no round exists, and they are not eligible for a prize |
+
+**Nothing in your API changes.** You still serve the same catalogue, create rounds the same
+way and report results the same way. `playMode` tells ChartVolt how to *schedule* contests
+around your title; it does not ask your service to do anything new.
 
 ---
 

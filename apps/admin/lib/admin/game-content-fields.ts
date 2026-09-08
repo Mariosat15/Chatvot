@@ -42,6 +42,7 @@ export const NEVER_EDITABLE_CONTENT_FIELDS: ReadonlyMap<string, string> = new Ma
   ["chartvoltEnabled", "changed with the Live on ChartVolt switch, which has its own checks"],
   ["providerStatus", "the provider's own status, rewritten by every catalogue sync"],
   ["family", "declared by the provider and rewritten by every catalogue sync"],
+  ["playMode", "declared by the provider and rewritten by every catalogue sync"],
   ["scoreDirection", "declared by the provider and rewritten by every catalogue sync"],
   ["scoreType", "declared by the provider and rewritten by every catalogue sync"],
   ["configSchema", "declared by the provider and rewritten by every catalogue sync"],

@@ -39,7 +39,6 @@ export const providerCapabilities: GameCapabilities = {
   // The engine never requires both players present. A 1v1 provider challenge is two
   // independently played rounds compared afterwards, which is what lets a challenge work
   // across time zones. A title genuinely needing simultaneous play is out of scope.
-  requiresSyncPlay: false,
 };
 
 /**

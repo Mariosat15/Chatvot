@@ -1217,6 +1217,55 @@ be absent, which `resolveRegistrationDeadline` already reads as "limited only by
 
 ---
 
+### 2.11 The wizard follows the title's play shape - BUILT 8 September 2026
+
+**`External game plans/22` section 8 is the authoritative account.** This section records only
+what the admin panel does, because that is what drifts.
+
+A title now declares `playMode: "anytime" | "scheduled"`. The wizard reads the **resolved**
+shape - `listContestableTitles` returns `resolvePlayMode(title)`, not the stored field - and
+changes its **defaults, wording and which controls it offers**. It does not change which
+*fields* exist, and a test forbids `gameCode`, `gameKey`, `providerKey` and any game name from
+every file that decides a shape.
+
+| Control | `anytime` | `scheduled` |
+|---|---|---|
+| Start / end date wording | "Contest starts" / "Contest ends" | "Everyone starts at" / "Everyone finishes by" |
+| Attempts | Offered | **Withheld**, with the reason. Stored as `single` |
+| How late a player may start | Offered | **Withheld**, with the reason. Stored as `until_window_closes` |
+| Entry closes | Last playable moment (s2.10) | **`startTime`** |
+
+**Five facts about it drift easily.**
+
+- **The withheld controls and the forced values come from ONE object.** `playShapeRules`
+  carries both the rule and the operator-facing sentence, for the same reason
+  `UNSCORED_CONTEST_POLICY_COPY` is one map: a wizard offering "best of three" on a contest the
+  server is about to store as one attempt is worse than either being wrong alone, because the
+  operator cannot tell which one is lying. That is not hypothetical here - the start-date hint
+  said "Registration closes at this moment" for a month after s2.10 moved the deadline, because
+  the sentence lived in the component and the rule lived in `entry-deadline.ts`.
+- **A withheld control states why it is absent.** An empty space teaches an operator the
+  setting does not exist; the reason is the feature, the same rule as refusing to enable a
+  provider with no adapter.
+- **The wizard patches the forced values into its own draft when a title is selected.**
+  Without it the review step shows the operator's answers and the database stores different
+  ones - the create service overrides them either way, so the screen would simply be wrong.
+- **The forcing on EDIT sits outside the "did the operator send this field" branch.** Inside
+  it, an ordinary edit that sends only `name` leaves a contest whose title has *since* become
+  scheduled carrying a policy the shape forbids. That is the probe that matters in
+  `tools/probe-play-shape.ps1`.
+- **`playMode` is on `NEVER_EDITABLE_CONTENT_FIELDS`**, so it cannot be typed into the game
+  content editor. It was refused before that only by the unknown-field branch, which is one
+  allow-list entry away from letting an operator turn a puzzle into a race from a screen
+  labelled "title and description".
+
+**Not built, deliberately:** the contest end is **not** defaulted to start plus one attempt
+plus grace, which `22` s4.2 asks for. The operator sets it and `describeRoundFit` already
+refuses a window too short for a round, so it is a convenience rather than a hole. And **no
+title declares `scheduled`**, so this path is exercised only by tests until X4.
+
+---
+
 ## 3. Contest list and detail screens
 
 | Screen | Change |

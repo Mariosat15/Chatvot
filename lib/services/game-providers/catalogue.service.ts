@@ -71,6 +71,11 @@ export interface CatalogueSyncResult {
 function providerOwnedFields(game: ProviderCatalogueGame) {
   return {
     family: game.family,
+    // Reason: provider-owned rather than first-sync-only, so a provider correcting a title
+    // from `anytime` to `scheduled` is honoured. It is their statement about how their own
+    // game works, and an operator cannot override it - `playMode` is in
+    // `NEVER_EDITABLE_CONTENT_FIELDS` for the same reason `family` is.
+    playMode: game.playMode ?? "anytime",
     supportsCompetition: game.supportsCompetition,
     supportsOneVsOne: game.supportsOneVsOne,
     supportsPractice: game.supportsPractice,

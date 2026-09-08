@@ -62,6 +62,18 @@ export interface TitleDefinition {
   category: string;
   tags: string[];
   family: "independent";
+  /**
+   * Does everybody play at one appointed moment, or whenever they like?
+   *
+   * Declared per TITLE rather than per provider, because a provider can legitimately supply a
+   * puzzle and a race. Both of ours are `anytime`, and the field is stated explicitly on each
+   * rather than defaulted, so a title added later has to answer the question rather than
+   * inheriting an answer.
+   *
+   * Note this is NOT the same question as `family`, which is about needing an opponent: a race
+   * is `independent` - every runner runs their own track - and is still simultaneous.
+   */
+  playMode: "anytime" | "scheduled";
   supportsCompetition: boolean;
   supportsOneVsOne: boolean;
   supportsPractice: boolean;
@@ -158,6 +170,7 @@ export const SPRINT: TitleDefinition = {
   category: "puzzle",
   tags: ["puzzle", "logic", "fast", "mobile-friendly", "no-text"],
   family: "independent",
+  playMode: "anytime",
   supportsCompetition: true,
   supportsOneVsOne: true,
   supportsPractice: true,
@@ -238,6 +251,7 @@ export const PERFECT: TitleDefinition = {
   category: "puzzle",
   tags: ["puzzle", "logic", "time-trial", "mobile-friendly", "no-text"],
   family: "independent",
+  playMode: "anytime",
   supportsCompetition: true,
   supportsOneVsOne: true,
   supportsPractice: true,

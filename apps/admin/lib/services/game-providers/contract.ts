@@ -42,6 +42,15 @@ export type ProviderScoreType = "integer" | "decimal" | "duration_ms";
 /** Chapter 01 section 3. Family A plays alone and is ranked; Family B plays an opponent. */
 export type ProviderGameFamily = "independent" | "head_to_head";
 
+/**
+ * Chapter 01 section 3.2. Does everybody play at one appointed moment, or whenever they like?
+ *
+ * Orthogonal to `family`, which is about needing an opponent - a race is `independent` and
+ * `scheduled`. Optional on the wire because it postdates spec 1.3, and an absent value means
+ * `anytime`. Resolve it with `resolvePlayMode`, never by reading it directly.
+ */
+export type ProviderPlayMode = "anytime" | "scheduled";
+
 /** What the provider says about a title, as distinct from whether WE have enabled it. */
 export type ProviderGameStatus = "active" | "deprecated" | "maintenance";
 
@@ -75,6 +84,7 @@ export interface ProviderCatalogueGame {
   thumbnailUrl?: string;
   category?: string;
   family: ProviderGameFamily;
+  playMode?: ProviderPlayMode;
   supportsCompetition: boolean;
   supportsOneVsOne: boolean;
   supportsPractice: boolean;

@@ -208,7 +208,7 @@
     <p class="lede">ChartVolt runs paid skill competitions. We handle the money, the ranking and the rewards. We are looking for partners who can supply the games and tell us what each player scored. This document specifies exactly what your API must do so that we can operate on top of it &mdash; three calls to you, one call back to us.</p>
     <div class="hero-meta">
       <div><b>Document</b><span>Integration requirements</span></div>
-      <div><b>Version</b><span>1.3</span></div>
+      <div><b>Version</b><span>1.4</span></div>
       <div><b>Audience</b><span>Your engineering team</span></div>
       <div><b>Required calls</b><span>3 out, 1 in</span></div>
       <div><b>Money handled by you</b><span>None, ever</span></div>
@@ -465,6 +465,7 @@
 
       <span class="c">// ---- what this game can do ----</span>
       "family":              "independent",  <span class="c">// or "head_to_head"</span>
+      "playMode":            "anytime",      <span class="c">// or "scheduled" - optional, see 3.2a</span>
       "supportsCompetition": true,
       "supportsOneVsOne":        true,
       "supportsPractice":    true,
@@ -506,6 +507,7 @@
     <tbody>
       <tr><td><code>gameCode</code></td><td><span class="b req">Yes</span></td><td><b>Stable and permanent.</b> Never rename it and never reuse it for a different game. It is the identity behind every historical score we hold for that title</td></tr>
       <tr><td><code>family</code></td><td><span class="b req">Yes</span></td><td><code>independent</code> or <code>head_to_head</code>. Decides which contest formats we can offer</td></tr>
+      <tr><td><code>playMode</code></td><td><span class="b">No</span></td><td><b>New in 1.4.</b> <code>anytime</code> (the default) or <code>scheduled</code>. A <i>different</i> question from <code>family</code>: that one asks whether your game needs an opponent, this asks whether everybody plays at one appointed moment. A race is <code>independent</code> <b>and</b> <code>scheduled</code>. Omit it and we assume <code>anytime</code> &mdash; see section 3.2a</td></tr>
       <tr><td><code>supportsCompetition</code><br /><code>supportsOneVsOne</code></td><td><span class="b req">Yes</span></td><td>We hide formats a game cannot support, so being accurate here prevents broken contests</td></tr>
       <tr><td><code>supportsContentSeed</code></td><td><span class="b req">Yes</span></td><td><b>A game with <code>false</code> here cannot be used in a multi-player competition.</b> See section 12</td></tr>
       <tr><td><code>scoreDirection</code></td><td><span class="b req">Yes</span></td><td>Speedruns and golf-style scoring are <code>lower_is_better</code>. If this is wrong we rank the entire field backwards and pay the worst player first</td></tr>
@@ -571,7 +573,46 @@
     </tbody>
   </table></div>
 
-  <p style="margin-bottom:0"><b>If your title's length is fixed rather than configurable</b>, declare nothing and set <code>maxDurationSeconds</code> to that fixed length. The fallback is then exactly right.</p>
+  <p><b>If your title's length is fixed rather than configurable</b>, declare nothing and set <code>maxDurationSeconds</code> to that fixed length. The fallback is then exactly right.</p>
+
+  <h3 id="playmode">3.2a &nbsp;<code>playMode</code> &mdash; does everybody play at once?</h3>
+  <p><b>New in version 1.4, and most providers can skip this section.</b> If your players can pick your game up whenever they like, omit the field. <code>anytime</code> is the default and describes every title in our live catalogue today, so a catalogue written against version 1.3 needs no change at all.</p>
+
+  <p>Declare <code>"playMode": "scheduled"</code> when your title only makes sense played <b>simultaneously</b> &mdash; a race, a live quiz, anything where the whole field runs one clock together.</p>
+
+  <div class="cal warn">
+    <div class="t">This is not the same question as <code>family</code></div>
+    <p><code>family</code> asks whether your game needs an <b>opponent</b>. A race does not: every runner runs their own track and gets their own time, so <b>a race is <code>independent</code></b>. What a race needs is for everyone to run at the same <b>moment</b>, and no other field carries that. Merging the two is the mistake this field exists to prevent.</p>
+  </div>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:180px"></th><th><code>anytime</code></th><th><code>scheduled</code></th></tr></thead>
+    <tbody>
+      <tr><td><code>independent</code></td><td>A puzzle, a solo time trial</td><td><b>A race, a live quiz</b></td></tr>
+      <tr><td><code>head_to_head</code></td><td><i>impossible</i></td><td>Chess, checkers</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>Three rules follow, each a consequence rather than a choice:</p>
+  <ul>
+    <li><b><code>head_to_head</code> is treated as <code>scheduled</code> whatever you declare</b>, because two people cannot play each other at different times. You need not declare both.</li>
+    <li><b>Omitting the field means <code>anytime</code>.</b> It is optional precisely so that nothing you have already built is invalidated.</li>
+    <li><b>A value we do not recognise is treated as <code>anytime</code> and logged.</b> This is the one place we deliberately fail towards the <i>less</i> constrained answer: a simultaneous title wrongly run as staggered still produces comparable, payable scores, whereas a staggered title wrongly run as simultaneous shuts entry at the start and turns away players who could have played and paid.</li>
+  </ul>
+
+  <p><b>What declaring <code>scheduled</code> changes on our side.</b> Listed so you can see it is a scheduling shape rather than a feature you must build:</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:230px"></th><th><code>anytime</code></th><th><code>scheduled</code></th></tr></thead>
+    <tbody>
+      <tr><td>When entry closes</td><td>At the last moment an attempt still fits</td><td><b>At the contest's start time</b> &mdash; you cannot join a race that has begun</td></tr>
+      <tr><td>Attempts</td><td>The operator's choice, 1..n</td><td><b>Exactly one</b></td></tr>
+      <tr><td>A player who opens their board late</td><td>Normal</td><td>Gets a <b>shortened</b> round, not a refusal. They paid, and starting late cannot help them</td></tr>
+      <tr><td>A player who never turns up</td><td>Their round is resolved by policy</td><td>A no-show: no round exists, and they are not eligible for a prize</td></tr>
+    </tbody>
+  </table></div>
+
+  <p style="margin-bottom:0"><b>Nothing in your API changes.</b> You serve the same catalogue, create rounds the same way and report results the same way. <code>playMode</code> tells us how to schedule contests around your title; it does not ask your service to do anything new.</p>
 </section>
 
 <!-- ===== 7 ===== -->
@@ -1154,20 +1195,21 @@ $headers = [
   <div class="tw"><table>
     <thead><tr><th style="width:90px">Version</th><th style="width:130px">Date</th><th>Change</th></tr></thead>
     <tbody>
+      <tr><td><b>1.4</b></td><td>8 Sep 2026</td><td><b>One new optional catalogue field, <code>playMode</code>.</b> Declare <code>"scheduled"</code> if your title only makes sense played by everybody at one appointed moment &mdash; a race, a live quiz &mdash; section 3.2a. <b>Omit it and nothing changes</b>: the default is <code>anytime</code>, which describes every title we run today, so a catalogue built against 1.3 remains valid as it stands. We added it because <code>family</code> answers a different question &mdash; whether your game needs an <i>opponent</i> &mdash; and a race is <code>independent</code> under that definition, so nothing we already had could tell a race from a puzzle. Your API is otherwise unchanged</td></tr>
       <tr><td><b>1.3</b></td><td>8 Sep 2026</td><td><b>One new <code>configSchema</code> keyword.</b> If a title's length of play is configurable, the property carrying it must be marked <code>format: "duration-seconds"</code> &mdash; section 3.2. Nothing else about <code>configSchema</code> changes, and a title whose length is fixed needs no change at all. We added it because a competition has to stop accepting attempts one full playing time before it ends, and without the keyword the only figure available is your <code>maxDurationSeconds</code> ceiling &mdash; which made short contests unplayable on our side</td></tr>
       <tr><td><b>1.2</b></td><td>30 Aug 2026</td><td><b>Two field renames.</b> <code>family: "solo_scored"</code> becomes <code>family: "independent"</code>, and the capability flag <code>supportsDuel</code> becomes <code>supportsOneVsOne</code>. Both were renamed because &ldquo;solo&rdquo; and &ldquo;duel&rdquo; were being misread as statements about contest size. Nothing else about either field changes. Added a note in section 4 making it explicit that every contest we run has at least two players, and that an independent-play game is used in contests of a hundred people</td></tr>
       <tr><td><b>1.1</b></td><td>30 Aug 2026</td><td>Page content per game promoted to a hard requirement &mdash; <code>tagline</code>, <code>description</code>, <code>rulesSummary</code>, <code>howToPlay</code>, <code>bannerUrl</code> &mdash; because each game now gets its own page on our site. Added artwork size minimums, localisation and unbranded-copy constraints. Added the rule that nothing sold may improve a score in a paid contest. Three product questions and one commercial question added; commercial questions renumbered from 21</td></tr>
       <tr><td><b>1.0</b></td><td>Initial</td><td>First issue &mdash; the four calls, authentication and signing, idempotency, content seeding, round states, error handling, sandbox, service levels</td></tr>
     </tbody>
   </table></div>
-  <p style="margin-bottom:0">If you have already begun work against an earlier version, almost nothing you have built is invalidated. The 1.1 additions are content fields on the catalogue response. The 1.2 changes are <b>two field renames on the same response</b> &mdash; tell us if you have already shipped the old names and we will accept both during your integration. The 1.3 change is <b>one keyword on one property</b> of a schema you are already sending, and only for titles whose length of play is configurable.</p>
+  <p style="margin-bottom:0">If you have already begun work against an earlier version, almost nothing you have built is invalidated. The 1.1 additions are content fields on the catalogue response. The 1.2 changes are <b>two field renames on the same response</b> &mdash; tell us if you have already shipped the old names and we will accept both during your integration. The 1.3 change is <b>one keyword on one property</b> of a schema you are already sending, and only for titles whose length of play is configurable. The 1.4 change is <b>an optional field with a default</b> &mdash; omit it and your catalogue behaves exactly as it did.</p>
 </section>
 
 </main>
 </div>
 
 <div class="foot">
-  <div>ChartVolt &mdash; Game API Requirements &middot; Version 1.3 &middot; Requirements document for prospective game providers</div>
+  <div>ChartVolt &mdash; Game API Requirements &middot; Version 1.4 &middot; Requirements document for prospective game providers</div>
   <div>Questions on this specification: contact your ChartVolt commercial contact</div>
 </div>
 

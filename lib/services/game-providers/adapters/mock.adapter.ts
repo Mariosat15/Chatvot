@@ -77,6 +77,13 @@ const DEFAULT_CATALOGUE: ProviderCatalogueGame[] = [
     description: "A fixture title used by the automated tests.",
     category: "quiz",
     family: "independent",
+    // Declared explicitly rather than left to the default, so the sync test proves the value
+    // TRAVELS. Note there is deliberately no `independent` + `scheduled` fixture here: a third
+    // title would turn four count assertions in `game-providers.test.ts` red for a reason that
+    // has nothing to do with play shapes. That combination - the one where the declaration is
+    // the only thing that can produce the answer, because `family` would say otherwise - is
+    // covered in `__tests__/services/play-shape.test.ts` instead.
+    playMode: "anytime",
     supportsCompetition: true,
     supportsOneVsOne: false,
     supportsPractice: true,
@@ -97,6 +104,12 @@ const DEFAULT_CATALOGUE: ProviderCatalogueGame[] = [
     description: "A fixture title scored on elapsed time, where lower wins.",
     category: "reflex",
     family: "head_to_head",
+    // `playMode` deliberately ABSENT, which is the second fixture this pair needs: a
+    // `head_to_head` title is resolved to `scheduled` whatever it declares, so this row proves
+    // the forcing works with nothing declared. The stored value will read `anytime` and the
+    // resolved shape will be `scheduled` - that is the design, not drift. The declaration is
+    // what the provider said; `resolvePlayMode` is the corrected truth, and every reader goes
+    // through it.
     supportsCompetition: true,
     supportsOneVsOne: true,
     supportsPractice: false,

@@ -170,16 +170,34 @@ describe("assertGameEnabled returns a result and never throws", () => {
 });
 
 describe("the trading module declares capabilities instead of the engine special-casing it", () => {
-  it("needs prices and market hours, and does not require synchronous play", () => {
+  it("needs prices and market hours", () => {
     const trading = getGameModule(TRADING_GAME_TYPE);
 
     expect(trading?.capabilities.needsPriceFeed).toBe(true);
     // Reason: the market-hours gate is currently unconditional. Scoping it to this flag
     // is what stops it blocking a provider contest at the weekend.
     expect(trading?.capabilities.needsMarketHours).toBe(true);
-    // Trading is an independent-play game: each trader plays their own account and all
-    // are ranked together. That is about gameplay, not contest size.
-    expect(trading?.capabilities.requiresSyncPlay).toBe(false);
     expect(trading?.capabilities.supportsChallenges).toBe(true);
+  });
+
+  // Reason: this assertion used to read `requiresSyncPlay).toBe(false)`. The flag was
+  // declared, set to false twice and READ BY NOTHING, and it is deleted rather than wired
+  // up because a capability is MODULE-level: one provider module backs the whole catalogue,
+  // so the flag can only ever give one answer for a race, a puzzle and a quiz at once. The
+  // question it appeared to answer now lives on the catalogue ROW as `provider_game.playMode`,
+  // resolved by `lib/services/games/play-shape.ts`. Kept as a tripwire rather than deleted,
+  // because reintroducing it reads like using an existing API - the `shouldBlockEntry`
+  // precedent - and the next person to need a per-title answer would get a per-module one.
+  it("does not carry a module-level synchronous-play flag, because a play shape is per title", () => {
+    const modules = listGameModules();
+    // A test that examines nothing passes everything asked of it.
+    expect(modules.length).toBeGreaterThan(0);
+
+    // Reason: named `gameModule` rather than `module`, which Next's
+    // no-assign-module-variable rule refuses even in a test.
+    for (const gameModule of modules) {
+      const capabilities = gameModule.capabilities as unknown as Record<string, unknown>;
+      expect(Object.keys(capabilities)).not.toContain("requiresSyncPlay");
+    }
   });
 });

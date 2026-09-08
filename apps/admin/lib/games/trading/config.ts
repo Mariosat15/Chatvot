@@ -21,7 +21,6 @@ export const tradingCapabilities: GameCapabilities = {
   // Traders play their own account against the clock, not against each other in real
   // time. Trading is an INDEPENDENT-PLAY game - which describes gameplay, not contest
   // size. Every trader is ranked together in one competition.
-  requiresSyncPlay: false,
 };
 
 /**

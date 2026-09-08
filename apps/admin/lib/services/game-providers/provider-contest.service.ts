@@ -12,6 +12,11 @@ import {
 import type { ConfigField } from "@/lib/services/games/config-schema";
 import { runPreflight } from "@/lib/services/games/contest-preflight";
 import { resolveContestEntryDeadline } from "@/lib/services/games/entry-deadline";
+import {
+  resolvePlayMode,
+  resolvePlayShape,
+  type PlayMode,
+} from "@/lib/services/games/play-shape";
 import type { PreflightResult } from "@/lib/services/games/contest-preflight";
 import type {
   AttemptsPolicy,
@@ -92,6 +97,8 @@ export interface ProviderContestOption {
   gameKey: string;
   displayName: string;
   family: string;
+  /** Resolved by `resolvePlayMode`, never the raw declaration - see `listContestableTitles`. */
+  playMode: PlayMode;
   scoreDirection: string;
   scoreType: string;
   maxDurationSeconds?: number;
@@ -147,6 +154,10 @@ export async function listContestableTitles(): Promise<ProviderContestOption[]> 
         gameKey: title.gameKey,
         displayName: title.displayName,
         family: title.family,
+        // The RESOLVED shape, not the raw `playMode`. A `head_to_head` title is scheduled
+        // whatever it declares, and the wizard must be shown the corrected answer or it offers
+        // controls the create service is about to override.
+        playMode: resolvePlayMode(title),
         scoreDirection: title.scoreDirection,
         scoreType: title.scoreType,
         maxDurationSeconds: title.maxDurationSeconds,
@@ -296,7 +307,18 @@ export async function createProviderContest(
   // The fallback used to be `until_window_closes`, matching a wizard that defaulted to the
   // permissive option. The owner reversed that on 8 September 2026, so it now agrees with both
   // the wizard and the schema again.
-  const roundStartPolicy = input.roundStartPolicy ?? "reserve_full_round";
+  //
+  // A SIMULTANEOUS title then overrides both the operator's choice and that fallback. Forcing
+  // the stored value here rather than teaching the runtime gates about play modes is the whole
+  // design: `roundFitsInWindow`, `RoundPreflight`'s `tooLateToStart` and `fullRoundCutoffMs`
+  // all read the stored policy already, so writing the right value means not one of them needs
+  // a second branch - and a branch added to each would be four places to forget. The operator
+  // is not being overruled behind their back either; the wizard withholds the control for a
+  // scheduled title and says why, from this same rule.
+  const shape = resolvePlayShape(title);
+  const roundStartPolicy =
+    shape.forcedRoundStartPolicy ?? input.roundStartPolicy ?? "reserve_full_round";
+  const attemptsPolicy = shape.forcedAttemptsPolicy ?? input.attemptsPolicy;
   const attemptSeconds = resolveAttemptSeconds(
     parsed.fields,
     validated.values,
@@ -327,9 +349,8 @@ export async function createProviderContest(
       playWindowStart: input.playWindowStart,
       playWindowEnd: input.playWindowEnd,
       resultGracePeriodSeconds: input.resultGracePeriodSeconds,
-      attemptsPolicy: input.attemptsPolicy,
-      attemptsAllowed:
-        input.attemptsPolicy === "single" ? undefined : input.attemptsAllowed,
+      attemptsPolicy,
+      attemptsAllowed: attemptsPolicy === "single" ? undefined : input.attemptsAllowed,
       unresolvedRoundPolicy: input.unresolvedRoundPolicy,
       // Reason for the fallback rather than leaving it absent: the schema default is
       // `unclaimed_pool`, so omitting it on a NEW provider contest would silently give the
@@ -356,6 +377,7 @@ export async function createProviderContest(
         attemptSeconds,
         roundStartPolicy,
         startTime: input.startTime,
+        entryClosesAtStart: shape.entryClosesAtStart,
       }),
 
       // DRAFT. Invisible to the player lobby, which queries only upcoming, active,

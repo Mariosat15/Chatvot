@@ -28,6 +28,7 @@ import {
   type WizardStep,
 } from "@/components/admin/wizard/WizardShell";
 import { resolveAttemptSeconds } from "@/lib/services/games/config-schema";
+import { playShapeRules } from "@/lib/services/games/play-shape";
 import { defaultConfigValues } from "./ConfigSchemaFields";
 import type { ContestableTitle } from "./contest-types";
 import {
@@ -169,10 +170,24 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
     // that schema's field names, so carrying them over would submit settings the new game
     // does not declare - which the validator drops silently, leaving the review step
     // showing values that will not be stored.
+    // The play shape's forced values are written into the DRAFT, not merely enforced by the
+    // server. Both are needed and they are not the same guarantee: the server force is what
+    // makes a direct API call safe, and this is what stops the review step showing "best of
+    // three" on a contest that is about to be stored as one attempt. A screen that disagrees
+    // with what will be saved is worse than either control being wrong, because the operator
+    // has no way to tell which one is lying.
+    const shape = playShapeRules(title.playMode);
+
     patch({
       providerKey: title.providerKey,
       gameCode: title.gameCode,
       settings: title.schema.ok ? defaultConfigValues(title.schema.fields) : {},
+      ...(shape.forcedAttemptsPolicy
+        ? { attemptsPolicy: shape.forcedAttemptsPolicy, attemptsAllowed: undefined }
+        : {}),
+      ...(shape.forcedRoundStartPolicy
+        ? { roundStartPolicy: shape.forcedRoundStartPolicy }
+        : {}),
     });
     setErrors([]);
     setWarnings([]);
@@ -484,7 +499,9 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
           />
         )}
 
-        {step === STEP_PRIZES && <StepPrizes draft={draft} patch={patch} />}
+        {step === STEP_PRIZES && (
+          <StepPrizes draft={draft} patch={patch} title={selected} />
+        )}
 
         {step === STEP_REVIEW && (
           <StepReview

@@ -26,6 +26,7 @@ export interface IProviderGame extends Document {
   bannerUrl?: string;
   highlights?: { title: string; detail: string }[];
   family: "independent" | "head_to_head";
+  playMode?: "anytime" | "scheduled";
   supportsCompetition: boolean;
   supportsOneVsOne: boolean;
   supportsPractice: boolean;
@@ -131,11 +132,28 @@ const ProviderGameSchema = new Schema<IProviderGame>(
     //
     // `family` is also NOT the axis that decides whether players must play at the same
     // moment: it describes whether a game needs an opponent, and a race is `independent`.
-    // Open question 18 and `22` s1.
+    // That axis is `playMode` below - `22` s1.
     family: {
       type: String,
       enum: ["independent", "head_to_head"],
       required: true,
+    },
+    // Does everybody play at one appointed moment, or whenever they like? `22` s4.1.
+    //
+    // Read through `resolvePlayMode` in `lib/services/games/play-shape.ts` and never directly:
+    // that function also forces `head_to_head` to `scheduled`, because two people cannot play
+    // each other at different times, so a provider declaring the impossible combination is
+    // corrected rather than believed.
+    //
+    // DEFAULTED rather than required, unlike `family` beside it. Every title in the live
+    // catalogue is `anytime`, and a required field would refuse the whole catalogue on the next
+    // sync - `family` could afford to be required because nothing had been synced when it was
+    // added. Note the consequence, which is the usual one for a schema default: this fixes new
+    // and re-synced rows only, and an unset value reads as `anytime` either way.
+    playMode: {
+      type: String,
+      enum: ["anytime", "scheduled"],
+      default: "anytime",
     },
     supportsCompetition: { type: Boolean, default: false },
     supportsOneVsOne: { type: Boolean, default: false },

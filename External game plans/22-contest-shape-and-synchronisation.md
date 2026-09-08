@@ -1,15 +1,18 @@
 # 22. Contest shape — staggered play, simultaneous play, and the wizard
 
-> **THIS IS A PROPOSAL. NOTHING IN IT IS BUILT.**
+> **SECTIONS 1-6 WERE A PROPOSAL. THE COMPETITION HALF IS NOW BUILT — see section 8, which is
+> the authoritative account of what exists. THE CHALLENGE HALF (section 5) IS NOT.**
 >
 > It answers **open question 18**, raised by the owner on 8 September 2026: every contest the
 > platform can currently create assumes players turn up whenever they like, and an external
 > race game will need them to start and finish together. It also covers the same question for
 > challenges, which the owner asked to be held until the competition side is settled.
 >
-> **No code should be written from this document until the owner has picked an option in
-> section 6.** Two of the three options change the entry rule that shipped on 8 September
-> (`12` s2.10), so getting this wrong costs a second reversal on a player-facing deadline.
+> The owner chose to build it rather than defer (**option B over the section 6 recommendation**,
+> 8 September 2026), on the grounds that the shape has to exist before X4 brings a title that
+> needs it. Sections 1-6 are kept as written, because the analysis is what the build was made
+> from and rewriting a proposal to match its outcome loses the reasoning. **Where section 8
+> disagrees with an earlier section, section 8 is right.**
 
 ---
 
@@ -299,3 +302,134 @@ Listed now so the estimate above is honest, per the docs-sync rule.
 | `03-competition-and-challenge-flows.md` s1.2 | A **fourth** amendment to the registration row |
 | `17-risk-register.md` | 3.1 as a new R-number; check the next free one with `rg -o "R\d+"` |
 | `PROGRESS.md`, `00-README.md`, `10` s3, the internal HTML | Phase list and effort, if this becomes a phase |
+
+---
+
+## 8. What was built (8 September 2026) — the authoritative account
+
+**Code-complete for competitions.** `playMode` is declared by the provider, resolved once, and
+forces three stored values at write time. **Challenges are untouched** (section 5), and there
+is **no live leaderboard during play** (X7). 27 tests in
+`__tests__/services/play-shape.test.ts`, 27 probes in `tools/probe-play-shape.ps1`, every one
+red on exactly the expected test with exactly one failure.
+
+### 8.1 The live code
+
+| File | What it holds |
+|---|---|
+| `lib/services/games/play-shape.ts` **(mirrored)** | `resolvePlayMode`, `playShapeRules`, `resolvePlayShape`, `PlayShapeRules`. **The only place a mode becomes a set of rules** |
+| `lib/services/games/entry-deadline.ts` **(mirrored)** | Gained `entryClosesAtStart`, checked **before** the policy |
+| `database/models/games/provider-game.model.ts` **(mirrored)** | `playMode`, defaulting to `anytime` |
+| `lib/services/game-providers/contract.ts` **(mirrored)** | `ProviderPlayMode` on `ProviderCatalogueGame` |
+| `lib/services/game-providers/adapters/chartvolt-games.adapter.ts` | Normalises the declaration; an unrecognised value warns and reads `anytime` |
+| `lib/services/game-providers/catalogue.service.ts` **(mirrored)** | Provider-owned, rewritten by every sync |
+| `apps/admin/lib/admin/game-content-fields.ts` | `playMode` on `NEVER_EDITABLE_CONTENT_FIELDS` |
+| `apps/admin/lib/services/game-providers/provider-contest.service.ts` | Forces the three values on create; `listContestableTitles` returns the **resolved** mode |
+| `apps/admin/lib/services/game-providers/provider-contest-edit.service.ts` | **Re-forces** them on every edit |
+| `apps/admin/components/admin/games/wizard/StepSchedule.tsx`, `StepPrizes.tsx`, `ProviderContestWizard.tsx` | Wording and withheld controls, from the same rules object |
+| `games-service/src/games/titles.ts`, `src/http/catalogue.ts` | Both titles declare `anytime` explicitly |
+
+**`check:mirrors` compares models**, so it has an opinion about `provider-game.model.ts` and
+about **none** of the rest. `play-shape.ts` and `entry-deadline.ts` are held byte-identical by
+tests instead. `apps/admin/lib/admin/` and the wizard components are admin-only.
+
+### 8.2 What the shape decides, as built
+
+| | `anytime` | `scheduled` |
+|---|---|---|
+| Entry closes | Last playable moment (`12` s2.10) | **`startTime`** |
+| `attemptsPolicy` | Operator's choice | **Forced `single`**, `attemptsAllowed` cleared |
+| `roundStartPolicy` | Operator's choice | **Forced `until_window_closes`**, control withheld with the reason |
+| Date wording | "Contest starts / ends" | "Everyone starts at / finishes by" |
+
+### 8.3 Eight things from the build that generalise
+
+- **`requiresSyncPlay` already existed, and finding it was worth more than the field it
+  replaced.** `GameCapabilities` carried exactly the flag this work needed, declared, set to
+  `false` twice and **read by nothing** — the fourth instance of that shape after `isPaused`
+  (R41), `lastSuccessfulRoundAt` (R38) and `family`. It is **deleted rather than wired up**,
+  and the reason is the whole design: a capability is **module-level**, and one provider
+  module backs the entire catalogue, so the flag can only ever give **one answer for a race, a
+  puzzle and a quiz at once**. Same lesson as `scoreDirection` in X5 — **the thing that varies
+  per title travels on the data, never in the module.** A tripwire test now asserts no module
+  carries it, because reintroducing it reads like using an existing API (the `shouldBlockEntry`
+  precedent).
+- **This gate deliberately fails towards the LESS constrained answer, which is the opposite of
+  every other gate here, and the reason has to be stated or somebody will "fix" it.** A race
+  wrongly run as `anytime` still produces comparable, payable scores, because
+  `supportsContentSeed` guarantees identical content; a puzzle wrongly run as `scheduled`
+  **shuts entry at the start and turns away players who would have paid**. The first is
+  recoverable and visible, the second is lost revenue. Fail-closed is a default, not a law —
+  ask which failure you are choosing.
+- **Forcing at WRITE time meant not one runtime gate had to learn about play modes.**
+  `roundFitsInWindow`, `RoundPreflight`'s `tooLateToStart` and `fullRoundCutoffMs` all already
+  read the **stored** policy, so storing `until_window_closes` makes every one of them correct
+  for free. The alternative — a branch in each — is five places to forget, and the fifth is
+  found by a player. **When a rule can be expressed as a stored value the existing code already
+  reads, that is not a shortcut, it is the smaller change.**
+- **The forcing must sit OUTSIDE the "did the operator send this field" branch, and inside it
+  reads perfectly correctly.** An ordinary edit sends `name` alone. Written as
+  `if (input.roundStartPolicy !== undefined) { ...force... }`, a contest whose title has
+  **since** become `scheduled` keeps a policy the shape forbids until somebody happens to touch
+  that one control. The probe for it is the load-bearing one in the file, and it fails only on
+  the edit that mentions nothing.
+- **Checking a new flag after the old logic is an ordering bug that returns a plausible date.**
+  A scheduled contest stores `until_window_closes`, so `resolveContestEntryDeadline` reading
+  the policy first returns the window end — entry open for the contest's whole duration, no
+  error, and a date that renders correctly on every screen. The flag is checked **first**, and
+  a probe moving it below the policy is red.
+- **Every forced value needs its mirror-image probe, or a rule applied to EVERY contest passes
+  the whole suite.** Forcing `single` unconditionally satisfies each scheduled assertion and
+  silently takes the attempts setting away from the entire live catalogue — which is every
+  contest that exists. There is a paired "leaves an anytime contest exactly as the operator
+  asked" test for each one.
+- **The wizard must be handed the RESOLVED shape, not the stored field.** A `head_to_head`
+  title declaring nothing is `scheduled`; giving the wizard the raw value has it render
+  controls the create service is about to override — a control that appears to work and does
+  nothing, after a provider with no adapter and a `rankingMethod` a provider game ignores.
+  `listContestableTitles` therefore returns `resolvePlayMode(title)`, and a test pins it.
+- **An unverified aside in a comment, the sixth instance, and this one had a real gap under
+  it.** `catalogue.service.ts` asserted that `playMode` was in `NEVER_EDITABLE_CONTENT_FIELDS`
+  "for the same reason `family` is". It was not. It *was* refused — by the unknown-field
+  branch — which is exactly the fragile state that file's own test describes: the day somebody
+  adds it to the allow-list, because it reads like a title property an operator might set, a
+  **puzzle becomes a race from a content form**, changing when entry closes and how many
+  attempts every subsequent contest grants, and the next catalogue sync reverts it silently.
+  Added to the map and to the capability-flag test. **Never latent in production**, because
+  the field did not exist before this slice.
+
+### 8.4 What is deliberately not built
+
+- **No synchronised launch was written, because the machinery already existed** — and this was
+  verified rather than assumed. `round-launch.service.ts:236` already refuses before
+  `playWindowStart`, the pre-flight already reads `contestStatus` (`13` s1.1b), the lobby
+  already counts down to the start (`13` s1.1e / s4.1f), and `resolveExpiry` already clamps a
+  late starter's round to the window end. Section 2's conclusion held: **`scheduled` is mostly
+  a configuration of machinery that exists.** A document describing a new launch mechanism is
+  describing something nobody wrote.
+- **Rounds are still created when the player presses Play**, never pre-created at the gun. An
+  attempt is consumed on creation (`03` s1.3), so pre-creating spends the attempt of every
+  no-show and turns them into scored zeros — and it is a side effect on a timer with no
+  request and no player, the shape behind `13` s1.1a.
+- **The contest end is NOT defaulted to start plus one attempt plus grace**, which section 4.2
+  asks for. The operator sets it, and `describeRoundFit` plus the pre-flight already refuse a
+  window too short for a round, so the gap is a convenience rather than a hole. Recorded rather
+  than absorbed.
+- **No live leaderboard during play.** It is the point of a simultaneous event and it is X7 —
+  `13` section 11's polling recommendation is unimplemented for *any* game.
+- **Challenges are untouched.** Section 5's three options remain a product decision, and the
+  scheduling problem there is genuinely different: nobody chooses the gun, because a challenge
+  is accepted at an unknown later moment. It also inherits **R50's warning** —
+  `ChallengeParticipant.score` still defaults to `0`, so the first provider challenge
+  reproduces R50 exactly unless that is dealt with in the same work.
+- **No title declares `scheduled`.** Both `games-service` titles are `anytime`, so the whole
+  scheduled path is **exercised only by tests** until X4 brings a real one. Say that rather
+  than implying a race has run.
+
+### 8.5 The section 6 questions, answered
+
+| # | Answer |
+|---|---|
+| **A** | **Built now.** The owner's call, 8 Sep 2026. Cost paid: spec version **1.4**, an optional field with a default, so nothing a provider has built against 1.3 is invalidated |
+| **B** | **Not merged, and the distinction in section 2.1 survives.** A scheduled contest closes entry at the start for a *physical* reason — you cannot join a race that has begun — and **not** because knowing the target is worth something. The informational question stays open and stays per-title for `anytime` games, exactly as `12` s2.10 decided it |
+| **C** | **Deferred with challenges.** Nothing was built either way, so no option has been foreclosed |

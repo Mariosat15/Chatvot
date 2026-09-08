@@ -8,6 +8,10 @@ import {
 } from "@/lib/services/games/config-schema";
 import type { ConfigField } from "@/lib/services/games/config-schema";
 import { resolveContestEntryDeadline } from "@/lib/services/games/entry-deadline";
+import {
+  resolvePlayShape,
+  type PlayShapeRules,
+} from "@/lib/services/games/play-shape";
 import type {
   AttemptsPolicy,
   RoundStartPolicy,
@@ -260,6 +264,11 @@ export async function editProviderContest(
     applyEdit(competition, input, coercedSettings, {
       schemaFields,
       maxDurationSeconds: title?.maxDurationSeconds,
+      // Resolved from the STORED catalogue row, so an edit honours the same shape the create
+      // service forced. Absent when the title has gone from the catalogue - in that case
+      // `applyEdit` leaves the stored policy alone rather than guessing, because the contest
+      // keeps the rule its entrants signed up under.
+      shape: title ? resolvePlayShape(title) : undefined,
     });
     await competition.save();
     return { success: true, warnings };
@@ -368,7 +377,11 @@ function applyEdit(
   competition: any,
   input: EditProviderContestInput,
   coercedSettings: Record<string, unknown> | undefined,
-  title: { schemaFields: ConfigField[]; maxDurationSeconds?: number },
+  title: {
+    schemaFields: ConfigField[];
+    maxDurationSeconds?: number;
+    shape?: PlayShapeRules;
+  },
 ): void {
   if (input.name !== undefined) competition.name = input.name.trim();
   if (input.description !== undefined) {
@@ -395,12 +408,16 @@ function applyEdit(
   if (input.playWindowEnd !== undefined) {
     competition.playWindowEnd = input.playWindowEnd;
   }
-  if (input.attemptsPolicy !== undefined) {
-    competition.attemptsPolicy = input.attemptsPolicy;
+  // The forced policy comes first, for the same reason as the round-start rule below: a title
+  // that has become scheduled since the contest was drafted must be corrected on this edit,
+  // not on the next one where an operator happens to touch the attempts control.
+  const attemptsPolicy = title.shape?.forcedAttemptsPolicy ?? input.attemptsPolicy;
+  if (attemptsPolicy !== undefined) {
+    competition.attemptsPolicy = attemptsPolicy;
     // Mirrors create: an allowance is meaningless for a single-attempt contest, and leaving
     // a stale one behind would show "3 attempts" on a contest that grants one.
     competition.attemptsAllowed =
-      input.attemptsPolicy === "single"
+      attemptsPolicy === "single"
         ? undefined
         : (input.attemptsAllowed ?? competition.attemptsAllowed);
   } else if (input.attemptsAllowed !== undefined) {
@@ -412,7 +429,13 @@ function applyEdit(
   if (input.unscoredContestPolicy !== undefined) {
     competition.unscoredContestPolicy = input.unscoredContestPolicy;
   }
-  if (input.roundStartPolicy !== undefined) {
+  // A simultaneous title overrides the operator's choice here exactly as it does on create.
+  // Applied unconditionally rather than inside the `input` branch: an operator who never
+  // touches the control on a contest whose title has SINCE become scheduled would otherwise
+  // keep a stored policy the shape forbids, and the edit is the moment to correct it.
+  if (title.shape?.forcedRoundStartPolicy) {
+    competition.roundStartPolicy = title.shape.forcedRoundStartPolicy;
+  } else if (input.roundStartPolicy !== undefined) {
     competition.roundStartPolicy = input.roundStartPolicy;
   }
   if (input.resultGracePeriodSeconds !== undefined) {
@@ -450,6 +473,7 @@ function applyEdit(
     // above does: a contest created before this field existed keeps the rule it was made under.
     roundStartPolicy: competition.roundStartPolicy ?? "reserve_full_round",
     startTime: competition.startTime,
+    entryClosesAtStart: title.shape?.entryClosesAtStart,
   });
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */

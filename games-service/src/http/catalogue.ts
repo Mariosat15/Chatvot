@@ -65,6 +65,7 @@ export function catalogueEntry(title: TitleDefinition, assetBase: string) {
     ...artwork(title, assetBase),
 
     family: title.family,
+    playMode: title.playMode,
     supportsCompetition: title.supportsCompetition,
     supportsOneVsOne: title.supportsOneVsOne,
     supportsPractice: title.supportsPractice,

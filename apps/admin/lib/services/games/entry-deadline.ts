@@ -45,6 +45,22 @@ interface EntryDeadlineInput {
    * clamps the same way at read time, for documents an older bug wrote that way.
    */
   startTime: Date;
+  /**
+   * The contest is simultaneous, so entry closes at the gun.
+   *
+   * `resolvePlayShape(title).entryClosesAtStart` in `play-shape.ts`, and it must be resolved
+   * from the stored catalogue row rather than taken from an operator's form - a caller-supplied
+   * shape is a way to keep entry open after a race has started.
+   *
+   * WHY IT LIVES HERE rather than as an `if` around the call. There are three call sites - the
+   * create service, the edit service and the wizard's clock note - and the two an operator can
+   * see sit either side of a decision, so a shape honoured in one and not another is a wizard
+   * promising an entry window the stored deadline does not grant. Same reasoning that made this
+   * module the single producer in the first place.
+   *
+   * Absent means false, so every existing caller and every `anytime` contest is unchanged.
+   */
+  entryClosesAtStart?: boolean;
 }
 
 /**
@@ -59,8 +75,15 @@ interface EntryDeadlineInput {
  * - **No attempt length at all** - the window end, because the gate applies no reservation it
  *   cannot compute either (`attemptSeconds ?? maxDurationSeconds ?? 0`). Guessing a length here
  *   would close entry against a rule nothing enforces.
+ *
+ * A fourth case sits in FRONT of all three: a simultaneous contest closes entry at its start,
+ * whatever its policy and attempt length say. It is checked first because the arithmetic below
+ * cannot express it - the window end less one attempt is not the gun, and on a contest sized
+ * for exactly one run the two coincide only by accident.
  */
 export function resolveContestEntryDeadline(input: EntryDeadlineInput): Date {
+  if (input.entryClosesAtStart) return new Date(input.startTime);
+
   const reserves = input.roundStartPolicy !== "until_window_closes";
   const reservedMs =
     reserves && typeof input.attemptSeconds === "number"

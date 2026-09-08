@@ -38,6 +38,7 @@ import type {
   ProviderCapabilities,
   ProviderCatalogueGame,
   ProviderGameFamily,
+  ProviderPlayMode,
   ProviderGameStatus,
   ProviderResult,
   ProviderScoreDirection,
@@ -63,6 +64,7 @@ interface CatalogueEntryPayload {
   thumbnailUrl?: unknown;
   category?: unknown;
   family?: unknown;
+  playMode?: unknown;
   supportsCompetition?: unknown;
   supportsOneVsOne?: unknown;
   supportsPractice?: unknown;
@@ -106,6 +108,30 @@ function count(value: unknown): number | undefined {
  * guessed `scoreDirection` ranks a real contest, and a guessed `family` decides which formats
  * the admin panel offers.
  */
+/**
+ * The declared play shape, or `anytime` for anything we do not recognise.
+ *
+ * WHY THIS DOES NOT REJECT THE TITLE, unlike `family` twenty lines below. `family` is required
+ * and has no correct default, so an unrecognised value leaves a title we cannot describe at
+ * all. `playMode` has a correct default and the whole live catalogue is one, so dropping an
+ * otherwise-usable title over it would cost more than the default does - and the default is the
+ * recoverable direction either way, for the reason set out in `play-shape.ts`.
+ *
+ * It does WARN, because a silent downgrade is this codebase's recurring failure mode: a
+ * provider who typed `synchronous` has said something we ignored, and the only symptom
+ * otherwise is a race that quietly runs staggered months later.
+ */
+function playMode(value: unknown, gameCode: string): ProviderPlayMode {
+  const declared = text(value);
+  if (!declared || declared === "anytime") return "anytime";
+  if (declared === "scheduled") return "scheduled";
+
+  console.warn(
+    `⚠️ [chartvolt-games] title "${gameCode}" declares playMode "${declared}", which is not a value we recognise. Treating it as "anytime" - players will be able to join and play whenever they like.`,
+  );
+  return "anytime";
+}
+
 function normaliseCatalogueEntry(
   entry: CatalogueEntryPayload,
 ): ProviderCatalogueGame | null {
@@ -136,6 +162,7 @@ function normaliseCatalogueEntry(
     gameCode,
     displayName,
     family: family as ProviderGameFamily,
+    playMode: playMode(entry.playMode, gameCode),
     supportsCompetition: flag(entry.supportsCompetition),
     supportsOneVsOne: flag(entry.supportsOneVsOne),
     supportsPractice: flag(entry.supportsPractice),

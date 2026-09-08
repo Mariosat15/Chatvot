@@ -1,4 +1,5 @@
 import type { ConfigField } from "@/lib/services/games/config-schema";
+import type { PlayMode } from "@/lib/services/games/play-shape";
 
 /**
  * What the wizard needs to know about a title it can run a contest on.
@@ -14,6 +15,14 @@ export interface ContestableTitle {
   gameKey: string;
   displayName: string;
   family: string;
+  /**
+   * The RESOLVED play shape, not the raw `playMode` off the catalogue row.
+   *
+   * A `head_to_head` title is scheduled whatever it declares, so the wizard must be handed the
+   * corrected answer - otherwise it offers schedule controls the create service is about to
+   * override, which is a control that appears to work and does nothing.
+   */
+  playMode: PlayMode;
   scoreDirection: string;
   scoreType: string;
   maxDurationSeconds?: number;

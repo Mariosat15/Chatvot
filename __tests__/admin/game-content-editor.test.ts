@@ -131,8 +131,22 @@ describe("what an operator may edit, and what they may never", () => {
       `supportsContentSeed` or `scoreDirection` be typed into a content form would let an
       operator turn off a fairness gate (R53) or invert who wins, from a screen labelled
       "title and description".
+
+      `playMode` joined this list when chapter 22 was built, and it was NOT here to begin
+      with even though a comment in `catalogue.service.ts` asserted it was - the sixth
+      instance of an unverified aside on this programme. It was refused the whole time, but
+      by the unknown-field branch, which is precisely the fragile state the test above
+      exists to describe: the day somebody adds it to the allow-list, because it reads like
+      a title property an operator might set, a puzzle becomes a race from a content form.
+      That changes when entry closes and how many attempts a contest grants, and the next
+      catalogue sync reverts it with no error and nothing in a log.
     */
-    for (const flag of ["supportsContentSeed", "scoreDirection", "configSchema"]) {
+    for (const flag of [
+      "supportsContentSeed",
+      "scoreDirection",
+      "configSchema",
+      "playMode",
+    ]) {
       expect(NEVER_EDITABLE_CONTENT_FIELDS.has(flag)).toBe(true);
       expect(EDITABLE_CONTENT_FIELDS.has(flag)).toBe(false);
     }
