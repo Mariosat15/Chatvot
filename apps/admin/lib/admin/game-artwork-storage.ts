@@ -1,8 +1,6 @@
 import { writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
-import { connectToDatabase } from "@/database/mongoose";
-import { WhiteLabel } from "@/database/models/whitelabel.model";
-import { encodeBrandingFileKey } from "@/lib/utils/branding-file-key";
+import { putBrandingAsset } from "@/lib/services/branding-assets.service";
 
 /**
  * Store an uploaded game image so that BOTH web servers can serve it.
@@ -11,17 +9,15 @@ import { encodeBrandingFileKey } from "@/lib/utils/branding-file-key";
  * than one application server behind one hostname, so a file written to the disk of the
  * server that happened to handle the upload is a 404 roughly half the time on every other
  * server - and it is a 404 that appears intermittently, which reads as a caching problem
- * rather than a storage one. A redeploy loses it too. So the bytes also go into
- * `WhiteLabel.brandingFiles`, which is what `/api/assets/images/[filename]` falls back to
- * when the disk has no copy. That serve route already exists and is proven; this module
- * deliberately produces a URL it already understands rather than adding a second one.
+ * rather than a storage one. A redeploy loses it too. So the bytes also go into the database,
+ * which is what `/api/assets/images/[filename]` falls back to when the disk has no copy.
+ * That serve route already exists and is proven; this module deliberately produces a URL it
+ * already understands rather than adding a second one.
  *
- * The storage MECHANICS are duplicated from `app/api/images/upload/route.ts` and the copy is
- * deliberate. That route is a live, untested branding upload path, so extracting it would
- * put a behaviour risk on branding in order to tidy a games feature - and the part that
- * genuinely must not drift, the filename-to-map-key encoding, is already ONE shared module.
- * Mongoose rejects a map key containing a dot, so a raw filename is silently discarded; see
- * `branding-file-key.ts`.
+ * WHERE those bytes live is `branding-assets.service.ts`'s business and not this module's.
+ * It used to be inline here, a base64 entry in the shared `WhiteLabel` document, and that
+ * document hit MongoDB's 16MB ceiling on 8 September 2026 - so a game logo could not be
+ * saved at all, and neither could any other image on the platform.
  */
 
 /** Extensions we will store, as a Map so a crafted extension cannot reach Object.prototype. */
@@ -125,16 +121,7 @@ export async function storeGameArtwork(
   // treats it as a nicety. An image that exists on one server only is a defect the operator
   // cannot see from the screen they uploaded it on.
   try {
-    await connectToDatabase();
-    let settings = await WhiteLabel.findOne();
-    if (!settings) settings = new WhiteLabel();
-    if (!settings.brandingFiles) settings.brandingFiles = new Map();
-    settings.brandingFiles.set(encodeBrandingFileKey(filename), {
-      data: buffer.toString("base64"),
-      contentType,
-      updatedAt: new Date(),
-    });
-    await settings.save();
+    await putBrandingAsset(filename, buffer, contentType);
   } catch (error) {
     console.error("❌ [Game artwork] Stored on disk but not in the database:", error);
     return {

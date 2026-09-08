@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile, access, writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { constants } from "fs";
-import { encodeBrandingFileKey } from "@/lib/utils/branding-file-key";
 
 // Reason: Track which missing filenames have already been warned about to avoid
 // spamming server logs on every request for the same missing image.
@@ -87,22 +86,21 @@ export async function GET(
       });
     }
 
-    // File not on disk - try to restore from database backup
+    // File not on disk - try to restore from database backup.
+    //
+    // Reason: one service owns where those bytes live, because the store changed on
+    // 8 September 2026 - a per-file collection, with the old shared-document map read as a
+    // fallback for anything uploaded before then. A reader that knew either location
+    // directly would silently stop finding half the images.
     try {
-      const { connectToDatabase } = await import("@/database/mongoose");
-      const { WhiteLabel } = await import("@/database/models/whitelabel.model");
-      await connectToDatabase();
-
-      const settings = await WhiteLabel.findOne();
-      // Reason: stored with the dots encoded, because Mongoose rejects map keys containing
-      // one. See branding-file-key.ts.
-      const fileEntry = settings?.brandingFiles?.get(
-        encodeBrandingFileKey(sanitizedFilename),
+      const { readBrandingAsset } = await import(
+        "@/lib/services/branding-assets.service"
       );
+      const fileEntry = await readBrandingAsset(sanitizedFilename);
 
-      if (fileEntry?.data) {
+      if (fileEntry) {
         console.log(`🔄 [Serve] Restoring branding image from DB: ${sanitizedFilename}`);
-        const buffer = Buffer.from(fileEntry.data, "base64");
+        const buffer = fileEntry.data;
 
         // Auto-restore file to disk for future requests
         try {
@@ -118,7 +116,7 @@ export async function GET(
 
         return new NextResponse(buffer, {
           headers: {
-            "Content-Type": fileEntry.contentType || "image/png",
+            "Content-Type": fileEntry.contentType,
             "Cache-Control": "no-cache, no-store, must-revalidate",
             Pragma: "no-cache",
             Expires: "0",

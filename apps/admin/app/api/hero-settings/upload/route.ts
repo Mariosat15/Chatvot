@@ -5,8 +5,10 @@ import path from "path";
 import { verifyAdminAuth } from "@/lib/admin/auth";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import { connectToDatabase } from "@/database/mongoose";
-import { WhiteLabel } from "@/database/models/whitelabel.model";
-import { encodeBrandingFileKey } from "@/lib/utils/branding-file-key";
+import {
+  putBrandingAsset,
+  deleteBrandingAsset,
+} from "@/lib/services/branding-assets.service";
 
 // POST - Upload hero images
 export async function POST(request: NextRequest) {
@@ -96,20 +98,11 @@ export async function POST(request: NextRequest) {
       ]);
       const contentType =
         contentTypes.get((ext || "png").toLowerCase()) || file.type;
-      const base64Data = buffer.toString("base64");
 
-      let settings = await WhiteLabel.findOne();
-      if (!settings) settings = new WhiteLabel();
-      // Reason: documents written before the field was declared have no map to set into.
-      if (!settings.brandingFiles) settings.brandingFiles = new Map();
-      // Reason: Mongoose rejects map keys containing a dot, so the raw filename could never
-      // be stored and this backup silently did nothing. See branding-file-key.ts.
-      settings.brandingFiles.set(encodeBrandingFileKey(filename), {
-        data: base64Data,
-        contentType,
-        updatedAt: new Date(),
-      });
-      await settings.save();
+      // Reason: one document per image, because this used to be an entry in the shared
+      // WhiteLabel document and that document reached MongoDB's 16MB ceiling on
+      // 8 September 2026, at which point no image on the platform could be stored.
+      await putBrandingAsset(filename, buffer, contentType);
       console.log(`💾 [Hero Upload] Backed up to DB: ${filename}`);
     } catch (dbErr) {
       console.warn(`⚠️ [Hero Upload] Could not backup to DB:`, dbErr);
@@ -185,15 +178,11 @@ export async function DELETE(request: NextRequest) {
       await unlink(filepath);
     }
 
-    // Also remove from database backup
+    // Also remove from database backup - both the collection and, for an image uploaded
+    // before 8 September 2026, the legacy map. Missing either leaves the file being served
+    // from the database after the operator has deleted it.
     try {
-      await connectToDatabase();
-      let settings = await WhiteLabel.findOne();
-      const brandingKey = encodeBrandingFileKey(filename);
-      if (settings?.brandingFiles?.has(brandingKey)) {
-        settings.brandingFiles.delete(brandingKey);
-        await settings.save();
-      }
+      await deleteBrandingAsset(filename);
     } catch {}
 
     // Create audit log

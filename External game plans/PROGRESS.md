@@ -1146,6 +1146,62 @@ title's shape.
 
 ---
 
+### 8 Sep 2026 - R56 - ONE DOCUMENT HELD EVERY IMAGE THE PLATFORM HAD EVER UPLOADED
+
+**Shipped:** uploaded images live in a `branding_asset` collection, one document per file, behind
+one service. **34 tests** in `__tests__/services/branding-assets.test.ts`, **14 probes** in
+`tools/probe-branding-assets.ps1`, all red on the expected test. Both typechecks match their
+baselines exactly - 198 main, 223 admin - with none in the changed files and none disappearing.
+
+**The report.** The owner could not save a logo for the game and was told *"The image saved on this
+server but could not be copied to the database, so other servers would not serve it."* The admin
+log said `BSONObj size: 17070874 is invalid. Size must be between 0 and 16793600(16MB)`, four
+times, on four different pictures.
+
+**The cause was not the picture.** Every image the platform has ever accepted was base64-encoded
+into `WhiteLabel.brandingFiles`, a map on the **single settings document**, and MongoDB caps a
+document at 16MB. The document was full, so **uploading any image anywhere in the admin panel had
+already become impossible** - the game logo was simply the next one attempted. Read the ordering
+carefully, because it is the whole finding: this is a store that fills up **by succeeding**. There
+is no bad input to find and no failing branch to bisect, and the first failure always looks like a
+problem with whatever was being uploaded at the time.
+
+**What was built.** `database/models/branding-asset.model.ts` (mirrored) is one document per file.
+`lib/services/branding-assets.service.ts` (mirrored, pinned byte-identical by a test) is the only
+module that knows where the bytes live - three writers, four readers and one delete go through it -
+and it reads the collection first, the legacy map second, so nothing uploaded before today breaks.
+`WhiteLabel.brandingFiles` became `select: false`. `tools/branding/migrate-branding-files.ts`
+empties the map and is **report-only until `--apply`**.
+
+**Four things generalise.**
+
+- **`select: false` was not tidying.** 67 files call `WhiteLabel.findOne()`, so reading *any*
+  setting transferred every image ever uploaded, and the old upload path was a read-modify-write
+  of the whole map - uploading one 2MB picture moved about 32MB. Hiding the field is only safe
+  because one service owns every access to it, which is the **"one rule, two copies"** shape
+  behind `referenceId`, `failedReason`, `challengeId` and the Game Master `||`; a test asserts no
+  writer reaches past the service.
+- **A workaround must not outlive its cause.** The `__DOT__` key encoding exists solely because
+  Mongoose refuses a dot in a **map** key. A plain `String` path has no such restriction, so the
+  new store is keyed by the filename and `branding-file-key.ts` survives for reading the legacy
+  map and nothing else. Carried over "for consistency", it lives long enough for somebody to
+  simplify it back into the bug it was written for.
+- **A migration out of a full document cannot save the document.** Clearing the map with `save()`
+  is refused by the same 16MB limit that caused the problem, so it clears one entry at a time with
+  `$unset` - and it copies, reads back, and only then clears, leaving the entry in place if either
+  step fails.
+- **The message was accurate and unactionable, which is worse than a wrong one.** The disk write
+  succeeded, so the operator was told to try again and did, four times. A message that names no
+  remedy invites the one action that cannot work.
+
+**Live and platform-wide; the migration has NOT been run.** New uploads work immediately because
+they no longer touch the settings document. Until `--apply`, that document is still carrying the
+images and still within a megabyte or two of the ceiling - nothing pays to read them any more, but
+**any other field on it is one growth spurt away from the same refusal**, and the refusal will name
+whatever field happened to grow.
+
+---
+
 ### 8 Sep 2026 - X4a / `21` s4.1o - HALF A BUILD FROM THE CACHE (R55)
 
 **Shipped:** the play surface's assets are served under a fingerprint of their own contents, so a

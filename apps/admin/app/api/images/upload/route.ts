@@ -4,8 +4,7 @@ import { writeFile, mkdir, access, stat } from "fs/promises";
 import { constants } from "fs";
 import path from "path";
 import { connectToDatabase } from "@/database/mongoose";
-import { WhiteLabel } from "@/database/models/whitelabel.model";
-import { encodeBrandingFileKey } from "@/lib/utils/branding-file-key";
+import { putBrandingAsset } from "@/lib/services/branding-assets.service";
 
 export async function POST(request: NextRequest) {
   try {
@@ -133,21 +132,12 @@ export async function POST(request: NextRequest) {
         ["ico", "image/x-icon"],
       ]);
       const contentType = contentTypes.get(ext) || "image/png";
-      const base64Data = buffer.toString("base64");
 
-      let settings = await WhiteLabel.findOne();
-      if (!settings) { settings = new WhiteLabel(); }
-      // Reason: documents written before the field was declared have no map to set into.
-      if (!settings.brandingFiles) settings.brandingFiles = new Map();
-      // Reason: Mongoose rejects map keys containing a dot, so the raw filename could never
-      // be stored and this backup silently did nothing. See branding-file-key.ts.
-      settings.brandingFiles.set(encodeBrandingFileKey(filename), {
-        data: base64Data,
-        contentType,
-        updatedAt: new Date(),
-      });
-      await settings.save();
-      console.log(`💾 [Upload] File backed up to DB: ${filename} (${Math.round(base64Data.length / 1024)}KB base64)`);
+      // Reason: one document per image, because this used to be an entry in the shared
+      // WhiteLabel document and that document reached MongoDB's 16MB ceiling on
+      // 8 September 2026, at which point no image on the platform could be stored.
+      await putBrandingAsset(filename, buffer, contentType);
+      console.log(`💾 [Upload] File backed up to DB: ${filename} (${Math.round(buffer.length / 1024)}KB)`);
     } catch (dbErr) {
       console.warn(`⚠️ [Upload] Could not backup file to DB:`, dbErr);
     }

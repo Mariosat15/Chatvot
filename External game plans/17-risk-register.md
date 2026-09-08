@@ -72,6 +72,7 @@ chapter covers risks to the programme and to the application.
 | R53 | **`supportsContentSeed` decided nothing, and three comments said it decided paid entry.** The flag guaranteeing every player in one contest faces identical content - *"the most important single field in the specification"*, `01` s4.3, and what preserves the skill-not-chance position - was declared, validated on ingest, stored, transported and badged, and read by **no gate in either app**. Its two siblings *are* enforced, in the pre-flight and in the wizard, which is what hid it: **a partially-implemented pattern is more dangerous than an absent one**, because the absent one prompts the question. Fifth instance of a comment asserting a check that does not run, and the first repeated in three files - **agreement between comments is not corroboration** | **High** | **CLOSED 8 Sep 2026. Latent, nothing to backfill** - every title that exists declares it `true`, so no unfair contest has run. It is the flag a real provider will set `false` at **X4**, and the failure then is a paid competition where every player faces different content, ranked, settled and paid, silently | One unconditional check in both mirrored pre-flight copies, the field **required** on the input so a caller cannot fail open again, both writers counted with `rg` first, and the wizard disabling the title with the capability named. **Not scoped to `competition`** despite the spec's wording - a challenge ranks two players for money on the same basis, so the challenge half is a tripwire for E8. 4 tests, 4 probes; the second test exists because all three format refusals share one block, so a fixture missing two things is refused either way |
 | R54 | **An edge that rewrites `Cache-Control` turns a ten-minute fault into a four-hour outage.** Every response from `/play/*` arrives carrying `max-age=14400` - Cloudflare's default four-hour Browser Cache TTL - **on the 404s as well as the 200s**, replacing the `no-store` and `no-cache` the service sends. So R52's missing `presentation.js`, fixed on the server within minutes, stayed broken in every browser that had already asked, for four hours, **because a browser holding a fresh cache entry never asks again**. The owner held a `curl` returning 200 while the page named the file it could not load; both were true | **High** | **PARTLY CLOSED 8 Sep 2026.** The **refusal** half is cured in the page, which is the only place with standing to act: the boot watchdog re-fetches the recorded failures with `cache: "reload"` - which *replaces* the stored copy rather than reading round it - and reloads once, guarded by `sessionStorage` so a genuinely missing file cannot loop (`21` s4.1k). **The 200s carry the same four-hour lifetime and that half is an OWNER ACTION**: a stale success has nothing to detect because it looks healthy, so **assume a play-surface fix does not reach anybody who played in the previous four hours** until a Cloudflare cache rule for `/play*` respects origin headers (`deploy/README.md`) | Identified by **measuring from the player's browser** rather than the server - `curl` from the box bypasses the poisoned cache entirely, so it can only ever confirm the half that was already right. `deploy/nginx.conf` contains no such value anywhere, which is how the layer was pinned rather than guessed. **The instinct it defeats:** the more recently someone tried and failed, the longer they stay broken, which reads exactly like the fix not working. General form: a service cannot defend itself from a header-rewriting intermediary **with headers**. **The same asymmetry produced a second, worse defect within the hour** (`21` s4.1l): the document is never cached, its assets are, so today's markup loaded around a four-hour-old `app.js` that works but predates the boot flag - and the watchdog **wiped a live board mid-round**. Second witness added; **an absent signal is evidence only if the thing that would have sent it was definitely present**. **The 200 half is CLOSED by R55, and not by the Cloudflare rule** - the remedy was to stop the stale copy being addressable rather than to ask the edge to behave, so the `deploy/README.md` owner action is stale as a present fact for `/play*` |
 | R55 | **Half a build from the cache and half from the server.** `board.js` was today's and `presentation.js` was four hours old, so the console said `does not provide an export named 'newlyJoined'` and the game stopped dead - **nothing missing, nothing 404ing, every response a 200**. This is precisely the half R54 recorded as undetectable, and it defeated the recovery built for R52: s4.1k re-fetches URLs that **failed**, and there were none. The third distinct cause of one reported symptom | **High** | **CLOSED 8 Sep 2026.** The assets are served under a fingerprint of their own contents, so a new build publishes URLs no browser has cached and the stale copy sits at an address nothing requests. `immutable` then says something true, so the surface is fetched once and never revalidated mid-contest. **Latent for money, nothing backfilled** - the burned attempts are real but were burned by R52 and R54 as much as by this. **One rebuild required**, after which the fingerprint is derived at boot from the directory, so a surface change still needs only pull and restart | **A path segment, never `?v=`** - `board.js` imports `./presentation.js` as a literal with nowhere to put a query string, so a query string leaves bare **exactly the file that broke**; the segment is inherited by ordinary URL resolution. **Content, not mtime**, or two servers publish different URLs for identical bytes. **An unrecognised fingerprint is served, not refused**: refusing manufactures 404s on a rolling deploy and R54's own finding is that the edge caches those for four hours too. The route shape invited its own outage - `/play/:version/:asset` has the shape of `/play/api/state`, which the board polls - so unrecognised segments fall through to the next route; **probe 12 removes that and turns five tests red, three of them unrelated round-state tests, against two expected** |
+| R56 | **Every image the platform has ever uploaded shared one 16MB document, and it filled up.** Hero images, branding images and game artwork were base64-encoded into `WhiteLabel.brandingFiles` - a map on the single settings document - so the game-logo upload that reported `BSONObj size: 17070874 is invalid` was not a big picture or a bad route: the **document was already full**, and by then uploading *any* image anywhere in the admin panel was impossible. The failure arrives by success rather than by a bug, so there is no warning and every upload after it fails identically. The disk write succeeded, so the operator was told the file saved but could not be copied - accurate, unactionable, and repeated on every retry | **High** | **CLOSED 8 Sep 2026.** One document per file in a new `branding_asset` collection, which has no such ceiling; the remaining limit is 8MB **per file**, which an operator can act on. Reads try the collection then fall back to the legacy map, so nothing uploaded before today breaks. **Live and platform-wide, and `tools/branding/migrate-branding-files.ts` is report-only until `--apply`** - the map still holds ~16MB until it is run, and `WhiteLabel` cannot be saved by any writer while it does | The map was on the **hot path**: 67 files call `WhiteLabel.findOne()`, so reading any setting at all transferred every image ever uploaded, in both directions on every save. `select: false` closes that, and it is only safe because one service owns every read - **the write side and the read side disagreeing about where bytes live is the "one rule, two copies" shape**, so a test asserts no writer reaches past it. The `__DOT__` key encoding was **not** carried over: it exists solely because Mongoose refuses a dot in a *map* key, and a workaround outliving its cause is how somebody later "simplifies" it into a bug |
 | R24 | Scope creep before anything ships | Medium | **High** | All |
 | R25 | Round write contention under load | Medium | Medium | X12 |
 | X15 | "Challenge any user" harassment surface - no report-user feature exists | Medium | Medium | X10 |
@@ -2087,6 +2088,64 @@ not defensiveness.
 TypeScript, so the owner must `npm run build` once. From then on the fingerprint is derived at boot
 from the directory, exactly as the served set has been since `21` s4.1i, so a play-surface change
 still needs only **pull and restart**.
+
+---
+
+### R56 - One document held every image the platform had ever uploaded - **CLOSED, 8 September 2026**
+
+The owner tried to save a logo for the game and was told:
+
+> The image saved on this server but could not be copied to the database, so other servers would
+> not serve it. Please try again.
+
+with `BSONObj size: 17070874 (0x1047B1A) is invalid. Size must be between 0 and 16793600(16MB)`
+in the admin log, four times, on four different pictures.
+
+**Nothing was wrong with the picture, the route or the encoding.** Every image the platform has
+ever accepted - hero images, branding images, and now game artwork - was base64-encoded into
+`WhiteLabel.brandingFiles`, a map on the **single settings document**, and MongoDB caps a document
+at 16MB. The document had reached the ceiling, so **uploading any image anywhere in the admin
+panel had already become impossible** and nobody had happened to try. The message is the second
+half of the trap: the disk write succeeds, so the operator is told the file saved and to try
+again, which is accurate, unactionable, and identical on every retry.
+
+**The general form is worth more than the instance: a store that fills up by SUCCEEDING gives no
+warning.** There is no bad input to find, no failing code path to bisect, and the first failure
+looks like a problem with whatever was being uploaded at the time.
+
+**The fix is one document per file**, in a `branding_asset` collection. A collection has no
+ceiling; the limit that remains is 8MB per file, which is a limit an operator can do something
+about ("this picture is too big") rather than one they cannot ("the platform has run out of
+pictures"). `lib/services/branding-assets.service.ts`, mirrored, is the only module that knows
+where the bytes live - three writers, four readers and one delete all go through it - and reads
+try the collection first and the legacy map second, so nothing uploaded before today breaks.
+
+**Three things about it are load-bearing.**
+
+- **`brandingFiles` is now `select: false`, and that is not tidying.** 67 files call
+  `WhiteLabel.findOne()`. Every one of them was transferring every image ever uploaded, and every
+  `save()` was writing them all back. The old upload path was a read-modify-write of the whole
+  map, so uploading one 2MB picture moved ~32MB over the wire. It is only safe to hide the field
+  because a single service owns every access to it, which is why a test asserts that no writer
+  reaches past that service.
+- **The `__DOT__` key encoding was deliberately not carried over.** It exists solely because
+  Mongoose refuses a dot in a **map** key; a plain `String` path has no such restriction.
+  `branding-file-key.ts` survives for reading the legacy map and for nothing else. Carrying a
+  workaround past its cause is how it lives long enough for somebody to "simplify" it back into
+  the bug it was written for.
+- **The migration clears the map one entry at a time with `$unset`, never by saving the
+  document.** A `save()` of a 16MB document is refused by the same limit that caused the problem,
+  so a migration written the obvious way cannot run at all.
+
+**Live, platform-wide, and the migration has NOT been applied.**
+`tools/branding/migrate-branding-files.ts` is report-only until `--apply`. New uploads work
+immediately, because they no longer touch the settings document at all - but until the migration
+runs, that document is still carrying the images and is still within a megabyte or two of the
+ceiling. `select: false` means nothing pays to read them any more, so what remains is **headroom**:
+any other field on that document is one growth spurt away from the same refusal, and the refusal
+will name whatever field happened to grow. Nothing is lost by running it: it copies,
+reads back, and only then clears, one `$unset` at a time - never by saving the document, which the
+same limit would refuse.
 
 ---
 

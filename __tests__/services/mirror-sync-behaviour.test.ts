@@ -253,7 +253,12 @@ describe("Defect 2 - the synced fields now actually persist", () => {
       // was permanently undefined - so recovery never ran.
       const doc = await writeBrandingFile("hero-banner-png");
 
-      const reread = await AdminWhiteLabel.findById(doc._id);
+      // Reason for `select("+brandingFiles")`: the field became `select: false` on
+      // 8 September 2026, when the map turned out to be the reason no image on the platform
+      // could be saved - one shared document holding every upload, against MongoDB's 16MB
+      // ceiling, on the hot path of 67 settings reads. The claim of this test is unchanged;
+      // only the way a reader asks for the field is.
+      const reread = await AdminWhiteLabel.findById(doc._id).select("+brandingFiles");
       const stored = (
         reread as unknown as { brandingFiles?: Map<string, unknown> }
       )?.brandingFiles;
@@ -282,7 +287,8 @@ describe("Defect 2 - the synced fields now actually persist", () => {
       const filename = "hero-1756713600-a1b2c3.png";
       const doc = await writeBrandingFile(encodeBrandingFileKey(filename));
 
-      const reread = await AdminWhiteLabel.findById(doc._id);
+      // See the note on `select("+brandingFiles")` in the test above.
+      const reread = await AdminWhiteLabel.findById(doc._id).select("+brandingFiles");
       const stored = (
         reread as unknown as { brandingFiles?: Map<string, unknown> }
       )?.brandingFiles;

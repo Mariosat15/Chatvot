@@ -186,7 +186,17 @@ const WhiteLabelSchema = new Schema<WhiteLabelDocument>(
     siteUrl: { type: String, default: "" },
 
     // Branding file backup (base64-encoded, auto-restored if disk files are lost)
+    //
+    // SUPERSEDED 8 September 2026 by the `branding_asset` collection. Nothing writes here
+    // any more; `lib/services/branding-assets.service.ts` reads it as a fallback for images
+    // uploaded before that date, and `tools/branding/migrate-branding-files.ts` empties it.
+    //
+    // `select: false` is not a tidy-up. This map holds a base64 copy of every image ever
+    // uploaded and had grown to the far side of 16MB, and 67 files call `WhiteLabel.findOne()`
+    // - so reading any setting at all transferred the lot. The four routes that genuinely
+    // want it now ask for it by name, through that one service.
     brandingFiles: {
+      select: false,
       type: Map,
       of: new Schema(
         {
