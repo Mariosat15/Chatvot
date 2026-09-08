@@ -1032,6 +1032,18 @@ pm2 restart chartvolt-games
 > nine `.webp` files that arrive with the pull and are served after the **restart**, with no build
 > and no catalogue re-sync.
 >
+> **The restart is not optional when a pull adds a new `.js` module, and that is the one case
+> which still reproduces R52 in full.** The served set is read from the directory **once at
+> boot**, so a module pulled into `public/play` is answered with a 404 until
+> `pm2 restart chartvolt-games` — and an ES module that 404s takes its importer down with it, so
+> the page dies entirely rather than losing the feature the new module adds. A missing **image**
+> is quiet and cosmetic; a missing **module** is the blank spinner. `public/play/sound.js`
+> (8 September 2026, `21` s4.1n) is the first such file since the directory-derived set replaced
+> the compiled list, so from here on: **pull and restart in one movement, never a pull alone.**
+> The play surface does heal itself if this is got wrong — the boot watchdog re-fetches a failed
+> module with `cache: "reload"` and reloads once (`21` s4.1k) — but only once the restart has
+> happened, because until then there is nothing there to fetch.
+>
 > What the boot audit reports now is narrower — a file in `public/play` whose *extension* the
 > service does not recognise, which is the only remaining way to leave an asset unreachable:
 >

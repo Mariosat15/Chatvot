@@ -187,7 +187,8 @@ service's own smoke tool, never yet launched from a ChartVolt contest.
 | The four spec endpoints | **Built.** Catalogue, create round, fetch round, void round, plus signed inbound auth with a rotation window, a retrying result callback, and a four-stage reconciliation sweeper |
 | Spec-ambiguity log | **Built and open.** `games-service/AMBIGUITY-LOG.md`. **Not yet resolved back into `01` and the requirements HTML** |
 | The platform adapter | **Built.** `chartvolt-games` registered in both registry copies, four files under `lib/services/game-providers/adapters/`, mirrored into `apps/admin` and verified byte-identical. 49 tests, 24 probes |
-| **The playable board** | **Built.** `GET /play?t={token}` serves a real game: `public/play/` (5 code files and 9 images, no build step) behind `src/http/play-page.ts`. Dragging with a finger draws paths, the clock runs, a solved board advances, and the round settles into a signed result. Verified by a human-equivalent browser run on both titles. 15 headless tests drive the browser module against the server's verifier; 20 probes. **Rebuilt twice since**: readable in **s4.1f**, and on the owner's supplied artwork in **s4.1m** - a document describing 4 files, or the board as bare vectors, is correct as history and stale as a present fact |
+| **The playable board** | **Built.** `GET /play?t={token}` serves a real game: `public/play/` (**6** code files and 9 images, no build step, **and no audio files** - sound is synthesised) behind `src/http/play-page.ts`. Dragging with a finger draws paths, the clock runs, a solved board advances, and the round settles into a signed result. Verified by a human-equivalent browser run on both titles. 15 headless tests drive the browser module against the server's verifier; 20 probes. **Rebuilt three times since**: readable in **s4.1f**, on the owner's supplied artwork in **s4.1m**, and with sound and animation in **s4.1n** - a document describing 4 or 5 files, or the board as bare vectors, is correct as history and stale as a present fact |
+| **Sound and animation** | **Built 8 September 2026, and NOT verified by eye or ear.** `public/play/sound.js`, Web Audio only, mute persisted, every animation off under `prefers-reduced-motion`. **s4.1n.** The deploy consequence is the fact to carry: it is the **first new `.js` module since the served set became directory-derived**, and that directory is read **once at boot**, so it 404s until `pm2 restart chartvolt-games` - and a 404 module takes its importer down, so the page dies rather than falling silent. **Pull and restart in one movement** |
 | **Provider registration** | **NOT DONE through the admin screens.** The service now has a local `.env` and has been started - including **from its production `dist` build**, not only under `tsx` - and answers signed catalogue calls. Registration was attempted in the admin UI on 6 Sep 2026 and **found a live defect**: the base-URL validator required `https://` unconditionally, so a loopback provider could not be registered at all. Fixed (see 4.1b) |
 | **Any end-to-end round** | **DONE BY TEST, NOT BY CLICKING - 7 September 2026.** A round now travels between the two halves: `__tests__/games/end-to-end-round.test.ts` starts a real `games-service` process, syncs its catalogue over signed HTTP, launches a round, plays it to completion, receives the service's own signed callback and settles the contest for real money. See **4.1d**. What is still NOT done is the acceptance criterion itself, which says *by clicking, in a browser* - that needs two sessions this environment cannot create, so it is a runbook for the owner (**4.1e**) |
 | **Production deployment** | **Prepared, not performed.** PM2 entry `chartvolt-games`, `games-service/env.example`, and a runbook in `deploy/README.md`. **Two exposure routes**: proxied through the platform app at `/play` (the default since 6 Sep 2026, owner's choice - no DNS, no nginx, no certificate) or its own `games.` subdomain (the nginx block is kept). Nothing has been deployed - see 4.1b for the two boot guards this work added and 4.1c for what the proxy route costs |
@@ -1018,6 +1019,85 @@ in this phase.
 **Verified by eye at desktop and phone widths, on the intro, board and result screens.** No
 platform file changed, and `check:isolation` still reports the service sharing no code with the
 repository around it.
+
+### 4.1n The game makes a noise, and moves - 8 September 2026
+
+The owner asked for animations and sound "to be more fun like a proper game", alongside the
+artwork in s4.1m. Both are built, in `games-service/` only. **242 tests** (up from 226 on this
+checkout - any figure of 225 was already stale) and **58 probes across three harnesses**, every
+one red on exactly the expected test with no `DID NOT APPLY`. Delivered by a subagent and the
+claims below were re-verified rather than accepted.
+
+**The files.** `public/play/sound.js` is new (210 lines) and holds the whole audio layer;
+`presentation.js` gained the fifteen numbers and strings the features need, so they can be
+asserted in Node; `app.js`, `board.js`, `app.css` and `index.html` gained the wiring, seven
+keyframes and a mute button. **No audio files were added** - every sound is one oscillator into
+one gain node, so the play surface still fetches nothing but the artwork.
+
+**A new `.js` module is the one deploy shape that still reproduces R52 in full, and this is the
+first one since s4.1i.** The served set is read from the directory **once at boot**, so
+`sound.js` is answered with a 404 until `pm2 restart chartvolt-games` - and an ES module that
+404s takes its importer down with it, so the page dies entirely rather than losing its sound.
+s4.1m's artwork was safe to describe as needing "no rebuild" because an `<image href>` is
+resolved long after the module graph has evaluated: **a missing image is quiet and cosmetic, a
+missing module is the blank spinner.** The rule now in `deploy/README.md`: **pull and restart in
+one movement, never a pull alone.** The watchdog's `cache: "reload"` recovery (s4.1k) does cure
+it, but only after the restart, because until then there is nothing to fetch.
+
+**Five design decisions that are about reliability rather than fun.**
+
+- **A broken audio stack is a silent game, never a broken one.** Every call is inside a
+  try/catch behind a latch, and `localStorage` is wrapped too - it *throws* rather than
+  returning null when a browser refuses storage, so an unwrapped read would kill the round in
+  exactly the privacy configurations most likely to refuse.
+- **Nothing on the gameplay path awaits audio hardware.** `AudioContext.resume()` returns a
+  promise and the tempting thing is to await it; a `.catch(() => {})` is attached and the result
+  discarded, so a hostile audio stack cannot stall a drag.
+- **The context is created from a gesture, and there are three of them.** Start, the mute
+  button, and the **first `pointerdown` on the board** - that last one is the resumed-round
+  case, where there is no Start press to hook and would otherwise be a permanently silent game
+  for anybody who reopened their round.
+- **`toneRecipe` is a `Map`, not an object literal.** The name reaches it from a derived string,
+  and object indexing walks the prototype chain, so `"__proto__"` returns something truthy that
+  survives a `!recipe` test. Fourth instance in this codebase after the admin round inspector,
+  the contest-edit field list and the unscored-policy copy.
+- **`prefers-reduced-motion` is queried live rather than cached**, so changing the OS setting
+  mid-round is honoured, and the media block stops every one of the seven keyframes.
+
+**The transient pulse is a new element in its own layer, not a class on an existing node**, and
+that is forced by s4.1m's own `build`/`paint` split: `paint()` recreates the traces on every
+pointer move, so an animation attached to one restarts on each frame of a drag and reads as
+broken. Same reason there is **no stroke-dash draw-on** for the completing wire.
+
+**A structural test that reads a media block must parse it, not search it.** The first
+reduced-motion guard asserted that a selector appeared inside the block, and a probe that left
+the selector there while deleting `animation: none` came back **green** - the seventh instance
+of a probe staying green, cause: weak test. It now splits the block into selector/body pairs and
+asserts the body actually stops the movement.
+
+**One probe was re-aimed rather than left green**, `probe-board.ps1`'s "a drag rebuilds the whole
+board" - `paint()` now takes an argument, so the old pattern reported `DID NOT APPLY`, which
+reads like a broken harness. Sixth instance in this phase, and the standing cost of changing a
+signature the harnesses name.
+
+**Three files are over the 500-line limit** - `app.js` 534 → 802, `board.js` 621 → 784,
+`app.css` 706 → 1036, all three already over before this work. **The owner exempted these files
+from the limit on 8 September 2026**, and the reasoning is specific to them rather than a
+relaxation of the rule: `public/play/` is unbundled and served file-by-file with no build step to
+a phone on a bad connection, so every extra module is another round trip **and another way for
+the page to die**, since a module that 404s takes its importer down with it. That is R52, and it
+has happened once. **The split that matters is already made and it is by testability, not by
+length:** `presentation.js` is pure and covered in Node, `app.js` touches `document` at module
+scope and cannot be imported at all - which is why three real defects hid there until s4.1f moved
+the decisions out. **So the rule to apply to this directory is "anything that computes a size or
+chooses a sentence belongs in `presentation.js`", never a line count**, and the `motion.js`
+extraction was declined because it satisfies the count for nothing while moving code the probes
+name by position.
+
+**Neither the animations nor the sounds have been verified by eye or ear** - the play surface is
+reachable only with a signed launch token, so everything above is proven by tests and probes.
+**A human pass in a browser is the remaining step**, and unlike s4.1m that is a claim nobody can
+make from a test run.
 
 ---
 

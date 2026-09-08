@@ -175,8 +175,10 @@ provider holding its own copy is a provider that keeps posting to a decommission
 ## The play surface
 
 The launch URL the platform is handed points at `GET /play?t={token}`, served from
-`public/play/` by `src/http/play-page.ts`. Five code files plus nine images, no build step and no
+`public/play/` by `src/http/play-page.ts`. Six code files plus nine images, no build step and no
 framework: a phone on a bad connection is the target, and a bundler here would buy nothing.
+**There are no audio files either** - `sound.js` synthesises every sound from one oscillator, so
+the whole surface fetches nothing but the pictures.
 
 **The artwork is decoration and the vectors underneath are the game.** `board-frame.webp` is the
 bezel and `token-1.webp`..`token-8.webp` are the terminals, but every terminal also draws its own
@@ -201,8 +203,25 @@ decisions moved out (`21` s4.1f). Anything that computes a size or chooses a sen
 `presentation.js`, which is pure and covered by `tools/test-presentation.ts` - `app.js` should
 only be reading state, calling those functions and writing to the DOM.
 
-**Adding a module means dropping the file in `public/play` and nothing else.** The served set is
-read from that directory at boot by `readServableAssets`, so there is no list to forget. It used
+**This directory is exempt from the repository's 500-line limit** (owner decision, 8 September
+2026; `app.js` 802, `board.js` 784, `app.css` 1036). The exemption is about *this* directory and
+not a relaxation of the rule: nothing here is bundled, so each file is a separate request to a
+phone on a bad connection, and each additional module is **another way for the page to die** -
+a module that 404s takes its importer down with it, which is R52 and has happened once.
+**Split by testability, never by length.** The `presentation.js` boundary above is the split that
+earns its keep; a `motion.js` carved out to satisfy a line count brings none of the three files
+under the limit while moving code the probes name by position.
+
+**Adding a module means dropping the file in `public/play` and restarting - the restart is not
+optional.** The served set is read from that directory **at boot** by `readServableAssets`, so
+there is no list to forget, but there is also nothing that notices a file arriving afterwards. A
+module pulled onto a running service is a 404 until `pm2 restart chartvolt-games`, and the 404
+lands mid-graph, so **the page dies rather than losing the feature the module adds**. Contrast the
+artwork, which is genuinely restart-tolerant in effect: an `<image href>` is resolved long after
+the module graph has evaluated, so a missing picture draws nothing while the game keeps working.
+**A missing image is quiet and cosmetic; a missing module is the blank spinner.** `sound.js`
+(8 September 2026) is the first new module since the list was removed and is the case that
+established the rule. It used
 to be a hand-maintained allowlist in TypeScript, and forgetting was not a partial failure: the 404
 lands mid-graph, so the importer fails to evaluate too and the game does not boot. That is **R52**,
 and the reason the list is gone rather than merely guarded is that the two halves shipped on
@@ -351,12 +370,13 @@ npm run probe:boot-watchdog  # the same, for the watchdog that names a module wh
 > that would have sent it was definitely present.** A test pins the markup's side of that bargain:
 > exactly one screen ships visible, and it is the loading screen.
 
-`npm test` runs **225 tests**: 15 config, 42 engine, 28 scoring, 41 API, 61 play and delivery,
-15 board client, 24 presentation. (Any figure of 219 predates the board artwork, 217 predates the
+`npm test` runs **242 tests**: 15 config, 42 engine, 28 scoring, 41 API, 66 play and delivery,
+15 board client, 35 presentation. (Any figure of 226 or 225 predates the sound and animation
+layer - the two were the same commit and the total was misstated as 225 while the suites summed
+to 226, so both are stale for the same reason. 219 predates the board artwork, 217 predates the
 watchdog's second witness, 216 predates the stale-cache recovery, 213
 predates the boot watchdog, 209 predates the directory-derived asset set, 204 predates the
-deploy-drift audit, 167 predates the presentation suite, and 152 predates the config suite; all
-seven are stale.)
+deploy-drift audit, 167 predates the presentation suite, and 152 predates the config suite.)
 
 **Every one of them runs in-process against an in-memory MongoDB, so none can fail because the
 PLATFORM disagrees with this service.** That check lives on the other side, in the platform's
