@@ -469,6 +469,75 @@ Both reported `DID NOT APPLY`, **which is indistinguishable from a test that doe
 
 ---
 
+### 4.1i The arena was dressed in the kit and the game inside it was not (8 September 2026)
+
+The owner's words were **"these graphics are basic, reproduce the graphics"**, beside their
+reference mock and a screenshot of the live arena. It reads as a matter of taste and it is not.
+
+**What was actually wrong.** `13` s4.1d built the neon kit and dressed the two lobbies in it.
+`4.1?` - the arena slice - dressed the arena's own chrome: the header, the standings rail, the
+contest panel. **The three components inside the arena were never touched.** `RoundPreflight`,
+`ProviderGameFrame` and `RoundResultPanel` were still wearing `border-gray-700 bg-gray-800/50`,
+the application's neutral shell - a flat charcoal card with a grey hairline - and between them
+they are the entire centre column. So the biggest thing on the screen, the one the player is
+looking at, was the only unstyled element on a page whose every edge had been designed.
+
+**Nothing failed, and nothing could have.** Every structural test in
+`__tests__/games/provider-play-ui.test.ts` passed throughout, because none of them had an
+opinion about appearance. This was found by a screenshot, which is the honest way to record it.
+
+**What was added, all of it in the kit.**
+
+| Token or component | What the reference draws |
+|---|---|
+| `NEON_STAGE_FRAME` | The glowing cyan bezel around the board |
+| `NEON_STAGE_PANEL` | A lit panel for something the player is acting on - the pre-flight, the result |
+| `NEON_HEAD_STRIP` + `NEON_HEADING` | The tinted heading bar every panel in the reference wears |
+| `NEON_INSET` | A note box one shade darker than the panel holding it |
+| `NeonHeadedPanel` | Panel with that strip, edge to edge |
+| `NeonStatStrip` | The reference's figure row, hairline-separated |
+| `neonButtonClasses("action")` | The cyan act-now gradient |
+
+**Five things about the shape of it.**
+
+- **Every one of these is ADDITIVE. `NEON_PANEL` was not touched, and that was the decision
+  rather than an omission.** The obvious response to "it looks flat" is to turn the base panel
+  up, and it is wrong: the reference lights *the things a player is looking at* and leaves
+  everything else quiet, so a screen where the quiet card also glows has no focus and reads as
+  uniformly loud. It also means **the trading lobby is byte-for-byte unaffected**, so this pass
+  cannot have changed a screen nobody reviewed.
+- **The lit frame is counted, not merely found.** One frame, on the board. A second one - on
+  the pre-flight, which is where somebody would naturally add it - looks correct in a diff and
+  destroys the only thing the frame is for. Probe 12 injects exactly that.
+- **The act-now button is a second tone rather than a change to `primary`.** `primary` is
+  violet because the component sheet says so and both lobbies' navigation already wears it; the
+  reference's cyan belongs to the single Play / Resume / Play-again control. And it is exported
+  as a **class string** (`neonButtonClasses`) rather than as a component, because that control
+  must be a real `<button>` with a handler - creating a round spends a paying player's attempt,
+  so it has to be a click and not a navigation, which is the one thing `NeonButton` refuses to
+  be.
+- **The guard is NEGATIVE, and the positive version would have been green throughout.**
+  Asserting the stage imports the kit is satisfied by a file that imports it and hand-rolls a
+  grey card beside it - which is literally the state that shipped, since `RoundResultPanel`
+  already imported kit colours for its amber panel. The rule names the shell that must *not*
+  appear: `bg-` or `border-gray-700/800/900` anywhere in the four stage files. It is scoped to
+  surfaces and borders on purpose, because grey **text** is correct and used throughout.
+- **The banner is no longer washed out to 20% under a black scrim.** Every game's header looked
+  the same shade of empty, so an operator who uploaded artwork could not see that they had. The
+  gradient still runs opaque behind the text, which is the only thing it must guarantee.
+
+7 probes added to `tools/probe-arena-layout.ps1`, taking it to 14, **all red on exactly the
+expected test**. Typecheck at the 198 baseline exactly, with none in the changed files and none
+disappearing. **Never verified by eye** - the play screen is behind sign-in and the automated
+browser has no session, so the owner is the first person who will see it.
+
+**What this does NOT close.** The reference also shows a live event ticker, a knockout
+"qualified 8/16" count, an up-next bracket and a credits balance. Each needs a data source that
+does not exist, and `ArenaContestPanel`'s header already records why inventing one is worse than
+omitting it. **Do not let a summary imply the reference is fully reproduced.**
+
+---
+
 ## 2. Provider scoping - the mistake that must not be made
 
 Six React context providers are mounted on the two trade pages today:

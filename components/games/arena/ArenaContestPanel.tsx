@@ -1,5 +1,6 @@
-import { Trophy, Ticket, Users, Timer, Target } from "lucide-react";
-import { NEON_LABEL, NEON_PANEL, accentClasses } from "@/components/neon/tokens";
+import { Trophy, Ticket, Users, Timer, Target, Info } from "lucide-react";
+import { NEON_LABEL } from "@/components/neon/tokens";
+import { NeonHeadedPanel, NeonStatStrip } from "@/components/neon/Cards";
 import type { PlayState } from "@/components/games/play-state";
 import type { GamePresentation } from "@/lib/services/games/game-presentation.service";
 import { attemptProgress, clock, money, scoreText, scoringSummary } from "./arena-facts";
@@ -46,47 +47,42 @@ export function ArenaContestPanel({ facts, state, presentation }: Props) {
   const scoring = scoringSummary(presentation.scoreType, presentation.scoreDirection);
 
   return (
-    <div className={`${NEON_PANEL} divide-y divide-[#161E36]`}>
-      <div className="px-4 py-3">
-        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-          Contest info
-        </h2>
-      </div>
+    <NeonHeadedPanel icon={Info} title="Contest info">
+      <NeonStatStrip
+        items={[
+          {
+            icon: Trophy,
+            accent: "prize",
+            label: "Prize pool",
+            value: money(facts.prizePool, facts.currencySymbol),
+          },
+          {
+            icon: Ticket,
+            accent: "entry",
+            label: "Entry",
+            value: money(facts.entryFee, facts.currencySymbol),
+          },
+          {
+            icon: Users,
+            accent: "players",
+            label: "Players",
+            value:
+              typeof facts.currentParticipants === "number"
+                ? `${facts.currentParticipants}${facts.maxParticipants ? ` / ${facts.maxParticipants}` : ""}`
+                : "—",
+          },
+          {
+            icon: Timer,
+            accent: "waiting",
+            label: "Round time",
+            // An absent round length says nothing rather than guessing. A default would be
+            // an invented deadline in front of a paying player.
+            value: roundClock ?? "—",
+          },
+        ]}
+      />
 
-      <div className="grid grid-cols-2 gap-px bg-[#161E36]">
-        <Figure
-          icon={Trophy}
-          accent="prize"
-          label="Prize pool"
-          value={money(facts.prizePool, facts.currencySymbol)}
-        />
-        <Figure
-          icon={Ticket}
-          accent="entry"
-          label="Entry"
-          value={money(facts.entryFee, facts.currencySymbol)}
-        />
-        <Figure
-          icon={Users}
-          accent="players"
-          label="Players"
-          value={
-            typeof facts.currentParticipants === "number"
-              ? `${facts.currentParticipants}${facts.maxParticipants ? ` / ${facts.maxParticipants}` : ""}`
-              : "—"
-          }
-        />
-        <Figure
-          icon={Timer}
-          accent="waiting"
-          label="Round time"
-          // An absent round length says nothing rather than guessing. A default would be an
-          // invented deadline in front of a paying player.
-          value={roundClock ?? "—"}
-        />
-      </div>
-
-      <div className="space-y-3 px-4 py-3">
+      <div className="space-y-3 border-t border-[#16203C] px-4 py-3">
         {attempt && (
           <div>
             <div className="flex items-baseline justify-between">
@@ -126,29 +122,6 @@ export function ArenaContestPanel({ facts, state, presentation }: Props) {
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-function Figure({
-  icon: Icon,
-  accent,
-  label,
-  value,
-}: {
-  icon: typeof Trophy;
-  accent: Parameters<typeof accentClasses>[0];
-  label: string;
-  value: string;
-}) {
-  const classes = accentClasses(accent);
-  return (
-    <div className="bg-[#0A0F1F] px-4 py-3">
-      <div className="flex items-center gap-1.5">
-        <Icon className={`h-3.5 w-3.5 ${classes.text}`} />
-        <span className={NEON_LABEL}>{label}</span>
-      </div>
-      <div className={`mt-1 text-lg font-bold ${classes.text}`}>{value}</div>
-    </div>
+    </NeonHeadedPanel>
   );
 }

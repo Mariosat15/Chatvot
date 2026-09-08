@@ -133,4 +133,60 @@ Invoke-Probe -Name '7 the rail narrows again' -File $ARENA `
   -To 'xl:grid-cols-[260px_minmax(0,1fr)_320px]' `
   -ExpectTest 'keeps the standings rail wide enough for the board it holds'
 
+$PREFLIGHT = 'components/games/RoundPreflight.tsx'
+$RESULT = 'components/games/RoundResultPanel.tsx'
+$FRAME = 'components/games/ProviderGameFrame.tsx'
+
+Write-Host '=== Probing the stage chrome ===' -ForegroundColor Cyan
+
+# 8. THE GRAPHICS DEFECT VERBATIM: the pre-flight back on the application's neutral shell. This
+#    is what the owner saw - the biggest panel on the screen was the only unstyled thing on it,
+#    inside an arena that had been dressed in the kit.
+Invoke-Probe -Name '8 the pre-flight reverts to the neutral shell (the real defect)' -File $PREFLIGHT `
+  -From '<div className={`space-y-4 p-6 ${NEON_STAGE_PANEL}`}>' `
+  -To '<div className="space-y-4 rounded-xl border border-gray-700 bg-gray-800/50 p-6">' `
+  -ExpectTest 'components/games/RoundPreflight.tsx wears no neutral surface'
+
+# 9. The same on the result panel. Separate probe because the guard runs per file, and a single
+#    assertion over the concatenation would let one screen cover for the other.
+Invoke-Probe -Name '9 the result panel reverts' -File $RESULT `
+  -From '<div className={`space-y-5 p-6 ${NEON_STAGE_PANEL}`}>' `
+  -To '<div className="space-y-5 rounded-xl border border-gray-700 bg-gray-800/50 p-6">' `
+  -ExpectTest 'components/games/RoundResultPanel.tsx wears no neutral surface'
+
+# 10. A note box inside a panel goes back to neutral grey. Smaller than the shell and the reason
+#     the pattern names borders as well as backgrounds: this one has no `bg-gray-800` in it.
+Invoke-Probe -Name '10 an inset note reverts' -File $PREFLIGHT `
+  -From '<div className={`flex items-start gap-2 p-3 ${NEON_INSET}`}>' `
+  -To '<div className="flex items-start gap-2 rounded-lg border border-gray-700 p-3">' `
+  -ExpectTest 'components/games/RoundPreflight.tsx wears no neutral surface'
+
+# 11. The board loses its lit frame. The count is what catches it - `NEON_STAGE_FRAME` is still
+#     imported, and an import is not a use.
+Invoke-Probe -Name '11 the board loses the lit frame' -File $FRAME `
+  -From '<div className={`relative overflow-hidden ${NEON_STAGE_FRAME}`}>' `
+  -To '<div className="relative overflow-hidden rounded-xl border border-sky-500/25">' `
+  -ExpectTest 'gives the board itself the one lit frame'
+
+# 12. A SECOND lit frame appears - here on the pre-flight, which is the natural place somebody
+#     would add one. Nothing looks wrong in the diff; the screen simply stops having a focus.
+Invoke-Probe -Name '12 a second lit frame appears' -File $PREFLIGHT `
+  -From 'NEON_STAGE_PANEL}`}>' `
+  -To 'NEON_STAGE_FRAME}`}>' `
+  -ExpectTest 'gives the board itself the one lit frame'
+
+# 13. The Play button restates the gradient rather than borrowing it. The positive half of the
+#     assertion catches this one.
+Invoke-Probe -Name '13 the Play button hand-rolls its gradient' -File $PREFLIGHT `
+  -From 'className={`w-full ${neonButtonClasses("action")}`}' `
+  -To 'className="w-full bg-gradient-to-r from-sky-500 to-cyan-400"' `
+  -ExpectTest 'borrows the act-now button rather than restating it'
+
+# 14. And the negative half: it borrows the class string AND paints over it. Probe 13 stays
+#     green against this, which is why both halves exist.
+Invoke-Probe -Name '14 it borrows the button and overrides it anyway' -File $RESULT `
+  -From 'className={`flex-1 ${neonButtonClasses("action")}`}' `
+  -To 'className={`flex-1 bg-gradient-to-r from-emerald-500 to-teal-400 ${neonButtonClasses("action")}`}' `
+  -ExpectTest 'borrows the act-now button rather than restating it'
+
 Write-Host '=== Done ===' -ForegroundColor Cyan

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft, ListOrdered } from "lucide-react";
 import { NEON_PANEL, NEON_LABEL } from "@/components/neon/tokens";
-import { NeonCountPill } from "@/components/neon/Cards";
+import { NeonCountPill, NeonHeadedPanel } from "@/components/neon/Cards";
 import { providerBanner } from "@/components/neon/banners";
 import type { GamePresentation } from "@/lib/services/games/game-presentation.service";
 import { ArenaIdentity } from "./ArenaIdentity";
@@ -76,10 +76,17 @@ export function GameArenaLayout({
           heading below carries the meaning. A plain `<img>` because an operator's banner is
           served by an API route with a database fallback - see `ArenaIdentity`.
         */}
+        {/*
+          THE SCRIM IS NAVY, NOT BLACK, and the banner is no longer dimmed to near-nothing.
+          Washing artwork out to 20% under a pure-black gradient made every game's header look
+          the same shade of empty - the operator uploads a banner and cannot see that they
+          did. The gradient still runs opaque behind the text, which is the only thing it has
+          to guarantee, and the artwork survives on the right where nothing is written.
+        */}
         <div className="pointer-events-none absolute inset-0" aria-hidden>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={banner.src} alt="" className="h-full w-full object-cover opacity-20" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#050505] via-[#050505]/85 to-transparent" />
+          <img src={banner.src} alt="" className="h-full w-full object-cover opacity-45" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#070C1A] via-[#070C1A]/90 to-[#070C1A]/30" />
         </div>
 
         <div className="relative p-5">
@@ -105,16 +112,11 @@ export function GameArenaLayout({
           facts, standings full width beneath. Desktop: standings, board, facts.
         */}
         <div className="order-2 lg:order-3 xl:order-1">
-          <div className={`${NEON_PANEL} overflow-hidden`}>
-            <div className="flex items-center justify-between gap-2 border-b border-[#161E36] px-4 py-3">
-              <div className="flex items-center gap-2">
-                <ListOrdered className="h-4 w-4 text-sky-400" />
-                <h2 className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-                  Standings
-                </h2>
-              </div>
-              <NeonCountPill>{standingsCount}</NeonCountPill>
-            </div>
+          <NeonHeadedPanel
+            icon={ListOrdered}
+            title="Standings"
+            action={<NeonCountPill>{standingsCount}</NeonCountPill>}
+          >
             <div className="max-h-[420px] overflow-y-auto p-2">{standings}</div>
             <div className="border-t border-[#161E36] px-4 py-2.5">
               <Link
@@ -124,7 +126,7 @@ export function GameArenaLayout({
                 Full leaderboard and prizes →
               </Link>
             </div>
-          </div>
+          </NeonHeadedPanel>
         </div>
 
         <div className="order-1 lg:order-1 xl:order-2">{stage}</div>

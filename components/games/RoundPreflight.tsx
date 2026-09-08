@@ -2,6 +2,8 @@
 
 import { AlertCircle, Clock, Loader2, Play, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { neonButtonClasses } from "@/components/neon/Buttons";
+import { NEON_INSET, NEON_STAGE_PANEL } from "@/components/neon/tokens";
 import { formatRemaining, useServerClock } from "@/hooks/useServerClock";
 import type { PlayState } from "./play-state";
 import { contestReservesFullRound, fullRoundCutoffMs } from "./round-window";
@@ -215,9 +217,11 @@ export function RoundPreflight({
                       : "Play";
 
   return (
-    <div className="space-y-4 rounded-xl border border-gray-700 bg-gray-800/50 p-6">
+    <div className={`space-y-4 p-6 ${NEON_STAGE_PANEL}`}>
       <div>
-        <h2 className="text-xl font-semibold text-gray-100">{gameName}</h2>
+        <h2 className="text-xl font-bold uppercase tracking-wide text-white">
+          {gameName}
+        </h2>
         <p className="mt-1 text-sm text-gray-400">{describeAttempts(state)}</p>
       </div>
 
@@ -228,7 +232,7 @@ export function RoundPreflight({
         it as an error teaches them something is broken.
       */}
       {blockedReason && (
-        <div className="flex items-start gap-2 rounded-lg border border-gray-700 bg-gray-900/60 p-3">
+        <div className={`flex items-start gap-2 p-3 ${NEON_INSET}`}>
           <Clock className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
           <p className="text-xs text-gray-300">{blockedReason}</p>
         </div>
@@ -246,7 +250,7 @@ export function RoundPreflight({
         server's clock, so the number agrees with the gate that will judge the click.
       */}
       {windowNotOpen && windowStartMs !== null && !noLongerOpen && (
-        <div className="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-900/60 p-3">
+        <div className={`flex items-center gap-2 p-3 ${NEON_INSET}`}>
           <Clock className="h-4 w-4 shrink-0 text-gray-400" />
           <p className="text-xs text-gray-300">
             Play opens in{" "}
@@ -261,7 +265,7 @@ export function RoundPreflight({
       )}
 
       {!windowNotOpen && windowEndMs !== null && !windowClosed && !noLongerOpen && (
-        <div className="flex items-start gap-2 rounded-lg border border-gray-700 bg-gray-900/60 p-3">
+        <div className={`flex items-start gap-2 p-3 ${NEON_INSET}`}>
           <Clock className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
           <div className="space-y-1">
             <p className="text-xs text-gray-300">
@@ -357,7 +361,7 @@ export function RoundPreflight({
       <Button
         onClick={onLaunch}
         disabled={launching || blocked}
-        className="w-full bg-blue-500 hover:bg-blue-600"
+        className={`w-full ${neonButtonClasses("action")}`}
       >
         {launching ? (
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -370,7 +374,7 @@ export function RoundPreflight({
       </Button>
 
       {state.rounds.length > 0 && (
-        <div className="border-t border-gray-700 pt-4">
+        <div className="border-t border-[#16203C] pt-4">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
             Your rounds
           </p>

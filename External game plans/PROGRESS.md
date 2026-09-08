@@ -679,6 +679,52 @@ Newest at the top.
 
 ---
 
+### 8 Sep 2026 - X7 / `13` s1.1h + s4.1i - THE ARENA WAS HALF DRESSED
+
+**Shipped:** two of the four faults the owner reported in one message. The standings board now
+fits the column it is given, the board is first at every width, and the three components inside
+the arena wear the same kit as the arena around them. **106 tests** in
+`__tests__/games/provider-play-ui.test.ts` (up from 91), **14 probes** in
+`tools/probe-arena-layout.ps1`, all red on exactly the expected test. Typecheck at the **198**
+baseline exactly, `check:mirrors` unaffected - none of this is mirrored.
+
+**Files touched:** `components/games/arena/GameArenaLayout.tsx`, `ArenaContestPanel.tsx`,
+`components/games/ProviderLeaderboard.tsx`, `RoundPreflight.tsx`, `ProviderGameFrame.tsx`,
+`RoundResultPanel.tsx`, and additively `components/neon/tokens.ts` + `Cards.tsx` + `Buttons.tsx`.
+
+**The layout half (s1.1h) is two faults, and the second generalises.** `ProviderLeaderboard`
+declared `min-w-[320px]` inside an `overflow-x-auto` wrapper - correct for the lobby's main
+column, where it was written, and a horizontal scrollbar in the arena's 260px rail, where **what
+fell off the right-hand edge was the score column.** And `GameArenaLayout` set `order` only at
+`xl`: **grid auto-placement follows order-modified document order**, so every narrower layout
+fell back to DOM order - standings first on a phone, pushing the board below the fold, which is
+the exact thing the comment beside it said the ordering prevented, and at `lg` the **board was
+placed in the 320px sidebar column.**
+
+**The chrome half (s4.1i) is the answer to "these graphics are basic", and it is not taste.**
+s4.1d dressed the two lobbies in the neon kit and the arena slice dressed the arena's chrome.
+The three components *inside* the arena were never touched - `RoundPreflight`,
+`ProviderGameFrame` and `RoundResultPanel` were still on `border-gray-700 bg-gray-800/50`, the
+application's neutral shell, and between them they are the whole centre column. **The biggest
+element on the screen was the only unstyled one.** Added to the kit, all additive:
+`NEON_STAGE_FRAME`, `NEON_STAGE_PANEL`, `NEON_HEAD_STRIP`, `NEON_HEADING`, `NEON_INSET`,
+`NeonHeadedPanel`, `NeonStatStrip` and a cyan `action` button tone.
+
+**Deviated from plan:** nothing planned covered either. Both came from the owner's screenshots.
+
+**Deferred:** the reference also shows a live ticker, a knockout count, an up-next bracket and a
+credits balance - each needs a data source that does not exist, recorded in `13` s4.1i and in
+`ArenaContestPanel`'s own header. **The mock is not fully reproduced and must not be summarised
+as such.**
+
+**Owner tested:** not yet. **Never verified by eye** - both screens are behind sign-in and the
+automated browser has no session.
+
+**Next chat should:** the challenges side - pick trading-or-game, then a title, then adapt the
+setup page to that title's shape (X10 / E8).
+
+---
+
 ### 8 Sep 2026 - X4a / `21` s4.1n - THE GAME MAKES A NOISE, AND MOVES
 
 **Shipped:** the second half of the owner's instruction alongside the artwork - synthesised sound

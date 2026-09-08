@@ -1,5 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
+  NEON_HEADING,
+  NEON_HEAD_STRIP,
   NEON_LABEL,
   NEON_PANEL,
   NEON_TILE_SHAPE,
@@ -165,6 +167,98 @@ export function NeonPanel({
         </div>
       )}
       {children}
+    </div>
+  );
+}
+
+/**
+ * A panel whose heading sits in its own tinted strip, edge to edge - the shape every panel in
+ * the owner's arena reference has.
+ *
+ * WHY IT IS NOT AN OPTION ON `NeonPanel`. That one pads its whole body and puts the heading
+ * inside the padding, which is right for a panel of prose. This one's strip runs to the edges
+ * and its body is frequently a divided list or a grid with no padding at all, so a `variant`
+ * prop would mean every caller also choosing whether the body is padded - two decisions where
+ * there should be one. They are two shapes, so they are two components.
+ *
+ * THE HEADING IS RENDERED HERE AND NOWHERE ELSE. Both the standings rail and the contest panel
+ * had hand-written their own strip, differing already in border colour and letter spacing,
+ * which is the "one rule, two copies" shape this codebase keeps paying for.
+ */
+export function NeonHeadedPanel({
+  icon: Icon,
+  title,
+  action,
+  children,
+  className = "",
+  bodyClassName = "",
+}: {
+  icon?: LucideIcon;
+  title: string;
+  /** A count pill, a link - anything that belongs on the heading's right. */
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  /** The shell. Pass `NEON_STAGE_PANEL` for something the player is acting on. */
+  className?: string;
+  bodyClassName?: string;
+}) {
+  return (
+    <div className={`${className || NEON_PANEL} overflow-hidden`}>
+      <div
+        className={`flex items-center justify-between gap-2 px-4 py-2.5 ${NEON_HEAD_STRIP}`}
+      >
+        <div className="flex items-center gap-2">
+          {Icon && <Icon className="h-3.5 w-3.5 text-sky-400" />}
+          <h2 className={NEON_HEADING}>{title}</h2>
+        </div>
+        {action}
+      </div>
+      <div className={bodyClassName}>{children}</div>
+    </div>
+  );
+}
+
+/**
+ * The reference's figure strip: several small figures across one row, hairline-separated.
+ *
+ * `gap-px` over a tinted background is what draws the separators, so the strip has no borders
+ * of its own and sits flush inside whatever panel holds it. **Give it items that fit** - the
+ * values are short by design (a pot, a fee, a count, a clock), and a long one truncates rather
+ * than widening the strip and pushing its neighbours off.
+ */
+export function NeonStatStrip({
+  items,
+  columns = 2,
+}: {
+  items: {
+    icon: LucideIcon;
+    accent: NeonAccent;
+    label: string;
+    /** Absent renders a dash. A zero is a real figure and renders as zero. */
+    value: React.ReactNode;
+  }[];
+  columns?: 2 | 4;
+}) {
+  return (
+    <div
+      className={`grid gap-px bg-[#16203C] ${
+        columns === 4 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2"
+      }`}
+    >
+      {items.map((item) => {
+        const classes = accentClasses(item.accent);
+        return (
+          <div key={item.label} className="bg-[#0A1122] px-4 py-3">
+            <div className="flex items-center gap-1.5">
+              <item.icon className={`h-3.5 w-3.5 shrink-0 ${classes.text}`} />
+              <span className={`truncate ${NEON_LABEL}`}>{item.label}</span>
+            </div>
+            <div className={`mt-1 truncate text-lg font-bold ${classes.text}`}>
+              {item.value}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

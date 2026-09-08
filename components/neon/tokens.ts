@@ -158,3 +158,55 @@ export const NEON_LABEL =
 /** The rounded icon tile that fronts every stat card and panel heading in the sheet. */
 export const NEON_TILE_SHAPE =
   "flex items-center justify-center rounded-lg border";
+
+/*
+ * ----------------------------------------------------------------------------------------
+ * THE LIT CHROME, added 8 September 2026 from the owner's arena reference.
+ *
+ * WHY THESE ARE ADDITIVE RATHER THAN A CHANGE TO `NEON_PANEL`. The reference is the same
+ * design language as the component sheet - deep navy, cyan hairlines - but it lights the
+ * things a player is looking AT: the board has a glowing frame, and every panel wears a
+ * tinted heading strip. `NEON_PANEL` is the quiet card that surrounds them, and it is right
+ * as it is; if the quiet card glowed too, nothing would stand out and the screen would read
+ * as uniformly loud rather than as designed. **Adding a lit variant is the change. Turning
+ * the base panel up is not.**
+ *
+ * AND THE PRACTICAL REASON THEY LIVE HERE RATHER THAN AT THE CALL SITE: the same shadow and
+ * the same border tint appear on the board frame, the stage panels and the headed panels. A
+ * shadow written out three times drifts by one hex digit and reads as a rendering fault.
+ * ----------------------------------------------------------------------------------------
+ */
+
+/**
+ * The heavy glowing frame the reference draws around the board itself.
+ *
+ * The board is the one thing on the screen the player is actually doing, so it is the one
+ * thing with a lit edge. Nothing else on the arena may use this.
+ */
+export const NEON_STAGE_FRAME =
+  "rounded-2xl border-2 border-sky-500/35 bg-[#060C1A] p-1.5 shadow-[0_0_45px_-15px_rgba(56,189,248,0.7)]";
+
+/**
+ * A panel that is part of the action rather than context - the pre-flight, the result. Lit,
+ * but a step below the board frame.
+ */
+export const NEON_STAGE_PANEL =
+  "rounded-2xl border border-sky-500/25 bg-gradient-to-b from-[#0C1730] to-[#070C1A] shadow-[0_0_35px_-18px_rgba(56,189,248,0.65)]";
+
+/** The tinted heading strip every panel in the reference wears. */
+export const NEON_HEAD_STRIP =
+  "border-b border-sky-500/20 bg-gradient-to-r from-sky-500/10 via-sky-500/[0.03] to-transparent";
+
+/** The heading text inside that strip: small, heavily tracked, cyan. */
+export const NEON_HEADING =
+  "text-[11px] font-bold uppercase tracking-[0.18em] text-sky-300";
+
+/**
+ * A note or figure box INSIDE a panel - one shade darker than whatever contains it.
+ *
+ * This exists because the game screens were still using `border-gray-700 bg-gray-900/60`,
+ * the app's neutral shell, for exactly this job. On a navy panel a neutral grey inset reads
+ * as a piece of a different website, which is what the owner was seeing.
+ */
+export const NEON_INSET =
+  "rounded-lg border border-[#16203C] bg-[#070C1A]/70";

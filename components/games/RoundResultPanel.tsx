@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { CheckCircle2, Clock3, Loader2, Trophy, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { neonButtonClasses } from "@/components/neon/Buttons";
+import { NEON_INSET, NEON_STAGE_PANEL } from "@/components/neon/tokens";
 import { humanizeMetric } from "@/lib/utils/humanize-metric";
 import type { PlayState, PlayerRoundView } from "./play-state";
 
@@ -128,7 +130,7 @@ export function RoundResultPanel({
   if (confirming) {
     const { heading, detail } = confirmingCopy(confirmReason);
     return (
-      <div className="space-y-3 rounded-xl border border-gray-700 bg-gray-800/50 p-8 text-center">
+      <div className={`space-y-3 p-8 text-center ${NEON_STAGE_PANEL}`}>
         <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-400" />
         <h2 className="text-lg font-semibold text-gray-100">{heading}</h2>
         <p className="text-sm text-gray-400">{detail}</p>
@@ -180,7 +182,7 @@ export function RoundResultPanel({
   const canPlayAgain = state.attemptsRemaining > 0;
 
   return (
-    <div className="space-y-5 rounded-xl border border-gray-700 bg-gray-800/50 p-6">
+    <div className={`space-y-5 p-6 ${NEON_STAGE_PANEL}`}>
       <div className="flex items-start gap-3">
         <Icon className={`mt-0.5 h-6 w-6 shrink-0 ${tone}`} />
         <div>
@@ -190,7 +192,7 @@ export function RoundResultPanel({
       </div>
 
       {typeof round.score === "number" && (
-        <div className="rounded-lg border border-gray-700 bg-gray-900/60 p-4">
+        <div className={`p-4 ${NEON_INSET}`}>
           <p className="text-xs uppercase tracking-wide text-gray-500">This round</p>
           <p className="mt-1 text-3xl font-bold text-gray-100">{round.score}</p>
           {/*
@@ -220,7 +222,7 @@ export function RoundResultPanel({
         nice labels per metric, is what would have broken the property above.
       */}
       {round.scoreBreakdown && Object.keys(round.scoreBreakdown).length > 0 && (
-        <div className="rounded-lg border border-gray-700 bg-gray-900/60 p-4">
+        <div className={`p-4 ${NEON_INSET}`}>
           <p className="mb-2 text-xs uppercase tracking-wide text-gray-500">
             How you played
           </p>
@@ -240,7 +242,7 @@ export function RoundResultPanel({
 
       <div className="flex flex-col gap-2 sm:flex-row">
         {canPlayAgain && (
-          <Button onClick={onPlayAgain} className="flex-1 bg-blue-500 hover:bg-blue-600">
+          <Button onClick={onPlayAgain} className={`flex-1 ${neonButtonClasses("action")}`}>
             Play another round
           </Button>
         )}

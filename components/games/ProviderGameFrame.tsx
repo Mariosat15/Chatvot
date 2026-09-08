@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Loader2, RotateCcw } from "lucide-react";
+import { NEON_STAGE_FRAME } from "@/components/neon/tokens";
 import {
   clampFrameHeight,
   frameOriginOf,
@@ -183,7 +184,13 @@ export function ProviderGameFrame({
   }
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-gray-700 bg-gray-900">
+    /*
+      THE LIT FRAME IS THE ONE ON THE BOARD. The owner's arena reference gives the playing
+      area a glowing cyan surround and everything else a quiet one, so the board is the thing
+      the eye lands on. `NEON_STAGE_FRAME` carries a small pad, which is what makes the glow
+      read as a bezel around the game rather than as an outline drawn on it.
+    */
+    <div className={`relative overflow-hidden ${NEON_STAGE_FRAME}`}>
       {/*
         Reason the overlay stops at `stalled` rather than waiting for `ready`: it is opaque and
         covers the whole frame, so a game that has rendered its own explanation underneath is
@@ -192,7 +199,10 @@ export function ProviderGameFrame({
         underneath to reveal.
       */}
       {!ready && !stalled && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-gray-900">
+        // Opaque on purpose - see the note above - and in the board's own navy rather than a
+        // neutral grey, so the loading state reads as part of the game rather than as a panel
+        // from somewhere else that has landed on top of it.
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-xl bg-[#060C1A]">
           <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
           <p className="text-sm text-gray-400">Loading {gameName}…</p>
         </div>
@@ -255,7 +265,7 @@ export function ProviderGameFrame({
         // Reason: the launch URL is single-use and short-lived, but our own contest URL is
         // still ours. No need to hand a third party the page the player came from.
         referrerPolicy="no-referrer"
-        className="w-full border-0"
+        className="w-full rounded-xl border-0 bg-[#060C1A]"
         style={{ height: `${height}px` }}
       />
     </div>

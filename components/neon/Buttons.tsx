@@ -18,12 +18,23 @@ import type { LucideIcon } from "lucide-react";
  * through the page. Same reasoning as keeping the launch out of the page's own render.
  */
 
-type NeonButtonTone = "primary" | "outline" | "quiet";
+type NeonButtonTone = "primary" | "action" | "outline" | "quiet";
 
 const TONES = new Map<NeonButtonTone, string>([
   [
     "primary",
     "border-transparent bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-900/40 hover:from-violet-500 hover:to-fuchsia-500",
+  ],
+  /*
+    THE ONE THE OWNER'S ARENA REFERENCE DRAWS, and it is a second tone rather than a change to
+    `primary` on purpose. `primary` is violet because the component sheet says so, and it is
+    what both lobbies' navigation buttons already wear; the reference's cyan belongs to the
+    single act-now control on the board - Play, Resume, Play again. Two of them on one screen
+    would defeat the point, so **there must never be more than one `action` button visible.**
+  */
+  [
+    "action",
+    "border-transparent bg-gradient-to-r from-sky-500 to-cyan-400 font-bold uppercase tracking-wide text-[#04101F] shadow-lg shadow-sky-900/50 hover:from-sky-400 hover:to-cyan-300",
   ],
   [
     "outline",
@@ -39,6 +50,20 @@ const BASE =
   "inline-flex w-full items-center justify-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-semibold transition-all";
 const DISABLED =
   "cursor-not-allowed border-[#161E36] bg-[#080C18] text-gray-500 shadow-none";
+
+/**
+ * The same tones, for a control that must be a real `<button>` with a handler.
+ *
+ * `NeonButton` above is deliberately server-safe - it takes an `href` and never an `onClick`,
+ * so both lobbies stay server components. The Play control cannot be: it POSTs, and creating a
+ * round spends a paying player's attempt, which is precisely why it must be a click and not a
+ * navigation. So the client screens keep their own `<Button>` and borrow the appearance from
+ * here. **Borrowing the string is the point** - writing the gradient out again in a game screen
+ * is how the act-now control ends up a different colour from one phase to the next.
+ */
+export function neonButtonClasses(tone: NeonButtonTone): string {
+  return TONES.get(tone) ?? "";
+}
 
 function Inner({
   icon: Icon,

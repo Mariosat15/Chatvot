@@ -1802,6 +1802,7 @@ describe("a player is told how long they have left to join", () => {
 });
 
 const ARENA_LAYOUT = "components/games/arena/GameArenaLayout.tsx";
+const ARENA_CONTEST_PANEL = "components/games/arena/ArenaContestPanel.tsx";
 
 describe("the arena puts the board first at every width", () => {
   /*
@@ -1884,5 +1885,63 @@ describe("the standings board fits the column it is given", () => {
     expect(template).toHaveLength(2);
     expect(board).not.toMatch(/grid-cols-\[auto_1fr_auto\]/);
     expect(board).not.toMatch(/\bflex-wrap\b/);
+  });
+});
+
+describe("the stage is dressed in the same kit as the frame around it", () => {
+  /*
+    THE DEFECT THIS PINS, because it is the one the owner reported as "the graphics are basic"
+    and it is not a matter of taste. The arena - the header, the standings rail, the contest
+    panel - was built on the neon kit. The three components INSIDE it were not: the pre-flight,
+    the frame and the result panel were still wearing `border-gray-700 bg-gray-800/50`, the
+    application's neutral shell, which is a flat charcoal card with a grey hairline.
+
+    So the biggest element on the screen, the one the player is actually looking at, was the
+    only unstyled thing on it. Every test in this file passed, because none of them had an
+    opinion about appearance, and a screenshot is what found it.
+
+    THE RULE IS A NEGATIVE ONE AND THAT IS DELIBERATE. Asserting the stage imports the kit is
+    trivially satisfied by a file that imports it and hand-rolls a grey card beside it - which
+    is precisely the state that shipped, since `RoundResultPanel` already imported kit colours
+    for its amber panel. Naming the shell that must NOT appear is the assertion that can fail.
+
+    IT IS SCOPED TO THE SHELL, NOT TO THE WORD "gray". Grey TEXT is correct and used
+    throughout - `text-gray-400` for secondary copy is the kit's own choice. What must not
+    appear is a neutral SURFACE or BORDER, so the pattern names those three prefixes.
+  */
+  const NEUTRAL_SURFACE = /\b(?:bg|border)-gray-(?:700|800|900)\b/g;
+
+  const STAGE = [PREFLIGHT, FRAME, RESULT, HOST];
+
+  it.each(STAGE)("%s wears no neutral surface", (file) => {
+    const found = readCode(file).match(NEUTRAL_SURFACE) ?? [];
+    expect(found).toEqual([]);
+  });
+
+  it("gives the board itself the one lit frame", () => {
+    /*
+      One frame, on the board. The reference lights the playing area and leaves everything else
+      quiet, which is what makes the board the thing the eye lands on; a second lit frame
+      anywhere on the arena defeats it, so this counts rather than merely finding.
+    */
+    const arena = [FRAME, PREFLIGHT, RESULT, ARENA_LAYOUT, ARENA_CONTEST_PANEL]
+      .map(readCode)
+      .join("\n");
+
+    expect(arena.match(/NEON_STAGE_FRAME/g) ?? []).toHaveLength(2); // the import and the use
+  });
+
+  it("borrows the act-now button rather than restating it", () => {
+    /*
+      Play, Resume and Play again are one control in three phases, and a gradient written out
+      at each site is how they end up three different colours. `neonButtonClasses` is the one
+      definition; the negative half is what stops a screen importing it and then styling the
+      button itself anyway.
+    */
+    for (const file of [PREFLIGHT, RESULT]) {
+      const code = readCode(file);
+      expect(code).toMatch(/neonButtonClasses\(["']action["']\)/);
+      expect(code).not.toMatch(/bg-gradient-to-r from-/);
+    }
   });
 });
