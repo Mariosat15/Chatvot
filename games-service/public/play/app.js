@@ -239,6 +239,18 @@ function show(name) {
 function fail(message) {
   ui.errorDetail.textContent = message;
   show("error");
+  /*
+   * Reason this announces `ready` on the FAILURE path too, which reads backwards: `ready` does
+   * not mean "the game is playable", it means "there is something on the screen, so drop your
+   * loading state". An error panel is something on the screen.
+   *
+   * Without it, every refusal `boot()` can hit - an expired launch token, a 401, the service
+   * answering 500 - rendered this panel underneath the platform's own opaque spinner and left it
+   * there for ever. The player saw an endless "Loading <game>..." and the one sentence telling
+   * them what had gone wrong was painted directly beneath it, unreachable. It also removed their
+   * only way out, because the button that leaves the round is inside this frame.
+   */
+  tellPlatform("ready");
 }
 
 function renderIntro() {

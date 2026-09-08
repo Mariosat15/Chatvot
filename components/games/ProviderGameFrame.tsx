@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AlertTriangle, Loader2, RotateCcw } from "lucide-react";
 import {
   clampFrameHeight,
   frameOriginOf,
@@ -36,6 +36,24 @@ import {
  * not ours.
  */
 
+/**
+ * How long to wait for `ready` before telling the player what is happening.
+ *
+ * WHY THE WAIT HAS TO BE BOUNDED. `ready` is the only thing that clears the loading overlay, and
+ * it can legitimately never arrive: the play surface can be refused by the provider's own
+ * `frame-ancestors` policy, served a 404 by a proxy that is not routing it, or be unreachable
+ * because the service is down. In every one of those cases the browser renders something inside
+ * the frame and fires `load`, so there is no error event to catch and nothing in our logs - the
+ * player simply watched "Loading ..." for ever, with no message, no retry, and no way out,
+ * because the button that leaves the round is inside the frame that failed.
+ *
+ * WHY 12 SECONDS. It has to clear a cold start on a slow connection, or a healthy game gets
+ * accused of being broken; and it has to be short enough that a player does not conclude the site
+ * is broken before we say anything. This is a few kilobytes of static assets behind whatever
+ * latency the provider has, so twelve seconds is generous for the working case.
+ */
+const READY_TIMEOUT_MS = 12000;
+
 interface ProviderGameFrameProps {
   launchUrl: string;
   gameName: string;
@@ -57,8 +75,42 @@ export function ProviderGameFrame({
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(MIN_FRAME_HEIGHT);
   const [ready, setReady] = useState(false);
+  const [stalled, setStalled] = useState(false);
+  // Whether the frame's document fired `load`. It does not mean the game started - a 404 page and
+  // a policy refusal both load - but it is what separates "we could not reach the game" from "the
+  // game answered and did not start", which are two different things to tell a player.
+  const [documentLoaded, setDocumentLoaded] = useState(false);
+  // Reason: remounting the iframe is what a retry IS. `servePlayPage` reads no token and consumes
+  // nothing, and the session behind it resumes rather than restarting, so reloading costs the
+  // player no attempt - which is what makes offering the button honest.
+  const [attempt, setAttempt] = useState(0);
 
   const expectedOrigin = frameOriginOf(launchUrl);
+
+  const retry = useCallback(() => {
+    setReady(false);
+    setStalled(false);
+    setDocumentLoaded(false);
+    setHeight(MIN_FRAME_HEIGHT);
+    setAttempt((n) => n + 1);
+  }, []);
+
+  useEffect(() => {
+    if (ready) return;
+    const timer = setTimeout(() => setStalled(true), READY_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [ready, attempt]);
+
+  useEffect(() => {
+    if (!stalled) return;
+    // Reason it is logged as well as shown: the player-facing copy deliberately does not name an
+    // origin or a timeout, and this is the one line that lets support tell a routing fault apart
+    // from a game that crashed on boot.
+    console.error(
+      `❌ The game frame at ${expectedOrigin} did not report ready within ${READY_TIMEOUT_MS}ms; ` +
+        `its document ${documentLoaded ? "loaded but the game did not start" : "never loaded"}.`,
+    );
+  }, [stalled, documentLoaded, expectedOrigin]);
 
   useEffect(() => {
     if (!expectedOrigin) return;
@@ -132,16 +184,70 @@ export function ProviderGameFrame({
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-gray-700 bg-gray-900">
-      {!ready && (
+      {/*
+        Reason the overlay stops at `stalled` rather than waiting for `ready`: it is opaque and
+        covers the whole frame, so a game that has rendered its own explanation underneath is
+        hidden by it. Standing down reveals that explanation, which is more useful than anything
+        this component could say, and the notice below covers the case where there is nothing
+        underneath to reveal.
+      */}
+      {!ready && !stalled && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-gray-900">
           <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
           <p className="text-sm text-gray-400">Loading {gameName}…</p>
         </div>
       )}
 
+      {!ready && stalled && (
+        <div className="border-b border-amber-500/30 bg-amber-500/10 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-amber-200">
+                {gameName} is taking longer than expected to start
+              </p>
+              <p className="text-xs text-amber-100/80">
+                {documentLoaded
+                  ? "The game opened but has not started. If the panel below stays blank, it is unavailable rather than slow."
+                  : "The game could not be reached, which is usually a connection problem."}
+              </p>
+              {/*
+                Accurate rather than reassuring. The attempt was spent when the round was created,
+                so leaving does not hand it back - the round stays open and the result is settled
+                by the contest's unresolved-round policy. Telling the player they can leave freely
+                would be the one thing here that is untrue.
+              */}
+              <p className="text-xs text-amber-100/60">
+                Your attempt is already open. Leaving keeps the round open and its result will be
+                confirmed for you.
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={retry}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/20 px-3 py-1.5 text-xs font-semibold text-amber-100 transition-colors hover:bg-amber-500/30"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Try again
+                </button>
+                <button
+                  type="button"
+                  onClick={onExit}
+                  className="rounded-lg border border-amber-500/30 px-3 py-1.5 text-xs font-semibold text-amber-100/80 transition-colors hover:bg-amber-500/10"
+                >
+                  Leave the game
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <iframe
+        key={attempt}
         ref={frameRef}
         src={launchUrl}
+        onLoad={() => setDocumentLoaded(true)}
         title={gameName}
         // See the header for why `allow-top-navigation` and `allow-popups` are absent.
         sandbox="allow-scripts allow-same-origin allow-forms"

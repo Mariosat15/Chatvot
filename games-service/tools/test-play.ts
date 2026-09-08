@@ -252,6 +252,60 @@ async function main(): Promise<number> {
     );
   });
 
+  await test("a failure inside the game still tells the platform to stop loading", async () => {
+    /*
+     * THE OWNER'S REPORT, AND THE HALF OF IT THAT LIVED HERE: starting a round showed
+     * "Loading Circuit Sprint..." for ever.
+     *
+     * `ready` does not mean "the game is playable" - it means "there is something on the screen,
+     * so drop your loading state", and the platform's overlay is OPAQUE and covers the whole
+     * frame. So every refusal `boot()` can hit - an expired launch token, a 401, this service
+     * answering 500 - used to render the error panel directly underneath that overlay and leave
+     * it there. The player saw a spinner, the sentence explaining what had happened was
+     * unreachable, and so was the button that leaves the round, because it is in here too.
+     *
+     * Asserted inside `fail`'s own body rather than anywhere in the file, because the happy path
+     * announces `ready` as well and a file-wide match is green on exactly the bug. Comments are
+     * stripped first: this one discusses `ready` at length, and a test that reads prose passes a
+     * broken file that merely talks about the right thing.
+     */
+    const script = await fetchRaw("/play/app.js");
+    assert.equal(script.status, 200);
+
+    const code = script.text
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+    const start = code.indexOf("function fail(");
+    assert.ok(start > -1, "fail() was renamed or removed");
+    const body = code.slice(start, code.indexOf("\n}", start));
+
+    assert.match(
+      body,
+      /tellPlatform\("ready"\)/,
+      "fail() renders an error panel without telling the platform to drop its loading overlay",
+    );
+    // And it must paint the panel before saying so, or the platform stands its overlay down over
+    // a frame that is still showing the previous screen.
+    const panel = body.indexOf('show("error")');
+    const announce = body.indexOf('tellPlatform("ready")');
+    assert.ok(panel < announce, "fail() announces ready before it has anything on the screen");
+
+    /*
+     * AND NOTHING MAY RETURN IN BETWEEN, which is the assertion this test was missing.
+     *
+     * The first version checked only that the call was present and in the right order, and a
+     * probe inserting `return;` straight after the panel stayed GREEN - the call is still there,
+     * still after `show`, and now unreachable. That is the exact shape of the original defect,
+     * so the test was weak rather than the claim being wrong. Text cannot see reachability in
+     * general; it can see the one form that produces it here.
+     */
+    assert.ok(
+      !/\breturn\b/.test(body.slice(panel, announce)),
+      "fail() returns before it announces ready, so the panel stays hidden behind the overlay",
+    );
+  });
+
   await test("an unknown asset is JSON, not an HTML error page", async () => {
     // Section 14's rule reaches here too. An HTML body from a path under `/play` would be the one
     // response the platform cannot read, and the framework's default for an unknown route is

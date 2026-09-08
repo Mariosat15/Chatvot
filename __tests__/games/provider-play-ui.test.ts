@@ -197,6 +197,104 @@ describe("the frame is hosted under supervision", () => {
   });
 });
 
+/**
+ * THE OWNER'S REPORT: starting a round showed "Loading Circuit Sprint..." and never stopped.
+ *
+ * Two independent defects produce that one symptom, and neither fix covers the other.
+ *
+ *   - The game rendered its own error panel and did not announce `ready`, so the platform's
+ *     OPAQUE overlay stayed on top of the explanation for ever. Fixed in the service's
+ *     `public/play/app.js` and pinned by its own `test-play.ts`.
+ *   - The platform waited for `ready` with no bound at all. A frame refused by a
+ *     `frame-ancestors` policy, 404'd by a proxy that is not routing `/play`, or served by a
+ *     service that is down renders something and fires `load`, so there is no error event to
+ *     catch - the wait simply never ended, nothing was logged, and the player had no way out,
+ *     because the button that leaves a round is inside the frame that failed.
+ */
+describe("the wait for a frame that never starts is bounded", () => {
+  it("stands the loading overlay down on a timer, not only on ready", () => {
+    const code = readCode(FRAME);
+
+    // The timer exists and is what sets the flag. Asserted as the call with its argument, since
+    // the constant's name alone appears in its own declaration.
+    expect(code).toMatch(/setTimeout\(\s*\(\)\s*=>\s*setStalled\(true\)\s*,\s*READY_TIMEOUT_MS\s*\)/);
+
+    // And it is cleared, or a frame that reports ready normally still flips to the notice a few
+    // seconds later - a working game accused of being broken.
+    expect(code).toMatch(/return\s*\(\)\s*=>\s*clearTimeout\(timer\)/);
+  });
+
+  it("shows the spinner and the notice on complementary conditions", () => {
+    const code = readCode(FRAME);
+
+    /*
+      The two must be exact complements of each other over `stalled`, and the reason is the whole
+      point of the fix rather than a tidiness argument: the overlay is opaque and covers the
+      frame, so leaving it up alongside the notice would keep hiding whatever the game rendered
+      underneath - which is the more useful of the two messages, because it is the game's own.
+
+      Asserted as the rendered conditions, and BOTH of them, because a version that adds the
+      notice while leaving `!ready` on the overlay reviews as correct and reproduces the bug.
+    */
+    expect(code).toMatch(/\{!ready\s*&&\s*!stalled\s*&&\s*\(/);
+    expect(code).toMatch(/\{!ready\s*&&\s*stalled\s*&&\s*\(/);
+
+    // The overlay is the one that is absolutely positioned over the frame. If that ever moves to
+    // the notice, the notice inherits the covering behaviour and the assertions above stop
+    // meaning anything.
+    const overlay = code.search(/\{!ready\s*&&\s*!stalled\s*&&\s*\(/);
+    const notice = code.search(/\{!ready\s*&&\s*stalled\s*&&\s*\(/);
+    expect(code.slice(overlay, notice)).toMatch(/absolute inset-0/);
+  });
+
+  it("tells a game that could not be reached apart from one that did not start", () => {
+    const code = readCode(FRAME);
+
+    /*
+      `load` fires for a 404 page and for a policy refusal as readily as for the real thing, so
+      it cannot mean "the game started". What it does separate is whether the browser got a
+      document at all, and those are two different things to tell a player: one is a connection
+      problem they might retry out of, the other is a game that is unavailable.
+
+      Matched as the branch on the flag rather than the flag's name, which also appears in its
+      own declaration and in the `onLoad` handler that sets it.
+    */
+    expect(code).toMatch(/onLoad=\{\(\)\s*=>\s*setDocumentLoaded\(true\)\}/);
+    expect(code).toMatch(/\{documentLoaded\s*\n?\s*\?/);
+  });
+
+  it("offers a retry that remounts the frame, and an exit that is the real one", () => {
+    const code = readCode(FRAME);
+
+    /*
+      The retry works by changing the iframe's `key`, which remounts it and re-requests the launch
+      URL. That is only an honest button because `servePlayPage` reads no token and consumes
+      nothing, and the session behind it resumes - so a retry costs the player no attempt.
+    */
+    expect(code).toMatch(/setAttempt\(\(n\)\s*=>\s*n\s*\+\s*1\)/);
+    expect(code).toMatch(/key=\{attempt\}/);
+
+    // The exit goes through the host's own handler, so leaving here does exactly what leaving
+    // from inside the game does: the round stays open and the result is confirmed by polling.
+    // A local "go back" would strand the round with the player believing they had left it.
+    expect(code).toMatch(/onClick=\{onExit\}/);
+  });
+
+  it("logs the diagnosis it deliberately does not show the player", () => {
+    const code = readCode(FRAME);
+
+    // The copy names neither the origin nor the timeout, on purpose - neither means anything to
+    // a player. This line is what lets support tell a routing fault from a game that crashed on
+    // boot, and without it the whole class of failure is still invisible to us.
+    const log = code.search(/console\.error\(/);
+    expect(log).toBeGreaterThan(-1);
+    const logged = code.slice(log, log + 400);
+    expect(logged).toMatch(/expectedOrigin/);
+    expect(logged).toMatch(/READY_TIMEOUT_MS/);
+    expect(logged).toMatch(/documentLoaded/);
+  });
+});
+
 describe("a provider contest is never sent to the trading workspace", () => {
   it("the trading page redirects a provider contest to the play route", () => {
     const code = readCode(TRADE_PAGE);

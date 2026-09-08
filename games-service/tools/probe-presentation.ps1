@@ -18,6 +18,7 @@ $SuitePlayRoutes = 'tools/test-play.ts'
 $SuiteCatalogue = 'tools/test-api.ts'
 
 $srcPresentation = 'public/play/presentation.js'
+$srcClient = 'public/play/app.js'
 $srcState = 'src/rounds/play.ts'
 $srcTitles = 'src/games/titles.ts'
 $srcPage = 'src/http/play-page.ts'
@@ -222,6 +223,27 @@ $results += Invoke-Probe -Name 'the page hard-codes a rule again' `
   -Find '            <ul id="intro-rules" class="rules"></ul>' `
   -Replace '            <ul id="intro-rules" class="rules"><li>Paths cannot cross each other or themselves.</li></ul>' `
   -ExpectRed 'the page has no rules of its own to disagree with the catalogue'
+
+Write-Host ""
+Write-Host "The failure the platform could not see" -ForegroundColor Cyan
+
+# THE THIRD ORIGINAL DEFECT, and the one the owner actually hit: starting a round showed
+# "Loading Circuit Sprint..." for ever.
+#
+# `fail()` rendered the error panel and said nothing, so the platform's OPAQUE overlay stayed on
+# top of it. Every refusal `boot()` can reach - an expired launch token, a 401, a 500 from this
+# service - looked identical from the player's seat: an endless spinner, with the sentence
+# explaining it painted directly underneath and the only way out of the round in here too.
+#
+# Restored as an early return rather than by deleting the call, because `tellPlatform("ready")`
+# appears twice in this file and the second one is the happy path. A probe that removed the wrong
+# one would report on a guard nobody wrote.
+$results += Invoke-Probe -Name 'an error panel stops telling the platform to drop its overlay' `
+  -Suite $SuitePlayRoutes -File $srcClient `
+  -Find '  show("error");' `
+  -Replace '  show("error");
+  return;' `
+  -ExpectRed 'a failure inside the game still tells the platform to stop loading'
 
 Write-Host ""
 Write-Host "The module graph the page cannot describe" -ForegroundColor Cyan
