@@ -780,6 +780,67 @@ because the change is *in* the build. After that rebuild the class of fault is g
 
 ---
 
+### 4.1j The game had no way to say why it had not started - 8 September 2026
+
+**The owner reopened it a third time and reported the same thing: an endless spinner.** The
+console had the answer, `/play/presentation.js` 404, and the product had nothing at all. Two
+fixes had already addressed the *cause* on our side, and the third report is what makes the point
+worth writing down: **every fix so far tried to prevent the fault, and none of them made it
+audible.** So the owner was reduced to reading a browser console and forwarding it, and the
+conversation about it kept turning into an argument about which machine was stale - which is what
+happens when the only witness is a log nobody in the product can see.
+
+**A missing module is a total failure, and that is why it looks like nothing.** `app.js` imports
+`board.js` and `presentation.js`, and one 404 anywhere in that graph means the browser abandons
+the whole of it: the importer does not evaluate either, so not one line of the game runs. There
+is nothing on screen but the loading section that ships in the markup, nothing in any server log,
+and no `ready` message - so the platform's overlay, which is opaque, stays in front of a page
+that could have explained itself. **The player's only affordance is Leave**, which is why the
+confirming-state defect in `13` s1.1g arrived from the same report.
+
+**The fix is a classic script in front of the module graph**, and it is deliberately the only
+script on the page that is not a module: a classic script cannot be taken down by a module that
+404s, so it is still running in the one situation the graph is not. If `window.__circuitLoaded` -
+set as the first statement of `app.js` - is still unset after 8 seconds, it names the failing
+file, reveals the error panel, gives the retry button a handler, and sends `ready`.
+
+| Decision | Why the alternative is worse |
+|---|---|
+| It keys on the module having **evaluated**, not on a screen being visible | A round that is merely slow to fetch is the platform's 12-second panel to report. Keying on "nothing is on screen" makes this fire for a slow network and name a file that loaded perfectly |
+| The flag is the **first statement after the imports**, at module scope | Further down it starts meaning "boot got that far", which is a weaker claim: an unset flag would then no longer distinguish a 404 from a slow request, and those need different messages. A test pins it to column zero, which is how it asserts "top level" without parsing |
+| **It sends `ready`** | The load-bearing part. Without it the panel is painted underneath the platform's opaque overlay, so the player reads nothing and cannot reach the Leave button, which lives inside this frame. A watchdog whose message nobody can see is worse than none, because it looks fixed |
+| **8 seconds, inside the platform's 12** | If it were the longer of the two the player would get the vaguer message and this would be dead code that still reads correctly. The test compares against 12000 as a number, because this service shares no code with the platform |
+| The retry button is **given a handler here** | Its real one is in the module that never ran, so it would be a control that does nothing. Reloading is also the correct action: a live round resumes rather than starting a second one |
+| The **404 is now `no-store`** | The 200 path uses `no-cache`, which permits storing for revalidation. A 404 here is always a deployment fault rather than a fact about the file, and a cached one keeps the game broken after the fix has shipped - indistinguishable from the fix not working, which sends whoever is debugging it back to a server that is now correct |
+
+**The defect this found was found by LOOKING, and no test would have caught it.** The first
+version named the file from the `error` event's target. Served with `presentation.js` deliberately
+404ing, the panel said **`app.js`** - a file that had loaded perfectly - because the event fires
+on the `<script>` element that *started* the graph, and a nested module has no element of its own.
+**Naming the wrong file is worse than naming none**, since it points whoever investigates at
+correct code. The failing request *is* recorded in
+`performance.getEntriesByType("resource")`, where Chromium exposes `responseStatus`, so the name
+now comes from there, filtered to `>= 400`. Safari does not implement `responseStatus`, which is
+why an unnamed message is a supported outcome rather than a bug - and why the error listener stays,
+in the **capture phase**, since resource errors do not bubble: it no longer supplies a name, only
+the fact that something failed, which picks the wording.
+
+**Verified by eye in a browser, in both directions**, which is the only way either half could be
+believed: with `presentation.js` refused, the panel names `presentation.js`; with every module
+served and the round state refused, the game's own error message renders and **survives past 8
+seconds**, proving the flag suppresses the watchdog rather than overwriting a real diagnosis.
+
+**216 tests** (up from 213), `tools/probe-boot-watchdog.ps1`, **8 probes**, all red on exactly
+the expected test. Probe 8 is the one worth keeping: it reinjects the wrong-filename defect by
+relaxing the status filter, which is the mistake a reader would make while "simplifying" this.
+
+**One structural-test trap, for the fourth time in this codebase: the guard read its own prose.**
+Counting `<script>` in the page found **two**, because the watchdog's comment explains why the
+error event names the wrong file and to do that it writes the word. It failed on correct code.
+Anchored to a line of its own instead.
+
+---
+
 ## 5. What this does NOT prove
 
 Stating this matters, because a green harness invites the conclusion that X4 is a formality.

@@ -42,6 +42,17 @@ import {
   HEIGHT_REPORT_THRESHOLD_PX,
 } from "./presentation.js";
 
+/*
+ * "The code arrived and started running." Read by the boot watchdog in `index.html`, which shows
+ * a named error and releases the platform's overlay if this is still unset after 8 seconds.
+ *
+ * It is the FIRST statement after the imports on purpose. A module graph with one missing file
+ * does not evaluate at all, so an unset flag is the only observable difference between "a file
+ * 404ed" and "the round is slow" - and those two need different messages. Move it further down
+ * and it starts meaning "boot got that far", which is a different claim and a weaker one.
+ */
+window.__circuitLoaded = true;
+
 const REFUSAL_HOLD_MS = 2600;
 
 /**

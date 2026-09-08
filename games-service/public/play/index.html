@@ -154,6 +154,123 @@
       </section>
     </main>
 
+    <!--
+      A CLASSIC SCRIPT IN FRONT OF THE MODULE, AND WHY IT IS NOT BELT-AND-BRACES.
+
+      Everything below this comment is one module graph: `app.js` imports `board.js` and
+      `presentation.js`. If any single file in that graph fails to arrive, the browser abandons
+      the WHOLE graph - the importer does not evaluate either - so not one line of the game runs.
+      There is then nothing on the screen but the loading section above, nothing in any server
+      log, and no message to the platform, which sits behind its own opaque overlay waiting for a
+      `ready` that can never come. That is exactly what a player reported on 8 September 2026,
+      and the reason it was diagnosed from a browser console rather than from the product is that
+      the product had no way to say it.
+
+      This script is a classic one and it is deliberately the only script on the page that is:
+      a classic script cannot be taken down by a module that 404s, so it is still running in the
+      one situation the module graph is not. It watches for a boot that never happens, names the
+      file if the browser told us which one, and - the load-bearing part - sends `ready` so the
+      platform drops its overlay and the player can actually read the message and leave.
+
+      IT MUST FIRE BEFORE THE PLATFORM'S OWN TIMEOUT (`READY_TIMEOUT_MS`, 12s in
+      `components/games/ProviderGameFrame.tsx`). The platform's panel is the honest fallback for
+      a frame that never even loaded its document; this one can say more, because it is inside
+      the document. If this deadline were the longer of the two, the player would get the vaguer
+      message and this would be dead code that still looked correct.
+    -->
+    <script>
+      (function () {
+        var BOOT_DEADLINE_MS = 8000;
+
+        /*
+         * WHY THE FAILING FILE IS FOUND IN THE RESOURCE TIMELINE AND NOT ON THE ERROR EVENT.
+         *
+         * Verified in a browser on 8 September 2026, with `presentation.js` deliberately 404ing:
+         * the `error` event fires on the `<script>` element that STARTED the graph, so its
+         * `src` is `app.js` - a file that loaded perfectly. Naming it told the player, and
+         * anybody they reported it to, to go and look at the wrong file. A nested module has no
+         * element of its own, so there is nothing else on the event to read.
+         *
+         * `performance.getEntriesByType("resource")` records the nested request, and Chromium
+         * exposes `responseStatus` on it, so the actual 404 can be named exactly. Safari does not
+         * implement `responseStatus`, which is why an unnamed message is a supported outcome
+         * rather than a bug - and why the error listener stays: it still tells us a resource
+         * failed, which picks the wording, even where the status is unavailable.
+         *
+         * The listener must be in the CAPTURE phase. Resource errors do not bubble, so a listener
+         * on `window` without the `true` never sees them at all.
+         */
+        var resourceFailed = false;
+        window.addEventListener(
+          "error",
+          function (event) {
+            var target = event.target;
+            if (target && target !== window && (target.src || target.href)) {
+              resourceFailed = true;
+            }
+          },
+          true,
+        );
+
+        function failedResourceName() {
+          if (!window.performance || !window.performance.getEntriesByType) return "";
+          var entries = window.performance.getEntriesByType("resource");
+          for (var i = entries.length - 1; i >= 0; i -= 1) {
+            if (typeof entries[i].responseStatus === "number" && entries[i].responseStatus >= 400) {
+              return String(entries[i].name).split("?")[0].split("/").pop();
+            }
+          }
+          return "";
+        }
+
+        window.setTimeout(function () {
+          // Set at the top of `app.js`, so it means "the code arrived and began running" rather
+          // than "the game is playable". A round that is merely slow to fetch is the platform's
+          // 12-second panel to report, not ours.
+          if (window.__circuitLoaded) return;
+
+          var name = failedResourceName();
+
+          var detail = document.getElementById("error-detail");
+          if (detail) {
+            detail.textContent =
+              (name
+                ? "The game could not load one of its files (" + name + ")."
+                : resourceFailed
+                  ? "The game could not load one of its files."
+                  : "The game's code did not finish loading.") +
+              " Your attempt is already open, so reloading does not cost another one. If it" +
+              " keeps failing, leave the round and its result will be resolved for you.";
+          }
+
+          var screens = document.querySelectorAll(".screen");
+          for (var i = 0; i < screens.length; i += 1) screens[i].hidden = true;
+          var error = document.getElementById("screen-error");
+          if (error) error.hidden = false;
+
+          // The retry button's real handler lives in `app.js`, which by definition never ran, so
+          // it would be a control that does nothing. Reloading is the correct action here anyway:
+          // a live round resumes rather than starting a second one.
+          var retry = document.getElementById("retry");
+          if (retry) {
+            retry.onclick = function () {
+              window.location.reload();
+            };
+          }
+
+          /*
+           * `"*"` as the target origin, matching `tellPlatform` in `app.js`. This message carries
+           * no secret - it is the single word `ready` - and the platform verifies the SOURCE
+           * window and the origin at its end, which is the check that matters.
+           */
+          try {
+            window.parent.postMessage({ type: "ready" }, "*");
+          } catch (ignored) {
+            /* No parent, or a parent we may not talk to. The panel above is still on screen. */
+          }
+        }, BOOT_DEADLINE_MS);
+      })();
+    </script>
     <script type="module" src="/play/app.js"></script>
   </body>
 </html>

@@ -256,6 +256,163 @@ async function main(): Promise<number> {
   });
 
   /*
+   * The boot watchdog, which exists because the test above and the audit below BOTH pass while a
+   * player watches a spinner.
+   *
+   * The import walk proves the files agree with the allowlist in this checkout. The audit proves
+   * the running deployment's two halves agree. Neither can promise that every layer between the
+   * browser and this service - a proxy, a CDN, a cache holding a 404 from before the fix - hands
+   * the file over. And the failure is total rather than partial: one missing file in a module
+   * graph means the importer does not evaluate either, so nothing runs, nothing is logged, and no
+   * `ready` is sent, leaving the platform's opaque overlay in front of a page that could have
+   * explained itself.
+   *
+   * So the last line of defence does not try to prevent the fault - it makes it SAY so.
+   */
+  await test("a module that never arrives names itself instead of spinning for ever", async () => {
+    const page = await fetchRaw("/play");
+    assert.equal(page.status, 200);
+
+    const moduleAt = page.text.indexOf('<script type="module"');
+    assert.ok(moduleAt > 0, "the page does not load its module at all");
+
+    /*
+     * Position, not presence. A watchdog placed AFTER the module tag still runs - scripts are
+     * parsed in order and a module is deferred - but the whole point is that it cannot be taken
+     * down by the graph it is watching, and a reader who finds it below the module will
+     * reasonably assume the opposite. Asserting the order keeps the file readable as the thing
+     * it is.
+     */
+    /*
+     * Anchored to a line of its own rather than matched anywhere in the text. The watchdog's own
+     * comment explains why the error event names the wrong file, and to do that it writes the
+     * words `<script>` - so a bare match counts two tags and fails on correct code. The same trap
+     * as every structural test in this codebase that reads prose as if it were code.
+     */
+    const classic = [...page.text.matchAll(/^[ \t]*<script>[ \t]*$/gm)];
+    assert.equal(classic.length, 1, "expected exactly one classic script - the boot watchdog");
+    assert.ok(
+      (classic[0].index ?? Number.MAX_SAFE_INTEGER) < moduleAt,
+      "the watchdog is below the module it watches",
+    );
+
+    const watchdog = page.text.slice(classic[0].index ?? 0, moduleAt);
+
+    /*
+     * It must key on the module having EVALUATED, not on a screen being visible. A round that is
+     * merely slow to fetch is the platform's 12-second panel to report; this one is specifically
+     * for code that never arrived, and the two need different messages.
+     */
+    assert.match(
+      watchdog,
+      /window\.__circuitLoaded/,
+      "the watchdog does not check whether the code ever loaded",
+    );
+
+    /*
+     * THE LOAD-BEARING ASSERTION. Without `ready` the panel is rendered underneath the
+     * platform's overlay, which is opaque - so the player reads nothing, and the button that
+     * leaves the round is unreachable because it lives inside this frame. A watchdog that shows
+     * a message nobody can see is worse than none, because it looks fixed.
+     */
+    assert.match(
+      watchdog,
+      /postMessage\(\s*\{\s*type:\s*"ready"\s*\}/,
+      "the watchdog never releases the platform's overlay",
+    );
+
+    // Resource errors do not bubble, so a listener without the capture flag never sees them and
+    // the wording falls back to the vaguest of the three. The `true` is the whole difference.
+    assert.match(
+      watchdog,
+      /addEventListener\(\s*"error",[\s\S]*?true,?\s*\)/,
+      "the error listener is not in the capture phase, so it cannot see a failed module",
+    );
+
+    /*
+     * THE FAILING FILE MUST BE READ FROM THE RESOURCE TIMELINE, NOT FROM THE ERROR EVENT.
+     *
+     * Proven in a browser: the `error` event fires on the `<script>` element that started the
+     * graph, so its `src` is `app.js` even when the file that 404ed is `presentation.js`. Naming
+     * the event's target is worse than naming nothing, because it points whoever investigates at
+     * a file that loaded correctly. A nested module has no element, so the timeline is the only
+     * place its request is recorded.
+     */
+    assert.match(
+      watchdog,
+      /getEntriesByType\(\s*"resource"\s*\)/,
+      "the watchdog does not consult the resource timeline, so it cannot name a nested module",
+    );
+    assert.match(
+      watchdog,
+      /responseStatus\s*>=\s*400/,
+      "the watchdog does not filter the timeline by status, so it would name a file that loaded",
+    );
+    // The negative half, and the one that fails if somebody "simplifies" this back: the element's
+    // URL must not reach the message. The listener may only record THAT something failed.
+    assert.ok(
+      !/(src|href)\)\s*\)?\s*;?\s*\n?\s*(failed|urls|names)\.push/.test(watchdog) &&
+        !/textContent[\s\S]{0,400}target\.(src|href)/.test(watchdog),
+      "the failing element's own URL is used in the message, which names the graph entry",
+    );
+
+    // It has to fire BEFORE the platform's own timeout, or the player gets the vaguer message
+    // and this is dead code that still reads correctly. Compared against the platform's constant
+    // as a number rather than importing it: this service shares no code with the platform.
+    const deadline = watchdog.match(/BOOT_DEADLINE_MS\s*=\s*(\d+)/);
+    assert.ok(deadline, "the watchdog has no deadline");
+    const ms = Number(deadline![1]);
+    assert.ok(ms > 0, "a deadline of zero fires before the module has any chance to load");
+    assert.ok(
+      ms < 12000,
+      `the watchdog waits ${ms}ms, at or beyond the platform's 12000ms - it can never be the one that speaks`,
+    );
+
+    // The panel is useless if the loading section is still on top of it, and the retry button's
+    // real handler is in the module that never ran - so it must be given one here or it is a
+    // control that does nothing.
+    assert.match(watchdog, /screen-error/, "the watchdog does not reveal the error panel");
+    assert.match(watchdog, /hidden = true/, "the watchdog does not hide the loading panel");
+    assert.match(watchdog, /location\.reload/, "the retry button would do nothing");
+  });
+
+  await test("app.js records that it loaded before it does anything else", async () => {
+    const app = await fetchRaw("/play/app.js");
+    assert.equal(app.status, 200);
+
+    /*
+     * No leading whitespace, which is how this asserts "module top level" without parsing: a
+     * flag set inside a function or a branch would be indented, and would then mean "boot got
+     * that far" rather than "the code arrived" - a weaker claim that reports a slow round as a
+     * missing file.
+     */
+    const flags = [...app.text.matchAll(/\nwindow\.__circuitLoaded = true;/g)];
+    assert.equal(flags.length, 1, "expected exactly one top-level boot flag in app.js");
+
+    const lastImport = app.text.lastIndexOf('from "./');
+    assert.ok(
+      (flags[0].index ?? 0) > lastImport,
+      "the flag sits above an import, so it is not a statement in the module body",
+    );
+  });
+
+  await test("a refused asset is never remembered by a cache", async () => {
+    /*
+     * The 200 path uses `no-cache`, which permits storing for revalidation. A 404 here is always
+     * a deployment fault rather than a fact about the file, so a stored one keeps the game broken
+     * after the fix has shipped - and that is indistinguishable from the fix not working, which
+     * sends whoever is debugging it back to a server that is now correct.
+     */
+    const missing = await fetchRaw("/play/definitely-not-an-asset.js");
+    assert.equal(missing.status, 404);
+    assert.equal(
+      missing.headers.get("cache-control"),
+      "no-store",
+      "a refused asset may be cached, so its 404 can outlive its cause",
+    );
+  });
+
+  /*
    * The boot audit, which exists because the test above CANNOT catch the failure that actually
    * reached players.
    *

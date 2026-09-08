@@ -303,6 +303,16 @@ export function servePlayAsset(req: Request, res: Response): void {
 
   const asset = ASSETS.get(String(req.params.asset));
   if (!asset) {
+    /*
+     * `no-store` on the REFUSAL, where the 200 path uses `no-cache`.
+     *
+     * Reason the two differ: a 404 here is always a deployment fault rather than a fact about
+     * the file, and a cached one outlives its cause. A browser or a proxy that remembers this
+     * answer keeps the game broken after the fix has shipped, which is indistinguishable from
+     * the fix not working - and it sends whoever is debugging it back to the server, which is
+     * now correct. `no-cache` would still permit storing it for revalidation; this does not.
+     */
+    res.setHeader("Cache-Control", "no-store");
     sendError(res, 404, "NOT_FOUND", "No such asset.");
     return;
   }

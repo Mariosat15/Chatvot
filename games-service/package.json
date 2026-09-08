@@ -27,7 +27,8 @@
     "probe:board": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/probe-board.ps1",
     "probe:presentation": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/probe-presentation.ps1",
     "probe:deploy-drift": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/probe-deploy-drift.ps1",
-    "probe:play-assets": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/probe-play-assets.ps1"
+    "probe:play-assets": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/probe-play-assets.ps1",
+    "probe:boot-watchdog": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/probe-boot-watchdog.ps1"
   },
   "dependencies": {
     "cors": "^2.8.5",

@@ -289,6 +289,7 @@ npm run probe:board          # the same, for the browser module
 npm run probe:presentation   # the same, for the play surface's sizing and wording
 npm run probe:deploy-drift   # the same, for the boot audit and the sweeper's failure log
 npm run probe:play-assets    # the same, for the disk-derived asset set - probe 1 reinjects R52
+npm run probe:boot-watchdog  # the same, for the watchdog that names a module which never arrived
 ```
 
 > **A new front-end file no longer needs a build**, and that is deliberate. Until 8 September 2026
@@ -302,10 +303,20 @@ npm run probe:play-assets    # the same, for the disk-derived asset set - probe 
 > nothing recognises. **Still build when you change `src/`** - `pm2 deploy` does, a hand-rolled pull
 > does not.
 
-`npm test` runs **213 tests**: 15 config, 42 engine, 28 scoring, 41 API, 52 play and delivery,
-11 board client, 24 presentation. (Any figure of 209 predates the directory-derived asset set, 204
-predates the deploy-drift audit, 167 predates the presentation suite, and 152 predates the config
-suite; all four are stale.)
+> **And the surface now says so itself, whoever the 404 came from.** Removing the coupling fixes
+> the cause we found; it cannot promise that every layer between a player's browser and this
+> service - a proxy, a CDN, a cache still holding a 404 from before a fix - hands the file over.
+> So a **classic script in front of the module graph** watches for a boot that never happens,
+> names the failing file from the resource timeline, and sends `ready` so the platform drops its
+> opaque overlay and the player can read the message and leave. It is the only script on the page
+> that is not a module, which is the whole point: a classic script cannot be taken down by a
+> module that 404s. It fires at 8 seconds, inside the platform's own 12-second timeout, or the
+> platform speaks first and this is dead code that still reads correctly.
+
+`npm test` runs **216 tests**: 15 config, 42 engine, 28 scoring, 41 API, 55 play and delivery,
+11 board client, 24 presentation. (Any figure of 213 predates the boot watchdog, 209 predates the
+directory-derived asset set, 204 predates the deploy-drift audit, 167 predates the presentation
+suite, and 152 predates the config suite; all five are stale.)
 
 **Every one of them runs in-process against an in-memory MongoDB, so none can fail because the
 PLATFORM disagrees with this service.** That check lives on the other side, in the platform's
