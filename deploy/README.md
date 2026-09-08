@@ -1028,7 +1028,9 @@ pm2 restart chartvolt-games
 > **no script on the page evaluated at all** — a loading spinner, nothing in any log, and no
 > failed request anywhere our side. That was **R52**. The served set is now read from the
 > directory at boot, so the two halves cannot disagree; build for everything else in the service,
-> not for this.
+> not for this. The same applies to the board's artwork added on 8 September 2026 (`21` s4.1m) —
+> nine `.webp` files that arrive with the pull and are served after the **restart**, with no build
+> and no catalogue re-sync.
 >
 > What the boot audit reports now is narrower — a file in `public/play` whose *extension* the
 > service does not recognise, which is the only remaining way to leave an asset unreachable:

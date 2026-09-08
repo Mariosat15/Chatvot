@@ -187,7 +187,7 @@ service's own smoke tool, never yet launched from a ChartVolt contest.
 | The four spec endpoints | **Built.** Catalogue, create round, fetch round, void round, plus signed inbound auth with a rotation window, a retrying result callback, and a four-stage reconciliation sweeper |
 | Spec-ambiguity log | **Built and open.** `games-service/AMBIGUITY-LOG.md`. **Not yet resolved back into `01` and the requirements HTML** |
 | The platform adapter | **Built.** `chartvolt-games` registered in both registry copies, four files under `lib/services/game-providers/adapters/`, mirrored into `apps/admin` and verified byte-identical. 49 tests, 24 probes |
-| **The playable board** | **Built.** `GET /play?t={token}` serves a real game: `public/play/` (4 files, no build step) behind `src/http/play-page.ts`. Dragging with a finger draws paths, the clock runs, a solved board advances, and the round settles into a signed result. Verified by a human-equivalent browser run on both titles. 11 headless tests drive the browser module against the server's verifier; 13 probes |
+| **The playable board** | **Built.** `GET /play?t={token}` serves a real game: `public/play/` (5 code files and 9 images, no build step) behind `src/http/play-page.ts`. Dragging with a finger draws paths, the clock runs, a solved board advances, and the round settles into a signed result. Verified by a human-equivalent browser run on both titles. 15 headless tests drive the browser module against the server's verifier; 20 probes. **Rebuilt twice since**: readable in **s4.1f**, and on the owner's supplied artwork in **s4.1m** - a document describing 4 files, or the board as bare vectors, is correct as history and stale as a present fact |
 | **Provider registration** | **NOT DONE through the admin screens.** The service now has a local `.env` and has been started - including **from its production `dist` build**, not only under `tsx` - and answers signed catalogue calls. Registration was attempted in the admin UI on 6 Sep 2026 and **found a live defect**: the base-URL validator required `https://` unconditionally, so a loopback provider could not be registered at all. Fixed (see 4.1b) |
 | **Any end-to-end round** | **DONE BY TEST, NOT BY CLICKING - 7 September 2026.** A round now travels between the two halves: `__tests__/games/end-to-end-round.test.ts` starts a real `games-service` process, syncs its catalogue over signed HTTP, launches a round, plays it to completion, receives the service's own signed callback and settles the contest for real money. See **4.1d**. What is still NOT done is the acceptance criterion itself, which says *by clicking, in a browser* - that needs two sessions this environment cannot create, so it is a runbook for the owner (**4.1e**) |
 | **Production deployment** | **Prepared, not performed.** PM2 entry `chartvolt-games`, `games-service/env.example`, and a runbook in `deploy/README.md`. **Two exposure routes**: proxied through the platform app at `/play` (the default since 6 Sep 2026, owner's choice - no DNS, no nginx, no certificate) or its own `games.` subdomain (the nginx block is kept). Nothing has been deployed - see 4.1b for the two boot guards this work added and 4.1c for what the proxy route costs |
@@ -658,7 +658,8 @@ the entire stack that noticed anything was wrong. **209 tests**, 7 probes in
 > **SUPERSEDED IN ITS CONCLUSION, later the same day - see 4.1i.** Everything below about the
 > cause is right. The **fix** was not: a boot audit cannot report a stale build, because it ships
 > **inside** the stale build. The owner reopened the game and it failed identically. The coupling
-> was then removed rather than monitored, and **213 tests** is the current figure. This section is
+> was then removed rather than monitored. **225 tests** is the current figure; 213 was correct on
+> the day this notice was written. This section is
 > kept as written because the reasoning that produced the wrong fix is the useful part.
 
 **There was no bug in any revision, which is why nothing found it.** `public/play` is plain
@@ -956,6 +957,67 @@ screen. `gameHasPainted` reads "any other screen is visible" as proof of life, s
 **silently retire the entire watchdog** - no failure, no log, and the endless spinner returns the
 next time a module goes missing. A guard whose subject lives in another file needs a test pinning
 the assumption it makes about that file.
+
+### 4.1m The board is drawn on supplied artwork, and the chrome was rebuilt to match it - 8 September 2026
+
+The owner supplied a bezelled circuit-board frame and five lit numeral tokens and asked for the
+buttons, clock, score and everything else to be rebuilt to that theme. **Nothing here was broken**
+- s4.1f had already made the surface readable - so this is presentation work, and saying so keeps
+it from being read later as a defect that needed fixing.
+
+**Nine files under `games-service/public/play/`**: `board-frame.webp` and `token-1.webp` to
+`token-8.webp`, 106 KB in total. Three of the eight tokens were **generated to match** the five
+supplied, because a board can carry up to eight pairs and a run of five real tokens beside three
+placeholder discs is worse than eight consistent ones.
+
+- **The artwork is decoration and the vector socket underneath it is the game.** Every terminal
+  still draws its own lit ring and its own numeral; the image sits on top. So a token that 404s
+  costs polish and never legibility, which is the only reason it is safe to depend on a network
+  fetch inside a paid round at all. A test pins the numeral, because "the artwork covers it
+  anyway" is exactly the reasoning that would delete it.
+- **An unserved image is the quietest failure on this screen, so `BOARD_ART` is exported and the
+  test reads it.** The hrefs are strings the browser resolves long after the module graph has
+  evaluated, so neither the import-graph walk nor the boot audit can see them - and unlike a
+  missing module, which takes the whole page down and is unmistakable, a missing token draws
+  nothing and the board keeps working. It merely looks unfinished, which nobody files.
+- **The frame is a background behind the grid, so it had to be sized in grid units.**
+  `BOARD_ART_OVERHANG` is the fraction of the grid the bezel overhangs, measured off the supplied
+  file rather than guessed, and `spaceForGrid` subtracts it before the cell size is chosen -
+  otherwise the frame's outer edge is what meets the viewport and the outer row of cells is
+  clipped. **The number is declared twice** - here and as `--board-art-overhang` in `app.css`,
+  because a stylesheet cannot import one - and a test pins the pair. Drift and the opening stops
+  landing on the grid's edge, which reads as "the art is a bit off" rather than as a bug.
+- **Rendering split into `build` and `paint`, and the split is the point rather than tidiness.**
+  A pointer move cannot move a cell or a terminal, so repainting only the wires means a drag no
+  longer re-decodes eight images and rebuilds a hundred nodes per frame. Two probes hold it from
+  both sides: a drag that rebuilds, and a **resize that only repaints** - the second matters
+  because the artwork is sized in grid units, so a repaint alone leaves every token and the bezel
+  at the old cell size while the wires move to the new one.
+- **The artwork is warmed at boot, not on the intro screen.** Warming from `renderIntro` reads
+  correctly and is wrong on one path: a player **resuming** a round never sees the intro, so the
+  board renders on the first response and the bezel snaps in a frame or two later around a bare
+  grid. Verified by eye, before and after, on a launched round. The test pins the call's
+  **position** - inside `boot`, before the first fetch that can paint - and **counts** it, because
+  a second call site is how the intro-only version returns half-fixed with the test still green.
+
+**Two traps in preparing the files, both of which produced a plausible-looking wrong result.** A
+mask made from a black-filled hole is **opaque**, because compositing reads the mask's alpha and
+not its colour - so the "hole" in the first frame was solid and the board did not show through,
+while the file itself looked exactly right in an image viewer. The fix is one path with
+`fill-rule="evenodd"`. And an absolutely-positioned background sibling **paints above** its
+statically-positioned sibling whatever the document order says, so the frame covered the tokens
+until `svg#board` was given a stacking context of its own. The symptom of the second was tokens
+present in the DOM, `visibility: visible`, and invisible on screen.
+
+**225 tests and 20 board probes, all red on exactly the expected test**, and two probes were
+**re-aimed rather than left reporting `DID NOT APPLY`**: both mutated the hand-written asset
+allowlist that stopped existing when s4.1i derived the served set from the directory. A probe
+aimed at a moved target reads like a broken harness, which is the fifth instance of that lesson
+in this phase.
+
+**Verified by eye at desktop and phone widths, on the intro, board and result screens.** No
+platform file changed, and `check:isolation` still reports the service sharing no code with the
+repository around it.
 
 ---
 

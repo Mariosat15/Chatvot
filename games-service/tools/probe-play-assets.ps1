@@ -33,7 +33,10 @@ function Invoke-Probe {
   param(
     [string]$Name,
     [string]$Mutated,
-    [string]$ExpectedTest
+    [string]$ExpectedTest,
+    # Declared per probe rather than fixed at 2, because a wide blast radius is sometimes the
+    # honest consequence of the mutation - see probe 1, which refuses six real files at once.
+    [int]$MaxRed = 2
   )
 
   if ($Mutated -eq $Original) {
@@ -64,11 +67,11 @@ function Invoke-Probe {
     if ($failed -eq 0) {
       Write-Host "  $Name : GREEN - the guard is missing or the test cannot see this"
     }
-    elseif ($failed -le 2) {
+    elseif ($failed -le $MaxRed) {
       Write-Host "  $Name : RED ($failed failed) - expected `"$ExpectedTest`""
     }
     else {
-      Write-Host "  $Name : RED but $failed failed - blast radius too wide, probe broke something structural"
+      Write-Host "  $Name : RED but $failed failed, over the declared limit of $MaxRed - suspect the harness, not the guard"
     }
   }
   else {
@@ -90,7 +93,11 @@ $p1 = $Original.Replace(
   ["app.css", { file: "app.css", type: "text/css; charset=utf-8" }],
   ["board.js", { file: "board.js", type: "text/javascript; charset=utf-8" }],
 ]);')
-Invoke-Probe "1 hand-written list is back (R52)" $p1 "this checkout's own play surface agrees with this build"
+#
+#    Declared at 3: the list names three files and the surface now ships nine, so reinstating it
+#    also stops the artwork and `presentation.js` being served. That is what the outage looked
+#    like, so the extra failures are the defect rather than harness damage.
+Invoke-Probe "1 hand-written list is back (R52)" $p1 "this checkout's own play surface agrees with this build" 3
 
 # 2. The derived set stops reading the directory and returns a fixed set, so a file added
 #    tomorrow is refused. Same defect, aimed at the regression test rather than the repo check.

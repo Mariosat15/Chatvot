@@ -55,23 +55,57 @@
           role="img"
           aria-label="A path drawn between two terminals numbered one, filling every square"
         >
+          <!--
+            Built out of the same parts as the real board - cell face and lip, wire halo and core,
+            socket bloom, rim and ring - so a player recognises the thing they are about to be
+            handed. It is drawn by hand here rather than by `board.js`, because the illustration
+            wants a chosen shape and a chosen route, and reusing the renderer would mean
+            introducing a fake puzzle for it to draw.
+          -->
+          <!--
+            Its own gradient, with its own id. The board's `#cell-face` is created by `board.js`
+            when the grid is built, which is after Start - so pointing at it here would resolve to
+            nothing on the one screen this artwork appears on, and an unresolved paint server is
+            not an error, it is a transparent fill. The illustration would simply lose its cells.
+          -->
+          <defs>
+            <linearGradient id="cell-face-flat" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#183053" />
+              <stop offset="0.55" stop-color="#102340" />
+              <stop offset="1" stop-color="#0b1a31" />
+            </linearGradient>
+          </defs>
           <g class="diagram-grid">
-            <rect x="10" y="10" width="38" height="38" rx="6" />
-            <rect x="52" y="10" width="38" height="38" rx="6" />
-            <rect x="94" y="10" width="38" height="38" rx="6" />
-            <rect x="10" y="52" width="38" height="38" rx="6" />
-            <rect x="52" y="52" width="38" height="38" rx="6" />
-            <rect x="94" y="52" width="38" height="38" rx="6" />
+            <rect x="10" y="10" width="38" height="38" rx="8" />
+            <rect x="52" y="10" width="38" height="38" rx="8" />
+            <rect x="94" y="10" width="38" height="38" rx="8" />
+            <rect x="10" y="52" width="38" height="38" rx="8" />
+            <rect x="52" y="52" width="38" height="38" rx="8" />
+            <rect x="94" y="52" width="38" height="38" rx="8" />
           </g>
+          <polyline
+            class="diagram-trace diagram-trace-halo"
+            points="29,29 71,29 113,29 113,71 71,71 29,71"
+            fill="none"
+          />
           <polyline
             class="diagram-trace"
             points="29,29 71,29 113,29 113,71 71,71 29,71"
             fill="none"
           />
+          <polyline
+            class="diagram-trace diagram-trace-core"
+            points="29,29 71,29 113,29 113,71 71,71 29,71"
+            fill="none"
+          />
           <g class="diagram-terminals">
-            <circle cx="29" cy="29" r="13" />
+            <circle class="diagram-bloom" cx="29" cy="29" r="18" />
+            <circle class="diagram-rim" cx="29" cy="29" r="14" />
+            <circle class="diagram-ring" cx="29" cy="29" r="10" />
             <text x="29" y="29">1</text>
-            <circle cx="29" cy="71" r="13" />
+            <circle class="diagram-bloom" cx="29" cy="71" r="18" />
+            <circle class="diagram-rim" cx="29" cy="71" r="14" />
+            <circle class="diagram-ring" cx="29" cy="71" r="10" />
             <text x="29" y="71">1</text>
           </g>
         </svg>
@@ -99,15 +133,37 @@
 
       <section id="screen-play" class="screen play" hidden>
         <header class="bar">
-          <span id="progress" class="progress"></span>
-          <span id="clock" class="clock" aria-live="off"></span>
+          <!--
+            Two readouts of the same shape, because they answer the two questions a player asks
+            under a clock: how far am I, and how long have I got. The labels are permanent markup
+            and only the values are written by the script - a bare number with no caption is the
+            thing that gets misread as the other one.
+          -->
+          <div class="readout">
+            <span class="readout-label">Progress</span>
+            <span id="progress" class="readout-value"></span>
+          </div>
+          <div class="readout readout-clock">
+            <span class="readout-label">Time left</span>
+            <span id="clock" class="readout-value clock" aria-live="off"></span>
+          </div>
           <button id="leave" class="ghost small-btn" type="button">Leave</button>
         </header>
 
         <div id="board-wrap" class="board-wrap">
-          <!-- `touch-action: none` lives in the stylesheet: a drag must not scroll the page. -->
-          <svg id="board" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Puzzle grid">
-          </svg>
+          <div class="board-stage">
+            <!--
+              The bezel is a SIBLING of the grid rather than part of it, and overhangs it by
+              `--board-art-overhang`. Drawn inside the `<svg>` it would sit in the element that
+              hit-tests drags, and `cellAt` maps a finger to a cell by proportion of that element's
+              box - so every touch would be off by the frame, worst at the edges, with nothing on
+              screen to suggest why. See `BOARD_ART_OVERHANG` in `presentation.js`.
+            -->
+            <div class="board-art" aria-hidden="true"></div>
+            <!-- `touch-action: none` lives in the stylesheet: a drag must not scroll the page. -->
+            <svg id="board" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Puzzle grid">
+            </svg>
+          </div>
         </div>
 
         <footer class="bar footer">

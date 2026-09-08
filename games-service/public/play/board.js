@@ -20,7 +20,7 @@
  * nothing the player can see that the server will not check.
  */
 
-import { boardCellPx } from "./presentation.js";
+import { boardCellPx, spaceForGrid } from "./presentation.js";
 
 /** Eight pairs is the most any grid size produces (`large`: 5-8). */
 const PAIR_COLOURS = [
@@ -33,6 +33,50 @@ const PAIR_COLOURS = [
   "#2dd4bf", // teal
   "#facc15", // yellow
 ];
+
+/**
+ * The terminal artwork: one lit socket per pair number, `token-1.webp` to `token-8.webp`.
+ *
+ * ONE PER PAIR NUMBER, NOT ONE PER COLOUR, and the two lists must stay the same length. The file
+ * has the numeral baked into it, so `token-3.webp` is only ever right for pair 3 - which is why
+ * this is indexed by `pairId` with no modulo. A modulo here would draw a "1" on pair 9 and look
+ * deliberate. There is no pair 9 today (`large` tops out at eight), and if a grid size ever
+ * produces more, `terminalArt` returns null and the socket drawn underneath carries the numeral.
+ *
+ * WHY THE SOCKET IS DRAWN UNDERNEATH RATHER THAN THE ARTWORK BEING THE TERMINAL. A numeral in
+ * every terminal is functional here rather than decorative - see the note on `colourFor`, it is
+ * what makes the board playable for a colour-blind player and what makes it playable with no
+ * language at all. An `<image>` that fails to arrive draws nothing and reports nothing, and this
+ * platform has now had two production faults caused by an asset that 404ed from a stale cache. So
+ * the vector socket, with its own numeral, is always drawn: the artwork is an enhancement laid
+ * over a board that is already complete and legible without it.
+ */
+const TERMINAL_ART = [
+  "/play/token-1.webp",
+  "/play/token-2.webp",
+  "/play/token-3.webp",
+  "/play/token-4.webp",
+  "/play/token-5.webp",
+  "/play/token-6.webp",
+  "/play/token-7.webp",
+  "/play/token-8.webp",
+];
+
+/** The bezel around the grid. Drawn by the stylesheet, listed here so `app.js` can warm it. */
+const FRAME_ART = "/play/board-frame.webp";
+
+/**
+ * Every image the board needs, for `app.js` to fetch while the player is still reading the rules.
+ *
+ * Reason this is worth doing at all: the round's clock starts on the server when Start is pressed,
+ * so anything the board downloads AFTER that comes out of the player's score. It is only a few
+ * kilobytes, but it is a few kilobytes the player would be paying for.
+ */
+export const BOARD_ART = [FRAME_ART, ...TERMINAL_ART];
+
+function terminalArt(pairId) {
+  return TERMINAL_ART[pairId] ?? null;
+}
 
 /*
  * A numeral inside every terminal, and it is not decoration.
@@ -68,6 +112,45 @@ function element(name, attributes) {
   return node;
 }
 
+function clear(node) {
+  while (node.firstChild) node.removeChild(node.firstChild);
+}
+
+/**
+ * The gradients the stylesheet paints the grid with.
+ *
+ * In the document rather than in CSS because a gradient FILL cannot be expressed in CSS alone -
+ * `fill: url(#cell-face)` needs something with that id to exist. They are rebuilt with the static
+ * layer, which happens once per board, so their cost is not on the drag path.
+ */
+function defs() {
+  const node = element("defs", {});
+
+  const cellFace = element("linearGradient", {
+    id: "cell-face",
+    x1: "0",
+    y1: "0",
+    x2: "0",
+    y2: "1",
+  });
+  cellFace.appendChild(element("stop", { offset: "0", "stop-color": "#183053" }));
+  cellFace.appendChild(element("stop", { offset: "0.55", "stop-color": "#102340" }));
+  cellFace.appendChild(element("stop", { offset: "1", "stop-color": "#0b1a31" }));
+  node.appendChild(cellFace);
+
+  const socketFace = element("radialGradient", {
+    id: "socket-face",
+    cx: "0.5",
+    cy: "0.34",
+    r: "0.72",
+  });
+  socketFace.appendChild(element("stop", { offset: "0", "stop-color": "#16233c" }));
+  socketFace.appendChild(element("stop", { offset: "1", "stop-color": "#05090f" }));
+  node.appendChild(socketFace);
+
+  return node;
+}
+
 /**
  * Creates a board bound to an `<svg>` element.
  *
@@ -87,6 +170,8 @@ export function createBoard(svg, onChange) {
   let cellPx = 48;
   let dragging = null;
   let locked = false;
+  /** @type {{cells:Node,traces:Node,marks:Node,sockets:Node}|null} Set by `build`. */
+  let layers = null;
 
   function rebuildOwnership() {
     owner = new Map();
@@ -255,7 +340,9 @@ export function createBoard(svg, onChange) {
       }
     }
     event.preventDefault();
-    render();
+    // `paint`, never `render`: nothing a pointer does can move a cell or a terminal, and rebuilding
+    // them mid-drag is what made the board stutter on a phone. See the note above `build`.
+    paint();
     onChange();
   }
 
@@ -264,7 +351,7 @@ export function createBoard(svg, onChange) {
     const cell = cellAt(event);
     if (!cell) return;
     if (walkTowards(dragging, cell)) {
-      render();
+      paint();
       onChange();
     }
     event.preventDefault();
@@ -273,7 +360,7 @@ export function createBoard(svg, onChange) {
   function onPointerUp() {
     if (dragging === null) return;
     dragging = null;
-    render();
+    paint();
     onChange();
   }
 
@@ -282,8 +369,24 @@ export function createBoard(svg, onChange) {
   svg.addEventListener("pointerup", onPointerUp);
   svg.addEventListener("pointercancel", onPointerUp);
 
-  function render() {
-    while (svg.firstChild) svg.removeChild(svg.firstChild);
+  const centre = (value) => value * cellPx + cellPx / 2;
+
+  /**
+   * Everything that cannot change while the player drags: the cells, the junction stars and the
+   * terminals with their artwork. Built once per board and once per resize.
+   *
+   * WHY THIS IS SPLIT FROM `paint` AT ALL, since the old single `render` was correct. A drag emits
+   * a pointer move for every few pixels of finger travel, and each one used to rebuild the entire
+   * board - on a 6x6 that is 36 cells plus up to 16 terminal nodes destroyed and recreated, plus
+   * eight `<image>` elements whose `href` the browser must resolve again, all to move one line by
+   * one square. It survived because the cache made the images cheap, so the cost was invisible on
+   * a fast machine and only showed as stutter on a phone, which is where this game is played and
+   * where the clock is the score. The static half now outlives the drag; only the wires are
+   * redrawn.
+   */
+  function build() {
+    clear(svg);
+    layers = null;
     if (!puzzle) return;
 
     const width = puzzle.width * cellPx;
@@ -292,44 +395,153 @@ export function createBoard(svg, onChange) {
     svg.setAttribute("width", String(width));
     svg.setAttribute("height", String(height));
 
-    const centre = (value) => value * cellPx + cellPx / 2;
+    svg.appendChild(defs());
 
+    const cells = element("g", { class: "layer-cells" });
+    const traces = element("g", { class: "layer-traces" });
+    const marks = element("g", { class: "layer-marks" });
+    const sockets = element("g", { class: "layer-terminals" });
+    svg.appendChild(cells);
+    svg.appendChild(traces);
+    svg.appendChild(marks);
+    svg.appendChild(sockets);
+    layers = { cells, traces, marks, sockets };
+
+    /*
+     * Two rects per cell: a face carrying a wide soft edge, and a thin bright outline over it.
+     *
+     * Two rather than one because a lit panel needs a glow, and the honest way to draw a glow is
+     * an SVG filter - which would be a per-cell blur, re-rasterised whenever the layer is
+     * composited. On a phone under a clock that is the wrong trade. A wide translucent stroke
+     * under a narrow opaque one produces the same read for the cost of one extra node in a layer
+     * that is built once and never touched during a drag.
+     */
+    const inset = Math.max(1, cellPx * 0.045);
+    const radius = Math.round(cellPx * 0.2);
     for (let y = 0; y < puzzle.height; y++) {
       for (let x = 0; x < puzzle.width; x++) {
-        svg.appendChild(
-          element("rect", {
-            x: x * cellPx,
-            y: y * cellPx,
-            width: cellPx,
-            height: cellPx,
-            rx: Math.round(cellPx * 0.16),
-            class: "cell",
-          }),
+        const at = {
+          x: x * cellPx + inset,
+          y: y * cellPx + inset,
+          width: cellPx - inset * 2,
+          height: cellPx - inset * 2,
+          rx: radius,
+        };
+        cells.appendChild(
+          element("rect", { ...at, "stroke-width": Math.max(2, cellPx * 0.09), class: "cell" }),
         );
-
-        /*
-         * A pip in every UNUSED square, and it is functional rather than decorative.
-         *
-         * Coverage is the rule players fail: every pair can be visibly joined with a square left
-         * over, and the hint line then says "use every square: 30 of 36" without saying WHICH.
-         * Counting squares on a 6x6 grid under a clock is not a puzzle anybody meant to set. The
-         * pips vanish as cells are taken, so the remaining work is the remaining dots.
-         *
-         * Drawn only where there is nothing, so the count falls as the board fills - which also
-         * means the most expensive frame is the one before the player has touched anything.
-         */
-        if (!owner.has(key([x, y]))) {
-          svg.appendChild(
-            element("circle", {
-              cx: centre(x),
-              cy: centre(y),
-              r: Math.max(1.5, Math.round(cellPx * 0.055)),
-              class: "pip",
-            }),
-          );
-        }
+        cells.appendChild(
+          element("rect", { ...at, "stroke-width": Math.max(1, cellPx * 0.03), class: "cell-lip" }),
+        );
       }
     }
+
+    /*
+     * The four-point stars where the grid lines cross, in ONE path node rather than one per
+     * junction. A 6x6 grid has 25 of them and an 8x8 has 49, redrawn on every resize; as separate
+     * nodes they would be the largest thing in the static layer for something the player never
+     * touches. A compound `d` costs one element whatever the grid size.
+     */
+    const spike = Math.max(2, cellPx * 0.075);
+    let stars = "";
+    for (let y = 1; y < puzzle.height; y++) {
+      for (let x = 1; x < puzzle.width; x++) {
+        const cx = x * cellPx;
+        const cy = y * cellPx;
+        stars +=
+          "M" +
+          cx +
+          " " +
+          (cy - spike) +
+          "L" +
+          (cx + spike * 0.34) +
+          " " +
+          cy +
+          "L" +
+          cx +
+          " " +
+          (cy + spike) +
+          "L" +
+          (cx - spike * 0.34) +
+          " " +
+          cy +
+          "Z";
+      }
+    }
+    if (stars) cells.appendChild(element("path", { d: stars, class: "junction" }));
+
+    for (const pair of puzzle.pairs) {
+      for (const cell of [pair.a, pair.b]) {
+        sockets.appendChild(socket(pair.id, centre(cell[0]), centre(cell[1])));
+      }
+    }
+  }
+
+  /** One terminal: a lit socket, its numeral, and the artwork laid over both. */
+  function socket(pairId, cx, cy) {
+    const colour = colourFor(pairId);
+    const group = element("g", { class: "terminal" });
+
+    group.appendChild(
+      element("circle", { cx, cy, r: cellPx * 0.46, fill: colour, class: "socket-bloom" }),
+    );
+    group.appendChild(
+      element("circle", {
+        cx,
+        cy,
+        r: cellPx * 0.37,
+        fill: "url(#socket-face)",
+        stroke: colour,
+        "stroke-width": Math.max(2, cellPx * 0.06),
+        class: "socket-rim",
+      }),
+    );
+    group.appendChild(
+      element("circle", {
+        cx,
+        cy,
+        r: cellPx * 0.28,
+        fill: "none",
+        stroke: colour,
+        "stroke-width": Math.max(1, cellPx * 0.03),
+        class: "socket-ring",
+      }),
+    );
+
+    const label = element("text", {
+      x: cx,
+      y: cy,
+      "text-anchor": "middle",
+      "dominant-baseline": "central",
+      "font-size": Math.round(cellPx * 0.38),
+      class: "terminal-label",
+    });
+    label.textContent = String(pairId + 1);
+    group.appendChild(label);
+
+    const art = terminalArt(pairId);
+    if (art) {
+      const size = cellPx * 0.94;
+      group.appendChild(
+        element("image", {
+          href: art,
+          x: cx - size / 2,
+          y: cy - size / 2,
+          width: size,
+          height: size,
+          class: "terminal-art",
+        }),
+      );
+    }
+
+    return group;
+  }
+
+  /** The two layers that change as the player draws: the wires, and the pips still to be covered. */
+  function paint() {
+    if (!layers) return;
+    clear(layers.traces);
+    clear(layers.marks);
 
     for (const pair of puzzle.pairs) {
       const cells = pathOf(pair.id);
@@ -337,21 +549,21 @@ export function createBoard(svg, onChange) {
       const points = cells.map((cell) => centre(cell[0]) + "," + centre(cell[1])).join(" ");
       const colour = colourFor(pair.id);
 
-      // Two strokes for one path: a wide translucent one under a narrower solid one, which reads
-      // as a lit wire rather than a felt-tip line. It is also the cheapest way to keep two
-      // adjacent paths legible where they run side by side, since the halo darkens the gap.
-      svg.appendChild(
+      // Three strokes for one wire: a wide translucent bloom, the conductor, and a pale core down
+      // the middle. Two of them read as a lit wire rather than a felt-tip line; the third is what
+      // keeps two paths legible where they run side by side, since the bloom darkens the gap.
+      layers.traces.appendChild(
         element("polyline", {
           points,
           fill: "none",
           stroke: colour,
-          "stroke-width": Math.round(cellPx * 0.56),
+          "stroke-width": Math.round(cellPx * 0.6),
           "stroke-linecap": "round",
           "stroke-linejoin": "round",
           class: "trace-halo",
         }),
       );
-      svg.appendChild(
+      layers.traces.appendChild(
         element("polyline", {
           points,
           fill: "none",
@@ -362,33 +574,45 @@ export function createBoard(svg, onChange) {
           class: "trace",
         }),
       );
+      layers.traces.appendChild(
+        element("polyline", {
+          points,
+          fill: "none",
+          stroke: "#eaf6ff",
+          "stroke-width": Math.max(1, Math.round(cellPx * 0.07)),
+          "stroke-linecap": "round",
+          "stroke-linejoin": "round",
+          class: "trace-core",
+        }),
+      );
     }
 
-    for (const pair of puzzle.pairs) {
-      for (const cell of [pair.a, pair.b]) {
-        svg.appendChild(
+    /*
+     * A pip in every UNUSED square, and it is functional rather than decorative.
+     *
+     * Coverage is the rule players fail: every pair can be visibly joined with a square left over,
+     * and the hint line then says "use every square: 30 of 36" without saying WHICH. Counting
+     * squares on a 6x6 grid under a clock is not a puzzle anybody meant to set. The pips vanish as
+     * cells are taken, so the remaining work is the remaining dots.
+     */
+    for (let y = 0; y < puzzle.height; y++) {
+      for (let x = 0; x < puzzle.width; x++) {
+        if (owner.has(key([x, y]))) continue;
+        layers.marks.appendChild(
           element("circle", {
-            cx: centre(cell[0]),
-            cy: centre(cell[1]),
-            r: Math.round(cellPx * 0.34),
-            fill: colourFor(pair.id),
-            stroke: colourFor(pair.id),
-            "stroke-width": Math.max(2, Math.round(cellPx * 0.08)),
-            class: "terminal",
+            cx: centre(x),
+            cy: centre(y),
+            r: Math.max(1.5, Math.round(cellPx * 0.055)),
+            class: "pip",
           }),
         );
-        const label = element("text", {
-          x: centre(cell[0]),
-          y: centre(cell[1]),
-          "text-anchor": "middle",
-          "dominant-baseline": "central",
-          "font-size": Math.round(cellPx * 0.36),
-          class: "terminal-label",
-        });
-        label.textContent = String(pair.id + 1);
-        svg.appendChild(label);
       }
     }
+  }
+
+  function render() {
+    build();
+    paint();
   }
 
   /**
@@ -397,10 +621,19 @@ export function createBoard(svg, onChange) {
    * The arithmetic is in `presentation.js` so it can be tested without a DOM, which is where the
    * cap and the floor are explained. Before 7 September 2026 the floor was what every player got,
    * because the frame never grew past its host's minimum.
+   *
+   * `spaceForGrid` takes the bezel off first. The artwork overhangs the grid on all four sides, so
+   * a grid measured against the raw box would push its own frame off the edge of the viewport - and
+   * the frame is the part that gets clipped, so the symptom is decorative and the cause is not.
    */
   function resize(availableWidth, availableHeight) {
     if (!puzzle) return;
-    cellPx = boardCellPx(availableWidth, availableHeight, puzzle.width, puzzle.height);
+    cellPx = boardCellPx(
+      spaceForGrid(availableWidth),
+      spaceForGrid(availableHeight),
+      puzzle.width,
+      puzzle.height,
+    );
     render();
   }
 
@@ -423,7 +656,7 @@ export function createBoard(svg, onChange) {
       paths = new Map();
       rebuildOwnership();
       dragging = null;
-      render();
+      paint();
       onChange();
     },
     lock() {

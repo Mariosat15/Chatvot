@@ -83,6 +83,50 @@ $results += Invoke-Probe -Name 'unfinished pairs are dropped from the submission
   -ExpectRed 'the submission carries one path per pair, and nothing else'
 
 Write-Host ""
+Write-Host "The artwork, and the split that lets it be drawn once" -ForegroundColor Cyan
+
+# The numeral under the token is not decoration - it is what the player reads if the artwork does
+# not arrive. A token that 404s draws nothing and the vector socket keeps the board playable; drop
+# the numeral and the same 404 leaves seven identical blank discs and an unsolvable-looking puzzle.
+$results += Invoke-Probe -Name 'the numeral under the token is dropped' `
+  -Suite $SuiteBoard -File $srcBoard `
+  -Find '  group.appendChild(label);' `
+  -Replace '  void label;' `
+  -ExpectRed "every terminal carries its number, so a missing image costs decoration only"
+
+# Artwork chosen by position rather than by pair number means two terminals of the SAME pair show
+# different tokens - which is exactly the thing the player is asked to match. The board still
+# works, so nothing errors and nobody can win.
+$results += Invoke-Probe -Name "a token is chosen by position instead of by pair" `
+  -Suite $SuiteBoard -File $srcBoard `
+  -Find '  return TERMINAL_ART[pairId] ?? null;' `
+  -Replace '  return TERMINAL_ART[pairId + 1] ?? null;' `
+  -ExpectRed "a terminal's artwork is chosen by its pair number, never by position"
+
+# The whole point of the build/paint split. Repainting everything on every pointer move means
+# re-decoding eight images and rebuilding ~100 nodes per frame - which does not fail, it just makes
+# a drag stutter on the phones most players are holding.
+$results += Invoke-Probe -Name 'a drag rebuilds the whole board again' `
+  -Suite $SuiteBoard -File $srcBoard `
+  -Find '    if (walkTowards(dragging, cell)) {
+      paint();' `
+  -Replace '    if (walkTowards(dragging, cell)) {
+      render();' `
+  -ExpectRed 'a drag repaints the wires and leaves the cells and terminals standing'
+
+# Resizing must do the opposite: the artwork is sized in grid units, so a repaint alone leaves
+# every token and the bezel at the old cell size while the wires move to the new one.
+$results += Invoke-Probe -Name 'a resize only repaints' `
+  -Suite $SuiteBoard -File $srcBoard `
+  -Find '    );
+    render();
+  }' `
+  -Replace '    );
+    paint();
+  }' `
+  -ExpectRed 'resizing rebuilds, because the artwork is sized in the same units as the grid'
+
+Write-Host ""
 Write-Host "The routes that serve it" -ForegroundColor Cyan
 
 # The token is a credential. It has to arrive in the URL, but rendering it into the document as
@@ -100,22 +144,59 @@ $results += Invoke-Probe -Name 'the referrer policy is dropped' `
   -Replace '  void 0;' `
   -ExpectRed 'the surface refuses to send a referrer'
 
-# A renamed asset is a blank frame, and nothing but this test connects the HTML to the allowlist:
-# one is markup and the other is TypeScript, so no typecheck and no lint can see the break.
-$results += Invoke-Probe -Name 'an asset is renamed out from under the page' `
-  -Suite $SuitePlay -File $srcPage `
-  -Find '  ["app.js", { file: "app.js", type: "text/javascript; charset=utf-8" }],' `
-  -Replace '  ["app-v2.js", { file: "app.js", type: "text/javascript; charset=utf-8" }],' `
+# A renamed asset is a blank frame, and nothing but this test connects the HTML to the served set:
+# one is markup and the other is a directory listing, so no typecheck and no lint can see the break.
+#
+# RE-AIMED on 8 September 2026. It used to rename an entry in the hand-written `ASSETS` map, which
+# stopped existing when R52's second fix derived the set from disk - so it reported DID NOT APPLY,
+# which reads like a broken harness rather than a moved target. The page is the half that can still
+# name a file nobody serves, so that is the half to mutate.
+$results += Invoke-Probe -Name 'the page asks for a script nobody serves' `
+  -Suite $SuitePlay -File 'public/play/index.html' `
+  -Find '<script type="module" src="/play/app.js"></script>' `
+  -Replace '<script type="module" src="/play/app-v2.js"></script>' `
   -ExpectRed 'every asset the page references is actually served' -MaxRed 3
+
+# An unserved token is the quietest failure on this screen: the board keeps working, so there is no
+# error anywhere and it merely looks unfinished. Nothing but this test connects `BOARD_ART` to the
+# files on disk - the hrefs are strings the browser resolves long after the code has evaluated, so
+# the import-graph walk above cannot see them.
+$results += Invoke-Probe -Name 'a token is named but not shipped' `
+  -Suite $SuitePlay -File $srcBoard `
+  -Find '  "/play/token-1.webp",' `
+  -Replace '  "/play/token-99.webp",' `
+  -ExpectRed 'every image the board names is served' -MaxRed 3
+
+# The version this replaced: warm on the intro screen, which is correct on the path everybody
+# tests and wrong for a player resuming a round, who never sees the intro.
+$results += Invoke-Probe -Name 'the artwork is warmed on the intro screen again' `
+  -Suite $SuitePlay -File 'public/play/app.js' `
+  -Find '  warmBoardArt();
+  try {' `
+  -Replace '  try {' `
+  -ExpectRed 'the artwork is fetched at boot, not when a screen happens to want it'
+
+# The bezel overhang is declared twice - a number in `presentation.js` reserves the space, a custom
+# property in `app.css` fills it - because a stylesheet cannot import a number. Drift and the
+# frame's opening stops landing on the grid's edge, which reads as "the art is a bit off".
+$results += Invoke-Probe -Name 'the stylesheet and the code disagree about the bezel' `
+  -Suite $SuitePlay -File 'public/play/app.css' `
+  -Find '  --board-art-overhang: 0.072;' `
+  -Replace '  --board-art-overhang: 0.1;' `
+  -ExpectRed 'the stylesheet and the board agree how far the bezel overhangs the grid'
 
 # The allowlist is a traversal guard as much as a file list. A path segment cannot contain a
 # literal slash - which is what makes serving the parameter look safe - but Express decodes route
 # parameters, so `%2f` becomes `/` and `path.join` follows it out of the directory.
+#
+# Declared at 4 rather than 1: serving the parameter verbatim also hands every request the one
+# hard-coded content type, so the artwork arrives as JavaScript and the token, cache and error-shape
+# tests all fail with it. That is a genuine consequence of the mutation, not harness damage.
 $results += Invoke-Probe -Name 'any filename is served, not just the allowlisted three' `
   -Suite $SuitePlay -File $srcPage `
   -Find '  const asset = ASSETS.get(String(req.params.asset));' `
   -Replace '  const asset = { file: String(req.params.asset), type: "text/javascript; charset=utf-8" };' `
-  -ExpectRed 'an encoded traversal cannot read a file outside the play directory' -MaxRed 3
+  -ExpectRed 'an encoded traversal cannot read a file outside the play directory' -MaxRed 4
 
 Write-Host ""
 Write-Host "The state the client reads before offering Start" -ForegroundColor Cyan

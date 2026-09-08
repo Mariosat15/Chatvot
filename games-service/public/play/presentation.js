@@ -64,6 +64,37 @@ export const MAX_FRAME_HEIGHT = 1200;
 export const BOARD_FRAME_PX = 16;
 
 /**
+ * How far the board's bezel artwork reaches OUTSIDE the grid, as a fraction of the grid's size.
+ *
+ * WHY THE FRAME IS A SIBLING OF THE GRID RATHER THAN PART OF IT. The artwork is one square image
+ * whose opening sits at about 6% of its own width, so the obvious implementation is to widen the
+ * board's `viewBox` and draw the grid inset. That moves the grid inside the element the player
+ * drags on, and `cellAt` in `board.js` maps a finger to a cell by proportion of the element's
+ * box - so every hit test would silently be off by the frame, worst at the edges. Instead the
+ * artwork is an absolutely-positioned element that overhangs the grid by this fraction, and the
+ * grid's own coordinate space is untouched.
+ *
+ * IT IS DECLARED TWICE AND A TEST PINS THE PAIR. The other copy is `--board-art-overhang` in
+ * `app.css`, because a stylesheet cannot import a number. If the two drift, the bezel's opening
+ * stops landing on the grid's edge - either clipping the outer row of cells or leaving a gap of
+ * page background inside the frame. Both read as "the artwork is slightly wrong" rather than as
+ * a bug with a cause, which is exactly the kind of thing nobody files.
+ */
+export const BOARD_ART_OVERHANG = 0.072;
+
+/** The grid size that leaves room for the bezel in `available` pixels of layout. */
+export function spaceForGrid(available) {
+  if (!positive(available)) return 0;
+  return Math.floor(available / (1 + 2 * BOARD_ART_OVERHANG));
+}
+
+/** The space a grid of `px` occupies once its bezel is counted. */
+export function framedGridPx(px) {
+  if (!positive(px)) return 0;
+  return Math.ceil(px * (1 + 2 * BOARD_ART_OVERHANG));
+}
+
+/**
  * The header-and-footer allowance used until the real one has been laid out.
  *
  * Only ever a first guess: `app.js` measures the bars and passes the real figure in on every
@@ -114,7 +145,11 @@ export function desiredFrameHeight(input) {
   if (screen === "play") {
     const rows = positive(gridHeight) ? Math.round(gridHeight) : 6;
     const chrome = positive(chromeHeight) ? chromeHeight : DEFAULT_CHROME_PX;
-    return clampFrame(chrome + rows * TARGET_CELL_PX + BOARD_FRAME_PX);
+    // The bezel is counted here as well as in `spaceForGrid`, and leaving it out is the version
+    // that looks correct: the board still fits, because `boardCellPx` measures what arrived - it
+    // just fits a 13% smaller grid, on every screen, for ever. That is the postage-stamp defect
+    // in a new disguise, so the height asked for is the height the framed board needs.
+    return clampFrame(chrome + framedGridPx(rows * TARGET_CELL_PX) + BOARD_FRAME_PX);
   }
 
   return clampFrame(positive(contentHeight) ? contentHeight : 0);

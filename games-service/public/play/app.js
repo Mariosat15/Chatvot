@@ -33,7 +33,7 @@
  * is no attempt left to protect and a dropped mobile connection must not cost one.
  */
 
-import { createBoard } from "./board.js";
+import { BOARD_ART, createBoard } from "./board.js";
 import {
   desiredFrameHeight,
   hintCopy,
@@ -297,6 +297,38 @@ function renderIntro() {
   show("intro");
 }
 
+let artWarmed = false;
+
+/**
+ * Fetch the board's artwork before anything asks to draw it.
+ *
+ * Two reasons, and the second is the one that decides WHERE this is called from.
+ *
+ * The round's clock starts on the SERVER when Start is pressed, so every byte the board downloads
+ * after that is taken out of the player's time. It is only about a hundred kilobytes, but it is a
+ * hundred kilobytes they are paying for, and on a phone on mobile data it is the first board that
+ * would pay them.
+ *
+ * And an image that arrives late is VISIBLE: the frame is a background behind the grid, so for one
+ * or two frames the player sees a bare grid floating on the page before the bezel snaps in around
+ * it. Warming on the intro screen alone was not enough, because the intro is not on every path -
+ * a player resuming a round they already started goes straight to the board. So this runs at boot,
+ * on every path, before the first render.
+ *
+ * Deliberately silent and unawaited: if a fetch fails the board still draws - every terminal has a
+ * vector socket with its own numeral underneath the artwork, so a missing image costs decoration
+ * and never legibility. This must not become something the game waits for.
+ */
+function warmBoardArt() {
+  if (artWarmed) return;
+  artWarmed = true;
+  for (const url of BOARD_ART) {
+    const image = new Image();
+    image.decoding = "async";
+    image.src = url;
+  }
+}
+
 function renderProgress() {
   if (state.boardTarget) {
     ui.progress.textContent = "Board " + (state.boardsSolved + 1) + " of " + state.boardTarget;
@@ -551,6 +583,9 @@ async function boot() {
     fail("This game must be opened from the contest.");
     return;
   }
+  // Before `refresh`, not after: a resumed round renders the board on the first response, and an
+  // image that arrives after that is a bare grid with the bezel snapping in around it.
+  warmBoardArt();
   try {
     await refresh();
   } catch (error) {

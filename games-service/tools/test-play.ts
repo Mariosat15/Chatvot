@@ -255,6 +255,61 @@ async function main(): Promise<number> {
     );
   });
 
+  await test("every image the board names is served", async () => {
+    /*
+     * The artwork is NOT part of the module graph, so the walk above cannot see it: an `<image>`
+     * href and a CSS `background-image` are strings, resolved by the browser long after the code
+     * has been evaluated.
+     *
+     * Which is also why a missing one is quiet. A module that 404s takes the whole page down and
+     * is at least unmistakable; a token that 404s draws nothing at all, and the board keeps
+     * working - the vector socket underneath still carries the pair's number, so the game is
+     * playable and merely looks unfinished. That is precisely the failure nobody reports and
+     * nobody notices in review.
+     *
+     * Read from `BOARD_ART` rather than listed here, so a ninth token is covered by existing.
+     */
+    // @ts-expect-error - untyped browser module, deliberately; see `test-board.ts` for why.
+    const board = (await import("../public/play/board.js")) as Record<string, unknown>;
+    const named = [...(board.BOARD_ART as string[])];
+    assert.ok(named.length >= 9, `BOARD_ART named only ${named.length} files`);
+
+    for (const url of named) {
+      const asset = await fetchRaw(url);
+      assert.equal(asset.status, 200, `${url} is drawn by the board but not served`);
+      assert.match(asset.headers.get("content-type") ?? "", /^image\//, `${url} is not an image`);
+    }
+  });
+
+  await test("the stylesheet and the board agree how far the bezel overhangs the grid", async () => {
+    /*
+     * The number is declared twice - `BOARD_ART_OVERHANG` in `presentation.js` reserves the space,
+     * `--board-art-overhang` in `app.css` fills it - because a stylesheet cannot import a number.
+     *
+     * The failure if they drift is the kind that never gets filed: the bezel's opening stops
+     * landing on the grid's edge, so it either clips the outer row of cells or leaves a band of
+     * page showing inside the frame. Both read as "the artwork is a bit off" rather than as a bug
+     * with a cause, and both get worse the larger the player's screen.
+     */
+    // @ts-expect-error - untyped browser module, deliberately; see `test-board.ts` for why.
+    const presentation = (await import("../public/play/presentation.js")) as Record<
+      string,
+      unknown
+    >;
+    const css = fs.readFileSync(
+      path.resolve(__dirname, "..", "public", "play", "app.css"),
+      "utf8",
+    );
+
+    const declared = /--board-art-overhang:\s*([\d.]+)\s*;/.exec(css);
+    assert.ok(declared, "app.css no longer declares --board-art-overhang");
+    assert.equal(
+      Number(declared[1]),
+      presentation.BOARD_ART_OVERHANG,
+      "the stylesheet and presentation.js disagree about the bezel",
+    );
+  });
+
   /*
    * The boot watchdog, which exists because the test above and the audit below BOTH pass while a
    * player watches a spinner.
@@ -561,6 +616,42 @@ async function main(): Promise<number> {
       (flags[0].index ?? 0) > lastImport,
       "the flag sits above an import, so it is not a statement in the module body",
     );
+  });
+
+  await test("the artwork is fetched at boot, not when a screen happens to want it", async () => {
+    /*
+     * POSITION, not presence. `warmBoardArt` was first called from `renderIntro`, which reads
+     * correctly and is wrong on one path: a player resuming a round they already started never
+     * sees the intro, so the board renders on the first response and the bezel - a background
+     * behind the grid - snaps in a frame or two later around a bare grid.
+     *
+     * A test asserting only that the warm exists is green on that version, because it does. So
+     * this pins it inside `boot` and BEFORE the first `refresh`, which is the call that can paint.
+     *
+     * Structural because `app.js` cannot be imported at all: it touches `document` at module
+     * scope, which is the whole reason `presentation.js` exists. See `test-presentation.ts`.
+     */
+    const app = await fetchRaw("/play/app.js");
+    assert.equal(app.status, 200);
+
+    const bootAt = app.text.indexOf("async function boot()");
+    assert.ok(bootAt > 0, "app.js no longer has a boot function under that name");
+    const body = app.text.slice(bootAt);
+    assert.ok(body.length > 200, "the slice found the name but not the body");
+
+    const warmAt = body.indexOf("warmBoardArt();");
+    const refreshAt = body.indexOf("await refresh()");
+    assert.ok(warmAt > 0, "boot does not warm the artwork");
+    assert.ok(refreshAt > 0, "boot no longer refreshes, so this test is aimed at nothing");
+    assert.ok(
+      warmAt < refreshAt,
+      "the artwork is warmed after the first fetch that can paint the board",
+    );
+
+    // And nowhere else: a second call site is how the "only on the intro" version comes back,
+    // half-fixed, with this test still green.
+    const calls = [...app.text.matchAll(/warmBoardArt\(\);/g)];
+    assert.equal(calls.length, 1, `expected one call to warmBoardArt, found ${calls.length}`);
   });
 
   await test("a refused asset is never remembered by a cache", async () => {

@@ -36,30 +36,60 @@ import { shapeFor } from "../src/games/titles";
 
 const CELL_PX = 40;
 
+/*
+ * Every node can hold children, not just the root.
+ *
+ * It grew this from a flat list on 8 September 2026, when the board started painting into layer
+ * groups so a drag repaints the wires without rebuilding the cells and the terminal artwork. A
+ * stub that only lets the ROOT hold children would have made that change untestable - and the
+ * tempting alternative, flattening the tree in the stub, would have quietly hidden the very thing
+ * the change is for: which nodes survive a repaint.
+ */
 interface FakeNode {
   nodeName: string;
   attributes: Map<string, string>;
   children: FakeNode[];
   textContent: string;
+  firstChild: FakeNode | null;
   setAttribute(name: string, value: string): void;
+  appendChild(node: FakeNode): void;
+  removeChild(node: FakeNode): void;
 }
 
 function fakeNode(nodeName: string): FakeNode {
-  return {
+  const node: FakeNode = {
     nodeName,
     attributes: new Map<string, string>(),
     children: [],
     textContent: "",
+    firstChild: null,
     setAttribute(name: string, value: string) {
       this.attributes.set(name, value);
     },
+    appendChild(child: FakeNode) {
+      node.children.push(child);
+    },
+    removeChild(child: FakeNode) {
+      const at = node.children.indexOf(child);
+      if (at >= 0) node.children.splice(at, 1);
+    },
   };
+
+  Object.defineProperty(node, "firstChild", {
+    get() {
+      return node.children.length > 0 ? node.children[0] : null;
+    },
+  });
+
+  return node;
+}
+
+/** Every node the board built, at any depth. */
+function descendants(node: FakeNode): FakeNode[] {
+  return node.children.flatMap((child) => [child, ...descendants(child)]);
 }
 
 interface FakeSvg extends FakeNode {
-  firstChild: FakeNode | null;
-  appendChild(node: FakeNode): void;
-  removeChild(node: FakeNode): void;
   addEventListener(type: string, handler: (event: unknown) => void): void;
   getBoundingClientRect(): { left: number; top: number; width: number; height: number };
   setPointerCapture(id: number): void;
@@ -72,19 +102,6 @@ function fakeSvg(): FakeSvg {
   node.handlers = new Map();
   node.grid = { width: 1, height: 1 };
 
-  Object.defineProperty(node, "firstChild", {
-    get() {
-      return node.children.length > 0 ? node.children[0] : null;
-    },
-  });
-
-  node.appendChild = (child: FakeNode) => {
-    node.children.push(child);
-  };
-  node.removeChild = (child: FakeNode) => {
-    const at = node.children.indexOf(child);
-    if (at >= 0) node.children.splice(at, 1);
-  };
   node.addEventListener = (type, handler) => {
     node.handlers.set(type, handler);
   };
@@ -459,6 +476,83 @@ async function main(): Promise<void> {
     const second = boardFor("determinism-1");
     assert.deepEqual(second.client.pairs, first.client.pairs);
     assert.equal(second.client.width, first.client.width);
+  });
+
+  console.log("");
+  console.log("What the board draws");
+
+  test("every terminal carries its number, so a missing image costs decoration only", () => {
+    /*
+     * The numeral is what makes the board playable for a colour-blind player and playable with no
+     * language at all, and it is drawn by us rather than being part of the artwork.
+     *
+     * This is the assertion that stops somebody deleting it as redundant once the tokens are on
+     * screen - the tokens have numerals of their own, so it LOOKS redundant. An `<image>` that
+     * 404s draws nothing and reports nothing, and this platform has had two production faults
+     * from exactly that (R52, R54). Without the vector numeral underneath, the same stale cache
+     * turns the board into unlabelled coloured rings.
+     */
+    const { client, svg } = boardFor("art-1", "large");
+    const labels = descendants(svg).filter((node) => node.nodeName === "text");
+    const expected = client.pairs.flatMap((pair) => [String(pair.id + 1), String(pair.id + 1)]);
+
+    assert.equal(labels.length, expected.length, "one numeral per terminal, both ends");
+    assert.deepEqual(labels.map((node) => node.textContent).sort(), expected.sort());
+  });
+
+  test("a terminal's artwork is chosen by its pair number, never by position", () => {
+    // `token-3.webp` has a 3 painted into it, so indexing this list by anything but the pair id
+    // puts one number in the artwork and a different one in the label underneath.
+    const { client, svg } = boardFor("art-2", "large");
+    const images = descendants(svg).filter((node) => node.nodeName === "image");
+    const hrefs = images.map((node) => node.attributes.get("href"));
+
+    assert.deepEqual(
+      hrefs.sort(),
+      client.pairs.flatMap((pair) => [
+        `/play/token-${pair.id + 1}.webp`,
+        `/play/token-${pair.id + 1}.webp`,
+      ]).sort(),
+    );
+  });
+
+  test("a drag repaints the wires and leaves the cells and terminals standing", () => {
+    /*
+     * The reason the board is drawn in layers, asserted by NODE IDENTITY rather than by counting.
+     *
+     * A count is green against a rebuild that produces the same number of nodes, which is exactly
+     * what the old single `render` did - and the cost it hid is real: every pointer move destroyed
+     * 36 cells and up to 16 terminals, eight of which carry an `<image>` the browser must resolve
+     * again, to move one line by one square. That is invisible on a desktop and is stutter on a
+     * phone, which is where this game is played and where the clock is the score.
+     */
+    const { generated, svg, board } = boardFor("layers-1");
+    const before = descendants(svg).filter((node) => node.nodeName === "image");
+    assert.ok(before.length > 0, "the fixture needs terminals with artwork");
+
+    drag(svg, generated.solution[0]);
+
+    const after = descendants(svg).filter((node) => node.nodeName === "image");
+    assert.equal(after.length, before.length);
+    // Identity, not equality: a rebuilt terminal would be an indistinguishable new node.
+    for (const [node, was] of after.map((node, at) => [node, before.at(at)] as const)) {
+      assert.equal(node, was, "a drag rebuilt a terminal it cannot have changed");
+    }
+    assert.ok(board.cellsUsed() > 0, "the drag under test must actually have drawn something");
+  });
+
+  test("resizing rebuilds, because the artwork is sized in the same units as the grid", () => {
+    // The other half of the layering rule: a repaint must NOT be enough here. Cells and terminals
+    // are drawn at `cellPx`, so a resize that only repainted the wires would leave the board's
+    // furniture at the old size while the wires moved - which reads as a rendering fault.
+    const { client, svg, board } = boardFor("layers-2");
+    const before = descendants(svg).filter((node) => node.nodeName === "image");
+
+    board.resize(client.width * CELL_PX * 2, client.height * CELL_PX * 2);
+
+    const after = descendants(svg).filter((node) => node.nodeName === "image");
+    assert.equal(after.length, before.length);
+    assert.notEqual(after[0], before[0], "a resize left the terminals at their old size");
   });
 
   console.log("");

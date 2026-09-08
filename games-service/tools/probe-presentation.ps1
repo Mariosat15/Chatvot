@@ -54,8 +54,8 @@ $results += Invoke-Probe -Name 'the height asked for is fed back from the height
 # defect produced. Tightening this to 2 would mean deleting three assertions to make a probe tidy.
 $results += Invoke-Probe -Name 'the request no longer scales with the grid' `
   -Suite $SuitePresentation -File $srcPresentation `
-  -Find '    return clampFrame(chrome + rows * TARGET_CELL_PX + BOARD_FRAME_PX);' `
-  -Replace '    return clampFrame(chrome + rows * MIN_CELL_PX + BOARD_FRAME_PX);' `
+  -Find '    return clampFrame(chrome + framedGridPx(rows * TARGET_CELL_PX) + BOARD_FRAME_PX);' `
+  -Replace '    return clampFrame(chrome + framedGridPx(rows * MIN_CELL_PX) + BOARD_FRAME_PX);' `
   -ExpectRed "a board always asks for more than a host's usual minimum, at every grid size" -MaxRed 4
 
 # A board screen taking the measured content height is the feedback loop by another route: the
@@ -252,10 +252,16 @@ Write-Host "The module graph the page cannot describe" -ForegroundColor Cyan
 # document's own references never sees it. A module missing from the allowlist is a 404 in the
 # middle of the graph: the importer fails to evaluate too, the game does not boot at all, and the
 # only evidence is a console message in a player's browser.
-$results += Invoke-Probe -Name 'a module reached only by import is dropped from the allowlist' `
-  -Suite $SuitePlayRoutes -File $srcPage `
-  -Find '  ["presentation.js", { file: "presentation.js", type: "text/javascript; charset=utf-8" }],' `
-  -Replace '  // removed by probe' `
+#
+# RE-AIMED on 8 September 2026, for the same reason as the sibling probe in `probe-board.ps1`: the
+# allowlist it removed an entry from stopped existing when R52's second fix derived the served set
+# from the directory, so it reported DID NOT APPLY - which reads like a broken harness rather than
+# a moved target. The half that can still go wrong is a module the directory does not hold, so the
+# mutation now renames the import instead.
+$results += Invoke-Probe -Name 'a module reached only by import goes missing' `
+  -Suite $SuitePlayRoutes -File 'public/play/board.js' `
+  -Find 'from "./presentation.js";' `
+  -Replace 'from "./presentation-v2.js";' `
   -ExpectRed 'every module the play surface imports is served'
 
 Write-ProbeSummary $results

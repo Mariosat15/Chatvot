@@ -48,6 +48,23 @@
   --accent-soft: rgba(56, 189, 248, 0.18);
   --accent-faint: rgba(56, 189, 248, 0.1);
   --accent-line: rgba(56, 189, 248, 0.35);
+  --accent-bright: #7dd8ff;
+
+  /* The brushed-metal edge the artwork's rings are made of. Used on the readouts and the buttons
+     so the chrome around the board belongs to the same machine as the board. */
+  --bezel-top: #3d4b63;
+  --bezel-bottom: #131c2c;
+
+  /*
+   * How far the bezel artwork reaches outside the grid, as a fraction of the grid's size.
+   *
+   * THE SECOND OF TWO COPIES. The first is `BOARD_ART_OVERHANG` in `presentation.js`, which is
+   * where the reasoning lives; a stylesheet cannot import a number, and a pinned pair is better
+   * than the grid measuring its own frame at runtime. `__tests__` compares them, because if they
+   * drift the opening stops landing on the grid's edge and the result reads as "the artwork is
+   * slightly wrong" rather than as a bug with a cause.
+   */
+  --board-art-overhang: 0.072;
 }
 
 * {
@@ -138,8 +155,15 @@ body {
 h1 {
   margin: 0;
   font-size: clamp(1.5rem, 5vw, 2rem);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  /* The same lit-glass treatment as the sockets and the clock. Two shadows rather than one: a
+     tight one for the edge and a wide faint one for the bloom, which is what stops it reading as
+     a blurred word. */
+  text-shadow:
+    0 0 2px rgba(125, 216, 255, 0.45),
+    0 0 18px rgba(56, 189, 248, 0.22);
 }
 
 .lead {
@@ -169,12 +193,26 @@ h1 {
   max-width: 32rem;
 }
 
+/*
+ * A panel is a lit plate: a dark face, a rim, and a bright bracket along its top edge.
+ *
+ * The bracket is a gradient on the background rather than a pseudo-element, so it costs no extra
+ * node and cannot be knocked out of place by the panel's own content. It is the same motif as the
+ * corner brackets in the board's bezel, which is what ties the two screens together without this
+ * file having to know anything about the artwork.
+ */
 .panel {
-  background: var(--panel-soft);
+  position: relative;
+  background:
+    linear-gradient(90deg, transparent 8%, var(--accent) 30%, var(--accent) 70%, transparent 92%)
+      top center / 60% 2px no-repeat,
+    linear-gradient(180deg, rgba(56, 189, 248, 0.07) 0%, transparent 40%),
+    var(--panel-soft);
   border: 1px solid var(--panel-edge);
   border-radius: var(--radius);
-  padding: 14px 16px;
+  padding: 16px 16px 14px;
   text-align: left;
+  box-shadow: inset 0 1px 0 rgba(190, 220, 255, 0.08);
 }
 
 .panel-title {
@@ -222,10 +260,14 @@ h1 {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent);
+  /* A miniature of the board's sockets, so the numbering reads as part of the same machine. */
+  background: radial-gradient(circle at 50% 34%, #16233c 0%, #05090f 100%);
+  box-shadow:
+    inset 0 0 0 1.5px var(--accent),
+    0 0 10px -2px var(--accent-soft);
+  color: var(--text);
   font-size: 0.72rem;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 /*
@@ -247,9 +289,9 @@ h1 {
 }
 
 .diagram-grid rect {
-  fill: var(--cell);
-  stroke: var(--cell-edge);
-  stroke-width: 1;
+  fill: url(#cell-face-flat);
+  stroke: rgba(125, 216, 255, 0.5);
+  stroke-width: 1.4;
 }
 
 .diagram-trace {
@@ -263,14 +305,39 @@ h1 {
   animation: draw 3.4s ease-in-out infinite;
 }
 
-.diagram-terminals circle {
+.diagram-trace-halo {
+  stroke-width: 26;
+  opacity: 0.2;
+}
+
+.diagram-trace-core {
+  stroke: #eaf6ff;
+  stroke-width: 3;
+  opacity: 0.42;
+}
+
+.diagram-bloom {
   fill: var(--accent);
+  opacity: 0.16;
+}
+
+.diagram-rim {
+  fill: #0a1524;
+  stroke: var(--accent);
+  stroke-width: 2.6;
+}
+
+.diagram-ring {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.4;
+  stroke-opacity: 0.35;
 }
 
 .diagram-terminals text {
-  fill: var(--accent-ink);
+  fill: var(--text);
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 800;
   text-anchor: middle;
   dominant-baseline: central;
 }
@@ -305,11 +372,30 @@ button:active:not(:disabled) {
   transform: translateY(1px);
 }
 
+/*
+ * The lit-panel button, built to match the sockets on the board: a dark glass face, a bright rim,
+ * and a bloom underneath.
+ *
+ * The rim is an `inset` box-shadow rather than a border, so the glow can sit outside the same
+ * element without a second wrapper - and so a disabled button drops the whole treatment by
+ * overriding one property. Cheap to paint and never animated: this is a timed game and a button
+ * that repaints on hover is a button competing with the board for frames.
+ */
 button.primary {
-  background: linear-gradient(180deg, var(--accent) 0%, #1b9fd8 100%);
-  color: var(--accent-ink);
-  font-weight: 700;
-  box-shadow: 0 6px 18px -8px var(--accent-deep);
+  background:
+    linear-gradient(180deg, rgba(125, 216, 255, 0.22) 0%, rgba(8, 24, 40, 0.9) 62%),
+    linear-gradient(180deg, #0d2135 0%, #071523 100%);
+  color: var(--accent-bright);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.9rem;
+  text-shadow: 0 0 12px rgba(125, 216, 255, 0.55);
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    inset 0 1px 0 rgba(190, 235, 255, 0.45),
+    inset 0 -14px 22px -18px var(--accent),
+    0 8px 26px -12px var(--accent-deep);
 }
 
 button.primary.large {
@@ -319,16 +405,20 @@ button.primary.large {
 }
 
 button.primary:disabled {
-  background: var(--cell-edge);
+  background: linear-gradient(180deg, #16203200 0%, #0b1322 100%);
   color: var(--muted);
-  box-shadow: none;
+  text-shadow: none;
+  box-shadow: inset 0 0 0 1px var(--panel-edge);
   cursor: default;
 }
 
 button.ghost {
-  background: transparent;
-  border-color: var(--panel-edge);
-  color: var(--muted);
+  background: linear-gradient(180deg, rgba(61, 75, 99, 0.35) 0%, rgba(19, 28, 44, 0.6) 100%);
+  border-color: transparent;
+  color: var(--text);
+  box-shadow:
+    inset 0 0 0 1px var(--panel-edge),
+    inset 0 1px 0 rgba(190, 220, 255, 0.16);
 }
 
 button.small-btn {
@@ -350,22 +440,73 @@ button.small-btn {
   gap: 8px;
 }
 
-.progress {
+/*
+ * The two instrument readouts. Same construction as the board's sockets and the primary button:
+ * a dark glass face inside a lit rim.
+ *
+ * `min-width` on the clock's value, not on the readout, and tabular figures on both: a countdown
+ * crossing from 10:00 to 9:59 loses a character, and without a reserved width it drags the whole
+ * header sideways once a second in the player's peripheral vision while they are concentrating on
+ * the grid.
+ */
+.readout {
+  display: grid;
+  gap: 1px;
+  padding: 5px 12px 6px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, #101d31 0%, #0a1322 100%);
+  box-shadow:
+    inset 0 0 0 1px var(--panel-edge),
+    inset 0 1px 0 rgba(190, 220, 255, 0.14);
+  text-align: left;
+}
+
+.readout-label {
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   color: var(--muted);
-  font-size: 0.9rem;
+}
+
+.readout-value {
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.1;
   font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.readout-clock {
+  box-shadow:
+    inset 0 0 0 1px var(--accent-line),
+    inset 0 1px 0 rgba(190, 235, 255, 0.2),
+    0 0 22px -10px var(--accent);
 }
 
 .clock {
-  font-size: 1.45rem;
-  font-weight: 700;
-  /* Tabular figures, so the countdown does not shift the layout every second. */
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
+  display: inline-block;
+  min-width: 3.4ch;
+  font-size: 1.32rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: var(--accent-bright);
+  text-shadow: 0 0 14px rgba(125, 216, 255, 0.5);
 }
 
 .clock.urgent {
   color: var(--danger);
+  text-shadow: 0 0 14px rgba(251, 113, 133, 0.55);
+}
+
+/* The rim goes red with the figures. Without it the panel keeps saying "everything is fine" while
+   the number inside it says the opposite, which is the sort of half-signal a player under a clock
+   reads as neither. */
+.readout-clock:has(.clock.urgent) {
+  box-shadow:
+    inset 0 0 0 1px rgba(251, 113, 133, 0.6),
+    inset 0 1px 0 rgba(255, 210, 220, 0.2),
+    0 0 22px -10px var(--danger);
 }
 
 /* ------------------------------------------------------------------------------------------
@@ -381,50 +522,131 @@ button.small-btn {
   justify-content: center;
 }
 
+/*
+ * The grid and the bezel drawn around it.
+ *
+ * The stage is sized by the `<svg>`, which carries explicit `width`/`height` attributes written by
+ * `board.js`. The artwork is then positioned against the stage with a NEGATIVE inset, so it
+ * overhangs by the same fraction the grid reserved for it - see `--board-art-overhang`.
+ */
+.board-stage {
+  position: relative;
+  /* Reason: an inline `<svg>` sits on the text baseline, which leaves a few pixels of descender
+     space below it - enough to push the bezel off centre against the grid. */
+  line-height: 0;
+}
+
+.board-art {
+  position: absolute;
+  inset: calc(var(--board-art-overhang) * -100%);
+  background-image: url("/play/board-frame.webp");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  /* The artwork is decoration over a board that is already complete without it, so it must never
+     intercept a drag - the grid underneath is the hit area, and the bezel overhangs it. */
+  pointer-events: none;
+}
+
+/*
+ * The grid paints ABOVE the bezel, which needs saying because the markup has the bezel first and
+ * the natural reading is that DOM order settles it. It does not: an absolutely positioned element
+ * paints over a static one whatever the order, so without this the artwork covered the board - and
+ * since the frame's opening is transparent, it covered it faintly enough to look like a rendering
+ * bug rather than a stacking one. The tokens are the visible casualty, being nearest the edge.
+ */
+.board-stage svg#board {
+  position: relative;
+  z-index: 1;
+}
+
 svg#board {
   /* The one rule in this file that is load-bearing rather than cosmetic: without it a drag
      scrolls the page on every touch device and the game is unplayable on a phone. */
   touch-action: none;
   display: block;
-  background: var(--panel);
-  border: 1px solid var(--panel-edge);
-  border-radius: var(--radius);
-  box-shadow: 0 24px 50px -30px #000;
+  background: radial-gradient(120% 100% at 50% 0%, #12233d 0%, #091425 100%);
+  border-radius: 6px;
+  box-shadow: 0 30px 60px -34px #000;
 }
 
+/* The soft outer half of a cell's edge. Wide and faint: this is the bloom. */
 svg#board .cell {
-  fill: var(--cell);
-  stroke: var(--cell-edge);
-  stroke-width: 1;
+  fill: url(#cell-face);
+  stroke: rgba(96, 190, 255, 0.16);
+}
+
+/* The crisp inner half, which is what actually reads as an edge. */
+svg#board .cell-lip {
+  fill: none;
+  stroke: rgba(125, 216, 255, 0.55);
+}
+
+/* The four-point stars where the grid lines cross. One path node for all of them - see `build`
+   in `board.js`, which explains why they are not one element each. */
+svg#board .junction {
+  fill: var(--accent);
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 /* The unused-square marker. See `board.js` - it is how the coverage rule becomes visible instead
    of being a number in the hint line. */
 svg#board .pip {
-  fill: var(--cell-edge);
+  fill: rgba(125, 216, 255, 0.4);
   pointer-events: none;
 }
 
 svg#board .trace,
-svg#board .trace-halo {
+svg#board .trace-halo,
+svg#board .trace-core {
   pointer-events: none;
 }
 
 svg#board .trace-halo {
-  opacity: 0.22;
+  opacity: 0.2;
+}
+
+/* A pale line down the middle of the conductor, which is what makes a wire read as lit from the
+   inside rather than as a coloured stripe. Kept faint: at full strength it washes the pair's own
+   colour out, and the colour is what tells two crossing paths apart. */
+svg#board .trace-core {
+  opacity: 0.42;
 }
 
 svg#board .terminal {
   pointer-events: none;
-  /* A ring in the surface colour between the fill and the stroke, so a terminal reads as a socket
-     rather than a blob - and so two adjacent terminals of similar hue stay countable. */
+}
+
+/* The bloom under a socket, so a terminal sits in its own pool of light rather than on top of the
+   cell. Low enough not to tint the neighbouring squares. */
+svg#board .socket-bloom {
+  opacity: 0.16;
+}
+
+svg#board .socket-rim {
+  stroke-opacity: 0.9;
+}
+
+svg#board .socket-ring {
   stroke-opacity: 0.35;
 }
 
+/*
+ * The numeral, drawn UNDER the artwork and visible only when the artwork is absent.
+ *
+ * It is what makes the board playable for a colour-blind player and playable with no language at
+ * all, so it must not depend on an image arriving - this platform has had two production faults
+ * caused by an asset a stale cache refused to fetch. A terminal that loses its picture loses
+ * decoration; a terminal that loses its number loses its meaning.
+ */
 svg#board .terminal-label {
   pointer-events: none;
-  fill: var(--accent-ink);
+  fill: var(--text);
   font-weight: 800;
+}
+
+svg#board .terminal-art {
+  pointer-events: none;
 }
 
 .hint {
@@ -506,13 +728,23 @@ svg#board .terminal-label {
   stroke: var(--muted);
 }
 
+/*
+ * The one figure on the result screen, and there is deliberately no score beside it - see
+ * `resultCopy`. It gets the readout treatment for the same reason the clock does: it is an
+ * instrument reading, and the player has just spent the whole round looking at two of them.
+ */
 .stat {
   display: grid;
   gap: 2px;
-  padding: 12px 26px;
-  border: 1px solid var(--panel-edge);
+  padding: 14px 30px;
   border-radius: var(--radius);
-  background: var(--panel-soft);
+  background:
+    linear-gradient(90deg, transparent 10%, var(--accent) 32%, var(--accent) 68%, transparent 90%)
+      top center / 55% 2px no-repeat,
+    linear-gradient(180deg, #101d31 0%, #0a1322 100%);
+  box-shadow:
+    inset 0 0 0 1px var(--accent-line),
+    0 0 30px -16px var(--accent);
 }
 
 .stat-value {
@@ -520,7 +752,8 @@ svg#board .terminal-label {
   font-weight: 800;
   line-height: 1;
   font-variant-numeric: tabular-nums;
-  color: var(--accent);
+  color: var(--accent-bright);
+  text-shadow: 0 0 18px rgba(125, 216, 255, 0.45);
 }
 
 .stat-label {

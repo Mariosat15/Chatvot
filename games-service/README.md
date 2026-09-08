@@ -175,8 +175,24 @@ provider holding its own copy is a provider that keeps posting to a decommission
 ## The play surface
 
 The launch URL the platform is handed points at `GET /play?t={token}`, served from
-`public/play/` by `src/http/play-page.ts`. Five files, no build step and no framework: a phone on
-a bad connection is the target, and a bundler here would buy nothing.
+`public/play/` by `src/http/play-page.ts`. Five code files plus nine images, no build step and no
+framework: a phone on a bad connection is the target, and a bundler here would buy nothing.
+
+**The artwork is decoration and the vectors underneath are the game.** `board-frame.webp` is the
+bezel and `token-1.webp`..`token-8.webp` are the terminals, but every terminal also draws its own
+lit ring and its own numeral in SVG, so an image that fails to arrive costs polish and never
+legibility. That is the only reason it is acceptable to depend on a network fetch inside a paid
+round - and it is why a test pins the numeral, since "the artwork covers it anyway" is exactly the
+reasoning that would delete it. Two consequences worth knowing before touching `board.js`:
+
+- **The bezel is sized in grid units.** `BOARD_ART_OVERHANG` in `presentation.js` is the fraction
+  of the grid the frame overhangs, and `spaceForGrid` reserves it before a cell size is chosen -
+  without that, the frame's outer edge is what meets the viewport and the outer row of cells is
+  clipped. **The same number lives in `app.css` as `--board-art-overhang`**, because a stylesheet
+  cannot import one, and a test pins the pair.
+- **`build` draws the cells and terminals, `paint` draws only the wires.** Nothing a pointer does
+  can move a cell, so a drag repaints the wires alone rather than re-decoding eight images every
+  frame. A **resize** must do the opposite and rebuild, because the artwork is sized in grid units.
 
 **`presentation.js` is where the layout numbers and every word of player-facing copy live, and
 that separation is the reason the surface is testable at all.** `app.js` touches `document` at
@@ -335,12 +351,12 @@ npm run probe:boot-watchdog  # the same, for the watchdog that names a module wh
 > that would have sent it was definitely present.** A test pins the markup's side of that bargain:
 > exactly one screen ships visible, and it is the loading screen.
 
-`npm test` runs **219 tests**: 15 config, 42 engine, 28 scoring, 41 API, 58 play and delivery,
-11 board client, 24 presentation. (Any figure of 217 predates the watchdog's second witness, 216
-predates the stale-cache recovery, 213
+`npm test` runs **225 tests**: 15 config, 42 engine, 28 scoring, 41 API, 61 play and delivery,
+15 board client, 24 presentation. (Any figure of 219 predates the board artwork, 217 predates the
+watchdog's second witness, 216 predates the stale-cache recovery, 213
 predates the boot watchdog, 209 predates the directory-derived asset set, 204 predates the
 deploy-drift audit, 167 predates the presentation suite, and 152 predates the config suite; all
-six are stale.)
+seven are stale.)
 
 **Every one of them runs in-process against an in-memory MongoDB, so none can fail because the
 PLATFORM disagrees with this service.** That check lives on the other side, in the platform's
