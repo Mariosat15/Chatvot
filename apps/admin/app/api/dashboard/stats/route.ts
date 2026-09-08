@@ -5,7 +5,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
@@ -13,6 +13,11 @@ import WithdrawalRequest from "@/database/models/withdrawal-request.model";
 import FraudAlert from "@/database/models/fraud/fraud-alert.model";
 import PaymentProvider from "@/database/models/payment-provider.model";
 import { WhiteLabel } from "@/database/models/whitelabel.model";
+import {
+  getLiveContestOverview,
+  shouldShowPriceFeed,
+  type LiveContestOverview,
+} from "@/lib/services/games/live-contest-overview.service";
 
 // Get User, KYCVerification, and KYCSettings collections directly (models not available in admin app)
 const getUserCollection = () => mongoose.connection.collection("users");
@@ -88,6 +93,15 @@ interface DashboardStats {
     kyc: "operational" | "degraded" | "down" | "not_configured";
   };
 
+  /**
+   * What is running right now, per game.
+   *
+   * Deliberately carries no money. The overview is granted by the `overview` section while
+   * revenue lives behind `analytics` and `financial`, so a prize pool or a fee figure here
+   * would quietly widen who can read the platform's earnings.
+   */
+  contests: LiveContestOverview & { showPriceFeed: boolean };
+
   // Recent Activity
   recentActivity: {
     type: "deposit" | "withdrawal" | "user" | "kyc" | "fraud";
@@ -98,6 +112,30 @@ interface DashboardStats {
 
   // Timestamp
   generatedAt: string;
+}
+
+/*
+  The three shapes the recent-activity feed reads.
+
+  Reason they are named rather than cast with `as any[]`: the pre-commit hook rejects `any` in a
+  file being edited, and naming the two or three fields each loop touches is both narrower and
+  self-documenting. `unknown` first because these arrive from `.lean()`, whose inferred type has
+  no properties in common with a declared interface.
+*/
+interface RecentDepositRow {
+  status?: string;
+  metadata?: { eurAmount?: number };
+  createdAt: Date;
+}
+interface RecentWithdrawalRow {
+  status?: string;
+  amountEUR?: number;
+  createdAt: Date;
+}
+interface RecentUserRow {
+  name?: string;
+  email?: string;
+  createdAt: Date;
 }
 
 // Helper to get date boundaries
@@ -203,7 +241,7 @@ async function checkServiceStatus(): Promise<DashboardStats["services"]> {
         if (kycSettings && (kycSettings.veriffApiKey || kycSettings.enabled)) {
           services.kyc = "operational";
         }
-      } catch (e) {
+      } catch {
         // KYCSettings collection might not exist, continue
       }
     }
@@ -216,10 +254,21 @@ async function checkServiceStatus(): Promise<DashboardStats["services"]> {
 
 export async function GET() {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    /*
+      SECTION ACCESS, NOT ADMIN-AT-ALL, AND THE CHANGE IS REQUIRED BY THE PAYLOAD RATHER THAN
+      TIDINESS. This used to call `verifyAdminAuth`, which asks only whether the caller is an
+      admin of any kind - so an employee granted one unrelated section passed it. That is the
+      eighth instance of that class here, after Prerequisite A, the internal-secret fallbacks,
+      the unprotected suspicion-score route, the provider admin routes, the trading contest
+      PUT, the lifecycle routes and the analytics route.
+
+      It matters more than usual now: this response gained contest and participant counts, so
+      leaving the weaker check would have widened who can read them. `overview` is the section
+      that owns the only screen fetching this route - checked with `rg`, there is exactly one
+      caller - so nobody who could reach the screen loses access.
+    */
+    const guard = await guardSection("overview");
+    if (!guard.ok) return guard.response;
 
     await connectToDatabase();
 
@@ -274,6 +323,9 @@ export async function GET() {
 
       // Service status
       services,
+
+      // What is running right now, per game
+      contestOverview,
     ] = await Promise.all([
       // User queries (using collection directly)
       // estimatedDocumentCount() is O(1) metadata read vs countDocuments() full scan
@@ -458,12 +510,31 @@ export async function GET() {
 
       // Service status
       checkServiceStatus(),
+
+      /*
+        Reason it degrades to an empty overview rather than failing the request: every other
+        figure on this page is independent of it, and a front page that returns 500 because one
+        contest aggregation failed tells an operator nothing about the deposits and fraud alerts
+        it could have shown. An empty `rows` array renders as "nothing running", which is
+        honest, and the error is logged with context.
+      */
+      getLiveContestOverview().catch((error) => {
+        console.error("❌ Live contest overview failed:", error);
+        return {
+          rows: [],
+          totals: { active: 0, upcoming: 0, participants: 0 },
+          // Fails towards SHOWING the price-feed tile. Withholding a health indicator because a
+          // contest query failed is the one direction that costs an operator information.
+          tradingEnabled: true,
+          tradingHasLiveContests: false,
+        } satisfies LiveContestOverview;
+      }),
     ]);
 
     // Build recent activity
     const recentActivity: DashboardStats["recentActivity"] = [];
 
-    for (const deposit of recentDeposits as any[]) {
+    for (const deposit of recentDeposits as unknown as RecentDepositRow[]) {
       recentActivity.push({
         type: "deposit",
         description: `€${deposit.metadata?.eurAmount?.toFixed(2) || "0"} deposit ${deposit.status}`,
@@ -477,7 +548,7 @@ export async function GET() {
       });
     }
 
-    for (const withdrawal of recentWithdrawals as any[]) {
+    for (const withdrawal of recentWithdrawals as unknown as RecentWithdrawalRow[]) {
       recentActivity.push({
         type: "withdrawal",
         description: `€${withdrawal.amountEUR?.toFixed(2) || "0"} withdrawal ${withdrawal.status}`,
@@ -485,13 +556,16 @@ export async function GET() {
         status:
           withdrawal.status === "completed"
             ? "success"
-            : ["failed", "rejected"].includes(withdrawal.status)
+            : // Reason for the `?? ""`: the named shape types `status` as optional, and an
+              // absent status must keep falling through to "warning" exactly as it did under the
+              // `any` cast this replaced — `includes(undefined)` was already false.
+              ["failed", "rejected"].includes(withdrawal.status ?? "")
               ? "error"
               : "warning",
       });
     }
 
-    for (const user of recentUsers as any[]) {
+    for (const user of recentUsers as unknown as RecentUserRow[]) {
       recentActivity.push({
         type: "user",
         description: `New user: ${user.name || user.email}`,
@@ -550,6 +624,10 @@ export async function GET() {
         bannedUsers: bannedUsers,
       },
       services,
+      contests: {
+        ...contestOverview,
+        showPriceFeed: shouldShowPriceFeed(contestOverview),
+      },
       recentActivity: recentActivity.slice(0, 10),
       generatedAt: new Date().toISOString(),
     };

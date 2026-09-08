@@ -12,7 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Users,
-  CreditCard,
   ArrowDownToLine,
   ArrowUpFromLine,
   AlertTriangle,
@@ -22,10 +21,7 @@ import {
   RefreshCcw,
   RefreshCw,
   Activity,
-  Server,
-  Wifi,
   Shield,
-  Database,
   Zap,
   TrendingUp,
   UserCheck,
@@ -33,6 +29,8 @@ import {
   Eye,
   BarChart3,
   Loader2,
+  Gamepad2,
+  Trophy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -95,6 +93,29 @@ interface DashboardStats {
     redis: "operational" | "degraded" | "down" | "not_configured";
     kyc: "operational" | "degraded" | "down" | "not_configured";
   };
+  /*
+    What is running right now, per game.
+
+    Reason it is optional: a browser holding this page open across a deploy has the previous
+    response in state, and every field below is read behind a check rather than assumed. There
+    is deliberately no money on it - the overview is granted by the `overview` section while
+    revenue lives behind `analytics` and `financial`.
+  */
+  contests?: {
+    rows: {
+      key: string;
+      label: string;
+      provider: string | null;
+      isProviderGame: boolean;
+      active: number;
+      upcoming: number;
+      participants: number;
+    }[];
+    totals: { active: number; upcoming: number; participants: number };
+    tradingEnabled: boolean;
+    tradingHasLiveContests: boolean;
+    showPriceFeed: boolean;
+  };
   recentActivity: {
     type: "deposit" | "withdrawal" | "user" | "kyc" | "fraud";
     description: string;
@@ -104,31 +125,36 @@ interface DashboardStats {
   generatedAt: string;
 }
 
-const statusColors = {
-  operational: "bg-green-500",
-  degraded: "bg-yellow-500",
-  down: "bg-red-500",
-  not_configured: "bg-gray-500",
-};
+type ServiceStatus = "operational" | "degraded" | "down" | "not_configured";
 
-const statusText = {
-  operational: "Operational",
-  degraded: "Degraded",
-  down: "Down",
-  not_configured: "Not Configured",
-};
+/*
+  Reason these are `Map`s rather than objects: the status arrives from an API response, and an
+  object index walks the prototype chain - a status of `"__proto__"` returns a truthy
+  `Object.prototype` that survives any `!value` test. Fifth instance after the round-inspector
+  action list, `competition-update-fields.ts`, the unscored-policy copy and the live-contest
+  grouping. A `Map` has no prototype chain, so the lookup is total.
+*/
+const statusColors = new Map<ServiceStatus, string>([
+  ["operational", "bg-green-500"],
+  ["degraded", "bg-yellow-500"],
+  ["down", "bg-red-500"],
+  ["not_configured", "bg-gray-500"],
+]);
 
-function StatusIndicator({
-  status,
-}: {
-  status: "operational" | "degraded" | "down" | "not_configured";
-}) {
+const statusText = new Map<ServiceStatus, string>([
+  ["operational", "Operational"],
+  ["degraded", "Degraded"],
+  ["down", "Down"],
+  ["not_configured", "Not Configured"],
+]);
+
+function StatusIndicator({ status }: { status: ServiceStatus }) {
   return (
     <div className="flex items-center gap-2">
       <div
         className={cn(
           "h-2.5 w-2.5 rounded-full animate-pulse",
-          statusColors[status],
+          statusColors.get(status),
         )}
       />
       <span
@@ -140,11 +166,31 @@ function StatusIndicator({
           status === "not_configured" && "text-gray-400",
         )}
       >
-        {statusText[status]}
+        {statusText.get(status)}
       </span>
     </div>
   );
 }
+
+type StatCardColor = "blue" | "green" | "yellow" | "red" | "purple" | "cyan";
+
+const statCardGradients = new Map<StatCardColor, string>([
+  ["blue", "from-blue-500/20 to-blue-600/10 border-blue-500/30"],
+  ["green", "from-green-500/20 to-green-600/10 border-green-500/30"],
+  ["yellow", "from-yellow-500/20 to-yellow-600/10 border-yellow-500/30"],
+  ["red", "from-red-500/20 to-red-600/10 border-red-500/30"],
+  ["purple", "from-purple-500/20 to-purple-600/10 border-purple-500/30"],
+  ["cyan", "from-cyan-500/20 to-cyan-600/10 border-cyan-500/30"],
+]);
+
+const statCardIconColors = new Map<StatCardColor, string>([
+  ["blue", "text-blue-400"],
+  ["green", "text-green-400"],
+  ["yellow", "text-yellow-400"],
+  ["red", "text-red-400"],
+  ["purple", "text-purple-400"],
+  ["cyan", "text-cyan-400"],
+]);
 
 function StatCard({
   title,
@@ -162,32 +208,17 @@ function StatCard({
   icon: React.ElementType;
   trend?: "up" | "down" | "neutral";
   trendLabel?: string;
-  color?: "blue" | "green" | "yellow" | "red" | "purple" | "cyan";
+  color?: StatCardColor;
   onClick?: () => void;
 }) {
-  const colorClasses = {
-    blue: "from-blue-500/20 to-blue-600/10 border-blue-500/30",
-    green: "from-green-500/20 to-green-600/10 border-green-500/30",
-    yellow: "from-yellow-500/20 to-yellow-600/10 border-yellow-500/30",
-    red: "from-red-500/20 to-red-600/10 border-red-500/30",
-    purple: "from-purple-500/20 to-purple-600/10 border-purple-500/30",
-    cyan: "from-cyan-500/20 to-cyan-600/10 border-cyan-500/30",
-  };
-
-  const iconColors = {
-    blue: "text-blue-400",
-    green: "text-green-400",
-    yellow: "text-yellow-400",
-    red: "text-red-400",
-    purple: "text-purple-400",
-    cyan: "text-cyan-400",
-  };
+  // Maps for the same reason as the status lookups above: a total lookup with no prototype
+  // chain. These keys are typed literals rather than API data, so this one is consistency.
 
   return (
     <Card
       className={cn(
         "bg-gradient-to-br border cursor-pointer transition-all hover:scale-[1.02]",
-        colorClasses[color],
+        statCardGradients.get(color),
       )}
       onClick={onClick}
     >
@@ -221,7 +252,10 @@ function StatCard({
             )}
           </div>
           <div
-            className={cn("p-3 rounded-lg bg-gray-800/50", iconColors[color])}
+            className={cn(
+              "p-3 rounded-lg bg-gray-800/50",
+              statCardIconColors.get(color),
+            )}
           >
             <Icon className="h-5 w-5" />
           </div>
@@ -310,7 +344,6 @@ export default function AdminOverviewDashboard({
     fetchStats();
     // Don't auto-run reconciliation on load - it's expensive and creates audit logs
     // User can manually refresh via the Refresh button
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleRefresh = () => {
@@ -441,10 +474,26 @@ export default function AdminOverviewDashboard({
                 <StatusIndicator status={stats.services.payments.paddle} />
               </div>
             )}
-            <div className="space-y-1">
-              <p className="text-xs text-gray-500 uppercase">WebSocket</p>
-              <StatusIndicator status={stats.services.massive} />
-            </div>
+            {/*
+              THE PRICE FEED, WITHHELD ONLY WHEN NOTHING COULD POSSIBLY NEED IT.
+
+              `12` s5 asks for this hidden when trading is off. The server decides, because the
+              condition is two facts rather than one: switching trading off stops new trading
+              contests being created and entered, and does NOT close the ones already running -
+              every open position in them is still priced and settled from this feed. Hiding the
+              only tile that reports it while a trading contest is live would remove the
+              indicator at exactly the moment an operator needs it.
+
+              `!== false` rather than a truthy test: a browser holding this page across a deploy
+              has a response with no `contests` block, and a health tile must fail towards being
+              shown.
+            */}
+            {stats.contests?.showPriceFeed !== false && (
+              <div className="space-y-1">
+                <p className="text-xs text-gray-500 uppercase">Price feed</p>
+                <StatusIndicator status={stats.services.massive} />
+              </div>
+            )}
             <div className="space-y-1">
               <p className="text-xs text-gray-500 uppercase">Redis</p>
               <StatusIndicator status={stats.services.redis} />
@@ -456,6 +505,121 @@ export default function AdminOverviewDashboard({
           </div>
         </CardContent>
       </Card>
+
+      {/*
+        WHAT IS RUNNING RIGHT NOW, PER GAME.
+
+        `12` s5 asks the front page for active contests and participants per game, and its row
+        reads as though a trading-shaped aggregate needed a game dimension adding. It did not:
+        this screen counted NO contests, of any game. So nothing here corrects a wrong figure -
+        there was no figure.
+
+        Two rules it obeys. It groups on `gameKey` and nothing enumerates game types, so a new
+        game appears without a line of code (invariant 8). And it carries **no money**, because
+        the overview is granted by `overview` while revenue sits behind `analytics` and
+        `financial` - a prize pool here would quietly widen who can read the platform's
+        earnings. It says where money lives instead, since a screen that omits it silently
+        teaches an operator the figures do not exist.
+      */}
+      {stats.contests && (
+        <Card className="bg-gray-900/50 border-gray-800">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Gamepad2 className="h-5 w-5 text-purple-400" />
+              Live competitions
+            </CardTitle>
+            <CardDescription>
+              Running and scheduled contests by game. Drafts are not counted.
+              Entry-fee and prize figures are on the Analytics screen.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-lg border border-gray-800 bg-gray-800/30 p-3">
+                <p className="text-xs uppercase text-gray-500">Active</p>
+                <p className="text-2xl font-bold text-green-400">
+                  {stats.contests.totals.active}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-800 bg-gray-800/30 p-3">
+                <p className="text-xs uppercase text-gray-500">Upcoming</p>
+                <p className="text-2xl font-bold text-blue-400">
+                  {stats.contests.totals.upcoming}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-800 bg-gray-800/30 p-3">
+                <p className="text-xs uppercase text-gray-500">Participants</p>
+                <p className="text-2xl font-bold text-gray-100">
+                  {stats.contests.totals.participants}
+                </p>
+              </div>
+            </div>
+
+            {stats.contests.rows.length === 0 ? (
+              <p className="text-sm text-gray-400">
+                Nothing is running right now. Contests appear here once they are
+                published.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {stats.contests.rows.map((row) => (
+                  <div
+                    key={row.key}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-800 bg-gray-800/20 px-3 py-2.5"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      {row.isProviderGame ? (
+                        <Gamepad2 className="h-4 w-4 text-purple-300" />
+                      ) : (
+                        <TrendingUp className="h-4 w-4 text-blue-300" />
+                      )}
+                      <div>
+                        <p className="text-sm font-medium text-gray-100">
+                          {row.label}
+                        </p>
+                        {/*
+                          The supplier, and only when there is one. Trading is ours, so a
+                          "Provider: ChartVolt" line beside it would invent a relationship.
+                        */}
+                        {row.provider && (
+                          <p className="text-xs text-gray-500">{row.provider}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs">
+                      <span className="text-green-400">
+                        {row.active} active
+                      </span>
+                      <span className="text-blue-400">
+                        {row.upcoming} upcoming
+                      </span>
+                      <span className="flex items-center gap-1 text-gray-300">
+                        <Trophy className="h-3.5 w-3.5 text-yellow-500" />
+                        {row.participants}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/*
+              Said only when it is true. A game an operator has switched off with a contest
+              still running is deliberately still counted above - that is precisely the state
+              worth surfacing - so the reason it appears has to be stated or the row reads as
+              the switch having failed.
+            */}
+            {!stats.contests.tradingEnabled &&
+              stats.contests.tradingHasLiveContests && (
+                <p className="text-xs text-yellow-400">
+                  Trading is switched off but still has contests running. They
+                  finish and settle normally; no new ones can be created or
+                  entered.
+                </p>
+              )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Reconciliation Check */}
       <Card
@@ -768,7 +932,7 @@ export default function AdminOverviewDashboard({
               <BarChart3 className="h-5 w-5 text-green-400" />
               Financial Overview
             </CardTitle>
-            <CardDescription>Today's financial summary</CardDescription>
+            <CardDescription>Today&apos;s financial summary</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">

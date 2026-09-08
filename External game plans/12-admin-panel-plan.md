@@ -1461,7 +1461,7 @@ what the derivation observed, never the current verdict.
 
 | Screen | Change |
 |---|---|
-| `AdminOverviewDashboard.tsx` | Active contests and participants **per game**. Hide the price-feed panel when trading is off |
+| `AdminOverviewDashboard.tsx` | Active contests and participants **per game**. Hide the price-feed panel when trading is off. **BUILT - s5.1b**, with the price-feed rule narrowed for the reason recorded there |
 | `CompetitionAnalytics.tsx` | Game filter, module-declared columns, participation funnel |
 | `FinancialDashboard.tsx` | Entry-fee volume, fee revenue, payout ratio and average pot **by game** - and by provider, since provider cost is per-provider |
 | `TradingHistorySection.tsx` | Leave as-is. Hide when trading disabled |
@@ -1494,7 +1494,8 @@ Two of the seven rows in the table above, plus the whole of **New: Game Performa
 `CompetitionAnalytics.tsx` became game-aware and grew a by-game and by-provider financial
 breakdown, which is `FinancialDashboard.tsx`'s row satisfied on the analytics screen rather
 than on the financial one - see the deviation at the end. **50 tests, 39 probes.** Still
-outstanding in this section: `AdminOverviewDashboard.tsx`, the hide-when-trading-off rows,
+outstanding in this section: `AdminOverviewDashboard.tsx` (**closed by s5.1b**, 8 September
+2026 - stale as a present fact, correct as history), the hide-when-trading-off rows,
 the participation funnel on the analytics screen itself (it is on Game Performance instead),
 and the per-round provider cost the commercial question needs, which has no data source until
 X4 supplies a real contract.
@@ -1672,7 +1673,94 @@ trap as the R42 fixture, and it is pinned by its own test.
   the stored `qualificationStatus` snapshot remain invisible outside the contest view screen
   added in s2.6. That is X6.5.
 - **`AdminOverviewDashboard.tsx` is untouched**, so the platform's front page still counts
-  active contests and participants with no game dimension at all.
+  active contests and participants with no game dimension at all. **Closed by s5.1b on
+  8 September 2026** - and the sentence above is wrong in a way worth keeping, because it
+  says "with no game dimension" where the truth was that it counted no contests at all.
+
+### 5.1b What was built - 8 September 2026, the overview's live-competition figures
+
+The first row of the table in section 5. `getLiveContestOverview()` groups every `active` and
+`upcoming` contest by game, `/api/dashboard/stats` carries it, and the front page renders a
+**Live competitions** card beside System Status. **14 tests, 8 probes red on exactly the
+expected test.**
+
+**The live code:**
+
+| File | What it is |
+|---|---|
+| `apps/admin/lib/services/games/live-contest-overview.service.ts` | The aggregation, plus `shouldShowPriceFeed` |
+| `apps/admin/app/api/dashboard/stats/route.ts` | Carries the figures - and is now granted by `overview` rather than by admin-at-all |
+| `apps/admin/components/admin/AdminOverviewDashboard.tsx` | The Live competitions card, and the conditional price-feed tile |
+
+**Nothing here is mirrored.** `apps/admin/lib/services/games/` and the admin API routes are
+admin-only, so `check:mirrors` says nothing about any of it.
+
+#### The five things worth knowing
+
+- **The row reads as a trading-shaped aggregate needing a game dimension added, and that is
+  not what was there.** No competition model, no participant model and no game field appeared
+  anywhere in `AdminOverviewDashboard.tsx` or `/api/dashboard/stats`. **The overview counted no
+  contests at all, of any game.** So this is additive, and none of the "a trading-shaped
+  aggregate keeps computing and keeps being wrong" hazard applies - there was no wrong number
+  on the screen, there was no number. Worth stating rather than letting a summary imply a
+  defect was fixed.
+- **Seats are attributed to the CONTEST's game, never to the seat's own label** - and the
+  obvious one-query version does the opposite. `competition_participant.gameKey` is
+  denormalised onto the seat with a schema default of `trading`, the Game Master route inserts
+  with the raw driver and bypasses defaults entirely (**R7**), and the X1 backfill has never
+  been applied to production. So a provider contest's seats can be stored labelled `trading`,
+  and grouping on them files real game entrants under trading **while every total still adds
+  up.** The contest is the authority on its own game.
+- **`competition_participant.competitionId` is declared `String` while `Competition._id` is an
+  ObjectId**, and an aggregation pipeline does no casting, so an unconverted `$in` matches
+  nothing and reports every contest as empty. Third instance after the R42 fixture and the
+  analytics participation funnel.
+- **The screen carries no money, and that is an RBAC decision rather than a layout one.** The
+  overview is granted by `overview` while revenue lives behind `analytics` and `financial`, so
+  a prize-pool figure here is a **silent widening of who can read the platform's earnings** -
+  and it reviews as a helpful addition. The guard asserts the field names the service could
+  select, not the word "revenue". Same reasoning that keeps Game Performance free of revenue.
+- **The route was granted by `verifyAdminAuth`**, which asks only whether the caller is an
+  admin at all, so an employee granted one unrelated section passed it. Now `guardSection`
+  with the `overview` id. **Eighth instance of that class** after Prerequisite A, the
+  internal-secret fallbacks, the suspicion-score route, the provider admin routes, the
+  contest-edit route, the seven lifecycle routes and the analytics route - so carry the rule
+  rather than the instances.
+
+#### The deviation, recorded rather than absorbed
+
+**The price-feed panel is not hidden on `tradingEnabled` alone**, which is what the table
+asks for. Switching trading off stops new trading contests being created and entered; it does
+not close the ones already running, and every open position in them is still priced, marked to
+market and settled from the same feed. **A health indicator that disappears exactly when
+somebody needs it is worse than one shown needlessly.** So `shouldShowPriceFeed` withholds it
+only when trading is off **and** has nothing live - which is the state the row is actually
+describing, a platform that has moved on from trading.
+
+The same reasoning keeps `getEnabledGameTypes()` out of the counts: it decides whether one
+status tile is drawn and nothing else. **The contests are grouped by whatever `gameKey` values
+the data holds**, so a game an operator has just switched off with a contest still running is
+still counted and still shown - which is R29 and invariant 9, and is the case where hiding it
+would be most harmful.
+
+#### A probing lesson, the fourth cause of a green probe
+
+The probe adding `draft` to the live status list came back **green, and the test was not
+weak, the claim was not wrong, and the guard was not unreachable** - the mutation changed no
+observable. A draft increments neither counter, so the totals stayed 1 and 1 while the draft
+was now being fetched. **The observable is the ROW**: an unpublished contest appears on the
+operator's front page as a game with something on, every figure beside it reading zero. A
+second test asserts the row set, and the probe names it.
+
+#### What is still outstanding in section 5
+
+- The hide-when-trading-off rows for `TradingHistorySection.tsx` and `PriceHealthWidget.tsx`.
+  The overview's own price-feed tile is done; those two screens are not.
+- The per-round provider cost the commercial question needs, which has **no data source until
+  X4** supplies a real contract.
+- The participation funnel on the analytics screen itself - it is on Game Performance instead,
+  for the reason recorded in s5.1a.
+- `finalLeaderboard` rendered outside the contest view screen. That is X6.5.
 
 ---
 
