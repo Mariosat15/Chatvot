@@ -18,45 +18,32 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { readdirSync, readFileSync, statSync } from "fs";
+import { readFileSync } from "fs";
 import { join } from "path";
 import { ADMIN_SECTIONS } from "../../apps/admin/database/models/admin-employee.model";
+import {
+  findRouteFiles,
+  guardCallPattern,
+  handlerPattern,
+  stripComments,
+} from "../helpers/route-guard-audit";
 
 const AI_ROUTES = join(process.cwd(), "apps", "admin", "app", "api", "ai");
 
-/**
- * Comments in these routes explain at length why the guard is there and name `guardSection`
- * in prose. A test that reads prose fails in both directions: it passes a file whose only
- * mention of the guard is the paragraph describing it, and it flags a correct file for
- * discussing the anti-pattern.
- */
-function stripComments(source: string): string {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1");
-}
+/*
+  The comment stripper, the directory walk and the two patterns MOVED to
+  `__tests__/helpers/route-guard-audit.ts` on 8 September 2026, when a second folder needed
+  them (`dev-zone/optimize-images`, the ninth unauthenticated admin route). They were extracted
+  rather than copied: each of these rules was learned from a probe that came back green, and a
+  second suite restating them means which folders are genuinely protected depends on which
+  file a reader opens. Nothing about the assertions below changed.
 
-function findRouteFiles(dir: string): string[] {
-  const found: string[] = [];
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
-      found.push(...findRouteFiles(full));
-    } else if (entry === "route.ts" || entry === "route.tsx") {
-      found.push(full);
-    }
-  }
-  return found;
-}
-
-const HANDLER = /export\s+async\s+function\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/g;
-
-/**
- * The guard must be CALLED WITH A SECTION, not merely named. `toContain("guardSection")` stays
- * true when the call is deleted, because the import line still holds the identifier - an
- * import is not a use, which has defeated three assertions elsewhere in this suite.
- */
-const GUARD_CALL = /guardSection\(\s*["'`]([a-z0-9-]+)["'`]\s*\)/g;
+  They are FUNCTIONS returning a fresh regex, and called at each use site rather than stored
+  once, because a `g` regex carries `lastIndex`. `match` and `search` happen to reset or ignore
+  it, so a shared instance would work here by accident - and the next assertion added, using
+  `exec` or `test`, would silently start from wherever the previous one stopped and report a
+  correct file as unguarded.
+*/
 
 describe("apps/admin/app/api/ai - every handler is behind a section guard", () => {
   const files = findRouteFiles(AI_ROUTES);
@@ -72,8 +59,8 @@ describe("apps/admin/app/api/ai - every handler is behind a section guard", () =
     const code = stripComments(readFileSync(file, "utf8"));
 
     it(`${name}: guards every exported handler`, () => {
-      const handlers = code.match(HANDLER) ?? [];
-      const guards = code.match(GUARD_CALL) ?? [];
+      const handlers = code.match(handlerPattern()) ?? [];
+      const guards = code.match(guardCallPattern()) ?? [];
 
       expect(handlers.length).toBeGreaterThan(0);
       // Per file and per handler. One guard in a file with two handlers is the shape that
@@ -87,7 +74,7 @@ describe("apps/admin/app/api/ai - every handler is behind a section guard", () =
         route has already done work for an unauthenticated caller - and on the two routes that
         write, anything between the two is work done on an unauthorized request.
       */
-      const guardAt = code.search(GUARD_CALL);
+      const guardAt = code.search(guardCallPattern());
       const bodyAt = code.search(/await\s+request\.json\(\)/);
 
       expect(guardAt).toBeGreaterThan(-1);
@@ -101,7 +88,7 @@ describe("apps/admin/app/api/ai - every handler is behind a section guard", () =
         to one that exists and is wrong in a way a typecheck cannot see, by pinning the
         argument against the enum that actually issues grants.
       */
-      const named = [...code.matchAll(GUARD_CALL)];
+      const named = [...code.matchAll(guardCallPattern())];
 
       // An assertion inside a loop over an empty list is green, and that is not a theoretical
       // worry: the first probe for this test mutated the call into a shape the regex could not

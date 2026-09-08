@@ -679,6 +679,64 @@ Newest at the top.
 
 ---
 
+### 8 Sep 2026 - R57 - THE IMAGE OPTIMIZER'S ROUTE HAD NO AUTHORIZATION, AND IT DELETES FILES
+
+**Shipped:** `guardSection("image-optimizer")` on both handlers of
+`apps/admin/app/api/dev-zone/optimize-images/route.ts`, which until today had **no session,
+admin or section check on either**. The `GET` listed every upload directory on the server; the
+`POST` re-encoded images in place and `unlink`ed the originals across marketplace uploads,
+avatars, cosmetics, indicators, strategies and general uploads. **8 tests, 8 probes**, every one
+red on exactly the expected test with exactly one failure.
+
+**Files touched:** the route; `__tests__/admin/image-optimizer-route-guard.test.ts` (new);
+`__tests__/helpers/route-guard-audit.ts` (new, extracted); `__tests__/admin/ai-route-guards.test.ts`
+(rewired onto the helper, assertions unchanged); `tools/probe-image-optimizer-guard.ps1` (new).
+
+**Deviated from plan:** this is not on any plan - it was found while auditing the Image
+Optimizer for **Tasks 15/16** of the owner's task document, which ask for game artwork to be
+optimised. It was taken before Task 1 with the owner's explicit approval, on the grounds that it
+is two lines and destructive if left.
+
+**Owner tested:** not yet. Verified by suite (479 admin tests green), the 8 probes, admin
+typecheck at the **223** baseline and main app at **198**, with none in the changed file and
+**none disappearing**.
+
+**Deferred, and both are recorded rather than silently scoped:**
+- **`dev-zone/dependency-check` still uses `verifyAdminAuth`** on all three handlers - admin-at-all
+  rather than section access, the same class. Converting it means choosing a section id and
+  deciding which existing employees keep the screen, which is an owner decision. The folder-wide
+  assertion therefore asserts the **weak** property (every handler authenticates somehow) with a
+  **tripwire that fails when somebody fixes it**, rather than an allow-list, which would be green
+  on the day a tenth route appears.
+- **The optimizer is the wrong tool for game artwork**, so Tasks 15/16 must not point it at
+  another directory. It converts in place, renames to `.webp` and deletes the source, while
+  artwork filenames are stored in `provider_game.thumbnailUrl` / `bannerUrl` and duplicated into
+  `branding_asset` (R56) - so both the row and the Mongo copy would end up naming a file that no
+  longer exists, with no error anywhere. It also cannot work by filesystem scan in the
+  multi-server case, because a logo that reached one server's disk has no file on the other.
+  Optimise at upload instead.
+
+**The finding worth carrying:** it was found by **counting exported handlers against guards**,
+not by reading routes - the same method as R40 and R47, and the ninth route of this class. The
+camouflage is worth naming: the *screen* is properly gated behind `image-optimizer`, so the
+feature reads as protected from every direction a person naturally looks, and the folder's other
+route authenticates all three of its handlers. **The guard was on the thing a reviewer can see.**
+
+**A probe caught a weak test, which is now the fifth instance of one identifier defeating a
+structural assertion.** "Returns the guard's own refusal" was a whole-file `toMatch`, and
+deleting the POST's refusal left it **green**, satisfied by the GET's surviving copy. Refusals
+are now *counted* against guard calls.
+
+**Next chat should:** wait for the owner's "start", then Task 1 - Volts everywhere. Note that
+`AppSettings.credits` already defaults to name "Volt Credits" and symbol ⚡ with a
+`formatCredits()` helper in both apps, so Task 1 is a labelling change routed through an
+existing helper, not a new formatter. The owner confirmed **1 credit = €1**, so the numbers were
+right and only the symbol is wrong - except `ActiveCompetitionCard.tsx`'s provider branch, which
+calls `formatCurrency` from `lib/utils.ts`, hardcoded to **USD** *and* prepending a `+`, so a
+prize pool renders as `+$30.00`; and `ContestsSidebar.tsx:610`, which hardcodes `$`.
+
+---
+
 ### 8 Sep 2026 - X7 / `13` s1.1h + s4.1i - THE ARENA WAS HALF DRESSED
 
 **Shipped:** two of the four faults the owner reported in one message. The standings board now

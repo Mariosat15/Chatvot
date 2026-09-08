@@ -1,8 +1,11 @@
 "use server";
 
 import { NextRequest, NextResponse } from "next/server";
-import { readdir, stat, unlink, writeFile, mkdir } from "fs/promises";
+// `mkdir` was imported here and used by nothing - a dead import, removed rather than left,
+// because this file is now linted on every commit that touches it.
+import { readdir, stat, unlink, writeFile } from "fs/promises";
 import path from "path";
+import { guardSection } from "@/lib/admin/section-route-guard";
 
 // Dynamically import sharp to handle potential import issues
 async function getSharp() {
@@ -228,6 +231,13 @@ interface OptimizeResult {
 
 // GET - Scan images from ALL directories and return stats
 export async function GET() {
+  // `guardSection`, never `requireAdminAuth` - the latter asks only whether the caller is an
+  // admin at all, so an employee granted one unrelated section would pass it. The section id
+  // matches the tab that renders this data, so the grant that reveals the screen is the same
+  // one that permits the read.
+  const guard = await guardSection("image-optimizer");
+  if (!guard.ok) return guard.response;
+
   try {
     const directories = await findAllImageDirectories();
 
@@ -325,6 +335,18 @@ export async function GET() {
 
 // POST - Optimize images from any directory
 export async function POST(request: NextRequest) {
+  /*
+    Guarded separately from the GET, and that is the whole point rather than repetition: this
+    handler re-encodes files in place and `unlink`s the original, so it is destructive, and a
+    file whose only copy was on disk is gone. Until 8 September 2026 NEITHER handler had any
+    authorization at all - the screen was gated behind the `image-optimizer` grant while the
+    route behind it was reachable by anyone who could address the admin app, which is exactly
+    why a guarded sibling is not evidence about the file next to it. Found by counting exported
+    handlers against guards, the same method that found R40 and R47.
+  */
+  const guard = await guardSection("image-optimizer");
+  if (!guard.ok) return guard.response;
+
   try {
     const body = await request.json();
     const { mode = "all", images: selectedImages = [] } = body;
@@ -506,5 +528,10 @@ function formatBytes(bytes: number): string {
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
+  // Reason: `security/detect-object-injection` flags any computed index, and this one is a
+  // logarithm of a local `number` that never touches request input - the rule's real target is
+  // a request-supplied key looked up in an object, which walks the prototype chain. Suppressed
+  // rather than reworked so this commit changes no behaviour outside the guard.
+  // eslint-disable-next-line security/detect-object-injection
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }

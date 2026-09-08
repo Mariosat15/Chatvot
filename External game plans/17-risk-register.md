@@ -73,6 +73,7 @@ chapter covers risks to the programme and to the application.
 | R54 | **An edge that rewrites `Cache-Control` turns a ten-minute fault into a four-hour outage.** Every response from `/play/*` arrives carrying `max-age=14400` - Cloudflare's default four-hour Browser Cache TTL - **on the 404s as well as the 200s**, replacing the `no-store` and `no-cache` the service sends. So R52's missing `presentation.js`, fixed on the server within minutes, stayed broken in every browser that had already asked, for four hours, **because a browser holding a fresh cache entry never asks again**. The owner held a `curl` returning 200 while the page named the file it could not load; both were true | **High** | **PARTLY CLOSED 8 Sep 2026.** The **refusal** half is cured in the page, which is the only place with standing to act: the boot watchdog re-fetches the recorded failures with `cache: "reload"` - which *replaces* the stored copy rather than reading round it - and reloads once, guarded by `sessionStorage` so a genuinely missing file cannot loop (`21` s4.1k). **The 200s carry the same four-hour lifetime and that half is an OWNER ACTION**: a stale success has nothing to detect because it looks healthy, so **assume a play-surface fix does not reach anybody who played in the previous four hours** until a Cloudflare cache rule for `/play*` respects origin headers (`deploy/README.md`) | Identified by **measuring from the player's browser** rather than the server - `curl` from the box bypasses the poisoned cache entirely, so it can only ever confirm the half that was already right. `deploy/nginx.conf` contains no such value anywhere, which is how the layer was pinned rather than guessed. **The instinct it defeats:** the more recently someone tried and failed, the longer they stay broken, which reads exactly like the fix not working. General form: a service cannot defend itself from a header-rewriting intermediary **with headers**. **The same asymmetry produced a second, worse defect within the hour** (`21` s4.1l): the document is never cached, its assets are, so today's markup loaded around a four-hour-old `app.js` that works but predates the boot flag - and the watchdog **wiped a live board mid-round**. Second witness added; **an absent signal is evidence only if the thing that would have sent it was definitely present**. **The 200 half is CLOSED by R55, and not by the Cloudflare rule** - the remedy was to stop the stale copy being addressable rather than to ask the edge to behave, so the `deploy/README.md` owner action is stale as a present fact for `/play*` |
 | R55 | **Half a build from the cache and half from the server.** `board.js` was today's and `presentation.js` was four hours old, so the console said `does not provide an export named 'newlyJoined'` and the game stopped dead - **nothing missing, nothing 404ing, every response a 200**. This is precisely the half R54 recorded as undetectable, and it defeated the recovery built for R52: s4.1k re-fetches URLs that **failed**, and there were none. The third distinct cause of one reported symptom | **High** | **CLOSED 8 Sep 2026.** The assets are served under a fingerprint of their own contents, so a new build publishes URLs no browser has cached and the stale copy sits at an address nothing requests. `immutable` then says something true, so the surface is fetched once and never revalidated mid-contest. **Latent for money, nothing backfilled** - the burned attempts are real but were burned by R52 and R54 as much as by this. **One rebuild required**, after which the fingerprint is derived at boot from the directory, so a surface change still needs only pull and restart | **A path segment, never `?v=`** - `board.js` imports `./presentation.js` as a literal with nowhere to put a query string, so a query string leaves bare **exactly the file that broke**; the segment is inherited by ordinary URL resolution. **Content, not mtime**, or two servers publish different URLs for identical bytes. **An unrecognised fingerprint is served, not refused**: refusing manufactures 404s on a rolling deploy and R54's own finding is that the edge caches those for four hours too. The route shape invited its own outage - `/play/:version/:asset` has the shape of `/play/api/state`, which the board polls - so unrecognised segments fall through to the next route; **probe 12 removes that and turns five tests red, three of them unrelated round-state tests, against two expected** |
 | R56 | **Every image the platform has ever uploaded shared one 16MB document, and it filled up.** Hero images, branding images and game artwork were base64-encoded into `WhiteLabel.brandingFiles` - a map on the single settings document - so the game-logo upload that reported `BSONObj size: 17070874 is invalid` was not a big picture or a bad route: the **document was already full**, and by then uploading *any* image anywhere in the admin panel was impossible. The failure arrives by success rather than by a bug, so there is no warning and every upload after it fails identically. The disk write succeeded, so the operator was told the file saved but could not be copied - accurate, unactionable, and repeated on every retry | **High** | **CLOSED 8 Sep 2026.** One document per file in a new `branding_asset` collection, which has no such ceiling; the remaining limit is 8MB **per file**, which an operator can act on. Reads try the collection then fall back to the legacy map, so nothing uploaded before today breaks. **Live and platform-wide, and `tools/branding/migrate-branding-files.ts` is report-only until `--apply`** - the map still holds ~16MB until it is run, and `WhiteLabel` cannot be saved by any writer while it does | The map was on the **hot path**: 67 files call `WhiteLabel.findOne()`, so reading any setting at all transferred every image ever uploaded, in both directions on every save. `select: false` closes that, and it is only safe because one service owns every read - **the write side and the read side disagreeing about where bytes live is the "one rule, two copies" shape**, so a test asserts no writer reaches past it. The `__DOT__` key encoding was **not** carried over: it exists solely because Mongoose refuses a dot in a *map* key, and a workaround outliving its cause is how somebody later "simplifies" it into a bug |
+| R57 | **The Image Optimizer's route had no authorization on either handler, and its POST deletes files.** `apps/admin/app/api/dev-zone/optimize-images/route.ts` exported a `GET` that enumerated every upload directory on disk and a `POST` that re-encoded images in place and `unlink`ed the originals - across marketplace uploads, avatars, cosmetics, indicators and strategies - with **no session check, no admin check and no section check on either**. The *screen* was gated behind the `image-optimizer` grant, which is exactly what made it invisible: the guard was on the thing a reviewer can see. **Ninth route of this class**, and found the same way as R40 and R47 - by counting exported handlers against guards, never by reading routes, because every neighbouring route having *something* is what sends a reader straight past the one that has nothing | **High** | **CLOSED 8 Sep 2026.** `guardSection("image-optimizer")` on both handlers, before the body is parsed and before anything is written or deleted. **Live, and the exposure ran both ways** - an anonymous caller could enumerate the upload tree *and* destructively rewrite it, and an image whose only copy was on that disk is gone. **There is no way to know whether it was ever called, and nothing was backfilled**: a route with no guard has no attribution, and a converted file is indistinguishable from an operator's own optimisation | The section id is the one that **reveals the screen**, not an adjacent real one - `guardSection` is typed to `AdminSection`, so the compiler refuses an invented id but accepts a valid wrong one, which compiles, reviews as plausible and demands the wrong grant. The suite asserts the **weak** property folder-wide (every handler authenticates *somehow*) and the **strong** one on this route, because `dependency-check` still uses `verifyAdminAuth` and converting it is an owner decision about which employees keep the screen - recorded as a failing-if-fixed tripwire rather than permitted by an allow-list, since a per-file allow-list is green on the day a tenth route appears. **A guard whose refusal is discarded reads perfectly and authorizes nothing**, so refusals are *counted* against guard calls: a whole-file `toMatch` stayed green when the POST's was deleted, satisfied by the GET's |
 | R24 | Scope creep before anything ships | Medium | **High** | All |
 | R25 | Round write contention under load | Medium | Medium | X12 |
 | X15 | "Challenge any user" harassment surface - no report-user feature exists | Medium | Medium | X10 |
@@ -2088,6 +2089,95 @@ not defensiveness.
 TypeScript, so the owner must `npm run build` once. From then on the fingerprint is derived at boot
 from the directory, exactly as the served set has been since `21` s4.1i, so a play-surface change
 still needs only **pull and restart**.
+
+---
+
+### R57 - The Image Optimizer's route was unauthenticated, and it deletes files - **CLOSED, 8 September 2026**
+
+`apps/admin/app/api/dev-zone/optimize-images/route.ts` exported two handlers and neither had any
+authorization whatsoever. Not a weak guard, not the wrong guard - **nothing**. No session check,
+no admin check, no section check.
+
+The `GET` enumerated every upload directory on the server and returned the hundred largest files
+with their paths and sizes. The `POST` re-encoded them in place with `sharp` and then:
+
+```
+await unlink(img.fullPath);
+```
+
+deleted the original. Across `public/uploads/marketplace`, `public/assets/avatars`,
+`public/uploads/cosmetics`, `.../indicators`, `.../strategies`, `.../gamemaster` and
+`public/uploads` itself. An image whose only copy was on that disk is gone.
+
+**Why it was invisible, and this is the part that generalises: the guard was on the thing a
+reviewer can see.** The Image Optimizer *screen* is properly gated - `image-optimizer` is a real
+entry in `ADMIN_SECTIONS`, and `filteredMenuGroups` removes the tab from anybody without the
+grant. So the feature reads as protected from every direction a person naturally looks. The route
+behind it answered anyone who could address the admin app.
+
+**It was not found by reading routes.** It was found by counting exported handlers against
+guards - the same method that found R40's `finalize-old-competitions` and R47's `sync-referrals`,
+and for the same reason: every neighbouring route in the admin app has *something*, and that is
+exactly what carries a reader past the one that has nothing. `dev-zone`'s other route,
+`dependency-check`, authenticates all three of its handlers, which is precisely the camouflage.
+
+This is the **ninth** route of this class, after Prerequisite A, the internal-secret fallbacks,
+the unprotected suspicion-score route, the provider admin routes, R40, R47, R51's five AI routes,
+and the two `verifyAdminToken` cases. Carry the class rather than the instances.
+
+**State the exposure in both directions.** It could pay nobody and move no money. It could hand
+an anonymous caller the layout of the upload tree, and it could destroy or silently re-encode
+every uploaded image on the platform. **There is no way to know whether it was ever called** -
+a route with no guard has no attribution - and **nothing was backfilled**, because a converted
+file is indistinguishable from an operator having optimised it on purpose.
+
+#### The fix, and the four things about it worth keeping
+
+`guardSection("image-optimizer")` on both handlers, positioned before the body is parsed and
+before anything is written or deleted.
+
+- **The section id is the one that reveals the screen**, never an adjacent real one.
+  `guardSection` is typed to `AdminSection`, so the compiler refuses an invented id - but it
+  accepts a *valid wrong* one, which compiles, reviews as plausible, and demands a grant that
+  has nothing to do with this screen. A probe naming `database` proves the assertion catches it.
+- **The folder-wide assertion is the WEAK one, deliberately.** `__tests__/admin/image-optimizer-route-guard.test.ts`
+  asserts that every handler under `dev-zone` authenticates *somehow*, and asserts
+  `guardSection` specifically on this route. The strong property is false for the folder today:
+  `dependency-check` uses `verifyAdminAuth`, which is admin-at-all rather than section access,
+  and converting it means choosing a section id and deciding which existing employees keep the
+  screen - an owner decision, not a mechanical fix. It is recorded as a **tripwire that fails
+  when somebody fixes it**, rather than permitted by a per-file allow-list, because an
+  allow-list is green on the day a tenth route appears. What the weak form still buys is the
+  thing that matters: a route added to that folder with no authorization at all turns it red.
+- **A guard whose refusal is discarded reads perfectly and authorizes nothing**, so the
+  refusals are **counted** against the guard calls. The first version of that assertion was a
+  whole-file `toMatch`, and a probe deleting the POST's refusal came back **green** - satisfied
+  by the GET's surviving copy. Fifth instance of one identifier defeating a structural test,
+  after `!expectedOrigin`, the fixed-character Edit guard, `canTransitionRound` and
+  `MIN_REASON_LENGTH`.
+- **The comment stripper is not decoration.** This route now explains at length why the guard is
+  there and names `guardSection` in prose, so a test that reads prose would pass a file whose
+  only mention of the guard is the paragraph describing it. Probe 8 comments out both calls and
+  must still go red.
+
+The shared machinery - the stripper, the directory walk and the two patterns - was **extracted**
+into `__tests__/helpers/route-guard-audit.ts` and the R51 suite rewired onto it, rather than
+copied. Each of those rules was learned from a probe that came back green, and two suites
+restating them means which folders are genuinely protected depends on which file a reader opens.
+
+**A note on the sibling finding that is NOT closed.** The optimizer is also the wrong tool for
+game artwork, and Tasks 15/16 of the owner's task document must not simply point it at another
+directory: it converts in place, renames to `.webp` and deletes the source, while game artwork
+filenames are stored in `provider_game.thumbnailUrl` / `bannerUrl` and duplicated into
+`branding_asset` (R56). Pointing it at `public/assets/images` would leave both the database row
+and the Mongo copy referring to a file that no longer exists - a broken image on every game
+screen, with no error anywhere. It also cannot work by filesystem scan in the multi-server case
+at all, because a logo that reached only one server's disk has no file on the other, which is
+the whole reason the Mongo copy exists.
+
+8 tests, 8 probes, all red on exactly the expected test with exactly one failure each. Admin
+typecheck at the 223 baseline, main app at 198, with none in the changed file and none
+disappearing.
 
 ---
 
