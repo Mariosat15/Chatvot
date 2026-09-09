@@ -957,7 +957,7 @@ describe("the two lobbies are built from one design kit", () => {
         stopOutLevel: 50,
         maxLeverage: 100,
       } as never,
-      unit: "Volts",
+      creditSymbol: "⚡",
     });
 
     expect(sections.length).toBeGreaterThan(0);

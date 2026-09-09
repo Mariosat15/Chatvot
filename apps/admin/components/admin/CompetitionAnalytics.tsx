@@ -42,7 +42,7 @@ import {
 import { creditsToEUR } from "@/lib/utils/credit-conversion";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import GameRevenueBreakdown from "./competitions/GameRevenueBreakdown";
-import { formatVolts } from "@/lib/utils/format-volts";
+import { formatVolts, DEFAULT_CREDIT_SYMBOL } from "@/lib/utils/format-volts";
 import {
   ALL_GAMES,
   filterByGame,
@@ -224,12 +224,17 @@ export default function CompetitionAnalytics() {
   );
 
   // Both units are legitimate on this screen and they mean different things. `creditSymbol`
-  // prefixes the amounts themselves, which are credits; `currencySymbol` labels the
+  // marks the amounts themselves, which are credits; `currencySymbol` labels the
   // `creditsToEUR` line beneath each one, which is the operator's reconciliation figure and
-  // reads the deposit rate. `creditName` is for the one place a full unit reads better than a
-  // prefix - see the entry-fee note below.
-  const creditSymbol = settings?.credits?.symbol || "⚡";
-  const creditName = settings?.credits?.name;
+  // reads the deposit rate. Keeping the two apart is the point - a single symbol here would
+  // make a credit total and its fiat estimate indistinguishable.
+  //
+  // Reason for resolving the fallback here rather than leaving it undefined: this value is
+  // interpolated directly into ~40 figures on this screen as well as handed to
+  // `GameRevenueBreakdown`, which requires a definite string. An undefined leaked through as
+  // the literal "undefined" beside a revenue total. The default comes from the formatter so
+  // there is one definition of it rather than a second copy of the glyph here.
+  const creditSymbol = settings?.credits?.symbol || DEFAULT_CREDIT_SYMBOL;
   const currencySymbol = settings?.currency?.symbol || "€";
   const currencyCode = settings?.currency?.code || "EUR";
 
@@ -665,7 +670,7 @@ export default function CompetitionAnalytics() {
                             entry fee written as euros, with no conversion applied.
                           */}
                           <span>
-                            {formatVolts(comp.entryFee, { unit: creditName })} entry
+                            {formatVolts(comp.entryFee, { symbol: creditSymbol })} entry
                             fee
                           </span>
                           {comp.disqualifiedCount > 0 && (

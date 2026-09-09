@@ -143,7 +143,7 @@ export default function CompetitionsListSection() {
   const { settings } = useAppSettings();
   // Reason: an entry fee and a prize pool are credits, so this read `credits.name` rather than
   // the fiat symbol configured for deposits.
-  const unit = settings?.credits?.name;
+  const creditSymbol = settings?.credits?.symbol;
   const [competitions, setCompetitions] = useState<Competition[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -477,12 +477,12 @@ export default function CompetitionsListSection() {
 
                   <div className="flex items-center gap-1 text-xs text-gray-500">
                     <DollarSign className="h-3 w-3" />
-                    Entry: {formatVolts(competition.entryFee, { unit })}
+                    Entry: {formatVolts(competition.entryFee, { symbol: creditSymbol })}
                   </div>
 
                   <div className="flex items-center gap-1 text-xs text-gray-500">
                     <Trophy className="h-3 w-3" />
-                    Pool: {formatVolts(competition.prizePool ?? 0, { unit })}
+                    Pool: {formatVolts(competition.prizePool ?? 0, { symbol: creditSymbol })}
                   </div>
 
                   <div className="flex items-center gap-1 text-xs text-gray-500">

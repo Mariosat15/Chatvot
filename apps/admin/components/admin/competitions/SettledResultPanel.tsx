@@ -33,12 +33,12 @@ import {
 export default function SettledResultPanel({
   finalLeaderboard,
   isProviderGame,
-  unit,
+  creditSymbol,
 }: {
   finalLeaderboard?: SettledLeaderboardEntry[] | null;
   isProviderGame: boolean;
-  /** `AppSettings.credits.name`. A prize is paid in credits, never in fiat. */
-  unit?: string;
+  /** `AppSettings.credits.symbol`. A prize is paid in credits, never in fiat. */
+  creditSymbol?: string;
 }) {
   const rows = resolveSettledResultRows(finalLeaderboard);
   if (!rows) return null;
@@ -110,7 +110,7 @@ export default function SettledResultPanel({
                 <p className="text-xs text-gray-500">{metric.label}</p>
                 {typeof row.prizeAmount === "number" && row.prizeAmount > 0 && (
                   <p className="text-xs text-yellow-400 font-semibold mt-1">
-                    Paid: {formatVolts(row.prizeAmount, { unit })}
+                    Paid: {formatVolts(row.prizeAmount, { symbol: creditSymbol })}
                   </p>
                 )}
               </div>

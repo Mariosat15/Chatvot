@@ -40,7 +40,7 @@ export default function ContestPrizePanel({
   distribution,
   finalLeaderboard,
   competition,
-  unit,
+  creditSymbol,
   platformFeePercentage,
 }: {
   distribution: { rank?: number | null; percentage: number }[];
@@ -53,8 +53,8 @@ export default function ContestPrizePanel({
     prizePoolCredits?: number | null;
     platformFeePercentage?: number | null;
   };
-  /** `AppSettings.credits.name`. Pools and prizes are credits, never fiat. */
-  unit?: string;
+  /** `AppSettings.credits.symbol`. Pools and prizes are credits, never fiat. */
+  creditSymbol?: string;
   platformFeePercentage: number;
 }) {
   const settledRows = resolveSettledPrizeRows({
@@ -145,7 +145,7 @@ export default function ContestPrizePanel({
                 >
                   {row.paidAmount === null
                     ? "-"
-                    : formatVolts(row.paidAmount, { unit })}
+                    : formatVolts(row.paidAmount, { symbol: creditSymbol })}
                 </p>
               </div>
 
@@ -211,7 +211,7 @@ export default function ContestPrizePanel({
                     }`}
                   >
                     {row.filled
-                      ? formatVolts(row.netAmount, { unit })
+                      ? formatVolts(row.netAmount, { symbol: creditSymbol })
                       : "-"}
                   </p>
                 </div>
@@ -234,7 +234,7 @@ export default function ContestPrizePanel({
         <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
           <p className="text-xs text-blue-300">
             Winners receive net amounts after {platformFeePercentage}% platform
-            fee. Total pool: {formatVolts(projected.prizePool, { unit })}.
+            fee. Total pool: {formatVolts(projected.prizePool, { symbol: creditSymbol })}.
           </p>
         </div>
       )}

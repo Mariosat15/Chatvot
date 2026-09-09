@@ -30,8 +30,8 @@ export interface ArenaContestFacts {
   entryFee?: number;
   currentParticipants?: number;
   maxParticipants?: number;
-  /** `AppSettings.credits.name`. Replaced a `currencySymbol` field handed the fiat symbol. */
-  unit?: string;
+  /** `AppSettings.credits.symbol`. Replaced a `currencySymbol` field handed the fiat symbol. */
+  creditSymbol?: string;
 }
 
 interface Props {
@@ -56,13 +56,13 @@ export function ArenaContestPanel({ facts, state, presentation }: Props) {
             icon: Trophy,
             accent: "prize",
             label: "Prize pool",
-            value: formatVolts(facts.prizePool, { unit: facts.unit }),
+            value: formatVolts(facts.prizePool, { symbol: facts.creditSymbol }),
           },
           {
             icon: Ticket,
             accent: "entry",
             label: "Entry",
-            value: formatVolts(facts.entryFee, { unit: facts.unit }),
+            value: formatVolts(facts.entryFee, { symbol: facts.creditSymbol }),
           },
           {
             icon: Users,

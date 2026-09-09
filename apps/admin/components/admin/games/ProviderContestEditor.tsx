@@ -28,7 +28,7 @@ import {
   toEditRequestBody,
 } from "./contest-draft";
 import { isClosedToEdits } from "@/lib/admin/provider-contest-edit-policy";
-import { DEFAULT_VOLTS_UNIT } from "@/lib/utils/format-volts";
+import { DEFAULT_CREDIT_SYMBOL } from "@/lib/utils/format-volts";
 
 /**
  * Editing a provider-game contest.
@@ -82,8 +82,11 @@ type SchemaState =
 
 export function ProviderContestEditor({
   competitionId,
+  creditSymbol,
 }: {
   competitionId: string;
+  /** `AppSettings.credits.symbol`, resolved by the page. An entry fee is a credit amount. */
+  creditSymbol?: string;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -333,7 +336,7 @@ export function ProviderContestEditor({
             id="entryFee"
             // Reason: the wizard's matching field names its unit. An unlabelled number here
             // left an operator editing a fee with no statement of what it is denominated in.
-            label={`Entry fee (${DEFAULT_VOLTS_UNIT})`}
+            label={`Entry fee (${creditSymbol?.trim() || DEFAULT_CREDIT_SYMBOL})`}
             value={draft.entryFee}
             min={0}
             step="0.01"

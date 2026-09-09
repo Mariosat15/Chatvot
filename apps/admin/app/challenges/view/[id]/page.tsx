@@ -40,7 +40,7 @@ const AdminChallengeViewPage = async ({
   // Reason: every amount on this screen - the pot, both entry fees, the winner's prize, the
   // platform fee and each Game Master's earning - is credits. It read `currency.symbol`, so an
   // operator reconciling a challenge saw euros against figures the ledger moves in credits.
-  const unit = appSettings?.credits?.name;
+  const creditSymbol = appSettings?.credits?.symbol;
 
   try {
     // Get challenge data
@@ -203,7 +203,7 @@ const AdminChallengeViewPage = async ({
                 <div>
                   <p className="text-xs text-gray-500">Prize Pool</p>
                   <p className="text-2xl font-bold text-yellow-400">
-                    {formatVolts(challenge.prizePool, { unit })}
+                    {formatVolts(challenge.prizePool, { symbol: creditSymbol })}
                   </p>
                 </div>
               </div>
@@ -217,7 +217,7 @@ const AdminChallengeViewPage = async ({
                 <div>
                   <p className="text-xs text-gray-500">Entry Fee</p>
                   <p className="text-2xl font-bold text-green-400">
-                    {formatVolts(challenge.entryFee, { unit })}
+                    {formatVolts(challenge.entryFee, { symbol: creditSymbol })}
                   </p>
                 </div>
               </div>
@@ -231,7 +231,7 @@ const AdminChallengeViewPage = async ({
                 <div>
                   <p className="text-xs text-gray-500">Winner Prize</p>
                   <p className="text-2xl font-bold text-orange-400">
-                    {formatVolts(challenge.winnerPrize, { unit })}
+                    {formatVolts(challenge.winnerPrize, { symbol: creditSymbol })}
                   </p>
                 </div>
               </div>
@@ -304,7 +304,7 @@ const AdminChallengeViewPage = async ({
                   <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
                     <p className="text-xs text-gray-500 mb-1">Platform Fee</p>
                     <p className="text-lg font-semibold text-gray-100">
-                      {challenge.platformFeePercentage}% ({formatVolts(challenge.platformFeeAmount, { unit })})
+                      {challenge.platformFeePercentage}% ({formatVolts(challenge.platformFeeAmount, { symbol: creditSymbol })})
                     </p>
                   </div>
 
@@ -458,7 +458,7 @@ const AdminChallengeViewPage = async ({
                                   Prize Won:
                                 </span>
                                 <span className="text-yellow-400 font-bold">
-                                  {formatVolts(challenge.winnerPrize, { unit })}
+                                  {formatVolts(challenge.winnerPrize, { symbol: creditSymbol })}
                                 </span>
                               </div>
                             )}
@@ -484,7 +484,7 @@ const AdminChallengeViewPage = async ({
                             <p className="text-xs text-purple-400 mt-1">
                               GM Earned:{" "}
                               <span className="font-bold">
-                                {formatVolts(challengerGm.gmEarning, { unit })}
+                                {formatVolts(challengerGm.gmEarning, { symbol: creditSymbol })}
                               </span>
                             </p>
                           </div>
@@ -579,7 +579,7 @@ const AdminChallengeViewPage = async ({
                                   Prize Won:
                                 </span>
                                 <span className="text-yellow-400 font-bold">
-                                  {formatVolts(challenge.winnerPrize, { unit })}
+                                  {formatVolts(challenge.winnerPrize, { symbol: creditSymbol })}
                                 </span>
                               </div>
                             )}
@@ -605,7 +605,7 @@ const AdminChallengeViewPage = async ({
                             <p className="text-xs text-purple-400 mt-1">
                               GM Earned:{" "}
                               <span className="font-bold">
-                                {formatVolts(challengedGm.gmEarning, { unit })}
+                                {formatVolts(challengedGm.gmEarning, { symbol: creditSymbol })}
                               </span>
                             </p>
                           </div>
@@ -697,7 +697,7 @@ const AdminChallengeViewPage = async ({
                   <p className="text-yellow-300/70 mb-3">Challenge Winner</p>
                   <div className="bg-yellow-500/20 px-4 py-3 rounded-lg">
                     <p className="text-yellow-400 font-bold text-xl">
-                      Earned {formatVolts(challenge.winnerPrize, { unit })}
+                      Earned {formatVolts(challenge.winnerPrize, { symbol: creditSymbol })}
                     </p>
                   </div>
                   {challenge.winnerPnL !== undefined && (
@@ -758,7 +758,7 @@ const AdminChallengeViewPage = async ({
                   <div className="flex justify-between">
                     <span className="text-gray-400">Total Pool:</span>
                     <span className="text-white font-semibold">
-                      {formatVolts(challenge.prizePool, { unit })}
+                      {formatVolts(challenge.prizePool, { symbol: creditSymbol })}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -766,13 +766,13 @@ const AdminChallengeViewPage = async ({
                       Platform Fee ({challenge.platformFeePercentage}%):
                     </span>
                     <span className="text-blue-400 font-semibold">
-                      -{formatVolts(challenge.platformFeeAmount, { unit })}
+                      -{formatVolts(challenge.platformFeeAmount, { symbol: creditSymbol })}
                     </span>
                   </div>
                   <div className="flex justify-between pt-2 border-t border-gray-700">
                     <span className="text-gray-400">Winner Receives:</span>
                     <span className="text-yellow-400 font-bold">
-                      {formatVolts(challenge.winnerPrize, { unit })}
+                      {formatVolts(challenge.winnerPrize, { symbol: creditSymbol })}
                     </span>
                   </div>
                 </div>

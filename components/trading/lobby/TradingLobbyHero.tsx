@@ -27,8 +27,8 @@ import { formatVolts } from "@/lib/utils/format-volts";
 export interface TradingLobbyHeroProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   competition: any;
-  /** `AppSettings.credits.name`. Replaced a `currSymbol` prop handed the fiat symbol. */
-  unit?: string;
+  /** `AppSettings.credits.symbol`. Replaced a `currSymbol` prop handed the fiat symbol. */
+  creditSymbol?: string;
   isActive: boolean;
   isUpcoming: boolean;
   isCompleted: boolean;
@@ -37,7 +37,7 @@ export interface TradingLobbyHeroProps {
 
 export default function TradingLobbyHero({
   competition,
-  unit,
+  creditSymbol,
   isActive,
   isUpcoming,
   isCompleted,
@@ -73,7 +73,7 @@ export default function TradingLobbyHero({
           label="Prize pool"
           value={formatVolts(
             competition.prizePool || competition.prizePoolCredits || 0,
-            { unit },
+            { symbol: creditSymbol },
           )}
         />
         <StatCard
@@ -82,7 +82,7 @@ export default function TradingLobbyHero({
           label="Entry fee"
           value={formatVolts(
             competition.entryFee || competition.entryFeeCredits || 0,
-            { unit },
+            { symbol: creditSymbol },
           )}
         />
         <StatCard

@@ -20,15 +20,15 @@ export function StepReview({
   title,
   errors,
   warnings,
-  unit,
+  creditSymbol,
 }: {
   draft: ContestDraft;
   patch: (changes: Partial<ContestDraft>) => void;
   title?: ContestableTitle;
   errors: string[];
   warnings: string[];
-  /** `AppSettings.credits.name`. An entry fee is a credit amount. */
-  unit?: string;
+  /** `AppSettings.credits.symbol`. An entry fee is a credit amount. */
+  creditSymbol?: string;
 }) {
   return (
     <>
@@ -58,7 +58,7 @@ export function StepReview({
                 : "-"}
             </SummaryRow>
             <SummaryRow label="Entry fee">
-              {formatVolts(draft.entryFee, { unit })}
+              {formatVolts(draft.entryFee, { symbol: creditSymbol })}
               <span className="text-gray-500">
                 {" "}
                 / {draft.platformFeePercentage}% platform fee

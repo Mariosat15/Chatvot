@@ -77,9 +77,9 @@ const AdminCompetitionViewPage = async ({
   // Every money figure on this screen - the pool, the entry fee, a Game Master's earning, a
   // player's prize - is credits. It read `currency.symbol`, which is the fiat symbol configured
   // for deposits and invoices, so an operator reconciling a contest was shown euros against
-  // amounts the ledger moved in credits. `credits.name` is the unit; the fiat settings are not
+  // amounts the ledger moved in credits. `credits.symbol` is the unit; the fiat settings are not
   // read here at all any more.
-  const unit = appSettings?.credits?.name;
+  const creditSymbol = appSettings?.credits?.symbol;
 
   try {
     // Get competition data
@@ -262,7 +262,7 @@ const AdminCompetitionViewPage = async ({
                   <p className="text-2xl font-bold text-yellow-400">
                     {formatVolts(
                       competition.prizePool || competition.prizePoolCredits || 0,
-                      { unit },
+                      { symbol: creditSymbol },
                     )}
                   </p>
                 </div>
@@ -279,7 +279,7 @@ const AdminCompetitionViewPage = async ({
                   <p className="text-2xl font-bold text-green-400">
                     {formatVolts(
                       competition.entryFee || competition.entryFeeCredits || 0,
-                      { unit },
+                      { symbol: creditSymbol },
                     )}
                   </p>
                 </div>
@@ -588,7 +588,7 @@ const AdminCompetitionViewPage = async ({
                                     {gmInfo && (
                                       <p className="text-xs text-purple-400 mt-1">
                                         GM: {gmInfo.gmEmail} â€¢ Earned:{" "}
-                                        {formatVolts(gmInfo.gmEarning, { unit })}
+                                        {formatVolts(gmInfo.gmEarning, { symbol: creditSymbol })}
                                       </p>
                                     )}
                                   </div>
@@ -622,7 +622,7 @@ const AdminCompetitionViewPage = async ({
                                   </p>
                                   {actualPrize > 0 && (
                                     <p className="text-xs text-yellow-400 font-semibold mt-1">
-                                      Won: {formatVolts(actualPrize, { unit })}
+                                      Won: {formatVolts(actualPrize, { symbol: creditSymbol })}
                                     </p>
                                   )}
                                 </div>
@@ -676,7 +676,7 @@ const AdminCompetitionViewPage = async ({
               <SettledResultPanel
                 finalLeaderboard={competition.finalLeaderboard}
                 isProviderGame={isProviderGame}
-                unit={unit}
+                creditSymbol={creditSymbol}
               />
             </div>
 
@@ -712,7 +712,7 @@ const AdminCompetitionViewPage = async ({
                 distribution={competition.prizeDistribution || []}
                 finalLeaderboard={competition.finalLeaderboard}
                 competition={competition}
-                unit={unit}
+                creditSymbol={creditSymbol}
                 platformFeePercentage={competition.platformFeePercentage || 0}
               />
 

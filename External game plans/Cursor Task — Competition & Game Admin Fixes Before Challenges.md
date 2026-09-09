@@ -111,9 +111,12 @@ Keep formatting consistent across the platform.
 ## 1.1 — WHAT WAS BUILT, 9 September 2026
 
 `lib/utils/format-volts.ts`, mirrored byte-for-byte into `apps/admin/lib/utils/`, is the one
-way a competition amount is written down. 41 files, 68 tests in
-`__tests__/admin/volts-currency.test.ts`, 26 probes in `tools/probe-volts-currency.ps1` red on
+way a competition amount is written down. 41 files, 70 tests in
+`__tests__/admin/volts-currency.test.ts`, 27 probes in `tools/probe-volts-currency.ps1` red on
 exactly the expected test with one failure each, plus one control probe green on purpose.
+
+**Read 1.2 below before trusting any sentence here about WHICH field is read.** This section
+rendered `AppSettings.credits.name`; the shipped behaviour renders `credits.symbol`.
 
 **Every amount was already correct and only its unit was a lie**, which is the reason forty
 sites survived: there is no error, no log line, and the figure reconciles perfectly against the
@@ -191,6 +194,52 @@ incidental, and recorded because the diagnostic generalises.
 
 **Not done, and not a rounding-up:** the two disagreeing conversion rates above, and the
 wallet/transaction surfaces outside competitions.
+
+## 1.2 — THE SYMBOL, NOT THE WORD, 9 September 2026
+
+Section 1.1 rendered the credit **name** — `AppSettings.credits.name`, defaulting to the word
+`Volts`. The owner's instruction was the **symbol**: `AppSettings.credits.symbol`, edited in
+admin **Settings → Currency → Credit Symbol (Emoji)** and defaulting to `⚡`. So an entry fee
+reads `50 ⚡`, not `50 Volts`. 1.1 is correct as history and **stale as a present fact** for
+every sentence that says which field is read; nothing else in it changed.
+
+**It is one field along, and that is exactly why it is worth its own section.** The task, the
+tests and the probes all said "unit" and read the wrong property of the right object, which
+typechecks, renders, and is only wrong to somebody who opens the currency screen.
+
+**Five things came out of it:**
+
+- **Singularisation had to be REMOVED, and the two tests that pinned it were inverted rather
+  than deleted.** A word has a plural and a glyph does not, so `1 Volt` was right and
+  `⚡`.replace(/s$/) is destructive — it strips the last character of whatever the operator
+  configured. The comment explaining why an entry fee of 1 is an ordinary amount is the most
+  valuable part of those tests, so it survives with the assertion turned round.
+- **The two probes for that stayed GREEN, and the cause was the FOURTH one: the mutation
+  changed no observable.** Re-adding the singulariser against the default `⚡` produces `⚡`,
+  because there is no trailing `s` to strip. The tests only asserted the default. Fixed by
+  adding a configured symbol that ends in one — the field is free text, so an operator typing
+  a word is the case that exposes it — and the rule the pair now pins is the general one:
+  **the configured symbol is rendered verbatim and never edited.**
+- **The symbol goes AFTER the number, and a test pins it.** `50 ⚡`, matching the wallet, the
+  deposit modal and the currency settings preview. Putting it in front is the fiat convention
+  and therefore what a later edit "corrects" it to — and an emoji ahead of a figure reads as an
+  icon beside an unlabelled number rather than as a unit.
+- **The formatter's default and the schema's default are two definitions with nothing making
+  them agree**, so a test compares them. The drift is quiet in the most confusing direction:
+  the formatter's copy is on every screen, so the **settings form** is what looks wrong.
+- **A codemod did most of the renaming and overreached into four files**, where `creditName`
+  was a prose label — a knowledge-base article, a CSV export header — rather than a formatter
+  input. Reverted with `git checkout` and the script deleted. The rule: **a rename driven by a
+  pattern cannot tell a formatter argument from a sentence**, and the tell was duplicate object
+  keys, which the compiler caught. It also converted only some `.select("credits.name")` calls,
+  and a missed one is silent — the symbol arrives `undefined` and the default covers for it.
+
+**A measurement error worth recording, because it looked like a live defect for a minute.** A
+whole-file regex for the symbol default returned the **euro sign**, which reads as the formatter
+and the schema disagreeing. `currency:` sits *before* `credits:` in `app-settings.model.ts`, so
+the match was the **fiat** field, where a euro sign is correct. The test slices from `credits:`
+first and was right all along. **Scope a probe of a schema to the block you mean**, and check a
+finding against the assertion that already passes before believing it.
 
 ---
 

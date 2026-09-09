@@ -12,8 +12,8 @@ import { formatVolts } from "@/lib/utils/format-volts";
 interface LastManStandingPopupProps {
   competitionId: string;
   prizePool: number;
-  /** `AppSettings.credits.name`. The pool is credits, so it is written in Volts. */
-  unit?: string;
+  /** `AppSettings.credits.symbol`. The pool is credits, so it is written in Volts. */
+  creditSymbol?: string;
 }
 
 const COUNTDOWN_SECONDS = 15;
@@ -21,7 +21,7 @@ const COUNTDOWN_SECONDS = 15;
 export default function LastManStandingPopup({
   competitionId,
   prizePool,
-  unit,
+  creditSymbol,
 }: LastManStandingPopupProps) {
   const router = useRouter();
   const [visible, setVisible] = useState(true);
@@ -154,7 +154,7 @@ export default function LastManStandingPopup({
                   <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
                     <Trophy className="h-5 w-5 text-yellow-400" />
                     <span className="text-lg font-bold text-yellow-400">
-                      {formatVolts(prizePool, { unit })}
+                      {formatVolts(prizePool, { symbol: creditSymbol })}
                     </span>
                     <span className="text-xs text-gray-400">Prize Pool</span>
                   </div>

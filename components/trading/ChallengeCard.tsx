@@ -475,7 +475,7 @@ export default function ChallengeCard({
                 <div className="flex items-baseline gap-2">
                   <span className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-300 to-yellow-500 drop-shadow-lg">
                     {formatVolts(challenge.winnerPrize ?? 0, {
-                      unit: settings?.credits?.name,
+                      symbol: settings?.credits?.symbol,
                     })}
                   </span>
                 </div>
@@ -502,7 +502,7 @@ export default function ChallengeCard({
                 <p className="text-[11px] text-gray-500 uppercase">Entry Fee</p>
                 <p className="text-sm font-bold text-gray-100">
                   {formatVolts(challenge.entryFee, {
-                    unit: settings?.credits?.name,
+                    symbol: settings?.credits?.symbol,
                   })}
                 </p>
               </div>

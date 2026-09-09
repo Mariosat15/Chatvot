@@ -97,7 +97,7 @@ export default function ContestStatsCards({
             <div className="text-right min-w-0">
               <p className="text-sm sm:text-lg font-bold text-yellow-400 truncate">
                 {formatVolts(competitionStats.totalCreditsWon, {
-                  unit: settings?.credits?.name,
+                  symbol: settings?.credits?.symbol,
                 })}
               </p>
               <p className="text-[11px] sm:text-xs text-gray-400">Total Prizes</p>
@@ -154,7 +154,7 @@ export default function ContestStatsCards({
             <div className="text-right min-w-0">
               <p className="text-sm sm:text-lg font-bold text-yellow-400 truncate">
                 {formatVolts(challengeStats.totalCreditsWon, {
-                  unit: settings?.credits?.name,
+                  symbol: settings?.credits?.symbol,
                 })}
               </p>
               <p className="text-[11px] sm:text-xs text-gray-400">Total Won</p>

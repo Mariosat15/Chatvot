@@ -109,13 +109,13 @@ interface RiskSettings {
 export function buildTradingLobbySections({
   competition,
   riskSettings,
-  unit,
+  creditSymbol,
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   competition: any;
   riskSettings: RiskSettings;
-  /** `AppSettings.credits.name`. Replaced a `currSymbol` prop handed the fiat symbol. */
-  unit?: string;
+  /** `AppSettings.credits.symbol`. Replaced a `currSymbol` prop handed the fiat symbol. */
+  creditSymbol?: string;
 }): NeonAccordionSection[] {
   const sections: NeonAccordionSection[] = [];
   const rules = competition.rules;
@@ -394,7 +394,7 @@ export function buildTradingLobbySections({
           accent="prize"
           value={formatVolts(
             competition.prizePool || competition.prizePoolCredits || 0,
-            { unit },
+            { symbol: creditSymbol },
           )}
         />
         <NeonRow

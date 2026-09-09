@@ -47,7 +47,7 @@ export default function LiveRankingPanel({
   // wallet, so they are written in Volts. Reason: giving both the same symbol is what made the
   // two look like one quantity.
   const currSymbol = settings?.currency?.symbol || "€";
-  const unit = settings?.credits?.name;
+  const creditSymbol = settings?.credits?.symbol;
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
   const [userRank, setUserRank] = useState<number | null>(null);
   const [totalParticipants, setTotalParticipants] = useState(0);
@@ -281,7 +281,7 @@ export default function LiveRankingPanel({
                   getRankBgColor={getRankBgColor}
                   formatDisplayValue={formatDisplayValue}
                   formatDistance={formatDistance}
-                  unit={unit}
+                  creditSymbol={creditSymbol}
                 />
               </div>
             );
@@ -296,7 +296,7 @@ export default function LiveRankingPanel({
               getRankBgColor={getRankBgColor}
               formatDisplayValue={formatDisplayValue}
               formatDistance={formatDistance}
-              unit={unit}
+              creditSymbol={creditSymbol}
             />
           );
         })}
@@ -328,7 +328,7 @@ export default function LiveRankingPanel({
               Prize Pool
             </span>
             <span className="font-bold text-yellow-400">
-              {formatVolts(prizePool, { unit })}
+              {formatVolts(prizePool, { symbol: creditSymbol })}
             </span>
           </div>
         </div>
@@ -345,7 +345,7 @@ function RankingRow({
   getRankBgColor,
   formatDisplayValue,
   formatDistance,
-  unit,
+  creditSymbol,
 }: {
   entry: RankingEntry;
   isCurrentUser: boolean;
@@ -357,7 +357,7 @@ function RankingRow({
   ) => string;
   formatDisplayValue: (value: number) => string;
   formatDistance: (value: number) => string | null;
-  unit?: string;
+  creditSymbol?: string;
 }) {
   const displayValue = entry.displayValue ?? entry.profitPercent;
   const distanceStr = formatDistance(entry.distanceToFirst);
@@ -408,7 +408,7 @@ function RankingRow({
       <div className="col-span-3 text-right">
         {entry.potentialReward > 0 ? (
           <span className="text-xs font-bold text-yellow-400 tabular-nums">
-            {formatVolts(entry.potentialReward, { unit })}
+            {formatVolts(entry.potentialReward, { symbol: creditSymbol })}
           </span>
         ) : (
           <span className="text-xs text-gray-600">—</span>

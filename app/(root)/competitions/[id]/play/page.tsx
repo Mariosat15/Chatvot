@@ -153,16 +153,20 @@ export default async function PlayPage({ params }: PlayPageProps) {
     // needs an endpoint that does not exist yet, and a board that silently goes stale is
     // better than one that appears live and is not.
     getCompetitionLeaderboard(competitionId, 25),
-    // `credits.name`, not `currency.symbol`. A prize pool is a credit amount, so the fiat
+    // `credits.symbol`, not `currency.symbol`. A prize pool is a credit amount, so the fiat
     // symbol was the wrong field - and its fallback here was `$`, which is not even the
     // configured fiat currency.
+    //
+    // Reason: the projection must name the same field the read below does. A `.select()` that
+    // still named `credits.name` returned a document with no `symbol`, so every amount on this
+    // screen silently fell back to the default rather than the operator's configured emoji.
     AppSettingsModel.findOne()
-      .select("credits.name")
-      .lean<{ credits?: { name?: string } } | null>(),
+      .select("credits.symbol")
+      .lean<{ credits?: { symbol?: string } } | null>(),
   ]);
 
   const competitionName = contest?.name ?? "this competition";
-  const unit = settings?.credits?.name || undefined;
+  const creditSymbol = settings?.credits?.symbol || undefined;
   const rows = Array.isArray(leaderboard) ? leaderboard : [];
 
   return (
@@ -202,7 +206,7 @@ export default async function PlayPage({ params }: PlayPageProps) {
               entryFee: contest?.entryFee,
               currentParticipants: contest?.currentParticipants,
               maxParticipants: contest?.maxParticipants,
-              unit,
+              creditSymbol,
             }}
             state={outcome.state}
             presentation={presentation}
@@ -215,7 +219,7 @@ export default async function PlayPage({ params }: PlayPageProps) {
           */}
           {Array.isArray(contest?.prizeDistribution) &&
             contest.prizeDistribution.length > 0 && (
-              <PrizeTable competition={contest} unit={unit} />
+              <PrizeTable competition={contest} creditSymbol={creditSymbol} />
             )}
         </>
       }

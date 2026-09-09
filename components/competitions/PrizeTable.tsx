@@ -39,17 +39,17 @@ import { formatVolts } from "@/lib/utils/format-volts";
 
 export default function PrizeTable({
   competition,
-  unit,
+  creditSymbol,
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   competition: any;
   /**
-   * `AppSettings.credits.name`. Optional, because every amount here is a credit amount and
+   * `AppSettings.credits.symbol`. Optional, because every amount here is a credit amount and
    * `formatVolts` already knows what a credit is called - the prop exists only so an operator
    * who renamed the unit sees their name. It replaced a `currSymbol` prop that was handed the
    * *fiat* symbol, so every prize in this table used to read `€33.33`.
    */
-  unit?: string;
+  creditSymbol?: string;
 }) {
   const { rows, prizePositions, unclaimedPercentage, allFilled } =
     projectPrizeDistribution(competition);
@@ -98,7 +98,7 @@ export default function PrizeTable({
                 row.filled ? "text-amber-300" : "text-gray-500"
               }`}
             >
-              {row.filled ? formatVolts(row.netAmount, { unit }) : "-"}
+              {row.filled ? formatVolts(row.netAmount, { symbol: creditSymbol }) : "-"}
             </span>
           </div>
         ))}

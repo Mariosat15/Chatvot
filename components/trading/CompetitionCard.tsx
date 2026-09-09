@@ -456,14 +456,14 @@ export default function CompetitionCard({
               <div className="flex items-center gap-1 text-yellow-500">
                 <GameIcon name="trophy" size={14} />
                 <span className="text-sm font-black">
-                  {formatVolts(getPrizePool(), { unit: settings?.credits?.name })}
+                  {formatVolts(getPrizePool(), { symbol: settings?.credits?.symbol })}
                 </span>
               </div>
               <span className="text-gray-600">·</span>
               <span className="text-[11px] text-gray-400">
                 Fee:{" "}
                 <span className="text-gray-200 font-bold">
-                  {formatVolts(getEntryFee(), { unit: settings?.credits?.name })}
+                  {formatVolts(getEntryFee(), { symbol: settings?.credits?.symbol })}
                 </span>
               </span>
               <span className="text-gray-600">·</span>
@@ -701,7 +701,7 @@ export default function CompetitionCard({
                     className={`text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r ${isCancelled ? "from-red-400 via-red-300 to-red-500 line-through" : "from-yellow-400 via-amber-300 to-yellow-500"} drop-shadow-lg`}
                   >
                     {formatVolts(getPrizePool(), {
-                      unit: settings?.credits?.name,
+                      symbol: settings?.credits?.symbol,
                     })}
                   </span>
                 </div>
@@ -737,7 +737,7 @@ export default function CompetitionCard({
                 <p
                   className={`text-sm font-bold ${isCancelled ? "text-red-400 line-through" : "text-gray-100"}`}
                 >
-                  {formatVolts(getEntryFee(), { unit: settings?.credits?.name })}
+                  {formatVolts(getEntryFee(), { symbol: settings?.credits?.symbol })}
                 </p>
               </div>
             </div>

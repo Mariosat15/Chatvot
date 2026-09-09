@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { requireSectionAccess } from "@/lib/admin/auth";
+import { connectToDatabase } from "@/database/mongoose";
+import AppSettings from "@/database/models/app-settings.model";
 import { ProviderContestEditor } from "@/components/admin/games/ProviderContestEditor";
 
 /**
@@ -34,6 +36,16 @@ export default async function EditGameContestPage({
 
   const { id } = await params;
 
+  // The entry-fee label reads the operator's configured credit symbol rather than the
+  // formatter's default. Reason: the editor is a client component that fetches the contest
+  // itself, so without this it printed the fallback glyph - which is right for a platform
+  // nobody has configured and wrong, silently, for every platform that has.
+  await connectToDatabase();
+  const appSettings = await AppSettings.findById("app-settings")
+    .select("credits.symbol")
+    .lean<{ credits?: { symbol?: string } } | null>()
+    .catch(() => null);
+
   return (
     <div className="min-h-screen bg-gray-900 p-6">
       <div className="max-w-3xl mx-auto mb-6">
@@ -45,7 +57,10 @@ export default async function EditGameContestPage({
         </Link>
       </div>
       <div className="max-w-3xl mx-auto">
-        <ProviderContestEditor competitionId={id} />
+        <ProviderContestEditor
+          competitionId={id}
+          creditSymbol={appSettings?.credits?.symbol || undefined}
+        />
       </div>
     </div>
   );

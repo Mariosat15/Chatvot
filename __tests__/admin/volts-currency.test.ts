@@ -1,5 +1,16 @@
 /**
- * TASK 1 - a competition amount is written in Volts, never in a national currency.
+ * TASK 1 - a competition amount is written in the platform's own credit symbol, never in a
+ * national currency.
+ *
+ * AMENDED 9 SEP 2026, owner instruction, and the amendment is recorded rather than folded in
+ * because the first build got the surface right and the field wrong. It rendered the credit
+ * NAME - "50 Volts", from `AppSettings.credits.name` - and the owner's requirement is the
+ * SYMBOL, `AppSettings.credits.symbol`, which defaults to the lightning bolt: "50 ⚡". Two
+ * consequences follow and both are tested below. Singularisation is gone, because a symbol has
+ * no plural, and the two tests that pinned it are inverted rather than deleted. And every
+ * consumer's prop and option is named `creditSymbol` / `symbol` rather than `unit`, so a site
+ * still reading `credits.name` is a compile error rather than a screen quietly showing a word
+ * where the operator configured a glyph.
  *
  * WHAT THE DEFECT WAS. Entry fees, prize pools, prizes and refunds are credits: they are
  * debited from and credited to `CreditWallet.creditBalance`, and no fiat currency is involved
@@ -23,7 +34,7 @@ import { join } from "node:path";
 import {
   formatVolts,
   formatVoltsCompact,
-  DEFAULT_VOLTS_UNIT,
+  DEFAULT_CREDIT_SYMBOL,
   NO_AMOUNT,
 } from "@/lib/utils/format-volts";
 import {
@@ -54,48 +65,90 @@ function stripComments(source: string): string {
 // =======================================================================================
 
 describe("formatVolts writes a credit amount", () => {
-  it("names the unit", () => {
-    expect(formatVolts(50)).toBe("50 Volts");
+  it("marks the amount with the credit symbol", () => {
+    expect(formatVolts(50)).toBe(`50 ${DEFAULT_CREDIT_SYMBOL}`);
+  });
+
+  it("puts the symbol after the number, matching the wallet", () => {
+    /*
+      The wallet has always written `1,000 ⚡`, so a contest screen writing `⚡ 1,000` would put
+      two spellings of one amount in front of the same player. The order is asserted rather
+      than assumed because it is the kind of thing a later edit "tidies" towards the fiat
+      convention, which is symbol-first.
+    */
+    expect(formatVolts(1000)).toBe(`1,000 ${DEFAULT_CREDIT_SYMBOL}`);
+    expect(formatVolts(1000).indexOf(DEFAULT_CREDIT_SYMBOL)).toBeGreaterThan(0);
   });
 
   it("separates thousands, because a prize pool is often four figures", () => {
-    expect(formatVolts(1000)).toBe("1,000 Volts");
-    expect(formatVolts(1234567)).toBe("1,234,567 Volts");
+    expect(formatVolts(1000)).toBe(`1,000 ${DEFAULT_CREDIT_SYMBOL}`);
+    expect(formatVolts(1234567)).toBe(`1,234,567 ${DEFAULT_CREDIT_SYMBOL}`);
   });
 
-  it("singularises exactly one", () => {
-    // An entry fee of 1 is ordinary, so `1 Volts` is not hypothetical.
-    expect(formatVolts(1)).toBe("1 Volt");
+  it("does NOT singularise one, because a symbol has no plural", () => {
+    /*
+      Inverted on 9 Sep 2026, not deleted. This test used to assert `1 Volt`, and the reason it
+      existed is the reason it is kept: an entry fee of 1 is ordinary, so whatever this
+      renders is on a real screen. Rendering the symbol makes the whole question disappear -
+      there is no `1 ⚡` / `2 ⚡s` distinction to get wrong - and a re-added singulariser would
+      strip the last character of whatever the operator configured.
+
+      THE SECOND ASSERTION IS THE ONLY ONE THAT CAN SEE THAT, and it was added because a probe
+      re-adding the singulariser came back GREEN against the first line alone: the default
+      glyph has no trailing `s`, so stripping one is unobservable. The field is free text, so
+      an operator who types a word is the case that exposes it - and the rule the two lines
+      together pin is the general one, which is that the configured symbol is rendered
+      verbatim and never edited.
+    */
+    expect(formatVolts(1)).toBe(`1 ${DEFAULT_CREDIT_SYMBOL}`);
+    expect(formatVolts(1, { symbol: "Volts" })).toBe("1 Volts");
   });
 
   it("carries no decimals on a whole amount and two on a fraction", () => {
     /*
-      An entry fee is nearly always whole and `50.00 Volts` on a lobby hero is noise. A prize
+      An entry fee is nearly always whole and `50.00 ⚡` on a lobby hero is noise. A prize
       share is nearly never whole, being a percentage of a pool, and `33.3` beside `33.33` in
       one column reads as a rounding bug rather than as two numbers.
     */
-    expect(formatVolts(50)).toBe("50 Volts");
-    expect(formatVolts(33.335)).toBe("33.34 Volts");
-    expect(formatVolts(33.3)).toBe("33.30 Volts");
+    expect(formatVolts(50)).toBe(`50 ${DEFAULT_CREDIT_SYMBOL}`);
+    expect(formatVolts(33.335)).toBe(`33.34 ${DEFAULT_CREDIT_SYMBOL}`);
+    expect(formatVolts(33.3)).toBe(`33.30 ${DEFAULT_CREDIT_SYMBOL}`);
   });
 
-  it("takes the operator's configured unit name", () => {
-    expect(formatVolts(5, { unit: "Sparks" })).toBe("5 Sparks");
-    expect(formatVolts(1, { unit: "Sparks" })).toBe("1 Spark");
+  it("takes the operator's configured symbol", () => {
+    // The field is free text in admin Settings -> Currency, so it is not necessarily one glyph.
+    expect(formatVolts(5, { symbol: "🔥" })).toBe("5 🔥");
+    expect(formatVolts(1, { symbol: "CV" })).toBe("1 CV");
   });
 
-  it("falls back to the default when the configured name is blank", () => {
+  it("falls back to the default when the configured symbol is blank", () => {
     // A settings read that has not resolved yet, and an operator who cleared the field.
-    expect(formatVolts(5, { unit: undefined })).toBe(`5 ${DEFAULT_VOLTS_UNIT}`);
-    expect(formatVolts(5, { unit: "   " })).toBe(`5 ${DEFAULT_VOLTS_UNIT}`);
-    expect(formatVolts(5, { unit: null })).toBe(`5 ${DEFAULT_VOLTS_UNIT}`);
+    expect(formatVolts(5, { symbol: undefined })).toBe(
+      `5 ${DEFAULT_CREDIT_SYMBOL}`,
+    );
+    expect(formatVolts(5, { symbol: "   " })).toBe(`5 ${DEFAULT_CREDIT_SYMBOL}`);
+    expect(formatVolts(5, { symbol: null })).toBe(`5 ${DEFAULT_CREDIT_SYMBOL}`);
+  });
+
+  it("defaults to the same glyph the settings schema does", () => {
+    /*
+      Two definitions of the default, one in the formatter and one in `app-settings.model.ts`,
+      and nothing else makes them agree. If they drift, a platform whose operator never touched
+      the currency screen renders one glyph while the settings form shows another - and the
+      formatter's copy is the one on every screen, so the settings form would look wrong.
+    */
+    const schema = read("database/models/app-settings.model.ts");
+    const symbolDefault = /symbol:\s*\{[^}]*default:\s*"([^"]+)"/.exec(
+      schema.slice(schema.indexOf("credits:")),
+    );
+    expect(symbolDefault?.[1]).toBe(DEFAULT_CREDIT_SYMBOL);
   });
 
   it("renders a dash for an absent amount, never a zero", () => {
     /*
       Same rule as R45's unheld rank and R50's absent score: a missing amount and a zero amount
-      are different facts, and only one of them is `0 Volts`. `NaN` matters most - it is one
-      `parseFloat` away on every admin form, and `NaN Volts` in a prize column is worse than a
+      are different facts, and only one of them is `0 ⚡`. `NaN` matters most - it is one
+      `parseFloat` away on every admin form, and `NaN ⚡` in a prize column is worse than a
       dash because it is a number shaped like a payout.
     */
     expect(formatVolts(undefined)).toBe(NO_AMOUNT);
@@ -103,10 +156,10 @@ describe("formatVolts writes a credit amount", () => {
     expect(formatVolts(Number.NaN)).toBe(NO_AMOUNT);
     expect(formatVolts(Number.POSITIVE_INFINITY)).toBe(NO_AMOUNT);
     // ... and a real zero is a real amount.
-    expect(formatVolts(0)).toBe("0 Volts");
+    expect(formatVolts(0)).toBe(`0 ${DEFAULT_CREDIT_SYMBOL}`);
   });
 
-  it("drops the unit on request, for a column whose header carries it", () => {
+  it("drops the symbol on request, for a column whose header carries it", () => {
     expect(formatVolts(1000, { bare: true })).toBe("1,000");
   });
 
@@ -129,18 +182,27 @@ describe("formatVolts writes a credit amount", () => {
 
 describe("formatVoltsCompact abbreviates a headline figure", () => {
   it("abbreviates thousands and millions", () => {
-    expect(formatVoltsCompact(30000)).toBe("30K Volts");
-    expect(formatVoltsCompact(2_400_000)).toBe("2.4M Volts");
+    expect(formatVoltsCompact(30000)).toBe(`30K ${DEFAULT_CREDIT_SYMBOL}`);
+    expect(formatVoltsCompact(2_400_000)).toBe(`2.4M ${DEFAULT_CREDIT_SYMBOL}`);
   });
 
   it("leaves a small amount alone", () => {
-    expect(formatVoltsCompact(750)).toBe("750 Volts");
+    expect(formatVoltsCompact(750)).toBe(`750 ${DEFAULT_CREDIT_SYMBOL}`);
   });
 
-  it("still singularises one, because under a thousand nothing is abbreviated", () => {
-    // The first draft asserted in a comment that an abbreviated amount is never exactly one.
-    // That is false below 1000, and this is the test that would have caught it.
-    expect(formatVoltsCompact(1)).toBe("1 Volt");
+  it("does NOT singularise one either", () => {
+    /*
+      Inverted alongside its sibling on 9 Sep 2026. It is kept because of what it originally
+      caught: a comment here once claimed an abbreviated amount is never exactly one, which is
+      false below 1000, and this assertion is the reason that claim did not survive. The value
+      of 1 is still the interesting input - it is simply no longer a special case.
+
+      Second assertion for the same reason as its sibling's: the default glyph has no trailing
+      `s`, so a probe re-adding the singulariser is invisible without a configured symbol that
+      has one.
+    */
+    expect(formatVoltsCompact(1)).toBe(`1 ${DEFAULT_CREDIT_SYMBOL}`);
+    expect(formatVoltsCompact(1, { symbol: "Volts" })).toBe("1 Volts");
   });
 
   it("renders a dash for an absent amount", () => {
@@ -153,7 +215,8 @@ describe("the formatter is mirrored byte for byte", () => {
     /*
       `check:mirrors` compares models, so it has no opinion about this file. A text comparison
       is the only guard - and it matters here because the two apps both render prize figures,
-      so a drifted copy means one screen singularises and the other does not.
+      so a drifted copy means one screen writes the operator's glyph and the other writes a
+      word, or the default differs between them.
     */
     expect(read("apps/admin/lib/utils/format-volts.ts")).toBe(
       read("lib/utils/format-volts.ts"),
@@ -166,8 +229,8 @@ describe("no caller pre-formats the number it hands to the formatter", () => {
     THE DEFECT THIS GUARDS, WHICH WAS REAL AND WAS COMMITTED FOR ABOUT AN HOUR.
 
     Five call sites on the admin challenge view were written as
-    `formatVolts(challenge.prizePool?.toLocaleString(), { unit })` and
-    `formatVolts(gm.gmEarning.toFixed(2), { unit })` - the pre-formatting left over from the
+    `formatVolts(challenge.prizePool?.toLocaleString(), { symbol })` and
+    `formatVolts(gm.gmEarning.toFixed(2), { symbol })` - the pre-formatting left over from the
     string being replaced. The formatter does both jobs itself, so the argument arrived as a
     STRING, hit the `typeof amount !== "number"` guard, and returned NO_AMOUNT.
 
@@ -307,18 +370,20 @@ describe("the ranking panels keep two units apart", () => {
     prize pool and the potential reward are credits.
 
     Giving both the same prefix is what made the two look like one quantity, so the test pins
-    that they are now different: the pool is Volts, the metric is not.
+    that they are now different: the pool carries the credit symbol, the metric does not.
   */
   const PANELS = [
     "components/trading/LiveRankingPanel.tsx",
     "components/trading/GameLiveRankingPanel.tsx",
   ];
 
-  it.each(PANELS)("%s writes the prize pool and the reward in Volts", (p) => {
+  it.each(PANELS)("%s writes the pool and the reward in credits", (p) => {
     const code = stripComments(read(p));
-    expect(code).toMatch(/formatVolts\(prizePool,\s*\{\s*unit\s*\}\)/);
     expect(code).toMatch(
-      /formatVolts\(entry\.potentialReward,\s*\{\s*unit\s*\}\)/,
+      /formatVolts\(prizePool,\s*\{\s*symbol:\s*creditSymbol\s*\}\)/,
+    );
+    expect(code).toMatch(
+      /formatVolts\(entry\.potentialReward,\s*\{\s*symbol:\s*creditSymbol\s*\}\)/,
     );
   });
 
@@ -340,23 +405,27 @@ describe("the ranking panels keep two units apart", () => {
   });
 });
 
-describe("the shared prize table takes a unit, not a symbol", () => {
+describe("the shared prize table takes the credit symbol, not the fiat one", () => {
   it("its prop is named for what it now carries", () => {
     /*
       `PrizeTable` is rendered by both lobbies, so a leftover `currSymbol` prop would be the
-      "one rule, two copies" shape - one lobby in Volts, the other in euros, from one
+      "one rule, two copies" shape - one lobby in credits, the other in euros, from one
       component. Asserting the prop NAME changed is what makes a half-done sweep fail.
+
+      Reason the name is `creditSymbol` and not `symbol`: this component sits next to trading
+      code where `symbol` means a market instrument - `EUR/USD`. A prop called `symbol` on a
+      contest component is ambiguous exactly where the ambiguity is expensive.
     */
     const code = stripComments(read("components/competitions/PrizeTable.tsx"));
     expect(code).not.toMatch(/currSymbol/);
-    expect(code).toMatch(/unit\??\s*:/);
+    expect(code).toMatch(/creditSymbol\??\s*:/);
   });
 
   it.each([
     "components/trading/lobby/TradingLobbySidebar.tsx",
     "components/games/ProviderContestLobby.tsx",
-  ])("%s hands it the unit", (p) => {
-    expect(stripComments(read(p))).toMatch(/unit=\{/);
+  ])("%s hands it the credit symbol", (p) => {
+    expect(stripComments(read(p))).toMatch(/creditSymbol=\{/);
   });
 });
 
@@ -393,13 +462,15 @@ describe("the landing routes share one abbreviating formatter", () => {
 // =======================================================================================
 
 /**
- * A screen can read the operator's configured unit name; a notification body cannot, because it
- * is written on a path with no React context and giving it one would put a settings read on
- * every send. These sites therefore call `formatVolts` with no options and get the default.
+ * A screen can read the operator's configured symbol; a notification body cannot, because it is
+ * written on a path with no React context and giving it one would put a settings read on every
+ * send. These sites therefore call `formatVolts` with no options and get the default glyph.
  *
- * That boundary is real and is recorded rather than implied away: renaming the unit reaches
+ * That boundary is real and is recorded rather than implied away: changing the symbol reaches
  * every screen and not these handful of strings. It is a strictly smaller inconsistency than
- * the euro sign it replaces.
+ * the euro sign it replaces, and it shrank further on 9 Sep 2026 - the default is now the same
+ * lightning bolt the settings schema ships, so an operator who never edits the field sees no
+ * inconsistency at all.
  */
 const SERVER_COMPOSED_CONTEST_MONEY = [
   // Three prize notifications - won, podium, prize received - each of which told a winner they

@@ -22,34 +22,48 @@
  */
 
 /**
- * The unit's name when nothing overrides it.
+ * The credit symbol when nothing overrides it.
  *
- * The name is configurable - `AppSettings.credits.name`, edited in admin Settings -> Currency -
- * so a caller with the settings loaded should pass it. The default exists because the callers
- * that need this most are on the server: a notification body or an entry refusal has no React
- * context, and making them each read the settings singleton would put a database round trip on
- * paths that currently have none. A renamed unit therefore reaches every screen and not the
- * handful of server-composed strings; that is a known boundary, recorded rather than implied
- * away, and it is a strictly smaller inconsistency than the euro sign it replaces.
+ * THE SYMBOL, NOT THE NAME, and the distinction is the whole of this module's second revision.
+ * The first wrote the configured *name* - `50 Volts` - which is a sentence rather than a price
+ * and which no other credit surface in the platform uses. The wallet, the deposit modal, the
+ * transaction list and the admin revenue tables have always written the symbol, so writing the
+ * name on contest screens alone made contests the odd one out while appearing to fix them.
+ *
+ * MUST EQUAL `AppSettings.credits.symbol`'s SCHEMA DEFAULT, and a test asserts it does. This is
+ * the migration rule in a smaller place: a constant that carries its own copy of another
+ * module's default is a constant that silently disagrees with it the day somebody edits one. It
+ * is not imported, because this file must stay free of Mongoose so a notification body and an
+ * `api-server` route can both use it.
+ *
+ * The default exists at all because the callers that need this most are on the server: a
+ * notification body or an entry refusal has no React context, and making each read the settings
+ * singleton would put a database round trip on paths that currently have none. A reconfigured
+ * symbol therefore reaches every screen and not the handful of server-composed strings; that is
+ * a known boundary, recorded rather than implied away, and it is a strictly smaller
+ * inconsistency than the euro sign it replaces.
  */
-export const DEFAULT_VOLTS_UNIT = "Volts";
+export const DEFAULT_CREDIT_SYMBOL = "⚡";
 
 /** What to render when there is no amount. */
 export const NO_AMOUNT = "-";
 
 export interface FormatVoltsOptions {
-  /** `AppSettings.credits.name`. Falls back to {@link DEFAULT_VOLTS_UNIT}. */
-  unit?: string | null;
-  /** Drop the unit and return the bare number, for a cell whose column header carries it. */
+  /**
+   * `AppSettings.credits.symbol`, edited in admin Settings -> Currency -> Credit Symbol.
+   * Falls back to {@link DEFAULT_CREDIT_SYMBOL}.
+   */
+  symbol?: string | null;
+  /** Drop the symbol and return the bare number, for a cell whose column header carries it. */
   bare?: boolean;
 }
 
 /**
  * Whole amounts carry no decimals, fractional ones carry exactly two.
  *
- * An entry fee is nearly always whole, and `50.00 Volts` on a lobby hero is noise. A prize
- * share is nearly never whole, because it is a percentage of a pool, and `33.3 Volts` beside
- * `33.33 Volts` in the same column reads as a rounding bug rather than as two numbers.
+ * An entry fee is nearly always whole, and `50.00 ⚡` on a lobby hero is noise. A prize share is
+ * nearly never whole, because it is a percentage of a pool, and `33.3 ⚡` beside `33.33 ⚡` in
+ * the same column reads as a rounding bug rather than as two numbers.
  */
 function formatAmount(amount: number): string {
   const isWhole = Number.isInteger(amount);
@@ -60,29 +74,26 @@ function formatAmount(amount: number): string {
 }
 
 /**
- * `1 Volt`, not `1 Volts`.
- *
- * Derived by trimming a trailing `s` because the setting is a single string and cannot carry
- * both forms. That is right for every name the placeholder suggests - Volts, Volt Credits,
- * Trading Points - and harmlessly inert for one that does not end in `s`. An entry fee of
- * exactly 1 is ordinary, so this is not a hypothetical.
- */
-function singularise(unit: string): string {
-  return unit.endsWith("s") ? unit.slice(0, -1) : unit;
-}
-
-/**
  * Writes a competition credit amount.
  *
- * `formatVolts(500)` -> `500 Volts`
- * `formatVolts(1000)` -> `1,000 Volts`
- * `formatVolts(33.335)` -> `33.34 Volts`
- * `formatVolts(1)` -> `1 Volt`
+ * `formatVolts(500)`    -> `500 ⚡`
+ * `formatVolts(1000)`   -> `1,000 ⚡`
+ * `formatVolts(33.335)` -> `33.34 ⚡`
+ * `formatVolts(1)`      -> `1 ⚡`
+ *
+ * NO SINGULARISATION, unlike the first revision, which trimmed a trailing `s` so that a
+ * one-credit fee read `1 Volt`. A symbol has no plural, and the rule was not merely redundant:
+ * an operator who types a word into a field labelled "Credit Symbol (Emoji)" would have had it
+ * silently edited, so the platform would show a character they never entered.
+ *
+ * THE SYMBOL FOLLOWS THE NUMBER, matching `WalletContent` and the currency settings preview.
+ * Fiat convention puts a symbol first, and an emoji is not a fiat symbol - `⚡ 50` reads as an
+ * icon beside an unlabelled figure, which is what the settings screen's own preview avoids.
  *
  * An absent or non-finite amount returns {@link NO_AMOUNT}. `NaN` is one `parseFloat` away on
- * every admin form, and `NaN Volts` in a prize column is worse than a dash: it is a number
- * shaped like a payout. This is the same rule as R45's unheld rank and R50's absent score -
- * a missing amount and a zero amount are different facts, and only one of them is `0 Volts`.
+ * every admin form, and `NaN ⚡` in a prize column is worse than a dash: it is a number shaped
+ * like a payout. This is the same rule as R45's unheld rank and R50's absent score - a missing
+ * amount and a zero amount are different facts, and only one of them is `0 ⚡`.
  */
 export function formatVolts(
   amount: number | null | undefined,
@@ -95,22 +106,21 @@ export function formatVolts(
   const formatted = formatAmount(amount);
   if (options.bare) return formatted;
 
-  const unit = options.unit?.trim() || DEFAULT_VOLTS_UNIT;
-  return `${formatted} ${amount === 1 ? singularise(unit) : unit}`;
+  return `${formatted} ${options.symbol?.trim() || DEFAULT_CREDIT_SYMBOL}`;
 }
 
 /**
  * The same amount, abbreviated, for a headline with no room for a full figure.
  *
- * `formatVoltsCompact(30000)` -> `30K Volts`
- * `formatVoltsCompact(2400000)` -> `2.4M Volts`
- * `formatVoltsCompact(750)` -> `750 Volts`
+ * `formatVoltsCompact(30000)`   -> `30K ⚡`
+ * `formatVoltsCompact(2400000)` -> `2.4M ⚡`
+ * `formatVoltsCompact(750)`     -> `750 ⚡`
  *
  * This exists because the landing page had two identical private `formatCurrency` helpers, one
  * per route, each hard-coded to `$` and each abbreviating a *credit* prize pool as dollars. Two
  * copies of one rule is the shape behind several defects here, so there is one copy and both
  * routes import it. Signed-out visitors are the audience, so there are no settings to read and
- * the default unit applies.
+ * the default symbol applies.
  */
 export function formatVoltsCompact(
   amount: number | null | undefined,
@@ -129,8 +139,7 @@ export function formatVoltsCompact(
 
   if (options.bare) return magnitude;
 
-  const unit = options.unit?.trim() || DEFAULT_VOLTS_UNIT;
-  return `${magnitude} ${amount === 1 ? singularise(unit) : unit}`;
+  return `${magnitude} ${options.symbol?.trim() || DEFAULT_CREDIT_SYMBOL}`;
 }
 
 /*

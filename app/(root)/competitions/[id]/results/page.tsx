@@ -99,10 +99,10 @@ const CompetitionResultsPage = async ({
     const [providerResults, refundedAmount, appSettings] = await Promise.all([
       getProviderContestResults(competition, session.user.id),
       findUnscoredRefund(competitionId, session.user.id),
-      // `credits.name`, not `currency.symbol`: a prize and a refunded entry fee are both
+      // `credits.symbol`, not `currency.symbol`: a prize and a refunded entry fee are both
       // credit amounts, so the fiat symbol made a 30-credit prize read `€30`.
       AppSettingsModel.findById("app-settings")
-        .lean<{ credits?: { name?: string } } | null>()
+        .lean<{ credits?: { symbol?: string } } | null>()
         .catch(() => null),
     ]);
 
@@ -152,7 +152,7 @@ const CompetitionResultsPage = async ({
           startTime={new Date(competition.startTime).toISOString()}
           endTime={new Date(competition.endTime).toISOString()}
           gameCode={competition.gameCode}
-          unit={appSettings?.credits?.name || undefined}
+          creditSymbol={appSettings?.credits?.symbol || undefined}
           refundedAmount={refundedAmount}
         />
       </div>

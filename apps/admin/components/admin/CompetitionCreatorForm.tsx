@@ -59,7 +59,7 @@ export default function CompetitionCreatorForm() {
   // Reason: the entry fee and the pool it builds are credits. `currency.symbol` is the fiat
   // symbol for deposits and invoices, and the operator was reading euro figures for amounts
   // the ledger only ever moves in credits.
-  const unit = settings?.credits?.name;
+  const creditSymbol = settings?.credits?.symbol;
   const currencyCode = settings?.currency?.code || "EUR";
 
   // Risk settings from database
@@ -658,7 +658,7 @@ export default function CompetitionCreatorForm() {
               icon={DollarSign}
               iconClassName="text-green-400"
               label="Entry Fee"
-              value={formatVolts(formData.entryFeeCredits, { unit })}
+              value={formatVolts(formData.entryFeeCredits, { symbol: creditSymbol })}
             />
             <WizardPreviewRow
               icon={Target}
@@ -972,7 +972,7 @@ export default function CompetitionCreatorForm() {
                               {formatVolts(
                                 formData.entryFeeCredits *
                                   formData.maxParticipants,
-                                { unit },
+                                { symbol: creditSymbol },
                               )}
                             </div>
                           </div>
@@ -987,7 +987,7 @@ export default function CompetitionCreatorForm() {
                                   formData.maxParticipants *
                                   (100 - formData.platformFeePercentage)) /
                                   100,
-                                { unit },
+                                { symbol: creditSymbol },
                               )}
                             </div>
                           </div>
@@ -2442,7 +2442,7 @@ export default function CompetitionCreatorForm() {
                     <div className="p-4 bg-gray-900/50 rounded-lg">
                       <p className="text-xs text-gray-400 mb-1">Entry Fee</p>
                       <p className="text-sm font-semibold text-gray-100">
-                        {formatVolts(formData.entryFeeCredits, { unit })}
+                        {formatVolts(formData.entryFeeCredits, { symbol: creditSymbol })}
                       </p>
                     </div>
                     <div className="p-4 bg-gray-900/50 rounded-lg">

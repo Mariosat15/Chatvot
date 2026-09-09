@@ -17,6 +17,11 @@
 # One rule specific to this file: every multi-line pattern is a here-string. Written inline in
 # single quotes the parser mis-terminated them and reported the error several probes further
 # down, which reads exactly like a broken probe rather than a quoting mistake.
+#
+# And one rule specific to this SUBJECT, which is the reason the euro sign and the lightning
+# bolt below are both built from char codes rather than typed: this harness writes its patterns
+# into real source files, so a glyph the PowerShell 5.1 parser mangles on the way in is a glyph
+# this script mangles on the way out. The probe then reports red for the wrong reason.
 
 $ErrorActionPreference = 'Continue'
 $Root = Split-Path -Parent $PSScriptRoot
@@ -84,18 +89,47 @@ function Invoke-Probe {
 $Formatter = 'lib/utils/format-volts.ts'
 $Vocabulary = 'apps/admin/lib/admin/ai-contest-vocabulary.ts'
 
+# THE LIGHTNING BOLT IS BUILT FROM A CHAR CODE, NEVER WRITTEN AS A LITERAL, for exactly the
+# reason recorded against the euro sign further down: PowerShell 5.1 decodes a .ps1 with the
+# system ANSI codepage, so an emoji typed into this file arrives as mojibake, gets written into
+# the source being probed, and reports red for entirely the wrong reason.
+$Bolt = [string][char]0x26A1
+
 Write-Host "`n=== Probing the formatter itself ===`n" -ForegroundColor Cyan
 
-# 1 - the singular. `1 Volts` on an entry fee of one, which is an ordinary amount rather than
-#     an edge case, so this is the cheapest real regression available.
-Invoke-Probe -Name '1 singular dropped' -File $Formatter `
+# 1 - singularisation put BACK. The mirror-image probe, and the one this revision needs: the
+#     first version of this module trimmed a trailing `s` so a one-credit fee read `1 Volt`.
+#     Re-adding it now strips the last character of whatever the operator configured, so a
+#     lightning bolt becomes mojibake and a two-letter code loses a letter. The test it turns
+#     red is the INVERTED one - kept rather than deleted, because the reason it was written
+#     (an entry fee of 1 is an ordinary amount) is still why the input matters.
+Invoke-Probe -Name '1 singularisation reintroduced' -File $Formatter `
   -From @'
-  const unit = options.unit?.trim() || DEFAULT_VOLTS_UNIT;
-  return `${formatted} ${amount === 1 ? singularise(unit) : unit}`;
+  return `${formatted} ${options.symbol?.trim() || DEFAULT_CREDIT_SYMBOL}`;
 '@ -To @'
-  const unit = options.unit?.trim() || DEFAULT_VOLTS_UNIT;
-  return `${formatted} ${unit}`;
-'@ -ExpectTest 'singularises exactly one'
+  const symbol = options.symbol?.trim() || DEFAULT_CREDIT_SYMBOL;
+  return `${formatted} ${amount === 1 ? symbol.replace(/s$/, "") : symbol}`;
+'@ -ExpectTest 'does NOT singularise one, because a symbol has no plural'
+
+# 1b - the symbol moved in front of the number. This is the fiat convention, so it is what a
+#      later edit "corrects" it to - and it is wrong here twice over: the wallet, the deposit
+#      modal and the currency settings preview have all always written the symbol last, and an
+#      emoji in front of a figure reads as an icon beside an unlabelled number.
+Invoke-Probe -Name '1b the symbol moved before the number' -File $Formatter `
+  -From @'
+  return `${formatted} ${options.symbol?.trim() || DEFAULT_CREDIT_SYMBOL}`;
+'@ -To @'
+  return `${options.symbol?.trim() || DEFAULT_CREDIT_SYMBOL} ${formatted}`;
+'@ -ExpectTest 'puts the symbol after the number, matching the wallet'
+
+# 1c - the default drifted from the settings schema. Nothing but the test makes these two
+#      agree, and the failure is quiet in the most confusing direction: a platform whose
+#      operator never touched the currency screen renders one glyph everywhere while the
+#      settings form shows another, so the SETTINGS screen is what looks broken.
+Invoke-Probe -Name '1c the default drifts from the schema' -File $Formatter `
+  -From ('export const DEFAULT_CREDIT_SYMBOL = "' + $Bolt + '";') `
+  -To 'export const DEFAULT_CREDIT_SYMBOL = "CR";' `
+  -ExpectTest 'defaults to the same glyph the settings schema does' -MaxRed 6
 
 # 2 - an absent amount rendered as a zero. Same rule as R45's unheld rank and R50's phantom
 #     score: a missing amount and a zero amount are different facts. `NaN` is the one that
@@ -121,27 +155,26 @@ Invoke-Probe -Name '3 decimals on a whole amount' -File $Formatter `
   -To '  const isWhole = false;' `
   -ExpectTest 'carries no decimals on a whole amount and two on a fraction'
 
-# 4 - the configured unit ignored. Reads correctly and silently overrides an operator who
-#     renamed the unit, on every screen at once.
-Invoke-Probe -Name '4 configured unit ignored' -File $Formatter `
+# 4 - the configured symbol ignored. Reads correctly and silently overrides an operator who
+#     set their own glyph, on every screen at once. This is the defect the owner's instruction
+#     was actually about, one level up: a symbol that is not fetched from settings.
+Invoke-Probe -Name '4 configured symbol ignored' -File $Formatter `
   -From @'
-  const unit = options.unit?.trim() || DEFAULT_VOLTS_UNIT;
-  return `${formatted} ${amount === 1 ? singularise(unit) : unit}`;
+  return `${formatted} ${options.symbol?.trim() || DEFAULT_CREDIT_SYMBOL}`;
 '@ -To @'
-  const unit = DEFAULT_VOLTS_UNIT;
-  return `${formatted} ${amount === 1 ? singularise(unit) : unit}`;
-'@ -ExpectTest "takes the operator's configured unit name"
+  return `${formatted} ${DEFAULT_CREDIT_SYMBOL}`;
+'@ -ExpectTest "takes the operator's configured symbol"
 
-# 5 - a blank configured name taken literally. An operator who clears the field, or a settings
-#     read that has not resolved, then gets `50 ` with no unit at all.
-Invoke-Probe -Name '5 blank unit taken literally' -File $Formatter `
+# 5 - a blank configured symbol taken literally. An operator who clears the field, or a
+#     settings read that has not resolved, then gets `50 ` with no symbol at all - which is an
+#     unlabelled number rather than a visibly missing one. `??` is the natural "modernisation"
+#     of the `||`, and it is wrong: the empty string is a real stored shape here.
+Invoke-Probe -Name '5 blank symbol taken literally' -File $Formatter `
   -From @'
-  const unit = options.unit?.trim() || DEFAULT_VOLTS_UNIT;
-  return `${formatted} ${amount === 1 ? singularise(unit) : unit}`;
+  return `${formatted} ${options.symbol?.trim() || DEFAULT_CREDIT_SYMBOL}`;
 '@ -To @'
-  const unit = options.unit ?? DEFAULT_VOLTS_UNIT;
-  return `${formatted} ${amount === 1 ? singularise(unit) : unit}`;
-'@ -ExpectTest 'falls back to the default when the configured name is blank'
+  return `${formatted} ${options.symbol ?? DEFAULT_CREDIT_SYMBOL}`;
+'@ -ExpectTest 'falls back to the default when the configured symbol is blank'
 
 # 6 - the thousands separator. A four-figure prize pool is the normal case, not a large one.
 Invoke-Probe -Name '6 thousands separator dropped' -File $Formatter `
@@ -172,25 +205,22 @@ Invoke-Probe -Name '7 a conversion rate reintroduced' -File $Formatter `
 # 8 - the mirror. `check:mirrors` compares models and has no opinion about this file, so a
 #     text comparison is the only thing standing between the two apps and a drifted formatter.
 Invoke-Probe -Name '8 admin mirror drifted' -File 'apps/admin/lib/utils/format-volts.ts' `
-  -From 'export const DEFAULT_VOLTS_UNIT = "Volts";' `
-  -To 'export const DEFAULT_VOLTS_UNIT = "Credits";' `
+  -From ('export const DEFAULT_CREDIT_SYMBOL = "' + $Bolt + '";') `
+  -To 'export const DEFAULT_CREDIT_SYMBOL = "CR";' `
   -ExpectTest 'the admin copy is identical'
 
-# 9 - the compact form's singular. This one is here because the FIRST draft of the module was
-#     wrong in exactly this way: a comment asserted an abbreviated amount is never exactly one,
-#     which is false below 1000, where nothing is abbreviated.
-Invoke-Probe -Name '9 compact singular dropped' -File $Formatter `
+# 9 - the compact form singularising. Its own probe rather than a duplicate of probe 1, because
+#     the FIRST draft of this module was wrong here specifically: a comment asserted an
+#     abbreviated amount is never exactly one, which is false below 1000, where nothing is
+#     abbreviated at all. The claim has flipped since the symbol replaced the word, but the
+#     input that exposes it has not, so the probe is re-aimed rather than dropped.
+Invoke-Probe -Name '9 compact singularisation reintroduced' -File $Formatter `
   -From @'
-  if (options.bare) return magnitude;
-
-  const unit = options.unit?.trim() || DEFAULT_VOLTS_UNIT;
-  return `${magnitude} ${amount === 1 ? singularise(unit) : unit}`;
+  return `${magnitude} ${options.symbol?.trim() || DEFAULT_CREDIT_SYMBOL}`;
 '@ -To @'
-  if (options.bare) return magnitude;
-
-  const unit = options.unit?.trim() || DEFAULT_VOLTS_UNIT;
-  return `${magnitude} ${unit}`;
-'@ -ExpectTest 'still singularises one'
+  const symbol = options.symbol?.trim() || DEFAULT_CREDIT_SYMBOL;
+  return `${magnitude} ${amount === 1 ? symbol.replace(/s$/, "") : symbol}`;
+'@ -ExpectTest 'does NOT singularise one either'
 
 Write-Host "`n=== Probing the render sites ===`n" -ForegroundColor Cyan
 
@@ -200,7 +230,7 @@ Invoke-Probe -Name '10 the prize table prop renamed back' -File 'components/comp
   -From @'
 export default function PrizeTable({
   competition,
-  unit,
+  creditSymbol,
 }: {
 '@ -To @'
 export default function PrizeTable({
@@ -220,14 +250,14 @@ export default function PrizeTable({
 #      `-t` is a REGEX and the test's name is the file path: `(root)` is a capture group and
 #      `[id]` is a character class, so the filter matched no test at all.
 Invoke-Probe -Name '11 a card reads currency.symbol again' -File 'components/trading/CompetitionCard.tsx' `
-  -From 'formatVolts(getPrizePool(), { unit: settings?.credits?.name })' `
-  -To 'formatVolts(getPrizePool(), { unit: settings?.currency?.symbol })' `
+  -From 'formatVolts(getPrizePool(), { symbol: settings?.credits?.symbol })' `
+  -To 'formatVolts(getPrizePool(), { symbol: settings?.currency?.symbol })' `
   -ExpectTest 'components/trading/CompetitionCard.tsx'
 
 # 12 - a hard-coded symbol, which is the half a `currency.symbol` check cannot see. This is
 #      what the two landing routes actually did.
 Invoke-Probe -Name '12 a hard-coded dollar sign' -File 'components/trading/CompetitionCard.tsx' `
-  -From 'formatVolts(getEntryFee(), { unit: settings?.credits?.name })' `
+  -From 'formatVolts(getEntryFee(), { symbol: settings?.credits?.symbol })' `
   -To '"$" + getEntryFee()' `
   -ExpectTest 'no contest screen hard-codes a currency symbol either'
 
@@ -263,22 +293,22 @@ Write-Host "`n=== Probing the two-units boundary ===`n" -ForegroundColor Cyan
 #      mutates one of the two metric formatters, which is the thing the claim is actually about.
 Invoke-Probe -Name '14 the ranking metric relabelled as credits' -File 'components/trading/LiveRankingPanel.tsx' `
   -From 'return `${currSymbol}${Math.abs(value).toFixed(0)}`;' `
-  -To 'return formatVolts(Math.abs(value), { unit });' `
+  -To 'return formatVolts(Math.abs(value), { symbol: creditSymbol });' `
   -ExpectTest 'still writes the metric in its own symbol'
 
 # 14b - the same mutation on the sibling panel. Two files, one rule, and a test written over
 #       either alone is green on the other.
 Invoke-Probe -Name '14b the sibling panel relabelled too' -File 'components/trading/GameLiveRankingPanel.tsx' `
   -From 'return `${currSymbol}${Math.abs(value).toFixed(0)}`;' `
-  -To 'return formatVolts(Math.abs(value), { unit });' `
+  -To 'return formatVolts(Math.abs(value), { symbol: creditSymbol });' `
   -ExpectTest 'still writes the metric in its own symbol'
 
 # 15 - and the forward direction on the same file: the pool reverting while the metric stays
 #      right. Both halves need their own probe or one covers for the other.
 Invoke-Probe -Name '15 the prize pool reverted, metric untouched' -File 'components/trading/LiveRankingPanel.tsx' `
-  -From '{formatVolts(prizePool, { unit })}' `
+  -From '{formatVolts(prizePool, { symbol: creditSymbol })}' `
   -To '{prizePool.toLocaleString()}' `
-  -ExpectTest 'components/trading/LiveRankingPanel.tsx writes the prize pool and the reward in Volts'
+  -ExpectTest 'components/trading/LiveRankingPanel\.tsx writes the pool and the reward in credits'
 
 Write-Host "`n=== Probing the strings the server composes ===`n" -ForegroundColor Cyan
 
@@ -359,8 +389,8 @@ Write-Host "`n=== Probing the pre-formatting guard ===`n" -ForegroundColor Cyan
 #      that page's challenge object is loosely typed and `?.toLocaleString()` widens to `any`.
 #      A probe on one of the two the compiler did catch would prove nothing this test owns.
 Invoke-Probe -Name '23 a caller pre-formats with toLocaleString' -File 'apps/admin/app/challenges/view/[id]/page.tsx' `
-  -From 'formatVolts(challenge.prizePool, { unit })' `
-  -To 'formatVolts(challenge.prizePool?.toLocaleString(), { unit })' `
+  -From 'formatVolts(challenge.prizePool, { symbol: creditSymbol })' `
+  -To 'formatVolts(challenge.prizePool?.toLocaleString(), { symbol: creditSymbol })' `
   -ExpectTest 'no call site hands it a string'
 
 # 23b - the behavioural half. Without it the scan is a rule whose cost nobody can see, and the
@@ -375,7 +405,7 @@ Invoke-Probe -Name '23b the formatter starts accepting a string' -File $Formatte
   const formatted = formatAmount(amount);
 '@ -To @'
   if (typeof amount === "string") {
-    return `${amount} ${DEFAULT_VOLTS_UNIT}`;
+    return `${amount} ${DEFAULT_CREDIT_SYMBOL}`;
   }
   if (typeof amount !== "number" || !Number.isFinite(amount)) {
     return NO_AMOUNT;

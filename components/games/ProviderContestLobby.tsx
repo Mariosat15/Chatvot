@@ -92,8 +92,8 @@ interface ProviderContestLobbyProps {
   isFull: boolean;
   userId: string;
   walletBalance: number;
-  /** `AppSettings.credits.name`. Replaced a `currencySymbol` prop handed the fiat symbol. */
-  unit?: string;
+  /** `AppSettings.credits.symbol`. Replaced a `currencySymbol` prop handed the fiat symbol. */
+  creditSymbol?: string;
   participantStatus?: string;
   registrationClosed?: boolean;
 }
@@ -127,7 +127,7 @@ export default async function ProviderContestLobby({
   isFull,
   userId,
   walletBalance,
-  unit,
+  creditSymbol,
   participantStatus,
   registrationClosed,
 }: ProviderContestLobbyProps) {
@@ -267,7 +267,7 @@ export default async function ProviderContestLobby({
             icon={Trophy}
             accent="prize"
             label="Prize pool"
-            value={formatVolts(competition.prizePool ?? 0, { unit })}
+            value={formatVolts(competition.prizePool ?? 0, { symbol: creditSymbol })}
           />
           <StatCard
             icon={Link2}
@@ -275,7 +275,7 @@ export default async function ProviderContestLobby({
             label="Entry fee"
             value={
               competition.entryFee
-                ? formatVolts(competition.entryFee, { unit })
+                ? formatVolts(competition.entryFee, { symbol: creditSymbol })
                 : "Free"
             }
           />
@@ -425,7 +425,7 @@ export default async function ProviderContestLobby({
           */}
           {(competition.prizeDistribution?.length ?? 0) > 0 && (
             <NeonPanel icon={Gift} accent="prize" title="Prize distribution">
-              <PrizeTable competition={competition} unit={unit} />
+              <PrizeTable competition={competition} creditSymbol={creditSymbol} />
             </NeonPanel>
           )}
 

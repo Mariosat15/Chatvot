@@ -1018,13 +1018,13 @@ export default function CompetitionDashboard({
                     </div>
                     <p className="text-2xl font-bold text-yellow-400">
                       {formatVolts(allTimeStats.totalPrizesWon ?? 0, {
-                        unit: settings?.credits?.name,
+                        symbol: settings?.credits?.symbol,
                       })}
                     </p>
                     <p className="text-xs text-slate-500 mt-1">
                       Net:{" "}
                       {formatVolts(allTimeStats.netProfit ?? 0, {
-                        unit: settings?.credits?.name,
+                        symbol: settings?.credits?.symbol,
                       })}
                     </p>
                   </div>
@@ -1098,7 +1098,7 @@ export default function CompetitionDashboard({
                     </p>
                     <p className="text-lg font-bold text-amber-400">
                       {formatVolts(allTimeStats.totalEntryFees ?? 0, {
-                        unit: settings?.credits?.name,
+                        symbol: settings?.credits?.symbol,
                       })}
                     </p>
                   </div>

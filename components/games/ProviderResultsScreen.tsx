@@ -95,7 +95,7 @@ export function ProviderResultsScreen({
   startTime,
   endTime,
   gameCode,
-  unit,
+  creditSymbol,
   refundedAmount,
 }: {
   results: ProviderContestResults;
@@ -105,8 +105,8 @@ export function ProviderResultsScreen({
   startTime: string;
   endTime: string;
   gameCode?: string | null;
-  /** `AppSettings.credits.name`. Replaced a `currencySymbol` prop handed the fiat symbol. */
-  unit?: string;
+  /** `AppSettings.credits.symbol`. Replaced a `currencySymbol` prop handed the fiat symbol. */
+  creditSymbol?: string;
   /**
    * What this player was actually returned, from the ledger row settlement wrote.
    *
@@ -172,7 +172,7 @@ export function ProviderResultsScreen({
           {won && (
             <span className="flex items-center gap-2 rounded-xl border border-yellow-500/30 bg-yellow-500/15 px-3 py-1.5 text-sm font-bold text-yellow-300">
               <Trophy className="h-4 w-4" />
-              You won {formatVolts(results.prizeAmount, { unit })}
+              You won {formatVolts(results.prizeAmount, { symbol: creditSymbol })}
             </span>
           )}
         </div>
@@ -224,7 +224,7 @@ export function ProviderResultsScreen({
           accent={won ? "prize" : "players"}
           label="Prize won"
           value={
-            won ? formatVolts(results.prizeAmount, { unit }) : "-"
+            won ? formatVolts(results.prizeAmount, { symbol: creditSymbol }) : "-"
           }
           valueAccent={won ? "prize" : undefined}
           note={
@@ -247,7 +247,7 @@ export function ProviderResultsScreen({
           <Undo2 className="mt-0.5 h-5 w-5 shrink-0 text-sky-400" />
           <div>
             <p className="text-sm font-semibold text-sky-200">
-              {formatVolts(refundedAmount, { unit })} was returned to you
+              {formatVolts(refundedAmount, { symbol: creditSymbol })} was returned to you
             </p>
             <p className="mt-1 text-xs text-sky-200/80">
               No player in this competition recorded a score, so there was no

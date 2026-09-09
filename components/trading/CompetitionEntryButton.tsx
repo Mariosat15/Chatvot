@@ -73,8 +73,8 @@ export default function CompetitionEntryButton({
   // Reason: an entry fee and a wallet balance are both credits. `settings.currency.symbol` is
   // the fiat symbol configured for deposits and invoices, and prefixing it here told a player
   // they were paying euros for something the ledger debits in credits.
-  const unit = settings?.credits?.name;
-  const volts = (amount: number) => formatVolts(amount, { unit });
+  const creditSymbol = settings?.credits?.symbol;
+  const volts = (amount: number) => formatVolts(amount, { symbol: creditSymbol });
 
   const entryFee = competition.entryFee || competition.entryFeeCredits || 0;
   const startingCapital =

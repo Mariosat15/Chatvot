@@ -749,7 +749,7 @@ export default function CompetitionsPageContent({
             </p>
             <div className="mt-1 sm:mt-2 flex items-baseline gap-0.5 sm:gap-1">
               <span className="text-2xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-400 tabular-nums">
-                {formatVolts(totalPrizePool, { unit: settings?.credits?.name })}
+                {formatVolts(totalPrizePool, { symbol: settings?.credits?.symbol })}
               </span>
             </div>
             <p className="text-[11px] sm:text-xs text-gray-500 hidden sm:block">
