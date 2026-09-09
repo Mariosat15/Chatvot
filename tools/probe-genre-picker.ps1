@@ -27,8 +27,11 @@ $repo = Split-Path -Parent $PSScriptRoot
 $utf8 = New-Object System.Text.UTF8Encoding($false)
 
 $suite = "__tests__/admin/game-categories.test.ts"
+$legibility = "__tests__/admin/native-select-legibility.test.ts"
 
 $dialog = Join-Path $repo "apps\admin\components\admin\games\GameContentDialog.tsx"
+$legibilityFile = Join-Path $repo "__tests__\admin\native-select-legibility.test.ts"
+$incidents = Join-Path $repo "apps\admin\components\admin\IncidentsSection.tsx"
 
 $probes = @(
     @{
@@ -72,6 +75,39 @@ $probes = @(
         Expected = "generates the options from the vocabulary"
         Find = '{GAME_CATEGORIES.map((entry) => ('
         Replace = '{[].map((entry: { slug: string; label: string }) => ('
+    },
+    # ---------------------------------------------------------------------------------------
+    # The platform-wide rule: a native select on a translucent background, anywhere.
+    # ---------------------------------------------------------------------------------------
+    @{
+        Name = "a clean native select is given a translucent background"
+        Suite = $legibility
+        File = $incidents
+        Expected = "no unlisted file combines the two"
+        Find = 'className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"'
+        Replace = 'className="bg-white/5 border border-gray-700 rounded-lg px-3 py-2 text-sm"'
+    },
+    @{
+        # Proves the offender scan actually REACHES the known instance rather than the
+        # exception list papering over a scan that finds nothing. Same role as the probe that
+        # mutates the dialog primitive in probe-dialog-widths.ps1.
+        Name = "the known exception is delisted, so the scan has to find it unaided"
+        Suite = $legibility
+        File = $legibilityFile
+        Expected = "no unlisted file combines the two"
+        Find = 'const KNOWN_UNFIXED = new Set(["apps/admin/components/admin/MessagingSection.tsx"]);'
+        Replace = 'const KNOWN_UNFIXED = new Set<string>([]);'
+    },
+    @{
+        # THE CONTROL. The first version of the scan was `<select\b[^>]*>`, which stops at the
+        # `>` inside `onChange={(e) => ...}` and never reaches className - every assertion
+        # green, every file reported clean. This is the probe that has to stay red.
+        Name = "the scan reverts to stopping at the first > , as it originally did"
+        Suite = $legibility
+        File = $legibilityFile
+        Expected = "reads past an inline handler to reach className"
+        Find = '  const starts = /<select\b/g;'
+        Replace = '  return [...source.matchAll(/<select\b[^>]*>/g)].map((m) => m[0]);' + "`n" + '  const starts = /<select\b/g;'
     }
 )
 
@@ -133,8 +169,13 @@ foreach ($probe in $probes) {
     Write-Host "Injecting the defect ..." -ForegroundColor Yellow
     Write-Source $path $mutated
 
+    # Reason: parameterise on the SUITE, not just the test name. A probe run against the wrong
+    # file reports "no test found", which reads like a broken harness rather than a missing
+    # guard - the sixth probing lesson in this repository.
+    $targetSuite = if ($probe.ContainsKey('Suite')) { $probe.Suite } else { $suite }
+
     try {
-        $raw = & npx vitest run $suite -t $probe.Expected 2>&1 | Out-String
+        $raw = & npx vitest run $targetSuite -t $probe.Expected 2>&1 | Out-String
         # Reason: Out-String wraps at the console width, so a long test name arrives split
         # across two lines and a literal match silently misses it. Collapse whitespace first.
         $flat = ($raw -replace '\s+', ' ')

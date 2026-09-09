@@ -33,7 +33,7 @@ chapter covers risks to the programme and to the application.
 | **R7** | Raw-driver contest inserts miss the game label | High | High | **CLOSED 4 Sep 2026** - **six** writers found, not one; all stamp `contestGameLabel()`, pinned by a test that counts labels against inserts |
 | **R58** | **A client component importing one number from a service took the admin panel down** | High | **ALREADY OCCURRED** | **CLOSED 9 Sep 2026** |
 | **R59** | **Every dialog that asked to be wide rendered at 32rem** - an unprefixed `max-w-*` never displaces the primitive's `sm:max-w-lg` | Medium | **ALREADY OCCURRED, 31 dialogs** | **CLOSED for the games surface 9 Sep 2026**; the other 29 are an owner decision |
-| **R60** | **The Genre drop-down rendered white on white** - the last native `<select>` on the games surface, whose list the *browser* paints from the element's own translucent background | Low | **ALREADY OCCURRED** | **CLOSED 9 Sep 2026** - on the shared `Select`, like its eleven siblings |
+| **R60** | **A native `<select>` on a translucent background renders white on white** - the *browser* paints the list, taking the background from the element and letting options inherit `color`. **Two instances found** | Low | **ALREADY OCCURRED, 2 controls** | **Genre picker CLOSED 9 Sep 2026**; `MessagingSection.tsx`'s employee picker is a **named, tested exception** - blocked by that file's lint debt |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -2230,21 +2230,41 @@ indistinguishable from white. So the options were white text on a white panel. T
 was legible was the highlighted one, readable only because the operating system paints its own
 selection band behind it.
 
-**Two conditions are needed and this was the only place in either app with both.** The element
-has to be a native `<select>`, and its background has to be translucent. The games admin surface
-has **eleven** pickers on the shared `Select` primitive - which draws its own list in a portal
-and never asks the browser for one - and this was the **twelfth and only native one left**. The
-~24 native selects elsewhere in the admin app sit on an opaque `bg-gray-*`, which the browser is
-perfectly happy to paint a list with, and most of them set no `color` at all, so they have two
-independent protections.
+**Two conditions are needed: a native `<select>` AND a translucent background.** The games admin
+surface has **eleven** pickers on the shared `Select` primitive - which draws its own list in a
+portal and never asks the browser for one - and this was the **twelfth and only native one left**
+there. The **33 remaining native selects in the admin app and 11 in the player app** sit on an
+opaque `bg-gray-*` or set no background at all, which the browser is perfectly happy to paint a
+list with, and most set no `color` either, so they carry two independent protections.
 
-That is why the guard is **scoped to this folder rather than banning the element platform-wide**.
-A platform-wide ban would fire on two dozen files that work correctly and would be deleted by the
-first person it inconvenienced - the reasoning that narrowed the `GameIcon` ban in `13` s4.1g.
+That is why the guard bans **the combination and not the element**. Banning `<select>` outright
+would fire on forty-odd files that work correctly and be deleted by the first person it
+inconvenienced - the reasoning that narrowed the `GameIcon` ban in `13` s4.1g. Banning the
+combination fires on nothing that works.
+
+#### There were TWO instances, and the second one is not fixed
+
+**Counting them is what corrected this entry.** It was first written claiming the genre picker
+was the only place in either app with both conditions. It was not: the **"Transfer to" employee
+picker in `MessagingSection.tsx:2110`** carries `bg-white/5 text-white` on a native select whose
+options are employee names, so **every name in it is white on white too**. Found by grepping for
+the *condition* after the fix, not before - the seventh instance of the counting rule, after four
+entry paths, ten finalize sites, six raw inserts, seven lifecycle routes, seven writers of the
+referral rate and two creation routes.
+
+**It is deliberately not fixed, and the reason is mechanical rather than a judgement about
+priority.** The fix is one token - `bg-white/5` to `bg-gray-800` - but that file carries about
+thirty pre-existing lint warnings and this repository's pre-commit hook lints staged files at
+`--max-warnings=0`. Touching it therefore requires an unrelated cleanup of a 2,180-line messaging
+component in the same commit, which cannot be verified by eye from here and has nothing to do
+with a drop-down. It is recorded as a **named exception inside the guard**, with a test asserting
+**the exception is still an offender**, so the entry has to be deleted for the suite to stay
+green once somebody does fix it. A stale exception is worse than none: it reads as a known
+problem long after it was solved, and silently re-permits the defect in that file.
 
 #### Severity, stated in both directions
 
-**Low, and live.** It is an operator-facing legibility fault on one control: no money moved, no
+**Low, and live.** It is an operator-facing legibility fault on two controls: no money moved, no
 document is wrong, nothing was stored incorrectly, and **nothing was backfilled** because there
 is nothing to backfill. But it made the genre unsettable in practice - an operator could only
 land on a value by arrowing blindly through an invisible list - so `category` is the field most
@@ -2275,8 +2295,21 @@ native `<select>`; **no other file on the surface has one either, read from the 
 than from a list of filenames, so it is not green on the day a thirteenth picker appears; the
 options are generated from the vocabulary rather than typed out, asserted by the **absence of
 every one of the thirteen slugs as a literal**; and the sentinels are non-empty and outside the
-slug namespace. `tools/probe-genre-picker.ps1`, 6 probes, all red on exactly the expected test
-with a blast radius of one.
+slug namespace.
+
+`__tests__/admin/native-select-legibility.test.ts`, eight tests, is the platform-wide half.
+**The load-bearing part of it is a brace-aware scanner, and the first version was wrong in the
+silent direction.** Written as `<select\b[^>]*>` it stops at the `>` inside
+`onChange={(e) => ...}`, which every real call site has - so the captured tag ends before
+`className`, no file can ever match, and **every assertion was green while the tree was
+unexamined**. What caught it was the exception-still-offends test reporting the *known* offender
+as clean. Two rules from that: **a rule that scans for a combination needs a fixture proving it
+reaches the second half**, and **a deliberately-listed exception doubles as a canary for the scan
+itself.**
+
+`tools/probe-genre-picker.ps1`, **9 probes**, all red on exactly the expected test with a blast
+radius of one. Three cover the platform-wide rule, including one that reverts the scanner to its
+broken form and one that delists the known offender so the scan has to find it unaided.
 
 **Never verified by eye** - the screen is behind an admin sign-in the automated browser has no
 session for. The mechanism is proven, the pixels are not.
