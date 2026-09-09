@@ -24,6 +24,7 @@ import {
   SCORE_UNIT_MAX_LENGTH,
 } from "@/lib/admin/score-eligibility-copy";
 import type { ProviderTitleRow } from "./provider-types";
+import { DIALOG_WIDTH_MEDIUM } from "@/lib/admin/dialog-widths";
 
 /**
  * Which scores win a prize on one catalogue title. Task document 14.
@@ -167,7 +168,7 @@ export default function GameScoringDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto">
+      <DialogContent className={`max-h-[88vh] overflow-y-auto ${DIALOG_WIDTH_MEDIUM}`}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Trophy className="h-5 w-5 text-amber-400" />

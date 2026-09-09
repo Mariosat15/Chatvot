@@ -32,6 +32,7 @@ chapter covers risks to the programme and to the application.
 | R6 | Price infrastructure broken by gating | High | Medium | X8 |
 | **R7** | Raw-driver contest inserts miss the game label | High | High | **CLOSED 4 Sep 2026** - **six** writers found, not one; all stamp `contestGameLabel()`, pinned by a test that counts labels against inserts |
 | **R58** | **A client component importing one number from a service took the admin panel down** | High | **ALREADY OCCURRED** | **CLOSED 9 Sep 2026** |
+| **R59** | **Every dialog that asked to be wide rendered at 32rem** - an unprefixed `max-w-*` never displaces the primitive's `sm:max-w-lg` | Medium | **ALREADY OCCURRED, 31 dialogs** | **CLOSED for the games surface 9 Sep 2026**; the other 29 are an owner decision |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -2210,6 +2211,106 @@ one the first person it inconveniences deletes, which is the same reasoning that
 Probed by `tools/probe-client-bundle-guard.ps1`: two probes, one restoring the admin defect
 verbatim and one reverting the main app's `import type` to a plain import, each red on exactly
 the expected test.
+
+---
+
+### R59 - A width class that is present, correct-looking and inert - **CLOSED for the games surface, 9 September 2026**
+
+The owner reported the game catalogue dialog as too narrow: seven columns of controls clipped
+at the fourth, the Prize eligibility heading cut to "PR". The dialog asks for room in the
+obvious way, and had since it was written:
+
+```tsx
+<DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
+```
+
+`max-w-4xl` is 56rem. The dialog was rendering at **32rem**, and so was every other dialog in
+the admin app that asked for width the same way. Two things have to line up for that, and both
+do:
+
+1. `DialogContent`'s own class list ends with **`sm:max-w-lg`**. `cn()` is `twMerge`, which
+   keys a conflict on the utility group **and the modifier together** - so a bare `max-w-4xl`
+   does not conflict with a `sm:`-prefixed cap, and **both reach the DOM**.
+2. Tailwind emits `.sm\:max-w-lg` **after** `.max-w-4xl` in the stylesheet, at equal
+   specificity. The cap wins at every width from 640px up.
+
+Measured rather than reasoned about: compiling the two candidates with this app's own Tailwind
+4.1.18 puts `.max-w-4xl` at byte 4541 and `.sm\:max-w-lg` at 4749, and `twMerge` on the real
+base string returns `w-full sm:max-w-lg max-w-4xl`. **Both halves of the trap are observable
+in about ten lines of Node**, which is worth doing before believing any explanation of a CSS
+width, because the intuition - "the later class in `className` wins" - is wrong twice over.
+
+**This is the codebase's most familiar failure mode in a new place: the control appears to
+work and does nothing.** The class is present, the diff reads correctly, review passes, and
+the author's stated intent is silently discarded. Same shape as enabling a provider with no
+adapter, a `rankingMethod` a provider game ignores, `isPaused` on a provider contest, and
+`playModeOverride` written to a provider-owned field.
+
+#### The scope is platform-wide, and the arithmetic is the useful part
+
+Across both apps, **55 `DialogContent`s carry an unprefixed `max-w-*` that has no effect**:
+
+| What the author asked for | Count | What renders | Visible? |
+|---|---|---|---|
+| Wider than 32rem (`2xl`-`6xl`) | **31** | 32rem | **Yes - clipped content** |
+| Narrower (`md`, 28rem) | 6 | 32rem | Mildly - too roomy |
+| `lg`, which is what the cap already says | 16 | 32rem | No - accidentally correct |
+
+Two more use `!max-w-none`, and the `!` is what makes those two work.
+
+**16 of the 55 being accidentally correct is why this survived**: the pattern demonstrably
+"works" on a third of its uses, so the first person to hit a clipped dialog has no reason to
+suspect the mechanism rather than their own value. **Two of the 31 are in the PLAYER app** -
+`components/trading/IndicatorSelector.tsx` and `components/profile/TradingArsenalSection.tsx` -
+so this is not an admin-only defect.
+
+#### The main app already had the answer, which is the finding worth carrying
+
+`components/ui/dialog.tsx` in the main app grew a `size` prop - `sm | default | lg | xl | full`
+- whose variants are **all `sm:`-prefixed**, which is exactly the mechanism that works. The
+admin app's copy of the primitive never got it. So the platform's two clipped player dialogs
+are not a missing capability, they are two call sites passing `className="max-w-4xl"` instead
+of `size="xl"`, and the correct sweep for the remaining 29 admin dialogs is probably **to port
+that prop** rather than to sprinkle a token across 24 files. **Before designing a mechanism a
+screen needs, check whether the sibling app already has one** - the same rule that found the
+deep-link and RBAC mechanisms already present in `12` s1.1.
+
+#### What was fixed, and what was deliberately not
+
+`apps/admin/lib/admin/dialog-widths.ts` holds three tokens - `DIALOG_WIDTH_WIDE` (90rem, data
+tables), `_MEDIUM` (56rem, forms) and `_STANDARD` (32rem, short forms) - and all five game
+dialogs take their width from it. The catalogue's table gains `min-w-[68rem]` inside an
+`overflow-x-auto` wrapper, because seven columns of controls do not fit a small laptop at any
+dialog width and a squeezed select is worse than a scrollbar.
+
+**The other 29 admin dialogs were not swept, and that is recorded rather than quietly scoped.**
+Each is a screen getting visibly wider, none can be verified by eye from here, and doing it in
+the same commit as the reported fix destroys the only evidence the reported fix is safe - the
+same reasoning that kept the Game Master `||` verbatim while settlement was extracted. It is
+an owner decision, and the honest framing is that 29 admin dialogs are currently showing less
+than their authors wrote.
+
+#### The guard is behavioural, because the string is not the property
+
+`__tests__/admin/dialog-widths.test.ts` (7 tests) runs the **real** `twMerge` against the base
+class list **read out of `dialog.tsx`**, and asserts each token displaces `sm:max-w-lg`. Three
+things about it are load-bearing:
+
+- **The control test is what gives the others meaning.** It asserts that an unprefixed
+  `max-w-4xl` *still* leaves the cap in place. Without it, a future version of `twMerge` that
+  stopped conflicting at all would leave every assertion passing while nothing was measured.
+- **The base string is read from the primitive, never restated.** A second copy is a test that
+  keeps passing after the thing it describes has moved.
+- **The token is asserted INSIDE the `DialogContent` opening**, not anywhere in the file. A
+  file-wide match is satisfied by the import line, so a second dialog added later with no
+  width at all would pass while inheriting the cap.
+
+Probed by `tools/probe-dialog-widths.ps1`: **7 probes, each red on exactly the expected test
+with exactly 1 failure.** The sixth mutates the **primitive** rather than the tokens, which is
+what proves the control reads `dialog.tsx` instead of carrying its own copy of the cap.
+
+**Never verified by eye** - the screen is behind an admin sign-in the automated browser has no
+session for, so the width is proven by the merge and not by a screenshot.
 
 ---
 

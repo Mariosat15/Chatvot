@@ -23,6 +23,7 @@ import {
 } from "@/lib/services/games/game-categories";
 import type { ProviderTitleRow } from "./provider-types";
 import GameArtworkField from "./GameArtworkField";
+import { DIALOG_WIDTH_MEDIUM } from "@/lib/admin/dialog-widths";
 
 /**
  * The operator's copy and artwork for one catalogue title.
@@ -148,7 +149,7 @@ export default function GameContentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] max-w-3xl overflow-y-auto">
+      <DialogContent className={`max-h-[88vh] overflow-y-auto ${DIALOG_WIDTH_MEDIUM}`}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-violet-400" />

@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { GameProviderRow } from "./provider-types";
+import { DIALOG_WIDTH_STANDARD } from "@/lib/admin/dialog-widths";
 
 /**
  * Credential entry for one provider. WRITE-ONLY.
@@ -138,7 +139,7 @@ export default function ProviderCredentialsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className={DIALOG_WIDTH_STANDARD}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <KeyRound className="h-5 w-5 text-violet-400" />

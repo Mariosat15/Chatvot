@@ -19,6 +19,7 @@ import type {
   CatalogueSyncSummary,
 } from "./provider-types";
 import { resolveGameCategory } from "@/lib/services/games/game-categories";
+import { DIALOG_WIDTH_WIDE } from "@/lib/admin/dialog-widths";
 import GameContentDialog from "./GameContentDialog";
 import GamePlayStyleControl from "./GamePlayStyleControl";
 import GameScoringDialog from "./GameScoringDialog";
@@ -156,7 +157,7 @@ export default function ProviderCatalogueDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
+      <DialogContent className={`max-h-[85vh] overflow-y-auto ${DIALOG_WIDTH_WIDE}`}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Gamepad2 className="h-5 w-5 text-violet-400" />
@@ -208,23 +209,27 @@ export default function ProviderCatalogueDialog({
             this provider.
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-white/10">
-            <table className="w-full text-sm">
+          // Reason: the dialog is as wide as a large screen allows, but seven columns of
+          // controls still need about 68rem. Below that the TABLE scrolls sideways rather
+          // than the cells compressing - a Play style select squeezed to 90px is unusable,
+          // whereas a scrollbar is at least honest about there being more to the right.
+          <div className="overflow-x-auto rounded-lg border border-white/10">
+            <table className="w-full min-w-[68rem] text-sm">
               <thead className="bg-white/5 text-left text-xs uppercase tracking-wide text-white/50">
                 <tr>
-                  <th className="px-3 py-2">Game</th>
-                  <th className="px-3 py-2">Formats</th>
-                  <th className="px-3 py-2">Play style</th>
-                  <th className="px-3 py-2">Prize eligibility</th>
-                  <th className="px-3 py-2">Provider says</th>
-                  <th className="px-3 py-2">Live on ChartVolt</th>
-                  <th className="px-3 py-2">Player-facing content</th>
+                  <th className="whitespace-nowrap px-3 py-2">Game</th>
+                  <th className="whitespace-nowrap px-3 py-2">Formats</th>
+                  <th className="whitespace-nowrap px-3 py-2">Play style</th>
+                  <th className="whitespace-nowrap px-3 py-2">Prize eligibility</th>
+                  <th className="whitespace-nowrap px-3 py-2">Provider says</th>
+                  <th className="whitespace-nowrap px-3 py-2">Live on ChartVolt</th>
+                  <th className="whitespace-nowrap px-3 py-2">Player-facing content</th>
                 </tr>
               </thead>
               <tbody>
                 {titles.map((title) => (
                   <tr key={title.gameCode} className="border-t border-white/5">
-                    <td className="px-3 py-2.5">
+                    <td className="px-3 py-2.5 align-top">
                       <div className="font-medium text-white/90">{title.displayName}</div>
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="font-mono text-xs text-white/40">
@@ -233,7 +238,7 @@ export default function ProviderCatalogueDialog({
                         <GenreBadge category={title.category} />
                       </div>
                     </td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-3 py-2.5 align-top">
                       <div className="flex flex-wrap gap-1">
                         {title.supportsCompetition && (
                           <Badge variant="outline" className="text-xs">
@@ -288,10 +293,10 @@ export default function ProviderCatalogueDialog({
                         {describeScoringSummary(title)}
                       </Button>
                     </td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-3 py-2.5 align-top">
                       <ProviderStatusBadge status={title.providerStatus} />
                     </td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-3 py-2.5 align-top">
                       <div className="flex items-center gap-2">
                         <Switch
                           checked={title.chartvoltEnabled}
@@ -312,7 +317,7 @@ export default function ProviderCatalogueDialog({
                         </div>
                       )}
                     </td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-3 py-2.5 align-top">
                       {/*
                         Editable whatever the provider's status is, unlike the switch beside
                         it. A deprecated title keeps its history and its contest pages, so

@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DIALOG_WIDTH_STANDARD } from "@/lib/admin/dialog-widths";
 
 /**
  * Registering a provider.
@@ -88,7 +89,7 @@ export default function ProviderRegisterDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className={DIALOG_WIDTH_STANDARD}>
         <DialogHeader>
           <DialogTitle>Register a game provider</DialogTitle>
           <DialogDescription>
