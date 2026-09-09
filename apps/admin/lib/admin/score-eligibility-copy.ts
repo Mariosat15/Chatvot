@@ -20,6 +20,31 @@
  * NOT MIRRORED. `apps/admin/lib/admin/` is admin-only.
  */
 
+/**
+ * How long a score unit may be, defined HERE rather than beside the parser that enforces it.
+ *
+ * IT LIVES IN THIS FILE BECAUSE OF WHO NEEDS IT, not because it is copy. The dialog sets
+ * `maxLength` from it and `parseScoringRulesInput` refuses on it, so the input and the
+ * validator must agree - but the parser's module opens with `@/database/mongoose` and the
+ * `ProviderGame` model, and the dialog is `"use client"`. Importing the value from there
+ * pulls the MongoDB driver into the browser bundle, where `fs`, `net`, `tls`, `dns` and
+ * `child_process` cannot resolve, and **the admin app fails to build** - which is exactly
+ * what it did on 9 September 2026 until this constant moved.
+ *
+ * SO THE SHARED VALUE MOVES TO THE MODEL-FREE MODULE AND THE SERVICE IMPORTS IT, rather than
+ * each side keeping its own 16. A second copy is the "one rule, two copies" shape behind
+ * `referenceId`, `failedReason`, `challengeId` and the Game Master `||`, and the drift here
+ * would be the quiet kind: raise the parser's limit alone and the box silently truncates
+ * before the operator reaches it; raise the box's alone and a full-length unit is refused by
+ * a server error naming a length the form just permitted.
+ *
+ * The general rule this is an instance of: **a `"use client"` file may only import a value
+ * from a module that reaches no model.** A `import type` is erased and therefore always
+ * safe - `round-types.ts` does exactly that with `mongoose` - so it is the VALUE imports
+ * that have to be checked, and the check is the module's transitive imports, not its name.
+ */
+export const SCORE_UNIT_MAX_LENGTH = 16;
+
 export interface EligibilityCopyInput {
   zeroIsValidResult: boolean;
   /** `undefined` means no bar. A `0` is a real and different instruction. */

@@ -16,10 +16,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+// Reason: BOTH from the model-free module. `SCORE_UNIT_MAX_LENGTH` used to come from
+// `game-scoring-rules.service`, which opens with `@/database/mongoose`, and importing a value
+// from there put the MongoDB driver in the browser bundle and broke the admin build.
 import {
   describeScoreEligibility,
+  SCORE_UNIT_MAX_LENGTH,
 } from "@/lib/admin/score-eligibility-copy";
-import { SCORE_UNIT_MAX_LENGTH } from "@/lib/services/game-providers/game-scoring-rules.service";
 import type { ProviderTitleRow } from "./provider-types";
 
 /**

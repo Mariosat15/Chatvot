@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
+// Reason: `import type`, not a plain import. `real-forex-prices.service` reaches the raw
+// MongoDB driver three links on (via `websocket-price-streamer` -> `database/mongoose`), and
+// the driver has no browser build - it needs `fs`, `net`, `tls` and `dns` at module scope.
+// A plain import here builds today only because both bindings happen to be interfaces used
+// in type positions, so the bundler elides it; the day one becomes a value, or anything else
+// is imported from that module, this becomes the failure that took the admin app down on
+// 9 September 2026. The keyword makes the erasure explicit instead of accidental.
+import type {
   MarketStatus,
   MarketHoliday,
 } from "@/lib/services/real-forex-prices.service";
@@ -45,7 +52,9 @@ export default function MarketStatusBanner({
         } else {
           // Holidays API might not be available
         }
-      } catch (error) {
+      } catch {
+        // Reason: every branch above already falls back to time-based status, so a failed
+        // fetch needs no handling beyond clearing the loading flag.
       } finally {
         setLoading(false);
       }

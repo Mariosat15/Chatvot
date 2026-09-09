@@ -31,6 +31,7 @@ chapter covers risks to the programme and to the application.
 | **R30** | `distributePrizesWithTies` took a **fraction** from a parameter named `platformFeePercentage`; a caller passing `10` paid **negative prizes** | **High** | Medium | **CLOSED 4 Sep 2026** - renamed to `platformFeeFraction` and range-checked in both apps |
 | R6 | Price infrastructure broken by gating | High | Medium | X8 |
 | **R7** | Raw-driver contest inserts miss the game label | High | High | **CLOSED 4 Sep 2026** - **six** writers found, not one; all stamp `contestGameLabel()`, pinned by a test that counts labels against inserts |
+| **R58** | **A client component importing one number from a service took the admin panel down** | High | **ALREADY OCCURRED** | **CLOSED 9 Sep 2026** |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -74,6 +75,7 @@ chapter covers risks to the programme and to the application.
 | R55 | **Half a build from the cache and half from the server.** `board.js` was today's and `presentation.js` was four hours old, so the console said `does not provide an export named 'newlyJoined'` and the game stopped dead - **nothing missing, nothing 404ing, every response a 200**. This is precisely the half R54 recorded as undetectable, and it defeated the recovery built for R52: s4.1k re-fetches URLs that **failed**, and there were none. The third distinct cause of one reported symptom | **High** | **CLOSED 8 Sep 2026.** The assets are served under a fingerprint of their own contents, so a new build publishes URLs no browser has cached and the stale copy sits at an address nothing requests. `immutable` then says something true, so the surface is fetched once and never revalidated mid-contest. **Latent for money, nothing backfilled** - the burned attempts are real but were burned by R52 and R54 as much as by this. **One rebuild required**, after which the fingerprint is derived at boot from the directory, so a surface change still needs only pull and restart | **A path segment, never `?v=`** - `board.js` imports `./presentation.js` as a literal with nowhere to put a query string, so a query string leaves bare **exactly the file that broke**; the segment is inherited by ordinary URL resolution. **Content, not mtime**, or two servers publish different URLs for identical bytes. **An unrecognised fingerprint is served, not refused**: refusing manufactures 404s on a rolling deploy and R54's own finding is that the edge caches those for four hours too. The route shape invited its own outage - `/play/:version/:asset` has the shape of `/play/api/state`, which the board polls - so unrecognised segments fall through to the next route; **probe 12 removes that and turns five tests red, three of them unrelated round-state tests, against two expected** |
 | R56 | **Every image the platform has ever uploaded shared one 16MB document, and it filled up.** Hero images, branding images and game artwork were base64-encoded into `WhiteLabel.brandingFiles` - a map on the single settings document - so the game-logo upload that reported `BSONObj size: 17070874 is invalid` was not a big picture or a bad route: the **document was already full**, and by then uploading *any* image anywhere in the admin panel was impossible. The failure arrives by success rather than by a bug, so there is no warning and every upload after it fails identically. The disk write succeeded, so the operator was told the file saved but could not be copied - accurate, unactionable, and repeated on every retry | **High** | **CLOSED 8 Sep 2026.** One document per file in a new `branding_asset` collection, which has no such ceiling; the remaining limit is 8MB **per file**, which an operator can act on. Reads try the collection then fall back to the legacy map, so nothing uploaded before today breaks. **Live and platform-wide, and `tools/branding/migrate-branding-files.ts` is report-only until `--apply`** - the map still holds ~16MB until it is run, and `WhiteLabel` cannot be saved by any writer while it does | The map was on the **hot path**: 67 files call `WhiteLabel.findOne()`, so reading any setting at all transferred every image ever uploaded, in both directions on every save. `select: false` closes that, and it is only safe because one service owns every read - **the write side and the read side disagreeing about where bytes live is the "one rule, two copies" shape**, so a test asserts no writer reaches past it. The `__DOT__` key encoding was **not** carried over: it exists solely because Mongoose refuses a dot in a *map* key, and a workaround outliving its cause is how somebody later "simplifies" it into a bug |
 | R57 | **The Image Optimizer's route had no authorization on either handler, and its POST deletes files.** `apps/admin/app/api/dev-zone/optimize-images/route.ts` exported a `GET` that enumerated every upload directory on disk and a `POST` that re-encoded images in place and `unlink`ed the originals - across marketplace uploads, avatars, cosmetics, indicators and strategies - with **no session check, no admin check and no section check on either**. The *screen* was gated behind the `image-optimizer` grant, which is exactly what made it invisible: the guard was on the thing a reviewer can see. **Ninth route of this class**, and found the same way as R40 and R47 - by counting exported handlers against guards, never by reading routes, because every neighbouring route having *something* is what sends a reader straight past the one that has nothing | **High** | **CLOSED 8 Sep 2026.** `guardSection("image-optimizer")` on both handlers, before the body is parsed and before anything is written or deleted. **Live, and the exposure ran both ways** - an anonymous caller could enumerate the upload tree *and* destructively rewrite it, and an image whose only copy was on that disk is gone. **There is no way to know whether it was ever called, and nothing was backfilled**: a route with no guard has no attribution, and a converted file is indistinguishable from an operator's own optimisation | The section id is the one that **reveals the screen**, not an adjacent real one - `guardSection` is typed to `AdminSection`, so the compiler refuses an invented id but accepts a valid wrong one, which compiles, reviews as plausible and demands the wrong grant. The suite asserts the **weak** property folder-wide (every handler authenticates *somehow*) and the **strong** one on this route, because `dependency-check` still uses `verifyAdminAuth` and converting it is an owner decision about which employees keep the screen - recorded as a failing-if-fixed tripwire rather than permitted by an allow-list, since a per-file allow-list is green on the day a tenth route appears. **A guard whose refusal is discarded reads perfectly and authorizes nothing**, so refusals are *counted* against guard calls: a whole-file `toMatch` stayed green when the POST's was deleted, satisfied by the GET's |
+| R58 | **One number imported across the server/client boundary took the admin panel off the air.** `GameScoringDialog.tsx` is `"use client"` and imported `SCORE_UNIT_MAX_LENGTH` from `game-scoring-rules.service.ts`, which imports `@/database/mongoose`, which imports `MongoClient` from `mongodb`. Turbopack traced the whole driver into the browser bundle, where `fs`, `net`, `tls`, `dns` and `child_process` do not exist, so **`next build` failed with 17 errors, `apps/admin` had no `.next` directory, and PM2 crash-looped it** - restarting it 283 times. The deploy reported the failure and then restarted the processes anyway, so the visible symptom was a boot loop rather than a build error | High | **CLOSED 9 Sep 2026. Already occurred, and it is the first entry in this register whose harm is that the application did not exist.** No money moved, no document is wrong and **nothing was backfilled** - a build either produces a bundle or it does not. The main app was unaffected and stayed up; the previous admin build was already gone, so there was no working version to fall back to | The constant moved to `apps/admin/lib/admin/score-eligibility-copy.ts`, which reaches no driver, and the service imports it back from there - so there is still exactly one definition. **The typecheck is structurally blind to this entire class**, the import being valid TypeScript for a value whose type is `number`, and nothing about a module's fitness for a browser bundle is expressible in the type system: it is caught by a full production build, which is to say by deploying. Guarded by `__tests__/admin/client-bundle-model-imports.test.ts`, which walks the **value**-import graph from every `"use client"` file in **both** apps, stopping at `"use server"` because Next replaces such a module with an RPC stub. Extending it to the main app found `MarketStatusBanner.tsx` one keystroke from the same outage - it built only because both its bindings are interfaces used in type positions, so **the safety was the bundler's unused-import elision and not a decision anyone had made**; now `import type`. The rule forbids `mongodb` and deliberately **not** `mongoose`, which has a browser build: the first draft banned both, flagged five files that build perfectly well, and would have been deleted by the first person it inconvenienced |
 | R24 | Scope creep before anything ships | Medium | **High** | All |
 | R25 | Round write contention under load | Medium | Medium | X12 |
 | X15 | "Challenge any user" harassment surface - no report-user feature exists | Medium | Medium | X10 |
@@ -2089,6 +2091,125 @@ not defensiveness.
 TypeScript, so the owner must `npm run build` once. From then on the fingerprint is derived at boot
 from the directory, exactly as the served set has been since `21` s4.1i, so a play-surface change
 still needs only **pull and restart**.
+
+---
+
+### R58 - One number imported across the server/client boundary took the admin panel off the air - **CLOSED, 9 September 2026**
+
+`apps/admin/components/admin/games/GameScoringDialog.tsx` is a `"use client"` component. It
+needed one constant - the maximum length of a score's unit label - and imported it from the
+service that validates the same field:
+
+```ts
+import { SCORE_UNIT_MAX_LENGTH } from "@/lib/services/game-providers/game-scoring-rules.service";
+```
+
+That service's first import is `@/database/mongoose`, whose own first import is
+`MongoClient` from `mongodb`. Turbopack followed the chain and traced **the entire MongoDB
+driver into the Client Component Browser bundle**, where `fs`, `net`, `tls`, `dns`,
+`fs/promises`, `timers/promises` and `child_process` do not exist. `next build` failed with
+17 unresolvable-builtin errors, so `apps/admin` had no `.next` directory, so `next start`
+refused with `Could not find a production build`, so PM2 restarted it - **283 times**.
+
+**The harm here is of a kind nothing else in this register has: the application did not
+exist.** Every other entry describes software that ran and was wrong - a wrong payout, a
+wrong label, an open door. This one produced no artifact at all. No money moved, no stored
+value is incorrect and there is **nothing to backfill**; a build either emits a bundle or it
+does not. The main app was unaffected and stayed up throughout.
+
+**Two things about how it presented are worth keeping, because both point away from the
+cause.** The deploy script reported the build failure and then went on to restart the
+processes regardless, so the last hundred lines of output - the part anybody reads - were a
+boot loop, and the seventeen errors that caused it had scrolled away. And the errors
+themselves all name files inside `node_modules/mongodb` and `node_modules/socks`, which reads
+as a dependency problem. The single useful line is the bottom of each import trace, which
+names the client component; everything above it is the driver's own internals.
+
+#### Why nothing caught it, and two guards look as though they should have
+
+`check:mirrors` compares models between the apps and has no opinion about who imports them.
+The ESLint import boundary from X1 invariant 2 bans model imports from `lib/games/*`, which is
+the game layer and not the component tree.
+
+**But the important one is the typecheck, which is structurally blind to this entire class.**
+The import is valid TypeScript: the value exists, its type is `number`, and both apps'
+`tsc --noEmit` were clean. Nothing about a module's *fitness for a browser bundle* is
+expressible in the type system. Nor did the dev server complain - it compiles per route on
+demand and had no reason to build the dashboard's client bundle. **This class is only ever
+caught by a full production build, which is to say by deploying**, which is exactly what
+happened.
+
+#### The fix keeps one definition of the constant
+
+`SCORE_UNIT_MAX_LENGTH` moved to `apps/admin/lib/admin/score-eligibility-copy.ts`, which is
+model-free and reaches no driver, and the service imports it back from there. The dialog and
+the validator still agree by construction rather than by coincidence - the alternative, a
+second literal in the component, is the "one rule, two copies" shape behind `referenceId`,
+`failedReason`, `challengeId` and the Game Master `||`, and here the drift would let the form
+accept a unit the server then refuses.
+
+One detail that cost a test run: the service imports it by a **relative** path, not `@/`.
+Vitest aliases `@` to the repository root rather than the admin root, so the aliased form
+resolves in `next build` and fails in the test suite. Same trap as the `Model.base` note in
+the rules file, from the opposite direction.
+
+#### The guard, and what extending it to the main app found
+
+`__tests__/admin/client-bundle-model-imports.test.ts` walks the **value**-import graph
+outward from every `"use client"` file in **both** apps and fails if it reaches `mongodb`.
+Five rules make it work, and each was necessary:
+
+- **The walk stops at `"use server"`.** Next replaces such a module with an RPC stub, so
+  nothing beyond it enters the client bundle. `CompetitionCreatorForm.tsx` imports a server
+  action that reaches the driver two links later and is entirely correct. Without the
+  exemption the guard fires on the framework's own pattern.
+- **`import type` is erased and therefore safe**, so it is value imports that matter.
+- **Strip comments first** - every module involved in this fix names the driver in prose to
+  explain the hazard, and a test that reads prose fails in both directions.
+- **Read the directory, never a list of files.** The component added next month is the whole
+  point, and a hard-coded list is green on the day it appears.
+- **Judge a module by its transitive imports, never by its name or folder.**
+  `lib/services/games/play-shape.ts` is a service by name and model-free by construction;
+  `game-scoring-rules.service.ts` sits beside it and is not. Both are imported by client
+  components today and only one was ever a defect.
+
+**Extending it to the main app is what turned this from a fixed bug into a finding.**
+`components/trading/MarketStatusBanner.tsx` imported `MarketStatus` and `MarketHoliday` from
+`real-forex-prices.service`, which reaches the driver three links on. **The main app built.**
+It built because both bindings are `interface` exports used only in type positions, so the
+bundler dropped the import and never entered the graph.
+
+That reads like a false positive and is not one. **The safety was the bundler's unused-import
+elision, not anything anyone had decided.** Promote either interface to a class, or import one
+more binding from that module, and the *player* app fails exactly as admin did - with no
+warning from any tool. So the rule is deliberately checkable without type analysis: **a client
+component may not name a driver-reaching module in a value-import position.** The remedy is
+one keyword, `verbatimModuleSyntax` would demand it anyway, and it turns an accident into a
+statement. The alternative - resolving each binding to decide whether it is type-only - means
+following re-exports and `export *` through the whole graph, and a guard that elaborate is one
+nobody trusts.
+
+#### The line the guard draws, and why it is narrower than "no models"
+
+The first draft forbade reaching a Mongoose **model** and flagged five files that build
+perfectly well. The real distinction is between two packages that read as one thing:
+
+- **`mongoose` has a browser build**, and a bundler resolves it. This is why
+  `SymbolsSection.tsx`, `CompanyDetailsSection.tsx` and `InvoiceTemplateSection.tsx` can
+  value-import `DEFAULT_FOREX_PAIRS`, `EU_COUNTRIES` and `COUNTRY_NAMES` out of model files
+  and always have.
+- **`mongodb`, the driver underneath it, does not.** It reaches for Node builtins at module
+  scope.
+
+A model import is therefore *fragile* rather than broken - it breaks on the day somebody adds
+a driver import to that model - and the guard deliberately does not forbid it. **Forbidding
+what actually fails is what keeps a guard believed**; a guard that fires on correct code is
+one the first person it inconveniences deletes, which is the same reasoning that narrowed the
+`GameIcon` ban in `13` s4.1g.
+
+Probed by `tools/probe-client-bundle-guard.ps1`: two probes, one restoring the admin defect
+verbatim and one reverting the main app's `import type` to a plain import, each red on exactly
+the expected test.
 
 ---
 

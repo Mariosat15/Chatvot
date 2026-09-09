@@ -1,5 +1,11 @@
 import { connectToDatabase } from "@/database/mongoose";
 import ProviderGame from "@/database/models/games/provider-game.model";
+// Reason: RELATIVE, not `@/lib/admin/...`, unlike its neighbours in this folder. `vitest.config.ts`
+// aliases `@` to the REPOSITORY root, where `lib/admin/` does not exist - it is admin-only - so the
+// alias form resolves in Next and fails in the test that imports this module for real. The
+// neighbouring services get away with the alias only because their suites read their source as text
+// rather than importing them.
+import { SCORE_UNIT_MAX_LENGTH } from "../../admin/score-eligibility-copy";
 
 /**
  * Set - or clear - our answer to "which scores are worth a prize on this title?".
@@ -51,7 +57,15 @@ export type ScoringRulesResult =
     }
   | { success: false; error: string };
 
-export const SCORE_UNIT_MAX_LENGTH = 16;
+/**
+ * Re-exported so server-side callers and the test keep one import path, while the DIALOG
+ * imports it from `score-eligibility-copy` directly.
+ *
+ * Reason: a `"use client"` component importing any value from this module pulls
+ * `@/database/mongoose` above into the browser bundle and the admin build fails on
+ * unresolvable Node builtins. See that module for the full account.
+ */
+export { SCORE_UNIT_MAX_LENGTH };
 
 /**
  * What the route may be handed.
