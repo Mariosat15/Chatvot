@@ -90,27 +90,79 @@ Probe -Name 'the disqualification carries no reason' `
 
 Write-Host "`n=== the provider module's answer ===" -ForegroundColor Cyan
 
+# THE BODY THESE THREE PATCH CHANGED ON 9 SEPTEMBER 2026, when the owner's rule made a
+# stored zero ineligible. The old `-Find` was `return Number.isFinite(participant.score);`
+# and every probe below reported PROBE DID NOT APPLY - which prints in the same magenta as
+# a genuine harness fault and is easy to read as one. Worth carrying: a probe file is
+# coupled to the source text it patches, so a rule change silently retires its own probes.
+$HAS_RESULT = '  return Number.isFinite(participant.score) && (participant.score as number) > 0;'
+
 Probe -Name 'the provider module claims every participant has a result' `
   -File $PROVIDER `
-  -Find '  return Number.isFinite(participant.score);' `
+  -Find $HAS_RESULT `
   -Replace '  return true;' `
   -ExpectRed 'pays nothing to a player who never scored'
 
-# TRUTHINESS IS THE INTERESTING WRONG ANSWER. It is shorter, it reads correctly, and it
-# refuses the player who attempted the game and scored nothing.
-Probe -Name 'the provider module uses truthiness, so a real zero is refused' `
+# THE OWNER'S RULE ITSELF: drop the `> 0` and a stored zero is paid again. This is the
+# probe that replaced the old truthiness one, which has stopped being a wrong answer -
+# `Boolean(score)` now agrees with the rule for 0, NaN and undefined alike, and differs
+# only on a negative score. It is no longer an interesting mutation, so it is gone rather
+# than kept as a probe that cannot fail.
+Probe -Name 'the zero exclusion is dropped, so a stored zero is paid again' `
   -File $PROVIDER `
-  -Find '  return Number.isFinite(participant.score);' `
-  -Replace '  return Boolean(participant.score);' `
-  -ExpectRed 'treats a genuine zero as a result'
+  -Find $HAS_RESULT `
+  -Replace '  return Number.isFinite(participant.score);' `
+  -ExpectRed 'pays nothing for a score of zero'
+
+# And the other direction: refusing a zero must not become refusing everybody, which is
+# what a stray `< 0` or a flipped comparison would do.
+Probe -Name 'the comparison is flipped, so every real score is refused' `
+  -File $PROVIDER `
+  -Find $HAS_RESULT `
+  -Replace '  return Number.isFinite(participant.score) && (participant.score as number) < 0;' `
+  -ExpectRed 'pays nothing to a player who never scored'
 
 # `!= null` admits NaN, which fails every comparison in the sort - so it lands wherever the
 # sort leaves it and is then paid from a position nobody chose.
 Probe -Name 'the provider module admits NaN as a score' `
   -File $PROVIDER `
-  -Find '  return Number.isFinite(participant.score);' `
+  -Find $HAS_RESULT `
   -Replace '  return participant.score !== undefined && participant.score !== null;' `
   -ExpectRed 'refuses a score that is not a finite number'
+
+Write-Host "`n=== the operator's own verdict ===" -ForegroundColor Cyan
+
+# `status: "disqualified"` is checked by the ENGINE rather than by a game module, because it
+# is an operator's decision about a person and not a fact about their metrics. Latent for
+# competitions today - nothing writes it on a competition participant - and live for
+# challenges, which is why removing it has to go red rather than being left to a game.
+$MATRIX = '__tests__/services/prize-rule-matrix.test.ts'
+
+Probe -Name 'an admin-disqualified GAME player is eligible again' `
+  -File $RANKING `
+  -Find '  if (participant.status === "disqualified") {' `
+  -Replace '  if (false) {' `
+  -ExpectRed 'beside a disqualified player' `
+  -Suite $MATRIX
+
+# Asserted on BOTH halves of the matrix, because the rule lives in one place and a game-only
+# or trading-only assertion would be satisfied by a branch on game type - which is precisely
+# the shape that makes the next game silently fail.
+Probe -Name 'an admin-disqualified TRADER is eligible again' `
+  -File $RANKING `
+  -Find '  if (participant.status === "disqualified") {' `
+  -Replace '  if (false) {' `
+  -ExpectRed 'case 3: a disqualified trader is excluded' `
+  -Suite $MATRIX
+
+# The liquidation switch must keep BOTH its states. Hard-wiring it on reads as a
+# tightening and turns an operator's setting into decoration.
+Probe -Name 'disqualifyOnLiquidation is hard-wired on, so the off state is decoration' `
+  -File $RANKING `
+  -Find '  if (rules.disqualifyOnLiquidation && participant.status === "liquidated") {' `
+  -Replace '  if (participant.status === "liquidated") {' `
+  -ExpectRed 'off, a liquidated trader is paid' `
+  -Suite $MATRIX
 
 Write-Host "`n=== trading must not change, which is the load-bearing half ===" -ForegroundColor Cyan
 

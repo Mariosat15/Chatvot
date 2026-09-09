@@ -687,6 +687,55 @@ Newest at the top.
 
 ---
 
+### 9 Sep 2026 - X6 - THE PRIZE RULES HAVE A TEST MATRIX AND A PROBE HARNESS (TASK 30)
+
+**Shipped:** `__tests__/services/prize-rule-matrix.test.ts` (21 cases, no database) and
+`__tests__/services/settlement-retry-idempotency.test.ts` (5 cases, real MongoDB), covering
+all 19 rows task 30 asks for plus the reachable divide-by-zero and two mirror assertions.
+`tools/probe-prize-redistribution.ps1` is new (10 probes) and `tools/probe-prize-eligibility.ps1`
+was re-aimed at the code as it now stands (14 probes). **24 probes red on exactly the expected
+test.** Full account in the task document at **30.1**.
+
+**Files touched:** the two suites, the two harnesses, `lib/utils/prize-shares.ts` and
+`lib/services/competition-ranking.service.ts` plus both admin mirrors (comments and three
+inline lint disables only - no behaviour), and a `.gitignore` rule for probe scratch output.
+
+**Deviated from plan:** the list asks for 19 cases and 26 were written. The two extra are not
+padding: **a rank that IS held with every held rank configured at 0%** is the only shape that
+can distinguish the divide-by-zero branches at all, and the **mirror assertions** are the only
+thing in this suite that can see the admin copy, because vitest aliases `@` to the repository
+root. Two probes aimed at the admin files were written, came back green, and were **removed
+with the reason recorded** rather than shipped.
+
+**One production comment was corrected, and no behaviour changed.** The comment beside
+`targetTotal` claimed the choice existed "to catch a discrepancy" between two expressions.
+Measuring it showed they agree to within **1e-13** on every input the function can construct,
+so there is nothing to catch; what it actually buys is a **cap bounded by the net pot**. Both
+copies now say so. An overstated comment is a wrong fact - the same duty as correcting R7 and
+R31 downward.
+
+**Three harness lessons, each of which produced a false result first.** A probe must inject a
+defect that **terminates** - deleting `residue -= 1` reads as "the residue is never consumed"
+and is an infinite loop, which hung a run for 35 minutes and **left the probed file mutated on
+disk**, because a killed PowerShell process never reaches its `finally`. `Start-Process
+-FilePath 'npx'` **cannot work on Windows** and fails into the script's error stream, so all
+twelve probes reported nothing and the run finished in twenty seconds looking like a pass.
+And **two guards covering each other** cannot be probed separately, so the harness now takes
+two edits per probe.
+
+**Owner tested:** not yet. Nothing here is player- or operator-visible - it is tests, probes
+and comments.
+
+**Deferred:** nothing from task 30.
+
+**Next chat should:** tasks 8, 9 and 11-14 - the game admin screen, the game type field, and
+the per-game mode, timing, configuration and score settings. **The challenges side is still
+gated and is not next**; two things about it are already decided, so do not rediscover them: a
+simultaneous-start title is **not challengeable at all** (`22` s6 answer C), and provider
+challenges inherit **R50** unfixed because `ChallengeParticipant.score` still defaults to `0`.
+
+---
+
 ### 9 Sep 2026 - X6 - A COMPETITION IS PRICED IN CREDITS, AND NOW SAYS SO (TASK 1)
 
 **Shipped:** `lib/utils/format-volts.ts`, mirrored byte-for-byte into `apps/admin/lib/utils/`,

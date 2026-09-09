@@ -143,3 +143,10 @@ probe-err.txt
 # Typecheck baseline scratch files, written when diffing tsc output against a stash.
 # Reason: they are a working artifact of one comparison, never a fact about the repo.
 .tsc-*.txt
+
+# Probe harness output, redirected to a file so a long run can be polled while it works.
+# Reason: Write-Host reports to the host rather than the pipeline, so a filtered pipe shows
+# nothing and reads like a stalled process - redirect and poll the file instead.
+.probe-*.txt
+.probe-*.err
+.scratch-*

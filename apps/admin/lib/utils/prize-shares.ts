@@ -178,15 +178,30 @@ export function allocateWithoutRoundingLoss(
   if (residue > 0) {
     remainders.sort((a, b) => b.fraction - a.fraction || a.index - b.index);
     for (let i = 0; residue > 0 && i < remainders.length; i++) {
-      floored[remainders[i].index] += 1;
+      // Reason: the linter cannot tell a request-supplied key from a loop counter, and
+      // `remainders[i].index` is an array position this function computed itself. Disabled
+      // inline, which is the convention already used for the same false positive in
+      // `app/arena/page.tsx` and `api-server/routes/auth.routes.ts`.
+      floored[remainders[i].index] += 1; // eslint-disable-line security/detect-object-injection
       residue -= 1;
-      if (i === remainders.length - 1 && residue > 0) i = -1; // wrap for large residues
+      // Reason: a second sweep, for a residue larger than the number of winners. It is
+      // UNREACHABLE on any input this function can be given - each floor discards less than
+      // one cent, so the residue is always smaller than the number of amounts and is spent
+      // before the sweep ends - and it is kept as a tripwire in case the target ever stops
+      // being derived from the same amounts.
+      //
+      // IT IS ALSO WHY `residue -= 1` ABOVE MUST NOT BE TOUCHED. Removing that decrement
+      // does not produce a wrong total; it makes this wrap restart for ever. A probe tried
+      // exactly that and hung a test run for 35 minutes, which is the one failure a probe
+      // harness cannot report on. See tools/probe-prize-redistribution.ps1.
+      if (i === remainders.length - 1 && residue > 0) i = -1;
     }
   } else {
     remainders.sort((a, b) => a.fraction - b.fraction || a.index - b.index);
     for (let i = 0; residue < 0 && i < remainders.length; i++) {
+      // eslint-disable-next-line security/detect-object-injection -- loop counter, see above
       if (floored[remainders[i].index] > 0) {
-        floored[remainders[i].index] -= 1;
+        floored[remainders[i].index] -= 1; // eslint-disable-line security/detect-object-injection
         residue += 1;
       }
       if (i === remainders.length - 1 && residue < 0) {

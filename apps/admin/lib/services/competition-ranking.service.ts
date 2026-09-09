@@ -534,6 +534,10 @@ export function distributePrizesWithTies(
   */
   const normalised = normalisePrizeShares(
     prizeDistribution,
+    // Reason: `rank` comes from the contest's own prize table, not from a request, and the
+    // linter cannot tell the two apart. Disabled inline, which is the convention already
+    // used for this false positive in `app/arena/page.tsx` and `api-server/routes/`.
+    // eslint-disable-next-line security/detect-object-injection
     (rank) => (rankGroups[rank]?.length ?? 0) > 0,
   );
 
@@ -652,9 +656,18 @@ export function distributePrizesWithTies(
   /*
     Step 3: round to whole cents so the winners' total is exactly the distributable pot.
 
-    The target is derived from `configuredTotal`, not from summing the amounts above: the
-    whole point is to catch a discrepancy between the two, and a target computed from the
-    thing being checked cannot do that.
+    THE TARGET IS A CAP, NOT A DISCREPANCY DETECTOR, and this comment used to claim the
+    latter - that deriving it from `configuredTotal` rather than from summing the amounts
+    above existed "to catch a discrepancy between the two". A probe disproved it: the two
+    expressions agree to within 1e-13 on every input this function can construct, because
+    `netOf` is linear and `normalisePrizeShares` guarantees the filled shares sum to
+    `configuredTotal`. There is no discrepancy to catch.
+
+    What the choice does buy is worth keeping. `netOf(configuredTotal)` is bounded by the
+    net pot whatever the per-winner arithmetic did, so a share computed wrongly high is
+    clamped here; summing the amounts would faithfully pay out whatever they happened to
+    be. That cap is pinned by `ranking-regression.test.ts`'s "no scenario pays out more
+    than its prize pool", across all 18 scenarios.
   */
   const targetTotal = exact.length > 0 ? netOf(normalised.configuredTotal) : 0;
   const rounded = allocateWithoutRoundingLoss(
@@ -665,6 +678,7 @@ export function distributePrizesWithTies(
   exact.forEach((e, index) => {
     distributions.push({
       userId: e.userId,
+      // eslint-disable-next-line security/detect-object-injection -- forEach index
       prizeAmount: rounded[index],
       rank: e.rank,
       isTied: e.isTied,

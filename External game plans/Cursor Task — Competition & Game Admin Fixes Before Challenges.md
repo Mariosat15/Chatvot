@@ -22,6 +22,47 @@ The implementation must remain generic enough to support many different game typ
 
 ---
 
+# STATE OF THE LIST
+
+**Last measured 9 September 2026.** Each "done" row names the sub-section holding the account
+of what was actually built, because that section is authoritative and this table is a summary.
+
+**Read this table as a claim about the code, not as evidence about it.** The `PROGRESS.md`
+decision log carries the same warning for a reason: *"content seeding is mandatory"* sat on
+record from 18 August and was enforced by nothing until 8 September. Check a row against the
+code before citing it.
+
+| Task | State |
+|---|---|
+| **1** — Volts / ⚡ everywhere instead of EUR | **Done.** `1.1`, then `1.2` for the symbol rather than the word |
+| **2-7** — Prize eligibility, redistribution, unclaimed pool | **Done, 9 Sep.** See the notes under tasks 2, 5, 6 and 7. Seven raw unclaimed-pool writers were found, not the five task 7 names |
+| **8** — Redesign the large game admin screen | Not started |
+| **9** — Game type / category field | Not started |
+| **10** — Competition style / participation mode | **Done.** `10.1`. Turn-based and heat-based are **blocked, not deferred** - see `10.2` |
+| **11** — Game-level supported modes | Not started |
+| **12** — Required timing / runtime settings | Not started |
+| **13** — Data-driven game configuration | Not started |
+| **14** — Score configuration | Not started |
+| **15-16** — Image optimizer for game artwork | **Scoped down by owner decision, 9 Sep: on upload only.** Existing files are left alone, so there is no retro-scan to write. See task 15's note - this is a refusal with a reason, not an omission |
+| **17** — Remove the legacy game | **Half done.** Circuit Perfect was deprecated 8 Sep and the wizard already filters on `providerStatus: "active"`, so the code is correct. It still needs a **catalogue re-sync** before it leaves the picker, which is an operational step and not a code change |
+| **18** — Redesign the other screen | Not started |
+| **19** — AI on the game content screen | Not started |
+| **20** — AI must be game-agnostic | **Mostly done 8 Sep** for the contest wizard's assistant. Task 19's screen is the remaining gap |
+| **21-24** — Game Performance section | Not started |
+| **25-27** — Consistency, model review, backward compatibility | Not started |
+| **28** — Settlement must be server-side | **Checked and true, for the four payout entry points.** Of the 40 files referencing `distributePrizesWithTies`, `recordUnclaimedPool`, `settleFeesAndGameMasters` or `finalizeCompetition`, **none** declares `"use client"`. Note what that does *not* cover: it names four functions, so a fifth payout path would not appear in it. A standing guard belongs with task 30 |
+| **29** — Prevent double settlement | **Done, 9 Sep.** `apps/admin`'s finalize now takes the same optimistic lock the main app does, with the release filtered on `status: "finalizing"` |
+| **30** — Tests for the new prize rules | **Done, 9 Sep.** 21 cases in `__tests__/services/prize-rule-matrix.test.ts` (7 game, 7 trading, 4 arithmetic, 1 the reachable divide-by-zero, 2 mirror) plus 5 database-backed idempotency cases in `settlement-retry-idempotency.test.ts`. **24 probes red on exactly the expected test** across `tools/probe-prize-eligibility.ps1` (14) and `tools/probe-prize-redistribution.ps1` (10). Two probes came back green and are recorded in `30.1` with the reason - one was two guards covering each other, the other a mutation that changes no observable and which corrected a wrong comment in the production code |
+| **31-35** — Mode logic tests, UI validation, per-game reviews, final audit | Not started |
+
+**The Challenges work named at the top of this document is still gated.** It is not "next";
+it is after this list. Two things about it are already decided and worth not rediscovering:
+a simultaneous-start title is **not challengeable at all** (`22` s6 answer C, owner decision
+8 Sep), and provider challenges inherit **R50** unfixed, because `ChallengeParticipant.score`
+still defaults to `0` - so the phantom-score defect reproduces on the first provider challenge.
+
+---
+
 # TASK 1 — USE VOLTS EVERYWHERE INSTEAD OF EUR FOR COMPETITIONS
 
 We must stop displaying competition-related values in EUR.
@@ -1423,6 +1464,68 @@ Add tests covering at minimum:
 - no eligible winners → entire amount goes to Unclaimed Pool
 - settlement retry does not create duplicate payments
 - settlement retry does not create duplicate Unclaimed Pool records
+
+## 30.1 — What was built (9 September 2026)
+
+**All 19 cases asked for above are covered, plus two the list did not ask for.** The split is
+between what needs a database and what does not, and it is not cosmetic: the arithmetic is
+pure, so it is tested in milliseconds, while idempotency is a property of a read-then-write
+against a unique index and can only be proven against a real MongoDB.
+
+| File | Cases | Needs a database |
+|---|---|---|
+| `__tests__/services/prize-rule-matrix.test.ts` | 21 — the 7 game rows, the 7 trading rows, 4 of the settlement rows, the reachable divide-by-zero, and 2 mirror assertions | No |
+| `__tests__/services/settlement-retry-idempotency.test.ts` | 5 — duplicate unclaimed pools, the first figure standing, competition-versus-challenge identity, a control that the guard is not refusing everything, and the stored euro rate | Yes |
+
+**24 probes, all red on exactly the expected test**, across `tools/probe-prize-eligibility.ps1`
+(14) and `tools/probe-prize-redistribution.ps1` (10).
+
+### Five things from building it, each of which cost a wrong result first
+
+- **A test seeded with the value under test has tested the consumer, not the producer.** The
+  settlement suites seed `score` and rank it, which is structurally silent on whether a score
+  ever arrives — the same shape as R32/R33. So the matrix asserts eligibility through the
+  module seam, and a mirror test asserts the *admin* copy carries the rule, because **vitest
+  aliases `@` to the repository root, so no runtime assertion in this suite can see the admin
+  file at all.** Two probes on the admin copies were written, both came back green, and both
+  were removed with the reason recorded rather than shipped — a green probe left in a harness
+  teaches the next reader that the admin copy is decoration.
+- **A probe must inject a defect that TERMINATES.** The natural mutation for the rounding
+  residue is to delete `residue -= 1`, which reads as "the residue is never consumed" and is
+  in fact an infinite loop, because the `i = -1` wrap beneath it restarts the sweep while the
+  residue is still positive. The run was killed after 35 minutes and **left `prize-shares.ts`
+  mutated on disk**, since a killed PowerShell process never reaches its `finally`. Two rules:
+  an injected hang is the one outcome a harness cannot report on unless it owns the clock, so
+  it now owns the clock; and after killing a probe run, `git diff` the probed file before
+  doing anything else — the restore is the part that did not happen.
+- **`Start-Process -FilePath 'npx'` cannot work on Windows, and it fails into the script's
+  error stream rather than into a probe result.** `npx` is a shell script with no extension,
+  so it is refused with "%1 is not a valid Win32 application" — and written the obvious way,
+  **all twelve probes reported nothing at all and the run finished in twenty seconds looking
+  like a completed pass.** Launch through `$env:ComSpec /c`, and make the harness say
+  `HARNESS BROKEN` when the child never starts.
+- **Two guards covering each other cannot be probed separately, and the green probe reads
+  identically to a missing guard.** `normalisePrizeShares`'s divide-by-zero guard and
+  `allocateWithoutRoundingLoss`'s `Number.isFinite` check both stop a NaN prize, so removing
+  either alone leaves the suite green. The harness gained a second edit per probe and the pair
+  is now the honest unit of protection. Note this probe was wrong *twice*: aimed first at the
+  "nobody is eligible" test, where the guard genuinely changes no answer, because every share
+  is `filled: false` and the bad factor is computed and never multiplied. **The one reachable
+  shape is a rank that IS held with every held rank configured at 0%**, which is legal, and
+  that is what the new case exists for.
+- **A green probe corrected the production code rather than the test.** The comment beside
+  `targetTotal` claimed deriving it from `configuredTotal` existed "to catch a discrepancy"
+  against summing the amounts. Measuring it showed the two agree to within **1e-13** on every
+  input the function can construct — `netOf` is linear and the filled shares sum to
+  `configuredTotal` by construction — so there is no discrepancy to catch. What the choice
+  actually buys is a **cap bounded by the net pot**, and the comment now says so in both
+  copies. An overstated comment is a wrong fact, the same duty as correcting R7 and R31
+  downward.
+
+**One measurement note.** Every probe on `prize-shares.ts` shows a blast radius one higher
+than its honest number, because the mirror test compares the two copies while the harness
+mutates only the root one. That is correct behaviour rather than noise, but it is worth
+knowing before reading "5 red in suite" as harness damage.
 
 ---
 
