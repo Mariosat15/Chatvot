@@ -17,6 +17,54 @@ export interface EarlyEndCheckResult {
   errors: string[];
 }
 
+/**
+ * Hand an unclaimed pool to the one writer of an unclaimed-pool row.
+ *
+ * THIS FUNCTION DELIBERATELY COMPUTES NOTHING. It is not another copy of the rule; it is
+ * the dynamic import, written once so that four call sites do not each carry it. The
+ * arithmetic - the euro conversion at the platform's real rate, and the duplicate check -
+ * lives in `PlatformFinancialsService.recordUnclaimedPool` and nowhere else.
+ *
+ * WHY THE IMPORT IS DYNAMIC: it is the convention every lib call in this worker follows
+ * (see the `competition-end.actions` and `notification.service` imports below). The
+ * service reaches Mongoose models through the `@/` alias, and keeping it out of the
+ * top-level graph is what stops one job's dependencies loading for every other job.
+ *
+ * WHY IT SWALLOWS ITS OWN ERRORS: the four callers all follow this with a status update
+ * that ends the contest. Before 9 September 2026 they used raw inserts that could not
+ * fail in a way worth reporting; the service now does two extra reads, so a database
+ * hiccup here must not leave a contest with every player eliminated stuck at `active`
+ * for ever. The row is a bookkeeping record - nothing pays out of it - so an operator
+ * reconciling a missing figure is a far better outcome than a contest that cannot end.
+ */
+async function recordUnclaimedPoolForWorker(params: {
+  competitionId: string;
+  competitionName: string;
+  poolAmount: number;
+  reason:
+    | "no_participants"
+    | "all_disqualified"
+    | "no_qualified_winners"
+    | "competition_cancelled";
+  winnersCount: number;
+  expectedWinnersCount: number;
+  description?: string;
+  sourceType?: "competition" | "challenge";
+  testRunId?: string;
+}): Promise<void> {
+  try {
+    const { PlatformFinancialsService } = await import(
+      "../../lib/services/platform-financials.service"
+    );
+    await PlatformFinancialsService.recordUnclaimedPool(params);
+  } catch (error) {
+    console.error(
+      `      ❌ [EARLY END] Could not record the unclaimed pool for ${params.sourceType ?? "competition"} ${params.competitionId}:`,
+      error instanceof Error ? error.message : error,
+    );
+  }
+}
+
 export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
   const result: EarlyEndCheckResult = {
     competitionsEnded: 0,
@@ -134,23 +182,14 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
           // Record unclaimed pool for platform
           const prizePool = competition.prizePool || 0;
           if (prizePool > 0) {
-            const platformTransactionsCollection = db.collection(
-              "platformtransactions",
-            );
-            await platformTransactionsCollection.insertOne({
-              transactionType: "unclaimed_pool",
-              amount: prizePool,
-              amountEUR: prizePool, // Simplified - in production use conversion rate
-              sourceType: "competition",
-              sourceId: competition._id.toString(),
-              sourceName: competition.name,
-              unclaimedReason: "all_disqualified",
-              originalPoolAmount: prizePool,
+            await recordUnclaimedPoolForWorker({
+              competitionId: competition._id.toString(),
+              competitionName: competition.name,
+              poolAmount: prizePool,
+              reason: "all_disqualified",
               winnersCount: 0,
               expectedWinnersCount: competition.prizeDistribution?.length || 3,
               description: `All participants disqualified in ${competition.name} - pool goes to platform`,
-              createdAt: now,
-              updatedAt: now,
             });
             console.log(
               `      💰 Recorded ${prizePool} credits to unclaimed pools`,
@@ -424,23 +463,15 @@ export async function runEarlyEndCheck(): Promise<EarlyEndCheckResult> {
           const prizePool = (challenge.entryFee || 0) * 2;
 
           if (prizePool > 0) {
-            const platformTransactionsCollection = db.collection(
-              "platformtransactions",
-            );
-            await platformTransactionsCollection.insertOne({
-              transactionType: "unclaimed_pool",
-              amount: prizePool,
-              amountEUR: prizePool,
+            await recordUnclaimedPoolForWorker({
               sourceType: "challenge",
-              sourceId: challenge._id.toString(),
-              sourceName: `${challenge.challengerName || "Challenger"} vs ${challenge.challengedName || "Opponent"}`,
-              unclaimedReason: "all_disqualified",
-              originalPoolAmount: prizePool,
+              competitionId: challenge._id.toString(),
+              competitionName: `${challenge.challengerName || "Challenger"} vs ${challenge.challengedName || "Opponent"}`,
+              poolAmount: prizePool,
+              reason: "all_disqualified",
               winnersCount: 0,
               expectedWinnersCount: 1,
               description: `Both players disqualified in challenge - pool goes to platform`,
-              createdAt: now,
-              updatedAt: now,
             });
             console.log(
               `      💰 Recorded ${prizePool} credits to unclaimed pools`,
@@ -627,24 +658,15 @@ export async function runEarlyEndCheckForTest(
         if (disqualifiedCount === participants.length) {
           const prizePool = competition.prizePool || 0;
           if (prizePool > 0) {
-            const platformTransactionsCollection = db.collection(
-              "platformtransactions",
-            );
-            await platformTransactionsCollection.insertOne({
-              transactionType: "unclaimed_pool",
-              amount: prizePool,
-              amountEUR: prizePool,
-              sourceType: "competition",
-              sourceId: competition._id.toString(),
-              sourceName: competition.name,
-              unclaimedReason: "all_disqualified",
-              originalPoolAmount: prizePool,
+            await recordUnclaimedPoolForWorker({
+              competitionId: competition._id.toString(),
+              competitionName: competition.name,
+              poolAmount: prizePool,
+              reason: "all_disqualified",
               winnersCount: 0,
               expectedWinnersCount: competition.prizeDistribution?.length || 1,
               description: `All participants disqualified - pool goes to platform`,
               testRunId, // Mark for cleanup
-              createdAt: now,
-              updatedAt: now,
             });
           }
 
@@ -817,24 +839,16 @@ export async function runEarlyEndCheckForTest(
 
         if (noWinner) {
           if (prizePool > 0) {
-            const platformTransactionsCollection = db.collection(
-              "platformtransactions",
-            );
-            await platformTransactionsCollection.insertOne({
-              transactionType: "unclaimed_pool",
-              amount: prizePool,
-              amountEUR: prizePool,
+            await recordUnclaimedPoolForWorker({
               sourceType: "challenge",
-              sourceId: challenge._id.toString(),
-              sourceName: `${challenge.challengerName} vs ${challenge.challengedName}`,
-              unclaimedReason: "all_disqualified",
-              originalPoolAmount: prizePool,
+              competitionId: challenge._id.toString(),
+              competitionName: `${challenge.challengerName} vs ${challenge.challengedName}`,
+              poolAmount: prizePool,
+              reason: "all_disqualified",
               winnersCount: 0,
               expectedWinnersCount: 1,
               description: `Both players disqualified - pool goes to platform`,
               testRunId,
-              createdAt: now,
-              updatedAt: now,
             });
           }
 

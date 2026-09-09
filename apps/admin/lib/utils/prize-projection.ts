@@ -35,6 +35,8 @@
  * a floor - and the admin screen stops projecting altogether once the real amounts exist.
  */
 
+import { normalisePrizeShares } from "./prize-shares";
+
 /** The shape both callers already hold. Deliberately not either app's model type. */
 export interface PrizeProjectionInput {
   prizeDistribution?: { percentage: number; rank?: number }[] | null;
@@ -85,28 +87,51 @@ export function projectPrizeDistribution(
   const platformFeePercentage = (competition.platformFeePercentage || 0) / 100;
   const filledPositions = Math.min(currentParticipants, prizePositions);
 
-  let unclaimedPercentage = 0;
-  if (currentParticipants < prizePositions) {
-    distribution.forEach((prize, index) => {
-      if (index >= currentParticipants) unclaimedPercentage += prize.percentage;
-    });
-  }
-  const bonusPerWinner =
-    filledPositions > 0 ? unclaimedPercentage / filledPositions : 0;
+  /*
+    THE REDISTRIBUTION IS NOW `normalisePrizeShares`, SHARED WITH SETTLEMENT.
+
+    Until 9 September 2026 this computed its own `bonusPerWinner` - the unclaimed share
+    divided equally by the filled positions - which was a faithful copy of what
+    `distributePrizesWithTies` did. When the owner's rule changed settlement to
+    proportional normalisation, that copy stopped agreeing with it: a 50/30/20 table with
+    two entrants would have been projected here at 60/40 and paid at 62.5/37.5. Nobody
+    would have seen an error; the lobby would simply have promised the wrong number to the
+    player deciding whether to pay the entry fee.
+
+    So the rule moved out and both callers now ask the same function. This module keeps
+    only the part that is genuinely its own: deciding WHICH ranks count as filled, which
+    here is by entrant count and not by eligibility - see the caveat in the docblock.
+  */
+  /*
+    Keyed by POSITION, not by the configured rank, and the difference matters. This
+    module's whole notion of "filled" is "the first N rows, where N is the entrant count",
+    and `distribution` rows are allowed to carry no `rank` at all. Feeding the real ranks
+    in would also mean two rows sharing a rank - which is bad data rather than impossible
+    - silently answering the filled question for each other. `shares` comes back in input
+    order either way, so the row mapping below reads it positionally.
+  */
+  const normalised = normalisePrizeShares(
+    distribution.map((prize, index) => ({
+      rank: index + 1,
+      percentage: prize.percentage,
+    })),
+    (position) => position <= currentParticipants,
+  );
+  const unclaimedPercentage = normalised.vacatedPercentage;
 
   const rows = distribution.map((prize, index) => {
     const isFilled = index < currentParticipants;
-    const adjustedPercentage =
-      isFilled && bonusPerWinner > 0
-        ? prize.percentage + bonusPerWinner
-        : prize.percentage;
+    const share = normalised.shares[index];
+    const adjustedPercentage = isFilled
+      ? share.effectivePercentage
+      : prize.percentage;
     const netAmount =
       ((prizePool * adjustedPercentage) / 100) * (1 - platformFeePercentage);
 
     return {
       rank: prize.rank ?? index + 1,
       configuredPercentage: prize.percentage,
-      bonusPercentage: isFilled && bonusPerWinner > 0 ? bonusPerWinner : 0,
+      bonusPercentage: isFilled ? share.bonusPercentage : 0,
       netAmount,
       filled: isFilled,
     };

@@ -1,6 +1,16 @@
 {
-  "description": "Frozen output of the trading ranking and prize functions, captured before the X1 game-module extraction. Regenerate only when award behaviour is deliberately changed.",
-  "capturedAt": "2026-09-04",
+  "description": "Frozen output of the trading ranking and prize functions. Regenerate only when award behaviour is deliberately changed, and record the change here.",
+  "capturedAt": "2026-09-09",
+  "revisions": [
+    {
+      "capturedAt": "2026-09-04",
+      "reason": "Original capture, taken BEFORE the X1 game-module extraction so the extraction could be proven behaviour-free."
+    },
+    {
+      "capturedAt": "2026-09-09",
+      "reason": "Owner's rule (task document 5 and 6): a vacated prize rank is redistributed PROPORTIONALLY rather than as an equal-share bonus, so the configured prize curve survives an unclaimed position. 4 of 18 scenarios changed - all of them ties, because a tie vacates a rank too (two players tied at rank 1 sends the next to rank 3). THE TOTAL PAID OUT IS IDENTICAL IN ALL 18: only the split between winners moved, and each new split restores the ratio the operator configured. Verified before regenerating rather than after."
+    }
+  ],
   "scenarioCount": 18,
   "results": [
     {
@@ -395,13 +405,13 @@
       "payouts": [
         {
           "userId": "ccccccccccccccccccccccc2",
-          "prizeAmount": 308.75,
+          "prizeAmount": 316.67,
           "rank": 1,
           "isTied": false
         },
         {
           "userId": "ccccccccccccccccccccccc1",
-          "prizeAmount": 166.25,
+          "prizeAmount": 158.33,
           "rank": 2,
           "isTied": false
         }
@@ -440,19 +450,19 @@
       "payouts": [
         {
           "userId": "ddddddddddddddddddddddd1",
-          "prizeAmount": 400,
+          "prizeAmount": 428.57,
           "rank": 1,
           "isTied": true
         },
         {
           "userId": "ddddddddddddddddddddddd2",
-          "prizeAmount": 400,
+          "prizeAmount": 428.57,
           "rank": 1,
           "isTied": true
         },
         {
           "userId": "ddddddddddddddddddddddd3",
-          "prizeAmount": 200,
+          "prizeAmount": 142.86,
           "rank": 3,
           "isTied": false
         }
@@ -538,13 +548,13 @@
       "payouts": [
         {
           "userId": "fffffffffffffffffffffff1",
-          "prizeAmount": 390,
+          "prizeAmount": 400,
           "rank": 1,
           "isTied": false
         },
         {
           "userId": "fffffffffffffffffffffff2",
-          "prizeAmount": 210,
+          "prizeAmount": 200,
           "rank": 2,
           "isTied": false
         }
@@ -601,13 +611,13 @@
       "payouts": [
         {
           "userId": "hhhhhhhhhhhhhhhhhhhhhhh2",
-          "prizeAmount": 455,
+          "prizeAmount": 466.67,
           "rank": 1,
           "isTied": false
         },
         {
           "userId": "hhhhhhhhhhhhhhhhhhhhhhh1",
-          "prizeAmount": 245,
+          "prizeAmount": 233.33,
           "rank": 2,
           "isTied": false
         }

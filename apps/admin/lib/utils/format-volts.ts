@@ -161,4 +161,19 @@ export function formatVoltsCompact(
   from competition surfaces rather than correcting it, because a competition is denominated in
   credits and has no business quoting a second unit at all. The wallet and deposit surfaces
   where the disagreement actually bites are untouched.
+
+  ANSWERED BY THE OWNER, 9 SEPTEMBER 2026: 100 credits = EUR 1 is authoritative, and
+  `valueInEUR` should DERIVE from `eurToCreditsRate` rather than be a second stored number.
+  Still not fixed here - it is its own slice, because it moves a player-facing figure by a
+  factor of a hundred and this module must not be the thing that quietly does that.
+
+  AND IT IS NOT A TIE BETWEEN TWO DEFAULTS - one side is live and wrong. Measured the same
+  day: `components/trading/WalletBalanceDisplay.tsx:32` renders `balance * valueInEUR`, while
+  `app/api/wallet/withdraw/route.ts:115` pays out on `eurToCreditsRate`. A player holding
+  1,000 credits is therefore shown EUR 1,000.00 and can withdraw EUR 10. `app/(root)/help/`
+  renders both numbers, from both models, on one page.
+
+  One trap for whoever builds it: `valueInEUR` is an operator-editable input on
+  `apps/admin/components/admin/CurrencySettingsSection.tsx`, so making it derived removes a
+  control that may already hold a deliberate value. Read what is stored before overwriting it.
 */

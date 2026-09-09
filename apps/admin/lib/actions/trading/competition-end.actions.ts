@@ -77,6 +77,62 @@ export async function finalizeCompetition(competitionId: string) {
     }
   }
 
+  /*
+    OPTIMISTIC LOCK, ADDED 9 SEPTEMBER 2026 (task document 29). Atomically claim the
+    contest for finalization; only one caller can move "active" -> "finalizing", and every
+    other caller gets null and leaves without touching anything.
+
+    CORRECT THE PREMISE BEFORE READING THE FIX. Task document 29 says this app could
+    double-pay because it had no lock. It could not, and the reason is worth stating so
+    nobody removes the transaction believing this lock replaces it: every concurrent
+    attempt writes the SAME `Competition` document at `competition.save({ session })`, and
+    the winners' wallets with it, so the second to commit takes a WriteConflict and unwinds
+    everything it did. There is no retry wrapper here, so it does not then re-read and
+    re-pay. That is the third risk in this programme to be overstated after R7 and R31, and
+    correcting one downward is the same duty as raising one.
+
+    WHAT THE LOCK ACTUALLY BUYS, AND IT IS NOT NOTHING. Two things, both real:
+
+    First, the money layer is not entirely inside that transaction. `settleFeesAndGameMasters`
+    calls `recordPlatformFee` and `recordUnclaimedPool` WITHOUT the session - they open
+    their own writes - so an attempt that gets as far as the fee stage and then loses the
+    write conflict leaves a platform-fee row behind with no completed contest and no prizes
+    paid. Those orphans overstate platform income and nothing reconciles them away. The
+    lock closes the window by refusing the loser BEFORE it does any work at all, which is a
+    better fix than threading a session through code the main app shares and has always
+    called this way - a behaviour change to trading settlement inside a concurrency fix
+    would destroy the only evidence the concurrency fix is safe.
+
+    Second, legibility. Without the lock the loser did the entire computation - every
+    position, every price fetch - and then failed with `Write conflict during plan execution
+    and yielding is disabled`, which the sweep records as "Failed to finalize" for a contest
+    that was in fact settled correctly by the other cron. An operator reading that output
+    cannot tell a real failure from the expected outcome of a race the platform creates
+    itself by running two every-minute crons. Classify a concurrency failure, never merely
+    report it.
+
+    THE LOCK MUST BE RELEASED ON EVERY REFUSAL AND EVERY THROW, or the contest strands in
+    "finalizing" - which neither app's gate accepts, so no later attempt can claim it and
+    nobody is ever paid. That is the failure this file's own provider sibling committed, and
+    it is why the release is repeated on the route gate and in the outer catch rather than
+    left to the reader.
+  */
+  const lockResult = await Competition.findOneAndUpdate(
+    { _id: competitionId, status: "active" },
+    { $set: { status: "finalizing" } },
+    { new: true },
+  );
+
+  if (!lockResult) {
+    const existing = (await Competition.findById(competitionId)
+      .select("status")
+      .lean()) as { status?: string } | null;
+    console.log(
+      `⚠️ Competition ${competitionId} is not active (status: ${existing?.status ?? "not found"}), skipping`,
+    );
+    return { success: false, message: "Competition is not active" };
+  }
+
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -92,13 +148,11 @@ export async function finalizeCompetition(competitionId: string) {
       throw new Error("Competition not found");
     }
 
-    if (competition.status !== "active") {
-      console.log(
-        `⚠️ Competition ${competitionId} is not active (status: ${competition.status}), skipping`,
-      );
-      await session.abortTransaction();
-      return { success: false, message: "Competition is not active" };
-    }
+    // Reason: the status check that used to live here has moved into the optimistic lock
+    // above, which answers the same question atomically. It is NOT re-asserted against
+    // "active" here, because the lock has just set it to "finalizing" and a check for
+    // "active" would now refuse every single finalization - the trap in moving a
+    // read-then-check behind a claim.
 
     // The SECOND gate, and its comment used to claim to be the dispatch - which was true
     // when this app had no provider path and is now wrong. The dispatch is above, before the
@@ -115,6 +169,11 @@ export async function finalizeCompetition(competitionId: string) {
     if (!settlementRoute.ok) {
       console.error(`❌ [COMPETITION] ${settlementRoute.error}`);
       await session.abortTransaction();
+      // Reason: the lock is released OUTSIDE the aborted transaction, not inside it. A
+      // release written before the abort is rolled back with everything else, so the
+      // contest stays at "finalizing" for ever while this code reads as though it had
+      // been handed back.
+      await releaseFinalizationLock(competitionId);
       return { success: false, error: settlementRoute.error };
     }
 
@@ -982,6 +1041,23 @@ export async function finalizeCompetition(competitionId: string) {
     if (session.inTransaction()) {
       await session.abortTransaction();
     }
+
+    /*
+      Hand the lock back, so a transient failure is retried by the next cron pass rather
+      than stranding the contest at "finalizing" where neither app's gate will claim it
+      and nobody is ever paid.
+
+      IT IS GUARDED ON THE STATUS, so a throw arriving AFTER the commit cannot demote a
+      finished contest back to "active" and settle it a second time. Everything past
+      `commitTransaction()` is fire-and-forget badge and notification work inside its own
+      try/catch, but "inside its own try/catch today" is not a property to bet a payout on.
+
+      Reported as a warning rather than swallowed: a concurrency loss and a genuine
+      database fault both land here, and only the message text separates them - a real
+      write conflict reads "Write conflict during plan execution and yielding is disabled".
+    */
+    await releaseFinalizationLock(competitionId);
+
     console.error("❌ Error finalizing competition:", error);
     throw error;
   } finally {
@@ -991,6 +1067,38 @@ export async function finalizeCompetition(competitionId: string) {
     } catch {
       // Session already ended after successful commit
     }
+  }
+}
+
+/**
+ * Hand a claimed contest back to "active" so a later pass can retry it.
+ *
+ * FILTERED ON `status: "finalizing"` rather than written unconditionally. The filter is
+ * the safety, not tidiness: a throw from the post-commit badge or notification work would
+ * otherwise move a `completed` contest back to `active`, and the next cron pass would
+ * finalize and pay it all over again - a lock-release turning into the double payment the
+ * lock exists to prevent.
+ *
+ * Its own failure is logged and swallowed. It runs on the error path, so throwing here
+ * would replace the original diagnosis with a second, less useful one.
+ */
+async function releaseFinalizationLock(competitionId: string): Promise<void> {
+  try {
+    const released = await Competition.findOneAndUpdate(
+      { _id: competitionId, status: "finalizing" },
+      { $set: { status: "active" } },
+    );
+
+    if (released) {
+      console.warn(
+        `⚠️ [COMPETITION] Released the finalization lock on ${competitionId} - it will be retried on the next pass`,
+      );
+    }
+  } catch (releaseError) {
+    console.error(
+      `❌ [COMPETITION] Could not release the finalization lock on ${competitionId} - it is stranded at "finalizing" and needs an operator:`,
+      releaseError instanceof Error ? releaseError.message : releaseError,
+    );
   }
 }
 

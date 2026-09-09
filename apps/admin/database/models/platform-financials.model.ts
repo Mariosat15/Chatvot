@@ -112,6 +112,23 @@ export interface IPlatformTransaction extends Document {
   processedBy?: string; // Admin ID who processed
   processedByEmail?: string;
 
+  /**
+   * Tag written by the admin end-logic and trading test panels so their cleanup routes
+   * can find and delete the rows again.
+   *
+   * DECLARED ON 9 SEPTEMBER 2026, AND IT HAD TO BE BEFORE THIS COLLECTION COULD BE
+   * WRITTEN THROUGH MONGOOSE AT ALL. The worker's two test-run paths were writing it with
+   * the raw driver, which stores an undeclared field happily; routing them through
+   * `PlatformFinancialsService.recordUnclaimedPool` would have handed it to a strict
+   * schema, which silently discards it. The row would then have been created, reported as
+   * a success, and been invisible to
+   * `apps/admin/app/api/admin/end-logic-tests/cleanup/route.ts` - which really does
+   * `deleteMany({ testRunId: /TEST_/i })` against `platformtransactions` - leaving test
+   * money on the platform's real books for ever. This is the mirror-drift failure mode
+   * arriving from the other direction: one writer disagreeing with its own schema.
+   */
+  testRunId?: string;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -252,6 +269,8 @@ const PlatformTransactionSchema = new Schema<IPlatformTransaction>(
       required: true,
     },
     notes: String,
+    // See the interface above for why this is declared rather than left to the raw driver.
+    testRunId: String,
     processedBy: String,
     processedByEmail: String,
   },

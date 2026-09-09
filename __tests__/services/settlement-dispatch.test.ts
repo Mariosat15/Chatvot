@@ -145,22 +145,85 @@ describe("every finalize function asks before settling", () => {
   );
 
   it("releases the optimistic lock when it refuses", () => {
-    // Reason: three of the four paths claim the contest by setting status to
-    // "finalizing" before this check can run in the private attempt function. Refusing
-    // without restoring "active" strands the contest permanently - no later attempt can
-    // claim it, and it never pays out at all. That is a worse outcome than the bug being
-    // guarded against.
+    /*
+      Reason: a path that claims the contest by setting status to "finalizing" and then
+      refuses without restoring "active" strands it permanently - no later attempt can
+      claim it, and it never pays out at all. That is a worse outcome than the bug being
+      guarded against.
+
+      TWO SPELLINGS ARE ACCEPTED, and widening this on 9 September 2026 was deliberate
+      rather than a concession. The assertion used to demand the literal `status:
+      "active"` inside the refusal block, which is one correct implementation - the main
+      app's inline `findOneAndUpdate` - and it failed on the other: the admin app releases
+      through a named `releaseFinalizationLock` helper, because it has to release from
+      three places including the outer catch, and three inline copies of a lock release is
+      the "one rule, three copies" shape. A structural test that permits only the
+      implementation that existed when it was written stops being a guard and becomes a
+      freeze on the file's shape.
+
+      THE HELPER SPELLING IS NOT THE WEAKER ONE, because the second assertion below
+      demands more of it than this one can demand of an inline write.
+    */
     for (const file of FINALIZE_FILES) {
       const source = sourceOf(file);
       if (!source.includes("lockResult")) continue;
 
-      const refusalBlock = source.slice(
-        source.indexOf("const settlementRoute = routeToTradingSettlement("),
+      const refusalBlock = source
+        .slice(
+          source.indexOf("const settlementRoute = routeToTradingSettlement("),
+        )
+        .slice(0, 900);
+
+      const releasesInline = refusalBlock.includes('status: "active"');
+      // Matches the CALL with its argument, not the bare name: the name alone appears in
+      // the function's own declaration and in comments about it.
+      const releasesViaHelper = /releaseFinalizationLock\(\s*competitionId/.test(
+        refusalBlock,
       );
+
       expect(
-        refusalBlock.slice(0, 900),
-        `${file} refuses after taking the lock without setting status back to "active"`,
-      ).toContain('status: "active"');
+        releasesInline || releasesViaHelper,
+        `${file} refuses after taking the lock without handing it back - neither an inline 'status: "active"' write nor a releaseFinalizationLock(competitionId) call appears in the refusal block, so the contest is stranded at "finalizing" and nobody is ever paid`,
+      ).toBe(true);
+    }
+  });
+
+  it("filters a lock release on the claimed status, so it cannot demote a settled contest", () => {
+    /*
+      The filter is the safety and it is invisible from the call site. An unconditional
+      write back to "active" is correct on the refusal paths and CATASTROPHIC on a throw
+      arriving after the transaction has committed: it would move a `completed` contest
+      back to `active`, and the next cron pass would finalize and pay it a second time -
+      a lock release turning into the exact double payment the lock exists to prevent.
+
+      Asserted on the release WRITE rather than on the presence of a helper, so it covers
+      both spellings accepted above.
+    */
+    for (const file of FINALIZE_FILES) {
+      const source = sourceOf(file);
+      if (!source.includes("lockResult")) continue;
+
+      const releaseWrites = [
+        ...source.matchAll(/\{\s*\$set:\s*\{\s*status:\s*"active"/g),
+      ];
+      if (releaseWrites.length === 0) continue;
+
+      for (const write of releaseWrites) {
+        // The filter is the argument BEFORE the update, so look back from the write to
+        // the start of the call. Bounded by the call's own opening rather than by a
+        // character count, which is how an earlier guard in this repository came to
+        // start mid-identifier and report a present guard as missing.
+        const callStart = source.lastIndexOf("findOneAndUpdate(", write.index);
+        expect(
+          callStart,
+          `${file} writes status back to "active" outside a findOneAndUpdate, so it cannot be conditional on the contest still being claimed`,
+        ).toBeGreaterThan(-1);
+
+        expect(
+          source.slice(callStart, write.index),
+          `${file} releases the lock WITHOUT filtering on status: "finalizing" - a throw arriving after the commit would demote a completed contest back to active and it would be finalized and paid twice`,
+        ).toContain('status: "finalizing"');
+      }
     }
   });
 });

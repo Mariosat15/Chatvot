@@ -16,7 +16,7 @@ export interface UnclaimedPoolParams {
   competitionName: string;
   poolAmount: number;
   // Note: 'partial_unclaimed' was removed - when there are fewer winners than prizes,
-  // the extra % is REDISTRIBUTED to existing winners as bonus, not kept by platform
+  // the extra % is REDISTRIBUTED to existing winners, not kept by platform
   reason:
     | "no_participants"
     | "all_disqualified"
@@ -25,6 +25,48 @@ export interface UnclaimedPoolParams {
   winnersCount: number;
   expectedWinnersCount: number;
   description?: string;
+  /**
+   * Which contest shape this pool came from. Defaults to `"competition"`, which is what
+   * every caller meant before 9 September 2026 - the parameter names still say
+   * `competitionId` for that reason, and renaming them would be a wide diff for no gain.
+   *
+   * IT EXISTS BECAUSE A CHALLENGE COULD NOT BE RECORDED HERE AT ALL. `sourceType` was
+   * hard-coded to `"competition"`, so the worker's two challenge paths had no way to use
+   * this writer and hand-rolled a raw insert instead - which is how they came to book a
+   * 1:1 euro figure while every other row on the platform's books used the real rate.
+   */
+  sourceType?: "competition" | "challenge";
+  /**
+   * Set only by the worker's test-run paths, which tag every document they create so the
+   * cleanup job can find it again. Omitting it from this writer is what kept those two
+   * paths on a raw insert, so it is carried rather than dropped: routing them through
+   * here and losing the tag would leave test rows on the platform's real books for ever.
+   */
+  testRunId?: string;
+  /**
+   * The pot BEFORE the platform fee, when that differs from `poolAmount`.
+   *
+   * Defaults to `poolAmount`, which is what both competition callers want - settlement
+   * already netted the fee off and there is nothing else to record. THE CHALLENGE PATH
+   * NEEDS THE TWO SEPARATELY: it books the winner's would-be prize as the amount and the
+   * doubled entry fee as the original pool, and collapsing them onto one parameter would
+   * have made the challenge row claim the platform kept the gross pot.
+   */
+  originalPoolAmount?: number;
+  /**
+   * Join the caller's transaction instead of writing on its own.
+   *
+   * PASSED BY THE CHALLENGE FINALIZE PATH AND BY NOBODY ELSE, and the asymmetry is
+   * deliberate rather than an oversight. Challenge finalization decides the winner, moves
+   * the money and records this row in one transaction, so an abort must take the row with
+   * it. Competition settlement has always called this writer outside its transaction, and
+   * pulling it inside would change when the row becomes visible on a screen an operator
+   * reconciles from - a behaviour change with no defect behind it.
+   *
+   * The duplicate check runs inside the same session when one is given, so it sees the
+   * caller's own uncommitted writes rather than a stale view of the collection.
+   */
+  session?: import("mongoose").ClientSession;
 }
 
 export interface AdminWithdrawalParams {
@@ -40,29 +82,94 @@ export interface AdminWithdrawalParams {
 
 export const PlatformFinancialsService = {
   /**
-   * Record unclaimed pool funds when competition ends without winners
+   * Record unclaimed pool funds when a contest ends without winners.
+   *
+   * THE ONE WRITER OF AN UNCLAIMED-POOL ROW, since 9 September 2026 (task document 7).
+   *
+   * COUNT THE WRITERS. The task document named four raw-driver inserts in
+   * `worker/jobs/early-end-check.job.ts`; there were SIX, because
+   * `challenge-finalize.actions.ts` carries its own in each app - found by grepping for
+   * `unclaimed_pool` rather than by reading the file the document pointed at. That is the
+   * same finding as four competition entry paths where the plan said two, ten finalize
+   * sites where it said five, and six raw inserts where R7 said one.
+   *
+   * They were not merely duplicated, they were WRONG in a way nothing could report. Every
+   * one booked `amountEUR` equal to the credit figure - the worker's four carried a comment
+   * reading "Simplified - in production use conversion rate" - so with the shipped rate of
+   * 100 credits to the euro every row overstated its euro value by a factor of a hundred,
+   * on the screens an operator reconciles platform funds from. Note the harm is a wrong
+   * REPORT and never a wrong payment: nothing pays out of this collection.
+   *
+   * NOT RETROACTIVE, AND NOTHING WAS BACKFILLED. Rows already written hold the inflated
+   * euro figure, and they cannot be corrected by a rule - the rate could legitimately have
+   * changed since. Which historical rows to restate is an owner decision.
+   *
+   * IDEMPOTENT ON `(sourceType, sourceId, transactionType)`. Task document 7 asks for this
+   * in terms, and it is not theoretical: both apps run `checkAndFinalizeCompetitions` on
+   * an every-minute cron, the early-end job runs beside them, and an operator can trigger
+   * completion by hand. A duplicate row does not double a payment - nothing pays out of
+   * here - but it doubles the platform's recorded holdings, which is the figure the
+   * unclaimed total on the financial dashboard is summed from.
+   *
+   * A DUPLICATE RETURNS QUIETLY RATHER THAN THROWING. A retried cron delivery has done
+   * nothing wrong, and throwing here would abort a settlement that had already succeeded -
+   * the same reasoning as the duplicate money-request rule: report success with nothing
+   * done, rather than inviting a third attempt.
    */
   recordUnclaimedPool: async (params: UnclaimedPoolParams): Promise<void> => {
     await connectToDatabase();
 
+    const sourceType = params.sourceType ?? "competition";
+
+    // Reason: checked before the conversion read, so a duplicate costs one indexed query
+    // rather than a settings round trip as well. `findOne` rather than a unique index
+    // because `platformtransactions` holds every transaction type and a partial unique
+    // index across a shared collection is a migration on live financial data - which is a
+    // separate decision, recorded at the foot of this function.
+    const existing = await PlatformTransaction.findOne({
+      transactionType: "unclaimed_pool",
+      sourceType,
+      sourceId: params.competitionId,
+    })
+      .select("_id")
+      .session(params.session ?? null)
+      .lean();
+
+    if (existing) {
+      console.log(
+        `💰 [PLATFORM] Unclaimed pool already recorded for ${sourceType} ${params.competitionId} - not recording a second time`,
+      );
+      return;
+    }
+
     const conversionSettings = await CreditConversionSettings.getSingleton();
     const eurAmount = params.poolAmount / conversionSettings.eurToCreditsRate;
 
-    await PlatformTransaction.create({
+    const doc = {
       transactionType: "unclaimed_pool",
       amount: params.poolAmount,
       amountEUR: eurAmount,
-      sourceType: "competition",
+      sourceType,
       sourceId: params.competitionId,
       sourceName: params.competitionName,
       unclaimedReason: params.reason,
-      originalPoolAmount: params.poolAmount,
+      originalPoolAmount: params.originalPoolAmount ?? params.poolAmount,
       winnersCount: params.winnersCount,
       expectedWinnersCount: params.expectedWinnersCount,
       description:
         params.description ||
         `Unclaimed pool from ${params.competitionName}: ${params.reason.replace("_", " ")}`,
-    });
+      ...(params.testRunId ? { testRunId: params.testRunId } : {}),
+    };
+
+    // Reason: `create([doc], { session })` rather than `create(doc, { session })` - the
+    // single-document overload treats a second argument as another document to insert, so
+    // the session would be stored as a row and the write would escape the transaction.
+    if (params.session) {
+      await PlatformTransaction.create([doc], { session: params.session });
+    } else {
+      await PlatformTransaction.create(doc);
+    }
 
     console.log(
       `💰 [PLATFORM] Recorded unclaimed pool: ${params.poolAmount} credits (€${eurAmount.toFixed(2)}) from ${params.competitionName}`,

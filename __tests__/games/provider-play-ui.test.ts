@@ -1087,17 +1087,36 @@ describe("the two lobbies are built from one design kit", () => {
 
   it("moves no money computation while restyling or relocating the prize table", () => {
     /*
-      THE FOUR ASSERTIONS HAVE NOW SURVIVED TWO MOVES UNCHANGED, which is the entire point of
-      them. First out of `components/trading/lobby/` on 7 Sep 2026 so the game lobby renders one
-      component rather than a second copy; then out of the component into
-      `lib/utils/prize-projection.ts` later the same day, so the ADMIN prize sidebar computes
-      the same answer instead of showing the bare configured share.
+      THREE OF THE FOUR ASSERTIONS HAVE NOW SURVIVED TWO MOVES CHARACTER FOR CHARACTER, and the
+      fourth was broken deliberately on 9 September 2026. Saying which is which is the whole
+      value of this test, so it is spelled out rather than quietly re-pinned.
 
-      They are asserted character for character because they decide what a winner is paid, and
-      an extraction's whole value is that a green suite proves nothing moved - which it only
-      does if nothing else changed in the same edit. The projection module's parameter is named
-      `competition` for exactly this reason: renaming it would have broken the verbatim match
-      and thrown away the proof.
+      The moves: first out of `components/trading/lobby/` on 7 Sep 2026 so the game lobby
+      renders one component rather than a second copy; then out of the component into
+      `lib/utils/prize-projection.ts` later the same day, so the ADMIN prize sidebar computes
+      the same answer instead of showing the bare configured share. Both were pure relocations,
+      and an extraction's whole value is that a green suite proves nothing moved - which it only
+      does if nothing else changed in the same edit. The module's parameter is named
+      `competition` for exactly this reason: renaming it would have broken the match and thrown
+      away the proof.
+
+      WHAT CHANGED, AND WHY THE PROOF IT CARRIED IS GONE RATHER THAN WEAKENED. The fourth
+      expression was `filledPositions > 0 ? unclaimedPercentage / filledPositions : 0` - the
+      equal-share bonus, which handed every filled rank the same slice of a vacated one. Task
+      document 6 specifies proportional normalisation with worked arithmetic (50/30/20 with the
+      third rank vacated pays 62.5 and 37.5, not 60/40), so the expression is now a call to the
+      shared `normalisePrizeShares`. That is a BEHAVIOUR change to what a winner is paid, and a
+      verbatim assertion cannot survive one; re-pinning it to the new text would look identical
+      to this test still working while proving something entirely different.
+
+      SO THE GUARANTEE FOR REDISTRIBUTION MOVED TO THREE OTHER PLACES, and it is stronger than
+      a text match: the golden ranking regression, which was regenerated with the changed
+      payouts recorded and shows the totals unmoved in all 18 scenarios; the byte-for-byte
+      mirror test on `prize-shares.ts`, since `check:mirrors` compares models and has no opinion
+      about a util; and the settlement payout suites, which assert real credits out of a real
+      database. This test keeps the assertions the change did NOT touch - the pool, the fee and
+      the net conversion - because those still decide what a winner is paid and are still
+      unproven by anything else.
     */
     const projection = readCode("lib/utils/prize-projection.ts");
 
@@ -1105,10 +1124,17 @@ describe("the two lobbies are built from one design kit", () => {
       "competition.prizePool || competition.prizePoolCredits || 0",
     );
     expect(projection).toContain("(competition.platformFeePercentage || 0) / 100");
-    expect(projection).toContain(
-      "filledPositions > 0 ? unclaimedPercentage / filledPositions : 0",
-    );
     expect(projection).toContain("(1 - platformFeePercentage)");
+
+    /*
+      And the redistribution is DELEGATED, not restated. This pair is the load-bearing half:
+      the positive assertion alone is trivially satisfied by a module that imports the shared
+      rule and then works the shares out again five lines later, which is precisely the
+      "one rule, two copies" shape this replaced - and here the two copies would be a lobby
+      promising one figure and a payout delivering another.
+    */
+    expect(projection).toContain("normalisePrizeShares(");
+    expect(projection).not.toContain("unclaimedPercentage / filledPositions");
 
     // And the component is now layout only, so a future restyle cannot reach the money at all.
     const table = readCode("components/competitions/PrizeTable.tsx");

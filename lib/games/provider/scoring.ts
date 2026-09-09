@@ -35,9 +35,11 @@ export function getProviderRankingValue(
     three prize ranks and three entrants.
 
     Ordering and ELIGIBILITY are separate questions, and `hasResult` below answers the
-    second. An absent score orders last and wins nothing; a stored zero orders last and is
-    eligible, because the player attempted the game. **A stored value and an absent one are
-    different facts.**
+    second. An absent score orders last and wins nothing. THE SENTENCE THAT FOLLOWED USED
+    TO SAY a stored zero "orders last and is eligible, because the player attempted the
+    game" - that was true of the code and is no longer the rule; see `providerHasResult`.
+    The half that survives is the one that matters here: **a stored value and an absent one
+    are different facts**, and this function still orders them identically.
   */
   const score = participant.score ?? 0;
 
@@ -45,17 +47,37 @@ export function getProviderRankingValue(
 }
 
 /**
- * A provider participant is eligible for a prize only once a score has actually arrived.
+ * A provider participant is eligible for a prize only once they have scored ABOVE ZERO.
  *
- * WRITTEN AS AN EXPLICIT NULL CHECK, NEVER AS TRUTHINESS. `if (!score)` is shorter, reads
- * correctly, and refuses **a player who played and scored nothing** - a failed puzzle, a
- * race not finished, a zero that the provider genuinely reported. Telling that player they
- * produced no result is the same class of error as `canEnterChallenges` treating an absent
- * value as a stored `false`.
+ * OWNER DECISION, 9 SEPTEMBER 2026 (task document 2 and 4, which says "score > 0" in
+ * terms). This reverses the rule this function shipped with, and the reasoning it
+ * reversed is left below rather than deleted, because it is a real argument and the next
+ * reader deserves to see that it was considered rather than overlooked.
  *
- * `Number.isFinite` rather than `!= null` because a `NaN` reaching here would rank as a
- * silent last place and then be paid: `NaN` fails every comparison in the sort, so it lands
- * wherever the sort happens to leave it, which is not a position anybody chose.
+ * THE ARGUMENT AGAINST, WHICH LOST: a stored zero and an absent score are different
+ * facts. A player who launched a round, played it and scored nothing has attempted the
+ * game, and refusing them is the same shape as `canEnterChallenges` treating an absent
+ * value as a stored `false`. THE ARGUMENT THAT WON: the observed case was a three-player
+ * contest with three prize ranks, where a zero simply sat in third place and was paid -
+ * so the rule was not distinguishing "attempted and failed" from "took the seat", it was
+ * paying anybody who turned up. A prize is for a result, and zero is the absence of one.
+ *
+ * `> 0` IS APPLIED IN BOTH SCORE DIRECTIONS AND MUST NOT BE MADE DIRECTIONAL. It reads as
+ * though a `lower_is_better` game should treat zero as the best possible score, and for
+ * the catalogue as it stands that is wrong twice over: the only lower-is-better title
+ * measures `duration_ms`, where zero milliseconds is not a fast round but an unrecorded
+ * one. A test pins the rule as direction-independent so nobody "improves" it into a
+ * branch.
+ *
+ * THE ONE FUTURE TITLE THIS WOULD BE WRONG FOR, named so it is noticed rather than
+ * discovered: an `integer` + `lower_is_better` game scoring mistakes or penalties, where
+ * zero is a flawless round. No such title exists, and the fix then is a declared
+ * capability on the catalogue row - never a guess made here from `scoreType`.
+ *
+ * `Number.isFinite` is still first, because a `NaN` would otherwise pass `> 0`'s inverse
+ * in some rewrites and, more importantly, ranks as a silent last place: `NaN` fails every
+ * comparison in the sort, so it lands wherever the sort happens to leave it, which is not
+ * a position anybody chose.
  *
  * Note what this does NOT do: it does not decide what an unreported round means. That is the
  * contest's `unresolvedRoundPolicy` - score zero, exclude and refund, or hold for a human -
@@ -63,7 +85,7 @@ export function getProviderRankingValue(
  * This is the residual case: the contest settled, and this player has no number.
  */
 export function providerHasResult(participant: RankableParticipant): boolean {
-  return Number.isFinite(participant.score);
+  return Number.isFinite(participant.score) && (participant.score as number) > 0;
 }
 
 /**

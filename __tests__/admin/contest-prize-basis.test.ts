@@ -54,9 +54,24 @@ const THREE_WAY: PrizeProjectionInput = {
 };
 
 describe("the projection is one calculation shared with the player table", () => {
-  it("redistributes an unclaimed rank's share among the ranks somebody holds", () => {
-    // The owner's own worked example: three paid ranks at 70/20/10 with two entrants. Rank 3
-    // is unclaimed, so its 10% is split between the two who did place.
+  it("redistributes an unclaimed rank's share among the ranks somebody holds, in proportion", () => {
+    /*
+      Three paid ranks at 70/20/10 with two entrants. Rank 3 is unclaimed, so its 10% goes to
+      the two who did place - IN PROPORTION to what they were configured, per task document 6.
+
+      THE NUMBERS CHANGED ON 9 SEPTEMBER 2026 and the old ones are worth keeping in view,
+      because this projection is what the lobby and the admin panel PROMISE and the change is
+      visible on both. It used to hand each filled rank an equal share of the vacated 10% - 75
+      and 25, paying 67.50 and 22.50 net - so the configured 3.5:1 curve became 3:1 every time
+      a position went unclaimed. Now the shares are 70/90 and 20/90 of the pot, the ratio is
+      preserved exactly, and the net amounts come out at a round 70 and 20.
+
+      WHICH IS THE POINT OF THE SHARED MODULE RATHER THAN A COINCIDENCE: `normalisePrizeShares`
+      is what settlement uses too, so these figures are the ones that will actually be paid. A
+      projection with its own arithmetic would leave the lobby quoting 67.50 while the payout
+      delivered 70 - the "one rule, two copies" shape, and the worst possible place for it,
+      since the disagreement is only visible to a player who does the sum.
+    */
     const projection = projectPrizeDistribution({
       ...THREE_WAY,
       currentParticipants: 2,
@@ -66,17 +81,32 @@ describe("the projection is one calculation shared with the player table", () =>
     expect(projection.filledPositions).toBe(2);
     expect(projection.allFilled).toBe(false);
 
-    expect(projection.rows[0].bonusPercentage).toBe(5);
-    expect(projection.rows[1].bonusPercentage).toBe(5);
+    // 70 -> 77.78 and 20 -> 22.22, so the bonuses are 7.78 and 2.22 rather than 5 each.
+    expect(projection.rows[0].bonusPercentage).toBeCloseTo(7.7778, 4);
+    expect(projection.rows[1].bonusPercentage).toBeCloseTo(2.2222, 4);
     expect(projection.rows[2].bonusPercentage).toBe(0);
 
-    // 75% of 100, less the 10% platform fee.
-    expect(projection.rows[0].netAmount).toBeCloseTo(67.5, 6);
-    expect(projection.rows[1].netAmount).toBeCloseTo(22.5, 6);
+    // Reason: the ratio the operator configured survives the redistribution. This is the
+    // assertion that actually distinguishes proportional from equal-share - the absolute
+    // bonuses above would also pass a subtly wrong factor, but 3.5:1 would become 3:1.
+    const effective = (row: (typeof projection.rows)[number]) =>
+      row.configuredPercentage + row.bonusPercentage;
+    expect(effective(projection.rows[0]) / effective(projection.rows[1])).toBeCloseTo(
+      70 / 20,
+      6,
+    );
+
+    // 77.78% and 22.22% of 100, each less the 10% platform fee: the whole 90 distributable.
+    expect(projection.rows[0].netAmount).toBeCloseTo(70, 6);
+    expect(projection.rows[1].netAmount).toBeCloseTo(20, 6);
+    expect(
+      projection.rows[0].netAmount + projection.rows[1].netAmount,
+      "the filled ranks between them must project the whole distributable pool",
+    ).toBeCloseTo(90, 6);
   });
 
   it("keeps the configured share visible beside the redistributed one", () => {
-    // An operator has to be able to see that 70 became 75, or the screen looks like it is
+    // An operator has to be able to see that 70 became 77.78, or the screen looks like it is
     // ignoring what they typed.
     const projection = projectPrizeDistribution({
       ...THREE_WAY,
@@ -84,7 +114,7 @@ describe("the projection is one calculation shared with the player table", () =>
     });
 
     expect(projection.rows[0].configuredPercentage).toBe(70);
-    expect(projection.rows[0].bonusPercentage).toBe(5);
+    expect(projection.rows[0].bonusPercentage).toBeCloseTo(7.7778, 4);
   });
 
   it("adds no bonus once every paid rank is held", () => {

@@ -110,30 +110,59 @@ describe("a player with no score is not a winner", () => {
     expect(paid[0].prizeAmount).toBe(POOL);
   });
 
-  it("treats a genuine zero as a result, because it is one", () => {
+  it("pays nothing for a score of zero - an owner rule, not a truthiness accident", () => {
     /*
-      THE DISTINCTION THE WHOLE FIX TURNS ON, and conflating the two is how this would be
-      wrong in the opposite direction. A player who attempted the game and scored nothing
-      HAS a result: `score` is 0. A player who never launched a round has no `score` field
-      at all. **A stored value and an absent one are different facts** - the same rule that
-      made `canEnterChallenges` a live defect.
+      THIS TEST WAS FLIPPED ON 9 SEPTEMBER 2026 AND IT USED TO ASSERT THE OPPOSITE. It is
+      kept rather than replaced because the argument it was written to defend is still
+      correct on its own terms, and the next person to read this file needs to know the
+      rule was reversed by a decision rather than by a bug.
 
-      So the zero-scorer stays eligible and takes rank 2's share. Written as a truthiness
-      check (`if (!score)`) the fix would refuse them, which is a player who played being
-      told they did not.
+      WHAT IT USED TO SAY, and why that was reasonable: a player who attempted the game and
+      scored nothing HAS a result - `score` is 0 - while a player who never launched a round
+      has no `score` field at all, and **a stored value and an absent one are different
+      facts**, the same rule that made `canEnterChallenges` a live defect. On that reading a
+      zero-scorer had placed last and was entitled to whatever last place paid.
+
+      WHY IT CHANGED (owner, task document 2): a prize is for performance, and zero is not
+      performance. The owner's instruction is explicit - "if the score is 0 the users don't
+      get prize and it is distributed to the first and second player only" - and the same
+      treatment applies to a disqualified or liquidated player. So the pot goes to whoever
+      actually scored, and if NOBODY scored it goes to the unclaimed pool rather than being
+      split between players who all achieved nothing.
+
+      THE OLD ARGUMENT SURVIVES IN ONE PLACE AND IT MATTERS: this is still not a truthiness
+      check. `providerHasResult` is `Number.isFinite(score) && score > 0`, so `NaN` is
+      refused by the first clause for the reason the test below gives, and the ordering is
+      what stops a `NaN` reaching a comparator. Written as `if (!score)` it would ALSO
+      refuse a legitimately absent-but-finite value in some future scoring shape, and the
+      distinction between stored and absent is still the thing to reason with - it just no
+      longer decides this particular question.
+
+      THE ONE CONSEQUENCE TO KNOW BEFORE IT SURPRISES SOMEBODY: this reverses the sign for a
+      `lower_is_better` game if such a title ever stores a genuine 0 as a PERFECT result -
+      zero seconds, zero mistakes. No catalogue title does today, and the platform stores
+      the raw score with the direction resolved once at comparison, so the fix then is a
+      per-direction eligibility question and not a change to this rule.
     */
     const paid = pay([player("scored", 900), player("tried-and-failed", 0)]);
 
-    expect(paid.map((d) => d.userId).sort()).toEqual([
-      "scored",
-      "tried-and-failed",
-    ]);
+    expect(paid.map((d) => d.userId)).toEqual(["scored"]);
 
-    // Rank 3 is unclaimed, so its 10% is split equally between the two who placed.
-    expect(paid.find((d) => d.userId === "scored")?.prizeAmount).toBe(750);
-    expect(paid.find((d) => d.userId === "tried-and-failed")?.prizeAmount).toBe(
-      250,
-    );
+    // Ranks 2 and 3 are both vacated, so the whole pot goes to the only real scorer.
+    expect(paid[0].prizeAmount).toBe(POOL);
+  });
+
+  it("pays the unclaimed pool when the only scores are zeros", () => {
+    /*
+      The other half of the owner's rule, and the half a redistribution cannot express: if
+      every player is ineligible there is no eligible winner to redistribute TO. The
+      caller must then book the pot as unclaimed rather than divide it between players who
+      all scored nothing - which is what the previous rule did, tying them all at rank 1
+      and splitting the whole pot equally.
+    */
+    const paid = pay([player("zero-a", 0), player("zero-b", 0)]);
+
+    expect(paid).toHaveLength(0);
   });
 
   it("refuses a score that is not a finite number", () => {

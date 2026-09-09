@@ -50,12 +50,49 @@ describe("isUnscoredContest - which contests owe a refund", () => {
     ).toBe(false);
   });
 
-  it("counts a genuine ZERO score as a score, so no refund is owed", () => {
-    // Reason: `hasResult` is `Number.isFinite(score)`, deliberately not truthiness. A player
-    // who scored nothing still played, and refunding them would be refunding a loss.
+  it("treats a contest where every score is ZERO as unscored, so a refund is owed", () => {
+    /*
+      FLIPPED ON 9 SEPTEMBER 2026, and this one is a consequence of the eligibility change
+      rather than a decision of its own - which is the reason to state it here, because a
+      refund is real money and nobody asked for it in these words.
+
+      It used to assert `false`, on the reasoning that `hasResult` was `Number.isFinite(score)`
+      and a player who scored nothing still played, so refunding them would be refunding a
+      loss. Under the owner's rule (task document 2) a zero is no longer a result, so
+      `providerHasResult` is `Number.isFinite(score) && score > 0` and this contest now has
+      no eligible winner at all.
+
+      THAT MAKES THE REFUND THE RIGHT ANSWER RATHER THAN AN ACCIDENT. `isUnscoredContest`
+      asks "did anybody produce a result", and it must give the SAME answer as the
+      eligibility gate or the two disagree about who won: if the gate pays nobody while
+      this returns false, the whole pot is booked as an unclaimed pool and every entrant
+      loses their fee for a contest that awarded nothing. Which of the two actually
+      happens - refund or unclaimed pool - is still the operator's `unscoredContestPolicy`
+      per contest; this function only reports that the question arises.
+
+      SO IT IS DRIVEN BY `hasResult` AND MUST NOT GET ITS OWN COPY OF THE RULE. A second
+      `score > 0` written here would drift from the module the moment eligibility changes
+      again - the "one rule, two copies" shape - and the drift would be invisible, because
+      each side would look correct on its own.
+    */
     expect(
       isUnscoredContest(
         [{ userId: "a", score: 0, ...base }, { userId: "b", score: 0, ...base }],
+        "provider",
+      ),
+    ).toBe(true);
+  });
+
+  it("says no when one player scored zero and another scored for real", () => {
+    /*
+      The boundary that stops the flip above from over-reaching. One real score means the
+      pot WAS distributed, so a refund on top would pay the pool out twice - and the
+      zero-scorer is not refunded either, because the contest produced a winner and they
+      simply were not it.
+    */
+    expect(
+      isUnscoredContest(
+        [{ userId: "a", score: 0, ...base }, { userId: "b", score: 40, ...base }],
         "provider",
       ),
     ).toBe(false);

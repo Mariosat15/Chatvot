@@ -349,11 +349,23 @@ describe("R45's prize gate, measured against rows the entry path actually writes
   it("pays the owner's example correctly - the unclaimed rank goes to the players who placed", async () => {
     /*
       THE OWNER'S REPORT, THROUGH REAL ROWS: "if the admin sets more winners and we don't have
-      them then the prize goes to the available winners... each of the 2 gets its percentage
-      and the 3rd is split between the 2 equally."
+      them then the prize goes to the available winners."
 
-      Two players score, one never plays. Rank 3 is unclaimed, so its 10% is split between the
-      two who placed - and the player who never started a round is paid nothing.
+      Two players score, one never plays. Rank 3 is unclaimed, so its 10% goes to the two who
+      placed - and the player who never started a round is paid nothing.
+
+      THE NUMBERS CHANGED ON 9 SEPTEMBER 2026 AND THE OWNER'S WORDS CHANGED WITH THEM, which
+      is worth spelling out because this docblock used to quote the earlier instruction and
+      the two do not agree. The report this test was written from finished "...and the 3rd is
+      split between the 2 EQUALLY", which is what the code did: 70 + 5 and 20 + 5, paying 750
+      and 250. Task document 6 then specified the rule with worked arithmetic - 50/30/20 with
+      the third player invalid pays 62.5% and 37.5%, not 60/40 - which is PROPORTIONAL
+      normalisation, and it is the later and more precise of the two statements, so it wins.
+
+      The difference is not cosmetic: an equal share hands the same absolute bonus to first
+      and second, which flattens a deliberately steep prize curve a little every time a
+      position goes unclaimed. Proportional normalisation preserves the ratio the operator
+      configured. Here 70:20 stays exactly 3.5:1 instead of becoming 3:1.
     */
     const contest = await seedContest();
     const contestId = contest._id.toString();
@@ -385,10 +397,18 @@ describe("R45's prize gate, measured against rows the entry path actually writes
       "scored-low",
     ]);
 
-    // 70 + half of the unclaimed 10, and 20 + the other half.
+    // 70/90 and 20/90 of the pot: 777.78 and 222.22, and they add up to all 1000.
     const byUser = new Map(paid.map((p) => [p.userId, p.prizeAmount]));
-    expect(byUser.get("scored-high")).toBe(750);
-    expect(byUser.get("scored-low")).toBe(250);
+    expect(byUser.get("scored-high")).toBe(777.78);
+    expect(byUser.get("scored-low")).toBe(222.22);
+
+    // Reason: the rounding must neither create nor lose a Volt (task document 6). The two
+    // exact shares are 777.777... and 222.222..., so flooring both independently would
+    // pay 999.99 and quietly keep a cent - every time, in the platform's favour.
+    expect(
+      paid.reduce((sum, p) => sum + p.prizeAmount, 0),
+      "the winners' prizes must add up to the whole distributable pool",
+    ).toBe(POOL);
   });
 
   it("qualifies a player once a score has actually arrived", async () => {
@@ -409,11 +429,24 @@ describe("R45's prize gate, measured against rows the entry path actually writes
     expect(ranked[0].score).toBe(512);
   });
 
-  it("qualifies a player who played and genuinely scored nothing", async () => {
+  it("STORES a genuine zero but does not qualify it for a prize", async () => {
     /*
-      THE BOUNDARY IN THE OTHER DIRECTION, and the reason the gate is `Number.isFinite` rather
-      than truthiness. A player who solved no board still attempted the game; refusing them is
-      the same class of error as reading an absent `canEnterChallenges` as a stored `false`.
+      FLIPPED ON 9 SEPTEMBER 2026. It used to assert `qualificationStatus === "qualified"`
+      for a zero score, on the reasoning that a player who solved no board still attempted
+      the game and that refusing them is the same class of error as reading an absent
+      `canEnterChallenges` as a stored `false`. The owner reversed the rule (task document
+      2): a prize is for performance and zero is not performance.
+
+      THE HALF THAT DID NOT CHANGE IS THE HALF THIS FILE EXISTS FOR, and keeping the two
+      assertions side by side is the point. The score is still **stored as 0**, and it must
+      be: R50's phantom `score: 0` was a defect precisely because an absent score and a
+      real zero are different facts, and this player has a real zero. What changed is only
+      what eligibility does with that fact.
+
+      So the two assertions below now deliberately disagree with each other, and that is
+      the correct shape - `score` is what happened, `qualificationStatus` is what it earns.
+      A future change that "tidies" this by declining to store the zero would reintroduce
+      R50 while leaving this test green on its second line.
     */
     const contest = await seedContest();
     await seedTitle();
@@ -429,7 +462,8 @@ describe("R45's prize gate, measured against rows the entry path actually writes
 
     const ranked = rank(await storedParticipants(contest._id.toString()));
     expect(ranked[0].score).toBe(0);
-    expect(ranked[0].qualificationStatus).toBe("qualified");
+    expect(ranked[0].qualificationStatus).toBe("disqualified");
+    expect(ranked[0].disqualificationReason).toBe("No score recorded");
   });
 });
 

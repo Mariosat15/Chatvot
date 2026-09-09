@@ -596,25 +596,27 @@ async function _finalizeChallengeAttempt(challengeId: string) {
         `⚠️ Both players disqualified in challenge ${challengeId}, platform keeps pool`,
       );
 
-      // Record unclaimed pool for platform
-      await PlatformTransaction.create(
-        [
-          {
-            transactionType: "unclaimed_pool",
-            amount: calculatedWinnerPrize,
-            amountEUR: calculatedWinnerPrize,
-            sourceType: "challenge",
-            sourceId: challenge._id.toString(),
-            sourceName: `${challenge.challengerName} vs ${challenge.challengedName}`,
-            unclaimedReason: "all_disqualified",
-            originalPoolAmount: prizePool,
-            winnersCount: 0,
-            expectedWinnersCount: 1,
-            description: `Both players disqualified in challenge - pool goes to platform`,
-          },
-        ],
-        { session },
+      // Reason: routed through the one unclaimed-pool writer on 9 September 2026 (task
+      // document 7). This was its own raw insert, and like the worker's four it booked
+      // `amountEUR` equal to the credit figure, so with the shipped rate of 100 credits to
+      // the euro it overstated the row's euro value a hundredfold. The session is passed
+      // because this row belongs to the transaction that decides the challenge - an abort
+      // must take it with it.
+      const { PlatformFinancialsService: unclaimedWriter } = await import(
+        "@/lib/services/platform-financials.service"
       );
+      await unclaimedWriter.recordUnclaimedPool({
+        sourceType: "challenge",
+        competitionId: challenge._id.toString(),
+        competitionName: `${challenge.challengerName} vs ${challenge.challengedName}`,
+        poolAmount: calculatedWinnerPrize,
+        originalPoolAmount: prizePool,
+        reason: "all_disqualified",
+        winnersCount: 0,
+        expectedWinnersCount: 1,
+        description: `Both players disqualified in challenge - pool goes to platform`,
+        session,
+      });
 
       // No winner, no prize distributed
       winnerId = null;

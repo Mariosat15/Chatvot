@@ -13,6 +13,10 @@
 
 import { getGameModuleOrTrading } from "@/lib/games/registry";
 import type { GameModule, ScoreDirection } from "@/lib/games/types";
+import {
+  allocateWithoutRoundingLoss,
+  normalisePrizeShares,
+} from "@/lib/utils/prize-shares";
 
 /**
  * A participant being ranked, in any game.
@@ -190,6 +194,36 @@ function checkQualification(
   options?: RankingOptions,
 ): { qualified: boolean; reason?: string } {
   const isCompleted = options?.competitionStatus === "completed";
+
+  /*
+    AN EXPLICITLY DISQUALIFIED PARTICIPANT IS NOT PAID, and this check did not exist until
+    9 September 2026 (owner's rule, task document 2 and 3).
+
+    Say the exposure precisely, because it differs between the two contest shapes and a
+    summary tends to average them. `"disqualified"` is a declared value on BOTH
+    `CompetitionParticipant.status` and `ChallengeParticipant.status`. Nothing writes it on
+    a competition participant today, so for competitions this was LATENT - an operator
+    reaching for the status by hand, or any future admin control, would have found it
+    decorative. `challenge-finalize.actions.ts` DOES write it on challenge participants,
+    so there the missing check was live in the sense that the status could be set and this
+    function would have ranked and paid the player anyway.
+
+    UNCONDITIONAL, unlike liquidation. `disqualifyOnLiquidation` is an operator switch
+    because "liquidated players still compete" is a legitimate contest variant; there is
+    no reading of "disqualified" under which the player should still be paid, so offering
+    a switch would be offering a way to pay somebody the platform has already excluded.
+
+    Checked before every other rule so the REASON a player sees is the decision an
+    operator actually took, rather than a downstream consequence of it - a disqualified
+    trader with no trades should read "Disqualified", not "Insufficient trades (0/1)".
+
+    Not gated on `isCompleted`, matching liquidation: unlike the minimum-trades and
+    win-rate rules, this is not a target the player might still reach, so hiding it from a
+    live leaderboard would show them as competing for a prize they cannot win.
+  */
+  if (participant.status === "disqualified") {
+    return { qualified: false, reason: "Disqualified" };
+  }
 
   // Check liquidation (always applies)
   if (rules.disqualifyOnLiquidation && participant.status === "liquidated") {
@@ -417,7 +451,22 @@ export function calculateRankings(
 /**
  * Calculate prize distribution with tie handling
  * FIXED: Now calculates from GROSS prize pool and deducts platform fee from each winner
- * FIXED: Redistributes unclaimed prize positions equally among actual winners
+ *
+ * REDISTRIBUTION IS PROPORTIONAL SINCE 9 SEPTEMBER 2026. This docblock used to say
+ * "redistributes unclaimed prize positions EQUALLY among actual winners", which was an
+ * accurate description of the code and is now the wrong rule - corrected in place rather
+ * than reworded, because the next reader needs to know the payout changed rather than
+ * that a sentence was tidied. The rule itself is `normalisePrizeShares`.
+ *
+ * ONE EFFECT WORTH KNOWING BEFORE IT SURPRISES SOMEBODY: a tie also vacates a rank, since
+ * `calculateRankings` gives two tied players rank 1 and sends the next player to rank 3.
+ * So the change reaches tie payouts as well as ineligible ones - there is no way for the
+ * normalisation to tell "nobody eligible holds this rank" from "a tie skipped past it",
+ * and inventing one would mean two redistribution rules. What was NOT changed is which
+ * ranks a tied group absorbs: two players tied for first still share first place's share
+ * alone, with second place's share normalised across everybody. Making a tied group
+ * absorb the ranks it occupies is a defensible different rule and a third behaviour
+ * change nobody asked for, so it is recorded here rather than smuggled in.
  *
  * @param platformFeeFraction A FRACTION, not a percentage: pass 0.1 for a 10% fee.
  *   Renamed from `platformFeePercentage` on 4 Sep 2026 (risk R30). The old name was
@@ -470,159 +519,156 @@ export function distributePrizesWithTies(
     `💰 Prize distribution: ${totalQualifiedParticipants} qualified participants, ${prizeDistribution.length} prize positions`,
   );
 
-  // Step 1: Calculate which prize positions are filled and which are unclaimed
-  let unclaimedPercentage = 0;
-  const filledPrizePositions: {
-    rank: number;
-    percentage: number;
-    winners: RankedParticipant[];
-  }[] = [];
+  /*
+    Step 1: normalise the configured shares over the ranks an ELIGIBLE player holds.
 
-  prizeDistribution.forEach((dist) => {
-    const winnersAtRank = rankGroups[dist.rank] || [];
+    Owner's rule, 9 September 2026 (task document 5 and 6). This replaced an equal-share
+    bonus: 50/30/20 with rank 3 vacated used to pay 60/40 and now pays 62.5/37.5, because
+    proportional normalisation preserves the prize curve the operator configured instead
+    of flattening it a little every time a position goes unclaimed.
 
-    if (winnersAtRank.length === 0) {
-      // No one at this rank - add percentage to unclaimed pool
-      unclaimedPercentage += dist.percentage;
+    The rule lives in `prize-shares.ts` rather than here BECAUSE IT HAS A SECOND CONSUMER:
+    `prize-projection.ts` renders what the lobby's prize table and the admin contest panel
+    promise. Two copies of a redistribution rule means a lobby quoting one figure while
+    settlement pays another - and the promise is the one the player read before paying.
+  */
+  const normalised = normalisePrizeShares(
+    prizeDistribution,
+    (rank) => (rankGroups[rank]?.length ?? 0) > 0,
+  );
+
+  normalised.shares.forEach((share) => {
+    if (share.filled) {
       console.log(
-        `  📭 Rank ${dist.rank}: No winner - ${dist.percentage}% added to unclaimed pool`,
+        `  ✅ Rank ${share.rank}: ${rankGroups[share.rank]?.length ?? 0} winner(s) - ${share.configuredPercentage}% normalised to ${share.effectivePercentage.toFixed(2)}%`,
       );
     } else {
-      // Winners exist at this rank
-      filledPrizePositions.push({
-        rank: dist.rank,
-        percentage: dist.percentage,
-        winners: winnersAtRank,
-      });
       console.log(
-        `  ✅ Rank ${dist.rank}: ${winnersAtRank.length} winner(s) - ${dist.percentage}%`,
+        `  📭 Rank ${share.rank}: No eligible winner - ${share.configuredPercentage}% redistributed`,
       );
     }
   });
-
   console.log(
-    `  📊 Unclaimed percentage to redistribute: ${unclaimedPercentage}%`,
+    `  📊 Vacated percentage redistributed proportionally: ${normalised.vacatedPercentage.toFixed(2)}% of a configured ${normalised.configuredTotal}%`,
   );
 
-  // Step 2: Calculate bonus percentage per filled winner from unclaimed pool
-  // Distribute unclaimed percentage equally among ALL actual winners
-  const totalActualWinners = filledPrizePositions.reduce(
-    (sum, pos) => sum + pos.winners.length,
-    0,
-  );
-  const bonusPercentagePerWinner =
-    totalActualWinners > 0 ? unclaimedPercentage / totalActualWinners : 0;
+  // Reason: the fee is taken off each winner's share rather than off the pot, which is
+  // how this function has always worked (see the R30 note above). Kept as one helper so
+  // the four tie branches below cannot disagree about the order of the arithmetic.
+  const netOf = (percentage: number) =>
+    ((grossPrizePool * percentage) / 100) * (1 - platformFeeFraction);
 
-  if (bonusPercentagePerWinner > 0) {
-    console.log(
-      `  🎁 Bonus per winner from unclaimed: +${bonusPercentagePerWinner.toFixed(2)}% each`,
-    );
-  }
+  /*
+    Step 2: EXACT amounts first, rounding last.
 
-  // Step 3: Distribute prizes with bonus
-  filledPrizePositions.forEach((pos) => {
-    const winnersAtRank = pos.winners;
+    Collected unrounded and rounded in a single pass at the end, so the total is
+    guaranteed rather than hoped for. Flooring each winner as it was computed - which is
+    what this function used to do - lost up to a cent per winner, always in the platform's
+    favour, which is the direction nobody reports.
+  */
+  const exact: {
+    userId: string;
+    amount: number;
+    rank: number;
+    isTied: boolean;
+  }[] = [];
 
-    // Calculate base percentage + bonus for each winner at this rank
-    const basePercentage = pos.percentage;
+  normalised.shares.forEach((share) => {
+    if (!share.filled) return;
+
+    const winnersAtRank = rankGroups[share.rank] ?? [];
     const winnersCount = winnersAtRank.length;
-
-    // For ties at the same rank, they already split the base percentage
-    // Plus each winner gets bonus from unclaimed pool
-    const perWinnerBasePercentage = basePercentage / winnersCount;
-    const totalPercentagePerWinner =
-      perWinnerBasePercentage + bonusPercentagePerWinner;
+    const groupNet = netOf(share.effectivePercentage);
 
     if (winnersCount === 1) {
-      // Single winner at this rank
-      const grossPrize =
-        (grossPrizePool * (basePercentage + bonusPercentagePerWinner)) / 100;
-      const netPrize = grossPrize * (1 - platformFeeFraction);
-      const prizeAmount = Math.floor(netPrize * 100) / 100;
-
-      console.log(
-        `  🏆 Rank ${pos.rank}: ${winnersAtRank[0].username} gets ${basePercentage}% + ${bonusPercentagePerWinner.toFixed(2)}% bonus = ${(basePercentage + bonusPercentagePerWinner).toFixed(2)}% (${prizeAmount} credits after ${(platformFeeFraction * 100).toFixed(1)}% fee)`,
-      );
-
-      distributions.push({
+      exact.push({
         userId: winnersAtRank[0].userId,
-        prizeAmount,
-        rank: pos.rank,
+        amount: groupNet,
+        rank: share.rank,
         isTied: false,
       });
-    } else {
-      // Multiple winners tied at this rank
-      console.log(
-        `  🤝 Rank ${pos.rank}: ${winnersCount} tied winners, each gets ${perWinnerBasePercentage.toFixed(2)}% + ${bonusPercentagePerWinner.toFixed(2)}% bonus = ${totalPercentagePerWinner.toFixed(2)}%`,
+      return;
+    }
+
+    console.log(
+      `  🤝 Rank ${share.rank}: ${winnersCount} tied winners sharing ${share.effectivePercentage.toFixed(2)}% under "${rules.tiePrizeDistribution}"`,
+    );
+
+    if (rules.tiePrizeDistribution === "first_gets_all") {
+      // First person by join time takes the whole group's share.
+      const sorted = [...winnersAtRank].sort(
+        (a, b) =>
+          new Date(a.enteredAt).getTime() - new Date(b.enteredAt).getTime(),
       );
 
-      if (rules.tiePrizeDistribution === "split_equally") {
-        // Split base percentage equally, plus each gets bonus
-        winnersAtRank.forEach((winner) => {
-          const grossPrize = (grossPrizePool * totalPercentagePerWinner) / 100;
-          const netPrize = grossPrize * (1 - platformFeeFraction);
-          const prizeAmount = Math.floor(netPrize * 100) / 100;
+      exact.push({
+        userId: sorted[0].userId,
+        amount: groupNet,
+        rank: share.rank,
+        isTied: true,
+      });
+      return;
+    }
 
-          distributions.push({
-            userId: winner.userId,
-            prizeAmount,
-            rank: pos.rank,
-            isTied: true,
-          });
-        });
-      } else if (rules.tiePrizeDistribution === "first_gets_all") {
-        // First person (by join time) gets all (base + all bonuses for this rank)
-        const sorted = winnersAtRank.sort(
-          (a, b) =>
-            new Date(a.enteredAt).getTime() - new Date(b.enteredAt).getTime(),
-        );
-        const totalGroupPercentage =
-          basePercentage + bonusPercentagePerWinner * winnersCount;
-        const grossPrize = (grossPrizePool * totalGroupPercentage) / 100;
-        const netPrize = grossPrize * (1 - platformFeeFraction);
-        const prizeAmount = Math.floor(netPrize * 100) / 100;
+    if (rules.tiePrizeDistribution === "split_weighted") {
+      const totalWeight = winnersAtRank.reduce(
+        (sum, w) => sum + (w.currentCapital ?? 0),
+        0,
+      );
 
-        distributions.push({
-          userId: sorted[0].userId,
-          prizeAmount,
-          rank: pos.rank,
+      // Reason: weighting by capital divides by the group's total capital, so a game
+      // with no capital - or a trading group where everyone is at zero - divides by zero
+      // and every prize in the group becomes NaN. A NaN prize is not a behaviour worth
+      // preserving, so an unweightable group falls back to an equal share. The
+      // alternative silently writes NaN into a wallet transaction.
+      const equalFallback = totalWeight <= 0;
+
+      winnersAtRank.forEach((winner) => {
+        const weight = equalFallback
+          ? 1 / winnersCount
+          : (winner.currentCapital ?? 0) / totalWeight;
+
+        exact.push({
+          userId: winner.userId,
+          amount: groupNet * weight,
+          rank: share.rank,
           isTied: true,
         });
-      } else if (rules.tiePrizeDistribution === "split_weighted") {
-        // Split based on secondary metrics (e.g., capital)
-        const totalWeight = winnersAtRank.reduce(
-          (sum, w) => sum + (w.currentCapital ?? 0),
-          0,
-        );
-        // Total pool for this group: base + all bonuses
-        const totalGroupPercentage =
-          basePercentage + bonusPercentagePerWinner * winnersCount;
-
-        // Reason: weighting by capital divides by the group's total capital, so a game
-        // with no capital - or a trading group where everyone is at zero - divides by zero
-        // and every prize in the group becomes NaN. A NaN prize is not a behaviour worth
-        // preserving, so an unweightable group falls back to an equal share. The
-        // alternative silently writes NaN into a wallet transaction.
-        const equalFallback = totalWeight <= 0;
-
-        winnersAtRank.forEach((winner) => {
-          const weight = equalFallback
-            ? 1 / winnersAtRank.length
-            : (winner.currentCapital ?? 0) / totalWeight;
-          const grossPrize =
-            (grossPrizePool * totalGroupPercentage * weight) / 100;
-          const netPrize = grossPrize * (1 - platformFeeFraction);
-          const prizeAmount = Math.floor(netPrize * 100) / 100;
-
-          distributions.push({
-            userId: winner.userId,
-            prizeAmount,
-            rank: pos.rank,
-            isTied: true,
-          });
-        });
-      }
+      });
+      return;
     }
+
+    // "split_equally", and the default for anything unrecognised.
+    winnersAtRank.forEach((winner) => {
+      exact.push({
+        userId: winner.userId,
+        amount: groupNet / winnersCount,
+        rank: share.rank,
+        isTied: true,
+      });
+    });
+  });
+
+  /*
+    Step 3: round to whole cents so the winners' total is exactly the distributable pot.
+
+    The target is derived from `configuredTotal`, not from summing the amounts above: the
+    whole point is to catch a discrepancy between the two, and a target computed from the
+    thing being checked cannot do that.
+  */
+  const targetTotal = exact.length > 0 ? netOf(normalised.configuredTotal) : 0;
+  const rounded = allocateWithoutRoundingLoss(
+    exact.map((e) => e.amount),
+    targetTotal,
+  );
+
+  exact.forEach((e, index) => {
+    distributions.push({
+      userId: e.userId,
+      prizeAmount: rounded[index],
+      rank: e.rank,
+      isTied: e.isTied,
+    });
   });
 
   return distributions;
