@@ -3,7 +3,9 @@ import { guardSection } from "@/lib/admin/section-route-guard";
 import { auditLogService } from "@/lib/services/audit-log.service";
 import {
   parsePlayStyleInput,
+  parseSupportedPlayModesInput,
   setGamePlayStyle,
+  setGameSupportedPlayModes,
 } from "@/lib/services/game-providers/game-play-style.service";
 
 /**
@@ -39,20 +41,74 @@ export async function PATCH(
     const body = (await request.json()) as {
       gameCode?: string;
       playMode?: unknown;
+      supportedPlayModes?: unknown;
     };
 
     if (!body.gameCode || typeof body.gameCode !== "string") {
       return NextResponse.json({ error: "A game code is required." }, { status: 400 });
     }
 
-    // The key must be PRESENT, because `null` means "clear it and follow the provider again"
-    // and an absent field would have to mean the same thing - at which point a malformed body
-    // of `{ gameCode }` silently undoes an operator's decision.
-    if (!("playMode" in body)) {
+    // TWO DECISIONS, ONE ROUTE, AND EXACTLY ONE PER REQUEST (task document 11).
+    //
+    // They belong on one route because they are one control - "how is this game played" - and
+    // a second route would need the same guard, the same lookups and the same `head_to_head`
+    // refusal. They must not arrive together because each writes its own audit line, and an
+    // operator asking "when did this change and who did it" of a combined edit gets one entry
+    // describing two changes. Refusing both is not pedantry: the two interact, since the style
+    // decides which member of the set cannot be removed, so applying them in one pass means
+    // choosing an order and being wrong for somebody.
+    const setsStyle = "playMode" in body;
+    const setsSupported = "supportedPlayModes" in body;
+
+    if (setsStyle && setsSupported) {
+      return NextResponse.json(
+        {
+          error:
+            "Change the play style or the supported styles, not both at once - each is recorded separately.",
+        },
+        { status: 400 },
+      );
+    }
+
+    // The key must be PRESENT, because `null` means "clear it" for both fields and an absent
+    // field would have to mean the same thing - at which point a malformed body of
+    // `{ gameCode }` silently undoes an operator's decision.
+    if (!setsStyle && !setsSupported) {
       return NextResponse.json(
         { error: "A play style is required, or null to follow the provider." },
         { status: 400 },
       );
+    }
+
+    if (setsSupported) {
+      const parsed = parseSupportedPlayModesInput(body.supportedPlayModes);
+      if (!parsed.ok) {
+        return NextResponse.json({ error: parsed.error }, { status: 400 });
+      }
+
+      const result = await setGameSupportedPlayModes(
+        providerKey,
+        body.gameCode,
+        parsed.modes,
+      );
+      if (!result.success) {
+        return NextResponse.json({ error: result.error }, { status: 400 });
+      }
+
+      // The RESOLVED set, for the same reason the style below logs the effective value: an
+      // operator reading this later wants to know what contests could then be created as, and
+      // the submitted list omits the game's own style whenever the resolver adds it back.
+      await auditLogService.log({
+        admin: guard.admin,
+        action: "settings_updated",
+        category: "settings",
+        description: `Contests on "${providerKey}/${body.gameCode}" may now be created as: ${result.supported.join(", ")}`,
+        targetType: "settings",
+        targetId: `${providerKey}/${body.gameCode}`,
+        newValue: parsed.modes ?? null,
+      });
+
+      return NextResponse.json({ success: true, supported: result.supported });
     }
 
     const parsed = parsePlayStyleInput(body.playMode);

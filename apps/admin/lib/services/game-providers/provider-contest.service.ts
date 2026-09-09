@@ -14,8 +14,12 @@ import { resolveGameCategory } from "@/lib/services/games/game-categories";
 import { runPreflight } from "@/lib/services/games/contest-preflight";
 import { resolveContestEntryDeadline } from "@/lib/services/games/entry-deadline";
 import {
+  isPlayModeSupported,
+  PLAY_MODE_COPY,
+  playShapeRules,
+  resolveContestPlayMode,
   resolvePlayMode,
-  resolvePlayShape,
+  resolveSupportedPlayModes,
   type PlayMode,
 } from "@/lib/services/games/play-shape";
 import type { PreflightResult } from "@/lib/services/games/contest-preflight";
@@ -73,6 +77,16 @@ export interface CreateProviderContestInput {
   unscoredContestPolicy?: UnscoredContestPolicy;
   /** Owner decision, 7 Sep 2026. See `RoundStartPolicy`. */
   roundStartPolicy?: RoundStartPolicy;
+  /**
+   * The shape THIS contest is run as, picked from the title's supported set (task document 11).
+   *
+   * Optional, and an absent value is not the same as a wrong one: it means "whatever this
+   * title is", which is what every caller written before task 11 intends and what the wizard
+   * sends for a title supporting one shape. An unsupported value is refused with the allowed
+   * modes named; it is never quietly corrected, because a contest silently run as the other
+   * shape closes entry at a different moment than the operator was shown.
+   */
+  playMode?: PlayMode;
   resultGracePeriodSeconds: number;
   perRoundCostAcknowledged?: boolean;
 
@@ -107,8 +121,18 @@ export interface ProviderContestOption {
    */
   category?: string;
   family: string;
-  /** Resolved by `resolvePlayMode`, never the raw declaration - see `listContestableTitles`. */
+  /**
+   * The title's DEFAULT shape, resolved by `resolvePlayMode` and never the raw declaration -
+   * see `listContestableTitles`. Still the answer for a title supporting one shape, and the
+   * pre-selection for the picker when it supports two.
+   */
   playMode: PlayMode;
+  /**
+   * Every shape this title may be run as, resolved (task document 11). Always contains
+   * `playMode`, so a one-entry list and a title that has no choice are the same thing and the
+   * wizard withholds the picker on `length < 2` rather than on a game-shaped test.
+   */
+  supportedPlayModes: PlayMode[];
   scoreDirection: string;
   scoreType: string;
   maxDurationSeconds?: number;
@@ -169,6 +193,11 @@ export async function listContestableTitles(): Promise<ProviderContestOption[]> 
         // whatever it declares, and the wizard must be shown the corrected answer or it offers
         // controls the create service is about to override.
         playMode: resolvePlayMode(title),
+        // The set the wizard's per-contest picker is built from (task document 11). RESOLVED
+        // for the same reason as `playMode` above: a `head_to_head` title supports scheduled
+        // and nothing else however its supported list reads, and the picker must not offer a
+        // choice the create service is about to refuse.
+        supportedPlayModes: resolveSupportedPlayModes(title),
         scoreDirection: title.scoreDirection,
         scoreType: title.scoreType,
         maxDurationSeconds: title.maxDurationSeconds,
@@ -326,7 +355,37 @@ export async function createProviderContest(
   // a second branch - and a branch added to each would be four places to forget. The operator
   // is not being overruled behind their back either; the wizard withholds the control for a
   // scheduled title and says why, from this same rule.
-  const shape = resolvePlayShape(title);
+  // TASK 11: the operator may pick the shape, but only from the set the TITLE declares.
+  //
+  // This is what makes a per-contest choice safe, and it is the reason `play-shape.ts`'s
+  // "never from caller input" rule could be amended rather than simply broken: the answer is
+  // still decided by a stored value, because an unsupported request is refused here. Without
+  // this check a caller could declare a race staggered and keep entry open after the gun,
+  // which is precisely the failure the old rule existed to prevent.
+  //
+  // It must sit BEFORE the shape is resolved and before the create, so a refusal leaves no
+  // contest and no slug reserved.
+  //
+  // An omitted mode is not an error - it means "whatever this title is", which is what every
+  // caller written before task 11 intends and what the wizard sends when a title supports one
+  // shape. Refusing it would break the API for the sake of a field with a correct default.
+  if (input.playMode !== undefined && !isPlayModeSupported(title, input.playMode)) {
+    const allowed = resolveSupportedPlayModes(title)
+      .map((mode) => PLAY_MODE_COPY.get(mode)?.label ?? mode)
+      .join(" or ");
+    return {
+      success: false,
+      // Naming what IS allowed, not just what is not. An operator told only that their choice
+      // is unsupported has to go and read another screen to find out what to pick.
+      error: `${title.displayName} cannot be run that way. It supports: ${allowed}.`,
+    };
+  }
+
+  // The contest's own shape, which from task 11 onwards is not necessarily the title's. An
+  // absent choice resolves to the title's default, so nothing about a single-shape title
+  // changed.
+  const playMode = resolveContestPlayMode(input.playMode, title);
+  const shape = playShapeRules(playMode);
   const roundStartPolicy =
     shape.forcedRoundStartPolicy ?? input.roundStartPolicy ?? "reserve_full_round";
   const attemptsPolicy = shape.forcedAttemptsPolicy ?? input.attemptsPolicy;
@@ -357,6 +416,12 @@ export async function createProviderContest(
       // here and never regenerated - a second seed mid-contest would mean two players
       // ranked against each other played different games.
       contentSeed: randomBytes(16).toString("hex"),
+      // The shape THIS contest is run as, stored rather than re-derived (task document 11).
+      // Written unconditionally, including for a single-shape title: an absent value falls
+      // back to the title, and the title's answer is exactly what changes when its supported
+      // set is edited later. Storing it is what stops an edit re-forcing the attempts policy
+      // and the entry deadline under people who have already paid.
+      playMode,
       playWindowStart: input.playWindowStart,
       playWindowEnd: input.playWindowEnd,
       resultGracePeriodSeconds: input.resultGracePeriodSeconds,

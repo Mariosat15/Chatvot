@@ -542,3 +542,118 @@ problem.
 - **No title is `scheduled` yet.** Both `games-service` titles declare `anytime` and no override
   has been set in production, so the scheduled path is still exercised only by tests until
   somebody uses the control or X4 brings a real one.
+
+---
+
+## 10. One title, both shapes (9 September 2026) - the authoritative account
+
+Task document **11**. A title may now declare that it supports **both** shapes, and the wizard
+offers the operator a choice per contest from that set. **This reverses a design decision
+recorded in s8.3 and in `play-shape.ts` itself**, and the reversal is written here rather than
+by editing s8, because a changed direction is exactly the fact a new chat needs.
+
+### 10.0 The reversal, stated plainly
+
+s8.3 says the shape is a property of the **title** and **never** of caller input, and
+`play-shape.ts`'s header said the same in stronger words. That is no longer true: the create
+service takes `playMode` from its caller. The sentence was not wrong when it was written - it was
+the correct rule for a world where a title had exactly one shape - and the owner's example is
+what ended that world: **a multiplayer racing game that legitimately has both a synchronised race
+and an asynchronous time trial.** One title, two shapes, and no way to express it.
+
+**What survives is the part that mattered**, and this is the distinction to carry rather than the
+two sentences. The stated fear behind "never from caller input" was an operator declaring a race
+`anytime` so that entry stays open after the gun. `resolveSupportedPlayModes` is precisely what
+prevents that: an operator may only pick a shape **the title says it supports**, so a race can be
+run staggered only if somebody has declared that this race has a legitimate time-trial form. All
+three properties that made the old rule safe are intact - the choice is validated against a
+**stored** set rather than against caller input, the consequences are still stamped onto the
+contest at **write** time so not one runtime gate reads a mode, and **no player-facing path
+supplies a shape at all**, which was always the absolute half.
+
+### 10.1 The live code
+
+| File | What it holds |
+|---|---|
+| `lib/services/games/play-shape.ts` (mirrored, byte-identical test) | `resolveSupportedPlayModes`, `isPlayModeSupported`, `resolveContestPlayMode` |
+| `database/models/trading/competition.model.ts` (both copies) | `playMode` on the contest - **the seam the feature rests on** |
+| `database/models/games/provider-game.model.ts` (both copies) | `supportedPlayModes`, operator-owned, no default |
+| `apps/admin/lib/services/game-providers/provider-contest.service.ts` | refuses an unsupported pick, **stores** the chosen mode |
+| `apps/admin/lib/services/game-providers/provider-contest-edit.service.ts` | reads the **contest's** mode, no longer the title's |
+| `apps/admin/lib/services/game-providers/game-play-style.service.ts` | `setGameSupportedPlayModes`, one action per request |
+| `apps/admin/components/admin/games/ContestPlayModeField.tsx` | the wizard's per-contest picker |
+| `apps/admin/components/admin/games/GamePlayStyleControl.tsx` | the title-level supported-set control |
+
+Pinned by `__tests__/services/play-shape.test.ts` (49 tests) and `tools/probe-play-shape.ps1`
+(**37 probes, all red on exactly one failure**). Full suite 1,919 green, `check:mirrors` clean,
+both typechecks at their baselines - main **194**, admin **223** - with none of the errors in a
+touched file and, equally important, none disappearing.
+
+### 10.2 Six things from this build that generalise
+
+- **A widening is safe or unsafe depending on what the choice is validated against, not on
+  whether there is a choice.** "Never from caller input" reads as the strong rule and it is
+  really two rules wearing one sentence: *do not let a caller invent a value* and *do not let a
+  caller pick from a set somebody trustworthy defined*. The first is load-bearing; the second was
+  collateral. **When a rule blocks a legitimate requirement, ask which of its several jobs is
+  actually the safety one** before either keeping it or deleting it.
+- **The moment a property stops being single-valued, every read of it through its parent becomes
+  a defect - and the reads look perfectly correct.** `resolvePlayShape(title)` was right on the
+  day it was written and became wrong with no edit to it at all. The edit service is the case
+  that matters: an ordinary rename would have re-forced a staggered contest to one attempt,
+  `until_window_closes` and entry closing at the gun, **under people who had already paid to
+  enter**, with no error and nothing in a log. This is why the contest stores its own `playMode`
+  rather than deriving it, and why the flipped structural test now asserts `resolvePlayShape` is
+  **absent** from both services. **The general form: adding a second possible value to a field is
+  never a purely additive change - grep for every read that goes through the owner of it.**
+- **Two questions, two functions, and folding the check into the resolver is the tidy-looking
+  mistake.** `isPlayModeSupported` decides whether a pick is allowed and runs **before anything
+  is written**, so a refusal leaves no draft behind; `resolveContestPlayMode` reads what a contest
+  already is and deliberately does **not** re-litigate it. Merged, every read of an existing
+  contest would re-check against the title's *current* set - so narrowing a title's supported
+  shapes would retroactively change the shape of contests already running under it.
+- **The set must contain the title's own style, and that union is the rule most likely to be
+  "simplified" away.** `resolveSupportedPlayModes` unions `resolvePlayMode(title)` in, because
+  that is what the Play style control says this game *is* and it is what every contest already
+  created on the title was created as - a set excluding it makes a title's own declared style
+  unselectable. Same reasoning as `resolveAllowedGameTypes` treating `[]` as the default: **decide
+  by asking whether any legitimate writer can produce the case you are about to take literally.**
+- **`head_to_head` beats the operator here too, which makes the wizard's options a SERVER
+  answer.** A component deriving its own option list would offer `anytime` on a chess title
+  whose stored set names it - and the create service refuses that, so the select would produce a
+  400 that reads to an operator like a permissions problem. The picker is handed
+  `resolveSupportedPlayModes`'s output, and a test asserts the two helpers **disagree** on that
+  case. Same rule as the genre label and the play style: **the screen is handed the answer.**
+- **The picker is withheld on `length < 2`, and that is what keeps the screen unchanged.** Every
+  title in the live catalogue supports exactly one shape, so nothing about the wizard moves until
+  a title opts in - which is also why `supportedPlayModes` has **no schema default**, on the
+  `playModeOverride` precedent: a schema default *is* a stored value, and one here would opt the
+  whole catalogue into a control nobody asked for.
+
+### 10.3 Frozen, and why that is not a limitation
+
+`playMode` on the contest is **absent from `EditProviderContestInput`, absent from
+`toEditRequestBody`, and named in `NEVER_EDITABLE_FIELDS`** - three places, because one is a
+suggestion. It decides **when entry closes** and **how many attempts a paying entrant gets**, so
+a contest that should be the other shape is a *new contest*, not an edited one. This is the same
+answer as the refusal to allow a game-type change on a zero-participant draft (`12` s2.2): a
+draft is cheap to delete and recreate, and the permission buys nothing while costing a guarantee.
+
+`supportedPlayModes` is on `NEVER_EDITABLE_CONTENT_FIELDS` for the reason `playModeOverride` is:
+the content editor writes copy an operator can fix, while this decides how contests may be run.
+It is changed from the Play style control, which has its own audit line - and the route **refuses
+a request carrying both `playMode` and `supportedPlayModes`**, deliberately, because one audit
+entry covering two decisions is an audit entry that cannot answer which one somebody made.
+
+### 10.4 What this does not do
+
+- **It does not change anything a provider sees.** `supportedPlayModes` is operator-owned and
+  never synced, so `01` and `ChartVolt-Game-API-Requirements.html` stay at **version 1.4**.
+  Checked rather than assumed, on the X1 precedent.
+- **It does not add a mode**, and **turn-based and heat-based are still blocked** on a real
+  provider and a real game - task document 10.2, not a scheduling item.
+- **It does not change a single existing contest.** No title declares a second shape, so
+  `resolveSupportedPlayModes` returns one entry for the whole live catalogue, the picker is
+  withheld everywhere, and every contest resolves exactly as it did on 8 September.
+- **Nothing has been verified by eye.** The wizard and the play-style control are behind an admin
+  sign-in the automated browser has no session for.

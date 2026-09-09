@@ -8,10 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  playShapeRules,
-  type PlayMode,
-} from "@/lib/services/games/play-shape";
+import { playShapeRules } from "@/lib/services/games/play-shape";
 import { PrizeDistributionEditor } from "../PrizeDistributionEditor";
 import { UnscoredPolicyField } from "../UnscoredPolicyField";
 import type { ContestDraft } from "../contest-draft";
@@ -29,14 +26,19 @@ import { NumberField } from "./fields";
 export function StepPrizes({
   draft,
   patch,
-  title,
 }: {
   draft: ContestDraft;
   patch: (changes: Partial<ContestDraft>) => void;
-  /** Needed only for the play shape, which decides whether "attempts" is a real question. */
-  title?: { playMode?: PlayMode };
 }) {
-  const shape = playShapeRules(title?.playMode ?? "anytime");
+  // THE DRAFT'S SHAPE, NOT THE TITLE'S, since task document 11, and this step is where getting
+  // it wrong costs the operator most: the shape decides whether "attempts" is a real question,
+  // so a title defaulting to scheduled while the operator picked staggered would withhold a
+  // control that does apply - and the reverse would offer best-of-three on a contest the
+  // server is about to force to one attempt, with the review step agreeing.
+  //
+  // The `title` prop is gone rather than ignored. Left in place it would be the obvious thing
+  // to reach for the next time this step needs a fact about the shape.
+  const shape = playShapeRules(draft.playMode ?? "anytime");
 
   return (
     <>

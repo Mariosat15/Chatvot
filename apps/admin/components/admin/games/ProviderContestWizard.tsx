@@ -28,7 +28,7 @@ import {
   type WizardStep,
 } from "@/components/admin/wizard/WizardShell";
 import { resolveAttemptSeconds } from "@/lib/services/games/config-schema";
-import { playShapeRules } from "@/lib/services/games/play-shape";
+import { playShapeRules, type PlayMode } from "@/lib/services/games/play-shape";
 import { defaultConfigValues } from "./ConfigSchemaFields";
 import type { ContestableTitle } from "./contest-types";
 import {
@@ -183,6 +183,13 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
       providerKey: title.providerKey,
       gameCode: title.gameCode,
       settings: title.schema.ok ? defaultConfigValues(title.schema.fields) : {},
+      // The title's default becomes the contest's shape until the operator says otherwise
+      // (task document 11). Seeded here rather than left on the previous game's answer,
+      // which is the same reasoning as discarding the settings above: carried over, a
+      // staggered choice made on a racing title would arrive at a puzzle that does not
+      // support it and be refused by the create service, naming a control the operator had
+      // not touched.
+      playMode: title.playMode,
       ...(shape.forcedAttemptsPolicy
         ? { attemptsPolicy: shape.forcedAttemptsPolicy, attemptsAllowed: undefined }
         : {}),
@@ -192,6 +199,31 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
     });
     setErrors([]);
     setWarnings([]);
+  }
+
+  /**
+   * Changing the shape mid-draft (task document 11).
+   *
+   * SEPARATE FROM `patch` BECAUSE THE FORCED VALUES MUST MOVE WITH IT. A scheduled contest is
+   * single-attempt and starts on the gun; switching to staggered and leaving those behind
+   * gives a contest whose review step shows one attempt and `until_window_closes` because a
+   * shape it is no longer being run as put them there. Switching the other way is the one
+   * that costs money: an operator who set best-of-three and then picks scheduled would see
+   * three attempts on the review step and get a one-attempt contest, because the server
+   * forces it.
+   *
+   * The forced values are RE-APPLIED rather than restored, so leaving a scheduled shape
+   * leaves the defaults rather than whatever the operator had before - there is nothing to
+   * restore, since the control was withheld while the choice was scheduled.
+   */
+  function selectPlayMode(mode: PlayMode) {
+    const shape = playShapeRules(mode);
+    patch({
+      playMode: mode,
+      attemptsPolicy: shape.forcedAttemptsPolicy ?? "single",
+      attemptsAllowed: shape.forcedAttemptsPolicy ? undefined : draft.attemptsAllowed,
+      roundStartPolicy: shape.forcedRoundStartPolicy ?? "reserve_full_round",
+    });
   }
 
   async function runPreflight() {
@@ -497,11 +529,12 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
             patch={patch}
             title={selected}
             creditSymbol={creditSymbol}
+            onPlayModeChange={selectPlayMode}
           />
         )}
 
         {step === STEP_PRIZES && (
-          <StepPrizes draft={draft} patch={patch} title={selected} />
+          <StepPrizes draft={draft} patch={patch} />
         )}
 
         {step === STEP_REVIEW && (

@@ -29,6 +29,8 @@ export interface IProviderGame extends Document {
   playMode?: "anytime" | "scheduled";
   /** OUR answer, when the provider's is absent or wrong for how we want to run it. */
   playModeOverride?: "anytime" | "scheduled";
+  /** Task 11. Read through `resolveSupportedPlayModes`, which unions the default in. */
+  supportedPlayModes?: ("anytime" | "scheduled")[];
   supportsCompetition: boolean;
   supportsOneVsOne: boolean;
   supportsPractice: boolean;
@@ -179,6 +181,33 @@ const ProviderGameSchema = new Schema<IProviderGame>(
     // cannot make two people play each other at different times.
     playModeOverride: {
       type: String,
+      enum: ["anytime", "scheduled"],
+    },
+    // Which shapes a contest on this title may be created as - task 11.
+    //
+    // The PLURAL of `playMode`, and it does not replace it: `playMode` (corrected by
+    // `playModeOverride`) is what this game IS and supplies the default a new contest gets,
+    // while this is the set an operator may choose from. Task 11's own example needs both -
+    // a multiplayer racing game running a synchronous race and an async time trial.
+    //
+    // Read through `resolveSupportedPlayModes`, never directly. That function unions the
+    // resolved default INTO the set, because a title's own declared style must not be
+    // unselectable and every contest already created on this title was created as it; and it
+    // returns `["scheduled"]` alone for a `head_to_head` title, because an async form of a
+    // chess match is not a shape anybody may enable.
+    //
+    // NO DEFAULT, like `playModeOverride` and for the same reason: a schema default IS a
+    // stored value, so `default: ["anytime"]` would write a decision nobody took onto every
+    // row the next sync creates and make an operator's deliberate single-shape answer
+    // indistinguishable from silence. R50, `entryBlockThreshold` and `canEnterChallenges`.
+    //
+    // OPERATOR-OWNED and in NO sync list, which is what makes it survive a catalogue pull -
+    // a property of the allow-list rather than of anything written here, so a test asserts it
+    // rather than trusting it. Deliberately NOT in the provider contract either, so `01` and
+    // the requirements HTML need no version bump: a provider declares what their game is, we
+    // declare what we are willing to run it as.
+    supportedPlayModes: {
+      type: [String],
       enum: ["anytime", "scheduled"],
     },
     supportsCompetition: { type: Boolean, default: false },

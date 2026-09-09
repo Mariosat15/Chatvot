@@ -2,8 +2,10 @@ import { connectToDatabase } from "@/database/mongoose";
 import ProviderGame from "@/database/models/games/provider-game.model";
 import {
   canOverridePlayMode,
+  PLAY_MODE_COPY,
   PLAY_MODES,
   resolvePlayMode,
+  resolveSupportedPlayModes,
   type PlayMode,
 } from "@/lib/services/games/play-shape";
 
@@ -125,5 +127,138 @@ export async function setGamePlayStyle(
     success: true,
     effective,
     override: mode ?? undefined,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The supported SET - which shapes a contest on this title may be created as
+// ---------------------------------------------------------------------------
+
+/**
+ * What the route may be handed for the supported set (task document 11).
+ *
+ * `null` clears it, so "go back to just this title's own style" is a decision an operator can
+ * take back - the same reason the override above accepts `null`. An absent key is not the same
+ * thing and is refused, or a malformed body reading `{}` would silently narrow a title.
+ *
+ * DUPLICATES ARE COLLAPSED RATHER THAN REFUSED, because two of one name express exactly the
+ * same intention and refusing a request nobody could act on differently is friction with no
+ * safety behind it. An unrecognised name IS refused: it means the caller believes in a shape
+ * the platform does not have, and quietly dropping it would store a narrower set than they
+ * asked for and report success.
+ */
+export function parseSupportedPlayModesInput(
+  value: unknown,
+): { ok: true; modes: PlayMode[] | null } | { ok: false; error: string } {
+  if (value === null) return { ok: true, modes: null };
+  if (!Array.isArray(value)) {
+    return {
+      ok: false,
+      error: "Supported play styles must be a list, or null to follow this game's own style.",
+    };
+  }
+
+  const modes = new Set<PlayMode>();
+  for (const entry of value) {
+    if (typeof entry !== "string" || !PLAY_MODES.includes(entry as PlayMode)) {
+      return {
+        ok: false,
+        error: `"${String(entry)}" is not a play style. Expected ${PLAY_MODES.join(" or ")}.`,
+      };
+    }
+    modes.add(entry as PlayMode);
+  }
+
+  // An empty list is a missing value, not an empty set, and taking it literally would leave a
+  // title no contest could be created on. Nothing offers "no shapes", so nothing means it -
+  // the same reading as an empty `allowedGameTypes` on a Game Master subscription, and the
+  // opposite of `entryBlockThreshold`'s, for the reason recorded there: this is a SHAPE that
+  // only ever arises by accident, rather than a stored value being over-trusted.
+  if (modes.size === 0) return { ok: true, modes: null };
+
+  // Ordered by `PLAY_MODES` so the stored array cannot depend on the order the checkboxes
+  // happened to be ticked in. Two rows meaning the same thing but holding different arrays is
+  // how a comparison somewhere reports a change nobody made.
+  return { ok: true, modes: PLAY_MODES.filter((mode) => modes.has(mode)) };
+}
+
+export type SupportedPlayModesResult =
+  | {
+      success: true;
+      /** What the contest wizard will now offer - resolved, so it includes the default. */
+      supported: PlayMode[];
+    }
+  | { success: false; error: string };
+
+/**
+ * Widen - or reset - the shapes a contest may be created as on this title.
+ *
+ * IT ONLY EVER WIDENS, AND THAT IS NOT A LIMITATION TO FIX. `resolveSupportedPlayModes` unions
+ * the title's own resolved style into the set, so a request omitting it is refused here rather
+ * than stored and silently ignored. Narrowing a title to one shape is what the Play style
+ * control above does. Two reasons the union is right: a set excluding the title's own style
+ * would make its declared style unselectable, so the two controls on this screen would
+ * contradict each other; and every contest ALREADY created on this title was created as that
+ * style, so calling it unsupported strands live contests on a shape the platform now denies.
+ *
+ * Same door as `setGamePlayStyle`, same refusals, and `head_to_head` beats the operator here
+ * too - two people cannot play each other at different times, so there is no set to choose.
+ */
+export async function setGameSupportedPlayModes(
+  providerKey: string,
+  gameCode: string,
+  modes: PlayMode[] | null,
+): Promise<SupportedPlayModesResult> {
+  await connectToDatabase();
+
+  const title = await ProviderGame.findOne({ providerKey, gameCode }).lean();
+  if (!title) {
+    return {
+      success: false,
+      error: "That game is not in this provider's catalogue.",
+    };
+  }
+
+  if (!canOverridePlayMode(title)) {
+    return {
+      success: false,
+      error:
+        "This game needs an opponent, so it is always played by both players at once. There is nothing to choose.",
+    };
+  }
+
+  // Refused with the style named, rather than accepted and unioned back in by the resolver.
+  // The resolver would produce the right answer either way, which is exactly why this has to
+  // refuse: an operator who unticked the game's own style and was told it saved would believe
+  // they had turned it off, and it would still be the default on every new contest.
+  const own = resolvePlayMode(title);
+  if (modes && !modes.includes(own)) {
+    return {
+      success: false,
+      error: `${PLAY_MODE_COPY.get(own)?.label ?? own} cannot be removed - it is this game's own play style, and contests already exist on it. Change the play style above instead.`,
+    };
+  }
+
+  await ProviderGame.updateOne(
+    { providerKey, gameCode },
+    // `$unset` for the clear, never a stored `[]`. An empty array is a value the resolver
+    // would read, union the default into, and produce the same answer from as an absent
+    // field - so the two would be indistinguishable in behaviour and distinguishable in the
+    // database, which is the worst of both. Same distinction as clearing the override.
+    modes === null
+      ? { $unset: { supportedPlayModes: "" } }
+      : { $set: { supportedPlayModes: modes } },
+  );
+
+  // Resolved from what will now be stored, not echoed back, so the caller is told what the
+  // wizard will actually offer rather than what they asked for.
+  return {
+    success: true,
+    supported: resolveSupportedPlayModes({
+      family: title.family,
+      playMode: title.playMode,
+      playModeOverride: title.playModeOverride,
+      supportedPlayModes: modes,
+    }),
   };
 }

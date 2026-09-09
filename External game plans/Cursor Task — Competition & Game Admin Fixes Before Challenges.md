@@ -39,7 +39,7 @@ code before citing it.
 | **8** — Redesign the large game admin screen | Not started |
 | **9** — Game type / category field | **Done.** `9.1`. **The field already existed** - what it lacked was a vocabulary. Analytics grouping (21-24) and discovery filtering are explicitly **not** part of it |
 | **10** — Competition style / participation mode | **Done.** `10.1`. Turn-based and heat-based are **blocked, not deferred** - see `10.2` |
-| **11** — Game-level supported modes | Not started |
+| **11** — Game-level supported modes | **Done, 9 Sep.** `11.1`, and `22` s10 is the authoritative account. It **reverses** a decision recorded in `22` s8.3 and in `play-shape.ts` itself - the shape is no longer a property of the title alone - and it closed a latent defect where an ordinary edit re-forced a staggered contest's rules from its title. 49 tests, **37 probes red on exactly the expected test**, two of them re-aimed after reporting `DID NOT APPLY` |
 | **12** — Required timing / runtime settings | Not started |
 | **13** — Data-driven game configuration | Not started |
 | **14** — Score configuration | **Done, 9 Sep.** `14.1`. Three operator-owned fields on `provider_game`, their own route and audit line, and a preview pinned **behaviourally** against the gate. 55 tests, **28 probes red on exactly the expected test.** The eligibility *rule* is unchanged - task 2's `> 0` is now the default rather than a constant |
@@ -965,6 +965,62 @@ The admin should therefore be able to configure:
 Then, when creating a competition for that game, only compatible modes should be selectable.
 
 The system should not allow an administrator to accidentally create an unsupported competition structure.
+
+## 11.1 — WHAT WAS BUILT, 9 September 2026
+
+**`22` section 10 is the authoritative account.** This is the summary.
+
+### What it is
+
+`provider_game.supportedPlayModes` is an operator-owned set. `resolveSupportedPlayModes` unions
+the title's own resolved style into it and returns `["scheduled"]` alone for a `head_to_head`
+title. The wizard offers a picker built from that set — **only when it holds more than one
+entry**, so nothing about the screen moves for the current catalogue — the create service
+**refuses** a pick outside it and names what *is* supported, and the chosen mode is **stored on
+the contest** as `Competition.playMode`.
+
+### The design reversal, because it must not be discovered by accident
+
+`22` s8.3 and `play-shape.ts`'s own header said the shape is a property of the **title** and
+**never** comes from caller input. The create service now takes it from its caller. That rule was
+correct for a world where a title had one shape, and the owner's racing-game example — a
+synchronised race *and* an async time trial on one title — is what ended that world.
+
+**What survives is the safety, and it is intact.** The pick is validated against a **stored** set,
+so a race can be run staggered only if somebody declared that this race has a legitimate
+time-trial form; the consequences are still stamped on at **write** time, so no runtime gate reads
+a mode; and **no player-facing path supplies a shape at all.**
+
+### The defect this closed on the way
+
+The edit service resolved the shape from the **title**. Correct with one shape per title, and a
+live defect the moment a title has two: an ordinary rename would re-force a staggered contest to
+one attempt, `until_window_closes` and entry closing at the gun — **under people who had already
+paid to enter**, with no error and nothing in a log. Latent, because no title declares a second
+shape yet, and **nothing was backfilled** for the same reason. That is why the contest stores its
+own `playMode` and why the flipped structural test asserts `resolvePlayShape` is now **absent**
+from both services.
+
+### Frozen
+
+`playMode` on the contest is absent from `EditProviderContestInput`, absent from
+`toEditRequestBody` and named in `NEVER_EDITABLE_FIELDS` — **three places, because one is a
+suggestion.** It decides when entry closes and how many attempts a paying entrant gets, so a
+contest that should be the other shape is a new contest. `supportedPlayModes` is on
+`NEVER_EDITABLE_CONTENT_FIELDS`, and the play-style route **refuses a request carrying both it and
+`playMode`**, so one audit entry can never cover two decisions.
+
+### Testing
+
+49 tests in `__tests__/services/play-shape.test.ts` and **37 probes in
+`tools/probe-play-shape.ps1`, every one red on exactly one failure.** Eleven are new; **two
+pre-existing ones were re-aimed** after reporting `PROBE DID NOT APPLY`, which reads like a broken
+harness rather than a moved target — they had been matching `resolvePlayMode`'s original one-line
+body since the operator override replaced it, so two real guards had been sitting unprobed. Full
+suite 1,919 green, `check:mirrors` clean, typechecks at baseline (main **194**, admin **223**)
+with nothing in a touched file and nothing disappearing.
+
+**Not verified by eye** — both screens are behind an admin sign-in.
 
 ---
 

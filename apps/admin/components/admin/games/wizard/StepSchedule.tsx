@@ -5,6 +5,7 @@ import {
   playShapeRules,
   type PlayMode,
 } from "@/lib/services/games/play-shape";
+import { ContestPlayModeField } from "../ContestPlayModeField";
 import { RoundClockNote } from "../RoundClockNote";
 import { RoundStartPolicyField } from "../RoundStartPolicyField";
 import type { ContestDraft } from "../contest-draft";
@@ -35,6 +36,7 @@ export function StepSchedule({
   patch,
   title,
   creditSymbol,
+  onPlayModeChange,
 }: {
   draft: ContestDraft;
   patch: (changes: Partial<ContestDraft>) => void;
@@ -51,16 +53,60 @@ export function StepSchedule({
     maxDurationSeconds?: number;
     schema: ContestableTitle["schema"];
     playMode?: PlayMode;
+    /**
+     * The title's supported set (task document 11). Absent before a title is chosen.
+     *
+     * The picker is offered on `length > 1` and nothing else - see the note beside it.
+     */
+    supportedPlayModes?: PlayMode[];
   };
   /** `AppSettings.credits.symbol`. An entry fee is a credit amount. */
   creditSymbol?: string;
+  /**
+   * Changing the contest's shape (task document 11).
+   *
+   * SEPARATE FROM `patch` ON PURPOSE, because the shape's forced values must move with it -
+   * see `selectPlayMode` in the wizard. A `patch({ playMode })` here would change the labels
+   * and the withheld controls while leaving an attempts policy behind that the server is
+   * about to override, so the review step would show a contest that is not the one saved.
+   */
+  onPlayModeChange?: (mode: PlayMode) => void;
 }) {
-  // Resolved from the chosen title, and `anytime` before one is chosen - which is the same
-  // answer the whole live catalogue gives, so the step reads identically until it needs not to.
-  const shape = playShapeRules(title?.playMode ?? "anytime");
+  // THE DRAFT'S SHAPE, NOT THE TITLE'S, since task document 11 - the contest is run as
+  // whatever the operator picked from the title's supported set, and this step's labels, hints
+  // and withheld controls are all consequences of that choice rather than of the catalogue.
+  //
+  // It read `title.playMode` while a title had exactly one shape, which was the same answer.
+  // Left alone, the whole step would describe the title's default while the contest was
+  // created as the other shape: "Contest starts" where it should say "Everybody plays at",
+  // and an attempts control on a contest about to be forced to one.
+  //
+  // `anytime` before a title is chosen, which is the same answer the whole live catalogue
+  // gives, so the step reads identically until it needs not to.
+  const shape = playShapeRules(draft.playMode ?? "anytime");
+  const modeOptions = title?.supportedPlayModes ?? [];
 
   return (
     <>
+      {/*
+        THE PICKER IS OFFERED ONLY WHEN THERE IS SOMETHING TO PICK, and the test is the length
+        of the supported set - never the family, the genre or the game code, any of which is a
+        place the next title silently gets the wrong controls. A one-entry set and a title with
+        no choice are the same thing, deliberately, so there is no second case to remember.
+
+        IT SITS ABOVE THE DATES because it renames them: under `scheduled` the start is the gun
+        rather than the opening of a window. An operator who set the dates first and then found
+        the labels had changed underneath them would reasonably wonder which reading had been
+        saved.
+      */}
+      {modeOptions.length > 1 && onPlayModeChange ? (
+        <ContestPlayModeField
+          value={draft.playMode}
+          options={modeOptions}
+          onChange={onPlayModeChange}
+        />
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2">
         <DateField
           label={shape.copy.startLabel}

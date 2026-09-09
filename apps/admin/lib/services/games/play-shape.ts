@@ -27,10 +27,31 @@
  * refuses players who could have played and paid. The first is recoverable and visible; the
  * second turns paying customers away. Neither is silent.
  *
- * WHAT IT MUST NEVER BE. It is a property of the TITLE, resolved from the stored catalogue row,
- * and never taken from caller input - the same rule as the market-hours gate and
- * `maxRoundSeconds`. An operator- or client-supplied shape is a way to turn off whichever half
- * of the rule is inconvenient: declare a race `anytime` and entry stays open after the gun.
+ * WHAT IT MUST NEVER BE, AMENDED 9 SEPTEMBER 2026 BY TASK 11 - and the amendment is recorded
+ * here rather than by rewriting the sentence it replaces, because a reversed design rule is
+ * exactly the fact a new reader needs.
+ *
+ * This used to say the shape is a property of the TITLE and never taken from caller input, full
+ * stop. The second half of that is still absolute and the first half is now wrong. Task 11's
+ * own example is a multiplayer racing game supporting a synchronous race AND an async time
+ * trial, and a title that supports both cannot answer the question by itself - something has
+ * to choose per contest.
+ *
+ * WHAT SURVIVES, WHICH IS THE PART THAT MATTERED. The stated fear was an operator declaring a
+ * race `anytime` so that entry stays open after the gun. `resolveSupportedPlayModes` is
+ * precisely what prevents that: an operator may only pick a shape the TITLE says it supports,
+ * so a race can be run staggered only if somebody has declared that this race has a legitimate
+ * time-trial form. The three properties that made the old rule safe are all intact:
+ *
+ *   - the choice is validated against a STORED set, never against caller input
+ *   - the consequences are still stamped onto the contest at WRITE time, so not one runtime
+ *     gate reads a mode - they read the policies this module forced
+ *   - no PLAYER-facing path supplies a shape at all, which was always the absolute half
+ *
+ * The one thing the change breaks if it is missed: `resolvePlayShape(title)` is the wrong
+ * question for an existing contest the moment a title supports two shapes, because the title's
+ * default is not necessarily what that contest was created as. A contest therefore stores its
+ * own `playMode`, and the edit path reads THAT. See `04`/`22` s10.
  *
  * MIRRORED, matching `entry-deadline.ts`, `config-schema.ts`, `contest-preflight.ts` and
  * `round-types.ts`, because the writers are in `apps/admin` and the readers are in the main app.
@@ -95,6 +116,23 @@ export const PLAY_MODE_COPY: ReadonlyMap<
 export interface PlayShapeInput {
   playMode?: string | null;
   playModeOverride?: string | null;
+  /**
+   * Which shapes this title can legitimately be run as (task 11).
+   *
+   * OPERATOR-OWNED, in no sync list, and deliberately NOT part of the provider contract - so
+   * this needs no change to `01` and no version bump on
+   * `ChartVolt-Game-API-Requirements.html`, which providers may already be building against.
+   * Task 11 asks for it as an admin control, and that is the cheaper answer in the honest
+   * sense: a provider declares what their game *is* (`playMode`), we declare what we are
+   * willing to run it as.
+   *
+   * Absent and `[]` both read as "nobody has said", which is the `allowedGameTypes` rule
+   * rather than the `entryBlockThreshold` one, and the direction matters: an empty array is
+   * what a bad edit, a half-run migration or a form submitting no checkboxes leaves behind,
+   * and nothing anywhere offers "this game supports no competitions at all". Taken literally
+   * it would make every title in the catalogue unrunnable.
+   */
+  supportedPlayModes?: (string | null)[] | null;
   family?: string | null;
 }
 
@@ -152,6 +190,92 @@ export function canOverridePlayMode(
   title: PlayShapeInput | null | undefined,
 ): boolean {
   return title?.family !== "head_to_head";
+}
+
+/**
+ * Which shapes a contest on this title may be created as (task 11).
+ *
+ * Always at least one, and always in `PLAY_MODES` order so two screens cannot present the same
+ * pair of choices the other way round.
+ *
+ * THE RESOLVED DEFAULT IS ALWAYS IN THE SET, and that union is the rule most likely to be read
+ * as a bug and "simplified" away. The reasoning: `resolvePlayMode` is what the title-level Play
+ * style control says this game IS, and it is what every contest already created on this title
+ * was created as. A supported set that excluded it would make a title's own declared style
+ * unselectable - two controls on one screen contradicting each other - and would strand every
+ * live contest on a shape the platform now calls unsupported. An operator narrowing a title to
+ * one shape does it by setting the style, which is task 10's control; this one only ever WIDENS.
+ *
+ * `head_to_head` is `scheduled` and nothing else, for the same reason `resolvePlayMode` forces
+ * it: two people cannot play each other at different times, so an async form of a chess match
+ * is not a shape somebody may enable. It beats the operator here exactly as it does there.
+ */
+export function resolveSupportedPlayModes(
+  title: PlayShapeInput | null | undefined,
+): PlayMode[] {
+  const fallback = resolvePlayMode(title);
+  if (title?.family === "head_to_head") return [fallback];
+
+  const declared = new Set<PlayMode>([fallback]);
+  for (const entry of title?.supportedPlayModes ?? []) {
+    const mode = storedMode(entry);
+    if (mode) declared.add(mode);
+  }
+
+  return PLAY_MODES.filter((mode) => declared.has(mode));
+}
+
+/**
+ * May a contest on this title be created as this shape?
+ *
+ * One definition, read by the create service, the edit service and the wizard, because the
+ * alternative is a picker offering a shape the server refuses with a 400 that reads to an
+ * operator like a permissions problem - and, worse in this direction, a server accepting one
+ * the picker never offered.
+ */
+export function isPlayModeSupported(
+  title: PlayShapeInput | null | undefined,
+  mode: string | null | undefined,
+): boolean {
+  const requested = storedMode(mode);
+  if (!requested) return false;
+  return resolveSupportedPlayModes(title).includes(requested);
+}
+
+/**
+ * The shape of one CONTEST, which is not the same question as the shape of its title.
+ *
+ * THE WHOLE REASON THIS EXISTS. Once a title supports two shapes, `resolvePlayMode(title)` is
+ * the title's *default* rather than a fact about any particular contest - so an edit that
+ * re-derived it would silently re-force the attempts policy and the entry deadline of a
+ * contest created as the other shape, under people who have already paid to enter. The stored
+ * value is the only thing that can answer it.
+ *
+ * Falls back to the title for a contest created before the field existed, which is correct
+ * rather than defensive: those contests were all created when the title had exactly one shape,
+ * so the title's answer IS what they were created as.
+ *
+ * ON CREATE this is also how the operator's choice becomes the contest's shape - the first
+ * argument is what they picked. It does NOT check whether the pick is allowed, deliberately:
+ * that is `isPlayModeSupported`, called before anything is written, so a refusal leaves no
+ * contest behind. Two functions because they answer two questions, and folding the check in
+ * here would mean every read of an existing contest re-litigating a decision already taken -
+ * so narrowing a title's supported set would retroactively change the shape of contests
+ * already running under it.
+ */
+export function resolveContestPlayMode(
+  storedContestMode: string | null | undefined,
+  title: PlayShapeInput | null | undefined,
+): PlayMode {
+  return storedMode(storedContestMode) ?? resolvePlayMode(title);
+}
+
+/** The two steps together, which is what every reader of an existing contest wants. */
+export function resolveContestPlayShape(
+  storedContestMode: string | null | undefined,
+  title: PlayShapeInput | null | undefined,
+): PlayShapeRules {
+  return playShapeRules(resolveContestPlayMode(storedContestMode, title));
 }
 
 /**

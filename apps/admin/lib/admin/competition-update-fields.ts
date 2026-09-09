@@ -60,6 +60,12 @@ export const TRADING_EDITABLE_FIELDS = [
  * `contentSeed` is the fairness one. Every round in a contest derives its content from it,
  * so changing it mid-contest means two players ranked against each other played different
  * games - and the leaderboard still renders, perfectly, side by side.
+ *
+ * `playMode` is listed even though it is absent from the allow-list and would therefore be
+ * refused anyway (task document 11). Belt and braces is not the reason: the two refusals say
+ * different things, and the day somebody adds `playMode` to an editor form and to the
+ * allow-list, this entry is what keeps it immutable. It decides when entry closes and how
+ * many attempts a paying entrant gets, so it is frozen for the same reason `contentSeed` is.
  */
 export const NEVER_EDITABLE_FIELDS = [
   "_id",
@@ -67,6 +73,7 @@ export const NEVER_EDITABLE_FIELDS = [
   "gameKey",
   "gameConfig",
   "contentSeed",
+  "playMode",
   "slug",
   "status",
   "createdBy",

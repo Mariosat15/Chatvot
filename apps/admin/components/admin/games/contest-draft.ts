@@ -10,6 +10,7 @@ import type { ConfigField } from "@/lib/services/games/config-schema";
 import { resolveAttemptSeconds } from "@/lib/services/games/config-schema";
 import { RESULT_GRACE_MARGIN_SECONDS } from "@/lib/services/games/contest-preflight";
 import { resolveContestEntryDeadline } from "@/lib/services/games/entry-deadline";
+import type { PlayMode } from "@/lib/services/games/play-shape";
 import type {
   RoundStartPolicy,
   UnscoredContestPolicy,
@@ -38,6 +39,16 @@ export interface ContestDraft {
   maxParticipants: number;
   platformFeePercentage: number;
   prizeDistribution: { rank: number; percentage: number }[];
+
+  /**
+   * The shape THIS contest is run as, chosen from the title's supported set (task document 11).
+   *
+   * Seeded from the title on selection and only ever offered as a choice when the title
+   * supports more than one, so an operator running a single-shape game never meets it. It is
+   * in the draft rather than derived at submit time because the forced attempts and
+   * round-start values follow from it, and the review step must show what will be stored.
+   */
+  playMode: PlayMode;
 
   attemptsPolicy: "single" | "best_of_n" | "sum_of_n";
   attemptsAllowed?: number;
@@ -76,6 +87,11 @@ export const emptyDraft: ContestDraft = {
     { rank: 2, percentage: 30 },
     { rank: 3, percentage: 20 },
   ],
+  // Overwritten by `selectTitle` before the operator can reach any control that depends on
+  // it. `anytime` rather than `scheduled` because it is the less constrained of the two, so
+  // an empty draft that somehow reached the schedule step would show every control rather
+  // than withholding controls for a shape nobody chose.
+  playMode: "anytime",
   attemptsPolicy: "single",
   unresolvedRoundPolicy: "score_zero",
   // Defaults to the refund, which is NOT the schema default. The schema keeps
@@ -155,6 +171,11 @@ export function toRequestBody(
     // would read it in the SERVER's zone, not the operator's. Appending nothing and letting
     // the browser resolve it is the fix: `toISOString` here pins the operator's own zone.
     ...deriveWindow(draft),
+    // The operator's chosen shape (task document 11), and CREATE ONLY - `toEditRequestBody`
+    // deliberately omits it. The create service validates it against the title's supported
+    // set and refuses an unsupported one with the allowed modes named, so sending it is not
+    // the same as being trusted with it.
+    playMode: draft.playMode,
     attemptsPolicy: draft.attemptsPolicy,
     attemptsAllowed:
       draft.attemptsPolicy === "single" ? undefined : draft.attemptsAllowed,
@@ -332,6 +353,11 @@ export function describeDurationSeconds(seconds: number): string {
  * `providerKey`, `gameCode` and the content seed are absent at every state, because game
  * identity is never editable. That is not an omission to fix later - editing it is creating
  * a different contest, which is what the wizard is for.
+ *
+ * `playMode` IS ABSENT FOR THE SAME REASON, and it is the one most likely to be "fixed" in
+ * (task document 11). It decides when entry closes and how many attempts a paying entrant
+ * gets, so changing it on a live contest changes the rules under people who have bought in.
+ * A contest that should be the other shape is a new contest.
  */
 export function toEditRequestBody(
   draft: ContestDraft,

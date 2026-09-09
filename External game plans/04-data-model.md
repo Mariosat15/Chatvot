@@ -38,6 +38,7 @@ to the wrong players, so this is not administrative tidiness.
 | `attemptsPolicy` | string | `single` \| `best_of_n` \| `sum_of_n` |
 | `attemptsAllowed` | number | Default 1 |
 | `unresolvedRoundPolicy` | string | `score_zero` \| `exclude` \| `hold_and_alert` |
+| `playMode` | string | **Added 9 September 2026, task 11.** `anytime` \| `scheduled`, no default. **The shape THIS contest was created as**, which from task 11 onwards is not necessarily its title's - a title may support both. Read through `resolveContestPlayMode`, which falls back to the title for a contest created before the field existed. **Frozen once written**: absent from `EditProviderContestInput`, absent from `toEditRequestBody`, and named in `NEVER_EDITABLE_FIELDS`, because it decides when entry closes and how many attempts a paying entrant gets. See `22` s10 |
 
 Indexes: `{ gameType, status }`, `{ gameKey, status }`, `{ status, playWindowEnd }`.
 
@@ -130,6 +131,7 @@ depend on a live provider call.
 | `family` | `independent` \| `head_to_head`. Does the game need an **opponent**? Read only as a fallback by `resolvePlayMode` and rendered as a badge - nothing else branches on it |
 | `playMode` | `anytime` \| `scheduled`, defaulting to `anytime`. Does everybody play at **one appointed moment**? A **different axis from `family`** - a race is `independent` and `scheduled`. Provider-owned, rewritten by every catalogue sync, and on `NEVER_EDITABLE_CONTENT_FIELDS`. Resolved by `lib/services/games/play-shape.ts`, never read raw. See `22` s8 |
 | `playModeOverride` | `anytime` \| `scheduled`, **with no default** - absent means we have taken no decision and the provider's `playMode` stands. **Ours, not the provider's**, and it is a second field precisely because `playMode` is in `providerOwnedFields` and would be reverted by the next sync. Written only by `game-play-style.service.ts`; **cleared with `$unset`, never `""`**, since an empty string read literally would mask a provider's `scheduled` declaration. Also on `NEVER_EDITABLE_CONTENT_FIELDS`. `head_to_head` beats it. See `22` s9 |
+| `supportedPlayModes` | `("anytime" \| "scheduled")[]`, **with no default**, for the same reason as `playModeOverride` - a schema default *is* a stored value, and one here would opt the whole catalogue into a per-contest picker nobody asked for. Which shapes a contest on this title may be **created as** (task 11), so a title can offer both a synchronised race and an async time trial. **Read through `resolveSupportedPlayModes`, never raw**: it unions the resolved default in, because a title's own declared style must not be unselectable and every contest already created on the title was created as it, and it returns `["scheduled"]` alone for a `head_to_head` title. Ours, not the provider's, and on `NEVER_EDITABLE_CONTENT_FIELDS`. See `22` s10 |
 | `supportsCompetition`, `supportsOneVsOne`, `supportsPractice`, `supportsContentSeed` | Capability flags |
 | `scoreDirection`, `scoreType`, `scoreRange` | Ranking |
 | `typicalDurationSeconds`, `maxDurationSeconds` | Scheduling and grace periods |

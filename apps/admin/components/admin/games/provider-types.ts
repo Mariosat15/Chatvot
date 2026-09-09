@@ -58,6 +58,15 @@ export interface ProviderTitleRow {
    */
   playMode?: string;
   playModeOverride?: string;
+  /**
+   * The set an operator may choose from when creating a contest (task document 11).
+   *
+   * RAW, and the control must pass it through `resolveSupportedPlayModes` rather than render
+   * it - that function unions the title's own resolved style in, so the stored array can
+   * legitimately omit the one member that behaves as ticked. Optional and must stay so, for
+   * the same reason as the two fields above.
+   */
+  supportedPlayModes?: string[];
   providerStatus: "active" | "deprecated" | "maintenance";
   chartvoltEnabled: boolean;
   supportsCompetition?: boolean;

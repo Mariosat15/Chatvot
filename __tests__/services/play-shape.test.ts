@@ -69,6 +69,9 @@ const {
   resolvePlayMode,
   playShapeRules,
   resolvePlayShape,
+  resolveSupportedPlayModes,
+  isPlayModeSupported,
+  resolveContestPlayMode,
   PLAY_MODES,
 } = await import("@/lib/services/games/play-shape");
 
@@ -222,6 +225,135 @@ describe("playShapeRules", () => {
 });
 
 // =======================================================================================
+// Task 11 - a title that supports MORE THAN ONE shape
+//
+// The decision this reverses: `play-shape.ts` said the shape must never come from caller
+// input, on the grounds that a race wrongly run as staggered keeps entry open after the gun.
+// That reasoning is intact and the rule is now enforced one step earlier - the operator picks
+// from a set the TITLE declares, and an unsupported pick is refused before anything is
+// written. What follows pins both halves: the widening, and the refusal that makes it safe.
+// =======================================================================================
+
+describe("resolveSupportedPlayModes", () => {
+  it("always contains the title's own resolved style", () => {
+    // THE UNION, which is the rule most likely to be read as a bug and simplified away. A set
+    // excluding the title's own style would make its declared style unselectable - two
+    // controls on one screen contradicting each other - and would strand every contest
+    // ALREADY created on this title on a shape the platform now calls unsupported.
+    expect(resolveSupportedPlayModes({ playMode: "scheduled" })).toEqual(["scheduled"]);
+    expect(
+      resolveSupportedPlayModes({ playMode: "scheduled", supportedPlayModes: ["anytime"] }),
+    ).toEqual(["anytime", "scheduled"]);
+  });
+
+  it("returns one entry for a title that has declared no set", () => {
+    // The whole live catalogue. A one-entry list and "this title has no choice" are the same
+    // thing deliberately, so no screen needs a second case for the pre-task-11 world.
+    expect(resolveSupportedPlayModes({})).toEqual(["anytime"]);
+    expect(resolveSupportedPlayModes(null)).toEqual(["anytime"]);
+    expect(resolveSupportedPlayModes({ supportedPlayModes: [] })).toEqual(["anytime"]);
+  });
+
+  it("orders by PLAY_MODES, so two rows cannot present the pair the other way round", () => {
+    // Stored order is whatever the operator's checkboxes produced. Two titles offering the
+    // same pair of choices in different orders is a screen an operator cannot learn.
+    expect(
+      resolveSupportedPlayModes({ supportedPlayModes: ["scheduled", "anytime"] }),
+    ).toEqual(PLAY_MODES);
+    expect(
+      resolveSupportedPlayModes({ supportedPlayModes: ["anytime", "scheduled"] }),
+    ).toEqual(PLAY_MODES);
+  });
+
+  it("ignores an unrecognised or blank entry rather than throwing on a screen", () => {
+    // These arrive from a database, so the resolver has to survive a row written by a version
+    // of the platform that knew a third mode. `""` matters on its own: it is a shape a bad
+    // write leaves behind, and `storedMode` must not read it as a decision.
+    expect(
+      resolveSupportedPlayModes({
+        playMode: "anytime",
+        supportedPlayModes: ["scheduled", "sideways", "", null],
+      }),
+    ).toEqual(PLAY_MODES);
+  });
+
+  it("gives a head_to_head title scheduled and nothing else, whatever it declares", () => {
+    // It beats the operator here for the same reason it beats them in `resolvePlayMode`: two
+    // people cannot play each other at different times, so an async form of a chess match is
+    // not a shape anybody may enable.
+    expect(
+      resolveSupportedPlayModes({
+        family: "head_to_head",
+        supportedPlayModes: ["anytime", "scheduled"],
+      }),
+    ).toEqual(["scheduled"]);
+  });
+});
+
+describe("isPlayModeSupported", () => {
+  it("admits a declared shape and refuses one the title never offered", () => {
+    const title = { playMode: "anytime", supportedPlayModes: ["scheduled"] };
+    expect(isPlayModeSupported(title, "anytime")).toBe(true);
+    expect(isPlayModeSupported(title, "scheduled")).toBe(true);
+    expect(isPlayModeSupported({ playMode: "anytime" }, "scheduled")).toBe(false);
+  });
+
+  it("refuses an absent, blank or unrecognised request rather than defaulting it", () => {
+    // FAILS CLOSED, which is the opposite of `resolvePlayMode`'s fallback and deliberately so.
+    // A resolver's job is to produce an answer for a partially-loaded row; a gate's job is to
+    // refuse what it cannot vouch for. Reading `undefined` as the default here would mean a
+    // malformed request quietly creating a contest as whatever the title happened to be.
+    const title = { playMode: "anytime", supportedPlayModes: ["scheduled"] };
+    expect(isPlayModeSupported(title, undefined)).toBe(false);
+    expect(isPlayModeSupported(title, null)).toBe(false);
+    expect(isPlayModeSupported(title, "")).toBe(false);
+    expect(isPlayModeSupported(title, "sideways")).toBe(false);
+  });
+
+  it("refuses anytime on a head_to_head title", () => {
+    expect(
+      isPlayModeSupported(
+        { family: "head_to_head", supportedPlayModes: ["anytime", "scheduled"] },
+        "anytime",
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("resolveContestPlayMode - the contest's shape, not its title's", () => {
+  it("prefers the contest's stored value over the title's default", () => {
+    // THE WHOLE POINT OF THE FIELD. Once a title supports two shapes its own answer is a
+    // default, so a reader that consults the title is answering a different question from the
+    // one it was asked.
+    expect(
+      resolveContestPlayMode("scheduled", { playMode: "anytime", supportedPlayModes: ["scheduled"] }),
+    ).toBe("scheduled");
+    expect(
+      resolveContestPlayMode("anytime", { playMode: "scheduled", supportedPlayModes: ["anytime"] }),
+    ).toBe("anytime");
+  });
+
+  it("falls back to the title for a contest created before the field existed", () => {
+    // Correct rather than defensive: every such contest was created when its title had
+    // exactly one shape, so the title's answer IS what it was created as.
+    expect(resolveContestPlayMode(undefined, { playMode: "scheduled" })).toBe("scheduled");
+    expect(resolveContestPlayMode(null, { playMode: "scheduled" })).toBe("scheduled");
+    expect(resolveContestPlayMode("", { playMode: "scheduled" })).toBe("scheduled");
+  });
+
+  it("does NOT re-check the pick against the title's current set", () => {
+    // Deliberate, and it looks like a hole until you consider the alternative. Validation is
+    // `isPlayModeSupported`, called once before anything is written. If this re-litigated it,
+    // an operator narrowing a title's supported set would retroactively change the shape of
+    // contests already running under it - so people who paid to enter a staggered contest
+    // would find it had become a synchronised one because of an edit to the catalogue.
+    expect(
+      resolveContestPlayMode("scheduled", { playMode: "anytime" }),
+    ).toBe("scheduled");
+  });
+});
+
+// =======================================================================================
 // The entry deadline
 // =======================================================================================
 
@@ -329,7 +461,13 @@ beforeEach(async () => {
  * a whole suite once failed on one missing `slug`.
  */
 async function seedCatalogue(
-  title: { playMode?: string; family?: string; gameCode?: string } = {},
+  title: {
+    playMode?: string;
+    family?: string;
+    gameCode?: string;
+    /** Task 11's set. Absent by default, so every pre-task-11 case is unchanged. */
+    supportedPlayModes?: string[];
+  } = {},
 ) {
   const gameCode = title.gameCode ?? "mock-trivia";
 
@@ -346,6 +484,12 @@ async function seedCatalogue(
     displayName: "Mock Trivia",
     family: title.family ?? "independent",
     ...(title.playMode ? { playMode: title.playMode } : {}),
+    // Absent unless asked for, deliberately. `supportedPlayModes` has no schema default for
+    // the reason recorded on the model, so a fixture that always set it would make every
+    // pre-task-11 assertion below run against a title that had opted in.
+    ...(title.supportedPlayModes
+      ? { supportedPlayModes: title.supportedPlayModes }
+      : {}),
     scoreDirection: "higher_is_better",
     scoreType: "integer",
     maxDurationSeconds: 300,
@@ -422,6 +566,8 @@ interface StoredContestFields {
   attemptsPolicy?: string;
   attemptsAllowed?: number;
   roundStartPolicy?: string;
+  /** Task 11. The seam the whole feature rests on, so it is read back rather than inferred. */
+  playMode?: string;
 }
 
 const STORED_CONTEST_FIELDS: (keyof StoredContestFields)[] = [
@@ -431,6 +577,7 @@ const STORED_CONTEST_FIELDS: (keyof StoredContestFields)[] = [
   "attemptsPolicy",
   "attemptsAllowed",
   "roundStartPolicy",
+  "playMode",
 ];
 
 function readContest(filter: Record<string, unknown>) {
@@ -603,6 +750,215 @@ describe("listContestableTitles", () => {
     const titles = await listContestableTitles();
     expect(titles.find((t) => t.gameCode === gameCode)?.playMode).toBe("anytime");
   });
+
+  it("reports the resolved SUPPORTED SET, so the picker cannot offer a refused shape", async () => {
+    // Task 11. The picker is built from this list, and the create service refuses anything
+    // outside it - so a raw value here means a select whose options produce a 400 that reads
+    // to an operator like a permissions problem.
+    const gameCode = await seedCatalogue({
+      playMode: "anytime",
+      supportedPlayModes: ["scheduled"],
+    });
+    const titles = await listContestableTitles();
+    const title = titles.find((t) => t.gameCode === gameCode);
+
+    // Both, in `PLAY_MODES` order, because the resolver unions the title's own style in.
+    expect(title?.supportedPlayModes).toEqual(["anytime", "scheduled"]);
+    // And the pre-selection is still the title's own answer.
+    expect(title?.playMode).toBe("anytime");
+  });
+
+  it("reports one supported shape for the whole live catalogue", async () => {
+    // The state every real title is in today. The wizard withholds the picker on
+    // `length < 2`, so this is what keeps the screen unchanged until a title opts in.
+    const gameCode = await seedCatalogue({ playMode: "anytime" });
+    const titles = await listContestableTitles();
+    expect(titles.find((t) => t.gameCode === gameCode)?.supportedPlayModes).toEqual([
+      "anytime",
+    ]);
+  });
+
+  it("reports scheduled alone for a head_to_head title however its set reads", async () => {
+    const gameCode = await seedCatalogue({
+      family: "head_to_head",
+      supportedPlayModes: ["anytime", "scheduled"],
+    });
+    const titles = await listContestableTitles();
+    expect(titles.find((t) => t.gameCode === gameCode)?.supportedPlayModes).toEqual([
+      "scheduled",
+    ]);
+  });
+});
+
+// =======================================================================================
+// Task 11, behavioural: the operator's per-contest choice, end to end
+//
+// Against a real database rather than structurally, for the reason in the file header - the
+// STORED field is the seam, and no structural test can see a seam.
+// =======================================================================================
+
+describe("createProviderContest with an operator-chosen shape", () => {
+  it("stores the chosen shape and forces that shape's rules", async () => {
+    const gameCode = await seedCatalogue({
+      playMode: "anytime",
+      supportedPlayModes: ["scheduled"],
+    });
+
+    // The fixture asks for three attempts and a reserving policy, both of which `scheduled`
+    // must override - so a create that stored the mode and forgot the rules fails here.
+    const result = await createProviderContest(
+      createInput(gameCode, { playMode: "scheduled" }),
+    );
+    expect(result.success).toBe(true);
+
+    const stored = await readContest({ name: "Shape Test" });
+    expect(stored?.playMode).toBe("scheduled");
+    expect(stored?.attemptsPolicy).toBe("single");
+    expect(stored?.attemptsAllowed).toBeUndefined();
+    expect(stored?.roundStartPolicy).toBe("until_window_closes");
+    expect(stored?.registrationDeadline?.getTime()).toBe(stored!.startTime.getTime());
+  });
+
+  it("refuses a shape the title does not support, and NAMES what it does support", async () => {
+    // The refusal is what makes the widening safe, and naming the alternatives is not
+    // politeness: an operator told only that their choice is unsupported has to go and read
+    // another screen to find out what to pick.
+    const gameCode = await seedCatalogue({ playMode: "anytime" });
+
+    const result = await createProviderContest(
+      createInput(gameCode, { playMode: "scheduled" }),
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Join any time");
+
+    // AND NOTHING WAS WRITTEN. The refusal sits before the create and before the slug is
+    // reserved, so a rejected request must leave no draft behind.
+    expect(await Competition.countDocuments({ name: "Shape Test" })).toBe(0);
+  });
+
+  it("refuses an unrecognised shape rather than falling back to the title's", async () => {
+    const gameCode = await seedCatalogue({ playMode: "anytime" });
+    const result = await createProviderContest(
+      createInput(gameCode, { playMode: "sideways" }),
+    );
+    expect(result.success).toBe(false);
+    expect(await Competition.countDocuments({ name: "Shape Test" })).toBe(0);
+  });
+
+  it("still stores a shape when the caller sends none", async () => {
+    // EVERY CALLER WRITTEN BEFORE TASK 11, and the wizard for a single-shape title. An
+    // absent choice means "whatever this title is" and must not be refused - but the field
+    // is still written, because falling back to the title at read time is exactly what the
+    // edit path used to do and is the defect this whole change exists to close.
+    const gameCode = await seedCatalogue({ playMode: "scheduled" });
+    const result = await createProviderContest(createInput(gameCode));
+    expect(result.success).toBe(true);
+
+    const stored = await readContest({ name: "Shape Test" });
+    expect(stored?.playMode).toBe("scheduled");
+  });
+
+  it("refuses anytime on a head_to_head title even when its set names it", async () => {
+    const gameCode = await seedCatalogue({
+      family: "head_to_head",
+      supportedPlayModes: ["anytime", "scheduled"],
+    });
+    const result = await createProviderContest(
+      createInput(gameCode, { playMode: "anytime" }),
+    );
+    expect(result.success).toBe(false);
+    expect(await Competition.countDocuments({ name: "Shape Test" })).toBe(0);
+  });
+});
+
+describe("editProviderContest reads the CONTEST's shape, never the title's", () => {
+  it("does not rewrite a staggered contest's rules when the title also supports scheduled", async () => {
+    // THE DEFECT THIS FIELD EXISTS FOR, and it is the one test in this file that would have
+    // failed silently before task 11. The edit service resolved the shape from the TITLE, so
+    // a title supporting both shapes with `scheduled` as its own style would have an ordinary
+    // rename re-force a staggered contest to one attempt, `until_window_closes`, and entry
+    // closing at the start - under people who had already paid to enter, with no error and
+    // nothing in a log.
+    const gameCode = await seedCatalogue({
+      playMode: "scheduled",
+      supportedPlayModes: ["anytime"],
+    });
+    const created = await createProviderContest(
+      createInput(gameCode, { playMode: "anytime" }),
+    );
+    expect(created.success).toBe(true);
+
+    const contest = await Competition.findOne({ name: "Shape Test" });
+    const before = await readContest({ _id: contest!._id });
+    expect(before?.playMode).toBe("anytime");
+    expect(before?.attemptsPolicy).toBe("best_of_n");
+
+    const result = await editProviderContest(String(contest!._id), {
+      name: "Renamed, nothing else",
+    });
+    expect(result.success).toBe(true);
+
+    const after = await readContest({ _id: contest!._id });
+    expect(after?.playMode).toBe("anytime");
+    expect(after?.attemptsPolicy).toBe("best_of_n");
+    expect(after?.attemptsAllowed).toBe(3);
+    expect(after?.roundStartPolicy).toBe("reserve_full_round");
+    // And entry still closes at the last playable moment rather than at the gun.
+    expect(after?.registrationDeadline?.getTime()).not.toBe(after!.startTime.getTime());
+  });
+
+  it("still forces the rules of a contest created AS scheduled", async () => {
+    // The control for the test above. Reading the contest's own value unconditionally would
+    // pass that one and take the forcing away from every scheduled contest - so this asserts
+    // the forcing still happens when the stored shape is the constrained one.
+    const gameCode = await seedCatalogue({
+      playMode: "anytime",
+      supportedPlayModes: ["scheduled"],
+    });
+    const created = await createProviderContest(
+      createInput(gameCode, { playMode: "scheduled" }),
+    );
+    expect(created.success).toBe(true);
+    const contest = await Competition.findOne({ name: "Shape Test" });
+
+    const result = await editProviderContest(String(contest!._id), {
+      attemptsPolicy: "best_of_n",
+      attemptsAllowed: 5,
+      roundStartPolicy: "reserve_full_round",
+    });
+    expect(result.success).toBe(true);
+
+    const stored = await readContest({ _id: contest!._id });
+    expect(stored?.attemptsPolicy).toBe("single");
+    expect(stored?.roundStartPolicy).toBe("until_window_closes");
+  });
+
+  it("cannot be moved to the other shape by an edit", async () => {
+    // FROZEN, and this is the assertion that keeps it so. `playMode` is absent from
+    // `EditProviderContestInput`, absent from `toEditRequestBody` and named in
+    // `NEVER_EDITABLE_FIELDS`, so an edit carrying it changes nothing. It decides when entry
+    // closes and how many attempts a paying entrant gets; a contest that should be the other
+    // shape is a new contest.
+    const gameCode = await seedCatalogue({
+      playMode: "anytime",
+      supportedPlayModes: ["scheduled"],
+    });
+    const created = await createProviderContest(
+      createInput(gameCode, { playMode: "anytime" }),
+    );
+    expect(created.success).toBe(true);
+    const contest = await Competition.findOne({ name: "Shape Test" });
+
+    await editProviderContest(String(contest!._id), {
+      name: "Renamed",
+      // Deliberately outside the input type - a caller reaching the route directly.
+      ...({ playMode: "scheduled" } as Record<string, unknown>),
+    });
+
+    const stored = await readContest({ _id: contest!._id });
+    expect(stored?.playMode).toBe("anytime");
+    expect(stored?.attemptsPolicy).toBe("best_of_n");
+  });
 });
 
 // =======================================================================================
@@ -649,6 +1005,13 @@ describe("the play shape is declared, never inferred from a game's identity", ()
   });
 
   it("has one resolver, so the wizard and the services cannot disagree", () => {
+    // FLIPPED ON 9 SEPTEMBER 2026, NOT REWRITTEN. This asserted `resolvePlayShape(` in both
+    // services, which was right while a title had exactly one shape: the title's answer WAS
+    // the contest's. Task 11 makes them different questions, so both services now go through
+    // `resolveContestPlayMode`, which prefers the contest's stored value and falls back to
+    // the title. The old spelling passing here is now the defect - see the edit test below,
+    // where it silently rewrites a paying entrant's rules - so it is asserted absent.
+    //
     // The negative half is the load-bearing one. Importing the resolver is trivially
     // satisfied by a file that imports it and then decides for itself - which is exactly
     // what `RoundPreflight` did before the entry-deadline extraction.
@@ -657,8 +1020,11 @@ describe("the play shape is declared, never inferred from a game's identity", ()
       "apps/admin/lib/services/game-providers/provider-contest-edit.service.ts",
     ]) {
       const src = readCode(file);
-      expect(src).toMatch(/resolvePlayShape\s*\(/);
-      // No second opinion about what a mode implies.
+      expect(src).toMatch(/resolveContestPlayMode\s*\(/);
+      expect(src).not.toMatch(/resolvePlayShape\s*\(/);
+      // No second opinion about what a mode implies. `playMode ===` is exempted only where
+      // the create service compares the OPERATOR's request against the supported set, which
+      // it does through `isPlayModeSupported` rather than by hand - so the ban still holds.
       expect(src).not.toMatch(/===\s*"scheduled"/);
       expect(src).not.toMatch(/playMode\s*===/);
     }

@@ -1827,9 +1827,57 @@ later allow-list edit.
   **resolved** value `listContestableTitles` already returns; a probe making it re-derive from
   the raw fields is red.
 
-**Not built:** no bulk edit, and no per-contest override. The shape is a property of the title,
-resolved from the stored catalogue row and never from caller input - a per-contest control is
-precisely the way to turn off whichever half of the rule is inconvenient.
+**Not built:** no bulk edit.
+
+> **SUPERSEDED LATER THE SAME DAY - see s2.12 and `22` s10.** This paragraph used to continue
+> "and no per-contest override. The shape is a property of the title, resolved from the stored
+> catalogue row and never from caller input - a per-contest control is precisely the way to turn
+> off whichever half of the rule is inconvenient." **That is now false.** A title may declare it
+> supports both shapes and the operator picks one per contest. The reasoning was sound and the
+> mechanism it feared is not what shipped: the pick is validated against a **stored** supported
+> set, so a race is only runnable as a time trial if somebody declared that this race has a
+> legitimate time-trial form - the operator cannot invent a shape, only choose a declared one.
+> Kept rather than rewritten, because the paragraph names the hazard the supported set exists to
+> close.
+
+### 2.12 The operator picks one of the title's supported shapes - BUILT 9 September 2026
+
+**`External game plans/22` section 10 is the authoritative account**, including the design
+reversal. This section records the admin surface only.
+
+Two controls, on two screens, answering two questions.
+
+- **On the Games list**, beside Play style: **Supported styles**, writing
+  `provider_game.supportedPlayModes`. It is what a title *can* be run as. The title's own
+  effective style is **always ticked and locked**, because that is what the Play style control
+  says the game is and what every contest already created on it was created as - narrowing the
+  set is therefore done by changing the play style, not by unticking it here. `head_to_head`
+  withholds the control entirely, for the same reason it withholds Play style.
+- **In the contest wizard's schedule step**: `ContestPlayModeField`, which is what *this*
+  contest is run as. **It renders only when the title supports more than one shape**, so the
+  step is byte-for-byte unchanged for the entire live catalogue, and its options are the
+  server's `resolveSupportedPlayModes` output rather than anything the component derives - a
+  select offering a shape the create service refuses produces a 400 that reads to an operator
+  like a permissions problem.
+
+**Three things about the surface specifically.**
+
+- **The route takes one decision per request.** `PATCH .../play-style` refuses a body carrying
+  both `playMode` and `supportedPlayModes`, because the two write different audit lines and one
+  entry covering both cannot answer which decision somebody made.
+- **The wizard's forced values move with the picker, not with the title.** Choosing `scheduled`
+  re-derives `attemptsPolicy` and `roundStartPolicy` from the *chosen* shape immediately, so the
+  step can never display "3 attempts" on a contest about to be stored as one - the same rule
+  that made step 4 and step 5 read the resolved shape in s2.11.
+- **The scheduled option carries a warning, not a note.** Both consequences - entry closing at
+  the gun and one attempt each - are irreversible on that contest once it exists, because
+  `Competition.playMode` is frozen. An operator picking it to get "everybody races together"
+  does not expect sign-ups to stop at the start time.
+
+**Not built:** no bulk edit of supported styles, and **no way to change a contest's shape after
+creation** - deliberately, and not for effort. It decides when entry closes and how many
+attempts a paying entrant gets, so a contest that should be the other shape is a new contest.
+Same answer as refusing a game-type change on a zero-participant draft (s2.2).
 
 ---
 

@@ -53,6 +53,11 @@ export const NEVER_EDITABLE_CONTENT_FIELDS: ReadonlyMap<string, string> = new Ma
   // gun-start race as a side effect of fixing a typo in a tagline, with the audit trail
   // recording a content edit.
   ["playModeOverride", "changed with the Play style control, which has its own audit line"],
+  // Ours, and barred for the same reason as `playModeOverride` beside it. This one decides
+  // which shapes an operator may pick when they create a contest on the title (task document
+  // 11), so writing it here would widen what a future contest may be run as from a screen
+  // labelled "title and description".
+  ["supportedPlayModes", "changed with the Play style control, which has its own audit line"],
   ["scoreDirection", "declared by the provider and rewritten by every catalogue sync"],
   ["scoreType", "declared by the provider and rewritten by every catalogue sync"],
   // Ours, like `chartvoltEnabled` and `playModeOverride` above, and barred for the same

@@ -142,6 +142,16 @@ export interface ICompetition extends Document {
    * for why the rule changed at all.
    */
   roundStartPolicy?: "reserve_full_round" | "until_window_closes";
+  /**
+   * Which shape this contest was created as (task 11).
+   *
+   * Read through `resolveContestPlayShape`, never directly, and never re-derived from the
+   * title: once a title supports both shapes the title's answer is a default, and re-deriving
+   * it rewrites the entry rules of a contest people have paid into. Absent for any contest
+   * created before the choice existed, which is when a title had exactly one shape - so the
+   * fallback to the title is a correct answer rather than a guess.
+   */
+  playMode?: "anytime" | "scheduled";
 
   // Competition Rules & Ranking
   rules: {
@@ -484,6 +494,31 @@ const CompetitionSchema = new Schema<ICompetition>(
       type: String,
       enum: ["reserve_full_round", "until_window_closes"],
       default: "reserve_full_round",
+    },
+    // WHICH SHAPE THIS CONTEST WAS CREATED AS - task 11, 9 Sep 2026.
+    //
+    // It is on the contest rather than only on the title because task 11 lets one title
+    // support both shapes, and from that moment the title's own `playMode` is a DEFAULT rather
+    // than a fact about any particular contest. `resolvePlayShape(title)` was being called by
+    // the edit service, so without this an ordinary edit to a contest created as an async time
+    // trial would re-force `single` attempts and close entry at the start - because the title's
+    // default happens to be the synchronous race - silently, under people who have already
+    // paid to enter. Read through `resolveContestPlayShape`, which falls back to the title.
+    //
+    // NO DEFAULT, deliberately, and this one is the opposite reasoning to `roundStartPolicy`
+    // two lines up. That field needed a default because it changed a gate every existing
+    // contest passes through; this one is only ever read to answer "what was chosen", and an
+    // absent value is a true and useful answer - the contest predates the choice, so the
+    // title's single shape IS what it was created as. A default of `anytime` would assert that
+    // a scheduled contest created last week was staggered.
+    //
+    // NOT EDITABLE, ever, on the `gameKey` precedent rather than the freeze-on-entry one: the
+    // shape decides when entry closes and how many attempts a paying player gets, so changing
+    // it mid-contest changes the deal people bought into. A draft is cheap to delete and
+    // recreate, which is the same answer `12` s2.2 gave to changing a draft's game type.
+    playMode: {
+      type: String,
+      enum: ["anytime", "scheduled"],
     },
     rules: {
       rankingMethod: {

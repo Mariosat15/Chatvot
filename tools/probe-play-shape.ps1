@@ -83,9 +83,14 @@ Write-Host "`n=== which source decides the shape ===" -ForegroundColor Cyan
 # THE PROBE THAT MATTERS MOST. If the resolver secretly leaned on `family`, an `independent`
 # race would come back as a puzzle - and every other test in the suite would still pass,
 # because the only other scheduled fixture is `head_to_head`, which the forcing covers.
+# RE-AIMED 9 SEPTEMBER 2026. This and the third probe below matched `resolvePlayMode`'s original
+# one-line body, which the operator override (`22` s9) replaced with the shared `storedMode`
+# helper. Both reported PROBE DID NOT APPLY, which reads like a broken harness rather than a
+# moved target - so a real guard sat unprobed. Confirm the FILE CHANGED, never that a run was
+# quiet.
 Invoke-Probe -Name 'the declaration is ignored, family decides' -File $SHAPE `
-  -From 'return title?.playMode === "scheduled" ? "scheduled" : "anytime";' `
-  -To 'return "anytime";' `
+  -From '    storedMode(title?.playMode) ??' `
+  -To '' `
   -ExpectTest 'an independent title declaring scheduled IS scheduled'
 
 Invoke-Probe -Name 'head_to_head is trusted rather than corrected' -File $SHAPE `
@@ -94,8 +99,8 @@ Invoke-Probe -Name 'head_to_head is trusted rather than corrected' -File $SHAPE 
   -ExpectTest 'FORCES head_to_head to scheduled'
 
 Invoke-Probe -Name 'an unrecognised value is honoured as scheduled' -File $SHAPE `
-  -From 'return title?.playMode === "scheduled" ? "scheduled" : "anytime";' `
-  -To 'return (title?.playMode ?? "anytime") as PlayMode;' `
+  -From '  if (value === "anytime" || value === "scheduled") return value;' `
+  -To '  if (value) return value as PlayMode;' `
   -ExpectTest 'falls back to anytime on a value it does not recognise'
 
 Write-Host "`n=== the consequences ===" -ForegroundColor Cyan
@@ -226,14 +231,96 @@ Invoke-Probe -Name 'the mirror drifts' -File $ADMIN_SHAPE `
 
 Write-Host "`n=== nothing switches on a game code ===" -ForegroundColor Cyan
 
+# RE-AIMED 9 SEPTEMBER 2026. This read `title?.playMode` until task 11 moved the step onto the
+# draft's chosen mode. Left alone it would have reported PROBE DID NOT APPLY, which reads like a
+# broken harness rather than a moved target - the lesson from the trading-surface probe.
 Invoke-Probe -Name 'the wizard special-cases one title' -File $SCHEDULE `
-  -From '  const shape = playShapeRules(title?.playMode ?? "anytime");' `
-  -To '  const shape = playShapeRules(title?.gameCode === "circuit-sprint" ? "anytime" : (title?.playMode ?? "anytime"));' `
+  -From '  const shape = playShapeRules(draft.playMode ?? "anytime");' `
+  -To '  const shape = playShapeRules(title?.gameCode === "circuit-sprint" ? "anytime" : (draft.playMode ?? "anytime"));' `
   -ExpectTest 'names no game code, provider key or game key'
 
+# RE-AIMED for the same reason: the create service resolved the shape from the title alone.
 Invoke-Probe -Name 'a service forms its own opinion about a mode' -File $CREATE `
-  -From '  const shape = resolvePlayShape(title);' `
-  -To '  const shape = title.playMode === "scheduled" ? resolvePlayShape(title) : resolvePlayShape(null);' `
+  -From '  const shape = playShapeRules(playMode);' `
+  -To '  const shape = playMode === "scheduled" ? playShapeRules("scheduled") : playShapeRules("anytime");' `
   -ExpectTest 'has one resolver, so the wizard and the services cannot disagree'
+
+Write-Host "`n=== task 11: the operator's per-contest choice ===" -ForegroundColor Cyan
+
+# THE PROBE THAT MATTERS MOST IN THIS SECTION, and the defect task 11 exists to close. Reading
+# the title rather than the contest is not a hypothetical mistake - it is what the edit service
+# did until 9 September 2026, correctly, while a title had exactly one shape.
+Invoke-Probe -Name 'edit resolves the shape from the TITLE again' -File $EDIT `
+  -From 'playShapeRules(resolveContestPlayMode(competition.playMode, title))' `
+  -To 'playShapeRules(resolveContestPlayMode(undefined, title))' `
+  -ExpectTest 'does not rewrite a staggered contest'
+
+# The mirror-image mutation. Reading the contest's own value UNCONDITIONALLY - never falling
+# back to the title - passes the probe above and silently drops the forcing for every contest
+# created before the field existed, which is all of them.
+Invoke-Probe -Name 'edit trusts a contest that has no stored shape' -File $SHAPE `
+  -From '  return storedMode(storedContestMode) ?? resolvePlayMode(title);' `
+  -To '  return storedMode(storedContestMode) ?? "anytime";' `
+  -ExpectTest 'falls back to the title for a contest created before the field existed'
+
+Invoke-Probe -Name 'create ignores the operator and stores the title default' -File $CREATE `
+  -From '  const playMode = resolveContestPlayMode(input.playMode, title);' `
+  -To '  const playMode = resolveContestPlayMode(undefined, title);' `
+  -ExpectTest 'stores the chosen shape and forces that shape'
+
+# A create that stamps the rules but never stores the mode. The contest behaves correctly on the
+# day it is made and its FIRST EDIT re-forces it from the title - the defect one step removed,
+# and invisible to every assertion about attempts and deadlines at create time.
+Invoke-Probe -Name 'create forces the rules but stores no shape' -File $CREATE `
+  -From '      playMode,' -To '' `
+  -ExpectTest 'stores the chosen shape and forces that shape'
+
+Write-Host "`n=== task 11: the choice is validated against a stored set ===" -ForegroundColor Cyan
+
+Invoke-Probe -Name 'any requested shape is accepted' -File $CREATE `
+  -From '  if (input.playMode !== undefined && !isPlayModeSupported(title, input.playMode)) {' `
+  -To '  if (false) {' `
+  -ExpectTest 'refuses a shape the title does not support'
+
+# The reverse direction. Refusing an ABSENT mode passes every refusal assertion and breaks the
+# whole live catalogue plus every caller written before task 11.
+Invoke-Probe -Name 'an omitted shape is refused as unsupported' -File $CREATE `
+  -From '  if (input.playMode !== undefined && !isPlayModeSupported(title, input.playMode)) {' `
+  -To '  if (!isPlayModeSupported(title, input.playMode)) {' `
+  -ExpectTest 'still stores a shape when the caller sends none'
+
+Invoke-Probe -Name 'an unrecognised value is admitted rather than refused' -File $SHAPE `
+  -From '  const requested = storedMode(mode);
+  if (!requested) return false;' `
+  -To '  const requested = storedMode(mode);
+  if (!requested) return true;' `
+  -ExpectTest 'refuses an unrecognised shape rather than falling back'
+
+Invoke-Probe -Name 'head_to_head is overridden by its supported set' -File $SHAPE `
+  -From '  if (title?.family === "head_to_head") return [fallback];' -To '' `
+  -ExpectTest 'refuses anytime on a head_to_head title even when its set names it'
+
+# The refusal that names nothing. An operator told only that their choice is unsupported has to
+# read another screen to find out what to pick, and the message still reads like a real error.
+Invoke-Probe -Name 'the refusal does not name what IS supported' -File $CREATE `
+  -From '    const allowed = resolveSupportedPlayModes(title)
+      .map((mode) => PLAY_MODE_COPY.get(mode)?.label ?? mode)
+      .join(" or ");' `
+  -To '    const allowed = "";' `
+  -ExpectTest 'refuses a shape the title does not support'
+
+Write-Host "`n=== task 11: the supported set the picker is built from ===" -ForegroundColor Cyan
+
+# A set that does NOT contain the title's own style. Every contest already created on that title
+# was created as it, and the operator could not pick it back.
+Invoke-Probe -Name 'the title default is dropped from its own supported set' -File $SHAPE `
+  -From '  const declared = new Set<PlayMode>([fallback]);' `
+  -To '  const declared = new Set<PlayMode>();' `
+  -ExpectTest 'always contains the title'
+
+Invoke-Probe -Name 'the wizard is handed the raw supported list' -File $CREATE `
+  -From '        supportedPlayModes: resolveSupportedPlayModes(title),' `
+  -To '        supportedPlayModes: (title.supportedPlayModes ?? []) as PlayMode[],' `
+  -ExpectTest 'reports the resolved SUPPORTED SET'
 
 Write-Host "`n=== done ===" -ForegroundColor Cyan

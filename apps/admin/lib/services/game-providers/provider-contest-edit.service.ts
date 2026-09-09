@@ -9,7 +9,8 @@ import {
 import type { ConfigField } from "@/lib/services/games/config-schema";
 import { resolveContestEntryDeadline } from "@/lib/services/games/entry-deadline";
 import {
-  resolvePlayShape,
+  playShapeRules,
+  resolveContestPlayMode,
   type PlayShapeRules,
 } from "@/lib/services/games/play-shape";
 import type {
@@ -264,11 +265,21 @@ export async function editProviderContest(
     applyEdit(competition, input, coercedSettings, {
       schemaFields,
       maxDurationSeconds: title?.maxDurationSeconds,
-      // Resolved from the STORED catalogue row, so an edit honours the same shape the create
-      // service forced. Absent when the title has gone from the catalogue - in that case
-      // `applyEdit` leaves the stored policy alone rather than guessing, because the contest
-      // keeps the rule its entrants signed up under.
-      shape: title ? resolvePlayShape(title) : undefined,
+      // THE CONTEST'S OWN SHAPE, NOT THE TITLE'S (task document 11).
+      //
+      // This read `resolvePlayShape(title)` until 9 September 2026, which was correct only
+      // while a title had exactly one shape. Once one supports two, the title's answer is its
+      // *default* - so an ordinary edit to a name or a description would re-force the attempts
+      // policy and the entry deadline of a staggered contest to the synchronised ones, under
+      // people who had already paid to enter, with no error and nothing in a log. The stored
+      // `playMode` is the only thing that can say what this contest was created as.
+      //
+      // Absent when the title has gone from the catalogue - in that case `applyEdit` leaves
+      // the stored policies alone rather than guessing, because the contest keeps the rule its
+      // entrants signed up under.
+      shape: title
+        ? playShapeRules(resolveContestPlayMode(competition.playMode, title))
+        : undefined,
     });
     await competition.save();
     return { success: true, warnings };
