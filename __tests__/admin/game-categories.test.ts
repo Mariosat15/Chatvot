@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
   GAME_CATEGORIES,
@@ -304,6 +304,88 @@ describe("the consumers read the LABEL, never the stored slug", () => {
     expect(source).toContain("title.category");
     expect(source).not.toContain("resolveGameCategory");
     expect(source).not.toContain("GAME_CATEGORIES");
+  });
+});
+
+describe("the genre picker is drawn by the app, not by the browser", () => {
+  const DIALOG = "apps/admin/components/admin/games/GameContentDialog.tsx";
+
+  it("uses the shared Select, never a native <select>", () => {
+    const source = stripComments(read(DIALOG));
+
+    // A DEFECT TEST, NOT A STYLE TEST, and the mechanism is the reason it is scoped to this
+    // surface. A browser paints the native drop-down list itself: the list background comes
+    // from the element's own `background-color`, while the options inherit `color`. Every
+    // field on this surface is themed `bg-white/5 text-white`, and a translucent white
+    // composites over the browser's light list surface - so all fifteen options rendered
+    // white on white. Only the highlighted row was legible, against the operating system's
+    // selection band, which is exactly what was reported: a tall empty list with one word in
+    // it. Nothing was missing and nothing failed to render, which is why it reads as a data
+    // fault rather than a CSS one.
+    //
+    // The primitive draws its own list in a portal and never asks the browser for one, so it
+    // cannot take a background from one place and a foreground from another.
+    expect(source.length).toBeGreaterThan(200);
+    expect(source).not.toMatch(/<select[\s>]/);
+    expect(source).toContain("<SelectTrigger");
+  });
+
+  it("and no other picker on this surface has one either", () => {
+    // READS THE DIRECTORY rather than naming files, so it is not green on the day a twelfth
+    // picker is added. Every field here inherits the same translucent theme, so a native
+    // `<select>` anywhere on this surface reproduces the defect.
+    //
+    // DELIBERATELY SCOPED TO THIS FOLDER and not platform-wide. The reproducing condition is
+    // a native select AND a translucent background AND a light foreground; the ~24 native
+    // selects elsewhere in the admin app sit on an opaque `bg-gray-*` and mostly set no
+    // colour at all, so they are correct. A platform-wide ban would fire on two dozen
+    // working files and be deleted by the first person it inconvenienced - the reasoning that
+    // narrowed the `GameIcon` ban in `13` s4.1g.
+    const dir = join(ROOT, "apps/admin/components/admin/games");
+    const files = readdirSync(dir, { recursive: true, encoding: "utf8" }).filter((name) =>
+      name.endsWith(".tsx"),
+    );
+    expect(files.length).toBeGreaterThan(10);
+
+    const offenders = files.filter((name) =>
+      /<select[\s>]/.test(stripComments(readFileSync(join(dir, name), "utf8"))),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it("generates the options from the vocabulary rather than listing them", () => {
+    const source = stripComments(read(DIALOG));
+
+    // So adding a genre reaches the picker with no second edit. A typed-out list is the
+    // "one rule, two copies" shape, and the copy that drifts is the one an operator reads.
+    expect(source).toMatch(/GAME_CATEGORIES\.map/);
+    for (const entry of GAME_CATEGORIES) {
+      expect(source).not.toContain(`"${entry.slug}"`);
+    }
+  });
+
+  it("its sentinels are non-empty and unreachable from the slug namespace", () => {
+    const source = stripComments(read(DIALOG));
+
+    const sentinels = [...source.matchAll(/const (?:NO_GENRE|CUSTOM) = "([^"]*)"/g)].map(
+      (match) => match[1],
+    );
+    expect(sentinels).toHaveLength(2);
+
+    for (const sentinel of sentinels) {
+      // Non-empty, because Radix reserves `""` for "nothing is selected" and THROWS on an
+      // item carrying it - so the native `<option value="">` could not be ported across as
+      // it stood, and "no genre" has to travel as a sentinel mapped back at the boundary.
+      expect(sentinel).not.toBe("");
+
+      // And it must be a value no operator can produce. Behavioural rather than a check on
+      // the spelling: a sentinel of "none" or "custom" is a genre somebody can legitimately
+      // type, and they would then find their own word clearing the field or opening the
+      // custom box. Normalising strips every non-alphanumeric run, so the double underscores
+      // are what put these outside the namespace - and this is what fails if anybody tidies
+      // them away.
+      expect(normaliseCategorySlug(sentinel)).not.toBe(sentinel);
+    }
   });
 });
 

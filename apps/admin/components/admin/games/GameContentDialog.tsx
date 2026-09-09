@@ -15,6 +15,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { CONTENT_LIMITS } from "@/lib/admin/game-content-fields";
 import {
   GAME_CATEGORIES,
@@ -329,7 +336,34 @@ export default function GameContentDialog({
  * seeded by a provider before this existed - opens in the custom box with its own text
  * intact. It is NOT silently remapped to the nearest known genre and it is NOT dropped: that
  * value is already the grouping key for whatever has been filed under it.
+ *
+ * IT USES THE SHARED `Select`, AND A NATIVE `<select>` HERE IS A LIVE DEFECT RATHER THAN A
+ * STYLE CHOICE. A browser paints the native drop-down list itself, taking the background from
+ * the element's own `background-color` but letting the options inherit `color`. This screen's
+ * fields are `bg-white/5 text-white`, and a translucent white composites over the browser's
+ * light list surface - so every option was white on white. Only the highlighted row was
+ * legible, against the operating system's selection band, which is exactly what the owner
+ * reported: a tall empty list with one word in it. Nothing was missing and nothing failed to
+ * render.
+ *
+ * // Reason: the eleven other pickers on this surface already use the primitive, which draws
+ * its own list in a portal and never asks the browser for one. This was the only native
+ * `<select>` left, so it was also the only one that could take a background from the theme and
+ * a foreground from the theme and still end up unreadable.
  */
+
+/**
+ * Radix refuses an empty `value` on an item - it reserves `""` for "nothing is selected", and
+ * a `SelectItem value=""` throws - so "no genre" travels as a sentinel and is mapped back to
+ * `""` at the boundary. Stored state is unaffected: absent is still absent.
+ *
+ * Same shape as `GamePlayStyleControl`'s `__follow_provider__`, and the double underscores are
+ * what keep both out of the slug namespace: `normaliseCategorySlug` strips every non
+ * alphanumeric run, so no genre an operator can type will ever collide with one of these.
+ */
+const NO_GENRE = "__no_genre__";
+const CUSTOM = "__custom__";
+
 function CategoryField({
   value,
   onChange,
@@ -352,27 +386,31 @@ function CategoryField({
     <div className="space-y-1.5">
       <Label>Genre</Label>
       <div className="grid gap-2 sm:grid-cols-2">
-        <select
-          className="h-10 rounded-md border border-white/10 bg-white/5 px-3 text-sm text-white"
-          value={mode === "custom" ? "__custom" : value}
-          onChange={(event) => {
-            if (event.target.value === "__custom") {
+        <Select
+          value={mode === "custom" ? CUSTOM : value === "" ? NO_GENRE : value}
+          onValueChange={(next) => {
+            if (next === CUSTOM) {
               setMode("custom");
               onChange(normaliseCategorySlug(typed) ?? "");
               return;
             }
             setMode("list");
-            onChange(event.target.value);
+            onChange(next === NO_GENRE ? "" : next);
           }}
         >
-          <option value="">No genre</option>
-          {GAME_CATEGORIES.map((entry) => (
-            <option key={entry.slug} value={entry.slug}>
-              {entry.label}
-            </option>
-          ))}
-          <option value="__custom">Something else…</option>
-        </select>
+          <SelectTrigger className="h-10 border-white/10 bg-white/5 text-sm text-white">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NO_GENRE}>No genre</SelectItem>
+            {GAME_CATEGORIES.map((entry) => (
+              <SelectItem key={entry.slug} value={entry.slug}>
+                {entry.label}
+              </SelectItem>
+            ))}
+            <SelectItem value={CUSTOM}>Something else…</SelectItem>
+          </SelectContent>
+        </Select>
 
         {mode === "custom" && (
           <Input

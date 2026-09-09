@@ -33,6 +33,7 @@ chapter covers risks to the programme and to the application.
 | **R7** | Raw-driver contest inserts miss the game label | High | High | **CLOSED 4 Sep 2026** - **six** writers found, not one; all stamp `contestGameLabel()`, pinned by a test that counts labels against inserts |
 | **R58** | **A client component importing one number from a service took the admin panel down** | High | **ALREADY OCCURRED** | **CLOSED 9 Sep 2026** |
 | **R59** | **Every dialog that asked to be wide rendered at 32rem** - an unprefixed `max-w-*` never displaces the primitive's `sm:max-w-lg` | Medium | **ALREADY OCCURRED, 31 dialogs** | **CLOSED for the games surface 9 Sep 2026**; the other 29 are an owner decision |
+| **R60** | **The Genre drop-down rendered white on white** - the last native `<select>` on the games surface, whose list the *browser* paints from the element's own translucent background | Low | **ALREADY OCCURRED** | **CLOSED 9 Sep 2026** - on the shared `Select`, like its eleven siblings |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -2211,6 +2212,74 @@ one the first person it inconveniences deletes, which is the same reasoning that
 Probed by `tools/probe-client-bundle-guard.ps1`: two probes, one restoring the admin defect
 verbatim and one reverting the main app's `import type` to a plain import, each red on exactly
 the expected test.
+
+---
+
+### R60 - A list the browser drew, in the theme's colours but not its background - **CLOSED 9 September 2026**
+
+The owner reported the Genre drop-down on the game content dialog opening as a tall, almost
+empty panel with a single word in it. **Nothing was missing.** All fifteen options were in the
+list, correctly generated from `GAME_CATEGORIES`, and every one of them was rendering white on
+white.
+
+A browser paints a native `<select>`'s drop-down list **itself**. It takes the list background
+from the element's own `background-color` and lets the options inherit `color`. This screen's
+fields are themed `bg-white/5 text-white` - and `bg-white/5` is `rgba(255,255,255,0.05)`, a
+*translucent* white, which composites over the browser's light list surface to something
+indistinguishable from white. So the options were white text on a white panel. The one row that
+was legible was the highlighted one, readable only because the operating system paints its own
+selection band behind it.
+
+**Two conditions are needed and this was the only place in either app with both.** The element
+has to be a native `<select>`, and its background has to be translucent. The games admin surface
+has **eleven** pickers on the shared `Select` primitive - which draws its own list in a portal
+and never asks the browser for one - and this was the **twelfth and only native one left**. The
+~24 native selects elsewhere in the admin app sit on an opaque `bg-gray-*`, which the browser is
+perfectly happy to paint a list with, and most of them set no `color` at all, so they have two
+independent protections.
+
+That is why the guard is **scoped to this folder rather than banning the element platform-wide**.
+A platform-wide ban would fire on two dozen files that work correctly and would be deleted by the
+first person it inconvenienced - the reasoning that narrowed the `GameIcon` ban in `13` s4.1g.
+
+#### Severity, stated in both directions
+
+**Low, and live.** It is an operator-facing legibility fault on one control: no money moved, no
+document is wrong, nothing was stored incorrectly, and **nothing was backfilled** because there
+is nothing to backfill. But it made the genre unsettable in practice - an operator could only
+land on a value by arrowing blindly through an invisible list - so `category` is the field most
+likely to be stale on any title touched before today, and that field is the grouping key tasks
+21-24 will join on.
+
+#### The one non-obvious thing the fix had to solve
+
+Radix reserves `""` for "nothing is selected" and **throws** on a `SelectItem` carrying it, so
+`<option value="">No genre</option>` could not be ported across as it stood. "No genre" travels
+as a sentinel and is mapped back to `""` at the boundary, so stored state is unchanged: absent is
+still absent.
+
+**The sentinel's spelling is load-bearing, not cosmetic.** `normaliseCategorySlug` strips every
+run of non-alphanumeric characters, so `__no_genre__` is a value no operator can produce by
+typing. A sentinel of `none` or `custom` is a genre somebody can legitimately type, and they
+would then find their own word clearing the field or opening the custom box. The test asserts
+this **behaviourally** - it reads the literals out of the file and feeds them to the real
+normaliser - rather than asserting the spelling, which is what fails if anybody tidies the
+underscores away.
+
+Same sentinel shape as `GamePlayStyleControl`'s `__follow_provider__`.
+
+#### Guard
+
+`__tests__/admin/game-categories.test.ts`, four tests: the dialog uses the primitive and no
+native `<select>`; **no other file on the surface has one either, read from the directory** rather
+than from a list of filenames, so it is not green on the day a thirteenth picker appears; the
+options are generated from the vocabulary rather than typed out, asserted by the **absence of
+every one of the thirteen slugs as a literal**; and the sentinels are non-empty and outside the
+slug namespace. `tools/probe-genre-picker.ps1`, 6 probes, all red on exactly the expected test
+with a blast radius of one.
+
+**Never verified by eye** - the screen is behind an admin sign-in the automated browser has no
+session for. The mechanism is proven, the pixels are not.
 
 ---
 
