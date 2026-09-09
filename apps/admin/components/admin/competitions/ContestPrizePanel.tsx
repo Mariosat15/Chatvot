@@ -6,6 +6,7 @@ import {
   type SettledLeaderboardEntry,
 } from "@/lib/admin/contest-result-presentation";
 import { projectPrizeDistribution } from "@/lib/utils/prize-projection";
+import { formatVolts } from "@/lib/utils/format-volts";
 
 /**
  * The operator's prize panel, which reports one of two genuinely different things.
@@ -39,7 +40,7 @@ export default function ContestPrizePanel({
   distribution,
   finalLeaderboard,
   competition,
-  currencySymbol,
+  unit,
   platformFeePercentage,
 }: {
   distribution: { rank?: number | null; percentage: number }[];
@@ -52,7 +53,8 @@ export default function ContestPrizePanel({
     prizePoolCredits?: number | null;
     platformFeePercentage?: number | null;
   };
-  currencySymbol: string;
+  /** `AppSettings.credits.name`. Pools and prizes are credits, never fiat. */
+  unit?: string;
   platformFeePercentage: number;
 }) {
   const settledRows = resolveSettledPrizeRows({
@@ -143,7 +145,7 @@ export default function ContestPrizePanel({
                 >
                   {row.paidAmount === null
                     ? "-"
-                    : `${currencySymbol}${row.paidAmount.toFixed(2)}`}
+                    : formatVolts(row.paidAmount, { unit })}
                 </p>
               </div>
 
@@ -209,7 +211,7 @@ export default function ContestPrizePanel({
                     }`}
                   >
                     {row.filled
-                      ? `${currencySymbol}${row.netAmount.toFixed(2)}`
+                      ? formatVolts(row.netAmount, { unit })
                       : "-"}
                   </p>
                 </div>
@@ -232,8 +234,7 @@ export default function ContestPrizePanel({
         <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
           <p className="text-xs text-blue-300">
             Winners receive net amounts after {platformFeePercentage}% platform
-            fee. Total pool: {currencySymbol}
-            {projected.prizePool.toFixed(2)}.
+            fee. Total pool: {formatVolts(projected.prizePool, { unit })}.
           </p>
         </div>
       )}

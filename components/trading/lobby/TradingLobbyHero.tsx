@@ -3,6 +3,7 @@ import { NeonHero, NeonStatusBadge } from "@/components/neon/Hero";
 import { tradingBanner } from "@/components/neon/banners";
 import { StatCard } from "@/components/neon/Cards";
 import InlineCountdown from "@/components/trading/InlineCountdown";
+import { formatVolts } from "@/lib/utils/format-volts";
 
 /**
  * The trading lobby's header, on the shared neon kit.
@@ -26,7 +27,8 @@ import InlineCountdown from "@/components/trading/InlineCountdown";
 export interface TradingLobbyHeroProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   competition: any;
-  currSymbol: string;
+  /** `AppSettings.credits.name`. Replaced a `currSymbol` prop handed the fiat symbol. */
+  unit?: string;
   isActive: boolean;
   isUpcoming: boolean;
   isCompleted: boolean;
@@ -35,7 +37,7 @@ export interface TradingLobbyHeroProps {
 
 export default function TradingLobbyHero({
   competition,
-  currSymbol,
+  unit,
   isActive,
   isUpcoming,
   isCompleted,
@@ -69,19 +71,19 @@ export default function TradingLobbyHero({
           icon={Trophy}
           accent="prize"
           label="Prize pool"
-          value={`${currSymbol}${(
-            competition.prizePool ||
-            competition.prizePoolCredits ||
-            0
-          ).toFixed(0)}`}
+          value={formatVolts(
+            competition.prizePool || competition.prizePoolCredits || 0,
+            { unit },
+          )}
         />
         <StatCard
           icon={Link2}
           accent="entry"
           label="Entry fee"
-          value={`${currSymbol}${
-            competition.entryFee || competition.entryFeeCredits || 0
-          }`}
+          value={formatVolts(
+            competition.entryFee || competition.entryFeeCredits || 0,
+            { unit },
+          )}
         />
         <StatCard
           icon={Users}

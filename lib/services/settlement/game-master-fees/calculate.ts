@@ -1,4 +1,7 @@
 import { Types } from "mongoose";
+// Reason: these are the operator's reconciliation lines for a settled contest, and every
+// figure in them is credits. They read euros, which is the same defect as the screens.
+import { formatVolts } from "@/lib/utils/format-volts";
 import type {
   GameMasterFeeCalculation,
   GameMasterPayment,
@@ -255,7 +258,7 @@ export async function calculateGameMasterFees({
     });
 
     console.log(
-      `   📊 GM ${gmId}: ${gmData.users.length} referrals × €${entryFee} × ${feePercentage}% = €${totalEarning.toFixed(2)}`,
+      `   📊 GM ${gmId}: ${gmData.users.length} referrals × ${formatVolts(entryFee)} × ${feePercentage}% = ${formatVolts(totalEarning)}`,
     );
   }
 

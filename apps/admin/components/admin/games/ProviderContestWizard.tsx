@@ -48,6 +48,7 @@ import { StepSettings } from "./wizard/StepSettings";
 import { StepSchedule } from "./wizard/StepSchedule";
 import { StepPrizes } from "./wizard/StepPrizes";
 import { StepReview } from "./wizard/StepReview";
+import { formatVolts } from "@/lib/utils/format-volts";
 
 /**
  * Creating a competition on a provider game.
@@ -133,7 +134,7 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
   const [errors, setErrors] = useState<string[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
 
-  const currencySymbol = settings?.credits?.symbol ?? "";
+  const unit = settings?.credits?.name;
   // Reason: `.at()` rather than STEPS[step] so the lookup is total. A computed index into an
   // array is also what the object-injection lint rule flags, and silencing that rule here
   // would silence it for whatever is added beside this line later.
@@ -436,7 +437,7 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
               icon={Coins}
               iconClassName="text-green-400"
               label="Entry Fee"
-              value={`${currencySymbol}${draft.entryFee}`}
+              value={formatVolts(draft.entryFee, { unit })}
             />
             <WizardPreviewRow
               icon={Trophy}
@@ -495,7 +496,7 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
             draft={draft}
             patch={patch}
             title={selected}
-            currencySymbol={currencySymbol}
+            unit={unit}
           />
         )}
 
@@ -510,7 +511,7 @@ export function ProviderContestWizard({ titles }: ProviderContestWizardProps) {
             title={selected}
             errors={errors}
             warnings={warnings}
-            currencySymbol={currencySymbol}
+            unit={unit}
           />
         )}
       </WizardStepCard>

@@ -8,6 +8,7 @@ import Link from "next/link";
 import { GameIcon } from "@/components/ui/GameIcon";
 import { useState, useEffect, useMemo } from "react";
 import { enterCompetition } from "@/lib/actions/trading/competition.actions";
+import { formatVolts } from "@/lib/utils/format-volts";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
@@ -454,12 +455,16 @@ export default function CompetitionCard({
             <div className="lg:hidden flex items-center gap-2 px-3 pb-2 flex-wrap">
               <div className="flex items-center gap-1 text-yellow-500">
                 <GameIcon name="trophy" size={14} />
-                <span className="text-sm font-black">{getPrizePool().toFixed(0)}</span>
-                <span className="text-[11px] text-gray-500">{settings?.credits.symbol}</span>
+                <span className="text-sm font-black">
+                  {formatVolts(getPrizePool(), { unit: settings?.credits?.name })}
+                </span>
               </div>
               <span className="text-gray-600">·</span>
               <span className="text-[11px] text-gray-400">
-                Fee: <span className="text-gray-200 font-bold">{getEntryFee()}</span>
+                Fee:{" "}
+                <span className="text-gray-200 font-bold">
+                  {formatVolts(getEntryFee(), { unit: settings?.credits?.name })}
+                </span>
               </span>
               <span className="text-gray-600">·</span>
               <span className="text-[11px] text-gray-400">
@@ -685,26 +690,21 @@ export default function CompetitionCard({
                     {isCancelled ? "Prize Pool (Refunded)" : "Grand Prize Pool"}
                   </p>
                 </div>
+                {/*
+                  The pot, and no fiat equivalent beneath it. A contest is denominated in
+                  credits - the pool is built from credit entry fees and paid out in credits -
+                  so a second unit under the headline figure invited a player to read the
+                  smaller of two numbers as what they were competing for.
+                */}
                 <div className="flex items-baseline gap-2">
                   <span
                     className={`text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r ${isCancelled ? "from-red-400 via-red-300 to-red-500 line-through" : "from-yellow-400 via-amber-300 to-yellow-500"} drop-shadow-lg`}
                   >
-                    {getPrizePool().toFixed(0)}
-                  </span>
-                  <span
-                    className={`text-sm font-bold ${isCancelled ? "text-red-400/80" : "text-yellow-400/80"}`}
-                  >
-                    {settings?.credits.symbol}
+                    {formatVolts(getPrizePool(), {
+                      unit: settings?.credits?.name,
+                    })}
                   </span>
                 </div>
-                {settings?.credits.showEUREquivalent && (
-                  <p className="text-xs text-gray-500">
-                    ≈ {settings?.currency?.symbol || "€"}
-                    {(
-                      getPrizePool() * (settings?.credits.valueInEUR || 1)
-                    ).toFixed(2)}
-                  </p>
-                )}
               </div>
               <div className="relative">
                 <div
@@ -737,7 +737,7 @@ export default function CompetitionCard({
                 <p
                   className={`text-sm font-bold ${isCancelled ? "text-red-400 line-through" : "text-gray-100"}`}
                 >
-                  {getEntryFee()} {settings?.credits.symbol}
+                  {formatVolts(getEntryFee(), { unit: settings?.credits?.name })}
                 </p>
               </div>
             </div>

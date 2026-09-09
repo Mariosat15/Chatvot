@@ -11,6 +11,7 @@ import TradingPosition from "@/database/models/trading/trading-position.model";
 import TradingOrder from "@/database/models/trading/trading-order.model";
 import TradeHistory from "@/database/models/trading/trade-history.model";
 import mongoose from "mongoose";
+import { formatVolts } from "@/lib/utils/format-volts";
 import {
   ForexSymbol,
   calculateUnrealizedPnL,
@@ -665,7 +666,9 @@ export async function emergencyCancelActiveCompetition(
           userId,
           type: "competition_emergency_cancelled",
           title: "🚨 Competition Emergency Cancelled",
-          message: `${competition.name} has been emergency cancelled due to: ${reason}. Your full entry fee of €${entryFee.toFixed(2)} has been refunded.`,
+          // Reason: the entry fee was debited in credits and the refund credits them back, so
+          // quoting euros here told a player they had been given back something they never paid.
+          message: `${competition.name} has been emergency cancelled due to: ${reason}. Your full entry fee of ${formatVolts(entryFee)} has been refunded.`,
           icon: "alert-octagon",
           category: "trading",
           priority: "urgent",

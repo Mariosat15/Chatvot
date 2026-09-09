@@ -13,6 +13,7 @@ import Link from "next/link";
 import { GameIcon } from "@/components/ui/GameIcon";
 import { useState, useEffect } from "react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
+import { formatVolts } from "@/lib/utils/format-volts";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface ChallengeCardProps {
@@ -469,23 +470,15 @@ export default function ChallengeCard({
                     Winner Takes
                   </p>
                 </div>
+                {/* The pot, in the unit it is actually paid in, and no fiat equivalent - see
+                    the same decision on `CompetitionCard`. */}
                 <div className="flex items-baseline gap-2">
                   <span className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-300 to-yellow-500 drop-shadow-lg">
-                    {challenge.winnerPrize?.toFixed(0) || 0}
-                  </span>
-                  <span className="text-sm font-bold text-yellow-400/80">
-                    {settings?.credits.symbol}
+                    {formatVolts(challenge.winnerPrize ?? 0, {
+                      unit: settings?.credits?.name,
+                    })}
                   </span>
                 </div>
-                {settings?.credits.showEUREquivalent && (
-                  <p className="text-xs text-gray-500">
-                    ≈ {settings?.currency?.symbol || "€"}
-                    {(
-                      challenge.winnerPrize *
-                      (settings?.credits.valueInEUR || 1)
-                    ).toFixed(2)}
-                  </p>
-                )}
               </div>
               <div className="relative">
                 <div className="absolute inset-0 bg-yellow-500 rounded-xl blur-lg opacity-30 animate-pulse"></div>
@@ -508,7 +501,9 @@ export default function ChallengeCard({
               <div>
                 <p className="text-[11px] text-gray-500 uppercase">Entry Fee</p>
                 <p className="text-sm font-bold text-gray-100">
-                  {challenge.entryFee} {settings?.credits.symbol}
+                  {formatVolts(challenge.entryFee, {
+                    unit: settings?.credits?.name,
+                  })}
                 </p>
               </div>
             </div>

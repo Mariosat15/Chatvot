@@ -18,6 +18,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import { connectToDatabase } from "@/database/mongoose";
 import AppSettings from "@/database/models/app-settings.model";
 import Challenge from "@/database/models/trading/challenge.model";
+import { formatVolts } from "@/lib/utils/format-volts";
 
 interface AdminChallengeViewPageProps {
   params: Promise<{ id: string }>;
@@ -36,10 +37,10 @@ const AdminChallengeViewPage = async ({
   const appSettings = (await AppSettings.findById(
     "app-settings",
   ).lean()) as any;
-  const _creditName = appSettings?.credits?.name || "Credits";
-  const _creditSymbol = appSettings?.credits?.symbol || "⚡";
-  const currencySymbol = appSettings?.currency?.symbol || "€";
-  const _currencyCode = appSettings?.currency?.code || "EUR";
+  // Reason: every amount on this screen - the pot, both entry fees, the winner's prize, the
+  // platform fee and each Game Master's earning - is credits. It read `currency.symbol`, so an
+  // operator reconciling a challenge saw euros against figures the ledger moves in credits.
+  const unit = appSettings?.credits?.name;
 
   try {
     // Get challenge data
@@ -202,8 +203,7 @@ const AdminChallengeViewPage = async ({
                 <div>
                   <p className="text-xs text-gray-500">Prize Pool</p>
                   <p className="text-2xl font-bold text-yellow-400">
-                    {currencySymbol}
-                    {challenge.prizePool?.toLocaleString()}
+                    {formatVolts(challenge.prizePool, { unit })}
                   </p>
                 </div>
               </div>
@@ -217,8 +217,7 @@ const AdminChallengeViewPage = async ({
                 <div>
                   <p className="text-xs text-gray-500">Entry Fee</p>
                   <p className="text-2xl font-bold text-green-400">
-                    {currencySymbol}
-                    {challenge.entryFee?.toLocaleString()}
+                    {formatVolts(challenge.entryFee, { unit })}
                   </p>
                 </div>
               </div>
@@ -232,8 +231,7 @@ const AdminChallengeViewPage = async ({
                 <div>
                   <p className="text-xs text-gray-500">Winner Prize</p>
                   <p className="text-2xl font-bold text-orange-400">
-                    {currencySymbol}
-                    {challenge.winnerPrize?.toLocaleString()}
+                    {formatVolts(challenge.winnerPrize, { unit })}
                   </p>
                 </div>
               </div>
@@ -306,8 +304,7 @@ const AdminChallengeViewPage = async ({
                   <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
                     <p className="text-xs text-gray-500 mb-1">Platform Fee</p>
                     <p className="text-lg font-semibold text-gray-100">
-                      {challenge.platformFeePercentage}% ({currencySymbol}
-                      {challenge.platformFeeAmount})
+                      {challenge.platformFeePercentage}% ({formatVolts(challenge.platformFeeAmount, { unit })})
                     </p>
                   </div>
 
@@ -461,8 +458,7 @@ const AdminChallengeViewPage = async ({
                                   Prize Won:
                                 </span>
                                 <span className="text-yellow-400 font-bold">
-                                  {currencySymbol}
-                                  {challenge.winnerPrize}
+                                  {formatVolts(challenge.winnerPrize, { unit })}
                                 </span>
                               </div>
                             )}
@@ -488,8 +484,7 @@ const AdminChallengeViewPage = async ({
                             <p className="text-xs text-purple-400 mt-1">
                               GM Earned:{" "}
                               <span className="font-bold">
-                                {currencySymbol}
-                                {challengerGm.gmEarning.toFixed(2)}
+                                {formatVolts(challengerGm.gmEarning, { unit })}
                               </span>
                             </p>
                           </div>
@@ -584,8 +579,7 @@ const AdminChallengeViewPage = async ({
                                   Prize Won:
                                 </span>
                                 <span className="text-yellow-400 font-bold">
-                                  {currencySymbol}
-                                  {challenge.winnerPrize}
+                                  {formatVolts(challenge.winnerPrize, { unit })}
                                 </span>
                               </div>
                             )}
@@ -611,8 +605,7 @@ const AdminChallengeViewPage = async ({
                             <p className="text-xs text-purple-400 mt-1">
                               GM Earned:{" "}
                               <span className="font-bold">
-                                {currencySymbol}
-                                {challengedGm.gmEarning.toFixed(2)}
+                                {formatVolts(challengedGm.gmEarning, { unit })}
                               </span>
                             </p>
                           </div>
@@ -704,8 +697,7 @@ const AdminChallengeViewPage = async ({
                   <p className="text-yellow-300/70 mb-3">Challenge Winner</p>
                   <div className="bg-yellow-500/20 px-4 py-3 rounded-lg">
                     <p className="text-yellow-400 font-bold text-xl">
-                      Earned {currencySymbol}
-                      {challenge.winnerPrize}
+                      Earned {formatVolts(challenge.winnerPrize, { unit })}
                     </p>
                   </div>
                   {challenge.winnerPnL !== undefined && (
@@ -766,8 +758,7 @@ const AdminChallengeViewPage = async ({
                   <div className="flex justify-between">
                     <span className="text-gray-400">Total Pool:</span>
                     <span className="text-white font-semibold">
-                      {currencySymbol}
-                      {challenge.prizePool}
+                      {formatVolts(challenge.prizePool, { unit })}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -775,15 +766,13 @@ const AdminChallengeViewPage = async ({
                       Platform Fee ({challenge.platformFeePercentage}%):
                     </span>
                     <span className="text-blue-400 font-semibold">
-                      -{currencySymbol}
-                      {challenge.platformFeeAmount}
+                      -{formatVolts(challenge.platformFeeAmount, { unit })}
                     </span>
                   </div>
                   <div className="flex justify-between pt-2 border-t border-gray-700">
                     <span className="text-gray-400">Winner Receives:</span>
                     <span className="text-yellow-400 font-bold">
-                      {currencySymbol}
-                      {challenge.winnerPrize}
+                      {formatVolts(challenge.winnerPrize, { unit })}
                     </span>
                   </div>
                 </div>

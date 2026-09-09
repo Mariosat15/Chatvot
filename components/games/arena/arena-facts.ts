@@ -100,12 +100,14 @@ export function scoringSummary(
   return null;
 }
 
-/** A whole-number money figure with the platform's symbol, or a dash when there is none. */
-export function money(amount: number | undefined, symbol: string): string {
-  if (typeof amount !== "number" || !Number.isFinite(amount)) return "—";
-  const rounded = Math.round(amount * 100) / 100;
-  return `${symbol}${Number.isInteger(rounded) ? rounded : rounded.toFixed(2)}`;
-}
+/*
+  `money(amount, symbol)` used to live here. It is gone rather than reworded: it was a second
+  implementation of `lib/utils/format-volts.ts` - same whole-number rule, same dash for a
+  non-finite amount - differing only in that it took a symbol and was handed the fiat one, so
+  the arena's prize pool read `€30`. Two copies of one rule is the shape behind `referenceId`,
+  `failedReason`, `challengeId` and the Game Master `||`, and a formatter is no exception: the
+  copies drift in the direction of one screen quoting a different figure from the next.
+*/
 
 /** `mm:ss` for a duration in seconds, used for the round clock. */
 export function clock(totalSeconds: number | undefined): string | null {

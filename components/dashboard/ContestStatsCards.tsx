@@ -3,6 +3,7 @@
 import { Trophy, Award, Swords, Crown } from "lucide-react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import { motion } from "framer-motion";
+import { formatVolts } from "@/lib/utils/format-volts";
 
 function HorizontalBar({
   label,
@@ -95,8 +96,9 @@ export default function ContestStatsCards({
             </div>
             <div className="text-right min-w-0">
               <p className="text-sm sm:text-lg font-bold text-yellow-400 truncate">
-                {competitionStats.totalCreditsWon.toFixed(settings.credits.decimals)}{" "}
-                {settings.credits.symbol}
+                {formatVolts(competitionStats.totalCreditsWon, {
+                  unit: settings?.credits?.name,
+                })}
               </p>
               <p className="text-[11px] sm:text-xs text-gray-400">Total Prizes</p>
             </div>
@@ -151,8 +153,9 @@ export default function ContestStatsCards({
             </div>
             <div className="text-right min-w-0">
               <p className="text-sm sm:text-lg font-bold text-yellow-400 truncate">
-                {challengeStats.totalCreditsWon.toFixed(settings.credits.decimals)}{" "}
-                {settings.credits.symbol}
+                {formatVolts(challengeStats.totalCreditsWon, {
+                  unit: settings?.credits?.name,
+                })}
               </p>
               <p className="text-[11px] sm:text-xs text-gray-400">Total Won</p>
             </div>

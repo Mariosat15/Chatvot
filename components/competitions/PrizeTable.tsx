@@ -1,6 +1,7 @@
 import { Gift } from "lucide-react";
 import { NeonRankBadge } from "@/components/neon/LeaderboardRow";
 import { projectPrizeDistribution } from "@/lib/utils/prize-projection";
+import { formatVolts } from "@/lib/utils/format-volts";
 
 /**
  * The ranked prize table, with the unclaimed-position redistribution the trading lobby has
@@ -38,11 +39,17 @@ import { projectPrizeDistribution } from "@/lib/utils/prize-projection";
 
 export default function PrizeTable({
   competition,
-  currSymbol,
+  unit,
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   competition: any;
-  currSymbol: string;
+  /**
+   * `AppSettings.credits.name`. Optional, because every amount here is a credit amount and
+   * `formatVolts` already knows what a credit is called - the prop exists only so an operator
+   * who renamed the unit sees their name. It replaced a `currSymbol` prop that was handed the
+   * *fiat* symbol, so every prize in this table used to read `€33.33`.
+   */
+  unit?: string;
 }) {
   const { rows, prizePositions, unclaimedPercentage, allFilled } =
     projectPrizeDistribution(competition);
@@ -91,7 +98,7 @@ export default function PrizeTable({
                 row.filled ? "text-amber-300" : "text-gray-500"
               }`}
             >
-              {row.filled ? `${currSymbol}${row.netAmount.toFixed(2)}` : "-"}
+              {row.filled ? formatVolts(row.netAmount, { unit }) : "-"}
             </span>
           </div>
         ))}

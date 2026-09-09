@@ -82,8 +82,12 @@ const CompetitionDetailsPage = async ({
         // Reason the shape is declared on the query rather than cast at the use site: the cast
         // was `as any`, which the pre-commit hook rejects now that this file is being edited.
         // Naming the one field that is read is both narrower and self-documenting.
+        //
+        // It reads `credits.name` and no longer `currency.symbol`. Every amount this page hands
+        // down is a credit amount, so the fiat symbol was the wrong field: an entry fee of 50
+        // credits rendered as `€50` on every screen below here.
         AppSettingsModel.findById("app-settings")
-          .lean<{ currency?: { symbol?: string } } | null>()
+          .lean<{ credits?: { name?: string } } | null>()
           .catch(() => null),
       ]);
     // A well-formed id for a contest that is not there. `getCompetitionById` returns `null` for
@@ -93,7 +97,7 @@ const CompetitionDetailsPage = async ({
       notFound();
     }
 
-    const currSymbol = appSettings?.currency?.symbol || "€";
+    const unit = appSettings?.credits?.name || undefined;
     // getUserParticipant depends on isUserIn — must be sequential
     const userParticipant = isUserIn ? await getUserParticipant(id) : null;
 
@@ -190,7 +194,7 @@ const CompetitionDetailsPage = async ({
           isFull={isFull}
           userId={userId}
           walletBalance={walletBalance.balance}
-          currencySymbol={currSymbol}
+          unit={unit}
           participantStatus={userParticipant?.status}
           registrationClosed={registrationClosed}
         />
@@ -308,7 +312,7 @@ const CompetitionDetailsPage = async ({
 
         <TradingLobbyHero
           competition={competition}
-          currSymbol={currSymbol}
+          unit={unit}
           isActive={isActive}
           isUpcoming={isUpcoming}
           isCompleted={isCompleted}
@@ -400,7 +404,7 @@ const CompetitionDetailsPage = async ({
             competition={competition}
             riskSettings={riskSettings}
             difficultyData={difficultyData}
-            currSymbol={currSymbol}
+            unit={unit}
             walletBalance={walletBalance.balance}
             isUserIn={isUserIn && !!userParticipant}
             isFull={isFull}

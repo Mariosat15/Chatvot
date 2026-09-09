@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
+import { formatVoltsCompact } from "@/lib/utils/format-volts";
 
 /**
  * GET /api/landing/competitions
@@ -72,9 +73,9 @@ export async function GET() {
         name: comp.name,
         description: comp.description?.slice(0, 100) || "",
         prizePool: comp.prizePool || 0,
-        prizePoolFormatted: formatCurrency(comp.prizePool || 0),
+        prizePoolFormatted: formatVoltsCompact(comp.prizePool || 0),
         entryFee: comp.entryFee || 0,
-        entryFeeFormatted: formatCurrency(comp.entryFee || 0),
+        entryFeeFormatted: formatVoltsCompact(comp.entryFee || 0),
         currentParticipants: comp.currentParticipants || 0,
         maxParticipants: comp.maxParticipants || 100,
         participantsPercentage: Math.round(
@@ -141,12 +142,6 @@ function formatTimeRemaining(ms: number): string {
   return `${minutes}m`;
 }
 
-function formatCurrency(amount: number): string {
-  if (amount >= 1000000) {
-    return "$" + (amount / 1000000).toFixed(1) + "M";
-  }
-  if (amount >= 1000) {
-    return "$" + (amount / 1000).toFixed(0) + "K";
-  }
-  return "$" + amount.toLocaleString();
-}
+// Reason: this route's private `formatCurrency` prefixed `$` to a prize pool and an entry fee,
+// both of which are credits. Replaced by the shared Volts formatter rather than a corrected
+// copy, because the sibling stats route carried the identical helper.

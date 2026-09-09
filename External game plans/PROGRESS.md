@@ -41,6 +41,7 @@
 | **"When I try to leave, the game is stuck"** | **Fixed 8 Sep 2026** (`13` s1.1g), and the report was accurate. Leaving moves to `confirming`, which is right - **leaving does not hand the attempt back**, so returning straight to the contest would let a player believe it had. But that state polls for **sixty seconds** before the panel with a Back button replaces it, and for that minute it rendered a spinner, two sentences and **no control of any kind**, to a player who had just pressed the one button meaning *get me out of here*. **The wait was already bounded, which is exactly why this hid** - `13` s1.1c and the frame's stall panel both fixed unbounded waits and this state read as covered, because it does terminate somewhere honest. **A bound is not an escape hatch**, and sixty seconds of no affordance is indistinguishable from a hang. **The worse half was a false statement:** it said "we are waiting for the game to confirm your score", and the overwhelming reason to press Leave is that **the game never started**, so there is no score and never was. The two routes in are now two situations - *Confirming your result* when the frame reported finished, *Checking how your round ended* when the player walked out - and **both say the player need not wait**, because the result arrives by signed callback into our own database and nothing about it needs the page open. It still polls on the leaving path, deliberately, since **R48** means a partial score may yet be reported. **The guard is positional**: the panel's other two branches always had a Back link, so asserting the file contains one is green on the defect; the test slices the branch by index and asserts a length, because a slice that found nothing passes everything. **95 tests, 7 probes red with a blast radius of one** |
 | **Does a contest need a "shape" per game family?** | **YES, AND THE COMPETITION HALF IS BUILT - 8 Sep 2026** (`22` s8, `12` s2.11), on the owner's instruction to build rather than defer. A title declares **`playMode: "anytime" \| "scheduled"`**, resolved **once** by `lib/services/games/play-shape.ts` (mirrored, byte-identical test) into rules that are **forced at write time**: entry closes at the gun, one attempt each, and the round-start reservation is dropped because there is nothing left to reserve for. The wizard's date wording and its withheld controls read from the **same object**, so it cannot promise a setting the create service is about to override. **The flag this needed already existed and was dead** - `GameCapabilities.requiresSyncPlay`, declared, set false twice and read by nothing, the fourth instance after `isPaused`, `lastSuccessfulRoundAt` and `family` - and it is **deleted rather than wired up**, because a capability is module-level and one provider module backs the whole catalogue, so it can only ever give one answer for a race, a puzzle and a quiz at once. **The gate deliberately fails towards the LESS constrained answer**, which is the opposite of almost everything else here and must not be "corrected": a race wrongly run as `anytime` still pays comparable scores, because `supportsContentSeed` guarantees identical content, while a puzzle wrongly run as `scheduled` **shuts entry at the start and turns away paying players**. **Forcing at write time meant no runtime gate had to learn about play modes** - `roundFitsInWindow`, `RoundPreflight` and `fullRoundCutoffMs` all read the stored policy already. **Three things are not built and must not be summarised as done:** challenges (X10 / E8, and they inherit **R50**, since `ChallengeParticipant.score` still defaults to `0`), the contest-end default, and the live leaderboard (X7). **No title declares `scheduled` yet**, so the path is exercised only by tests until X4. Requirements HTML at **version 1.4**; the field is optional with a default, so nothing built against 1.3 is invalidated. **27 tests, 27 probes.** Three findings from the design still reframe the owner's question. **`provider_game.family` already exists, is required, is validated on ingest and is read by nothing** - its comment claimed it drives which formats the wizard offers, which `supportsCompetition` / `supportsOneVsOne` actually do; corrected in place in both model copies. **It is the wrong axis anyway**, because it describes whether a game needs an *opponent*, so **a race is `independent`** - what a race needs is a shared *moment*, which no field describes. And **five of the seven things a simultaneous contest changes were already expressible** with `attemptsPolicy: "single"`, the derived window, the existing `playWindowStart` refusal and R45/R50's no-score handling, which is why the build is a declaration and a resolver rather than a lifecycle - what was missing was anything **stopping an operator configuring a race as a staggered contest**, and that is now what the shape forces. **No synchronised-launch machinery was written, and that was verified rather than assumed:** the launch service already refuses before `playWindowStart`, the lobby already counts down to it, and `resolveExpiry` already clamps a late starter to the window end. The finding most likely to be lost is s2.1: **a staggered race with a fixed content seed is not unfair**, since every player gets the same track and clock, so what is lost is the *event* rather than the comparability - a real product requirement and **not** a payout defect |
 | **Who decides a game's play style?** | **The operator can, from 9 Sep 2026** (`22` s9, `12` s4.2c), which is the first step and for now the whole of **Task 10** in the owner's task document. The row above left the shape entirely in the provider's hands - right for a third party, **wrong for the one provider we run ourselves**, where the declaration is a TypeScript literal in `games-service/src/games/titles.ts` and making a title a race meant an edit, a build and a redeploy. A **Play style** control now sits on every row of the Games list, writing `provider_game.playModeOverride` through its own section-guarded route with its own audit line, and the resolved style is badged on the wizard's game picker because it changes more of the wizard than anything else about the title. **Nothing about the rules changed** - `22` s8.2 is unaltered and every gate still reads the same three forced values. **Four things drift easily.** It is a **second field, never an edit to `playMode`**: that one is in `providerOwnedFields`, so a control writing there saves, toasts and is reverted by the next sync with no error and nothing in a log - and because the safety lives in an allow-list in a *different file*, it is pinned by a test that runs a **real sync** and asserts the provider's own field **was** rewritten in the same pass, since asserting only that the override survived would pass against a sync that did nothing. **`head_to_head` beats the operator**, not the other way round - two people cannot play each other at different times, so an override there would be a declared, written, dead field, the fifth instance - and the control withholds itself with the reason rather than being greyed out. **Clearing uses `$unset`, never `""`**, because an empty string read literally would mask a provider's `scheduled` declaration behind an override nobody chose. And it is **out of the title-and-logo content editor deliberately** and on `NEVER_EDITABLE_CONTENT_FIELDS`: that dialog writes copy an operator can get wrong harmlessly, this decides when entry closes and how many attempts a player gets on a contest people have paid into. **37 tests, 19 probes.** **No title is `scheduled` yet and no override has been set in production**, so the scheduled path is still exercised only by tests. **Turn-based and heat-based stay BLOCKED** beside the per-round provider cost - a bracket needs opponents, and nothing in the catalogue and no signed provider works either way, so designing one now means inventing a protocol against no counterparty |
+| **What unit is a competition priced in?** | **Credits, and every screen says so from 9 Sep 2026** (task doc **1.1**) - and before that around forty render sites prefixed a credit amount with `settings.currency.symbol`, the **fiat** symbol configured for deposits and invoices, so a 50-credit entry fee read `EUR 50`. Two landing routes were worse, each carrying a private `formatCurrency` hard-coded to `$`, so a provider contest's prize pool advertised to signed-out visitors read `+$30.00`. **Every amount was correct and only its unit was a lie**, which is the whole reason forty sites survived: no error, no log line, and the figure reconciles perfectly against the ledger - so the guards are **structural rather than behavioural**, there being no wrong number to assert on. One mirrored formatter, `lib/utils/format-volts.ts`, **which never converts**, and that refusal is the finding rather than a simplification: the platform stores what a credit is worth **twice and the two defaults disagree by a factor of a hundred** - `AppSettings.credits.valueInEUR` at 1 credit = EUR 1 drives the player's "approximately EUR x" line, while `CreditConversionSettings.eurToCreditsRate` at 100 credits = EUR 1 is what deposits, withdrawals and the admin financial screens move money on. **That is a separate defect, recorded at the foot of the module and deliberately not fixed**; this work removes the fiat equivalent from competition surfaces rather than correcting it, because a contest is denominated in credits and has no business quoting a second unit. **Do not summarise it as a display pass**: the same wrong unit reached players by **email** and operators in the **settlement reconciliation logs**. **There are two units on a trading contest and merging them is the tempting mistake** - a prize pool is credits, a trader's equity and P&L are simulated trading capital in the contest's quote currency - so the ranking panels write both and the guard **counts** `${currSymbol}` interpolations, a probe relabelling one metric having stayed green against a presence check while leaving the other right. **An absent amount is a dash, never a zero**, R45 and R50's rule one layer out. The unit stays configurable and `"Volts"` is only the default, so a rename reaches every screen and **not** the few server-composed strings, which have no React context - a boundary recorded rather than implied away, and strictly smaller than the euro sign it replaces. The assistant's no-fiat rule is **appended** to trading's prompt rather than written into it, because a test pins that prompt character for character as the only evidence the trading wizard still writes what it wrote; the guarantee is now "the historical string plus one shared rule" and **the composition itself is asserted**. **Two carve-outs are correct and must not be finished off:** deposit and withdrawal strings are genuinely fiat, so a control probe adding a euro deposit line **stays green on purpose**, and the admin analytics screen keeps its `creditsToEUR` figures, which are an operator converting deliberately. **One defect was introduced and caught before shipping, and the diagnostic is the point:** five admin challenge-view calls kept the `.toFixed(2)` / `.toLocaleString()` from the strings they replaced, so a **string** reached the formatter, hit the non-number guard and would have rendered the prize pool, entry fee and winner's prize as `-`. The typecheck saw only **two of the five** - that page's challenge object is loosely typed, so `?.toLocaleString()` widens to `any` - and every structural test here stayed green, because they ask whether a screen reads the fiat symbol and it does not. **Diffing the typecheck against a stashed baseline is what found it**, two new entries inside 225 being invisible in a count; closed with a repo-wide scan rather than a list of five files, plus the behavioural half. Separately **four typecheck errors disappeared**, which got the same suspicion as a rise and turned out to be real: `ContestStatsCards.tsx` read `settings.credits.decimals` unguarded on a context that can be `null`, so four latent dashboard crash paths went with the unit fix. **68 tests, 26 probes red with a blast radius of one** |
 | **The content-seed fairness gate** | **R53, closed 8 Sep 2026.** Found while mapping the row above. `supportsContentSeed` - which `01` s4.3 calls the most important single field in the specification, and which underwrites the skill-not-chance position - **was read by no gate in either app**, while **three separate comments in three files** asserted it gated paid entry. Fifth instance of a comment claiming a check that does not run, and the first repeated three times: **agreement between comments is not corroboration, because the second and third were written by reading the first.** What hid it is that its two siblings *are* enforced, in the pre-flight and in the wizard - **a partially-implemented pattern is more dangerous than an absent one.** **Latent, nothing backfilled**: every existing title declares it `true`, but it is exactly the flag a real provider sets `false` at X4, and the failure then is a paid contest where every player faces different content, ranked, settled and paid in silence. One unconditional check in both mirrored pre-flight copies, **required** on the input so a caller cannot fail open again, both writers counted with `rg` first, and the wizard disabling the title with the capability named. **Not scoped to `competition`** despite the spec's word, so the challenge half is a tripwire for E8. 4 tests, 4 probes |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
 | **Phase in progress** | **X4a - STARTED 6 Sep 2026. The two halves connected 7 Sep 2026** - see the row above and `21` s4.1d. What remains is the *clicking* half: the provider has still never been registered through the admin screens, and nothing has been deployed. `games-service/` (the provider) and the `chartvolt-games` adapter (the platform) are both code-complete. **The game is playable by a human**: the launch URL serves a real board, verified in a browser on both titles, which also fixed a live defect - an unstarted round reported itself as `finished`, so the first screen a paying player saw was a result screen for a round they had not played. It also **found and then closed a defect in the platform's own published auth scheme** (**R34**): there was no `callbackToken` field anywhere, so a provider implementing `Bearer {CALLBACK_TOKEN}` exactly was rejected and logged as a probable attack. Latent throughout, so nothing was backfilled. **Nothing technical now stands between the two halves** - what remains is deploying the service and registering it. It is now **deployable**: a PM2 entry, an nginx block for a `games.` subdomain, `env.example` and a `deploy/README.md` runbook, plus **two production-only boot guards** for the play origin and the frame allowlist, both of which previously failed invisibly. Writing the runbook also found that the admin panel **could not register a loopback provider at all**. See the three 6 Sep work-log entries |
@@ -681,6 +682,136 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 9 Sep 2026 - X6 - A COMPETITION IS PRICED IN CREDITS, AND NOW SAYS SO (TASK 1)
+
+**Shipped:** `lib/utils/format-volts.ts`, mirrored byte-for-byte into `apps/admin/lib/utils/`,
+and 41 files moved onto it. Entry fees, prize pools, prizes, refunds and rewards are credits -
+debited from and credited to `CreditWallet.creditBalance` - and around forty render sites
+prefixed them with `settings.currency.symbol`, which is the **fiat** symbol configured for
+deposits and invoices, so a 50-credit entry fee read `EUR 50`. The two landing routes were
+worse: each carried its own private `formatCurrency` hard-coded to `$`, so the prize pool
+advertised to signed-out visitors read `+$30.00`. **66 tests, 24 probes**, every one red on
+exactly the expected test with a blast radius of one, plus one control probe green on purpose.
+
+**Files touched:** `lib/utils/format-volts.ts` and `apps/admin/lib/utils/format-volts.ts`
+(new, byte-identical); `components/competitions/PrizeTable.tsx`,
+`components/trading/{CompetitionCard,ChallengeCard,CompetitionDashboard,CompetitionEntryButton,LiveRankingPanel,GameLiveRankingPanel,LastManStandingPopup,LastManStandingListener}.tsx`,
+`components/trading/lobby/*`, `components/games/{ProviderContestLobby,ProviderResultsScreen}.tsx`,
+`components/games/arena/{ArenaContestPanel,arena-facts}.ts?x`,
+`components/dashboard/ContestStatsCards.tsx`; `app/(root)/competitions/**`,
+`app/api/landing/{competitions,stats}/route.ts`; `apps/admin/components/admin/**`
+(analytics, the two wizards, both editors, the list, the prize panels),
+`apps/admin/app/competitions/view/[id]/page.tsx`, `apps/admin/app/challenges/view/[id]/page.tsx`;
+`lib/services/notification.service.ts` + mirror,
+`lib/services/settlement/fees.service.ts` + mirror,
+`lib/services/settlement/game-master-fees/calculate.ts` + mirror,
+`apps/admin/lib/actions/trading/competition-cancel.actions.ts`,
+`apps/admin/app/api/competitions/[id]/adjust-results/route.ts`;
+`apps/admin/lib/admin/ai-contest-vocabulary.ts`;
+`__tests__/admin/volts-currency.test.ts` (new), `tools/probe-volts-currency.ps1` (new).
+
+**Deviated from plan:** the task doc suggests `formatVolts` and optionally a compact `500 V`.
+Both exist, but the unit is **not hard-coded to "Volts"** - `AppSettings.credits.name` is an
+existing configurable setting, so the formatter takes it and `"Volts"` is only the default.
+Recorded as task doc **1.1**. The other deviation is a refusal: the formatter **cannot
+convert**, so nothing on a competition surface quotes a fiat equivalent any more rather than
+quoting a corrected one.
+
+**Findings, in the order they matter.** **Every amount was already correct and only its unit
+was a lie** - no error, no log line, and each figure reconciles perfectly against the ledger,
+which is why forty sites survived and why every guard here is structural. **The reach was
+wider than the screens:** the same wrong unit reached players by **email** (`notifyCompetitionWon`,
+the podium and prize-received templates, the emergency-cancellation refund) and reached
+operators in the **settlement reconciliation logs** they check a contest against. And while
+mapping it, the platform turned out to store what a credit is worth **twice, with the two
+defaults disagreeing by a factor of a hundred**: `AppSettings.credits.valueInEUR` defaults to
+1 credit = EUR 1 and drives the player's "approximately EUR x" line, while
+`CreditConversionSettings.eurToCreditsRate` defaults to 100 credits = EUR 1 and is what
+deposits, withdrawals, exports and the admin financial dashboard move money on. **So the
+player's fiat equivalent and the operator's are computed from different stored numbers.** That
+is a real defect and it is **out of scope here, recorded at the foot of the module** where
+somebody will come looking - a formatter that could convert would be one that could quietly
+pick the wrong rate.
+
+**Three things are load-bearing and easy to undo by tidying up.** **There are two units on a
+trading contest**: a prize pool and a reward are credits, a trader's starting capital, equity
+and P&L are *simulated trading capital* in the contest's own quote currency. The two ranking
+panels therefore write Volts and `currSymbol` side by side, and the guard is a **count** of
+`${currSymbol}` interpolations rather than an assertion that it appears - a probe relabelling
+one metric as credits stayed green against the presence check while leaving the other one
+right, which is precisely how half a screen ends up in the wrong unit. **An absent amount is a
+dash, never a zero** - `NaN` is one `parseFloat` away on every admin form, and `NaN Volts` in a
+prize column is worse than a dash because it is a number shaped like a payout; R45's unheld
+rank and R50's phantom score, one layer out. And **the assistant's no-fiat rule is appended to
+trading's prompt rather than written into it**: a test pins that prompt character for
+character, being the only evidence the trading wizard still writes what it wrote, so
+`TRADING_SYSTEM_PROMPT_HISTORICAL` keeps the literal and `TRADING_SYSTEM_PROMPT` is composed as
+`HISTORICAL + NO_FIAT_RULE`. **The guarantee is genuinely weaker now** - "the historical string
+plus one shared rule" - which is why the composition itself is asserted rather than a
+`toContain` on the opening sentence, that being green against a prompt somebody has rewritten
+around it. The rule forbids naming a currency **without naming the unit**, a prompt being the
+one place that cannot read the operator's setting.
+
+**Two carve-outs are correct and must not be "finished off".** Deposit, withdrawal and invoice
+strings are genuinely fiat, so the notification guard is scoped to contest money and **probe 22
+adds a euro deposit line and must stay GREEN** - a guard that fires on correct code is one the
+first person it inconveniences deletes. The admin analytics screen likewise keeps its
+`creditsToEUR` reconciliation figures, which are an operator converting on purpose.
+
+**One defect was introduced by this work and caught before it shipped, and how it was caught is
+the useful part.** Five call sites on the admin challenge view kept the pre-formatting from the
+strings they replaced - `formatVolts(challenge.prizePool?.toLocaleString(), { unit })` and
+`formatVolts(gm.gmEarning.toFixed(2), { unit })`. The formatter does both jobs itself, so the
+argument arrived as a **string**, hit the non-number guard and returned the dash: **the prize
+pool, the entry fee and the winner's prize would have rendered as `-` on the one screen whose
+purpose is those three numbers.** That is the absent-amount rule biting from the far side - a
+dash is right for a missing amount and is a lie about a present one, and it looks exactly like
+data that has not loaded. **Neither instrument was sufficient alone.** The admin typecheck saw
+only **two of the five**, because that page's challenge object is loosely typed so
+`?.toLocaleString()` widens to `any` on the other three and the compiler had nothing to object
+to - the older "a hand-written type is not the schema" rule in a new place. And **every
+structural test in this file stayed green**, because they ask whether a screen reads the fiat
+symbol and this screen does not. What exposed it was **diffing the typecheck against a stashed
+baseline rather than reading the total**: two new entries inside 225, invisible in a count.
+Closed by a **repo-wide scan** for the pattern rather than a list of the five files, on R51's
+rule, plus a behavioural test that a pre-formatted string really does return the dash - without
+that half the scan is a rule whose cost nobody can see, and the first person it inconveniences
+deletes it. **Probe 23 is aimed at one of the three the compiler could not see**, deliberately.
+
+**A second, smaller one was found the same way, in the other direction.** Four typecheck errors
+**disappeared** from `components/dashboard/ContestStatsCards.tsx`, and per the standing rule an
+unexplained *drop* gets the same suspicion as a rise. They were real: the old code read
+`settings.credits.decimals` and `settings.credits.symbol` unguarded on a context that can be
+`null`, so the dashboard's contest cards would throw while settings were loading. The
+replacement is optional-chained, so four latent crash paths went with the unit fix. **Recorded
+rather than claimed as the goal** - it was incidental, and the reason it is worth writing down
+is the diagnostic, not the fix.
+
+**One harness lesson, and it is the same one R26 learned about emojis.** The probe file
+originally contained literal euro signs. PowerShell 5.1 decodes a `.ps1` with the system ANSI
+codepage, so they arrived as mojibake - the parser then failed several probes further down,
+which reads exactly like a broken harness rather than a quoting fault, and had it parsed it
+would have written that mojibake into the source files it was probing and reported red for
+entirely the wrong reason. **The euro sign is now built from `[char]0x20AC`**, and the file is
+pure ASCII. Also, as in every earlier harness here, multi-line patterns are here-strings.
+
+**Owner tested:** no. Nothing was verified by eye - these are ~40 screens, most behind sign-in,
+and the automated browser has no session. Structural tests and probes only.
+
+**Deferred:** the two disagreeing conversion rates above, and the wallet and transaction
+surfaces outside competitions, which is where that disagreement actually bites. Neither is a
+rounding-up of this task; both are recorded.
+
+**Next chat should:** Task 2 - prize eligibility. The owner's rule is on record and is
+narrower than it first reads: a zero score, a disqualification or a liquidation removes a
+player from the distribution **only when at least one eligible player remains**; with nobody
+eligible the whole pot goes to the unclaimed pool. **Read R45 and R50 first** - `hasResult`
+and the phantom-score fix are half of this already, and `05` s9.3's `unscoredContestPolicy`
+is the other half of the nobody-eligible branch, so the honest first step is counting what
+already holds rather than building.
 
 ---
 

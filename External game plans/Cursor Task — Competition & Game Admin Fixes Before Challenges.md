@@ -108,6 +108,90 @@ if a compact Volts format is already officially used.
 
 Keep formatting consistent across the platform.
 
+## 1.1 — WHAT WAS BUILT, 9 September 2026
+
+`lib/utils/format-volts.ts`, mirrored byte-for-byte into `apps/admin/lib/utils/`, is the one
+way a competition amount is written down. 41 files, 68 tests in
+`__tests__/admin/volts-currency.test.ts`, 26 probes in `tools/probe-volts-currency.ps1` red on
+exactly the expected test with one failure each, plus one control probe green on purpose.
+
+**Every amount was already correct and only its unit was a lie**, which is the reason forty
+sites survived: there is no error, no log line, and the figure reconciles perfectly against the
+ledger. So the guards here are **structural rather than behavioural** — there is no wrong
+number to assert on — and a summary calling this a display fix is right about the mechanism
+while understating the reach, because the same wrong unit reached players by **email** and
+operators in the **settlement logs** they reconcile a contest against.
+
+**Five things are load-bearing and easy to undo by tidying up:**
+
+- **The formatter never converts, and that is a refusal rather than an omission.** Fiat
+  conversion has its own stored rate, and while writing this it turned out the platform holds
+  **two of those rates and they disagree by a factor of a hundred** —
+  `AppSettings.credits.valueInEUR` defaults to 1 credit = EUR 1 and drives the player's
+  "approximately EUR x" line, while `CreditConversionSettings.eurToCreditsRate` defaults to 100
+  credits = EUR 1 and is what deposits, withdrawals and the admin financial screens move money
+  on. A formatter that *could* convert would be one that could quietly pick the wrong one. That
+  disagreement is **a separate defect, recorded at the foot of the module and deliberately not
+  fixed here** — this work removes the fiat equivalent from competition surfaces rather than
+  correcting it, because a contest is denominated in credits and has no business quoting a
+  second unit; the wallet and deposit surfaces where it actually bites are untouched.
+- **There are TWO units on a trading contest and merging them is the tempting mistake.** A
+  prize pool and a reward are credits; a trader's starting capital, equity and P&L are
+  *simulated trading capital* in the contest's own quote currency. `LiveRankingPanel` and
+  `GameLiveRankingPanel` therefore write Volts and `currSymbol` side by side, and the guard is a
+  **count** of `${currSymbol}` interpolations rather than an assertion that it appears — a probe
+  relabelling one metric as credits stayed green against the presence check while leaving the
+  other one right, which is exactly how half a screen ends up in the wrong unit.
+- **An absent amount is a dash, never a zero.** `NaN` is one `parseFloat` away on every admin
+  form, and `NaN Volts` in a prize column is worse than a dash because it is a number shaped
+  like a payout. Same rule as R45's unheld rank and R50's phantom score: a missing amount and a
+  zero amount are different facts.
+- **The unit stays configurable and `"Volts"` is only the default.**
+  `AppSettings.credits.name` is edited in admin Settings, so a caller with settings loaded
+  passes it; the default exists for the server-composed strings — a notification body, a
+  settlement log — which have no React context, and putting a settings read on those paths would
+  add a database round trip where there is currently none. **A renamed unit therefore reaches
+  every screen and not those few strings.** That boundary is recorded rather than implied away,
+  and it is a strictly smaller inconsistency than the euro sign it replaces.
+- **The assistant's rule is APPENDED to trading's prompt, never written into it.** A test pins
+  the historical trading prompt character for character, because it is the only evidence the
+  trading wizard still writes what it wrote. So `TRADING_SYSTEM_PROMPT_HISTORICAL` keeps that
+  guarantee and `TRADING_SYSTEM_PROMPT` is composed as `HISTORICAL + NO_FIAT_RULE`, shared with
+  the provider prompt. The guarantee is now "the historical string **plus one shared rule**",
+  which is a real weakening of it and is why the composition itself is asserted — a `toContain`
+  on the opening sentence stays green against a prompt somebody has rewritten around it. The
+  rule forbids naming a currency **without naming the unit**, since a prompt is the one place
+  that cannot read the operator's setting.
+
+**Two carve-outs are correct and must not be "finished off":** deposit, withdrawal and invoice
+strings are genuinely fiat, so the notification-service guard is scoped to contest money and a
+control probe adding a euro deposit line **must stay green** — a guard that fires on correct
+code is one the first person it inconveniences deletes. And the admin analytics screen keeps its
+`creditsToEUR` reconciliation figures, which are an operator converting on purpose.
+
+**One defect was introduced by this work and caught before shipping, and the diagnostic is
+worth more than the fix.** Five admin challenge-view calls kept the pre-formatting from the
+strings they replaced — `formatVolts(challenge.prizePool?.toLocaleString(), { unit })` — so a
+**string** reached the formatter, hit the non-number guard, and the prize pool, entry fee and
+winner's prize would have rendered as `-`: the absent-amount rule biting from the far side,
+and indistinguishable on screen from data that has not loaded. **Neither instrument sufficed
+alone.** The typecheck saw **two of the five**, because that page's challenge object is loosely
+typed so `?.toLocaleString()` widens to `any`; every structural test here stayed green, because
+they ask whether a screen reads the fiat symbol and it does not. **Diffing the typecheck against
+a stashed baseline is what found it** — two new entries inside 225 are invisible in a count.
+Closed with a **repo-wide scan** rather than a list of the five files, plus a behavioural test
+that a pre-formatted string really does return the dash, without which the scan is a rule whose
+cost nobody can see. Probe 23 is aimed at one of the three the compiler could **not** see.
+
+**And four typecheck errors disappeared**, which gets the same suspicion as a rise and was real:
+`components/dashboard/ContestStatsCards.tsx` read `settings.credits.decimals` and
+`settings.credits.symbol` unguarded on a context that can be `null`, so the dashboard's contest
+cards would throw while settings loaded. Four latent crash paths went with the unit fix —
+incidental, and recorded because the diagnostic generalises.
+
+**Not done, and not a rounding-up:** the two disagreeing conversion rates above, and the
+wallet/transaction surfaces outside competitions.
+
 ---
 
 # TASK 2 — FIX PRIZE ELIGIBILITY RULES

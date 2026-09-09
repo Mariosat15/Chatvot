@@ -29,6 +29,7 @@ import ActionTermsDialog, {
 import { isProviderContest } from "@/lib/services/games/contest-config";
 import InlineCountdown from "@/components/trading/InlineCountdown";
 import { resolveRegistrationDeadline } from "@/lib/utils/registration-deadline";
+import { formatVolts } from "@/lib/utils/format-volts";
 
 // Level names for display
 const LEVEL_NAMES: Record<number, { icon: string; title: string }> = {
@@ -69,7 +70,11 @@ export default function CompetitionEntryButton({
   const [showTerms, setShowTerms] = useState(false);
   const router = useRouter();
   const { settings } = useAppSettings();
-  const cs = settings?.currency?.symbol || "€";
+  // Reason: an entry fee and a wallet balance are both credits. `settings.currency.symbol` is
+  // the fiat symbol configured for deposits and invoices, and prefixing it here told a player
+  // they were paying euros for something the ledger debits in credits.
+  const unit = settings?.credits?.name;
+  const volts = (amount: number) => formatVolts(amount, { unit });
 
   const entryFee = competition.entryFee || competition.entryFeeCredits || 0;
   const startingCapital =
@@ -198,7 +203,7 @@ export default function CompetitionEntryButton({
   // Reason: Show terms dialog before entering a competition
   const handleEnter = async () => {
     if (!canAfford) {
-      toast.error(`Insufficient balance. Need ${cs}${entryFee}`);
+      toast.error(`Insufficient balance. Need ${volts(entryFee)}`);
       return;
     }
 
@@ -387,7 +392,7 @@ export default function CompetitionEntryButton({
               <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50">
                 <span className="text-sm text-gray-400">Entry Fee</span>
                 <span className="text-sm font-semibold text-gray-100">
-                  {cs}{entryFee}
+                  {volts(entryFee)}
                 </span>
               </div>
               <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50">
@@ -397,7 +402,7 @@ export default function CompetitionEntryButton({
                     canAfford ? "text-green-500" : "text-red-500"
                   }`}
                 >
-                  {cs}{userBalance.toFixed(2)}
+                  {volts(userBalance)}
                 </span>
               </div>
             </div>
@@ -479,7 +484,7 @@ export default function CompetitionEntryButton({
             ) : !canAfford ? (
               <>
                 <DollarSign className="mr-2 h-4 w-4" />
-                Need {cs}{Math.abs(entryFee - userBalance).toFixed(2)} More
+                Need {volts(Math.abs(entryFee - userBalance))} More
               </>
             ) : (
               <>

@@ -28,6 +28,7 @@ import {
   toEditRequestBody,
 } from "./contest-draft";
 import { isClosedToEdits } from "@/lib/admin/provider-contest-edit-policy";
+import { DEFAULT_VOLTS_UNIT } from "@/lib/utils/format-volts";
 
 /**
  * Editing a provider-game contest.
@@ -330,7 +331,9 @@ export function ProviderContestEditor({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <NumberField
             id="entryFee"
-            label="Entry fee"
+            // Reason: the wizard's matching field names its unit. An unlabelled number here
+            // left an operator editing a fee with no statement of what it is denominated in.
+            label={`Entry fee (${DEFAULT_VOLTS_UNIT})`}
             value={draft.entryFee}
             min={0}
             step="0.01"

@@ -1,4 +1,5 @@
 import { Award } from "lucide-react";
+import { formatVolts } from "@/lib/utils/format-volts";
 import {
   resolveResultMetric,
   resolveSettledResultRows,
@@ -32,11 +33,12 @@ import {
 export default function SettledResultPanel({
   finalLeaderboard,
   isProviderGame,
-  currencySymbol,
+  unit,
 }: {
   finalLeaderboard?: SettledLeaderboardEntry[] | null;
   isProviderGame: boolean;
-  currencySymbol: string;
+  /** `AppSettings.credits.name`. A prize is paid in credits, never in fiat. */
+  unit?: string;
 }) {
   const rows = resolveSettledResultRows(finalLeaderboard);
   if (!rows) return null;
@@ -108,8 +110,7 @@ export default function SettledResultPanel({
                 <p className="text-xs text-gray-500">{metric.label}</p>
                 {typeof row.prizeAmount === "number" && row.prizeAmount > 0 && (
                   <p className="text-xs text-yellow-400 font-semibold mt-1">
-                    Paid: {currencySymbol}
-                    {row.prizeAmount.toFixed(2)}
+                    Paid: {formatVolts(row.prizeAmount, { unit })}
                   </p>
                 )}
               </div>

@@ -4,6 +4,11 @@ import NotificationTemplate, {
   NotificationCategory,
 } from "@/database/models/notification-template.model";
 import { connectToDatabase } from "@/database/mongoose";
+// Reason: a competition prize is credits. These three notifications told a winner they had won
+// a number of euros, which is the only place the wrong unit reached a player by email as well
+// as on screen. The default unit applies - see the note in the module about why a server-composed
+// string does not read the operator's configured name.
+import { formatVolts } from "@/lib/utils/format-volts";
 
 export interface NotificationData {
   userId: string;
@@ -545,7 +550,7 @@ class NotificationService {
       templateId: "competition_won",
       variables: {
         competitionName,
-        prize: `€${prize.toFixed(2)}`,
+        prize: formatVolts(prize),
         position: position.toString(),
       },
     });
@@ -565,7 +570,7 @@ class NotificationService {
       templateId: "competition_podium",
       variables: {
         competitionName,
-        prize: `€${prize.toFixed(2)}`,
+        prize: formatVolts(prize),
         finalRank: position.toString(),
       },
     });
@@ -584,7 +589,7 @@ class NotificationService {
       templateId: "competition_prize_received",
       variables: {
         competitionName,
-        prize: `€${prize.toFixed(2)}`,
+        prize: formatVolts(prize),
       },
     });
   }

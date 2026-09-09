@@ -35,6 +35,7 @@ import {
 import ContestPrizePanel from "@/components/admin/competitions/ContestPrizePanel";
 import SettledResultPanel from "@/components/admin/competitions/SettledResultPanel";
 import WalletTransaction from "@/database/models/trading/wallet-transaction.model";
+import { formatVolts } from "@/lib/utils/format-volts";
 
 // Derived from the actions rather than hand-written. Reason: a hand-written row interface is
 // where an invented field survives a typecheck - the compiler checks the annotation, not the
@@ -73,14 +74,12 @@ const AdminCompetitionViewPage = async ({
     credits?: { name?: string; symbol?: string };
     currency?: { symbol?: string; code?: string };
   } | null>();
-  // Unused since the prize sidebar moved onto the currency symbol - the unit the pool stat,
-  // the per-row "Won:" figure and the player-facing prize table all already used. Kept in the
-  // `_` form like its two neighbours rather than deleted, because it is a settings read the
-  // next person adding a credits-denominated figure here will want.
-  const _creditName = appSettings?.credits?.name || "Credits";
-  const _creditSymbol = appSettings?.credits?.symbol || "âš¡";
-  const currencySymbol = appSettings?.currency?.symbol || "â‚¬";
-  const _currencyCode = appSettings?.currency?.code || "EUR";
+  // Every money figure on this screen - the pool, the entry fee, a Game Master's earning, a
+  // player's prize - is credits. It read `currency.symbol`, which is the fiat symbol configured
+  // for deposits and invoices, so an operator reconciling a contest was shown euros against
+  // amounts the ledger moved in credits. `credits.name` is the unit; the fiat settings are not
+  // read here at all any more.
+  const unit = appSettings?.credits?.name;
 
   try {
     // Get competition data
@@ -261,12 +260,10 @@ const AdminCompetitionViewPage = async ({
                 <div>
                   <p className="text-xs text-gray-500">Prize Pool</p>
                   <p className="text-2xl font-bold text-yellow-400">
-                    {currencySymbol}
-                    {(
-                      competition.prizePool ||
-                      competition.prizePoolCredits ||
-                      0
-                    ).toLocaleString()}
+                    {formatVolts(
+                      competition.prizePool || competition.prizePoolCredits || 0,
+                      { unit },
+                    )}
                   </p>
                 </div>
               </div>
@@ -280,12 +277,10 @@ const AdminCompetitionViewPage = async ({
                 <div>
                   <p className="text-xs text-gray-500">Entry Fee</p>
                   <p className="text-2xl font-bold text-green-400">
-                    {currencySymbol}
-                    {(
-                      competition.entryFee ||
-                      competition.entryFeeCredits ||
-                      0
-                    ).toLocaleString()}
+                    {formatVolts(
+                      competition.entryFee || competition.entryFeeCredits || 0,
+                      { unit },
+                    )}
                   </p>
                 </div>
               </div>
@@ -593,8 +588,7 @@ const AdminCompetitionViewPage = async ({
                                     {gmInfo && (
                                       <p className="text-xs text-purple-400 mt-1">
                                         GM: {gmInfo.gmEmail} â€¢ Earned:{" "}
-                                        {currencySymbol}
-                                        {gmInfo.gmEarning.toFixed(2)}
+                                        {formatVolts(gmInfo.gmEarning, { unit })}
                                       </p>
                                     )}
                                   </div>
@@ -628,8 +622,7 @@ const AdminCompetitionViewPage = async ({
                                   </p>
                                   {actualPrize > 0 && (
                                     <p className="text-xs text-yellow-400 font-semibold mt-1">
-                                      Won: {currencySymbol}
-                                      {actualPrize.toFixed(2)}
+                                      Won: {formatVolts(actualPrize, { unit })}
                                     </p>
                                   )}
                                 </div>
@@ -683,7 +676,7 @@ const AdminCompetitionViewPage = async ({
               <SettledResultPanel
                 finalLeaderboard={competition.finalLeaderboard}
                 isProviderGame={isProviderGame}
-                currencySymbol={currencySymbol}
+                unit={unit}
               />
             </div>
 
@@ -719,7 +712,7 @@ const AdminCompetitionViewPage = async ({
                 distribution={competition.prizeDistribution || []}
                 finalLeaderboard={competition.finalLeaderboard}
                 competition={competition}
-                currencySymbol={currencySymbol}
+                unit={unit}
                 platformFeePercentage={competition.platformFeePercentage || 0}
               />
 

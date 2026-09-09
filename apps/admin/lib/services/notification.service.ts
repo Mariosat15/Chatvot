@@ -1,4 +1,5 @@
 import { connectToDatabase } from "@/database/mongoose";
+import { formatVolts } from "@/lib/utils/format-volts";
 import NotificationTemplate, {
   NotificationType,
   NotificationCategory,
@@ -591,7 +592,9 @@ class NotificationService {
     return this.send({
       userId,
       templateId: "competition_prize_received",
-      variables: { competitionName, prize: `€${prize.toFixed(2)}`, rank },
+      // Reason: a competition prize is credits, not euros. Same fix as the main app's three
+      // prize notifications - this copy carries only one, and the two files are not mirrors.
+      variables: { competitionName, prize: formatVolts(prize), rank },
     });
   }
 

@@ -44,14 +44,30 @@ export interface ContestVocabulary {
 }
 
 /**
+ * The one rule both prompts carry, and the only thing ever appended to trading's.
+ *
+ * A contest is denominated in credits. The model has no way of knowing that, and asked for
+ * "exciting" copy about a prize it will reach for a currency symbol - which is how a generated
+ * description came to promise euros for a pot the ledger pays in credits. The rule is written
+ * as a prohibition rather than by naming the unit, because the unit is operator-configurable
+ * and a prompt that hard-codes "Volts" is wrong the day somebody renames it.
+ */
+export const NO_FIAT_RULE = `
+- Never name a currency or use a currency symbol - prizes are denominated in platform credits, not in any national currency`;
+
+/**
  * Trading's prompt, character for character as it was before this module existed.
  *
  * KEPT VERBATIM ON PURPOSE. The trading wizard is the screen operators use daily, and the only
  * evidence this change does not alter what it produces is that its prompt did not change.
  * Improving it in the same edit would destroy that, which is the reasoning that kept the Game
  * Master `||` intact while settlement was extracted.
+ *
+ * `TRADING_SYSTEM_PROMPT` below is this string plus {@link NO_FIAT_RULE} and nothing else, so
+ * the guarantee is now "the historical prompt plus one shared rule" rather than "unchanged" -
+ * stated here rather than left for a reader to infer from a test that still passes.
  */
-export const TRADING_SYSTEM_PROMPT = `You are a creative marketing expert for a trading competition platform. 
+export const TRADING_SYSTEM_PROMPT_HISTORICAL = `You are a creative marketing expert for a trading competition platform. 
 Generate engaging, exciting competition content that attracts traders.
 
 IMPORTANT RULES:
@@ -62,6 +78,9 @@ IMPORTANT RULES:
 - Make it sound professional yet fun
 - Include relevant emojis in the title if it fits the theme
 - Focus on the competitive/gaming aspect`;
+
+export const TRADING_SYSTEM_PROMPT =
+  TRADING_SYSTEM_PROMPT_HISTORICAL + NO_FIAT_RULE;
 
 export const TRADING_VOCABULARY: ContestVocabulary = {
   subject: "trading",
@@ -162,7 +181,7 @@ IMPORTANT RULES:
 - Include relevant emojis in the title if it fits the theme
 - Write about playing ${title.displayName}, never about trading, investing or financial markets
 - Never use these words: ${TRADING_WORDS.join(", ")}
-- Do not claim a prize amount, a player count or a start time - the operator sets those`;
+- Do not claim a prize amount, a player count or a start time - the operator sets those${NO_FIAT_RULE}`;
 
   return {
     subject,

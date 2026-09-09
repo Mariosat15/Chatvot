@@ -38,6 +38,7 @@ import { useAppSettings } from "@/contexts/AppSettingsContext";
 import AIGeneratorDialog from "@/components/admin/AIGeneratorDialog";
 import { calculateCompetitionDifficulty } from "@/lib/utils/competition-difficulty";
 import { TITLE_LEVELS } from "@/lib/constants/levels";
+import { formatVolts } from "@/lib/utils/format-volts";
 import {
   WizardShell,
   WizardStepRail,
@@ -55,8 +56,10 @@ export default function CompetitionCreatorForm() {
   const [submitted, setSubmitted] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
 
-  // Get dynamic currency settings
-  const currencySymbol = settings?.currency?.symbol || "€";
+  // Reason: the entry fee and the pool it builds are credits. `currency.symbol` is the fiat
+  // symbol for deposits and invoices, and the operator was reading euro figures for amounts
+  // the ledger only ever moves in credits.
+  const unit = settings?.credits?.name;
   const currencyCode = settings?.currency?.code || "EUR";
 
   // Risk settings from database
@@ -655,7 +658,7 @@ export default function CompetitionCreatorForm() {
               icon={DollarSign}
               iconClassName="text-green-400"
               label="Entry Fee"
-              value={`${currencySymbol}${formData.entryFeeCredits}`}
+              value={formatVolts(formData.entryFeeCredits, { unit })}
             />
             <WizardPreviewRow
               icon={Target}
@@ -966,11 +969,11 @@ export default function CompetitionCreatorForm() {
                               Total Entry Fees
                             </div>
                             <div className="text-lg font-bold text-green-400 mt-1">
-                              {currencySymbol}
-                              {(
+                              {formatVolts(
                                 formData.entryFeeCredits *
-                                formData.maxParticipants
-                              ).toFixed(2)}
+                                  formData.maxParticipants,
+                                { unit },
+                              )}
                             </div>
                           </div>
                           <div className="bg-gray-800/50 p-3 rounded-lg">
@@ -979,13 +982,13 @@ export default function CompetitionCreatorForm() {
                               %)
                             </div>
                             <div className="text-lg font-bold text-yellow-400 mt-1">
-                              {currencySymbol}
-                              {(
+                              {formatVolts(
                                 (formData.entryFeeCredits *
                                   formData.maxParticipants *
                                   (100 - formData.platformFeePercentage)) /
-                                100
-                              ).toFixed(2)}
+                                  100,
+                                { unit },
+                              )}
                             </div>
                           </div>
                         </div>
@@ -2439,8 +2442,7 @@ export default function CompetitionCreatorForm() {
                     <div className="p-4 bg-gray-900/50 rounded-lg">
                       <p className="text-xs text-gray-400 mb-1">Entry Fee</p>
                       <p className="text-sm font-semibold text-gray-100">
-                        {currencySymbol}
-                        {formData.entryFeeCredits}
+                        {formatVolts(formData.entryFeeCredits, { unit })}
                       </p>
                     </div>
                     <div className="p-4 bg-gray-900/50 rounded-lg">

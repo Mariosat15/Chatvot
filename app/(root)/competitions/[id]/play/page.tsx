@@ -153,13 +153,16 @@ export default async function PlayPage({ params }: PlayPageProps) {
     // needs an endpoint that does not exist yet, and a board that silently goes stale is
     // better than one that appears live and is not.
     getCompetitionLeaderboard(competitionId, 25),
+    // `credits.name`, not `currency.symbol`. A prize pool is a credit amount, so the fiat
+    // symbol was the wrong field - and its fallback here was `$`, which is not even the
+    // configured fiat currency.
     AppSettingsModel.findOne()
-      .select("currency.symbol")
-      .lean<{ currency?: { symbol?: string } } | null>(),
+      .select("credits.name")
+      .lean<{ credits?: { name?: string } } | null>(),
   ]);
 
   const competitionName = contest?.name ?? "this competition";
-  const currencySymbol = settings?.currency?.symbol ?? "$";
+  const unit = settings?.credits?.name || undefined;
   const rows = Array.isArray(leaderboard) ? leaderboard : [];
 
   return (
@@ -199,7 +202,7 @@ export default async function PlayPage({ params }: PlayPageProps) {
               entryFee: contest?.entryFee,
               currentParticipants: contest?.currentParticipants,
               maxParticipants: contest?.maxParticipants,
-              currencySymbol,
+              unit,
             }}
             state={outcome.state}
             presentation={presentation}
@@ -212,7 +215,7 @@ export default async function PlayPage({ params }: PlayPageProps) {
           */}
           {Array.isArray(contest?.prizeDistribution) &&
             contest.prizeDistribution.length > 0 && (
-              <PrizeTable competition={contest} currSymbol={currencySymbol} />
+              <PrizeTable competition={contest} unit={unit} />
             )}
         </>
       }

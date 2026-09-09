@@ -5,6 +5,7 @@ import {
   logMalformedCompetitionId,
 } from "@/lib/utils/competition-id";
 import { competitionDetailsHref } from "@/lib/utils/competition-details-view";
+import { formatVolts } from "@/lib/utils/format-volts";
 import { auth } from "@/lib/better-auth/auth";
 import { headers } from "next/headers";
 import { getCompetitionById } from "@/lib/actions/trading/competition.actions";
@@ -98,8 +99,10 @@ const CompetitionResultsPage = async ({
     const [providerResults, refundedAmount, appSettings] = await Promise.all([
       getProviderContestResults(competition, session.user.id),
       findUnscoredRefund(competitionId, session.user.id),
+      // `credits.name`, not `currency.symbol`: a prize and a refunded entry fee are both
+      // credit amounts, so the fiat symbol made a 30-credit prize read `€30`.
       AppSettingsModel.findById("app-settings")
-        .lean<{ currency?: { symbol?: string } } | null>()
+        .lean<{ credits?: { name?: string } } | null>()
         .catch(() => null),
     ]);
 
@@ -149,7 +152,7 @@ const CompetitionResultsPage = async ({
           startTime={new Date(competition.startTime).toISOString()}
           endTime={new Date(competition.endTime).toISOString()}
           gameCode={competition.gameCode}
-          currencySymbol={appSettings?.currency?.symbol || "€"}
+          unit={appSettings?.credits?.name || undefined}
           refundedAmount={refundedAmount}
         />
       </div>
@@ -314,7 +317,7 @@ const CompetitionResultsPage = async ({
               <div className="px-4 py-2 bg-yellow-500/20 border border-yellow-500/30 rounded-xl">
                 <p className="text-yellow-400 font-bold flex items-center gap-2">
                   <GameIcon name="trophy" size={20} />
-                  You won {prizeWon.toFixed(2)} credits!
+                  You won {formatVolts(prizeWon)}!
                 </p>
               </div>
             )}

@@ -30,6 +30,7 @@ import {
   StatusCard,
 } from "@/components/neon/Cards";
 import { NEON_PANEL } from "@/components/neon/tokens";
+import { formatVolts } from "@/lib/utils/format-volts";
 import { getPlayState } from "@/lib/services/games/round-status.service";
 import { isProviderContest } from "@/lib/services/games/contest-config";
 import {
@@ -91,7 +92,8 @@ interface ProviderContestLobbyProps {
   isFull: boolean;
   userId: string;
   walletBalance: number;
-  currencySymbol: string;
+  /** `AppSettings.credits.name`. Replaced a `currencySymbol` prop handed the fiat symbol. */
+  unit?: string;
   participantStatus?: string;
   registrationClosed?: boolean;
 }
@@ -125,7 +127,7 @@ export default async function ProviderContestLobby({
   isFull,
   userId,
   walletBalance,
-  currencySymbol,
+  unit,
   participantStatus,
   registrationClosed,
 }: ProviderContestLobbyProps) {
@@ -265,7 +267,7 @@ export default async function ProviderContestLobby({
             icon={Trophy}
             accent="prize"
             label="Prize pool"
-            value={`${currencySymbol}${(competition.prizePool ?? 0).toLocaleString()}`}
+            value={formatVolts(competition.prizePool ?? 0, { unit })}
           />
           <StatCard
             icon={Link2}
@@ -273,7 +275,7 @@ export default async function ProviderContestLobby({
             label="Entry fee"
             value={
               competition.entryFee
-                ? `${currencySymbol}${competition.entryFee.toLocaleString()}`
+                ? formatVolts(competition.entryFee, { unit })
                 : "Free"
             }
           />
@@ -423,10 +425,7 @@ export default async function ProviderContestLobby({
           */}
           {(competition.prizeDistribution?.length ?? 0) > 0 && (
             <NeonPanel icon={Gift} accent="prize" title="Prize distribution">
-              <PrizeTable
-                competition={competition}
-                currSymbol={currencySymbol}
-              />
+              <PrizeTable competition={competition} unit={unit} />
             </NeonPanel>
           )}
 

@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { formatVolts } from "@/lib/utils/format-volts";
 
 // Live countdown badge component
 function LiveCountdownBadge({
@@ -140,7 +141,9 @@ interface Competition {
 
 export default function CompetitionsListSection() {
   const { settings } = useAppSettings();
-  const cs = settings?.currency?.symbol || "€";
+  // Reason: an entry fee and a prize pool are credits, so this read `credits.name` rather than
+  // the fiat symbol configured for deposits.
+  const unit = settings?.credits?.name;
   const [competitions, setCompetitions] = useState<Competition[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -474,12 +477,12 @@ export default function CompetitionsListSection() {
 
                   <div className="flex items-center gap-1 text-xs text-gray-500">
                     <DollarSign className="h-3 w-3" />
-                    Entry: {cs}{competition.entryFee}
+                    Entry: {formatVolts(competition.entryFee, { unit })}
                   </div>
 
                   <div className="flex items-center gap-1 text-xs text-gray-500">
                     <Trophy className="h-3 w-3" />
-                    Pool: {cs}{competition.prizePool?.toFixed(0) || 0}
+                    Pool: {formatVolts(competition.prizePool ?? 0, { unit })}
                   </div>
 
                   <div className="flex items-center gap-1 text-xs text-gray-500">

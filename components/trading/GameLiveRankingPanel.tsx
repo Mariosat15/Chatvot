@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { Skull, Target, Swords, Crown, Loader2 } from "lucide-react";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
+import { formatVolts } from "@/lib/utils/format-volts";
 
 interface RankingEntry {
   rank: number;
@@ -33,7 +34,10 @@ export default function GameLiveRankingPanel({
   className,
 }: GameLiveRankingPanelProps) {
   const { settings } = useAppSettings();
+  // See the note in `LiveRankingPanel`: the ranking metric is simulated trading capital and
+  // keeps its own symbol, while the prize pool and the potential reward are credits.
   const currSymbol = settings?.currency?.symbol || "€";
+  const unit = settings?.credits?.name;
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
   const [userRank, setUserRank] = useState<number | null>(null);
   const [totalParticipants, setTotalParticipants] = useState(0);
@@ -246,7 +250,7 @@ export default function GameLiveRankingPanel({
                   distanceStr={distanceStr}
                   formatDisplayValue={formatDisplayValue}
                   getRankDisplay={getRankDisplay}
-                  currSymbol={currSymbol}
+                  unit={unit}
                 />
               </div>
             );
@@ -261,7 +265,7 @@ export default function GameLiveRankingPanel({
               distanceStr={distanceStr}
               formatDisplayValue={formatDisplayValue}
               getRankDisplay={getRankDisplay}
-              currSymbol={currSymbol}
+              unit={unit}
             />
           );
         })}
@@ -302,7 +306,7 @@ export default function GameLiveRankingPanel({
               <span className="text-yellow-300 font-bold">Prize Pool</span>
             </div>
             <span className="text-2xl font-black text-yellow-400 drop-shadow-lg">
-              {currSymbol}{prizePool.toLocaleString()}
+              {formatVolts(prizePool, { unit })}
             </span>
           </div>
         </div>
@@ -319,7 +323,7 @@ function RankingRow({
   distanceStr,
   formatDisplayValue,
   getRankDisplay,
-  currSymbol,
+  unit,
 }: {
   entry: RankingEntry;
   isCurrentUser: boolean;
@@ -327,7 +331,7 @@ function RankingRow({
   distanceStr: string | null;
   formatDisplayValue: (value: number) => string;
   getRankDisplay: (rank: number, isDisqualified: boolean) => React.ReactNode;
-  currSymbol: string;
+  unit?: string;
 }) {
   return (
     <div
@@ -379,7 +383,7 @@ function RankingRow({
       <div className="col-span-3 text-right">
         {entry.potentialReward > 0 ? (
           <span className="text-sm font-bold text-yellow-400 tabular-nums">
-            {currSymbol}{entry.potentialReward.toLocaleString()}
+            {formatVolts(entry.potentialReward, { unit })}
           </span>
         ) : (
           <span className="text-xs text-gray-600">—</span>

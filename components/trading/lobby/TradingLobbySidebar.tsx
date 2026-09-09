@@ -102,7 +102,8 @@ export interface TradingLobbySidebarProps {
   competition: any;
   riskSettings: RiskSettings;
   difficultyData: DifficultyData;
-  currSymbol: string;
+  /** `AppSettings.credits.name`. Replaced a `currSymbol` prop handed the fiat symbol. */
+  unit?: string;
   walletBalance: number;
   isUserIn: boolean;
   isFull: boolean;
@@ -119,7 +120,7 @@ export default function TradingLobbySidebar({
   competition,
   riskSettings,
   difficultyData,
-  currSymbol,
+  unit,
   walletBalance,
   isUserIn,
   isFull,
@@ -140,7 +141,7 @@ export default function TradingLobbySidebar({
   const sections = buildTradingLobbySections({
     competition,
     riskSettings,
-    currSymbol,
+    unit,
   });
 
   return (
@@ -245,7 +246,7 @@ export default function TradingLobbySidebar({
           ) : undefined
         }
       >
-        <PrizeTable competition={competition} currSymbol={currSymbol} />
+        <PrizeTable competition={competition} unit={unit} />
       </NeonPanel>
 
       {/* Read. */}

@@ -8,6 +8,9 @@ import WalletTransaction from "@/database/models/trading/wallet-transaction.mode
 import Incident from "@/database/models/incident.model";
 import { notificationService } from "@/lib/services/notification.service";
 import mongoose from "mongoose";
+// Reason: every figure this route moves is a competition prize, which is credits. Both the
+// player notifications and the operator's audit line quoted euros.
+import { formatVolts } from "@/lib/utils/format-volts";
 
 /**
  * POST /api/competitions/[id]/adjust-results
@@ -221,7 +224,7 @@ export async function POST(
                 userId: participant.userId.toString(),
                 type: "disqualification_adjustment",
                 title: "⚠️ Competition Result Adjusted",
-                message: `You have been disqualified from ${competition.name}. Your prize of €${previousPrize.toFixed(2)} has been reclaimed. Reason: ${adj.reason}`,
+                message: `You have been disqualified from ${competition.name}. Your prize of ${formatVolts(previousPrize)} has been reclaimed. Reason: ${adj.reason}`,
                 icon: "alert-triangle",
                 category: "trading",
                 priority: "urgent",
@@ -309,7 +312,7 @@ export async function POST(
               type: "prize_adjustment",
               title:
                 prizeDiff > 0 ? "💰 Prize Adjustment" : "⚠️ Prize Adjustment",
-              message: `Your prize for ${competition.name} has been adjusted by €${prizeDiff.toFixed(2)}. New prize: €${adj.newPrize.toFixed(2)}. Reason: ${adj.reason}`,
+              message: `Your prize for ${competition.name} has been adjusted by ${formatVolts(prizeDiff)}. New prize: ${formatVolts(adj.newPrize)}. Reason: ${adj.reason}`,
               icon: "gift",
               category: "trading",
               priority: "high",
@@ -376,7 +379,7 @@ export async function POST(
       action: "results_adjusted",
       by: guard.admin.id,
       byEmail: guard.admin.email,
-      details: `Adjusted ${resultAdjustments.length} participant results. Total prize adjustment: €${totalPrizeAdjustment.toFixed(2)}`,
+      details: `Adjusted ${resultAdjustments.length} participant results. Total prize adjustment: ${formatVolts(totalPrizeAdjustment)}`,
       metadata: { competitionId, results },
     });
 
@@ -385,12 +388,12 @@ export async function POST(
     await mongoSession.commitTransaction();
 
     console.log(
-      `🔧 [ResultAdjustment] Complete: ${resultAdjustments.length} adjustments, €${totalPrizeAdjustment.toFixed(2)} prize change`,
+      `🔧 [ResultAdjustment] Complete: ${resultAdjustments.length} adjustments, ${formatVolts(totalPrizeAdjustment)} prize change`,
     );
 
     return NextResponse.json({
       success: true,
-      message: `Adjusted ${resultAdjustments.length} results. Total prize adjustment: €${totalPrizeAdjustment.toFixed(2)}`,
+      message: `Adjusted ${resultAdjustments.length} results. Total prize adjustment: ${formatVolts(totalPrizeAdjustment)}`,
       results,
       totalPrizeAdjustment,
     });

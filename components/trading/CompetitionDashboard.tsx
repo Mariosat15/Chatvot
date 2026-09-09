@@ -33,6 +33,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
+import { formatVolts } from "@/lib/utils/format-volts";
 
 interface CompetitionRules {
   minimumTrades?: number;
@@ -1016,12 +1017,15 @@ export default function CompetitionDashboard({
                       <p className="text-xs text-slate-400">Prizes Won</p>
                     </div>
                     <p className="text-2xl font-bold text-yellow-400">
-                      {settings?.credits.symbol || "⚡"}{" "}
-                      {allTimeStats.totalPrizesWon?.toLocaleString() || "0"}
+                      {formatVolts(allTimeStats.totalPrizesWon ?? 0, {
+                        unit: settings?.credits?.name,
+                      })}
                     </p>
                     <p className="text-xs text-slate-500 mt-1">
-                      Net: {settings?.credits.symbol || "⚡"}{" "}
-                      {allTimeStats.netProfit?.toLocaleString() || "0"}
+                      Net:{" "}
+                      {formatVolts(allTimeStats.netProfit ?? 0, {
+                        unit: settings?.credits?.name,
+                      })}
                     </p>
                   </div>
                 </div>
@@ -1093,8 +1097,9 @@ export default function CompetitionDashboard({
                       Entry Fees Paid
                     </p>
                     <p className="text-lg font-bold text-amber-400">
-                      {settings?.credits.symbol || "⚡"}{" "}
-                      {(allTimeStats.totalEntryFees || 0).toLocaleString()}
+                      {formatVolts(allTimeStats.totalEntryFees ?? 0, {
+                        unit: settings?.credits?.name,
+                      })}
                     </p>
                   </div>
                   <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/30 hover:border-slate-600/50 transition-colors">

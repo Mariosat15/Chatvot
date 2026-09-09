@@ -3,7 +3,8 @@ import { NEON_LABEL } from "@/components/neon/tokens";
 import { NeonHeadedPanel, NeonStatStrip } from "@/components/neon/Cards";
 import type { PlayState } from "@/components/games/play-state";
 import type { GamePresentation } from "@/lib/services/games/game-presentation.service";
-import { attemptProgress, clock, money, scoreText, scoringSummary } from "./arena-facts";
+import { attemptProgress, clock, scoreText, scoringSummary } from "./arena-facts";
+import { formatVolts } from "@/lib/utils/format-volts";
 
 /**
  * The contest's own facts, beside the board: pot, entry, size, clock, attempts, your score.
@@ -29,7 +30,8 @@ export interface ArenaContestFacts {
   entryFee?: number;
   currentParticipants?: number;
   maxParticipants?: number;
-  currencySymbol: string;
+  /** `AppSettings.credits.name`. Replaced a `currencySymbol` field handed the fiat symbol. */
+  unit?: string;
 }
 
 interface Props {
@@ -54,13 +56,13 @@ export function ArenaContestPanel({ facts, state, presentation }: Props) {
             icon: Trophy,
             accent: "prize",
             label: "Prize pool",
-            value: money(facts.prizePool, facts.currencySymbol),
+            value: formatVolts(facts.prizePool, { unit: facts.unit }),
           },
           {
             icon: Ticket,
             accent: "entry",
             label: "Entry",
-            value: money(facts.entryFee, facts.currencySymbol),
+            value: formatVolts(facts.entryFee, { unit: facts.unit }),
           },
           {
             icon: Users,

@@ -7,11 +7,13 @@ import { Trophy, Crown, Timer, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { formatVolts } from "@/lib/utils/format-volts";
 
 interface LastManStandingPopupProps {
   competitionId: string;
   prizePool: number;
-  currencySymbol: string;
+  /** `AppSettings.credits.name`. The pool is credits, so it is written in Volts. */
+  unit?: string;
 }
 
 const COUNTDOWN_SECONDS = 15;
@@ -19,7 +21,7 @@ const COUNTDOWN_SECONDS = 15;
 export default function LastManStandingPopup({
   competitionId,
   prizePool,
-  currencySymbol,
+  unit,
 }: LastManStandingPopupProps) {
   const router = useRouter();
   const [visible, setVisible] = useState(true);
@@ -152,7 +154,7 @@ export default function LastManStandingPopup({
                   <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
                     <Trophy className="h-5 w-5 text-yellow-400" />
                     <span className="text-lg font-bold text-yellow-400">
-                      {currencySymbol}{prizePool.toLocaleString()}
+                      {formatVolts(prizePool, { unit })}
                     </span>
                     <span className="text-xs text-gray-400">Prize Pool</span>
                   </div>

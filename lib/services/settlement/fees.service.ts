@@ -1,4 +1,7 @@
 import type { ClientSession } from "mongoose";
+// Reason: these are the operator's reconciliation lines for a settled contest, and every
+// figure in them is credits. They read euros, which is the same defect as the screens.
+import { formatVolts } from "@/lib/utils/format-volts";
 import Competition from "@/database/models/trading/competition.model";
 import {
   calculateGameMasterFees,
@@ -208,10 +211,10 @@ export async function settleFeesAndGameMasters({
 
   console.log(`💼 Platform fee breakdown:`);
   console.log(
-    `   Gross platform fee: €${grossPlatformFee.toFixed(2)} (${contest.platformFeePercentage}%)`,
+    `   Gross platform fee: ${formatVolts(grossPlatformFee)} (${contest.platformFeePercentage}%)`,
   );
-  console.log(`   GM referral fees:   €${gmEarnings.toFixed(2)}`);
-  console.log(`   NET platform fee:   €${netPlatformFee.toFixed(2)}`);
+  console.log(`   GM referral fees:   ${formatVolts(gmEarnings)}`);
+  console.log(`   NET platform fee:   ${formatVolts(netPlatformFee)}`);
 
   if (netPlatformFee > 0) {
     await PlatformFinancialsService.recordPlatformFee({

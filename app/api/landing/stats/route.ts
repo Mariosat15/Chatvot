@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/database/mongoose";
 import mongoose from "mongoose";
+import { formatVoltsCompact } from "@/lib/utils/format-volts";
 
 /**
  * GET /api/landing/stats
@@ -117,8 +118,8 @@ export async function GET() {
         totalCompetitions: formatNumber(
           completedCount + activeCompetitions,
         ),
-        activePrizePool: formatCurrency(activePrizePool[0]?.total || 0),
-        totalPrizesPaid: formatCurrency(totalPrizesPaid),
+        activePrizePool: formatVoltsCompact(activePrizePool[0]?.total || 0),
+        totalPrizesPaid: formatVoltsCompact(totalPrizesPaid),
         totalTrades: formatNumber(totalTrades),
         tradesToday: formatNumber(tradesToday),
       },
@@ -152,12 +153,5 @@ function formatNumber(num: number): string {
   return num.toLocaleString();
 }
 
-function formatCurrency(amount: number): string {
-  if (amount >= 1000000) {
-    return "$" + (amount / 1000000).toFixed(1) + "M";
-  }
-  if (amount >= 1000) {
-    return "$" + (amount / 1000).toFixed(0) + "K";
-  }
-  return "$" + amount.toLocaleString();
-}
+// Reason: see the sibling competitions route. The prize-pool figures are credits, and this
+// helper's `$` was the second copy of one wrong rule.

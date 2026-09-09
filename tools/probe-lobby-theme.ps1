@@ -214,7 +214,7 @@ export function accentClasses('
   @{
     Name = 'the prize table is buried inside the accordion'
     File = $SIDEBAR
-    From = '<PrizeTable competition={competition} currSymbol={currSymbol} />'
+    From = '<PrizeTable competition={competition} unit={unit} />'
     To   = '<span data-moved="PrizeTable" />'
     Test = 'keeps the trading sidebar.s decisions open'
   },

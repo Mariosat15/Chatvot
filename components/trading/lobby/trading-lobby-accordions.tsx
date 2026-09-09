@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { IconTile, NeonNote, NeonRow } from "@/components/neon/Cards";
 import type { NeonAccordionSection } from "@/components/neon/Accordion";
+import { formatVolts } from "@/lib/utils/format-volts";
 
 /**
  * The six collapsible reference sections in the trading lobby's sidebar, from the bottom row of
@@ -108,12 +109,13 @@ interface RiskSettings {
 export function buildTradingLobbySections({
   competition,
   riskSettings,
-  currSymbol,
+  unit,
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   competition: any;
   riskSettings: RiskSettings;
-  currSymbol: string;
+  /** `AppSettings.credits.name`. Replaced a `currSymbol` prop handed the fiat symbol. */
+  unit?: string;
 }): NeonAccordionSection[] {
   const sections: NeonAccordionSection[] = [];
   const rules = competition.rules;
@@ -390,11 +392,10 @@ export function buildTradingLobbySections({
         <NeonRow
           label="Prize pool"
           accent="prize"
-          value={`${currSymbol}${(
-            competition.prizePool ||
-            competition.prizePoolCredits ||
-            0
-          ).toFixed(0)}`}
+          value={formatVolts(
+            competition.prizePool || competition.prizePoolCredits || 0,
+            { unit },
+          )}
         />
         <NeonRow
           label="Paid positions"

@@ -10,6 +10,7 @@ import { RoundStartPolicyField } from "../RoundStartPolicyField";
 import type { ContestDraft } from "../contest-draft";
 import type { ContestableTitle } from "../contest-types";
 import { DateField, NumberField } from "./fields";
+import { DEFAULT_VOLTS_UNIT } from "@/lib/utils/format-volts";
 
 /**
  * Step four: the contest's clock, its fee and how many players it takes.
@@ -33,7 +34,7 @@ export function StepSchedule({
   draft,
   patch,
   title,
-  currencySymbol,
+  unit,
 }: {
   draft: ContestDraft;
   patch: (changes: Partial<ContestDraft>) => void;
@@ -51,7 +52,8 @@ export function StepSchedule({
     schema: ContestableTitle["schema"];
     playMode?: PlayMode;
   };
-  currencySymbol: string;
+  /** `AppSettings.credits.name`. An entry fee is a credit amount. */
+  unit?: string;
 }) {
   // Resolved from the chosen title, and `anytime` before one is chosen - which is the same
   // answer the whole live catalogue gives, so the step reads identically until it needs not to.
@@ -109,7 +111,7 @@ export function StepSchedule({
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <NumberField
-          label={`Entry fee (${currencySymbol})`}
+          label={`Entry fee (${unit?.trim() || DEFAULT_VOLTS_UNIT})`}
           value={draft.entryFee}
           onChange={(v) => patch({ entryFee: v })}
           icon={Coins}

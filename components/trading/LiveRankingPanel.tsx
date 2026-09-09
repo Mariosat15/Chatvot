@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
+import { formatVolts } from "@/lib/utils/format-volts";
 
 interface RankingEntry {
   rank: number;
@@ -38,7 +39,15 @@ export default function LiveRankingPanel({
   className,
 }: LiveRankingPanelProps) {
   const { settings } = useAppSettings();
+  // Two different units share this panel and only one of them is credits.
+  //
+  // `currSymbol` prefixes the ranking metric and the distance to first, which are the player's
+  // simulated TRADING capital - not credits, and not something this task decides the unit of.
+  // The prize pool and the potential reward are credits, debited from and paid into the credit
+  // wallet, so they are written in Volts. Reason: giving both the same symbol is what made the
+  // two look like one quantity.
   const currSymbol = settings?.currency?.symbol || "€";
+  const unit = settings?.credits?.name;
   const [rankings, setRankings] = useState<RankingEntry[]>([]);
   const [userRank, setUserRank] = useState<number | null>(null);
   const [totalParticipants, setTotalParticipants] = useState(0);
@@ -272,7 +281,7 @@ export default function LiveRankingPanel({
                   getRankBgColor={getRankBgColor}
                   formatDisplayValue={formatDisplayValue}
                   formatDistance={formatDistance}
-                  currSymbol={currSymbol}
+                  unit={unit}
                 />
               </div>
             );
@@ -287,7 +296,7 @@ export default function LiveRankingPanel({
               getRankBgColor={getRankBgColor}
               formatDisplayValue={formatDisplayValue}
               formatDistance={formatDistance}
-              currSymbol={currSymbol}
+              unit={unit}
             />
           );
         })}
@@ -319,7 +328,7 @@ export default function LiveRankingPanel({
               Prize Pool
             </span>
             <span className="font-bold text-yellow-400">
-              {currSymbol}{prizePool.toLocaleString()}
+              {formatVolts(prizePool, { unit })}
             </span>
           </div>
         </div>
@@ -336,7 +345,7 @@ function RankingRow({
   getRankBgColor,
   formatDisplayValue,
   formatDistance,
-  currSymbol,
+  unit,
 }: {
   entry: RankingEntry;
   isCurrentUser: boolean;
@@ -348,7 +357,7 @@ function RankingRow({
   ) => string;
   formatDisplayValue: (value: number) => string;
   formatDistance: (value: number) => string | null;
-  currSymbol: string;
+  unit?: string;
 }) {
   const displayValue = entry.displayValue ?? entry.profitPercent;
   const distanceStr = formatDistance(entry.distanceToFirst);
@@ -399,7 +408,7 @@ function RankingRow({
       <div className="col-span-3 text-right">
         {entry.potentialReward > 0 ? (
           <span className="text-xs font-bold text-yellow-400 tabular-nums">
-            {currSymbol}{entry.potentialReward.toLocaleString()}
+            {formatVolts(entry.potentialReward, { unit })}
           </span>
         ) : (
           <span className="text-xs text-gray-600">—</span>

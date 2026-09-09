@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import type { ContestDraft } from "../contest-draft";
 import type { ContestableTitle } from "../contest-types";
 import { Notice, Problem } from "./fields";
+import { formatVolts } from "@/lib/utils/format-volts";
 
 /**
  * Step six: what the pre-flight said, a summary of the answers, and the publish decision.
@@ -19,14 +20,15 @@ export function StepReview({
   title,
   errors,
   warnings,
-  currencySymbol,
+  unit,
 }: {
   draft: ContestDraft;
   patch: (changes: Partial<ContestDraft>) => void;
   title?: ContestableTitle;
   errors: string[];
   warnings: string[];
-  currencySymbol: string;
+  /** `AppSettings.credits.name`. An entry fee is a credit amount. */
+  unit?: string;
 }) {
   return (
     <>
@@ -56,8 +58,7 @@ export function StepReview({
                 : "-"}
             </SummaryRow>
             <SummaryRow label="Entry fee">
-              {currencySymbol}
-              {draft.entryFee}
+              {formatVolts(draft.entryFee, { unit })}
               <span className="text-gray-500">
                 {" "}
                 / {draft.platformFeePercentage}% platform fee

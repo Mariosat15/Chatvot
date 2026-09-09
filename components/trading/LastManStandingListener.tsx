@@ -23,7 +23,7 @@ export default function LastManStandingListener({
   competitionId,
 }: LastManStandingListenerProps) {
   const { settings } = useAppSettings();
-  const currencySymbol = settings?.currency?.symbol || "€";
+  const unit = settings?.credits?.name;
   const [showPopup, setShowPopup] = useState(false);
   const [prizePool, setPrizePool] = useState(0);
   const [popupKey, setPopupKey] = useState(0);
@@ -52,7 +52,7 @@ export default function LastManStandingListener({
       key={popupKey}
       competitionId={competitionId}
       prizePool={prizePool}
-      currencySymbol={currencySymbol}
+      unit={unit}
     />
   );
 }

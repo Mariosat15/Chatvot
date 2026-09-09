@@ -42,6 +42,7 @@ import {
 import { creditsToEUR } from "@/lib/utils/credit-conversion";
 import { useAppSettings } from "@/contexts/AppSettingsContext";
 import GameRevenueBreakdown from "./competitions/GameRevenueBreakdown";
+import { formatVolts } from "@/lib/utils/format-volts";
 import {
   ALL_GAMES,
   filterByGame,
@@ -222,8 +223,13 @@ export default function CompetitionAnalytics() {
     null,
   );
 
-  // Get dynamic currency settings
+  // Both units are legitimate on this screen and they mean different things. `creditSymbol`
+  // prefixes the amounts themselves, which are credits; `currencySymbol` labels the
+  // `creditsToEUR` line beneath each one, which is the operator's reconciliation figure and
+  // reads the deposit rate. `creditName` is for the one place a full unit reads better than a
+  // prefix - see the entry-fee note below.
   const creditSymbol = settings?.credits?.symbol || "⚡";
+  const creditName = settings?.credits?.name;
   const currencySymbol = settings?.currency?.symbol || "€";
   const currencyCode = settings?.currency?.code || "EUR";
 
@@ -651,9 +657,16 @@ export default function CompetitionAnalytics() {
                             <Users className="h-3 w-3" />
                             {comp.participants} participants
                           </span>
+                          {/*
+                            The only figure on this screen that wore the fiat symbol. Every
+                            other amount here is prefixed with the credit symbol and then
+                            converted underneath with `creditsToEUR`, which is the operator's
+                            reconciliation view and is correct. This one was neither: a credit
+                            entry fee written as euros, with no conversion applied.
+                          */}
                           <span>
-                            {currencySymbol}
-                            {comp.entryFee} entry fee
+                            {formatVolts(comp.entryFee, { unit: creditName })} entry
+                            fee
                           </span>
                           {comp.disqualifiedCount > 0 && (
                             <span className="text-red-400 flex items-center gap-1">

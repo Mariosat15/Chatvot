@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { formatVolts } from "@/lib/utils/format-volts";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -748,9 +749,8 @@ export default function CompetitionsPageContent({
             </p>
             <div className="mt-1 sm:mt-2 flex items-baseline gap-0.5 sm:gap-1">
               <span className="text-2xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-400 tabular-nums">
-                {totalPrizePool.toFixed(0)}
+                {formatVolts(totalPrizePool, { unit: settings?.credits?.name })}
               </span>
-              <span className="text-green-400 text-lg sm:text-2xl">{settings?.credits.symbol || "⚡"}</span>
             </div>
             <p className="text-[11px] sm:text-xs text-gray-500 hidden sm:block">
               Available to win
