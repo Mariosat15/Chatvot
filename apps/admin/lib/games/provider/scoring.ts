@@ -47,12 +47,18 @@ export function getProviderRankingValue(
 }
 
 /**
- * A provider participant is eligible for a prize only once they have scored ABOVE ZERO.
+ * A provider participant is eligible for a prize once they have produced a score the
+ * game counts as a result.
  *
  * OWNER DECISION, 9 SEPTEMBER 2026 (task document 2 and 4, which says "score > 0" in
- * terms). This reverses the rule this function shipped with, and the reasoning it
- * reversed is left below rather than deleted, because it is a real argument and the next
- * reader deserves to see that it was considered rather than overlooked.
+ * terms): a score of zero wins nothing. That rule shipped as a hard-coded `> 0` and,
+ * later the same day, task document 14 asked for exactly the thing the comment below had
+ * predicted - "make eligibility game-configurable while setting the correct defaults for
+ * our existing games". So the RULE IS UNCHANGED and only its source moved: it is now the
+ * DEFAULT, applied when a title declares nothing, rather than a law this function states.
+ *
+ * The reasoning the owner's rule reversed is left below rather than deleted, because it is
+ * a real argument and the next reader deserves to see it was considered.
  *
  * THE ARGUMENT AGAINST, WHICH LOST: a stored zero and an absent score are different
  * facts. A player who launched a round, played it and scored nothing has attempted the
@@ -62,22 +68,26 @@ export function getProviderRankingValue(
  * so the rule was not distinguishing "attempted and failed" from "took the seat", it was
  * paying anybody who turned up. A prize is for a result, and zero is the absence of one.
  *
- * `> 0` IS APPLIED IN BOTH SCORE DIRECTIONS AND MUST NOT BE MADE DIRECTIONAL. It reads as
+ * THE ZERO RULE IS DIRECTION-INDEPENDENT AND MUST NOT BE MADE DIRECTIONAL. It reads as
  * though a `lower_is_better` game should treat zero as the best possible score, and for
  * the catalogue as it stands that is wrong twice over: the only lower-is-better title
  * measures `duration_ms`, where zero milliseconds is not a fast round but an unrecorded
- * one. A test pins the rule as direction-independent so nobody "improves" it into a
- * branch.
+ * one. A test pins it as direction-independent so nobody "improves" it into a branch.
+ * THE TITLE THAT WOULD NEED THE OTHER ANSWER - an `integer` + `lower_is_better` game
+ * scoring mistakes, where zero is a flawless round - now says so with
+ * `zeroIsValidResult`, which is a DECLARATION and never a guess made here from
+ * `scoreType`. Inferring it from the type would be wrong for the very case it was reached
+ * for.
  *
- * THE ONE FUTURE TITLE THIS WOULD BE WRONG FOR, named so it is noticed rather than
- * discovered: an `integer` + `lower_is_better` game scoring mistakes or penalties, where
- * zero is a flawless round. No such title exists, and the fix then is a declared
- * capability on the catalogue row - never a guess made here from `scoreType`.
+ * `minimumEligibleScore` IS directional, and that asymmetry is the point rather than an
+ * inconsistency: zero means "no result" in every game we can run, while a bar of 60,000
+ * means opposite things to a points game and a stopwatch. The test is "at least as good
+ * as", which `>=` expresses upward and `<=` downward.
  *
- * `Number.isFinite` is still first, because a `NaN` would otherwise pass `> 0`'s inverse
- * in some rewrites and, more importantly, ranks as a silent last place: `NaN` fails every
- * comparison in the sort, so it lands wherever the sort happens to leave it, which is not
- * a position anybody chose.
+ * `Number.isFinite` is still first, because a `NaN` would otherwise pass some rewrites of
+ * these comparisons and, more importantly, ranks as a silent last place: `NaN` fails
+ * every comparison in the sort, so it lands wherever the sort happens to leave it, which
+ * is not a position anybody chose.
  *
  * Note what this does NOT do: it does not decide what an unreported round means. That is the
  * contest's `unresolvedRoundPolicy` - score zero, exclude and refund, or hold for a human -
@@ -85,7 +95,28 @@ export function getProviderRankingValue(
  * This is the residual case: the contest settled, and this player has no number.
  */
 export function providerHasResult(participant: RankableParticipant): boolean {
-  return Number.isFinite(participant.score) && (participant.score as number) > 0;
+  if (!Number.isFinite(participant.score)) return false;
+
+  const score = participant.score as number;
+
+  // Reason: `!== true` rather than `=== false`, so an absent declaration and an explicit
+  // `false` are the same answer. That is the deliberate opposite of `entryBlockThreshold`'s
+  // "a stored value and an absent one are different facts": there, over-trusting a stored
+  // number locked players out; here, the absent case is the overwhelming majority of the
+  // catalogue and it means "nobody has said otherwise", which is the platform rule.
+  if (score === 0 && participant.zeroIsValidResult !== true) return false;
+
+  const bar = participant.minimumEligibleScore;
+  if (Number.isFinite(bar)) {
+    // Reason: "at least as good as", not "at least as large as". See the class comment - a
+    // race time of 48 seconds must clear a 60-second bar by being SMALLER, so a single `>=`
+    // here would exclude precisely the players who did best.
+    return participant.scoreDirection === "lower_is_better"
+      ? score <= (bar as number)
+      : score >= (bar as number);
+  }
+
+  return true;
 }
 
 /**

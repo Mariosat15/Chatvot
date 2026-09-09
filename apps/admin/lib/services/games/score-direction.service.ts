@@ -45,6 +45,55 @@ export async function resolveScoreDirection(
    */
   session?: ClientSession,
 ): Promise<ScoreDirection> {
+  // Reason this DELEGATES rather than reading the row itself: five of the six callers want
+  // only the direction, and the sixth - settlement - also needs the eligibility rules added
+  // for task 14. Two functions each doing their own `findOne` would be two definitions of
+  // "what does this title say", and the defaults would drift apart exactly as this file's
+  // own class comment describes happening to the direction itself. The delegation is pinned
+  // by a test asserting this function's answer always equals the wider one's, in every case.
+  const rules = await resolveScoringRules(gameKey, session);
+  return rules.direction;
+}
+
+/**
+ * Everything about how ONE contest's scores are ranked and which of them get paid.
+ *
+ * Task document 14. This is the wider read `resolveScoreDirection` above now delegates to,
+ * and it exists because eligibility became configurable per title: whether a score of zero
+ * counts, and whether there is an extra bar to clear. Those are prize decisions, so they must
+ * reach `providerHasResult` - and the only route a game module has to a catalogue fact is the
+ * participant, because invariant 2 bans a module from importing a model.
+ *
+ * ONE READ PER CONTEST, THREADED ONTO EVERY ROW. Not stored per participant, for the reason
+ * R32/R33 recorded: a per-row copy lets two rows in one leaderboard disagree, and half a board
+ * negating while the other half does not is incoherent rather than merely wrong. A uniformly
+ * wrong direction is at least visibly wrong and can be explained; an incoherent one cannot.
+ *
+ * EVERY DEFAULT HERE FAILS TOWARDS THE PLATFORM RULE, NOT TOWARDS PAYING. A missing title, an
+ * absent `gameKey` or an unrecognised value all yield "upward, zero is not a result, no extra
+ * bar" - which is precisely what the code did before any of this was configurable, so a
+ * catalogue row that has been deleted or was never synced cannot turn a refusal into a payment.
+ * That direction matters more than it looks: the opposite default would mean an operator
+ * deleting a title retroactively makes every zero-scoring entrant of a live contest a winner.
+ */
+export interface ContestScoringRules {
+  direction: ScoreDirection;
+  /** Absent on the title reads as `false` - see `providerHasResult`. */
+  zeroIsValidResult: boolean;
+  /** `undefined` means no bar. A stored `0` is a real and different instruction. */
+  minimumEligibleScore?: number;
+}
+
+const PLATFORM_DEFAULT_RULES: ContestScoringRules = {
+  direction: "higher_is_better",
+  zeroIsValidResult: false,
+  minimumEligibleScore: undefined,
+};
+
+export async function resolveScoringRules(
+  gameKey: string | undefined,
+  session?: ClientSession,
+): Promise<ContestScoringRules> {
   // Reason this is a real case and not defensive noise: `gameKey` is optional on the contest
   // document. An absent label cannot resolve a title, so there is nothing to read and the
   // safe upward default applies.
@@ -52,13 +101,19 @@ export async function resolveScoreDirection(
     console.warn(
       "⚠️ Provider contest has no gameKey; ranking its scores as higher-is-better.",
     );
-    return "higher_is_better";
+    return PLATFORM_DEFAULT_RULES;
   }
 
-  const query = ProviderGame.findOne({ gameKey }).select("scoreDirection");
+  const query = ProviderGame.findOne({ gameKey }).select(
+    "scoreDirection zeroIsValidResult minimumEligibleScore",
+  );
   if (session) query.session(session);
 
-  const title = await query.lean<{ scoreDirection?: string } | null>();
+  const title = await query.lean<{
+    scoreDirection?: string;
+    zeroIsValidResult?: boolean;
+    minimumEligibleScore?: number;
+  } | null>();
 
   if (!title) {
     // Not fatal: the contest's own scores are still rankable, and refusing here would strand a
@@ -67,10 +122,26 @@ export async function resolveScoreDirection(
     console.warn(
       `⚠️ No catalogue entry for "${gameKey}"; ranking its scores as higher-is-better.`,
     );
-    return "higher_is_better";
+    return PLATFORM_DEFAULT_RULES;
   }
 
-  return title.scoreDirection === "lower_is_better"
-    ? "lower_is_better"
-    : "higher_is_better";
+  return {
+    direction:
+      title.scoreDirection === "lower_is_better"
+        ? "lower_is_better"
+        : "higher_is_better",
+    // Reason: `=== true` rather than a truthiness check or a `??`. The field is read from a
+    // `.lean()` document, so it arrives as whatever is stored - and a schema default is not
+    // applied on a lean read (defaults are a hydration step). Anything other than a real
+    // stored `true` therefore has to mean the platform rule, or a pre-migration row would
+    // read as `undefined` and a `??` chain would still have to name the same fallback twice.
+    zeroIsValidResult: title.zeroIsValidResult === true,
+    // Reason: `Number.isFinite`, so a stored `null` from an old row - or a `NaN` from a bad
+    // edit - reads as "no bar" rather than as a comparison that is false for every score.
+    // An unguarded `NaN` here refuses EVERY participant and pays the whole pot to the
+    // unclaimed pool, with no error and nothing in a log.
+    minimumEligibleScore: Number.isFinite(title.minimumEligibleScore)
+      ? title.minimumEligibleScore
+      : undefined,
+  };
 }

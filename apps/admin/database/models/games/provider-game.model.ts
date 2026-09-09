@@ -36,6 +36,12 @@ export interface IProviderGame extends Document {
   scoreDirection: "higher_is_better" | "lower_is_better";
   scoreType: "integer" | "decimal" | "duration_ms";
   scoreRange?: { min?: number; max?: number };
+  /** Display only. "points", "ms", "boards" - never parsed, never ranked on. */
+  scoreUnit?: string;
+  /** Does a score of exactly zero count as a result worth paying? Defaults to no. */
+  zeroIsValidResult?: boolean;
+  /** An extra bar a score must clear to be paid, expressed in the game's own units. */
+  minimumEligibleScore?: number;
   typicalDurationSeconds?: number;
   maxDurationSeconds?: number;
   /** JSON Schema from the provider. The admin contest form is generated from this. */
@@ -199,6 +205,59 @@ const ProviderGameSchema = new Schema<IProviderGame>(
       min: { type: Number },
       max: { type: Number },
     },
+
+    // How a score is described, and what counts as one at all (task document 14).
+    //
+    // These three are OPERATOR-owned and in no sync allow-list, like `tagline` and
+    // `bannerUrl` above - a provider declares how their game scores, but whether a
+    // particular number is worth a prize is our commercial rule about our own money.
+    //
+    // Read through `resolveScoreEligibility` in `lib/services/games/score-direction.service.ts`
+    // and never directly. That function is the single place the defaults live, and it is the
+    // same one-resolve-per-contest seam `scoreDirection` already travels on - which is not a
+    // convenience. R32/R33 established that a per-participant copy of a ranking input lets two
+    // rows in ONE leaderboard disagree, and an incoherent board cannot be explained to a
+    // player, whereas a uniformly wrong one is at least visibly wrong.
+    scoreUnit: { type: String, trim: true },
+    // Task 14 asks for zero-eligibility to be configurable, and this is the field that
+    // makes the owner's 9 September rule a DEFAULT rather than a law hard-coded in
+    // `providerHasResult`. The rule is unchanged: a score of zero wins nothing.
+    //
+    // NO DEFAULT, and this was written WITH `default: false` first, so the correction is left
+    // visible rather than tidied away. The argument for defaulting was that a stored `false`
+    // equals what `providerHasResult` already does, so nothing settles differently on the day
+    // it ships - which is true, and is not the whole question.
+    //
+    // A schema default IS a stored value (R50, `entryBlockThreshold`, `canEnterChallenges`),
+    // and a default only ever fixes FUTURE rows. This particular rule has already been
+    // reversed once - a zero used to be paid, until the owner's decision of 9 September 2026 -
+    // so a reversal is a live possibility rather than a hypothetical. With a default, every
+    // synced row holds a real stored `false` indistinguishable from an operator's deliberate
+    // `false`, and a second reversal becomes a migration that cannot tell the two apart. With
+    // no default, absence keeps meaning "nobody has said otherwise" and the platform rule
+    // stays a single line of code. Same reasoning as `playModeOverride`.
+    //
+    // Nothing is lost by the absence: `resolveScoringRules` reads `=== true`, the gate reads
+    // `!== true`, and the dialog's `draftFrom` reads `=== true`, so a blank row renders the
+    // switch OFF correctly rather than ambiguously.
+    //
+    // THE TITLE THIS EXISTS FOR was named in `scoring.ts` before it could be expressed: an
+    // `integer` + `lower_is_better` game scoring mistakes or penalties, where zero is a
+    // flawless round rather than an absent one. No such title is in the catalogue. That is
+    // also why this must never be inferred from `scoreType` - the only lower-is-better title
+    // today measures `duration_ms`, where zero is an unrecorded round, so a guess from the
+    // type would be wrong for the one case it was reached for.
+    zeroIsValidResult: { type: Boolean },
+    // An optional extra bar, "if required" in task 14's words, and it is DIRECTIONAL: the
+    // test is "at least as good as", so a higher-is-better game needs `score >= this` and a
+    // lower-is-better game needs `score <= this`. Naming it a minimum and comparing it with
+    // `>=` in both directions would silently refuse every finisher of a race, which reads
+    // correct in the diff because the field says "minimum".
+    //
+    // No default. Absent means "no bar beyond the zero rule", and a stored `0` is a real and
+    // different instruction: it admits zero on a higher-is-better game, which is why it must
+    // not be conflated with absence.
+    minimumEligibleScore: { type: Number },
 
     typicalDurationSeconds: { type: Number },
     maxDurationSeconds: { type: Number },

@@ -65,6 +65,21 @@ export interface ProviderTitleRow {
   supportsPractice?: boolean;
   scoreDirection?: string;
   scoreType?: string;
+  /**
+   * OUR prize-eligibility rules for this title (task document 14).
+   *
+   * All three optional and they must stay so. A title synced before these fields existed
+   * carries none of them, and `resolveScoringRules` answers with the platform rule for that
+   * row - zero wins nothing, no extra bar - rather than throwing.
+   *
+   * `minimumEligibleScore` is `number | undefined` and NEVER coerced to a fallback on the
+   * way to a screen. A stored `0` is a real instruction, so `?? 0` or `|| undefined`
+   * anywhere on this path turns a configured bar into an unset one, or an unset one into a
+   * bar of zero. The dialog's `draftFrom` is written for exactly that trap.
+   */
+  zeroIsValidResult?: boolean;
+  minimumEligibleScore?: number;
+  scoreUnit?: string;
   // Operator presentation content. Every one is optional and must stay so: a title synced
   // before these fields existed has none of them, and the screens that read them fall back
   // rather than printing a blank. See the model comment on `tagline`.

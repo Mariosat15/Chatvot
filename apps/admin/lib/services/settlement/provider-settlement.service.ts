@@ -1,6 +1,6 @@
 import Competition from "@/database/models/trading/competition.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
-import { resolveScoreDirection } from "@/lib/services/games/score-direction.service";
+import { resolveScoringRules } from "@/lib/services/games/score-direction.service";
 import { payContestPrizes } from "./prize-payout.service";
 import { settleFeesAndGameMasters } from "./fees.service";
 import { completeContest } from "./contest-completion.service";
@@ -185,7 +185,15 @@ export async function settleProviderCompetition(
     "@/lib/services/competition-ranking.service"
   );
 
-  // ONE direction for the whole contest, read from the catalogue title.
+  // ONE set of scoring rules for the whole contest, read from the catalogue title.
+  //
+  // Widened from direction alone on 9 September 2026 (task document 14): the same read now
+  // also carries whether a zero counts as a result and whether there is an extra bar to
+  // clear, because both are prize decisions and `providerHasResult` is a game module, which
+  // may not import a model. Settlement is the ONLY caller that needs the eligibility half -
+  // the leaderboards and the dashboard rank but never pay - and it takes the whole object
+  // rather than picking fields so that a rule added later reaches the payout without a
+  // second edit here.
   //
   // This used to be read off each participant row, which was a defect on two counts. The
   // field was declared on neither `CompetitionParticipant` copy, so the read returned
@@ -197,7 +205,7 @@ export async function settleProviderCompetition(
   // Note why the typecheck never objected: the participant read is a `.lean<{...}>()` with a
   // hand-written generic, so the compiler checked the annotation rather than the schema.
   // **An explicitly-typed lean read is a place a field that does not exist looks real.**
-  const direction = await resolveScoreDirection(competition.gameKey, session);
+  const scoringRules = await resolveScoringRules(competition.gameKey, session);
 
   // Reason: `gameType` is passed so `calculateRankings` dispatches to the provider game
   // module, which ranks on `score` and applies the title's direction. Omit it and the
@@ -209,7 +217,13 @@ export async function settleProviderCompetition(
       userId: p.userId,
       username: p.username || "Anonymous",
       score: p.score,
-      scoreDirection: direction,
+      scoreDirection: scoringRules.direction,
+      // Reason: spread onto EVERY row from the one contest-level read, never read per row.
+      // The engine asks the module about one participant at a time, so the rule has to be
+      // on the participant - but it is the same rule on all of them by construction, which
+      // is what stops one board negating half its rows (R32/R33).
+      zeroIsValidResult: scoringRules.zeroIsValidResult,
+      minimumEligibleScore: scoringRules.minimumEligibleScore,
       status: p.status ?? "active",
       enteredAt: p.enteredAt ?? new Date(),
     })),

@@ -42,7 +42,7 @@ code before citing it.
 | **11** — Game-level supported modes | Not started |
 | **12** — Required timing / runtime settings | Not started |
 | **13** — Data-driven game configuration | Not started |
-| **14** — Score configuration | Not started |
+| **14** — Score configuration | **Done, 9 Sep.** `14.1`. Three operator-owned fields on `provider_game`, their own route and audit line, and a preview pinned **behaviourally** against the gate. 55 tests, **28 probes red on exactly the expected test.** The eligibility *rule* is unchanged - task 2's `> 0` is now the default rather than a constant |
 | **15-16** — Image optimizer for game artwork | **Scoped down by owner decision, 9 Sep: on upload only.** Existing files are left alone, so there is no retro-scan to write. See task 15's note - this is a refusal with a reason, not an omission |
 | **17** — Remove the legacy game | **Half done.** Circuit Perfect was deprecated 8 Sep and the wizard already filters on `providerStatus: "active"`, so the code is correct. It still needs a **catalogue re-sync** before it leaves the picker, which is an operational step and not a code change |
 | **18** — Redesign the other screen | Not started |
@@ -1003,6 +1003,108 @@ But architect this properly because some future games could theoretically use ze
 Therefore make eligibility game-configurable while setting the correct defaults for our existing games.
 
 For Circuit Sprint, a player with no completed valid result must not receive a prize.
+
+## 14.1 — WHAT WAS BUILT, 9 September 2026
+
+**The rule did not change. It became a default.** Task 2's owner decision of this morning
+shipped as a hard-coded `> 0` inside `providerHasResult`; this replaces that constant with
+three fields an operator sets per title, whose absence produces the identical answer. Nothing
+settles differently until somebody deliberately turns it on for a game, which is the whole
+point - a title synced before these fields existed carries none of them and is unaffected.
+
+**Three of the six things the task lists were already there and were not rebuilt.**
+`scoreDirection`, `scoreType` and `scoreRange` have been on `provider_game` since X2 and are
+**provider-owned** - they are in `providerOwnedFields` in `catalogue.service.ts`, so a control
+writing to them saves, toasts, and is reverted by the next catalogue pull with no error and
+nothing in a log. Which is the right split: how a game scores is the provider's fact, whether
+a score is worth paying is ours. Display format is `scoreType` plus the new `scoreUnit`.
+
+The three new fields are ours, in no sync list at all:
+
+| Field | Meaning | Absent means |
+|---|---|---|
+| `zeroIsValidResult` | Does a score of exactly zero count as a result worth paying? | No - the platform rule, and what the constant did |
+| `minimumEligibleScore` | An extra bar the score must clear, in the game's own units | No bar |
+| `scoreUnit` | Display only. `"points"`, `"ms"`, `"boards"` | No unit shown |
+
+**The live code** is `zeroIsValidResult` / `minimumEligibleScore` / `scoreUnit` on both
+`provider-game.model.ts` copies, `resolveScoringRules` in `lib/services/games/score-direction.service.ts`
+(mirrored), the read in `lib/games/provider/scoring.ts` (mirrored), the threading in
+`provider-settlement.service.ts` (mirrored), and admin-only:
+`apps/admin/lib/services/game-providers/game-scoring-rules.service.ts`,
+`apps/admin/app/api/games/providers/[providerKey]/games/scoring/route.ts`,
+`apps/admin/lib/admin/score-eligibility-copy.ts` and
+`apps/admin/components/admin/games/GameScoringDialog.tsx`. Read those, not this prose.
+
+### Seven facts that drift easily
+
+- **`minimumEligibleScore` is DIRECTIONAL, and the word "minimum" is the trap.** The test is
+  *at least as good as*, so it reads `score >= bar` upward and `score <= bar` downward.
+  Written with `>=` in both directions - which is what the field name invites - it refuses
+  every finisher of a race whose time is under the bar, meaning **the better a player did the
+  more certainly they are excluded.** That is not a wrong screen; it is the wrong winner paid.
+- **A stored `0` and an absent value are different facts, and here they are opposites.** On a
+  higher-is-better title a bar of zero *admits* a zero score. So `value || null` at the edge,
+  `?? ""` in the dialog, or a truthiness test in the row summary each silently delete the one
+  setting an operator is most likely to want on a title where zero is real. R31's
+  `referralFeePercentage || 5` in a new place, and four separate probes exist for it because
+  the collapse can be reintroduced at four different layers.
+- **The three fields are read ONCE per contest and ride on the participant row**, exactly as
+  `scoreDirection` has since R32/R33. Not stored per row - per-row storage lets two rows in
+  one leaderboard disagree, which is incoherent rather than merely wrong - and not read inside
+  the module, because invariant 2 bans a model import there and one provider module serves
+  every one of that provider's titles, so a module-level constant would force one module per
+  title.
+- **The preview is pinned BEHAVIOURALLY against the gate, never against expected strings.** A
+  copy test passes for ever while the wording describes the opposite of what settlement does,
+  and an operator sets a money rule from that sentence. `describeScoreEligibility` is fed the
+  same inputs as `providerHasResult` and the test asserts the sentence agrees with the
+  refusal - which is what makes probe 17 possible at all.
+- **`zeroIsValidResult` carries NO schema default, deliberately.** `default: false` is the
+  obvious spelling and matches today's behaviour exactly, and it is wrong for one reason: it
+  writes a real `false` onto every row the sync creates, so an explicit "no" and "nobody has
+  said" become indistinguishable and a future reversal of the platform rule cannot tell them
+  apart. It was found by a test asserting the sync **invents** nothing, which went red on
+  `default: false` alone. `resolveScoringRules` reads `=== true`, so an absent field and a
+  stored `false` are the same answer today - and separable tomorrow.
+- **All three are on `NEVER_EDITABLE_CONTENT_FIELDS`**, following `playModeOverride`. Two of
+  them decide who is paid out of a pot people bought into, so accepting them through the
+  content door would let a prize rule change as a side effect of fixing a typo, with the audit
+  trail recording a content edit. `scoreUnit` would be harmless there and is barred anyway, so
+  that one screen's three fields cannot be written through two doors with two audit lines.
+- **The player app RESOLVES these and must never write them.** The service is admin-only and
+  unmirrored, matching `game-play-style.service.ts` - a second writer in the app with the
+  widest reach and no operator behind it is the door this deliberately does not build.
+
+### Four probing lessons, all of them recurrences
+
+**28 probes, all red on exactly the expected test.** Four were not, and every one is a rule
+already on record here in a different costume.
+
+- **Removing a field from the never-editable list stayed GREEN**, because the field is absent
+  from the editable allow-list too, so it still fell through to the unknown-field refusal -
+  whose message *also* names the field. Identical to `competition-update-fields.ts` and
+  `gameKey`. The test now pins **which refusal fired**, not that one did.
+- **Deleting the whole `newValue` block stayed GREEN** against `toMatch(/zeroIsValidResult/)`,
+  because the human-readable `description` one line above names both fields. Fifth instance
+  after `!expectedOrigin`, the fixed-character Edit guard, `canTransitionRound` and
+  `MIN_REASON_LENGTH`: **one identifier, two jobs, and a structural test cannot tell which one
+  it found.** Now asserted inside the construct, with the slice's length checked first.
+- **`-t '$unset'` matches nothing**, because vitest treats the filter as a regex and `$` is an
+  anchor. The probe reported the guard absent while the test it named never ran. **A probe
+  aimed at nothing is indistinguishable from a test that does not work** - keep filters free
+  of regex metacharacters.
+- **An em-dash in a probe pattern cannot match the file.** This script is UTF-8 with no BOM,
+  PowerShell 5.1 decodes it with the system codepage, and the pattern arrives as mojibake:
+  `PROBE DID NOT APPLY`. **Keep probe anchors ASCII**, and anchor on the condition rather than
+  the prose whenever the prose is the thing being tested.
+
+**What this does not cover.** Placement scoring and win/loss records - two of the five models
+the task lists - need no configuration here and are not built: a provider reporting a placing
+or a result reports **a number**, and the platform ranks numbers. If a title ever needs the
+platform to understand a ladder, that is a scoring *model* rather than an eligibility rule,
+and it belongs with task 13. And nothing here is player-visible: the fields decide settlement
+and the sentences are for the operator.
 
 ---
 

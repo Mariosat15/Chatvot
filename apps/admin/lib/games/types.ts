@@ -95,6 +95,37 @@ export interface RankableParticipant {
    */
   scoreDirection?: ScoreDirection;
 
+  /**
+   * Does a score of exactly zero count as a result worth paying, for THIS game?
+   *
+   * Absent means no, which is the owner's rule of 9 September 2026 and what
+   * `providerHasResult` did unconditionally before this existed - so an absent value and the
+   * old hard-coded behaviour are the same answer, and nothing settles differently until an
+   * operator deliberately turns it on for a title.
+   *
+   * It rides here rather than being read from the catalogue inside the module for the same
+   * two reasons `scoreDirection` does. A module may not import a model - invariant 2, ESLint
+   * enforced - and one provider module serves every one of that provider's titles, so a
+   * module-level constant would force one module per title. Threaded in ONCE per contest,
+   * never stored per row: R32/R33 established that per-row storage lets two rows in one
+   * leaderboard disagree, which is incoherent rather than merely wrong.
+   */
+  zeroIsValidResult?: boolean;
+
+  /**
+   * An optional extra bar the score must clear to be paid, in the game's own units.
+   *
+   * DIRECTIONAL, and the direction is the trap. The test is "at least as good as", so it
+   * reads `score >= this` upward and `score <= this` downward. Compared with `>=` in both
+   * directions - which is what the word "minimum" invites - it refuses every finisher of a
+   * race whose time is under the bar, meaning the better they did the more certainly they
+   * are excluded.
+   *
+   * Absent means no bar. A stored `0` is a different and legitimate instruction, so the two
+   * must not be conflated - the usual "a stored value and an absent one are different facts".
+   */
+  minimumEligibleScore?: number;
+
   // Trading metrics. Present only for trading participants.
   currentCapital?: number;
   pnl?: number;

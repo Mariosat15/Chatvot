@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, Gamepad2, Info, Sparkles } from "lucide-react";
+import { Loader2, RefreshCw, Gamepad2, Info, Sparkles, Trophy } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,7 @@ import type {
 } from "./provider-types";
 import GameContentDialog from "./GameContentDialog";
 import GamePlayStyleControl from "./GamePlayStyleControl";
+import GameScoringDialog from "./GameScoringDialog";
 
 /**
  * One provider's game catalogue, with our own enable switch per title.
@@ -33,12 +34,13 @@ import GamePlayStyleControl from "./GamePlayStyleControl";
  * and updates rows, reports titles the provider has stopped listing without deleting them,
  * and leaves every ChartVolt switch exactly as it was.
  *
- * THERE ARE THREE CONTROLS PER ROW AND THEY WRITE THROUGH THREE ROUTES, deliberately. The
- * enable switch, the Play style and the player-facing content each have their own endpoint
- * and their own audit line, because one route inferring which edit it was being asked for
- * from the fields present is how a content save silently changes a game's live state - or how
- * a typo fix turns a puzzle into a gun-start race. Play style also survives a sync where the
- * provider's own `playMode` does not, which is the whole reason it is a separate field.
+ * THERE ARE FOUR CONTROLS PER ROW AND THEY WRITE THROUGH FOUR ROUTES, deliberately. The
+ * enable switch, the Play style, the prize eligibility and the player-facing content each
+ * have their own endpoint and their own audit line, because one route inferring which edit it
+ * was being asked for from the fields present is how a content save silently changes a game's
+ * live state - or how a typo fix turns a puzzle into a gun-start race, or moves the bar
+ * deciding who gets paid. Play style and prize eligibility also survive a sync where the
+ * provider's own declarations do not, which is the whole reason they are separate fields.
  */
 
 interface Props {
@@ -60,6 +62,7 @@ export default function ProviderCatalogueDialog({
   const [pendingCode, setPendingCode] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<CatalogueSyncSummary | null>(null);
   const [editing, setEditing] = useState<ProviderTitleRow | null>(null);
+  const [scoring, setScoring] = useState<ProviderTitleRow | null>(null);
 
   const providerKey = provider?.providerKey;
 
@@ -211,6 +214,7 @@ export default function ProviderCatalogueDialog({
                   <th className="px-3 py-2">Game</th>
                   <th className="px-3 py-2">Formats</th>
                   <th className="px-3 py-2">Play style</th>
+                  <th className="px-3 py-2">Prize eligibility</th>
                   <th className="px-3 py-2">Provider says</th>
                   <th className="px-3 py-2">Live on ChartVolt</th>
                   <th className="px-3 py-2">Player-facing content</th>
@@ -264,6 +268,21 @@ export default function ProviderCatalogueDialog({
                           )
                         }
                       />
+                    </td>
+                    <td className="px-3 py-2.5 align-top">
+                      {/*
+                        Settable at any provider status, for the same reason as the Play style
+                        and the content button: correcting how a title's history was run is
+                        useful, putting it back in front of players is not.
+                      */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setScoring(title)}
+                      >
+                        <Trophy className="mr-1.5 h-3.5 w-3.5" />
+                        {describeScoringSummary(title)}
+                      </Button>
                     </td>
                     <td className="px-3 py-2.5">
                       <ProviderStatusBadge status={title.providerStatus} />
@@ -333,9 +352,58 @@ export default function ProviderCatalogueDialog({
             );
           }}
         />
+
+        <GameScoringDialog
+          providerKey={provider.providerKey}
+          title={scoring}
+          open={scoring !== null}
+          onOpenChange={(next) => {
+            if (!next) setScoring(null);
+          }}
+          onSaved={(rules) => {
+            // Reason: merged locally rather than refetched, so the row's summary updates at
+            // once. `onChanged` is deliberately not called - the provider list above counts
+            // titles and enabled titles, and an eligibility edit changes neither.
+            //
+            // The merge must be a SPREAD of the whole `rules` object, not a field-by-field
+            // assignment with `??` fallbacks: the route answers `minimumEligibleScore: null`
+            // when the bar has been cleared, `onSaved` maps that to `undefined`, and any
+            // `?? row.minimumEligibleScore` here would restore the value that was just
+            // deleted - so the row would keep claiming a bar the database no longer has.
+            setTitles((current) =>
+              current.map((row) =>
+                row.gameCode === scoring?.gameCode
+                  ? {
+                      ...row,
+                      zeroIsValidResult: rules.zeroIsValidResult,
+                      minimumEligibleScore: rules.minimumEligibleScore,
+                      scoreUnit: rules.scoreUnit,
+                    }
+                  : row,
+              ),
+            );
+          }}
+        />
       </DialogContent>
     </Dialog>
   );
+}
+
+/**
+ * The row's one-line summary of who gets paid.
+ *
+ * It names the RULE and never the game, so a title nobody has seen summarises itself. It also
+ * distinguishes an absent bar from a bar of zero - `minimumEligibleScore === undefined` is
+ * "no minimum", a stored `0` is a real instruction and prints as one - because collapsing the
+ * two with a truthiness test is how a configured bar becomes invisible on the screen an
+ * operator uses to check it.
+ */
+function describeScoringSummary(title: ProviderTitleRow): string {
+  const bar = title.minimumEligibleScore;
+  if (bar !== undefined && bar !== null) {
+    return `Min ${bar}${title.scoreUnit ? ` ${title.scoreUnit}` : ""}`;
+  }
+  return title.zeroIsValidResult === true ? "Zero counts" : "Zero wins nothing";
 }
 
 function ProviderStatusBadge({ status }: { status: string }) {

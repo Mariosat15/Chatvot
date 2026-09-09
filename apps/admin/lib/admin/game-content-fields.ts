@@ -51,6 +51,18 @@ export const NEVER_EDITABLE_CONTENT_FIELDS: ReadonlyMap<string, string> = new Ma
   ["playModeOverride", "changed with the Play style control, which has its own audit line"],
   ["scoreDirection", "declared by the provider and rewritten by every catalogue sync"],
   ["scoreType", "declared by the provider and rewritten by every catalogue sync"],
+  // Ours, like `chartvoltEnabled` and `playModeOverride` above, and barred for the same
+  // reason rather than because a sync would revert them: these two decide WHO IS PAID out of
+  // a pot people have bought into. Accepting them here would let a prize rule change as a
+  // side effect of fixing a typo in a tagline, with the audit trail recording a content edit.
+  //
+  // `scoreUnit` is display-only and would be harmless here - it is barred anyway so that the
+  // three fields of one screen cannot be written through two different doors with two
+  // different audit lines, which is how an operator ends up unable to answer "when did this
+  // change and who did it".
+  ["zeroIsValidResult", "changed with the Prize eligibility control, which has its own audit line"],
+  ["minimumEligibleScore", "changed with the Prize eligibility control, which has its own audit line"],
+  ["scoreUnit", "changed with the Prize eligibility control, which has its own audit line"],
   ["configSchema", "declared by the provider and rewritten by every catalogue sync"],
   ["supportsCompetition", "declared by the provider and rewritten by every catalogue sync"],
   ["supportsOneVsOne", "declared by the provider and rewritten by every catalogue sync"],

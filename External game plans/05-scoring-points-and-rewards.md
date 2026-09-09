@@ -489,6 +489,36 @@ sits on the game module interface beside `getRankingValue` and `getTieBreakerVal
 Asked of the module for the reason section 10 gives: `if (gameType === "provider")` is the shape
 that makes the next game silently fail while the query runs and the page renders.
 
+> **AMENDED TWICE ON 9 SEPTEMBER 2026, AND THE PROVIDER BULLET ABOVE IS NOW HALF THE ANSWER.**
+> Both changes are owner decisions and neither touches the trading bullet.
+>
+> **First, a genuine reversal (task 2).** The sentence above defends paying "the player who
+> attempted the game and genuinely scored zero". The owner's rule is the opposite: **a zero
+> wins nothing**, and its share is redistributed among the players who did score, or routed to
+> the unclaimed pool if none did. So the bullet is correct as the reasoning s9.2 shipped with
+> and **stale as a description of what settles** - the argument it makes is a real cost of the
+> decision rather than an error, which is why it is left standing rather than rewritten.
+>
+> **Second, it became configurable (task 14, `14.1` in the task document).** The rule is now the
+> **default** rather than a constant: `zeroIsValidResult` and `minimumEligibleScore` on
+> `provider_game` let an operator declare, per title, that a zero is a real result or that a
+> score must clear a bar. All three fields absent produces the identical answer, so **nothing
+> settles differently until somebody turns one on**, and a title synced before they existed is
+> unaffected.
+>
+> Two facts about the pair that a summary loses. **`minimumEligibleScore` is directional** -
+> `>=` on a higher-is-better title, `<=` on a lower-is-better one - because the test is "at
+> least as good as"; the both-directions-upward spelling that the word "minimum" invites
+> refuses every finisher of a race *under* the bar, so the better a player did the more
+> certainly they are excluded. And **a stored `0` is not an absent value but its opposite**: on
+> a higher-is-better title a bar of zero *admits* a zero score, so `|| null` anywhere on that
+> path deletes the one setting an operator is most likely to want.
+>
+> The rules are resolved **once per contest** by `resolveScoringRules` and ride on
+> `RankableParticipant`, for the same two reasons `scoreDirection` does - a module may not
+> import a model, and one provider module serves every one of that provider's titles. **Not
+> stored per row**, which R32/R33 established would let two rows in one leaderboard disagree.
+
 > **THIS GATE WAS DEAD ON THE DAY IT SHIPPED, AND THE REASON IS THE PART TO CARRY (R50, 7
 > September 2026).** The rule above is right and it could not fire, because **an absent score was
 > unreachable in production.** Three places supplied a nought before the player had played:
