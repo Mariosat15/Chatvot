@@ -44,6 +44,7 @@
 | **What unit is a competition priced in?** | **Credits, and every screen says so from 9 Sep 2026** (task doc **1.1**) - and before that around forty render sites prefixed a credit amount with `settings.currency.symbol`, the **fiat** symbol configured for deposits and invoices, so a 50-credit entry fee read `EUR 50`. Two landing routes were worse, each carrying a private `formatCurrency` hard-coded to `$`, so a provider contest's prize pool advertised to signed-out visitors read `+$30.00`. **Every amount was correct and only its unit was a lie**, which is the whole reason forty sites survived: no error, no log line, and the figure reconciles perfectly against the ledger - so the guards are **structural rather than behavioural**, there being no wrong number to assert on. One mirrored formatter, `lib/utils/format-volts.ts`, **which never converts**, and that refusal is the finding rather than a simplification: the platform stores what a credit is worth **twice and the two defaults disagree by a factor of a hundred** - `AppSettings.credits.valueInEUR` at 1 credit = EUR 1 drives the player's "approximately EUR x" line, while `CreditConversionSettings.eurToCreditsRate` at 100 credits = EUR 1 is what deposits, withdrawals and the admin financial screens move money on. **That is a separate defect, recorded at the foot of the module and deliberately not fixed**; this work removes the fiat equivalent from competition surfaces rather than correcting it, because a contest is denominated in credits and has no business quoting a second unit. **Do not summarise it as a display pass**: the same wrong unit reached players by **email** and operators in the **settlement reconciliation logs**. **There are two units on a trading contest and merging them is the tempting mistake** - a prize pool is credits, a trader's equity and P&L are simulated trading capital in the contest's quote currency - so the ranking panels write both and the guard **counts** `${currSymbol}` interpolations, a probe relabelling one metric having stayed green against a presence check while leaving the other right. **An absent amount is a dash, never a zero**, R45 and R50's rule one layer out. The unit stays configurable and `"Volts"` is only the default, so a rename reaches every screen and **not** the few server-composed strings, which have no React context - a boundary recorded rather than implied away, and strictly smaller than the euro sign it replaces. The assistant's no-fiat rule is **appended** to trading's prompt rather than written into it, because a test pins that prompt character for character as the only evidence the trading wizard still writes what it wrote; the guarantee is now "the historical string plus one shared rule" and **the composition itself is asserted**. **Two carve-outs are correct and must not be finished off:** deposit and withdrawal strings are genuinely fiat, so a control probe adding a euro deposit line **stays green on purpose**, and the admin analytics screen keeps its `creditsToEUR` figures, which are an operator converting deliberately. **One defect was introduced and caught before shipping, and the diagnostic is the point:** five admin challenge-view calls kept the `.toFixed(2)` / `.toLocaleString()` from the strings they replaced, so a **string** reached the formatter, hit the non-number guard and would have rendered the prize pool, entry fee and winner's prize as `-`. The typecheck saw only **two of the five** - that page's challenge object is loosely typed, so `?.toLocaleString()` widens to `any` - and every structural test here stayed green, because they ask whether a screen reads the fiat symbol and it does not. **Diffing the typecheck against a stashed baseline is what found it**, two new entries inside 225 being invisible in a count; closed with a repo-wide scan rather than a list of five files, plus the behavioural half. Separately **four typecheck errors disappeared**, which got the same suspicion as a rise and turned out to be real: `ContestStatsCards.tsx` read `settings.credits.decimals` unguarded on a context that can be `null`, so four latent dashboard crash paths went with the unit fix. **CORRECTED THE SAME DAY (task doc 1.2): it is the credit SYMBOL, not the credit name** - `AppSettings.credits.symbol` from Settings → Currency, defaulting to `⚡`, so an entry fee reads `50 ⚡` and not `50 Volts`. One field along on the right object, which typechecks and renders and is only wrong to somebody who opens the currency screen - so **any sentence above naming `credits.name` is correct as history and stale as a present fact**. Three things came with it: **singularisation was removed and its two tests inverted rather than deleted**, because a word has a plural and a glyph does not, and stripping a trailing `s` from a configured symbol is destructive; **both of those probes came back green on the FOURTH cause - the mutation changed no observable** - since re-adding the singulariser to `⚡` yields `⚡`, fixed by asserting a configured symbol that ends in one, the field being free text; and **the symbol goes after the number**, matching the wallet, with a test pinning it because the fiat convention is what a later edit corrects it to. A **codemod overreached into four files** where `creditName` was prose rather than a formatter input and was reverted, the tell being duplicate object keys - **a pattern-driven rename cannot tell an argument from a sentence.** And a **measurement error worth keeping**: a whole-file regex for the symbol default returned the euro sign, which reads as a live drift, because `currency:` precedes `credits:` in the model and the fiat field is correctly a euro sign - the test slices from `credits:` and was right. **70 tests, 27 probes red with a blast radius of one** |
 | **The content-seed fairness gate** | **R53, closed 8 Sep 2026.** Found while mapping the row above. `supportsContentSeed` - which `01` s4.3 calls the most important single field in the specification, and which underwrites the skill-not-chance position - **was read by no gate in either app**, while **three separate comments in three files** asserted it gated paid entry. Fifth instance of a comment claiming a check that does not run, and the first repeated three times: **agreement between comments is not corroboration, because the second and third were written by reading the first.** What hid it is that its two siblings *are* enforced, in the pre-flight and in the wizard - **a partially-implemented pattern is more dangerous than an absent one.** **Latent, nothing backfilled**: every existing title declares it `true`, but it is exactly the flag a real provider sets `false` at X4, and the failure then is a paid contest where every player faces different content, ranked, settled and paid in silence. One unconditional check in both mirrored pre-flight copies, **required** on the input so a caller cannot fail open again, both writers counted with `rg` first, and the wizard disabling the title with the capability named. **Not scoped to `competition`** despite the spec's word, so the challenge half is a tripwire for E8. 4 tests, 4 probes |
 | **Which scores are worth a prize?** | **A per-title setting from 9 Sep 2026** (task doc **14.1**), and **THE RULE DID NOT CHANGE - IT BECAME A DEFAULT.** The owner's task-2 decision that a score of nothing wins nothing shipped that morning as a hard-coded `> 0` inside `providerHasResult`; `zeroIsValidResult` and `minimumEligibleScore` on `provider_game` now let an operator declare otherwise per title, with `scoreUnit` beside them for display. **All three absent produce the identical answer**, so nothing settles differently until somebody turns one on and a row synced before they existed is unaffected - a summary describing eligibility as loosened, or as newly strict, is wrong in both directions. Resolved **once per contest** by `resolveScoringRules` and threaded onto every `RankableParticipant`, exactly as `scoreDirection` has since R32/R33: a module may not import a model, and one provider module serves every one of that provider's titles, so per-row storage would let two rows in one leaderboard disagree. **Three of the six things task 14 lists already existed and were not rebuilt** - `scoreDirection`, `scoreType` and `scoreRange` are in `providerOwnedFields`, so a control writing to them saves, toasts and is reverted by the next sync; that split is the design rather than a gap, since *how* a game scores is the provider's fact and *whether a score is worth paying* is ours. **Four things drift easily.** **`minimumEligibleScore` is DIRECTIONAL** - `>=` upward, `<=` downward - because the test is "at least as good as"; the both-directions-upward spelling the word "minimum" invites refuses every finisher of a race **under** the bar, so the better a player did the more certainly they are excluded, and that is a wrong winner paid rather than a wrong screen. **A stored `0` is not an absent value but its opposite**: on a higher-is-better title a bar of zero *admits* a zero score, so `|| null`, `?? ""` and a truthiness test each delete the one setting an operator is most likely to want - probed at four separate layers because it can be reintroduced at four. **`zeroIsValidResult` carries no schema default**, `default: false` being the obvious spelling that writes a real `false` onto every row the sync creates and makes an explicit "no" indistinguishable from "nobody has said" - found by a test asserting the sync **invents** nothing. And **all three are on `NEVER_EDITABLE_CONTENT_FIELDS`**, `scoreUnit` included despite being harmless, so one screen's three fields cannot be written through two doors with two audit lines. The operator-facing preview is pinned **behaviourally** against the gate, never against expected strings, because a copy test passes for ever while the wording describes the opposite of what settlement does. **Placement scoring and win/loss records need nothing here** - a provider reporting a placing reports a number and the platform ranks numbers; a ladder is task 13. **55 tests, 28 probes red on exactly the expected test.** **Nothing has settled in production on any of it** |
+| **What KIND of game is a title?** | **A controlled vocabulary from 9 Sep 2026** (task doc **9.1**), and **THE FIELD ALREADY EXISTED - what it lacked was a vocabulary.** `provider_game.category` has been on both model copies since X2: free text, 40 characters, seeded from the provider on the first sync and operator-owned after, edited as a plain text box and rendered raw in two places. A summary describing a new field is describing something nobody built. **The harm is the analytics grouping failure one field along**: `category` is the natural grouping key for discovery, the Game Performance screen and analytics, and as free text `Racing`, `racing` and `race` become **three rows that each look complete** - no error, no log line, totals still adding up. Thirteen slug/label pairs in `lib/services/games/game-categories.ts` (mirrored, byte-identical test), plus a custom box, which is task 9's **second** offered architecture rather than its first: **a `game_category` collection is a deletable grouping key**, and an operator deleting a row at 2am orphans every title and every historical figure joined to it - the reasoning that gives providers a disable switch and no delete, and that retires a disabled game's rows rather than removing them (R29). **Five things drift easily.** It is **deliberately not a Mongoose enum**, and that is a refusal rather than an omission: a missing enum value **rejects the whole write**, so the vocabulary on the schema means a provider shipping an unforeseen genre **costs us that entire catalogue row**, silently, on a scheduled sync. An **unrecognised slug is shown verbatim, never remapped and never dropped** - the mock catalogue's `quiz` is the live case, conceptually `trivia`, and mapping it would silently rewrite a provider's own statement about their game while dropping it would hide a real key with real titles under it; same reason the analytics label chain ends at the game code and **never at "Unknown"**. An **absent genre renders nothing, never a placeholder**, because "Uncategorised" on a player's screen is a genre nobody chose. The validator **normalises rather than refusing**, inverting this codebase's usual unknown-value rule, because the content dialog submits every field in one request - so refusing a legacy free-text genre would block an unrelated tagline edit, and the dialog shows the operator the slug before they save. And **every consumer is handed the LABEL**, resolved by the service exactly as `playMode` is; a screen that re-derives is a second copy of the vocabulary. **Four of task 9's six destinations are built** - the content dialog, the catalogue list, the wizard picker, the AI prompt and the player's arena badge - while **analytics grouping (tasks 21-24) and discovery filtering are NOT**, the latter because one provider game makes a filter with one value a control that appears to work. **30 tests, 23 probes**, four of which came back green first time on four different causes, one being **the harness itself**: vitest treats a `-t` pattern matching nothing as a passing run over zero tests, so a misspelt test name reported the guard as absent |
 | **Blocked by** | **Nothing technical below X4.** Stage 0 / X0 was signed off 2 Sep 2026. **X4 is blocked on a signed provider**; X6's remaining admin work is not |
 | **Phase in progress** | **X4a - STARTED 6 Sep 2026. The two halves connected 7 Sep 2026** - see the row above and `21` s4.1d. What remains is the *clicking* half: the provider has still never been registered through the admin screens, and nothing has been deployed. `games-service/` (the provider) and the `chartvolt-games` adapter (the platform) are both code-complete. **The game is playable by a human**: the launch URL serves a real board, verified in a browser on both titles, which also fixed a live defect - an unstarted round reported itself as `finished`, so the first screen a paying player saw was a result screen for a round they had not played. It also **found and then closed a defect in the platform's own published auth scheme** (**R34**): there was no `callbackToken` field anywhere, so a provider implementing `Bearer {CALLBACK_TOKEN}` exactly was rejected and logged as a probable attack. Latent throughout, so nothing was backfilled. **Nothing technical now stands between the two halves** - what remains is deploying the service and registering it. It is now **deployable**: a PM2 entry, an nginx block for a `games.` subdomain, `env.example` and a `deploy/README.md` runbook, plus **two production-only boot guards** for the play origin and the frame allowlist, both of which previously failed invisibly. Writing the runbook also found that the admin panel **could not register a loopback provider at all**. See the three 6 Sep work-log entries |
 | **Next phase, scope decided** | **X4a - ChartVolt as a first-party provider, with a real playable game** (`21`), **3.5-5 weeks**, starting before the provider health panel. It exists because **the review gate the programme is sequenced around cannot currently be held**: `mock.adapter.ts` returns a hostname that does not resolve, so the play screen's iframe fails to load and the final step has never been performed by a person. **Owner decided 5 Sep 2026 that it is both** the reference implementation *and* open question 10's hedge game - which **modifies the 2 Sep "no in-house game is built" decision** and is recorded in the decision log rather than by editing that entry. **No commercial dependency.** Two things not to misread: **risk X8 is reduced when it ships, not now**, and X4a **shrinks X4 without replacing it** - a provider we control cannot rehearse a real partner's auth, error shapes, latency or pricing |
@@ -672,6 +673,52 @@ unaffected by the decision - it is the work currently in flight.
 
 ---
 
+## THE 35-TASK DOCUMENT - WHERE EVERY TASK STANDS
+
+`Cursor Task — Competition & Game Admin Fixes Before Challenges.md`, as at **9 September
+2026**. Owner's own list, with the state corrected against the code where the two disagreed.
+**Read the task document's numbered `N.1` sections for what was actually built** - this table
+is an index, not an account.
+
+| Task | State |
+|---|---|
+| **1** - Volts / the credit symbol everywhere | **Done** (1.1, then **1.2** for the symbol rather than the word) |
+| **2-7** - Prize eligibility, redistribution, unclaimed pool | **Done** |
+| **8** - Redesign the large game admin screen | **Not started.** Blocked on the referenced image, which has not been supplied |
+| **9** - Game type / category field | **Done** (9.1). The **field already existed** - what it lacked was a vocabulary. Analytics grouping and discovery filtering are explicitly **not** part of it |
+| **10** - Competition style / participation mode | **Done** (10.1). Turn-based and heat-based are **blocked, not deferred** (10.2) |
+| **11** - Game-level supported modes | **Not started** |
+| **12** - Required timing / runtime settings | **Not started** |
+| **13** - Data-driven game configuration | **Not started** |
+| **14** - Score configuration | **Done** (14.1). **The rule did not change - it became a default** |
+| **15-16** - Image optimizer for game artwork | **Not started**, and see the owner decision below: **optimise on upload only**. Pointing the existing optimizer at `public/assets` would rename files that `provider_game.thumbnailUrl` and `branding_asset` still name |
+| **17** - Remove the legacy game | **Deprecated 8 Sep** and the wizard already filters on `active`, but it needs a **catalogue re-sync** to actually leave the picker. Open |
+| **18** - Redesign the other screen | **Not started** |
+| **19** - AI on the game content screen | **Not started.** This is the gap task 20 does not cover |
+| **20** - AI must be game-agnostic | **Mostly done 8 Sep** for the wizard's assistant (`12` s2.8). Task 19's screen is what remains |
+| **21-24** - Game Performance section | **Not started.** Task 9's grouping key now exists for it |
+| **25-27** - Consistency, model review, backward compatibility | **Not started** |
+| **28** - Settlement server-side | **Not verified, likely already true.** Worth confirming rather than assuming - the claim is exactly the kind an aside makes |
+| **29** - Prevent double settlement | **Done.** Optimistic lock on the admin finalize path |
+| **30** - Tests for the new prize rules | **Done** (30.1). The 19-case matrix plus a probe harness |
+| **31-35** - Mode logic tests, UI validation, per-game reviews, final audit | **Not started** |
+
+**Two owner decisions from 9 September are recorded and NOT built.** Both are their own slice
+and neither should be folded into a task above:
+
+- **100 credits = EUR 1 is authoritative**, and `AppSettings.credits.valueInEUR` derives from
+  `CreditConversionSettings.eurToCreditsRate` rather than being stored separately. This
+  **moves the wallet's euro line by a factor of a hundred**, so it is a money-visible change
+  and not a tidy-up. Recorded at the foot of `lib/utils/format-volts.ts`.
+- **Tasks 15/16 optimise on upload only** and leave existing files alone.
+
+**The challenges side is still not started and is gated behind this list** - picking
+trading-or-game, then a title, then a setup page adapting to that title's shape. It inherits
+**R50**: `ChallengeParticipant.score` still defaults to `0`, so the first provider challenge
+reproduces that defect exactly.
+
+---
+
 ## WORK LOG
 
 Newest at the top.
@@ -685,6 +732,89 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 9 Sep 2026 - X6 - THE GAME TYPE / CATEGORY VOCABULARY (TASK 9)
+
+**Shipped:** `lib/services/games/game-categories.ts`, mirrored into
+`apps/admin/lib/services/games/` and held byte-identical by a test - thirteen slug/label
+pairs, `isKnownCategorySlug`, `normaliseCategorySlug` and `resolveGameCategory`. The content
+dialog's plain text box became a dropdown plus a custom entry showing the slug that will be
+stored; the provider catalogue list and the wizard's game picker gained a genre badge; the
+player's arena badge and the AI prompt now read the resolved **label**. Task doc **9.1**.
+
+**Files touched:** `lib/services/games/game-categories.ts` (+ admin mirror),
+`apps/admin/lib/admin/game-content-fields.ts`,
+`apps/admin/components/admin/games/GameContentDialog.tsx`, `ProviderCatalogueDialog.tsx`,
+`wizard/StepChooseGame.tsx`, `contest-types.ts`,
+`apps/admin/lib/services/game-providers/provider-contest.service.ts`,
+`lib/services/games/game-presentation.service.ts`,
+`apps/admin/lib/admin/ai-contest-vocabulary.ts`,
+`__tests__/admin/game-categories.test.ts` (30), `tools/probe-game-categories.ps1` (23).
+
+**The finding, and it is the first thing to say:** **the field already existed.**
+`provider_game.category` has been on both model copies since X2 - free text, 40 characters,
+first-sync-seeded and operator-owned after - so nothing here adds a field. What did not exist
+was a vocabulary, and its absence is the **analytics grouping failure one field along**: as
+free text, `Racing`, `racing` and `race` are three rows that each look complete, with no error
+and totals that still add up. Same shape as grouping revenue by a display name instead of
+`gameKey`, except nobody had made the choice, because there was no key/label distinction to
+make it with.
+
+**Deviated from plan:** task 9 offers "controlled configurable categories from admin" first
+and predefined-plus-custom second. **The second was built, deliberately.** A
+`game_category` collection is a *deletable grouping key* - thirteen rows nobody administers,
+bought with a screen, a route, a model pair and an RBAC decision, in exchange for letting an
+operator orphan every title joined to a category at 2am. That is the reasoning that gives
+providers a disable switch and no delete, and that retires a disabled game's rows rather than
+removing them (R29). **A slug in code cannot be deleted.**
+
+Also **deliberately not a Mongoose enum**, which is a refusal rather than an omission: a
+missing enum value rejects the **whole write**, so the vocabulary on the schema would mean a
+provider shipping an unforeseen genre costs us that entire catalogue row, silently, on a
+scheduled sync. Two probes cover it, one per model copy.
+
+**Four probes came back green first time, on four different causes, and one was the harness.**
+Worth carrying because the harness failure is new:
+
+1. **The harness.** A probe named a test that did not exist - "genre" where the test says
+   "slug" - and **vitest treats a `-t` pattern matching nothing as a passing run over zero
+   tests**, so it reported the guard as absent. The harness now refuses any run in which no
+   test ran. Sixth probing instance of the same class: *a probe aimed at the wrong place is
+   indistinguishable from a test that does not work.*
+2. **A weak fixture.** The truncation test put the hyphen at index 40, which `slice(0, 40)`
+   drops anyway, so the second strip had nothing to do. It must be the **last character kept**.
+3. **A weak negative assertion.** `not.toMatch(/category:\s*title\.category/)` was satisfied
+   by `resolveGameCategory(title.category) ? title.category : undefined` - the resolver called,
+   its answer discarded, the slug shipped. Fixed by asserting the label explicitly and
+   **counting** `title.category` to one mention. Third instance of one identifier appearing
+   twice defeating a structural test.
+4. **Two guards covering each other**, R42's shape: both `=== ""` checks in
+   `normaliseCategorySlug` answer `null` for an empty input, so removing either leaves the
+   other holding the property. Probeable only because both live in one file, so the harness
+   gained a second injection - and the source says so rather than calling one of them dead.
+
+**One existing test was flipped rather than edited.** `game-contest-wizard.test.ts` asserted
+the AI prompt received `(puzzle)`, the raw stored value. It was right about the code on the day
+it was written; what it was recording is that there was nowhere to resolve the genre. The
+reason is kept in the test.
+
+**Owner tested:** nothing. **Never verified by eye** - every screen here is behind an admin
+sign-in the automated browser has no session for. 844 tests green across the admin and games
+suites, admin typecheck at the **223** baseline exactly (two of my own errors caught by
+diffing the list rather than the count - the wizard has its own client-side
+`ContestableTitle`, not the service's `ProviderContestOption`), main app **194** with and
+without the change, `check:mirrors` green.
+
+**Deferred:** **analytics grouping and the Game Performance widgets** (tasks 21-24) and
+**discovery filtering and banners**. The first wants a *group by* rather than a badge; the
+second is withheld because there is one provider game, and a filter with one value is a
+control that appears to work and does nothing.
+
+**Next chat should:** read tasks 11, 12 and 13 together - 11 (game-level supported modes) is
+the next actionable one in order, 8 and 18 being blocked on images that have not been supplied,
+and 12 and 13 both depend on 11.
 
 ---
 

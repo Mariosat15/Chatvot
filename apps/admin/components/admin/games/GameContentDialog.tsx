@@ -16,6 +16,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CONTENT_LIMITS } from "@/lib/admin/game-content-fields";
+import {
+  GAME_CATEGORIES,
+  normaliseCategorySlug,
+  resolveGameCategory,
+} from "@/lib/services/games/game-categories";
 import type { ProviderTitleRow } from "./provider-types";
 import GameArtworkField from "./GameArtworkField";
 
@@ -184,19 +189,10 @@ export default function GameContentDialog({
             />
           </Field>
 
-          <Field
-            label="Genre"
-            hint="A one-word badge beside the title, such as Race or Puzzle."
-            length={draft.category.length}
-            limit={CONTENT_LIMITS.category}
-          >
-            <Input
-              value={draft.category}
-              maxLength={CONTENT_LIMITS.category}
-              placeholder="Puzzle"
-              onChange={(event) => set("category", event.target.value)}
-            />
-          </Field>
+          <CategoryField
+            value={draft.category}
+            onChange={(slug) => set("category", slug)}
+          />
 
           <Field
             label="Description"
@@ -311,6 +307,99 @@ export default function GameContentDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * The genre picker: the predefined vocabulary, plus a way to say something else.
+ *
+ * Task 9 asks for "a combination of predefined category and custom category rather than
+ * hardcoding a tiny permanent list", and this is that combination. The dropdown is the
+ * vocabulary; "Something else" reveals a box, and what an operator types is slugified AND
+ * SHOWN BACK TO THEM before they save.
+ *
+ * Showing the slug is the load-bearing part rather than a nicety. The server normalises what
+ * it is sent, so "Sci Fi" is stored as `sci-fi` - and a transformation the operator cannot
+ * see is indistinguishable, from their seat, from the field not saving what they typed. It is
+ * also the reason the server can normalise instead of refusing: nothing is being rewritten
+ * behind anybody's back.
+ *
+ * A stored value the vocabulary does not carry - the mock catalogue's `quiz`, or anything
+ * seeded by a provider before this existed - opens in the custom box with its own text
+ * intact. It is NOT silently remapped to the nearest known genre and it is NOT dropped: that
+ * value is already the grouping key for whatever has been filed under it.
+ */
+function CategoryField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (slug: string) => void;
+}) {
+  const resolved = resolveGameCategory(value);
+  const isCustom = resolved !== undefined && !resolved.isKnown;
+
+  // Reason: which mode the control is in has to be state, not derived from `value`. Derived,
+  // choosing "Something else" would set the value to "" - which resolves to `undefined`, not
+  // to a custom value - so the box would close the instant it opened.
+  const [mode, setMode] = useState<"list" | "custom">(isCustom ? "custom" : "list");
+  const [typed, setTyped] = useState(isCustom ? value : "");
+
+  const preview = normaliseCategorySlug(typed);
+
+  return (
+    <div className="space-y-1.5">
+      <Label>Genre</Label>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <select
+          className="h-10 rounded-md border border-white/10 bg-white/5 px-3 text-sm text-white"
+          value={mode === "custom" ? "__custom" : value}
+          onChange={(event) => {
+            if (event.target.value === "__custom") {
+              setMode("custom");
+              onChange(normaliseCategorySlug(typed) ?? "");
+              return;
+            }
+            setMode("list");
+            onChange(event.target.value);
+          }}
+        >
+          <option value="">No genre</option>
+          {GAME_CATEGORIES.map((entry) => (
+            <option key={entry.slug} value={entry.slug}>
+              {entry.label}
+            </option>
+          ))}
+          <option value="__custom">Something else…</option>
+        </select>
+
+        {mode === "custom" && (
+          <Input
+            value={typed}
+            maxLength={CONTENT_LIMITS.category}
+            placeholder="Rhythm"
+            onChange={(event) => {
+              setTyped(event.target.value);
+              onChange(normaliseCategorySlug(event.target.value) ?? "");
+            }}
+          />
+        )}
+      </div>
+      <p className="text-xs text-white/50">
+        {mode === "custom" ? (
+          preview ? (
+            <>
+              Stored as <code className="text-violet-300">{preview}</code> — one genre, however
+              it is typed, so counts and filters group it together.
+            </>
+          ) : (
+            "Type a genre. It is stored in lower case with hyphens so it can be grouped on."
+          )
+        ) : (
+          "A badge beside the title on the player's screen. Leave it at No genre and no badge is shown."
+        )}
+      </p>
+    </div>
   );
 }
 

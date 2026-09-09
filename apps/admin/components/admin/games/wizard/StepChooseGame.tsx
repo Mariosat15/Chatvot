@@ -5,6 +5,7 @@ import {
   Clock,
   Gamepad2,
   TrendingDown,
+  Tag,
   TrendingUp,
   Users,
 } from "lucide-react";
@@ -96,6 +97,23 @@ export function StepChooseGame({
                 </div>
 
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                  {/*
+                    The genre (task document 9), first because it is the fastest way to tell
+                    two titles apart when the catalogue grows past a handful - which is what
+                    this screen is for. `title.category` is already the resolved LABEL:
+                    `listContestableTitles` passes it through `resolveGameCategory`, so a
+                    custom genre stored as `sci-fi` reads "Sci Fi" and an absent one is
+                    `undefined`. This file must not re-derive it, and must not print a
+                    placeholder in its place - a badge reading "Uncategorised" is a genre
+                    nobody chose.
+                  */}
+                  {title.category ? (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-violet-500/15 px-2 py-1 text-violet-300">
+                      <Tag className="h-3 w-3" />
+                      {title.category}
+                    </span>
+                  ) : null}
+
                   <span className="inline-flex items-center gap-1 rounded-md bg-gray-900/70 px-2 py-1 text-gray-300">
                     {lowerWins ? (
                       <TrendingDown className="h-3 w-3 text-blue-400" />

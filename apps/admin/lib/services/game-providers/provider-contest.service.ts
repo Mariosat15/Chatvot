@@ -10,6 +10,7 @@ import {
   validateConfigValues,
 } from "@/lib/services/games/config-schema";
 import type { ConfigField } from "@/lib/services/games/config-schema";
+import { resolveGameCategory } from "@/lib/services/games/game-categories";
 import { runPreflight } from "@/lib/services/games/contest-preflight";
 import { resolveContestEntryDeadline } from "@/lib/services/games/entry-deadline";
 import {
@@ -96,6 +97,15 @@ export interface ProviderContestOption {
   gameCode: string;
   gameKey: string;
   displayName: string;
+  /**
+   * The genre a human reads - "Puzzle", not the stored `puzzle` (task document 9).
+   *
+   * Resolved here rather than in the wizard for the same reason `playMode` is: the picker
+   * must be handed the answer, not the raw field, or two screens end up with two spellings
+   * of one genre and the operator cannot tell which is the catalogue's. `undefined` when the
+   * title has no genre, so the badge is omitted rather than reading "Uncategorised".
+   */
+  category?: string;
   family: string;
   /** Resolved by `resolvePlayMode`, never the raw declaration - see `listContestableTitles`. */
   playMode: PlayMode;
@@ -153,6 +163,7 @@ export async function listContestableTitles(): Promise<ProviderContestOption[]> 
         gameCode: title.gameCode,
         gameKey: title.gameKey,
         displayName: title.displayName,
+        category: resolveGameCategory(title.category)?.label,
         family: title.family,
         // The RESOLVED shape, not the raw `playMode`. A `head_to_head` title is scheduled
         // whatever it declares, and the wizard must be shown the corrected answer or it offers

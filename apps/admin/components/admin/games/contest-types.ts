@@ -14,6 +14,15 @@ export interface ContestableTitle {
   gameCode: string;
   gameKey: string;
   displayName: string;
+  /**
+   * The genre, as a LABEL a human reads - "Puzzle", never the stored `puzzle` (task 9).
+   *
+   * Resolved by the service for the same reason `playMode` is: a screen that re-derives it is
+   * a second copy of the vocabulary, and two spellings of one genre then depend on which
+   * screen you are looking at. `undefined` when the title has no genre, so the badge is
+   * omitted rather than reading "Uncategorised" - a genre nobody chose.
+   */
+  category?: string;
   family: string;
   /**
    * The RESOLVED play shape, not the raw `playMode` off the catalogue row.

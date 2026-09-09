@@ -175,8 +175,16 @@ describe("describeWinningRule - the direction and the units are read together", 
     );
   });
 
-  it("puts the genre beside the name when the catalogue declares one", () => {
-    expect(describeSubject(PUZZLE)).toBe("Circuit Sprint (puzzle)");
+  it("puts the genre beside the name as a LABEL, never the stored slug", () => {
+    /*
+      FLIPPED by task document 9, not edited. This asserted `(puzzle)` - the raw stored value -
+      and it was right about the code on the day it was written. What it was really recording is
+      that `category` was free text with nowhere to resolve it, so the model was being handed
+      our database rather than a description of the game. With a vocabulary in place the label
+      is the only correct thing to send: a title stored as `sci-fi` would otherwise reach the
+      prompt as `sci-fi`, and a model told the genre is "sci-fi" writes about a hyphen.
+    */
+    expect(describeSubject(PUZZLE)).toBe("Circuit Sprint (Puzzle)");
     expect(
       describeSubject({
         displayName: "Tile Rush",

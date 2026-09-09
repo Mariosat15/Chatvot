@@ -18,6 +18,7 @@ import type {
   ProviderTitleRow,
   CatalogueSyncSummary,
 } from "./provider-types";
+import { resolveGameCategory } from "@/lib/services/games/game-categories";
 import GameContentDialog from "./GameContentDialog";
 import GamePlayStyleControl from "./GamePlayStyleControl";
 import GameScoringDialog from "./GameScoringDialog";
@@ -225,8 +226,11 @@ export default function ProviderCatalogueDialog({
                   <tr key={title.gameCode} className="border-t border-white/5">
                     <td className="px-3 py-2.5">
                       <div className="font-medium text-white/90">{title.displayName}</div>
-                      <div className="font-mono text-xs text-white/40">
-                        {title.gameCode}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-mono text-xs text-white/40">
+                          {title.gameCode}
+                        </span>
+                        <GenreBadge category={title.category} />
                       </div>
                     </td>
                     <td className="px-3 py-2.5">
@@ -398,6 +402,44 @@ export default function ProviderCatalogueDialog({
  * two with a truthiness test is how a configured bar becomes invisible on the screen an
  * operator uses to check it.
  */
+/**
+ * The genre, in the Game cell rather than a column of its own (task document 9).
+ *
+ * It is here at all because an operator could not see a title's genre without opening the
+ * content dialog, one title at a time - which is the wrong shape for the question a genre
+ * answers, that being "what does this catalogue actually contain". A column would make an
+ * already seven-column table unreadable, and genre is an identity fact about the title rather
+ * than a control, so it belongs beside the game code.
+ *
+ * AN UNRECOGNISED GENRE IS SHOWN IN A DIFFERENT COLOUR, not hidden and not corrected. It is a
+ * real grouping key with real titles filed under it, and the operator is the only person who
+ * can decide whether the mock catalogue's `quiz` should become `trivia` - so the screen's job
+ * is to make the two distinguishable, not to pick.
+ */
+function GenreBadge({ category }: { category?: string }) {
+  const resolved = resolveGameCategory(category);
+  // Nothing at all rather than a placeholder. A title with no genre has not been described
+  // yet, and "Uncategorised" in a table reads like a genre somebody chose.
+  if (!resolved) return null;
+
+  return (
+    <span
+      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+        resolved.isKnown
+          ? "bg-violet-500/15 text-violet-300"
+          : "bg-amber-500/15 text-amber-300"
+      }`}
+      title={
+        resolved.isKnown
+          ? `Genre: ${resolved.label}`
+          : `Genre "${resolved.slug}" is not one of the standard ones. It still works; pick a standard genre in Content if you want it grouped with others.`
+      }
+    >
+      {resolved.label}
+    </span>
+  );
+}
+
 function describeScoringSummary(title: ProviderTitleRow): string {
   const bar = title.minimumEligibleScore;
   if (bar !== undefined && bar !== null) {

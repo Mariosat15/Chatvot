@@ -37,7 +37,7 @@ code before citing it.
 | **1** — Volts / ⚡ everywhere instead of EUR | **Done.** `1.1`, then `1.2` for the symbol rather than the word |
 | **2-7** — Prize eligibility, redistribution, unclaimed pool | **Done, 9 Sep.** See the notes under tasks 2, 5, 6 and 7. Seven raw unclaimed-pool writers were found, not the five task 7 names |
 | **8** — Redesign the large game admin screen | Not started |
-| **9** — Game type / category field | Not started |
+| **9** — Game type / category field | **Done.** `9.1`. **The field already existed** - what it lacked was a vocabulary. Analytics grouping (21-24) and discovery filtering are explicitly **not** part of it |
 | **10** — Competition style / participation mode | **Done.** `10.1`. Turn-based and heat-based are **blocked, not deferred** - see `10.2` |
 | **11** — Game-level supported modes | Not started |
 | **12** — Required timing / runtime settings | Not started |
@@ -638,6 +638,127 @@ This game type must be available to the rest of the platform because it can infl
 - game discovery/filtering
 - banners
 - analytics
+
+---
+
+## 9.1 — WHAT WAS BUILT, 9 September 2026
+
+**The field already existed, and that is the first thing to get right about this task.**
+`provider_game.category` has been on both model copies since X2: free text, a 40-character
+limit, seeded from the provider on the **first sync only** and operator-owned after that,
+edited as a plain text box on the game content dialog and rendered raw in two places. So
+nothing here adds a field. What did not exist was a **vocabulary**, and its absence is a
+specific hazard rather than an untidiness.
+
+**The harm is the one this programme keeps finding, one field along from the last time.**
+`category` is the natural grouping key for discovery, for the Game Performance screen and for
+analytics, and as free text `Racing`, `racing` and `race` become **three rows that each look
+complete**. No error, no log line, and the totals still add up. It is exactly the failure the
+analytics slice avoided by grouping on `gameKey` rather than a display name — except here
+nobody had made the choice, because the field had no key/label distinction to make it with.
+
+### What it is
+
+`lib/services/games/game-categories.ts`, mirrored into `apps/admin/lib/services/games/`.
+Thirteen slug/label pairs — task 9's own list plus `circuit` and `reflex`, which the live and
+mock catalogues already declare — with three functions: `isKnownCategorySlug`,
+`normaliseCategorySlug` and `resolveGameCategory`.
+
+The task offers two architectures and asks for one of them rather than a hardcoded list. It
+was built as the **second** — predefined plus custom — and the reasoning for refusing the
+first is worth keeping, because "configurable from admin" sounds strictly better:
+
+> **A `game_category` collection is a deletable grouping key.** Thirteen rows nobody
+> administers costs a screen, a route, a model pair and an RBAC decision, and buys the ability
+> for an operator to *delete* a category at 2am — orphaning every title and every historical
+> figure joined to it. That is the same reasoning that gives providers a disable switch and no
+> delete, and that retires a disabled game's rows rather than removing them (R29). **A slug in
+> code cannot be deleted.** Adding one is a one-line change; the custom box covers the gap
+> until somebody does.
+
+### Five things that drift easily
+
+- **It is deliberately NOT a Mongoose enum, and that is a refusal rather than an omission.**
+  A missing enum value **rejects the whole write**, so declaring the vocabulary on the schema
+  means a provider shipping a title in a genre we have not thought of **costs us that entire
+  catalogue row** — silently, on a scheduled sync, with the row simply absent afterwards. The
+  vocabulary is what we *offer*; a stored value we do not recognise is **displayed, never
+  refused and never remapped**. Two probes turn red on the enum, one per model copy.
+- **An unrecognised slug is shown verbatim.** The mock catalogue's `quiz` is the live example:
+  conceptually it is `trivia`, and mapping it would be a silent rewrite of a provider's own
+  statement about their game, while dropping it would hide a real grouping key with real
+  titles filed under it. It reads "Quiz" and stays the key it already was — the same reason
+  the analytics label chain ends at the game code and then the key and **never at "Unknown"**.
+- **An absent genre renders nothing, never a placeholder.** `resolveGameCategory` answers
+  `undefined` for absent, `null`, `""` and whitespace — the three shapes of missing, plus
+  `null` — because a badge reading "Uncategorised" on a player's screen is a genre nobody
+  chose, and it makes an unfiled title indistinguishable from a filed one.
+- **The validator NORMALISES rather than refusing, which inverts this codebase's usual rule**
+  that an unknown value is refused with its name. The difference is what each protects: the
+  content dialog submits **every field in one request**, so refusing a legacy free-text
+  `category` would block an unrelated edit to a tagline — a title stored as "Racing game"
+  before this existed could never have its description fixed. It is accepted as `racing-game`,
+  and **the dialog shows the operator the slug before they save**, so nothing is rewritten
+  behind their back.
+- **Every consumer is handed the LABEL and must not re-derive it.** `listContestableTitles`
+  resolves it exactly as it already resolves `playMode`, and the wizard picker, the arena
+  badge, the AI prompt and the catalogue list all read the resolved value. A screen that
+  re-derives is a second copy of the vocabulary, and two spellings of one genre then depend on
+  which screen you are looking at.
+
+### Where it now appears
+
+Task 9 asks for the genre to reach six places. Four are done and two are named as outstanding
+rather than implied:
+
+| Destination | State |
+|---|---|
+| The game content dialog | A dropdown of the vocabulary plus a custom box, showing the slug that will be stored |
+| The provider catalogue list | A genre badge beside the game code, dimmed when the slug is not one of ours |
+| The contest wizard's game picker | A genre badge, first in the row, because it is the fastest way to tell two titles apart |
+| AI-generated content | `describeSubject` composes the prompt from the label |
+| The player's arena badge | The label, via `game-presentation.service.ts` |
+| **Game Performance widgets and analytics grouping** | **Not built.** Tasks 21–24, and it wants a *group by* rather than a badge |
+| **Discovery and filtering, banners** | **Not built.** There is one provider game, so a filter with one value is a control that appears to work |
+
+### Testing
+
+`__tests__/admin/game-categories.test.ts`, 30 tests, and
+`tools/probe-game-categories.ps1`, **23 probes, all red on exactly the expected test**.
+
+**Four probes came back green first time and all four are worth recording**, because they are
+four different causes and one of them was the harness:
+
+1. **The harness itself.** A probe named a test that did not exist — "genre" where the test
+   says "slug" — and vitest treats a `-t` pattern matching nothing as a **passing run over
+   zero tests**, so it reported the guard as absent. The harness now refuses any run where no
+   test ran. *A probe aimed at a misspelt test name is indistinguishable from a guard that
+   does nothing.*
+2. **A weak fixture.** The truncation test built its input with the hyphen at index 40, which
+   `slice(0, 40)` drops anyway — so the second strip had nothing to do and removing it stayed
+   green. The hyphen has to be the **last character kept**, at index 39.
+3. **A weak negative assertion.** `not.toMatch(/category:\s*title\.category/)` was satisfied
+   by `resolveGameCategory(title.category) ? title.category : undefined`, which calls the
+   resolver, **discards its answer and ships the slug**. Fixed by asserting the label
+   explicitly and **counting** `title.category` to exactly one mention. Third instance of one
+   identifier appearing twice defeating a structural test.
+4. **Two guards covering each other**, R42's shape. Both `=== ""` checks in
+   `normaliseCategorySlug` answer `null` for an empty input, so removing either leaves the
+   other holding the property. Probeable here only because both live in one file, so the
+   harness gained a second injection — and the source now says so rather than calling one of
+   them dead.
+
+Admin typecheck at **223**, the baseline exactly; main app **194** with and without the
+change. `check:mirrors` green — it compares models, so the vocabulary's two copies are held
+by a byte-for-byte test instead.
+
+**One existing test was flipped rather than edited.** `game-contest-wizard.test.ts` asserted
+the AI prompt received `(puzzle)`, the raw stored value, and it was right about the code on the
+day it was written — what it was really recording is that there was nowhere to resolve the
+genre. The reason is kept in the test.
+
+**Never verified by eye**: every screen here is behind an admin sign-in the automated browser
+has no session for.
 
 ---
 

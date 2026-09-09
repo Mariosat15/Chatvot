@@ -1,5 +1,6 @@
 import { connectToDatabase } from "@/database/mongoose";
 import ProviderGame from "@/database/models/games/provider-game.model";
+import { resolveGameCategory } from "./game-categories";
 
 /**
  * The operator's presentation content for one catalogue title, for player-facing screens.
@@ -23,6 +24,14 @@ export interface GamePresentation {
   gameName: string;
   tagline?: string;
   description?: string;
+  /**
+   * The genre a PLAYER reads - "Puzzle", not `puzzle` (task document 9).
+   *
+   * Resolved from the stored slug rather than passed through, because the stored value is a
+   * grouping key and a key is not copy. A custom genre stored as `sci-fi` renders "Sci Fi"
+   * here and stays `sci-fi` everywhere something counts by it, which is the same separation
+   * as `gameKey` versus `displayName`.
+   */
   category?: string;
   logoUrl?: string;
   bannerUrl?: string;
@@ -86,7 +95,11 @@ export async function getGamePresentation(
     // means no screen has to know that.
     tagline: title.tagline || undefined,
     description: title.description || undefined,
-    category: title.category || undefined,
+    // Reason: `resolveGameCategory` already answers `undefined` for an absent or empty value,
+    // so no `|| undefined` is needed - and an unrecognised slug comes back with its own text
+    // humanised rather than as a placeholder, because a badge reading "Uncategorised" on a
+    // title that plainly has a genre is worse than a badge reading the provider's own word.
+    category: resolveGameCategory(title.category)?.label,
     logoUrl: title.thumbnailUrl || undefined,
     bannerUrl: title.bannerUrl || undefined,
     highlights: Array.isArray(title.highlights) ? title.highlights : [],

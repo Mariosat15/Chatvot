@@ -11,7 +11,11 @@
  *
  * NOT MIRRORED. `apps/admin/lib/admin/` is admin-only; the player app reads this content and
  * never writes it, so there is no second copy for `check:mirrors` to have an opinion about.
+ * The one exception it IMPORTS is the category vocabulary, which both apps need - see
+ * `lib/services/games/game-categories.ts`.
  */
+
+import { normaliseCategorySlug, CATEGORY_SLUG_MAX_LENGTH } from "@/lib/services/games/game-categories";
 
 /** Fields an operator owns. A value outside this set is REFUSED, never ignored - see below. */
 export const EDITABLE_CONTENT_FIELDS: ReadonlySet<string> = new Set([
@@ -73,7 +77,10 @@ export const CONTENT_LIMITS = {
   displayName: 80,
   tagline: 120,
   description: 2000,
-  category: 40,
+  // Reason: imported rather than repeated. The normaliser truncates to this, so two numbers
+  // would let it return a slug the validator on the next line refuses - a form that reports
+  // success and then fails with a 400 the operator reads as a permissions problem.
+  category: CATEGORY_SLUG_MAX_LENGTH,
   url: 500,
   highlights: 6,
   highlightTitle: 40,
@@ -171,7 +178,7 @@ export function validateGameContent(body: unknown): ContentValidation {
   // and the request-derived case is already total - every key of `raw` was proved a
   // member of `EDITABLE_CONTENT_FIELDS` above, which is a `Set` for exactly that reason.
   /* eslint-disable security/detect-object-injection */
-  for (const field of ["tagline", "description", "category"] as const) {
+  for (const field of ["tagline", "description"] as const) {
     if (!(field in raw)) continue;
     const value = trimmedString(raw[field]);
     if (value === null) return { ok: false, error: `"${field}" must be text.` };
@@ -179,6 +186,31 @@ export function validateGameContent(body: unknown): ContentValidation {
       return { ok: false, error: `The ${field} must be ${CONTENT_LIMITS[field]} characters or fewer.` };
     }
     content[field] = value;
+  }
+
+  // `category` is handled on its own because it is the one content field with a VOCABULARY
+  // (task document 9). It is normalised to a slug rather than stored as typed, so that
+  // anything grouping by it - discovery, the Game Performance screen, analytics - cannot see
+  // "Racing" and "racing" as two genres that each look complete.
+  //
+  // NORMALISED, NOT REFUSED, which is the deliberate opposite of the unknown-field rule
+  // above. Refusing an unrecognised genre would block an unrelated edit, because the dialog
+  // submits every field in one request: a title stored as free text before this existed could
+  // never have its description fixed. The form shows the operator the slug it will store, so
+  // this is a stated transformation rather than a silent rewrite.
+  if ("category" in raw) {
+    const typed = trimmedString(raw.category);
+    if (typed === null) return { ok: false, error: `"category" must be text.` };
+    if (typed.length > CONTENT_LIMITS.category) {
+      return {
+        ok: false,
+        error: `The category must be ${CONTENT_LIMITS.category} characters or fewer.`,
+      };
+    }
+    // An empty box CLEARS the genre, and the badge then renders nothing. `normaliseCategorySlug`
+    // answers `null` both for "" and for a value with no letters or digits in it at all - "!!!"
+    // is not a genre - and both mean the same thing to an operator who can see the box.
+    content.category = typed === "" ? "" : (normaliseCategorySlug(typed) ?? "");
   }
 
   for (const field of ["thumbnailUrl", "bannerUrl"] as const) {

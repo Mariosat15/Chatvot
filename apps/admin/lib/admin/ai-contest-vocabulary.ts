@@ -21,6 +21,8 @@
  * still passes. Same shape as `12` s2's schema-driven settings form.
  */
 
+import { resolveGameCategory } from "@/lib/services/games/game-categories";
+
 export type ScoreDirection = "higher_is_better" | "lower_is_better";
 export type ScoreType = "integer" | "decimal" | "duration_ms";
 
@@ -138,10 +140,18 @@ export function describeWinningRule(
     : "the highest score wins";
 }
 
-/** A short human phrase for the game, used by the prompt and by the wizard's own preview. */
+/**
+ * A short human phrase for the game, used by the prompt and by the wizard's own preview.
+ *
+ * The genre goes in as its LABEL, never as the stored slug (task document 9). The stored
+ * value is a grouping key, so a custom genre is held as `sci-fi` - and a model handed
+ * "Circuit Sprint (sci-fi)" is being shown our database rather than being told what the game
+ * is. `resolveGameCategory` returns `undefined` for an absent genre, which is why the phrase
+ * degrades to the bare title rather than printing empty brackets.
+ */
 export function describeSubject(title: CatalogueVocabularySource): string {
-  const category = title.category?.trim();
-  return category ? `${title.displayName} (${category})` : title.displayName;
+  const category = resolveGameCategory(title.category);
+  return category ? `${title.displayName} (${category.label})` : title.displayName;
 }
 
 export function providerVocabulary(
