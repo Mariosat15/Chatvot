@@ -129,6 +129,7 @@ depend on a live provider call.
 | `displayName`, `description`, `thumbnailUrl`, `category` | Presentation |
 | `family` | `independent` \| `head_to_head`. Does the game need an **opponent**? Read only as a fallback by `resolvePlayMode` and rendered as a badge - nothing else branches on it |
 | `playMode` | `anytime` \| `scheduled`, defaulting to `anytime`. Does everybody play at **one appointed moment**? A **different axis from `family`** - a race is `independent` and `scheduled`. Provider-owned, rewritten by every catalogue sync, and on `NEVER_EDITABLE_CONTENT_FIELDS`. Resolved by `lib/services/games/play-shape.ts`, never read raw. See `22` s8 |
+| `playModeOverride` | `anytime` \| `scheduled`, **with no default** - absent means we have taken no decision and the provider's `playMode` stands. **Ours, not the provider's**, and it is a second field precisely because `playMode` is in `providerOwnedFields` and would be reverted by the next sync. Written only by `game-play-style.service.ts`; **cleared with `$unset`, never `""`**, since an empty string read literally would mask a provider's `scheduled` declaration. Also on `NEVER_EDITABLE_CONTENT_FIELDS`. `head_to_head` beats it. See `22` s9 |
 | `supportsCompetition`, `supportsOneVsOne`, `supportsPractice`, `supportsContentSeed` | Capability flags |
 | `scoreDirection`, `scoreType`, `scoreRange` | Ranking |
 | `typicalDurationSeconds`, `maxDurationSeconds` | Scheduling and grace periods |

@@ -433,3 +433,112 @@ tests instead. `apps/admin/lib/admin/` and the wizard components are admin-only.
 | **A** | **Built now.** The owner's call, 8 Sep 2026. Cost paid: spec version **1.4**, an optional field with a default, so nothing a provider has built against 1.3 is invalidated |
 | **B** | **Not merged, and the distinction in section 2.1 survives.** A scheduled contest closes entry at the start for a *physical* reason — you cannot join a race that has begun — and **not** because knowing the target is worth something. The informational question stays open and stays per-title for `anytime` games, exactly as `12` s2.10 decided it |
 | **C** | **Deferred with challenges.** Nothing was built either way, so no option has been foreclosed |
+
+---
+
+## 9. The operator's own answer (9 September 2026) — the authoritative account
+
+Section 8 left the shape entirely in the provider's hands, which is right for a third party
+and **wrong for the one provider we run ourselves**. `playMode` reaches `provider_game`
+through a catalogue sync, and for ChartVolt Games the declaration is a TypeScript literal in
+`games-service/src/games/titles.ts` — so making a title a race meant an edit, a build and a
+redeploy of a separate service. There was no screen anywhere that could say it.
+
+`provider_game.playModeOverride` closes that. 37 tests in
+`__tests__/admin/game-play-style.test.ts`, 19 probes in `tools/probe-game-play-style.ps1`,
+every one red on exactly the expected test. **Nothing about the rules changed** — section 8.2
+is unaltered, and every gate still reads the same three stored values.
+
+### 9.1 The live code
+
+| File | What it holds |
+|---|---|
+| `lib/services/games/play-shape.ts` **(mirrored)** | `playModeOverride` on `PlayShapeInput`, the `storedMode` normaliser, the new precedence in `resolvePlayMode`, `canOverridePlayMode`, and `PLAY_MODE_COPY` |
+| `database/models/games/provider-game.model.ts` **(mirrored)** | `playModeOverride`, enum-constrained, **with no default** |
+| `apps/admin/lib/services/game-providers/game-play-style.service.ts` | `setGamePlayStyle`, `parsePlayStyleInput`. The only writer |
+| `apps/admin/app/api/games/providers/[providerKey]/games/play-style/route.ts` | `PATCH`, `guardSection("game-providers")`, one audit line per change |
+| `apps/admin/lib/admin/game-content-fields.ts` | `playModeOverride` on `NEVER_EDITABLE_CONTENT_FIELDS` |
+| `apps/admin/components/admin/games/GamePlayStyleControl.tsx` | The control, and the withheld state with its reason |
+| `apps/admin/components/admin/games/ProviderCatalogueDialog.tsx` | A Play style column on the Games list |
+| `apps/admin/components/admin/games/wizard/StepChooseGame.tsx` | The badge on the game picker |
+
+`check:mirrors` covers the model. `play-shape.ts` is held byte-identical by a test; everything
+else is admin-only.
+
+### 9.2 The precedence, and why it is that order
+
+```
+head_to_head  →  scheduled        (the title answers it; nobody may override)
+playModeOverride                  (our answer, if we have taken one)
+playMode                          (the provider's declaration)
+                 anytime          (the default)
+```
+
+**`head_to_head` beats the operator, which is the surprising end.** An override cannot make
+two people play each other at different times, so honouring one would store a value nothing
+ever reads — the declared-written-dead field found four times already in this programme
+(`requiresSyncPlay`, `isPaused`, `lastSuccessfulRoundAt`, `family`). The service refuses it
+and the control withholds itself, both from `canOverridePlayMode`, so the operator is told why
+rather than being offered a choice the server rejects with a 400 that reads like a permissions
+problem.
+
+**An override the other way is honoured**, including a provider's `scheduled` run as
+`anytime`. That is the direction this module already fails towards, for the reason in 8.3.
+
+### 9.3 Six things from this build that generalise
+
+- **A control writing to a field the sync owns is a control that appears to work.** `playMode`
+  is in `providerOwnedFields`, so writing there saves, toasts, renders correctly and is
+  reverted by the next sync with no error and nothing in a log — the shape already on record
+  for a provider enabled with no adapter, a `rankingMethod` a provider game ignores and
+  `isPaused` on a provider contest. **The reason this is worth a rule rather than a note is
+  that the safety lives in a different file**: `playModeOverride` is safe because of an
+  allow-list in `catalogue.service.ts`, not because of anything visible where the field is
+  declared or written. So it is pinned by a test that runs a **real sync** and asserts the
+  provider's own `playMode` **was** rewritten in the same pass — an assertion that the
+  override survived would pass just as well against a sync that did nothing.
+- **A mirrored allow-list needs the mirror asserted, not just the behaviour.** The sync test
+  runs against the main app's copy; `apps/admin` has its own, and only that one runs when an
+  operator presses Sync. A probe adding `playModeOverride` to the admin copy alone leaves every
+  behavioural test green. The suite compares the two files byte for byte, which is the only
+  thing that catches it — `check:mirrors` compares models.
+- **"Missing" has three shapes and the empty string is the one that inverts a rule here.**
+  A stored `""` read literally would mask a provider's `scheduled` declaration behind an
+  override nobody chose — turning a race into a staggered contest because a form submitted a
+  blank. `storedMode` admits only the two real values, and clearing uses **`$unset`** rather
+  than storing `""`, so the document afterwards is indistinguishable from one that never had an
+  override. Same family as the label backfill's three filters and `entryBlockThreshold`.
+- **The field must be in `NEVER_EDITABLE_CONTENT_FIELDS`, and the reason is not tidiness.**
+  The content dialog writes copy an operator can get wrong harmlessly. This decides when entry
+  closes and how many attempts a player gets on a contest people have paid into, so it needs
+  its own control, its own route and its own audit line. Left merely *unrecognised* it would be
+  refused by the unknown-field branch — the fragile state 8.3 already recorded for `playMode`,
+  where one plausible-looking allow-list addition turns a puzzle into a race from a form
+  labelled "title and description".
+- **The control and the service must not each know the head-to-head rule.** Both call
+  `canOverridePlayMode`; a probe replacing the component's call with its own `family ===` test
+  is red. Two copies of one rule is the shape behind `referenceId`, `failedReason`,
+  `challengeId` and the Game Master `||`, none of which `check:mirrors` can see — and here the
+  drift is worse than cosmetic, because a control offering a choice the server refuses looks to
+  the operator like a broken permission.
+- **The picker shows the RESOLVED shape and must not compute it.** `listContestableTitles`
+  already returns `resolvePlayMode(title)` (8.3), so the badge reads the value it is handed. A
+  probe making it re-derive from the raw fields is red, because a second resolution in the
+  browser is one place for the precedence to be one line out of date.
+
+### 9.4 What this does not do
+
+- **It does not change anything a provider sees.** The override is ours; `playMode` on the wire
+  is untouched, so `01` and `ChartVolt-Game-API-Requirements.html` stay at **version 1.4** and
+  nobody building against the issued spec is affected. Checked before assuming, on the
+  precedent of the restatement that nearly got a pointless version bump in X1.
+- **It does not add a mode.** `anytime` and `scheduled` are still the only two, and turn-based
+  and heat-based remain blocked on a real provider and a real game — see the task document's
+  section 10.2. A bracket needs opponents.
+- **It does not change any contest already created.** The shape is forced onto stored values at
+  write time (8.3), so changing a title's play style affects contests created *afterwards*. A
+  live contest keeps the rules its entrants signed up under, which is the same reasoning as the
+  two deliberately different defaults in `12` s2.7.
+- **No title is `scheduled` yet.** Both `games-service` titles declare `anytime` and no override
+  has been set in production, so the scheduled path is still exercised only by tests until
+  somebody uses the control or X4 brings a real one.

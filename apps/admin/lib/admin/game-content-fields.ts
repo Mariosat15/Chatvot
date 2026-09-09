@@ -43,6 +43,12 @@ export const NEVER_EDITABLE_CONTENT_FIELDS: ReadonlyMap<string, string> = new Ma
   ["providerStatus", "the provider's own status, rewritten by every catalogue sync"],
   ["family", "declared by the provider and rewritten by every catalogue sync"],
   ["playMode", "declared by the provider and rewritten by every catalogue sync"],
+  // Ours, like `chartvoltEnabled` above it, and barred here for the same reason: it has its
+  // own control and its own audit line, and it decides when entry closes and how many
+  // attempts a player gets. Accepting it here would let an operator turn a puzzle into a
+  // gun-start race as a side effect of fixing a typo in a tagline, with the audit trail
+  // recording a content edit.
+  ["playModeOverride", "changed with the Play style control, which has its own audit line"],
   ["scoreDirection", "declared by the provider and rewritten by every catalogue sync"],
   ["scoreType", "declared by the provider and rewritten by every catalogue sync"],
   ["configSchema", "declared by the provider and rewritten by every catalogue sync"],

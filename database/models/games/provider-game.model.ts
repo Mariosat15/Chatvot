@@ -27,6 +27,8 @@ export interface IProviderGame extends Document {
   highlights?: { title: string; detail: string }[];
   family: "independent" | "head_to_head";
   playMode?: "anytime" | "scheduled";
+  /** OUR answer, when the provider's is absent or wrong for how we want to run it. */
+  playModeOverride?: "anytime" | "scheduled";
   supportsCompetition: boolean;
   supportsOneVsOne: boolean;
   supportsPractice: boolean;
@@ -154,6 +156,24 @@ const ProviderGameSchema = new Schema<IProviderGame>(
       type: String,
       enum: ["anytime", "scheduled"],
       default: "anytime",
+    },
+    // OUR answer, and the reason it is a second field rather than an edit to `playMode` above
+    // is the sync: `playMode` is in `providerOwnedFields`, so a control writing there would be
+    // reverted on the next catalogue pull with no error raised anywhere. An operator would set
+    // a race to run simultaneously, watch it save, and find it staggered again the next
+    // morning. This field is in NO sync list, which is what makes it survive - and that is a
+    // property of the allow-list rather than of anything written here, so it is asserted by a
+    // test rather than trusted.
+    //
+    // NO DEFAULT, deliberately, unlike `playMode` beside it. Absent means "we have not
+    // decided, follow the provider", and a default would make every existing row carry a
+    // decision nobody took - a schema default IS a stored value, which is the rule behind R50,
+    // `entryBlockThreshold` and `canEnterChallenges`. Read through `resolvePlayMode`, never
+    // directly: it also refuses to let this beat a `head_to_head` title, because an override
+    // cannot make two people play each other at different times.
+    playModeOverride: {
+      type: String,
+      enum: ["anytime", "scheduled"],
     },
     supportsCompetition: { type: Boolean, default: false },
     supportsOneVsOne: { type: Boolean, default: false },

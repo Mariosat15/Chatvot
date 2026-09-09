@@ -1,6 +1,14 @@
 "use client";
 
-import { Check, Clock, Gamepad2, TrendingDown, TrendingUp } from "lucide-react";
+import {
+  Check,
+  Clock,
+  Gamepad2,
+  TrendingDown,
+  TrendingUp,
+  Users,
+} from "lucide-react";
+import { PLAY_MODE_COPY } from "@/lib/services/games/play-shape";
 import type { ContestableTitle } from "../contest-types";
 import { Problem } from "./fields";
 
@@ -103,6 +111,30 @@ export function StepChooseGame({
                       Up to {title.maxDurationSeconds}s an attempt
                     </span>
                   ) : null}
+
+                  {/*
+                    The play style, because it changes the rest of the wizard more than any
+                    other property of the title: under "Everyone at once" the schedule step
+                    relabels itself, entry closes at the start rather than at the last playable
+                    moment, and the attempts and round-start controls are withheld. An operator
+                    picking a game with no idea which of those is about to happen is how a
+                    contest gets created with the wrong entry window.
+
+                    `title.playMode` is already the RESOLVED shape - `listContestableTitles`
+                    passes it through `resolvePlayMode`, so a `head_to_head` title reads
+                    "Everyone at once" here whatever it declared, and our own override is
+                    honoured. This file must not re-derive it.
+                  */}
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-md px-2 py-1 ${
+                      title.playMode === "scheduled"
+                        ? "bg-sky-500/15 text-sky-300"
+                        : "bg-gray-900/70 text-gray-300"
+                    }`}
+                  >
+                    <Users className="h-3 w-3" />
+                    {PLAY_MODE_COPY.get(title.playMode)?.label}
+                  </span>
 
                   <span className="rounded-md bg-gray-900/70 px-2 py-1 text-gray-500">
                     {title.family}

@@ -577,6 +577,72 @@ Possible values:
 
 Use names that fit the existing architecture.
 
+## 10.1 — WHAT WAS BUILT, 9 September 2026
+
+**Two of the four modes were already built and enforced before this task was written.** That
+is the most important fact here, and a summary that reads Task 10 as unstarted is wrong. The
+axis exists as `provider_game.playMode`, resolved once in `lib/services/games/play-shape.ts`,
+with `anytime` for asynchronous entry and `scheduled` for a live start. Everything the task
+asks the mode to *do* was already derived from it at write time — entry closing at the gun,
+one attempt only, the round-start control withheld, the schedule step relabelled — and no
+runtime gate anywhere switches on a game code, which is the requirement that mattered.
+
+**What was missing was any way to say so from a screen.** `playMode` arrives with the
+provider's catalogue, which is right for a third party — they know whether their title is a
+race — and wrong for ChartVolt Games, where the declaration is a TypeScript literal in
+`games-service/src/games/titles.ts` that only changes on a rebuild and a redeploy. So the
+answer to "how does the admin specify this per game" was: they could not.
+
+Two things closed that, and they are treated as the whole of Task 10 for now:
+
+1. **A Play style control on the Games list**, per title, writing a new
+   `provider_game.playModeOverride` through its own section-guarded route
+   (`PATCH /api/games/providers/[providerKey]/games/play-style`) with its own audit line. It
+   is deliberately **not** part of the title-and-logo content editor: that dialog writes copy
+   an operator can get wrong harmlessly, whereas this decides when entry closes and how many
+   attempts a player gets on a contest people have paid into. `playModeOverride` is in
+   `NEVER_EDITABLE_CONTENT_FIELDS` for the same reason `chartvoltEnabled` is.
+2. **The style shown where it is chosen and where it is used** — on every row of the Games
+   list, and as a badge on the contest wizard's game picker, because it changes the rest of
+   the wizard more than any other property of the title.
+
+**Three details are load-bearing and easy to undo by tidying up:**
+
+- **It is a SECOND field, not an edit to `playMode`.** `playMode` is a member of
+  `providerOwnedFields` in `catalogue.service.ts`, so a control writing there saves, toasts,
+  and is reverted by the next catalogue sync with no error and nothing in a log. That is the
+  "control that appears to work and does nothing" shape already on record for a provider
+  enabled with no adapter, a `rankingMethod` a provider game ignores and `isPaused` on a
+  provider contest. `playModeOverride` is in no sync list, and because that is a property of
+  an allow-list elsewhere rather than of the field itself, it is pinned by a test that runs a
+  real sync and asserts the provider's own field **was** rewritten in the same pass.
+- **`head_to_head` beats the override, not the other way round.** Two people cannot play each
+  other at different times, so a value stored against such a title would be read by nothing —
+  the class of declared, written, dead field found four times in this programme. The service
+  refuses it and the control withholds itself with the reason, both from `canOverridePlayMode`.
+- **The names are the codebase's, not the task's.** `anytime` and `scheduled` on `playMode`,
+  not `ASYNC` / `SYNCHRONOUS` on a new `competitionMode` — which is what "use names that fit
+  the existing architecture" asks for, and renaming would be a mirrored migration of a stored
+  field for a cosmetic gain.
+
+## 10.2 — Turn-based and heat-based: BLOCKED, not deferred
+
+`TURN_BASED` and `ROUND_BASED` join the **per-round provider cost** on the blocked list, and
+the reason is the same in both cases: **there is no real thing to build against.**
+
+A turn-based contest needs a game that takes turns and a provider protocol that can carry
+them; a heat-based one needs a bracket, and a bracket needs opponents. Nothing in the
+catalogue works either way, no provider has been signed, and `01`'s issued contract describes
+one round producing one score. Designing either now means inventing a protocol, a schedule and
+a UI against no counterparty, then discovering on the first real integration which half of it
+was wrong — while carrying two more values through every gate, every wizard step and every
+migration in the meantime.
+
+**What that costs us is nothing, because the refusal is already expressible.**
+`supportsOneVsOne` says a title cannot be challenged, and `playMode` covers the two shapes we
+can actually run. A provider offering a turn-based title is an X4 conversation, and the honest
+sequence is: sign one, read what they support, then design.
+
 ---
 
 # TASK 11 — GAME-LEVEL SUPPORTED COMPETITION MODES

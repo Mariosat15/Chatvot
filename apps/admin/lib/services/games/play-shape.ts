@@ -44,15 +44,71 @@ export type PlayMode = "anytime" | "scheduled";
 export const PLAY_MODES: PlayMode[] = ["anytime", "scheduled"];
 
 /**
+ * Operator-facing names for the two shapes.
+ *
+ * A `ReadonlyMap` rather than a `Record`, and it must not be "simplified" back: the key
+ * reaching this comes off a stored document, so an object lookup walks the prototype chain
+ * and `"__proto__"` returns a truthy `Object.prototype` that survives a `!copy` test before
+ * failing somewhere unrelated. Fourth instance of that trap after the round-inspector action
+ * map, `competition-update-fields.ts` and `UNSCORED_CONTEST_POLICY_COPY`.
+ *
+ * It lives beside the rules for the same reason `PlayShapeRules.copy` does: the sentence an
+ * operator picks from and the gate that enforces it must come from one definition.
+ */
+export const PLAY_MODE_COPY: ReadonlyMap<
+  PlayMode,
+  { label: string; detail: string }
+> = new Map([
+  [
+    "anytime",
+    {
+      label: "Join any time",
+      detail:
+        "Players enter and play whenever they like while the contest is open, and their scores are compared at the end. Right for a puzzle, a high-score board or a time trial.",
+    },
+  ],
+  [
+    "scheduled",
+    {
+      label: "Everyone at once",
+      detail:
+        "Every player's board opens at the same moment, so entry closes when the contest starts and each player gets one attempt. Right for a race or anything where players are up against each other live.",
+    },
+  ],
+]);
+
+/**
  * What the catalogue row has to carry for the shape to be resolvable.
  *
  * `playMode` is optional because a title synced before the field existed has none, and
  * `family` because the resolver must survive a partially-loaded projection rather than
  * throwing on a screen.
+ *
+ * `playModeOverride` is OUR answer, and the reason it is a second field rather than a write
+ * to `playMode` is the catalogue sync: `playMode` is in `providerOwnedFields`, so a control
+ * writing there would be reverted on the next sync with no error and nothing in a log - the
+ * "control that appears to work and does nothing" shape this codebase keeps finding. It is
+ * still resolved from the STORED row rather than taken from caller input, which is the rule
+ * this module opened by stating; a per-contest shape would be a way to turn off whichever
+ * half of the rule was inconvenient, and this is not that.
  */
 export interface PlayShapeInput {
   playMode?: string | null;
+  playModeOverride?: string | null;
   family?: string | null;
+}
+
+/**
+ * A stored string to a mode, or nothing.
+ *
+ * "Missing" has three shapes and only one is obvious: absent, `null` and `""`. The empty
+ * string is the one that matters here, because it is what a half-run migration or a form
+ * submitting a blank leaves behind - and read literally it would mask a provider's
+ * `scheduled` declaration behind an override nobody chose.
+ */
+function storedMode(value: string | null | undefined): PlayMode | undefined {
+  if (value === "anytime" || value === "scheduled") return value;
+  return undefined;
 }
 
 /**
@@ -62,10 +118,40 @@ export interface PlayShapeInput {
  * shared moment - two people cannot play each other at different times - so a provider
  * declaring `head_to_head` + `anytime` has declared a combination that cannot work, and the
  * resolver corrects it instead of letting the wizard offer a staggered chess match.
+ *
+ * THE ORDER IS LOAD-BEARING, and the interesting part is that `head_to_head` beats the
+ * operator rather than the other way round. An override cannot make two people play each
+ * other at different times, so honouring one there would store a value nothing ever reads -
+ * the `requiresSyncPlay` / `isPaused` / `lastSuccessfulRoundAt` / `family` class of declared,
+ * written, dead field this codebase has now found four times. `canOverridePlayMode` below is
+ * the same question asked ahead of time, so the control is withheld rather than offered and
+ * silently discarded.
+ *
+ * An override the other way - a provider's `scheduled` run as `anytime` - IS honoured. It is
+ * the direction this module already fails towards: `supportsContentSeed` guarantees every
+ * player identical content, so a staggered race still produces comparable, payable scores,
+ * whereas the reverse shuts entry at the start and turns paying players away.
  */
 export function resolvePlayMode(title: PlayShapeInput | null | undefined): PlayMode {
   if (title?.family === "head_to_head") return "scheduled";
-  return title?.playMode === "scheduled" ? "scheduled" : "anytime";
+  return (
+    storedMode(title?.playModeOverride) ??
+    storedMode(title?.playMode) ??
+    "anytime"
+  );
+}
+
+/**
+ * May an operator choose this title's shape, or does the title already answer it?
+ *
+ * One definition, read by the service that refuses the write and by the control that
+ * withholds itself, because the alternative is a form offering a choice the server rejects
+ * with a 400 that reads to the operator like a permissions problem.
+ */
+export function canOverridePlayMode(
+  title: PlayShapeInput | null | undefined,
+): boolean {
+  return title?.family !== "head_to_head";
 }
 
 /**

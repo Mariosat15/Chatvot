@@ -1788,6 +1788,49 @@ second one drifts from it. `07`'s `provider_health_check` model was **not** crea
 staleness reason above - if a stored history is ever wanted it should be an append-only log of
 what the derivation observed, never the current verdict.
 
+### 4.2c A third per-title control: the play style - BUILT 9 September 2026
+
+The Games list carried two switches per title (s4.1a) and a content editor. It now carries a
+**third control**, the play style, and the separation from the content editor is the design
+rather than a layout preference. `apps/admin/components/admin/games/GamePlayStyleControl.tsx`,
+`apps/admin/lib/services/game-providers/game-play-style.service.ts` and
+`PATCH /api/games/providers/[providerKey]/games/play-style`, with the resolved style also
+badged on the contest wizard's game picker. 37 tests in
+`__tests__/admin/game-play-style.test.ts`, 19 probes in `tools/probe-game-play-style.ps1`.
+**Chapter `22` section 9 is the authoritative account**; what follows is the admin-surface half.
+
+**Why it is not in the content dialog.** That dialog writes the title, the description, the
+thumbnail and the banner - copy an operator can get wrong and fix, with no consequence beyond
+how a page reads. The play style decides **when entry closes and how many attempts a player
+gets** (`22` s8.2), on contests people pay to enter. It is the same distinction as
+`chartvoltEnabled`, which is also a switch on the card rather than a field in the form, and
+`playModeOverride` is on `NEVER_EDITABLE_CONTENT_FIELDS` so the two cannot be conflated by a
+later allow-list edit.
+
+**Three things about the surface specifically.**
+
+- **The control writes a SECOND field.** The provider's `playMode` is rewritten by every
+  catalogue sync, so a control editing it would save, toast and be silently reverted - the
+  "appears to work and does nothing" shape this chapter has now recorded for a provider enabled
+  with no adapter, a `rankingMethod` a provider game ignores, `isPaused` on a provider contest
+  and the Edit link on the competitions list. The card shows the effective style and, when we
+  have overridden the provider, says so.
+- **It withholds itself on a `head_to_head` title, with the reason.** Two people cannot play
+  each other at different times, so there is nothing to choose; the card says that rather than
+  greying a select box. Same rule as refusing to enable a provider with no adapter. The
+  component and the service both ask `canOverridePlayMode` - a probe giving the component its
+  own copy of the test is red, because a control offering a choice the server refuses reads to
+  an operator like a broken permission.
+- **The wizard's picker badges the style because it changes the wizard.** More of step 4 and
+  step 5 depend on this one property than on anything else about the title (`12` s2.11), so an
+  operator choosing a game is choosing a schedule shape at the same moment. The badge reads the
+  **resolved** value `listContestableTitles` already returns; a probe making it re-derive from
+  the raw fields is red.
+
+**Not built:** no bulk edit, and no per-contest override. The shape is a property of the title,
+resolved from the stored catalogue row and never from caller input - a per-contest control is
+precisely the way to turn off whichever half of the rule is inconvenient.
+
 ---
 
 ## 5. Stats and analytics

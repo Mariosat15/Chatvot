@@ -45,6 +45,19 @@ export interface ProviderTitleRow {
   gameKey: string;
   displayName: string;
   family: string;
+  /**
+   * The provider's own declaration, and OUR override, carried separately on purpose.
+   *
+   * The Play style control needs both: it shows the effective answer, and it has to be able
+   * to label the "follow the provider" option with what the provider actually says. Sending
+   * only the resolved value would leave that option reading "Provider's choice" with no way
+   * to tell an operator what they would be falling back to.
+   *
+   * Both optional and both must stay so - a title synced before either field existed carries
+   * neither, and `resolvePlayMode` answers `anytime` for that row rather than throwing.
+   */
+  playMode?: string;
+  playModeOverride?: string;
   providerStatus: "active" | "deprecated" | "maintenance";
   chartvoltEnabled: boolean;
   supportsCompetition?: boolean;

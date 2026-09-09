@@ -19,6 +19,7 @@ import type {
   CatalogueSyncSummary,
 } from "./provider-types";
 import GameContentDialog from "./GameContentDialog";
+import GamePlayStyleControl from "./GamePlayStyleControl";
 
 /**
  * One provider's game catalogue, with our own enable switch per title.
@@ -31,6 +32,13 @@ import GameContentDialog from "./GameContentDialog";
  * A SYNC NEVER ENABLES ANYTHING. Pulling a catalogue is safe to press at any time: it adds
  * and updates rows, reports titles the provider has stopped listing without deleting them,
  * and leaves every ChartVolt switch exactly as it was.
+ *
+ * THERE ARE THREE CONTROLS PER ROW AND THEY WRITE THROUGH THREE ROUTES, deliberately. The
+ * enable switch, the Play style and the player-facing content each have their own endpoint
+ * and their own audit line, because one route inferring which edit it was being asked for
+ * from the fields present is how a content save silently changes a game's live state - or how
+ * a typo fix turns a puzzle into a gun-start race. Play style also survives a sync where the
+ * provider's own `playMode` does not, which is the whole reason it is a separate field.
  */
 
 interface Props {
@@ -202,6 +210,7 @@ export default function ProviderCatalogueDialog({
                 <tr>
                   <th className="px-3 py-2">Game</th>
                   <th className="px-3 py-2">Formats</th>
+                  <th className="px-3 py-2">Play style</th>
                   <th className="px-3 py-2">Provider says</th>
                   <th className="px-3 py-2">Live on ChartVolt</th>
                   <th className="px-3 py-2">Player-facing content</th>
@@ -234,6 +243,27 @@ export default function ProviderCatalogueDialog({
                           </Badge>
                         )}
                       </div>
+                    </td>
+                    <td className="px-3 py-2.5 align-top">
+                      {/*
+                        Settable whatever the provider's status is, like the content button and
+                        unlike the switch between them. A deprecated title still has contests in
+                        its history and can still be looked at, so correcting how it was run is
+                        useful; putting it back in front of players is not.
+                      */}
+                      <GamePlayStyleControl
+                        providerKey={provider.providerKey}
+                        title={title}
+                        onChanged={(next) =>
+                          setTitles((current) =>
+                            current.map((row) =>
+                              row.gameCode === title.gameCode
+                                ? { ...row, ...next }
+                                : row,
+                            ),
+                          )
+                        }
+                      />
                     </td>
                     <td className="px-3 py-2.5">
                       <ProviderStatusBadge status={title.providerStatus} />
