@@ -22,6 +22,12 @@ export const EDITABLE_CONTENT_FIELDS: ReadonlySet<string> = new Set([
   "displayName",
   "tagline",
   "description",
+  // Seeded from the provider on the first sync and the operator's thereafter, exactly like
+  // `description` beside them. Editable rather than read-only because a provider's grammar,
+  // tone and language are all things an operator legitimately has to fix - and because the
+  // sync will not overwrite the correction (`firstSyncOnlyFields`). See R63.
+  "rulesSummary",
+  "howToPlay",
   "category",
   "thumbnailUrl",
   "bannerUrl",
@@ -82,6 +88,8 @@ export const CONTENT_LIMITS = {
   displayName: 80,
   tagline: 120,
   description: 2000,
+  rulesSummary: 2000,
+  howToPlay: 2000,
   // Reason: imported rather than repeated. The normaliser truncates to this, so two numbers
   // would let it return a slug the validator on the next line refuses - a form that reports
   // success and then fails with a 400 the operator reads as a permissions problem.
@@ -101,6 +109,8 @@ export interface GameContentInput {
   displayName?: string;
   tagline?: string;
   description?: string;
+  rulesSummary?: string;
+  howToPlay?: string;
   category?: string;
   thumbnailUrl?: string;
   bannerUrl?: string;
@@ -183,7 +193,7 @@ export function validateGameContent(body: unknown): ContentValidation {
   // and the request-derived case is already total - every key of `raw` was proved a
   // member of `EDITABLE_CONTENT_FIELDS` above, which is a `Set` for exactly that reason.
   /* eslint-disable security/detect-object-injection */
-  for (const field of ["tagline", "description"] as const) {
+  for (const field of ["tagline", "description", "rulesSummary", "howToPlay"] as const) {
     if (!(field in raw)) continue;
     const value = trimmedString(raw[field]);
     if (value === null) return { ok: false, error: `"${field}" must be text.` };

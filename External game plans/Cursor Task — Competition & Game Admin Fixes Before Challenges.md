@@ -1600,6 +1600,67 @@ But the AI must **adapt to the selected game**.
 
 Do not generate generic text that assumes every game is a racing game.
 
+## 19.1 — THE PREREQUISITE THIS TASK EXPOSED, 10 September 2026 (R63)
+
+**This is the storage half. The AI panel is not built** and is the second half; a summary
+saying task 19 is done is wrong.
+
+Setting out to add AI generation for the content this task lists turned up the reason most
+of it could not be generated anywhere: **there was nowhere to put it, and worse, the
+provider was already supplying it and we were throwing it away.**
+
+`01` section 3.1 requires **six** content fields of every provider - `displayName`,
+`tagline`, `description`, `rulesSummary`, `howToPlay`, `thumbnailUrl` and `bannerUrl`, all
+marked `Yes` - and has since the requirements document issued to providers reached version
+1.1. `games-service`, our own reference provider, publishes every one of them. The platform
+stored two.
+
+| Field | Provider sends it | Stored before 10 Sep | Now |
+|---|---|---|---|
+| `displayName`, `description`, `thumbnailUrl`, `category` | yes | yes, seeded on first sync | unchanged |
+| `tagline`, `bannerUrl` | yes | **no** - model field existed, in neither sync allow-list | seeded on first sync |
+| `rulesSummary`, `howToPlay` | yes | **no field at all**, and not on `ProviderCatalogueGame` | new fields, seeded on first sync |
+
+Full account in **R63**. Four things about it are worth carrying rather than the incident:
+
+- **The drift ran DOCUMENT to CODE**, which no guard looks for. `01` and the requirements
+  HTML were correct and agreed with each other, so the paired-document rule was satisfied
+  and reported nothing. The guard added for it therefore **reads section 3.1's own table**
+  and requires each `Yes` row to be stored by a real sync or listed as a documented
+  exception - and probe 12 proves it by adding a seventh required field to the spec while
+  changing no code at all.
+- **The model's comment said the omission was deliberate**, which is why nobody re-read it.
+  It claimed these fields were content "no provider ever supplies" and "in no contract at
+  all", both false for two of the three. Seventh instance of an aside being a claim rather
+  than a fact, and the first where the wrong sentence actively deterred the check.
+- **Seeded once, then the operator's** (`firstSyncOnlyFields`), not provider-owned. These
+  are sentences a player reads, so an operator must be able to fix grammar, tone or
+  language without the next scheduled sync silently reverting the edit.
+- **Live, and nothing was backfilled or needed to be** - the values are on the provider, so
+  a re-sync populates them. What it cost was the game page having no rules text to show.
+
+### What this means for the AI half, and it is the owner's decision, not an inference
+
+**Owner decision, 10 September 2026: the AI never writes `rulesSummary` or `howToPlay`.**
+Those come from the provider. `01` s3.1 calls the rules summary the first text support
+quotes back when a player disputes a prize, so invented wording there is invented wording in
+a money argument - and the operator can already edit the provider's text by hand on the same
+screen. The AI assists with the marketing copy that genuinely has no authoritative source:
+tagline, description and highlights.
+
+Which also settles most of this task's list. **Rules, How to Play, Scoring Explanation and
+Player Instructions are the provider's**, and Competition Introduction, Competition
+Description and Result/Leaderboard copy belong to a *contest*, not a title - the contest
+wizard's assistant already writes those, game-awarely, since `12` s2.8. What is left for
+task 19 is Game Title, Short Description, Full Description, Banner copy and Marketing text.
+
+### Not built, and not blocked either - the natural next slice
+
+`13` s4.1h's **View Rules** button on the provider lobby points at `/help/competitions`
+because no rules surface existed for a provider title. **There is now rules text to show
+it**, so that button can finally do what it says. That is a player-facing change and is its
+own slice.
+
 ---
 
 # TASK 20 — AI MUST BE GAME-AGNOSTIC AND CONTEXT-AWARE

@@ -89,11 +89,15 @@ export interface ProviderTitleRow {
   zeroIsValidResult?: boolean;
   minimumEligibleScore?: number;
   scoreUnit?: string;
-  // Operator presentation content. Every one is optional and must stay so: a title synced
-  // before these fields existed has none of them, and the screens that read them fall back
-  // rather than printing a blank. See the model comment on `tagline`.
+  // Presentation content: seeded from the provider on the first sync, the operator's after.
+  // Every one is optional and must stay so: a title synced before these fields existed has
+  // none of them, and the screens that read them fall back rather than printing a blank.
+  // See the model comment on `tagline`, which used to claim no provider supplies any of
+  // this and was wrong about four of the six (R63).
   tagline?: string;
   description?: string;
+  rulesSummary?: string;
+  howToPlay?: string;
   category?: string;
   thumbnailUrl?: string;
   bannerUrl?: string;

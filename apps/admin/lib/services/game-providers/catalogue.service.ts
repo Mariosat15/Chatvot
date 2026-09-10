@@ -95,12 +95,29 @@ function providerOwnedFields(game: ProviderCatalogueGame) {
  *
  * Presentation copy is seeded from the provider once and then belongs to the operator.
  * This is the mechanism behind rule 3 above.
+ *
+ * THIS LIST HELD FOUR OF THE SIX CONTENT FIELDS UNTIL 10 SEPTEMBER 2026, and the two it
+ * omitted - `tagline` and `bannerUrl` - are as contractually required as the four it had
+ * (`01` s3, all six marked `Yes`). A provider sending them, as our own reference provider
+ * always has, had them silently discarded on every sync. `rulesSummary` and `howToPlay`
+ * could not even reach this function. See R63.
+ *
+ * First-sync-only rather than provider-owned, for all six, and the distinction decides who
+ * wins an argument. These are sentences a player reads, so an operator must be able to
+ * improve them, localise them or correct a provider's grammar without the next scheduled
+ * sync quietly reverting the edit. That is the opposite treatment to `scoreDirection` or
+ * `playMode`, which are the provider's statements about how their own game works and which
+ * an operator must NOT be able to override.
  */
 function firstSyncOnlyFields(game: ProviderCatalogueGame) {
   return {
     displayName: game.displayName,
     description: game.description,
+    tagline: game.tagline,
+    rulesSummary: game.rulesSummary,
+    howToPlay: game.howToPlay,
     thumbnailUrl: game.thumbnailUrl,
+    bannerUrl: game.bannerUrl,
     category: game.category,
   };
 }

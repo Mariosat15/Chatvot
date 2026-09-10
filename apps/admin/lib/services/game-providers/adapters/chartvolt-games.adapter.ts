@@ -61,7 +61,11 @@ interface CatalogueEntryPayload {
   gameCode?: unknown;
   displayName?: unknown;
   description?: unknown;
+  tagline?: unknown;
+  rulesSummary?: unknown;
+  howToPlay?: unknown;
   thumbnailUrl?: unknown;
+  bannerUrl?: unknown;
   category?: unknown;
   family?: unknown;
   playMode?: unknown;
@@ -172,10 +176,25 @@ function normaliseCatalogueEntry(
     status,
   };
 
+  // The six content fields `01` s3 requires of every provider. Absent ones are simply not
+  // set, never set to "" - an absent value means "say less" to every consumer, while an
+  // empty string is a thing to print.
+  //
+  // Reason four of these are new on 10 September 2026: they were required of providers,
+  // sent by our own reference provider, and **dropped here**, because the shape this
+  // function returns had no room for them. Nothing errored and nothing logged. See R63.
   const description = text(entry.description);
   if (description) game.description = description;
+  const tagline = text(entry.tagline);
+  if (tagline) game.tagline = tagline;
+  const rulesSummary = text(entry.rulesSummary);
+  if (rulesSummary) game.rulesSummary = rulesSummary;
+  const howToPlay = text(entry.howToPlay);
+  if (howToPlay) game.howToPlay = howToPlay;
   const thumbnailUrl = text(entry.thumbnailUrl);
   if (thumbnailUrl) game.thumbnailUrl = thumbnailUrl;
+  const bannerUrl = text(entry.bannerUrl);
+  if (bannerUrl) game.bannerUrl = bannerUrl;
   const category = text(entry.category);
   if (category) game.category = category;
 

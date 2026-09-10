@@ -76,12 +76,43 @@ export type ProviderResult<T> =
   | { success: true; data: T }
   | { success: false; error: string; code?: string; retryable?: boolean };
 
-/** One title as the catalogue reports it, already normalised to our vocabulary. */
+/**
+ * One title as the catalogue reports it, already normalised to our vocabulary.
+ *
+ * THE SIX CONTENT FIELDS ARE OPTIONAL HERE AND REQUIRED IN THE CONTRACT, WHICH IS
+ * DELIBERATE. `01` section 3 marks `tagline`, `description`, `rulesSummary`, `howToPlay`,
+ * `thumbnailUrl` and `bannerUrl` all `Yes`, and the requirements document issued to
+ * providers has done so since version 1.1. They are optional in the parser because the
+ * alternative is refusing the whole row: a title whose marketing copy is missing still
+ * plays, still scores and still pays, and losing it from the catalogue over a missing
+ * sentence is the same failure as rejecting a title for an unforeseen genre. Demanding
+ * them is the contract's job; a sync's job is not to lose a game over it.
+ *
+ * FOUR OF THEM WERE ABSENT FROM THIS INTERFACE UNTIL 10 SEPTEMBER 2026, and their absence
+ * here is what discarded them - an adapter cannot hand over a field the shape it returns
+ * does not have, so `tagline`, `rulesSummary`, `howToPlay` and `bannerUrl` were dropped at
+ * parse on every sync of every provider, silently. See R63.
+ */
 export interface ProviderCatalogueGame {
   gameCode: string;
   displayName: string;
   description?: string;
+  /** One line for cards and search results. `01` s3, required of the provider. */
+  tagline?: string;
+  /**
+   * How the score is produced and how ties break.
+   *
+   * Reason for treating this as the provider's text rather than ours: `01` s3 says it is
+   * the first thing support quotes back when a player disputes a prize, so it has to
+   * describe what the game actually did, not what we assume it did.
+   */
+  rulesSummary?: string;
+  /** The controls and constraints in plain language. `01` s3. */
+  howToPlay?: string;
+  /** Square catalogue card art. Distinct from `bannerUrl`, which crops differently. */
   thumbnailUrl?: string;
+  /** Wide game-page header art. `01` s3, required of the provider. */
+  bannerUrl?: string;
   category?: string;
   family: ProviderGameFamily;
   playMode?: ProviderPlayMode;

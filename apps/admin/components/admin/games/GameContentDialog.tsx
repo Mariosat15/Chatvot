@@ -58,6 +58,8 @@ interface Draft {
   displayName: string;
   tagline: string;
   description: string;
+  rulesSummary: string;
+  howToPlay: string;
   category: string;
   thumbnailUrl: string;
   bannerUrl: string;
@@ -72,6 +74,8 @@ function draftFrom(title: ProviderTitleRow): Draft {
     displayName: title.displayName ?? "",
     tagline: title.tagline ?? "",
     description: title.description ?? "",
+    rulesSummary: title.rulesSummary ?? "",
+    howToPlay: title.howToPlay ?? "",
     category: title.category ?? "",
     thumbnailUrl: title.thumbnailUrl ?? "",
     bannerUrl: title.bannerUrl ?? "",
@@ -213,6 +217,42 @@ export default function GameContentDialog({
               value={draft.description}
               maxLength={CONTENT_LIMITS.description}
               onChange={(event) => set("description", event.target.value)}
+            />
+          </Field>
+
+          {/*
+            Both of these are the PROVIDER's account of their own game, seeded on the first
+            sync and editable here so an operator can fix grammar, tone or language. Neither
+            is generated: `01` s3 says the rules summary is the first text support quotes
+            back when a player disputes a prize, so invented wording here is invented
+            wording in a money argument. The AI panel on this screen is deliberately scoped
+            away from both (owner decision, 10 September 2026).
+          */}
+          <Field
+            label="Rules summary"
+            hint="How the score is produced and how ties break. Support quotes this back when a player disputes a prize, so it must match what the game actually does."
+            length={draft.rulesSummary.length}
+            limit={CONTENT_LIMITS.rulesSummary}
+          >
+            <Textarea
+              rows={4}
+              value={draft.rulesSummary}
+              maxLength={CONTENT_LIMITS.rulesSummary}
+              onChange={(event) => set("rulesSummary", event.target.value)}
+            />
+          </Field>
+
+          <Field
+            label="How to play"
+            hint="The controls and constraints in plain language. A player asking how to play and a player asking why they lost are asking two different questions."
+            length={draft.howToPlay.length}
+            limit={CONTENT_LIMITS.howToPlay}
+          >
+            <Textarea
+              rows={4}
+              value={draft.howToPlay}
+              maxLength={CONTENT_LIMITS.howToPlay}
+              onChange={(event) => set("howToPlay", event.target.value)}
             />
           </Field>
 

@@ -23,6 +23,8 @@ export interface IProviderGame extends Document {
   thumbnailUrl?: string;
   category?: string;
   tagline?: string;
+  rulesSummary?: string;
+  howToPlay?: string;
   bannerUrl?: string;
   highlights?: { title: string; detail: string }[];
   family: "independent" | "head_to_head";
@@ -94,21 +96,39 @@ const ProviderGameSchema = new Schema<IProviderGame>(
     thumbnailUrl: { type: String },
     category: { type: String },
 
-    // Presentation content the OPERATOR writes, and which no provider ever supplies.
+    // Presentation content, seeded from the provider once and owned by the operator after.
     //
-    // The distinction from `description` and `thumbnailUrl` above is worth stating, because
-    // all five read like the same kind of field and two of them are not. Those two appear in
-    // the provider contract, so the catalogue sync SEEDS them on the first sync and never
-    // touches them again (`firstSyncOnlyFields`). These three are in no contract at all, so
-    // they are in neither sync allow-list and cannot be seeded, overwritten or cleared by a
-    // provider. That is deliberate rather than incidental: a spread of a provider payload
-    // over this document would revert an operator's wording on the next sync with nothing
-    // raising an error, which is the failure `catalogue.service.ts` is written to prevent.
+    // THIS COMMENT USED TO SAY THESE FIELDS ARE "content the OPERATOR writes, and which no
+    // provider ever supplies", and that they "are in no contract at all". BOTH CLAIMS WERE
+    // FALSE, corrected 10 September 2026 (R63). `01` section 3 marks `tagline`,
+    // `description`, `rulesSummary`, `howToPlay`, `thumbnailUrl` and `bannerUrl` all `Yes`,
+    // required of every provider, and has since the requirements document issued to
+    // providers reached version 1.1. Our own reference provider sends all six.
+    //
+    // The correction is left visible rather than tidied away, because the wrong sentence is
+    // the reason nobody looked: it explained the omission as a deliberate design choice, so
+    // `tagline` and `bannerUrl` sat outside both sync allow-lists and every provider's
+    // values for them were discarded on every sync, silently. An aside in a comment is a
+    // claim, not a fact, and this is the seventh instance of it here.
+    //
+    // What IS true, and is the real distinction: these are sentences a player reads, so
+    // they are in `firstSyncOnlyFields` and not `providerOwnedFields` - an operator may
+    // improve, localise or correct them and the next scheduled sync will not revert the
+    // edit. That is the opposite treatment to `scoreDirection` or `playMode`, which are the
+    // provider's statements about how their own game works.
     //
     // Nothing here may become required. A title synced before these existed, or supplied by
     // a provider whose operator has not written copy yet, must still render - so every
     // consumer treats an absent value as "say less", never as an empty string to print.
     tagline: { type: String, trim: true },
+    // Reason: how the score is produced and how ties break. `01` s3 calls this the first
+    // text support quotes back when a player disputes a prize, which is why it is the
+    // provider's account of their own game rather than ours - and why nothing generates it.
+    rulesSummary: { type: String, trim: true },
+    // Reason: the controls and constraints in plain language. Separate from `rulesSummary`
+    // because a player asking "how do I play" and a player asking "why did I lose" are
+    // asking two different questions, and one text answering both answers neither well.
+    howToPlay: { type: String, trim: true },
     // Reason: the WIDE hero art, distinct from `thumbnailUrl`, which is the square logo. Two
     // fields because the two shapes crop differently and a single URL used for both makes one
     // of the two look broken. Until this is set, `components/neon/banners.ts` still answers

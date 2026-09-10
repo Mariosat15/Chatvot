@@ -75,6 +75,15 @@ const DEFAULT_CATALOGUE: ProviderCatalogueGame[] = [
     gameCode: "mock-trivia",
     displayName: "Mock Trivia",
     description: "A fixture title used by the automated tests.",
+    // The four content fields `01` s3 requires and the sync discarded until 10 September
+    // 2026 (R63). Declared on THIS title and deliberately absent from `mock-sprint`, so the
+    // pair proves both halves: that a supplied value travels all the way to a stored row,
+    // and that an absent one is left unset rather than stored as an empty string. A fixture
+    // where both titles carry everything cannot tell those two outcomes apart.
+    tagline: "A fixture tagline, under ninety characters.",
+    rulesSummary: "Correct answers score. Highest total wins; ties break on total time.",
+    howToPlay: "Read the question and answer before the timer runs out.",
+    bannerUrl: "https://example.test/mock-trivia-banner.png",
     category: "quiz",
     family: "independent",
     // Declared explicitly rather than left to the default, so the sync test proves the value

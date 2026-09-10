@@ -36,6 +36,7 @@ chapter covers risks to the programme and to the application.
 | **R60** | **A native `<select>` on a translucent background renders white on white** - the *browser* paints the list, taking the background from the element and letting options inherit `color`. **Two instances found** | Low | **ALREADY OCCURRED, 2 controls** | **Genre picker CLOSED 9 Sep 2026**; `MessagingSection.tsx`'s employee picker is a **named, tested exception** - blocked by that file's lint debt |
 | **R61** | **The contest EDITOR never learned the play shape** - it offered the attempts and round-start controls on a simultaneous contest, and `applyEdit` forces both before reading what the operator sent, so the save reported success and stored something else | Medium | **LATENT** - no title declares `scheduled` yet | **CLOSED 10 Sep 2026** (task doc 12.1); nothing backfilled |
 | **R62** | **The adapter guessed how a title ranks from a hard-coded map of two game codes**, and ingestion believed it - so a third title would have had every player scored on their WORST attempt under `best_of_n`, uniformly enough that no board looked reversed | Medium | **LATENT** - the two listed titles are the only ones synced | **CLOSED 10 Sep 2026** (task doc 13.1); nothing backfilled |
+| **R63** | **The catalogue sync discarded four of the six content fields the issued contract REQUIRES of every provider** - `tagline` and `bannerUrl` had model fields and were in neither sync allow-list, `rulesSummary` and `howToPlay` were not even on `ProviderCatalogueGame`, so an adapter could not hand them over. Our own reference provider sent all six on every sync and four were dropped, silently | Medium | **LIVE and occurring on every sync**, but nothing was lost that cannot be re-fetched | **CLOSED 10 Sep 2026**; re-sync to populate, nothing backfilled |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -2214,6 +2215,78 @@ one the first person it inconveniences deletes, which is the same reasoning that
 Probed by `tools/probe-client-bundle-guard.ps1`: two probes, one restoring the admin defect
 verbatim and one reverting the main app's `import type` to a plain import, each red on exactly
 the expected test.
+
+---
+
+### R63 - The sync discarded content the contract demands - **CLOSED 10 September 2026**
+
+**What it was.** `01` section 3.1 requires six content fields of every provider -
+`displayName`, `tagline`, `description`, `rulesSummary`, `howToPlay`, `thumbnailUrl` and
+`bannerUrl`, every one marked `Yes` - and has done since the requirements document issued to
+providers reached version 1.1 on 30 August 2026. `games-service`, our own reference provider,
+publishes all of them on `GET /v1/games`. The platform stored two.
+
+`tagline` and `bannerUrl` were declared on `provider_game` and appeared in **neither**
+`providerOwnedFields` nor `firstSyncOnlyFields`, so the sync never wrote them.
+`rulesSummary` and `howToPlay` had no model field at all and were not declared on
+`ProviderCatalogueGame`, which is where they were actually lost: an adapter cannot hand over
+a field the shape it returns has no room for, so they were dropped at parse before the sync
+could have stored them.
+
+**State the harm in both directions.** It was **live and happening on every sync**, which is
+rarer here than latent - but nothing was destroyed. The values live on the provider and a
+re-sync populates them, so **nothing was backfilled and nothing needed to be**. What it cost
+was the game page having no rules text and no how-to-play text to show, which is why
+`13` s4.1h's **View Rules** button on the provider lobby points at `/help/competitions`
+rather than at the game's own rules. A summary calling this a data-loss incident is wrong;
+one calling it cosmetic is missing that the rules summary is, in the spec's own words, the
+first text support quotes back when a player disputes a prize.
+
+**Why nothing caught it, which is the transferable part. NOTHING CONNECTED THE ISSUED
+SPECIFICATION TO THE CODE.** `01` and `ChartVolt-Game-API-Requirements.html` were correct and
+agreed with each other, so the paired-document rule was satisfied and reported nothing; the
+drift ran **document to code**, in a direction no guard looks. Every test that touched the
+sync asserted the fields it already knew about, which is the fixture rule in a new place: a
+test that enumerates what exists cannot report what is missing.
+
+**And the reason nobody read it twice: the model's own comment explained the omission as a
+design decision.** It said these fields were "content the OPERATOR writes, and which no
+provider ever supplies", and that they "are in no contract at all". Both sentences were false
+for two of the three fields they covered. That is the **seventh** instance of an aside in a
+comment being a claim rather than a fact, after `challengeId`, the R7 severity,
+`billsPerRound`, the `participant.score` comment, the `walletMap` comment and R42's dispatch
+comment - and the first where the wrong sentence actively deterred the reading that would
+have found the defect. The correction is **left visible in the file** rather than tidied into
+the present tense.
+
+**The fix.** All six now sit in `firstSyncOnlyFields`, seeded from the provider on the first
+sync and the operator's thereafter. First-sync-only rather than provider-owned is the
+load-bearing choice and it is not obvious: these are sentences a player reads, so an operator
+must be able to fix a provider's grammar, tone or language without the next scheduled sync
+silently reverting the edit - the opposite treatment to `scoreDirection` or `playMode`, which
+are the provider's statements about how their own game works and which an operator must not
+override. `rulesSummary` and `howToPlay` are new on both `provider_game` copies and editable
+through the existing content dialog.
+
+**The guard reads the specification.** `__tests__/services/provider-content-fields.test.ts`
+(10 tests) parses section 3.1's own table and requires every `Yes` row to be either stored by
+a real sync or listed in `NOT_STORED` **with a reason**. It is behavioural rather than a text
+match against the allow-list, because a structural check is satisfied by a field named in an
+allow-list that the schema then discards. Probe 12 of
+`tools/probe-provider-content-fields.ps1` adds a seventh required field to the issued spec
+**and changes no code at all**, which is exactly the shape of this defect; it is red. All 12
+probes are red on exactly one failure.
+
+**Two `Yes` rows are deliberately not stored**, and saying which beats a claim that the
+contract is fully honoured. `displayName` is stored on create and covered by the sync suite.
+`locales` is localisation, which is chapter 16 / X11 and unbuilt - storing a provider's
+declared locales today would be a field written and read by nothing, the sixth
+declared-written-dead field after `requiresSyncPlay`, `isPaused`, `lastSuccessfulRoundAt`,
+`family` and `playModeOverride` on a head-to-head title.
+
+**No change to the provider contract and no version bump.** `01` and the requirements HTML
+were right throughout; the code was wrong. Verifying that cost one search and prevented a
+pointless bump on a document providers may already be building against.
 
 ---
 
