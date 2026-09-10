@@ -221,6 +221,43 @@ export function hardDeadline(round: Pick<RoundDoc, "startedAt" | "config" | "exp
 }
 
 /**
+ * How long the player will actually get, in whole seconds.
+ *
+ * NOT THE SAME QUESTION AS THE TITLE'S CONFIGURED LENGTH, and answering it with that length is
+ * the defect this exists for. A contest closes at `expiresAt`, which the platform clamps to the
+ * end of its play window - so a player who starts a ten-minute sprint with five minutes of
+ * contest left gets five. `playability` refuses them at that point and reports `expired`, which
+ * is correct; what was wrong is that the play surface was telling them ten the whole way.
+ *
+ * Two reasons that matters more than it looks. The platform's own pre-flight panel already
+ * states the shortened figure before the attempt is spent, so the game was contradicting the
+ * screen the player had just read - and the game's number is the one they watch. And since a
+ * partial run counts towards the leaderboard, the number changes how they PACE the round: on a
+ * "solve as many as you can" title, pacing for ten minutes leaves boards unsolved.
+ *
+ * ANCHORED ON `startedAt` ONCE THE CLOCK IS RUNNING, and on `now` before it. The pre-start panel
+ * is asking "how long will I get if I press Start", which can only be measured from now; after
+ * that the answer is fixed at what they were granted, and must not shrink on every poll.
+ *
+ * It defers to `hardDeadline` rather than repeating its arithmetic, because a second copy of the
+ * min is a second place for the three deadlines to be weighed differently.
+ */
+export function playableSeconds(
+  round: Pick<RoundDoc, "startedAt" | "config" | "expiresAt">,
+  now = new Date(),
+): number {
+  const anchor = round.startedAt ?? now;
+  const deadline = hardDeadline({
+    startedAt: anchor,
+    config: round.config,
+    expiresAt: round.expiresAt,
+  });
+  // Floored, never rounded: rounding up overstates by up to a second, and an overstatement here
+  // is a promise the server then breaks.
+  return Math.max(0, Math.floor((deadline.getTime() - anchor.getTime()) / 1000));
+}
+
+/**
  * Whether a round may still be played, and if not, which terminal state it owes.
  *
  * Called by every play endpoint before it does anything. Reason for returning the owed state

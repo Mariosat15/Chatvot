@@ -353,6 +353,7 @@ npm run probe:presentation   # the same, for the play surface's sizing and wordi
 npm run probe:deploy-drift   # the same, for the boot audit and the sweeper's failure log
 npm run probe:play-assets    # the same, for the disk-derived asset set - probe 1 reinjects R52
 npm run probe:boot-watchdog  # the same, for the watchdog that names a module which never arrived
+npm run probe:round-clock    # the same, for the clock and the length promised before Start
 ```
 
 > **A new front-end file no longer needs a build**, and that is deliberate. Until 8 September 2026
@@ -398,8 +399,10 @@ npm run probe:boot-watchdog  # the same, for the watchdog that names a module wh
 > that would have sent it was definitely present.** A test pins the markup's side of that bargain:
 > exactly one screen ships visible, and it is the loading screen.
 
-`npm test` runs **249 tests**: 15 config, 42 engine, 28 scoring, 41 API, 73 play and delivery,
-15 board client, 35 presentation. (Counted from the suite's own output. Any figure of 242 predates
+`npm test` runs **259 tests**: 15 config, 42 engine, 28 scoring, 41 API, 78 play and delivery,
+15 board client, 40 presentation. (Counted from the suite's own output. Any figure of 249 predates
+the round-clock fix, which added five tests to each of the play and presentation suites. Any
+figure of 242 predates
 the fingerprinted asset URLs, and was itself understated - the suites summed to 246 at the time,
 so **do not hand-count these either; read the seven result lines**. 226 and 225 predate the sound
 and animation layer, the two were the same commit and the total was misstated as 225 while the

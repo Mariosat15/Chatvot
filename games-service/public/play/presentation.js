@@ -161,10 +161,34 @@ export function desiredFrameHeight(input) {
 
 /** The pre-round panel: the title's name and what the format asks of them. */
 export function introCopy(input) {
-  const { title, boardTarget, durationSeconds, mode } = input ?? {};
+  const { title, boardTarget, durationSeconds, playableSeconds, mode } = input ?? {};
 
   const name = typeof title === "string" && title.trim() ? title.trim() : "Circuit";
   const practice = mode === "practice";
+
+  /*
+   * THE LENGTH TO STATE IS THE ONE THE PLAYER WILL GET, NEVER THE TITLE'S OWN.
+   *
+   * This panel used to read `durationSeconds` alone, so a player joining a contest with five
+   * minutes to run was told they had ten - and then cut off, mid-board, by a clock that still
+   * showed time remaining. The platform's own pre-flight screen had already told them the truth
+   * moments earlier, which made it worse rather than better: two screens, one round, two numbers,
+   * and this is the one they are looking at when they press Start.
+   *
+   * `playableSeconds` is authoritative whenever the server sent it, INCLUDING WHEN IT IS ZERO.
+   * Falling back to the nominal length on a falsy value is the version that looks defensive and
+   * reinstates the promise the server cannot keep.
+   */
+  const nominal = positive(durationSeconds) ? Math.floor(durationSeconds) : null;
+  const granted =
+    typeof playableSeconds === "number" &&
+    Number.isFinite(playableSeconds) &&
+    playableSeconds >= 0
+      ? Math.floor(playableSeconds)
+      : nominal;
+  // Both known and the contest is the tighter of the two. Said out loud, because "you have five
+  // minutes" on a title the player knows is a ten-minute game reads as a fault in the game.
+  const cutShort = granted !== null && nominal !== null && granted < nominal;
 
   let limit = "";
   if (positive(boardTarget)) {
@@ -172,10 +196,18 @@ export function introCopy(input) {
       `Finish ${boardTarget} ` +
       (boardTarget === 1 ? "board" : "boards") +
       ". Your total time is your score, and the lowest time wins.";
-  } else if (positive(durationSeconds)) {
+    // Perfect leads on its board count and makes no claim about time, so the shortening has to be
+    // stated separately or a player with two minutes left is told to finish three boards.
+    if (cutShort && positive(granted)) {
+      limit +=
+        ` The competition closes in ${formatDuration(granted)}, ` +
+        "so that is all the time this round has.";
+    }
+  } else if (positive(granted)) {
     limit =
-      `You have ${formatDuration(durationSeconds)}. ` +
-      "Solve as many boards as you can, and the highest score wins.";
+      `You have ${formatDuration(granted)}` +
+      (cutShort ? ", which is all that is left before the competition closes" : "") +
+      ". Solve as many boards as you can, and the highest score wins.";
   }
 
   return {

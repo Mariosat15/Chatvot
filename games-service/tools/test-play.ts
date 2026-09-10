@@ -57,6 +57,7 @@ interface PlayStateBody {
   boardsSolved: number;
   boardTarget?: number;
   durationSeconds?: number;
+  playableSeconds?: number;
   endsAt?: string;
   finished?: { status: string; boardsSolved: number };
 }
@@ -1398,6 +1399,146 @@ async function main(): Promise<number> {
     // exactly when `endsAt` does not exist yet.
     assert.equal(state.body.durationSeconds, 90);
     assert.equal(state.body.endsAt, undefined);
+  });
+
+  /*
+   * ── the clock the player is shown ─────────────────────────────────────────────────────────────
+   *
+   * THE OWNER'S REPORT, 10 September 2026: "when a user enters late and the time of the
+   * competition is less than the game's default time, it must show the time left to end the
+   * competition, so it is not misleading."
+   *
+   * Two numbers were wrong and they are two separate reads. `endsAt` drove the live countdown and
+   * was `gameplayEndsAt(round)` - the title's clock from `startedAt` - so a ten-minute sprint
+   * started with five minutes of contest left counted down from 10:00 and stopped, mid-board, with
+   * the clock still reading 5:00. `durationSeconds` drove the sentence before Start and was the
+   * configured length, so the same player was promised ten minutes in writing.
+   *
+   * `hardDeadline` had weighed all three deadlines correctly since the file was written and was
+   * called by nothing, which is the part worth remembering: the answer existed, unwired.
+   */
+
+  await test("a round the contest will cut short counts down to the contest, not the title's clock", async () => {
+    /*
+     * The defect, end to end. This is exactly the shape the platform sends: `resolveExpiry` clamps
+     * `expiresAt` to the end of the play window, so a late joiner's round is born with less time
+     * than its title asks for.
+     */
+    await clearRounds();
+    const expiresAt = new Date(Date.now() + 60_000);
+    const { token } = await openRound({
+      config: { durationSeconds: 120, gridSize: "small" },
+      expiresAt: expiresAt.toISOString(),
+    });
+
+    const state = await callPlay<PlayStateBody>("/play/api/session", { t: token });
+    assert.equal(state.status, 200);
+    assert.ok(state.body.endsAt, "no clock was reported");
+
+    const ends = new Date(state.body.endsAt as string).getTime();
+    assert.ok(
+      Math.abs(ends - expiresAt.getTime()) < 5_000,
+      `the clock runs to ${state.body.endsAt}, not the contest's ${expiresAt.toISOString()}`,
+    );
+
+    /*
+     * And the failure it replaced, asserted separately. Without this the test would also pass
+     * against a clock set to the title's full length on a contest that happened to end later -
+     * the two only differ when the contest is the tighter of the two, which is the whole case.
+     */
+    assert.ok(
+      ends < Date.now() + 110_000,
+      "the clock still runs the title's full length, so the player is cut off with time showing",
+    );
+  });
+
+  await test("the length promised before Start is the length the server will honour", async () => {
+    await clearRounds();
+    const { token } = await openRound({
+      config: { durationSeconds: 120, gridSize: "small" },
+      expiresAt: new Date(Date.now() + 45_000).toISOString(),
+    });
+
+    const state = await callPlay<PlayStateBody>(`/play/api/state?t=${token}`, undefined, "GET");
+    assert.equal(state.body.status, "created");
+
+    // The title's own length is still reported, and deliberately: the client needs both figures in
+    // order to tell the player WHY the round is short. It is simply no longer the promise.
+    assert.equal(state.body.durationSeconds, 120);
+    const promised = state.body.playableSeconds ?? -1;
+    assert.ok(
+      promised <= 45 && promised >= 35,
+      `promised ${promised}s inside a 45s window`,
+    );
+  });
+
+  await test("a round with the whole window ahead of it promises its full length", async () => {
+    /*
+     * THE CONTROL, and without it the fix is unfalsifiable. "Always report the contest's remaining
+     * time" satisfies both tests above while telling a player with an hour of contest left that a
+     * two-minute sprint lasts an hour - a worse lie than the one being fixed, in the other
+     * direction.
+     */
+    await clearRounds();
+    const { token } = await openRound({ config: { durationSeconds: 120, gridSize: "small" } });
+
+    const state = await callPlay<PlayStateBody>(`/play/api/state?t=${token}`, undefined, "GET");
+    assert.equal(state.body.durationSeconds, 120);
+    assert.equal(state.body.playableSeconds, 120);
+  });
+
+  await test("a fixed-set title reports a length too, so it can notice being cut short", async () => {
+    /*
+     * Circuit Perfect has no clock in its rules, so its intro leads on the board count and makes
+     * no claim about time - which is why it was easy to miss that a Perfect round is cut short by
+     * the contest exactly as a sprint is. `roundDurationMs` gives its declared maximum, which IS
+     * its hard stop, and the client compares the two to decide whether to mention the contest.
+     */
+    await clearRounds();
+    const { PERFECT, PERFECT_CODE } = await import("../src/games/titles");
+    const { token } = await openRound({
+      gameCode: PERFECT_CODE,
+      config: { boardCount: 3, gridSize: "small", unfinishedPenaltyMs: 60_000 },
+      expiresAt: new Date(Date.now() + 90_000).toISOString(),
+    });
+
+    const state = await callPlay<PlayStateBody>(`/play/api/state?t=${token}`, undefined, "GET");
+    assert.equal(state.body.durationSeconds, PERFECT.maxDurationSeconds);
+    assert.ok(
+      (state.body.playableSeconds ?? Number.MAX_SAFE_INTEGER) <= 90,
+      `a Perfect round promised ${state.body.playableSeconds}s inside a 90s window`,
+    );
+  });
+
+  await test("the promised length stops moving once the clock is running", async () => {
+    /*
+     * Anchored on `startedAt` after Start and on `now` before it, which is two behaviours from one
+     * function and therefore worth pinning. Measured from `now` throughout, the figure shrinks on
+     * every poll - so a player who refreshes watches the round they were granted getting shorter,
+     * which reads as the game taking time off them.
+     *
+     * THE CONTEST MUST BE THE TIGHTER OF THE TWO DEADLINES OR THIS TEST PROVES NOTHING, which is
+     * how it was first written. With the window an hour away the gameplay clock wins, and a
+     * gameplay clock re-anchored on `now` is *also* a constant 120 - so both the correct and the
+     * broken version answer identically and the fixture cannot tell them apart. Against a window
+     * 45 seconds out, only the correct anchor holds still.
+     *
+     * Exact equality is safe rather than flaky: once anchored, the value is a difference between
+     * two fixed instants.
+     */
+    await clearRounds();
+    const { token } = await openRound({
+      config: { durationSeconds: 120, gridSize: "small" },
+      expiresAt: new Date(Date.now() + 45_000).toISOString(),
+    });
+    const started = await callPlay<PlayStateBody>("/play/api/session", { t: token });
+    const first = started.body.playableSeconds;
+    assert.ok(typeof first === "number", "no promised length was reported");
+
+    await new Promise((resolve) => setTimeout(resolve, 1_200));
+
+    const again = await callPlay<PlayStateBody>(`/play/api/state?t=${token}`, undefined, "GET");
+    assert.equal(again.body.playableSeconds, first, "the promised length shrank while playing");
   });
 
   await test("the state carries the title's own name, rules and scoring", async () => {

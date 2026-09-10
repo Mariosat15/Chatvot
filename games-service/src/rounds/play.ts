@@ -2,10 +2,16 @@ import { generateForPlayer } from "../engine/generate";
 import { toClientPuzzle, type ClientPuzzle } from "../engine/puzzle";
 import { REFUSAL_MESSAGES, verifyAttempt, type AttemptRefusal } from "../engine/verify";
 import { BOARD_RULES } from "../games/instructions";
-import { findTitle, shapeFor, type PerfectConfig, type RoundConfig } from "../games/titles";
+import {
+  findTitle,
+  roundDurationMs,
+  shapeFor,
+  type PerfectConfig,
+  type RoundConfig,
+} from "../games/titles";
 import { Round, isTerminal, type RoundDocument } from "../store/round.model";
 import { ApiError, unknownRound } from "../http/errors";
-import { finishRound, gameplayEndsAt, playability } from "./lifecycle";
+import { finishRound, hardDeadline, playability, playableSeconds } from "./lifecycle";
 
 /**
  * The play surface, used by the game in the iframe rather than by the platform.
@@ -62,13 +68,31 @@ export interface PlayState {
   /** Present for Circuit Perfect, which has a fixed set. Absent for Sprint, which has no limit. */
   boardTarget?: number;
   /**
-   * Present for Circuit Sprint, so the pre-start panel can tell the player how long they get.
+   * The round's own length by its title's rules - the sprint clock, or Perfect's declared maximum.
    *
    * `endsAt` cannot answer that question, because it does not exist until the clock has started -
    * and the one moment the player needs to know the length is before they start it.
+   *
+   * IT IS NOT WHAT THE PLAYER IS PROMISED. See `playableSeconds` below, which is; this is here
+   * only so the client can tell the two apart and say WHY the round is short when it is.
    */
   durationSeconds?: number;
-  /** When the gameplay clock stops, so the client can render a countdown it does not own. */
+  /**
+   * How long the player will actually get, which is at or below `durationSeconds`.
+   *
+   * The contest's window can be nearer than the title's clock, and when it is, this is the figure
+   * the server will honour. `lifecycle.playableSeconds` carries the full reasoning.
+   */
+  playableSeconds?: number;
+  /**
+   * When play stops, so the client can render a countdown it does not own.
+   *
+   * THE EARLIEST OF THE THREE DEADLINES, not the gameplay clock alone. It read
+   * `gameplayEndsAt(round)` until 10 September 2026, so a player who started a ten-minute sprint
+   * with five minutes of contest left watched a clock counting from 10:00 and was cut off with it
+   * still reading 5:00. `hardDeadline` already weighed all three correctly and was called by
+   * nothing.
+   */
   endsAt?: string;
   /** Where to send the player when they leave. */
   returnUrl?: string;
@@ -123,7 +147,11 @@ function needsAnotherBoard(round: RoundDocument): boolean {
 
 function stateFor(round: RoundDocument, board?: ClientPuzzle): PlayState {
   const config = round.config as unknown as RoundConfig;
-  const endsAt = gameplayEndsAt(round);
+  // Absent until the clock is running, deliberately - see `durationSeconds` on `PlayState`. The
+  // presence test is `startedAt` rather than a null from the deadline helper, because
+  // `hardDeadline` answers for an unstarted round too and its answer there is the contest's
+  // expiry, which is not a countdown this round is running against yet.
+  const endsAt = round.startedAt ? hardDeadline(round) : null;
 
   /*
    * A round whose title has vanished from the catalogue still has to render something. It is
@@ -146,7 +174,15 @@ function stateFor(round: RoundDocument, board?: ClientPuzzle): PlayState {
     returnUrl: round.returnUrl,
   };
 
-  if (config.kind === "sprint") state.durationSeconds = config.durationSeconds;
+  /*
+   * Both titles, not just Sprint. Perfect has no clock in its rules, so `roundDurationMs` gives
+   * its declared maximum - which is its hard stop and is therefore the honest answer - and the
+   * client needs it in order to notice that a Perfect round is being cut short too. The intro
+   * copy for Perfect leads on its board count either way, so nothing about that screen changes
+   * unless the contest is genuinely shortening the round.
+   */
+  state.durationSeconds = Math.floor(roundDurationMs(config) / 1000);
+  state.playableSeconds = playableSeconds(round);
   if (board) state.board = board;
   if (endsAt) state.endsAt = endsAt.toISOString();
 

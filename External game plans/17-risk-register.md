@@ -39,6 +39,7 @@ chapter covers risks to the programme and to the application.
 | **R63** | **The catalogue sync discarded four of the six content fields the issued contract REQUIRES of every provider** - `tagline` and `bannerUrl` had model fields and were in neither sync allow-list, `rulesSummary` and `howToPlay` were not even on `ProviderCatalogueGame`, so an adapter could not hand them over. Our own reference provider sent all six on every sync and four were dropped, silently | Medium | **LIVE and occurring on every sync**, but nothing was lost that cannot be re-fetched | **CLOSED 10 Sep 2026**; re-sync to populate, nothing backfilled |
 | **R64** | **A player who only plays games had no performance at all.** The admin per-user Performance tab computed eleven trading figures and gated the WHOLE tab on `totalTrades === 0`, so a games-only player read "This client has no closed trades yet" while every round, score and prize stayed invisible. `05` s10 broken in its plainest form. Note task 21's premise was **false where it pointed** - the screen actually named Game Performance mentions no game | Medium | **LIVE**, but a REPORTING defect and never a payment one | **CLOSED 10 Sep 2026** (task doc 21.1); nothing stored, so nothing to backfill |
 | **R65** | **The entry panel promised every game entrant "$0 in trading capital to compete"**, because `startingCapital` is `required` only while the contest is trading and the panel's `\|\| 0` turned the absent field into a number. Beside it, one unconditional sentence claimed no entries are taken "whether or not the competition is still running" - false under `until_window_closes`, where the deadline IS the moment play stops, and silent about the reason under `reserve_full_round`, where the gap exists to stop somebody paying for a contest they cannot finish a round in | Medium | **LIVE and player-visible**, on the screen a player reads before paying; no money moved | **CLOSED 10 Sep 2026** (`13` s1.1i); nothing stored, so nothing to backfill |
+| **R66** | **The game's own countdown ignored the contest.** `stateFor` sent `endsAt = gameplayEndsAt(round)`, the title's length from `startedAt`, while `playability` refuses at `expiresAt` too - so a player starting a ten-minute sprint with five minutes of contest left watched a clock counting from **10:00** and was stopped with **5:00** still showing. The pre-Start sentence read the configured length and was wrong the same way. **`hardDeadline` already returned the right answer and was called by nothing** | Medium | **LIVE and player-visible** whenever a round is started late; scores and payouts were correct throughout | **CLOSED 10 Sep 2026** (`21` s4.1p); nothing stored, so nothing to backfill |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -2217,6 +2218,68 @@ one the first person it inconveniences deletes, which is the same reasoning that
 Probed by `tools/probe-client-bundle-guard.ps1`: two probes, one restoring the admin defect
 verbatim and one reverting the main app's `import type` to a plain import, each red on exactly
 the expected test.
+
+---
+
+### R66 - The game's clock counted down to the wrong moment - **CLOSED 10 September 2026**
+
+**What it was.** `stateFor` in `games-service/src/rounds/play.ts` published
+`endsAt = gameplayEndsAt(round)` - `startedAt` plus the title's own configured length - while
+`playability`, two functions along in the same file's dependency, refuses a move once
+`round.expiresAt` has passed. The platform sets that expiry to
+`Math.min(now + maxDurationSeconds, playWindowEnd)`, so a player starting a ten-minute sprint
+with five minutes of contest left watched a clock counting down from **10:00** and was stopped
+dead with **5:00** still on it.
+
+**It is two wrong numbers and they are two separate reads**, which is the part a summary will
+merge. `endsAt` drives the ticking clock; the sentence *before* the player presses Start is
+composed by `introCopy` from `durationSeconds`, which was the configured length. So the player
+was told ten minutes in words, shown ten minutes on a clock, and given five.
+
+**The correct answer already existed and nothing called it.** `hardDeadline` in
+`lifecycle.ts` mins `[expiresAt, gameplay, ceiling]` and is documented as *"the hard ceiling
+section 6 requires: a round must be impossible to extend beyond it"*. It was exported, correct,
+and reached by no code path - the **seventh** declared-written-dead find in this programme after
+`requiresSyncPlay`, `isPaused`, `lastSuccessfulRoundAt`, `family`, `playModeOverride` and the SEO
+field. The fix is a call, not a calculation, and `playableSeconds` defers to it rather than
+repeating the three-way min, so there is one definition of *when this round stops*.
+
+**The platform was already telling the truth**, which is what makes this a contradiction rather
+than merely an omission. `RoundPreflight.tsx` computes `shortenedMs = windowEndMs - now` under
+`until_window_closes` and discloses it, so a player read the honest figure on the pre-flight
+screen, clicked Play, and was shown a different one by the game. Two screens, one round, two
+numbers - and the game's is the one they watch while deciding how to play.
+
+**Worse since R48**, and this is why it is not cosmetic. Once a partial run counts towards the
+leaderboard, the clock is not decoration: on a "solve as many as you can" title it is the only
+input to how a player **paces** themselves. Believing they have ten minutes, they spend the first
+five on care they could not afford.
+
+**The obvious over-correction is worse than the defect and is probed for.** Reporting "the time
+left in the contest" satisfies the report and every assertion above it, while telling a player
+with an hour of contest ahead of them that a two-minute sprint runs for an hour. The rule is the
+**tighter** of the two, which is exactly what `hardDeadline` already said.
+
+**Anchored on `startedAt`, never on `now`.** Re-measured from the present on every poll, the
+promise shrinks while the player watches - the round they were granted appears to be having time
+taken off it, and it is the shape of complaint nobody who is not watching that same round can
+reproduce. Floored rather than rounded, because an overstatement here is a promise the server
+then breaks.
+
+**`durationSeconds` is now sent for both titles**, where it used to be sprint-only. A fixed-set
+title has no clock in its rules, so its panel leads on the board count and quotes no time - which
+is precisely why it was easy to miss that the contest cuts a Perfect round short as readily as a
+sprint. With no length on the state the client has nothing to compare against and cannot notice,
+so the shortening gets its own sentence there rather than a corrected number.
+
+**State the harm precisely.** **Live and player-visible** from the moment any round is started
+late enough for the window to bind. Scores, ranking and payouts were correct throughout - the
+server always enforced `expiresAt` - so **nothing was stored wrongly and nothing was backfilled**.
+What it cost is a player's ability to pace a paid attempt, and their trust in the clock.
+
+**10 probes, all red on exactly the named test; 10 tests.** One probe is deliberately absent with
+its reason in the file: the floor cannot be distinguished from a round by any fixture that is not
+asserting on the suite's own clock.
 
 ---
 

@@ -1182,6 +1182,107 @@ restart** - and now a player who loaded the game minutes earlier gets the new on
 
 ---
 
+### 4.1p The clock counted down to the wrong moment - 10 September 2026
+
+**The owner's report, and it is exactly right:** *"when the admin sets that the users can enter
+at any time, the game countdown starts from the time that the admin set for the game, for example
+10 min - but when a user enters and the competition time left is 5 min, the user sees 10 min
+available. When the user enters late and the time of the competition is less than the game's
+default time, it must show the time left to end the competition, so it is not misleading."*
+
+Recorded as **R66**. What follows is what was actually wrong, which is one layer beneath the
+report and slightly larger than it.
+
+#### There were two wrong numbers, and they are two separate reads
+
+A summary will merge these. They fail independently and each needed its own fix.
+
+| What the player sees | Where it came from | Why it was wrong |
+|---|---|---|
+| The **ticking clock** on the board | `endsAt` on `PlayState`, set to `gameplayEndsAt(round)` | `startedAt` plus the title's configured length, with no reference to the contest at all |
+| The **sentence before Start** - "You have ten minutes" | `introCopy` reading `durationSeconds` | The configured length, which is what the *title* asks for and not what this round will get |
+
+So a player starting a ten-minute sprint with five minutes of contest remaining was told ten
+minutes in words, shown a clock counting from 10:00, and stopped by the server at 5:00.
+
+#### The correct answer already existed and nothing called it
+
+`hardDeadline` in `lifecycle.ts` mins `[expiresAt, gameplay, ceiling]`, is documented as *"the
+hard ceiling section 6 requires: a round must be impossible to extend beyond it"*, and was
+**reached by no code path**. This is the seventh declared-written-dead field or function found in
+this programme, after `requiresSyncPlay`, `isPaused`, `lastSuccessfulRoundAt`, `family`,
+`playModeOverride` and the SEO description.
+
+The general form is worth carrying, because it is now a pattern rather than an anecdote: **a
+helper that is exported, correct and uncalled is not dormant, it is evidence that the caller
+computed the answer itself.** Go and look at the caller. In every one of these seven cases the
+thing beside it was wrong, and finding the dead symbol was faster than finding the defect.
+
+The fix is therefore a **call, not a calculation**. `playableSeconds` defers to `hardDeadline`
+rather than repeating the three-way min, so there is exactly one definition of *when this round
+stops*, and a fourth constraint added later reaches the clock, the promise and the gate together.
+
+#### The platform was already telling the truth, which makes this a contradiction
+
+`components/games/RoundPreflight.tsx` computes `shortenedMs = windowEndMs - now` under
+`until_window_closes` and discloses it. The player read the honest figure on the pre-flight
+screen, clicked Play, and was shown a different one by the game. **Two screens, one round, two
+numbers** - and the game's is the one they watch while deciding how to play.
+
+#### It is not cosmetic, and R48 is the reason
+
+Once a partial run counts towards the leaderboard, the clock is not decoration. On a "solve as
+many boards as you can" title it is the sole input to how a player **paces** themselves: believing
+they have ten minutes, they spend the first five on care they cannot afford, and the difference
+lands in their score. Before R48 a cut-short round was discarded and the wrong clock cost them
+nothing they were keeping.
+
+#### The obvious over-correction is worse than the defect
+
+Reporting "the time left in the contest" fixes the reported case, satisfies every assertion above
+it, and tells a player with an hour of contest ahead of them that a two-minute sprint runs for an
+hour. The rule is the **tighter of the two deadlines**, which is what `hardDeadline` already said.
+It is probed for, twice - the control test asserting an unshortened round still promises its full
+length is the one that fails.
+
+#### Three properties that a review will read as fussiness
+
+- **Anchored on `startedAt`, never on `now`.** Re-measured from the present on every poll, the
+  promise shrinks while the player watches, so the round they were granted appears to be having
+  time taken off it. That is the shape of complaint nobody who is not watching the same round can
+  reproduce.
+- **Floored, never rounded.** Rounding overstates by up to a second, and an overstatement here is
+  a promise the server then breaks. No probe exists for this and the reason is in the file: the
+  only fixture that distinguishes floor from round is one asserting on the clock the suite itself
+  runs against.
+- **A promised length of zero is honoured, not treated as absent.** A falsy check reads as
+  defensive and reinstates the full-length promise at the one moment it is most wrong. Zero is
+  reachable - the window can close between the state being read and the panel being drawn.
+
+#### Both titles now report a length, where it used to be sprint-only
+
+A fixed-set title has no clock in its rules, so its panel leads on the board count and quotes no
+time. That is exactly why it was easy to miss that the contest cuts a **Perfect** round short as
+readily as a sprint: with no length on the state the client has nothing to compare against and
+cannot notice it is being shortened. The shortening therefore gets its **own sentence** there
+rather than a corrected number.
+
+#### What was built
+
+| File | Change |
+|---|---|
+| `src/rounds/lifecycle.ts` | `playableSeconds()`, deferring to `hardDeadline` and anchoring on `startedAt` |
+| `src/rounds/play.ts` | `endsAt` reads `hardDeadline`; `durationSeconds` sent for both titles; new `playableSeconds` field |
+| `public/play/presentation.js` | `introCopy` states the granted length and, when it is shorter, says the competition is why |
+
+**10 tests, 10 probes red on exactly the named test.** Nothing here is in the platform
+repository, so `check:mirrors` and every platform test say nothing about any of it.
+
+**Not verified by eye.** The surface is reachable only with a signed launch token, and the case
+itself needs a contest whose window is closing.
+
+---
+
 ## 5. What this does NOT prove
 
 Stating this matters, because a green harness invites the conclusion that X4 is a formality.

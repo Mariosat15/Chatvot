@@ -396,6 +396,93 @@ async function main(): Promise<void> {
     assert.match(sprint.limit, /highest score wins/i);
   });
 
+  test("the length stated is the one the player will get, not the title's own", () => {
+    /*
+     * THE OWNER'S REPORT, 10 September 2026. A player joining a contest with five minutes to run
+     * was told in writing that they had ten, and then cut off mid-board.
+     *
+     * The worst part is that the platform's own pre-flight panel had already stated the shortened
+     * figure moments before. Two screens, one round, two numbers - and this is the one in front of
+     * the player when they press Start.
+     */
+    const short = p.introCopy({
+      title: "Circuit Sprint",
+      durationSeconds: 600,
+      playableSeconds: 300,
+    });
+    assert.match(short.limit, /5 minutes/, `stated the wrong length: ${short.limit}`);
+    assert.doesNotMatch(short.limit, /10 minutes/, `stated the title's length: ${short.limit}`);
+
+    // And it says WHY. "You have five minutes" on a title the player knows is a ten-minute game
+    // reads as a fault in the game rather than as the contest running out.
+    assert.match(short.limit, /competition closes/i, `no reason given: ${short.limit}`);
+  });
+
+  test("a round that is not being cut short says nothing about the competition", () => {
+    /*
+     * The control. Without it, "always mention the competition" passes the test above while
+     * telling every player of every full-length round that their time is being taken away.
+     */
+    const full = p.introCopy({
+      title: "Circuit Sprint",
+      durationSeconds: 120,
+      playableSeconds: 120,
+    });
+    assert.match(full.limit, /2 minutes/);
+    assert.doesNotMatch(full.limit, /competition/i, `an unshortened round blamed the contest`);
+  });
+
+  test("a promised length of zero is honoured rather than falling back", () => {
+    /*
+     * `playableSeconds` is authoritative WHENEVER THE SERVER SENT IT, including zero. Reaching for
+     * the nominal length on a falsy value is the version that looks defensive and quietly
+     * reinstates the promise the server cannot keep - and zero is reachable, because the contest
+     * window can close between the state being read and the panel being drawn.
+     */
+    const none = p.introCopy({
+      title: "Circuit Sprint",
+      durationSeconds: 600,
+      playableSeconds: 0,
+    });
+    assert.doesNotMatch(none.limit, /10 minutes/, `fell back to the title's length: ${none.limit}`);
+    assert.equal(none.limit, "", `promised time it does not have: ${none.limit}`);
+  });
+
+  test("a fixed-set title is told about the contest separately, or not at all", () => {
+    /*
+     * Circuit Perfect leads on its board count and makes no claim about time, so a shortened
+     * Perfect round cannot be corrected by changing a number - the sentence has to be added. A
+     * player with two minutes left being told to finish three boards is the same defect wearing
+     * different copy.
+     */
+    const short = p.introCopy({
+      title: "Circuit Perfect",
+      boardTarget: 3,
+      durationSeconds: 300,
+      playableSeconds: 120,
+    });
+    assert.match(short.limit, /3 boards/);
+    assert.match(short.limit, /2 minutes/, `the shortening was not stated: ${short.limit}`);
+
+    const full = p.introCopy({
+      title: "Circuit Perfect",
+      boardTarget: 3,
+      durationSeconds: 300,
+      playableSeconds: 300,
+    });
+    assert.match(full.limit, /3 boards/);
+    assert.doesNotMatch(full.limit, /competition/i, "an unshortened round blamed the contest");
+  });
+
+  test("a state with no promised length still reads correctly", () => {
+    // Backwards compatibility in the direction that matters: a browser holding an older
+    // `presentation.js` is a solved problem, but a state from an older SERVER is not, and the
+    // panel must not go blank.
+    const legacy = p.introCopy({ title: "Circuit Sprint", durationSeconds: 120 });
+    assert.match(legacy.limit, /2 minutes/);
+    assert.doesNotMatch(legacy.limit, /competition/i);
+  });
+
   test("a duration reads as a person would say it", () => {
     assert.equal(p.formatDuration(60), "1 minute");
     assert.equal(p.formatDuration(120), "2 minutes");
