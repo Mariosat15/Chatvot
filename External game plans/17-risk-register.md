@@ -37,6 +37,7 @@ chapter covers risks to the programme and to the application.
 | **R61** | **The contest EDITOR never learned the play shape** - it offered the attempts and round-start controls on a simultaneous contest, and `applyEdit` forces both before reading what the operator sent, so the save reported success and stored something else | Medium | **LATENT** - no title declares `scheduled` yet | **CLOSED 10 Sep 2026** (task doc 12.1); nothing backfilled |
 | **R62** | **The adapter guessed how a title ranks from a hard-coded map of two game codes**, and ingestion believed it - so a third title would have had every player scored on their WORST attempt under `best_of_n`, uniformly enough that no board looked reversed | Medium | **LATENT** - the two listed titles are the only ones synced | **CLOSED 10 Sep 2026** (task doc 13.1); nothing backfilled |
 | **R63** | **The catalogue sync discarded four of the six content fields the issued contract REQUIRES of every provider** - `tagline` and `bannerUrl` had model fields and were in neither sync allow-list, `rulesSummary` and `howToPlay` were not even on `ProviderCatalogueGame`, so an adapter could not hand them over. Our own reference provider sent all six on every sync and four were dropped, silently | Medium | **LIVE and occurring on every sync**, but nothing was lost that cannot be re-fetched | **CLOSED 10 Sep 2026**; re-sync to populate, nothing backfilled |
+| **R64** | **A player who only plays games had no performance at all.** The admin per-user Performance tab computed eleven trading figures and gated the WHOLE tab on `totalTrades === 0`, so a games-only player read "This client has no closed trades yet" while every round, score and prize stayed invisible. `05` s10 broken in its plainest form. Note task 21's premise was **false where it pointed** - the screen actually named Game Performance mentions no game | Medium | **LIVE**, but a REPORTING defect and never a payment one | **CLOSED 10 Sep 2026** (task doc 21.1); nothing stored, so nothing to backfill |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -2215,6 +2216,75 @@ one the first person it inconveniences deletes, which is the same reasoning that
 Probed by `tools/probe-client-bundle-guard.ps1`: two probes, one restoring the admin defect
 verbatim and one reverting the main app's `import type` to a plain import, each red on exactly
 the expected test.
+
+---
+
+### R64 - A games-only player had no performance at all - **CLOSED 10 September 2026**
+
+**What it was.** The admin's per-user **Performance** tab read
+`GET /api/users/[userId]/performance`, which computed eleven figures - trades, wins, losses,
+win rate, profit factor, P&L, trade ROI, net ROI, prizes - every one of them from
+`TradeHistory` and `startingCapital`. `UserFullDetailPanel.tsx` then gated the **entire tab**
+on `!perfStats || perfStats.totalTrades === 0`, rendering one card:
+
+> This client has no closed trades yet.
+
+So an operator opening a player who had only ever played provider games was shown a true
+sentence presented as the answer to *how is this player doing*, with every ranked round they
+had played, every score and every prize invisible. No error, no empty column, nothing in a
+log. It is `05` **s10** broken in its plainest form - **no performance figure may silently
+mean "trading only"**.
+
+**Two defects, not one, and the second is inside the first.** `netRoi` is prizes against entry
+fees, which is real wallet money and entirely game-agnostic, and it was hidden by a *trade*
+count as well.
+
+**State the harm precisely.** It is **live** - unlike most of this register - but it is a
+**reporting** defect and never a payment one: no prize, no fee and no wallet balance is
+computed anywhere near this screen, and **nothing was backfilled** because nothing is stored.
+What it cost is the ability to answer a support question about a player who plays games, which
+is the reason an operator opens the tab. A summary calling it cosmetic is missing that; one
+calling it a money defect is wrong.
+
+**Task 21's premise was false where it pointed, and that is the third instance.** The task list
+says the Game Performance area carries hardcoded game-specific assumptions. The screen it names
+- `GamePerformanceSection.tsx` - measures the round lifecycle and mentions no game, nothing in
+either app hardcodes Circuit-style metric labels, and the player's own result surfaces have
+rendered the reported breakdown generically since 7 September. **A fix aimed at the sentence
+would have changed the only code that was already right.** After **R7** and **R31**, carry the
+class: **check a claimed defect against the code before fixing it, and correcting one downward
+is the same documentation duty as raising one.**
+
+**The fix.** `apps/admin/lib/services/games/player-game-performance.service.ts` returns one row
+per game the player has ranked rounds in, the route serves it as a second `games` key beside
+`performance`, and `PlayerGamePerformance.tsx` renders it on **both** sides of the trades gate.
+The trading figures keep a **trading** heading, which is the other half of the s10 rule: a
+figure is generalised, or explicitly scoped and labelled to one game.
+
+**No declared metric schema, deliberately** - the full reasoning is in the task document's
+`21.1`. The short form: a per-category table of metric names is the one failure mode the
+platform is built to avoid, and it is also a second source that can disagree with what the
+provider actually sends. The rows rendered are the metrics the game reported, labelled by the
+shared `humanizeMetric`, so a test can forbid a game code appearing in the service or the
+component at all.
+
+**The coupling was deleted rather than detected.** The admin app must answer *which rounds
+produced a score* and cannot import `participant-score.service.ts`, which is unmirrored so
+there is exactly one ingestion door. Rather than a third copy of the status list plus a test to
+notice the drift, the list moved into the mirrored, model-free `round-types.ts` and the
+ingestion path now builds from it - `21` s4.1i's rule in a new place.
+
+**The guard.** `__tests__/admin/player-game-performance.test.ts` (33 tests), mostly behavioural
+against a real database because *which score is this player's best* and *does a voided round
+count* are answers about data. `tools/probe-player-game-performance.ps1` (22 probes), all red on
+exactly one failure - and probe 1 is the one that matters, because it restores the actual defect
+by putting the games block back inside the no-trades branch. A test merely asserting the panel
+renders the component is **green** against that, which is why the occurrences are counted and
+their position asserted against the gate.
+
+**Not built, and it is the same defect one screen along:** the player's own dashboard is still
+trading-shaped. That is why the service is **not mirrored** - a file mirrored before anything
+imports it is **R42** exactly, two copies agreeing while one runs.
 
 ---
 

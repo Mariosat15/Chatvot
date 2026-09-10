@@ -166,6 +166,36 @@ export const ROUND_START_POLICY_COPY: ReadonlyMap<
 ]);
 
 /**
+ * The round statuses whose score is one that counts (R48), as a literal subset.
+ *
+ * IT LIVES HERE SO THERE IS ONE DEFINITION, and the reason is the same shape as
+ * `DEFAULT_RESULT_GRACE_SECONDS` above. The rule was stated in the main app only, on
+ * `participant-score.service.ts`, which is deliberately unmirrored so there is exactly one
+ * ingestion door. But the rule is not a door - it is arithmetic - and the admin app has to
+ * answer the same question to report on a player's rounds. Without a shared statement, the
+ * admin copy would be the THIRD, after the ingestion path and the private status buckets in
+ * `game-performance.service.ts`, and drift would be silent in the worst direction: an operator
+ * screen counting a round the leaderboard ignored, or the reverse, while both render.
+ *
+ * The type is spelled out rather than imported. `RoundStatus` is derived from the round MODEL,
+ * and this module is model-free by requirement - `contest-preflight.ts` imports it and runs in
+ * a client bundle (R58). A test pins every entry against the model's own list, so a typo here
+ * cannot ship, and a second test pins the main app's export equal to this one.
+ *
+ * WHAT STAYS OUT, for two different reasons. A `voided` round has no score by construction and
+ * its attempt is handed back - it is stored with `rawScore: 0` deliberately - so a number
+ * arriving with that status is bookkeeping rather than play. An `unresolved` one is the
+ * contest's `unresolvedRoundPolicy` to decide, and counting it here answers that twice.
+ */
+export type ScoreProducingRoundStatus = "completed" | "expired" | "abandoned";
+
+export const SCORE_PRODUCING_ROUND_STATUSES: ScoreProducingRoundStatus[] = [
+  "completed",
+  "expired",
+  "abandoned",
+];
+
+/**
  * How long after the play window a late provider result is still welcome (chapter 04
  * section 2.1), when a contest does not name its own.
  *

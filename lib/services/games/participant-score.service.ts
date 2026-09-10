@@ -5,7 +5,10 @@ import GameRound, {
 import Competition from "@/database/models/trading/competition.model";
 import CompetitionParticipant from "@/database/models/trading/competition-participant.model";
 import type { ProviderScoreDirection } from "@/lib/services/game-providers/contract";
-import type { AttemptsPolicy } from "./round-types";
+import {
+  SCORE_PRODUCING_ROUND_STATUSES,
+  type AttemptsPolicy,
+} from "./round-types";
 
 /**
  * Carrying a round's score up to the contest participant, where ranking reads it.
@@ -83,11 +86,15 @@ export type ScoreSyncOutcome =
  * CREATED. And under every attempts policy, counting a cut-short run can only help the player -
  * `best_of_n` discards it if it was worse, `sum_of_n` adds it, `single` means it was their one
  * attempt.
+ *
+ * THE LIST ITSELF MOVED to `round-types.ts` on 10 September 2026, and only the list. This name
+ * is unchanged and so is its value - the move exists because the admin app has to answer the
+ * same question to report a player's rounds, and it cannot import this file: there is exactly
+ * one ingestion door and mirroring it would build a second. A shared constant is the coupling
+ * removed rather than detected, which is strictly better than a test that notices the drift.
  */
 export const SCORING_ROUND_STATUSES: RoundStatus[] = [
-  "completed",
-  "expired",
-  "abandoned",
+  ...SCORE_PRODUCING_ROUND_STATUSES,
 ];
 
 /**

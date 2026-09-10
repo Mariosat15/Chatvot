@@ -48,7 +48,7 @@ code before citing it.
 | **18** — Redesign the other screen | Not started |
 | **19** — AI on the game content screen | Not started |
 | **20** — AI must be game-agnostic | **Mostly done 8 Sep** for the contest wizard's assistant. Task 19's screen is the remaining gap |
-| **21-24** — Game Performance section | Not started |
+| **21-24** — Game Performance section | **Done, 10 Sep (R64).** `21.1`. **Task 21's premise is false where it points** - the Game Performance screen names no game, and the player's result surfaces have rendered the reported breakdown generically since 7 Sep, so 22-24 were already satisfied there. What was genuinely broken is the admin **per-user Performance tab**, which gated *the whole tab* on `totalTrades === 0`, so a games-only player read "This client has no closed trades yet". 33 tests, **22 probes red on exactly one failure**. Task 22's declared schema is a **deliberate deviation** - the metrics come from the reported breakdown, never a per-category table |
 | **25-27** — Consistency, model review, backward compatibility | Not started |
 | **28** — Settlement must be server-side | **Checked and true, for the four payout entry points.** Of the 40 files referencing `distributePrizesWithTies`, `recordUnclaimedPool`, `settleFeesAndGameMasters` or `finalizeCompetition`, **none** declares `"use client"`. Note what that does *not* cover: it names four functions, so a fifth payout path would not appear in it. A standing guard belongs with task 30 |
 | **29** — Prevent double settlement | **Done, 9 Sep.** `apps/admin`'s finalize now takes the same optimistic lock the main app does, with the release filtered on `status: "finalizing"` |
@@ -1952,6 +1952,139 @@ Competition
 → Render relevant metrics
 
 If game information is missing, handle it gracefully.
+
+---
+
+## 21.1 — WHAT WAS BUILT, 10 September 2026 (R64)
+
+**The premise of task 21 is false where it points, and that had to be established before
+anything was written.** Three checks, each independent:
+
+- The only screen in either app called **Game Performance** is
+  `apps/admin/components/admin/games/GamePerformanceSection.tsx`. Every figure on it is a
+  round-lifecycle figure that every game has — rounds started, scored, walked out, cut off,
+  never reported, average play, result latency — and there is no `gameKey ===`, no switch on a
+  game and no metric named after one.
+- Nothing anywhere hardcodes Circuit-style metric labels. `rg` for laps, best time, lines and
+  combo across `components/` and `apps/admin/components/` returns nothing.
+- The player's own round surfaces — `ProviderResultsScreen.tsx` and `RoundResultPanel.tsx` —
+  have rendered whatever the game reported, generically, through `lib/utils/humanize-metric.ts`
+  since 7 September 2026, with three distinct empty states. **Tasks 22, 23 and 24 were already
+  satisfied there.**
+
+**Correcting a claimed defect downward is the same documentation duty as raising one**, and this
+is the third instance after **R7** (an unlabelled contest was never a live payout bug) and
+**R31** (the current-package read already handled 0%). A fix aimed at the sentence would have
+changed the code that was already right.
+
+### Where the premise IS true, and it is worse than a wrong label
+
+The admin's **per-user Performance tab**. `GET /api/users/[userId]/performance` computed eleven
+figures, all of them from `TradeHistory` and `startingCapital`, and
+`UserFullDetailPanel.tsx` then gated the **whole tab**:
+
+```tsx
+) : !perfStats || perfStats.totalTrades === 0 ? (
+  <Card>…This client has no closed trades yet.</Card>
+) : (
+```
+
+So an operator opening a player who has only ever played provider games was told **"This client
+has no closed trades yet"** — a true sentence presented as the answer to *how is this player
+doing*, with every round they played, every score and every prize invisible. No error, no empty
+column, nothing in a log. That is `05` **s10** broken in its plainest form: **no performance
+figure may silently mean "trading only"** — it is either generalised, or explicitly scoped and
+labelled to one game, or removed, and there is no third option. A second defect sat inside the
+same gate: `netRoi` is wallet money and therefore game-agnostic, and it was hidden by a trade
+count too.
+
+### What was built
+
+| File | |
+|---|---|
+| `lib/services/games/round-types.ts` + admin copy | `SCORE_PRODUCING_ROUND_STATUSES`, mirrored and byte-identical |
+| `lib/services/games/participant-score.service.ts` | `SCORING_ROUND_STATUSES` now built from the shared list |
+| `apps/admin/lib/utils/humanize-metric.ts` | mirrored from the main app, byte-identical |
+| `apps/admin/lib/services/games/player-game-performance.service.ts` | one row per game the player has ranked rounds in |
+| `apps/admin/components/admin/games/PlayerGamePerformance.tsx` | renders those rows and names no game |
+| `apps/admin/app/api/users/[userId]/performance/route.ts` | `guardSection("users")`, and a second `games` key |
+| `apps/admin/components/admin/UserFullDetailPanel.tsx` | the gate split, the trading heading kept |
+
+33 tests in `__tests__/admin/player-game-performance.test.ts`, 22 probes in
+`tools/probe-player-game-performance.ps1`, **all red on exactly one failure**.
+
+### The deliberate deviation from task 22, which must not be "finished off"
+
+**The metrics are not declared anywhere, and adding a declaration would make this worse in both
+directions.** Task 22 asks the game's metadata to declare a performance schema and groups its
+examples by kind of game. Implemented literally that is a table of metric names per category,
+which is the **one failure mode the platform is built to avoid**: anything that enumerates games
+means the next game silently fails to appear while the query runs and the page renders. And a
+declared schema is a **second source** that can disagree with what the provider actually sends —
+a metric declared and never sent is a permanent blank row, one sent and never declared is real
+data hidden.
+
+The result already carries the answer. A provider reports `scoreBreakdown` as free-form JSON,
+`humanizeMetric` labels any camelCase identifier without knowing one game's field names, and so
+the rows rendered **are** the metrics the game reported. That satisfies task 22's actual
+requirement — *only show values actually supported by the game* — **by construction rather than
+by configuration**. Task 9's `category` earns its keep as the grouping and labelling key it
+already is, never as a metric selector, and a test forbids a game code, a `gameKey ===` or a
+switch on category in either the service or the component.
+
+### Seven things that drift easily
+
+- **`null` is not zero.** A stored nought is a real score on a points game, so absence renders
+  `-`. The read-side form of **R45** and **R50**, which are the two defects that arrived from
+  exactly this confusion.
+- **The raw score is stored and shown, never negated.** A time trial's best is the *minimum* and
+  it is still the positive number the player achieved; only comparison negates (`05` s2).
+- **A `voided` round stores `rawScore: 0` deliberately**, so "has a number" is not the test —
+  `SCORE_PRODUCING_ROUND_STATUSES` is. Filtering on the number alone reports a support action as
+  a result the player earned, and on a lower-is-better title that zero sorts **first** and would
+  be nominated as their best round.
+- **The breakdown is one round's, never an aggregate.** Nothing here knows what any key means,
+  so nothing here may combine them: a mean of `accuracyPercent` is arguable, a sum of it is
+  nonsense, and a sum of `bestLapMs` is nonsense that renders perfectly.
+- **The label chain ends at the code and then the key, never at "Unknown".** A row captioned
+  "Unknown game" holding real rounds cannot be investigated, and a title can legitimately leave
+  the catalogue while the history stays (**R29**, and `gameKey` is immutable).
+- **No money on it**, and that is an RBAC decision rather than a layout one: this screen is
+  granted by `users` while prizes and fees stay behind `analytics` and `financial`.
+- **`userId` is declared `String` on `game_round`**, so it is matched as the string it arrives
+  as. An ObjectId conversion here matches nothing while logging nothing — the boundary that has
+  now bitten three times in the other direction.
+
+### The coupling was deleted rather than detected
+
+The admin app has to answer *which rounds produced a score* and **cannot import**
+`participant-score.service.ts`, which is deliberately unmirrored so there is exactly one
+ingestion door. A third copy plus a test noticing the drift was the obvious move; the list moved
+into the mirrored, model-free `round-types.ts` instead and the ingestion path builds from it —
+`s4.1i`'s rule, **prefer deleting a coupling to detecting it**. The type is spelled out as a
+literal union rather than importing `RoundStatus`, because `round-types.ts` is reached from a
+client bundle through `contest-preflight.ts` and must stay model-free (**R58**).
+
+### Two probing lessons, both recurrences
+
+- **A green probe's fourth cause: the mutation changed no observable.** Collapsing the
+  empty-breakdown check left the suite green because the fixture had `{}` on the *losing* round,
+  so that path was never reached.
+- **And then a fixture that could not express the case at all.** Mongoose's `minimize` default
+  **deletes an empty object before saving**, so `scoreBreakdown: {}` cannot be stored through
+  the model and a fixture going through it silently tests the *absent* case instead. Seeded with
+  the raw driver, which is the one situation where that is the honest fixture rather than a way
+  to prove anything — and the check is recorded in the test as a **tripwire**, since `minimize`
+  is an unstated dependency somebody could flip for an unrelated reason.
+
+### Not built
+
+- **The player's own dashboard has the same gap** and is the natural next slice. That is why the
+  service is **not mirrored**: a file mirrored before anything imports it is **R42** exactly —
+  two copies agreeing with each other while only one of them runs.
+- **No cross-game total and no ranking**, which is chapter `05` and risk **X13**, not this task.
+- **Never verified by eye**: the screen is behind an admin sign-in the automated browser has no
+  session for.
 
 ---
 

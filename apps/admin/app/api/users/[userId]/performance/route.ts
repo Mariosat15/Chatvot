@@ -8,28 +8,46 @@ import {
   computeProfitFactor,
   computeWinRate,
 } from "@/lib/services/trading-metrics";
-import { verifyAdminAuth } from "@/lib/admin/auth";
+import { guardSection } from "@/lib/admin/section-route-guard";
+import { getPlayerGamePerformance } from "@/lib/services/games/player-game-performance.service";
 
 /**
  * GET /api/users/[userId]/performance
  *
- * Returns the SAME trading-performance metrics the customer sees on their
- * dashboard "Performance" rings, so an admin can review any client's numbers:
- * Win Rate, Net ROI (wallet: prizes vs entry fees), Trade ROI (trading PnL vs
- * starting capital), Profit Factor, Average Win/Loss, Best/Worst trade.
+ * TWO BLOCKS, EACH LABELLED, and the second one is why this file changed on 10 September 2026.
  *
- * Reason: uses the shared trading-metrics helpers + the financial-summary
- * service so admin and customer can never disagree on the same user's stats.
+ * `performance` is the trading block, unchanged character for character: Win Rate, Net ROI
+ * (wallet: prizes vs entry fees), Trade ROI (trading PnL vs starting capital), Profit Factor,
+ * Average Win/Loss, Best/Worst trade - the same figures the customer sees on their dashboard
+ * rings, computed through the shared trading-metrics helpers and the financial-summary service
+ * so admin and customer can never disagree about one user.
+ *
+ * `games` is every provider game the player has actually played. It was added because the
+ * trading block was the WHOLE answer: an operator opening a player who only plays games was
+ * told "This client has no closed trades yet", with every round, score and prize invisible.
+ * `05` s10 forbids exactly that - no performance figure may silently mean "trading only".
+ *
+ * The two are returned as separate keys rather than merged, deliberately. A win rate and a best
+ * lap time are not two values of one metric, and a merged shape would need a common denominator
+ * that does not exist - which is how a trading-shaped aggregate gets built by accident.
+ *
+ * GRANT: `users`, the section that owns the calling screen. It authenticated with
+ * `verifyAdminAuth` until 10 September 2026, which asks whether the caller is an admin at all
+ * and not whether they hold the grant - so an employee granted one unrelated section could read
+ * any client's full financial performance. That is the tenth instance of that class here, after
+ * Prerequisite A, the internal-secret fallbacks, the suspicion-score route, the provider admin
+ * routes, the contest-edit route, R40's seven lifecycle routes, R47's sync-referrals, R51's five
+ * AI routes and R57's image optimizer. It is found by counting handlers against guards, never by
+ * reading routes - every neighbour having something is what carries a reader past the one that
+ * has the wrong thing.
  */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> },
 ) {
   try {
-    const admin = await verifyAdminAuth();
-    if (!admin.isAuthenticated) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await guardSection("users");
+    if (!guard.ok) return guard.response;
 
     const { userId } = await params;
     if (!userId) {
@@ -43,7 +61,7 @@ export async function GET(
 
     // TradeHistory is the SINGLE SOURCE OF TRUTH for trade stats (matches the
     // customer dashboard, profile and leaderboard).
-    const [tradeAgg, capAgg, challengeCapAgg, financialSummary] =
+    const [tradeAgg, capAgg, challengeCapAgg, financialSummary, games] =
       await Promise.all([
         TradeHistory.aggregate([
           { $match: { userId } },
@@ -95,6 +113,7 @@ export async function GET(
           { $group: { _id: null, capital: { $sum: "$startingCapital" } } },
         ]),
         getUserFinancialSummary(userId),
+        getPlayerGamePerformance(userId),
       ]);
 
     const stats = tradeAgg[0] || {
@@ -144,6 +163,7 @@ export async function GET(
         totalPnL: stats.totalPnL,
         totalPrizesWon: financialSummary.totalPrizesWon,
       },
+      games,
     });
   } catch (error) {
     console.error("❌ Error fetching user performance:", error);

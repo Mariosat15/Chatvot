@@ -72,6 +72,14 @@ import { toast } from "sonner";
 import { UserData, Assignment } from "./UsersSection";
 import { CustomerAssignmentCard } from "./CustomerAssignmentBadge";
 import ChargebacksTab from "./chargebacks/ChargebacksTab";
+// Reason: aliased rather than "./games/..." on purpose. Invariant 1's
+// no-restricted-imports rule matches the import STRING, not the resolved path, and
+// its exemption for this UI folder is written "!**/components/admin/games/**" - which
+// a relative "./games/..." does not satisfy. Tidying this back to a sibling import
+// fails the lint with a message about game modules, which this is not.
+import PlayerGamePerformance, {
+  type PlayerGamePerformanceRowView,
+} from "@/components/admin/games/PlayerGamePerformance";
 import { CustomerAuditTrail } from "./CustomerAuditTrail";
 import { TransferCustomerDialog } from "./TransferCustomerDialog";
 import TransactionDetailDialog, {
@@ -579,8 +587,14 @@ export default function UserFullDetailPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, user.id]);
 
-  // ── Performance metrics (mirrors the customer dashboard rings) ──────────
+  // ── Performance: trading metrics (the customer dashboard rings) and games ──
+  //
+  // Two pieces of state rather than one, because they are two answers. The trading block can
+  // legitimately be empty for a player who only plays games, and the games list can be empty
+  // for a pure trader - so a single "no data" flag covering both is what produced the defect
+  // this tab had: `totalTrades === 0` hid every game the player had ever played.
   const [perfStats, setPerfStats] = useState<PerformanceStats | null>(null);
+  const [perfGames, setPerfGames] = useState<PlayerGamePerformanceRowView[]>([]);
   const [perfLoading, setPerfLoading] = useState(false);
   const fetchPerformance = useCallback(async () => {
     if (!user.id) return;
@@ -590,6 +604,7 @@ export default function UserFullDetailPanel({
       const data = await res.json();
       if (data.success) {
         setPerfStats(data.performance as PerformanceStats);
+        setPerfGames((data.games ?? []) as PlayerGamePerformanceRowView[]);
       } else {
         toast.error("Failed to load performance stats");
       }
@@ -2497,9 +2512,17 @@ export default function UserFullDetailPanel({
                           <BarChart3 className="h-5 w-5 text-purple-400" />
                           Trading Performance
                         </h3>
+                        {/*
+                          The heading names TRADING deliberately. These eleven figures are
+                          questions about a trading account - a win rate, a profit factor, a
+                          P&L - and a puzzle has no answer to any of them. Captioning them as
+                          the client's performance is what `05` s10 forbids: a figure is
+                          generalised, or explicitly scoped to one game, or removed. Game
+                          performance is its own block below, on its own metrics.
+                        */}
                         <p className="text-xs text-gray-500 mt-1">
                           The same metrics this client sees on their dashboard
-                          rings.
+                          rings. Games are measured separately, below.
                         </p>
                       </div>
                       <Button
@@ -2521,12 +2544,22 @@ export default function UserFullDetailPanel({
                         Loading performance…
                       </div>
                     ) : !perfStats || perfStats.totalTrades === 0 ? (
-                      <Card className="bg-gray-800/50 border-gray-700">
-                        <CardContent className="p-8 text-center text-gray-400">
-                          <Activity className="h-8 w-8 mx-auto mb-2 text-gray-500" />
-                          This client has no closed trades yet.
-                        </CardContent>
-                      </Card>
+                      /*
+                        THE EMPTY TRADING BLOCK, NOT AN EMPTY TAB. Until 10 September 2026 this
+                        branch was the whole tab: a player who had only ever played provider
+                        games was reported as having no performance at all, with every round,
+                        score and prize invisible - no error and nothing in a log. The games
+                        block now renders beside it, and the sentence is scoped to trading.
+                      */
+                      <>
+                        <Card className="bg-gray-800/50 border-gray-700">
+                          <CardContent className="p-8 text-center text-gray-400">
+                            <Activity className="h-8 w-8 mx-auto mb-2 text-gray-500" />
+                            This client has no closed trades yet.
+                          </CardContent>
+                        </Card>
+                        <PlayerGamePerformance games={perfGames} />
+                      </>
                     ) : (
                       <>
                         {/* Metric tiles — mirrors the dashboard performance rings */}
@@ -2666,6 +2699,8 @@ export default function UserFullDetailPanel({
                           trading P&amp;L vs virtual starting capital (this is
                           what the leaderboard and ROI competitions use).
                         </div>
+
+                        <PlayerGamePerformance games={perfGames} />
                       </>
                     )}
                   </div>

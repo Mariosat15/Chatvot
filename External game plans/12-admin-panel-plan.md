@@ -2270,6 +2270,70 @@ forwards. It now mutates the shared rule, which is the property that matters onc
 consumers. Left un-updated it would have reported `DID NOT APPLY`, which reads like a broken
 harness rather than a moved target.
 
+### 5.1d What was built - 10 September 2026, a player's performance in each game (R64)
+
+Section 5 asks for analytics *by game* and a Game Performance screen, both of which s5.1a
+delivered. **It does not mention the per-user Performance tab at all, and that is where the
+rule this whole section exists to serve was being broken.**
+
+`GET /api/users/[userId]/performance` computed eleven figures, every one from `TradeHistory`
+and `startingCapital`, and `UserFullDetailPanel.tsx` gated **the entire tab** on
+`totalTrades === 0`. An operator opening a player who had only ever played provider games was
+shown one card - *"This client has no closed trades yet"* - with every ranked round, score and
+prize invisible. That is `05` **s10** in its plainest form: **no performance figure may
+silently mean "trading only"**. Risk **R64**, and the full account is in the owner's task
+document at **21.1**.
+
+**Task 21's premise is false where it points**, which had to be established before anything was
+written: `GamePerformanceSection.tsx` from s5.1a measures the round lifecycle and names no game,
+nothing in either app hardcodes Circuit-style metric labels, and the player's own result
+surfaces have rendered the reported breakdown generically since 7 September. Third instance
+after **R7** and **R31**, so carry the class - **a claimed defect is a claim about the code**,
+and correcting one downward is the same duty as raising one.
+
+**What was built**
+
+| File | |
+|---|---|
+| `apps/admin/lib/services/games/player-game-performance.service.ts` | one row per game the player has ranked rounds in |
+| `apps/admin/components/admin/games/PlayerGamePerformance.tsx` | renders those rows, and names no game |
+| `apps/admin/lib/utils/humanize-metric.ts` | mirrored from the main app, so an operator and a player read the same label |
+| `apps/admin/app/api/users/[userId]/performance/route.ts` | `guardSection("users")`, and a second `games` key beside `performance` |
+| `apps/admin/components/admin/UserFullDetailPanel.tsx` | the gate split; the trading figures keep a trading heading |
+| `lib/services/games/round-types.ts` + mirror | `SCORE_PRODUCING_ROUND_STATUSES`, the one definition |
+
+**Six things worth carrying**
+
+- **No declared metric schema, deliberately.** A per-category table of metric names is the
+  single failure mode this plan is built to avoid, and it is *also* a second source that can
+  disagree with what the provider sends - a metric declared and never sent is a permanent blank
+  row, one sent and never declared is real data hidden. The reported `scoreBreakdown` is the
+  only source. Task 9's `category` stays the grouping and labelling key, **never a metric
+  selector**.
+- **The games block renders on both sides of the trades gate**, and the guard **counts** the
+  occurrences and asserts their **position** against the gate. A test asserting the panel
+  merely renders the component is **green** on the original defect, because the component would
+  be there, in the branch nobody reaches.
+- **The trading figures keep a trading heading.** That is the other half of the s10 rule: a
+  figure is generalised, or explicitly scoped and labelled to one game, and there is no third
+  option.
+- **No money on the screen**, which is an RBAC decision rather than a layout one - this tab is
+  granted by `users`, and prizes and fees stay behind `analytics` and `financial`, exactly as
+  s5.1a decided for Game Performance and s5.1b for the overview. **Ninth** screen where that
+  question has come up and the answer has been the same every time.
+- **The route was granted by `verifyAdminAuth`**, which is admin-at-all rather than section
+  access. **Tenth instance** of that class, found by counting exported handlers against guards
+  rather than by reading the route.
+- **The coupling was deleted rather than detected.** The admin app must answer *which rounds
+  produced a score* and cannot import `participant-score.service.ts`, which is unmirrored so
+  there is exactly one ingestion door - so the status list moved into the mirrored, model-free
+  `round-types.ts` and the ingestion path builds from it, rather than a third copy plus a test
+  noticing the drift.
+
+**Not built.** The player's own dashboard has the same gap, which is why the service is
+deliberately **not mirrored**: a file mirrored before anything imports it is **R42** exactly.
+33 tests, 22 probes, all red on exactly one failure. Never verified by eye.
+
 ---
 
 ## 6. Settings that need a game dimension
