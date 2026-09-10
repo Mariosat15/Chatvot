@@ -754,6 +754,78 @@ Newest at the top.
 
 ---
 
+### 10 Sep 2026 - R65 - THE ENTRY PANEL TOLD A GAME PLAYER TWO UNTRUE THINGS
+
+**Shipped.** `13` s1.1i. The entry countdown now explains **which rule** shut the door, and the
+trading-capital promise is withheld from a game contest. 16 tests, 12 probes red on exactly one
+failure, main typecheck at the **194** baseline exactly with the lists diffed, full suite 2061.
+
+**Files touched.** `lib/utils/registration-deadline.ts` (`describeEntryClose`),
+`components/trading/CompetitionEntryButton.tsx`,
+`__tests__/games/entry-close-explanation.test.ts`,
+`tools/probe-entry-close-explanation.ps1`. **Nothing is mirrored** - both files are main-app
+only, so `check:mirrors` correctly says nothing about either.
+
+**The owner's report.** The panel carried one **unconditional** sentence under the entry
+countdown: *"After that no new entries are accepted, whether or not the competition is still
+running."* There are two round-start policies and it describes neither. Under
+`until_window_closes` the deadline **is** the moment play stops, so the clause names a gap that
+does not exist. Under `reserve_full_round` the gap is real and the sentence never gives the
+reason, so a player who can see time left on the clock reads an arbitrary lock-out instead of the
+rule that protects them.
+
+**THE RULE WAS ALREADY CORRECT, AND THAT IS THE FINDING.** The owner also asked for entry to
+close hard under "everybody gets the full time", *like a trading competition*. It already does:
+`resolveContestEntryDeadline` has reserved a whole attempt since `12` s2.10, and
+`contest-entry.service.ts` refuses past it with "Registration for this competition has closed".
+Verified end to end - deadline writer, join guard, both screens - **before anything was written**,
+because a report is a claim about the code rather than a fact about it. What was missing was
+never the rule; it was that no screen said so. Third instance after R7 and R31, and a fix aimed
+at the deadline would have changed the one thing already right.
+
+**The second defect, found while reading the file.** The panel's closing note said *"You will
+receive $0 in trading capital to compete"* on every game contest. `startingCapital` is `required`
+only while the contest is trading, and the model says why in as many words - *"an invented number
+is worse than an absent one: it renders in any summary that has not yet learned about games."*
+This panel was such a summary, and `|| 0` did the inventing. **Live and player-visible**, on the
+one screen a player reads before paying. Withheld rather than relabelled: what a game player gets
+for their fee is attempts, and the play screen already derives that.
+
+**Findings that generalise.**
+
+- **The explanation belongs beside the deadline, not beside the screen.** The span is measured
+  from the instant `resolveRegistrationDeadline` returns, including the legacy clamp against
+  `startTime` that widens it past one round on a short contest. Two producers here means a
+  countdown and the sentence under it describing different instants, millimetres apart.
+- **Read the stored policy; never infer it from the arithmetic.** A reserving contest is exactly
+  the one whose deadline precedes its end - and so is a contest with no declared attempt length,
+  which behaves permissively because the gate reserves `?? 0` as well.
+- **Count the misleading clause, do not ban it.** It is correct for a trading contest whose
+  operator chose a deadline; a blanket ban fails on correct code and gets deleted.
+- **Guard the capital clause alone.** Guarding the whole box is the smaller diff and silently
+  removes the non-refundable warning from every game.
+- **One probe deliberately absent, with the reason in the file.** Deleting the
+  `until_window_closes` early return is green - the fourth cause, a mutation with no observable -
+  yet the branch is the only thing that answers correctly when a permissive contest's deadline
+  precedes its end.
+
+**Two harness notes, both of which had already produced a false result here.** An **emoji in the
+anchor did not survive the shell**, so probe 13 reported `DID NOT APPLY` - keep anchors ASCII.
+And a `tsc` count of 195 against a 194 baseline was **one error in the new test file** (an `s`
+regex flag needing an es2018 target), found by `git stash push --include-untracked` and
+`Compare-Object`, not by reading the count.
+
+**Not built.** The countdowns are still inline text, not the trading page's four-cell clock. That
+is the owner's other request and is its own slice: `LiveCountdown` computes from `new Date()`,
+and the game screens deliberately run on `useServerClock`, so the **appearance** has to be
+extracted rather than the component reused. **Never verified by eye.**
+
+**Next chat should:** take the in-game clock (`games-service` `play.ts` exposes
+`gameplayEndsAt(round)` where `hardDeadline(round)` is the honest figure), then the big-clock
+extraction, then the two live-refresh reports.
+
+---
+
 ### 10 Sep 2026 - TASKS 21-24 / R64 - A GAMES-ONLY PLAYER HAD NO PERFORMANCE AT ALL
 
 **Shipped:** the admin's per-user **Performance** tab now reports the games a player has

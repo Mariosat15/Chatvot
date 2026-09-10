@@ -38,6 +38,7 @@ chapter covers risks to the programme and to the application.
 | **R62** | **The adapter guessed how a title ranks from a hard-coded map of two game codes**, and ingestion believed it - so a third title would have had every player scored on their WORST attempt under `best_of_n`, uniformly enough that no board looked reversed | Medium | **LATENT** - the two listed titles are the only ones synced | **CLOSED 10 Sep 2026** (task doc 13.1); nothing backfilled |
 | **R63** | **The catalogue sync discarded four of the six content fields the issued contract REQUIRES of every provider** - `tagline` and `bannerUrl` had model fields and were in neither sync allow-list, `rulesSummary` and `howToPlay` were not even on `ProviderCatalogueGame`, so an adapter could not hand them over. Our own reference provider sent all six on every sync and four were dropped, silently | Medium | **LIVE and occurring on every sync**, but nothing was lost that cannot be re-fetched | **CLOSED 10 Sep 2026**; re-sync to populate, nothing backfilled |
 | **R64** | **A player who only plays games had no performance at all.** The admin per-user Performance tab computed eleven trading figures and gated the WHOLE tab on `totalTrades === 0`, so a games-only player read "This client has no closed trades yet" while every round, score and prize stayed invisible. `05` s10 broken in its plainest form. Note task 21's premise was **false where it pointed** - the screen actually named Game Performance mentions no game | Medium | **LIVE**, but a REPORTING defect and never a payment one | **CLOSED 10 Sep 2026** (task doc 21.1); nothing stored, so nothing to backfill |
+| **R65** | **The entry panel promised every game entrant "$0 in trading capital to compete"**, because `startingCapital` is `required` only while the contest is trading and the panel's `\|\| 0` turned the absent field into a number. Beside it, one unconditional sentence claimed no entries are taken "whether or not the competition is still running" - false under `until_window_closes`, where the deadline IS the moment play stops, and silent about the reason under `reserve_full_round`, where the gap exists to stop somebody paying for a contest they cannot finish a round in | Medium | **LIVE and player-visible**, on the screen a player reads before paying; no money moved | **CLOSED 10 Sep 2026** (`13` s1.1i); nothing stored, so nothing to backfill |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -2216,6 +2217,79 @@ one the first person it inconveniences deletes, which is the same reasoning that
 Probed by `tools/probe-client-bundle-guard.ps1`: two probes, one restoring the admin defect
 verbatim and one reverting the main app's `import type` to a plain import, each red on exactly
 the expected test.
+
+---
+
+### R65 - The entry panel told a game player two untrue things - **CLOSED 10 September 2026**
+
+**Two defects on one panel, reported and found in the same reading.** The owner's report was the
+wording; the second was found while reading the file to fix it, which is the fifth time opening
+a screen to generalise it has been a better bug-finding instrument than looking for bugs.
+
+**The one the owner reported.** `CompetitionEntryButton.tsx` counted down to the entry deadline
+and put one **unconditional** sentence underneath it:
+
+> After that no new entries are accepted, whether or not the competition is still running.
+
+On a game contest that is wrong in **both** directions, because there are two round-start
+policies and the sentence describes neither.
+
+- Under **`until_window_closes`** the deadline **is** the moment play stops, so the clause
+  describes a gap that does not exist. A player reads it as being shut out early from a
+  competition they can in fact join right up to the end.
+- Under **`reserve_full_round`** the gap is real - the door shuts one whole attempt before play
+  ends - and the sentence never gives the reason. A player who can see time left on the clock
+  reads an arbitrary lock-out rather than the rule that **protects** them: entry closes early
+  precisely so that nobody pays to enter a contest they would have too little time to finish a
+  round in.
+
+**The rule itself was already correct and is not what changed.** `resolveContestEntryDeadline`
+has reserved a whole attempt under `reserve_full_round` since `12` s2.10, and
+`contest-entry.service.ts` refuses past it with "Registration for this competition has closed".
+Proven end to end before anything was written, because **a report is a claim about the code
+rather than a fact about it** - and here the claim was about the *surface*, not the rule. A fix
+aimed at the deadline would have changed the one thing that was already right, which is the R7
+and R31 shape for the third time.
+
+**The one found while reading.** The panel's closing note read:
+
+> Entry fee is non-refundable. You will receive $0 in trading capital to compete.
+
+`startingCapital` is `required` only while `gameType` is trading, and the model says in as many
+words why: *"an invented number is worse than an absent one: it renders in any summary that has
+not yet learned about games."* This panel was such a summary - `competition.startingCapital || 0`
+turned the deliberately absent field into a promise of nothing, shown to every player about to
+pay to enter a puzzle. **Withheld rather than relabelled**, because what a game player gets for
+their fee is attempts, and the attempts line already exists on the play screen where it is
+derived from the contest rather than guessed here.
+
+**State the harm precisely.** **Live and player-visible**, on the one screen a player reads
+before parting with an entry fee - so a summary calling it cosmetic is wrong. No money moved,
+no gate behaved differently and **nothing was backfilled**, because nothing here is stored.
+
+**Where the explanation lives, and why.** `describeEntryClose` sits in
+`lib/utils/registration-deadline.ts`, beside `resolveRegistrationDeadline`, so the span it
+reports is measured from the very instant the countdown counts to and the gate compares
+against. That includes the **legacy clamp** against `startTime`, which widens the reserved span
+beyond one round on a contest shorter than a round - a module recomputing the deadline in order
+to describe it is the "one rule, two copies" shape this file was extracted to prevent.
+
+**It reads the stored policy and never infers one from the arithmetic**, which is the tempting
+shortcut: a reserving contest is exactly the one whose deadline sits before its end. But the two
+coincide whenever nothing declares an attempt length, and such a contest behaves **permissively**
+because the round-start gate reserves `attemptSeconds ?? maxDurationSeconds ?? 0` too. Describing
+that as "we held a round back for you" is a promise no gate keeps.
+
+**One probe is deliberately absent with its reason recorded.** Deleting the
+`until_window_closes` early return leaves the suite green - the **fourth cause** of a green
+probe, a mutation that changes no observable, since a permissive contest's stored deadline is
+its window end and the arithmetic below falls through to the same answer. The branch is not
+decoration: it is the only thing that answers correctly when a permissive contest's deadline
+sits before its end, which is probe 5 and is red. A green line in a probe list teaches the next
+reader the branch can be removed.
+
+**12 probes, all red on exactly one failure; 16 tests.** Never verified by eye - the screen is
+behind sign-in and the automated browser has no session.
 
 ---
 

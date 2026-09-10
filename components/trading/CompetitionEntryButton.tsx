@@ -28,7 +28,11 @@ import ActionTermsDialog, {
 } from "@/components/ActionTermsDialog";
 import { isProviderContest } from "@/lib/services/games/contest-config";
 import InlineCountdown from "@/components/trading/InlineCountdown";
-import { resolveRegistrationDeadline } from "@/lib/utils/registration-deadline";
+import {
+  describeEntryClose,
+  resolveRegistrationDeadline,
+} from "@/lib/utils/registration-deadline";
+import { formatRemaining } from "@/hooks/useServerClock";
 import { formatVolts } from "@/lib/utils/format-volts";
 
 // Level names for display
@@ -183,6 +187,22 @@ export default function CompetitionEntryButton({
   const entryDeadline = resolveRegistrationDeadline(competition);
   const showEntryCountdown =
     !isUserIn && !registrationClosed && (isActive || isUpcoming);
+
+  /*
+    WHY THE DOOR SHUTS WHEN IT DOES, which the panel stated wrongly rather than not at all.
+
+    The old sentence - "after that no new entries are accepted, whether or not the competition
+    is still running" - is unconditional, and on a game contest it is wrong in both directions.
+    Under `until_window_closes` the deadline IS the moment play stops, so the clause describes
+    a gap that does not exist. Under `reserve_full_round` the gap is real and the sentence
+    never gives the reason, so a player who can see time left on the clock reads an arbitrary
+    lock-out rather than the rule that protects them: entry closes early precisely so that
+    nobody pays to join a contest they would have too little time to finish a round in.
+
+    Resolved from the same module as the deadline, so the countdown and the sentence under it
+    cannot disagree.
+  */
+  const entryClose = describeEntryClose(competition);
 
   // Check if user is disqualified (liquidated or disqualified status)
   const isDisqualified =
@@ -439,10 +459,32 @@ export default function CompetitionEntryButton({
                   <span className="ml-1 text-gray-500">
                     ({entryDeadline.toUTCString()})
                   </span>
-                  <span className="mt-1 block text-gray-500">
-                    After that no new entries are accepted, whether or not the
-                    competition is still running.
-                  </span>
+                  {/*
+                    THREE SENTENCES FOR THREE RULES, and the middle one is the owner's report.
+                    They must not be collapsed: each names a different consequence of joining
+                    late, and the wrong one is worse than none because a player acts on it.
+                  */}
+                  {entryClose.kind === "reserves_round" ? (
+                    <span className="mt-1 block text-gray-500">
+                      Entry shuts{" "}
+                      <span className="tabular-nums">
+                        {formatRemaining(entryClose.reservedMs)}
+                      </span>{" "}
+                      before play ends, so everyone who joins still gets a full
+                      round. After that no new entries are accepted.
+                    </span>
+                  ) : entryClose.kind === "runs_to_the_end" ? (
+                    <span className="mt-1 block text-gray-500">
+                      You can join right up to the end. Joining late leaves you
+                      less time, and a round still running when the competition
+                      closes is scored on what you managed.
+                    </span>
+                  ) : (
+                    <span className="mt-1 block text-gray-500">
+                      After that no new entries are accepted, whether or not the
+                      competition is still running.
+                    </span>
+                  )}
                 </p>
               ) : (
                 <p className="text-xs text-gray-300">
@@ -580,11 +622,31 @@ export default function CompetitionEntryButton({
             </div>
           )}
 
-          {/* Info */}
+          {/*
+            Info.
+
+            THE CAPITAL SENTENCE IS WITHHELD FROM A GAME, NOT RELABELLED, and it was a live
+            defect rather than a tidy-up. `startingCapital` is `required` only while the
+            contest is trading - the model says in as many words that "an invented number is
+            worse than an absent one: it renders in any summary that has not yet learned about
+            games" - and this panel was such a summary. The `|| 0` above turned the absent
+            field into a promise of "$0 in trading capital to compete", shown to every player
+            about to pay to enter a puzzle.
+
+            Withheld rather than replaced with a game equivalent: what a player gets for their
+            fee is attempts, and the attempts line already sits on the play screen where it is
+            derived from the contest rather than guessed here.
+          */}
           <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
             <p className="text-xs text-blue-300">
-              ℹ️ Entry fee is non-refundable. You will receive $
-              {startingCapital.toLocaleString()} in trading capital to compete.
+              ℹ️ Entry fee is non-refundable.
+              {!isProviderGame && (
+                <>
+                  {" "}
+                  You will receive ${startingCapital.toLocaleString()} in trading
+                  capital to compete.
+                </>
+              )}
             </p>
           </div>
         </div>

@@ -469,6 +469,73 @@ Both reported `DID NOT APPLY`, **which is indistinguishable from a test that doe
 
 ---
 
+### 1.1i The entry panel told a game player two untrue things (R65, 10 September 2026)
+
+The owner's report was the wording on the entry countdown. The second defect was found while
+reading the file in order to change it.
+
+**What was built.**
+
+| | |
+|---|---|
+| `describeEntryClose` in `lib/utils/registration-deadline.ts` | One answer to *why* entry closes when it does, and how much time is held back. Three kinds: `reserves_round`, `runs_to_the_end`, `operator_chosen` |
+| The entry countdown in `components/trading/CompetitionEntryButton.tsx` | Three sentences for the three rules, replacing one unconditional claim |
+| The same panel's closing note | The trading-capital promise is **withheld** from a game contest; the non-refundable warning is not |
+| `__tests__/games/entry-close-explanation.test.ts` | 16 tests |
+| `tools/probe-entry-close-explanation.ps1` | 12 probes, all red on exactly one failure, plus one deliberately absent with its reason |
+
+**The sentence that was wrong in both directions.** The panel said *"After that no new entries
+are accepted, whether or not the competition is still running"* on **every** contest. Under
+`until_window_closes` the deadline **is** the moment play stops, so the clause describes a gap
+that does not exist. Under `reserve_full_round` the gap is real and the sentence never gives the
+reason - so a player who can see time left reads an arbitrary lock-out rather than the rule that
+protects them.
+
+**The rule was already right, and that is the finding.** Entry has closed one whole attempt
+before play ends since `12` s2.10, and `contest-entry.service.ts` refuses past it. Proven end to
+end before a line was written, because a report is a claim about the code rather than a fact
+about it - and this claim was about the *surface*. A fix aimed at the deadline would have changed
+the one thing that was correct.
+
+**Six things worth carrying.**
+
+- **The explanation lives beside the deadline, not beside the screen.** The span it reports is
+  measured from the instant `resolveRegistrationDeadline` returns, including the **legacy clamp**
+  against `startTime` - which widens the reserved span past one round on a contest shorter than a
+  round. A module recomputing the deadline to describe it is the "one rule, two copies" shape this
+  file was extracted to prevent, and here the two sit millimetres apart on screen.
+- **It reads the stored policy and never infers one from the arithmetic.** A reserving contest is
+  exactly the one whose deadline sits before its end - but the two also coincide whenever nothing
+  declares an attempt length, and such a contest behaves **permissively**, because the round-start
+  gate reserves `attemptSeconds ?? maxDurationSeconds ?? 0` as well. Calling that a reservation is
+  a promise no gate keeps.
+- **The trading-capital line was withheld, not relabelled, and it was a live defect.**
+  `startingCapital` is `required` only while the contest is trading, and the model says why in as
+  many words - *"an invented number is worse than an absent one: it renders in any summary that
+  has not yet learned about games."* This panel was such a summary: `|| 0` turned the absent field
+  into **"You will receive $0 in trading capital to compete"**, in front of every player about to
+  pay to enter a puzzle.
+- **The guard wraps the capital clause alone, and the negative half is load-bearing.** Guarding
+  the whole info box is the smaller diff and takes the non-refundable warning off every game
+  contest with it - and that sentence is true of every game. A test asserts the fee warning
+  survives.
+- **The misleading clause is COUNTED, not banned.** It is correct for a trading contest whose
+  operator chose a deadline, so a test forbidding it outright would fail on correct code and be
+  deleted by the first person it inconvenienced. The guard asserts exactly one occurrence and that
+  it sits after the last branch test.
+- **One probe is deliberately absent with its reason recorded.** Deleting the
+  `until_window_closes` early return leaves the suite green - the fourth cause of a green probe, a
+  mutation that changes no observable. The branch still earns its place: it is the only thing that
+  answers correctly when a permissive contest's deadline sits before its end. A green line in a
+  probe list teaches the next reader the branch is decoration.
+
+**Not built.** The countdowns on these screens are still inline text rather than the trading
+page's four-cell clock, which is the owner's other request and is its own slice - `LiveCountdown`
+computes from `new Date()`, so it cannot simply be dropped onto a game screen that deliberately
+runs on `useServerClock`. **Never verified by eye**: the screen is behind sign-in.
+
+---
+
 ### 4.1i The arena was dressed in the kit and the game inside it was not (8 September 2026)
 
 The owner's words were **"these graphics are basic, reproduce the graphics"**, beside their
