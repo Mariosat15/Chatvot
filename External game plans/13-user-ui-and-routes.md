@@ -605,6 +605,74 @@ omitting it. **Do not let a summary imply the reference is fully reproduced.**
 
 ---
 
+### 1.1j The lobby was a photograph (R67, 10 September 2026)
+
+Two owner reports on one screen, and one cause under both: *"while the user see the time and
+waiting the competition to start he must refresh the page to see the play button"*, and *"during
+the competition the data are not updated live, we must refresh the page"*.
+
+**The cause is the branch being the whole page.** Section 1.1a's game branch returns a complete
+screen for a provider contest before the trading markup begins, which is right and is argued for
+in the file. The consequence is that **anything mounted above that markup is not mounted for a
+game** - and `CompetitionStatusMonitor` was. It is entirely game-agnostic, reading a status, a
+cancellation reason, a rank and a prize, none of which are trading concepts. The game lobby simply
+never had it, so `CompetitionEntryButton` went on deciding from `competition.status`, a prop frozen
+at render, and a player who had already paid watched the countdown reach zero in front of a screen
+that had stopped being true several minutes earlier. Nothing errored and nothing was logged.
+
+**Mounting it does not fix the second half**, and merging the two is the mistake a summary
+invites. The monitor refreshes on a status *change*; a running contest sits at `active` for its
+whole duration, so it never fires. That left **both** lobbies - trading as well as game - showing
+the standings that existed when the page loaded, which on the trading lobby is arguably worse,
+because a rank there moves with the price rather than only when somebody finishes a round.
+
+#### What was built
+
+| Piece | What it does |
+|---|---|
+| `components/competitions/LiveContestRefresher.tsx` | Calls `router.refresh()` on a 15-second cadence while the contest is running. Visibility-gated, and refreshes immediately on the way back to the tab |
+| The game branch of `app/(root)/competitions/[id]/page.tsx` | Now mounts `CompetitionStatusMonitor` **and** the refresher, above the lobby |
+| The trading branch of the same file | Gains the refresher beside the monitor it already had |
+
+**It re-reads the page rather than polling an endpoint, and that is a decision.** There is no
+player-facing JSON API that returns a competition's ranking: `getCompetitionLeaderboard` is a
+**server action**, and it is where the whole rule lives - the score direction resolved from the
+catalogue, the R45 eligibility gate, the tie handling. An endpoint would be a second reader that
+can drift from it, the shape behind `referenceId`, `failedReason`, `challengeId` and the Game
+Master `||`, **none of which `check:mirrors` can see**. A refresh re-runs the page that already
+calls the action, so there is one answer to "who is winning". The cost is a whole server render
+rather than one query, taken knowingly: a lobby is not a hot path, and React preserves client
+state across a refresh, so an open dialog stays open and a half-typed field keeps its text.
+
+**It must not be mounted on the play screen, and that negative is the load-bearing guard.** That
+page hosts the game in an iframe and owns a 20-second poll of `/rounds` which updates the player's
+state without re-rendering the frame. A timer calling `router.refresh()` underneath a live round
+is a way to disturb an attempt somebody has **paid** for, failing intermittently and
+unreproducibly. It is the obvious next step for anybody fixing that screen's own stale sidebar, so
+the test is what stops it being fixed the easy and wrong way.
+
+**Running is read from the stored status, never computed from a clock.** A contest whose end time
+has passed is still `active` until a cron finalizes it, so a client deciding for itself stops
+refreshing exactly while the last rounds are being scored. This is the mutation most likely to be
+made deliberately, because it reads as more accurate, and it is probed.
+
+**The trading lobby was included deliberately** rather than scoped to games: the owner's
+instruction was *"all pages related to live data like scoring standings"*, and a live board on one
+lobby beside a photograph on the other is the inconsistency this programme keeps finding. It is
+safe here because this is the **lobby** - the trading workspace at `/trade` is a separate route
+with its own 15-second live-ranking poll, and nothing is re-rendered underneath an open position.
+
+13 tests in `__tests__/games/live-contest-refresh.test.ts`, 12 probes in
+`tools/probe-live-contest-refresh.ps1`, **all red on exactly the named test**. Typecheck error
+lists identical before and after - nothing added and nothing disappeared. **Never verified by
+eye**: both lobbies are behind sign-in and the automated browser has no session.
+
+**Two surfaces are deliberately still stale and must not be summarised as done**: the play
+screen's own standings sidebar, and the dashboard contest cards, where `ContestsSidebar` polls
+challenges every ten seconds and reads competitions from static props.
+
+---
+
 ## 2. Provider scoping - the mistake that must not be made
 
 Six React context providers are mounted on the two trade pages today:

@@ -40,6 +40,7 @@ chapter covers risks to the programme and to the application.
 | **R64** | **A player who only plays games had no performance at all.** The admin per-user Performance tab computed eleven trading figures and gated the WHOLE tab on `totalTrades === 0`, so a games-only player read "This client has no closed trades yet" while every round, score and prize stayed invisible. `05` s10 broken in its plainest form. Note task 21's premise was **false where it pointed** - the screen actually named Game Performance mentions no game | Medium | **LIVE**, but a REPORTING defect and never a payment one | **CLOSED 10 Sep 2026** (task doc 21.1); nothing stored, so nothing to backfill |
 | **R65** | **The entry panel promised every game entrant "$0 in trading capital to compete"**, because `startingCapital` is `required` only while the contest is trading and the panel's `\|\| 0` turned the absent field into a number. Beside it, one unconditional sentence claimed no entries are taken "whether or not the competition is still running" - false under `until_window_closes`, where the deadline IS the moment play stops, and silent about the reason under `reserve_full_round`, where the gap exists to stop somebody paying for a contest they cannot finish a round in | Medium | **LIVE and player-visible**, on the screen a player reads before paying; no money moved | **CLOSED 10 Sep 2026** (`13` s1.1i); nothing stored, so nothing to backfill |
 | **R66** | **The game's own countdown ignored the contest.** `stateFor` sent `endsAt = gameplayEndsAt(round)`, the title's length from `startedAt`, while `playability` refuses at `expiresAt` too - so a player starting a ten-minute sprint with five minutes of contest left watched a clock counting from **10:00** and was stopped with **5:00** still showing. The pre-Start sentence read the configured length and was wrong the same way. **`hardDeadline` already returned the right answer and was called by nothing** | Medium | **LIVE and player-visible** whenever a round is started late; scores and payouts were correct throughout | **CLOSED 10 Sep 2026** (`21` s4.1p); nothing stored, so nothing to backfill |
+| **R67** | **A contest lobby was a photograph.** `CompetitionStatusMonitor` was mounted inside the *trading* return of `app/(root)/competitions/[id]/page.tsx`, and the game branch returns the whole page before reaching it - so a player who had already paid watched the countdown reach zero and had to **reload before the Play button appeared**. The monitor also fires only on a status CHANGE, so on **both** lobbies the standings stayed frozen for the whole of a running contest, when the status does not move | Medium | **LIVE and player-visible** on every game contest since the branch was written; no money moved and nothing was stored wrongly | **CLOSED 10 Sep 2026** (`13` s1.1j); nothing stored, so nothing to backfill |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -2218,6 +2219,77 @@ one the first person it inconveniences deletes, which is the same reasoning that
 Probed by `tools/probe-client-bundle-guard.ps1`: two probes, one restoring the admin defect
 verbatim and one reverting the main app's `import type` to a plain import, each red on exactly
 the expected test.
+
+---
+
+### R67 - The lobby was a photograph - **CLOSED 10 September 2026**
+
+**What it was.** Two faces of one cause, both reported by the owner on 10 September 2026: *"while
+the user see the time and waiting the competition to start he must refresh the page to see the
+play button"*, and *"during the competition the data are not updated live, we must refresh the
+page"*.
+
+**The cause is the branch being the whole page**, which is right and is argued for at length in
+the file itself. `app/(root)/competitions/[id]/page.tsx` returns a complete screen for a provider
+contest before reaching the trading markup - and the consequence nobody had noticed is that
+**anything mounted above that markup is silently not mounted for a game**.
+`CompetitionStatusMonitor` is such a thing. It is entirely game-agnostic - it reads a status, a
+cancellation reason, a rank and a prize, none of which are trading concepts - and the game lobby
+simply never had it.
+
+**So the Play button was answering a question asked once, minutes earlier.**
+`CompetitionEntryButton` derives `isActive` from `competition.status`, a prop frozen at render.
+Nothing errored, nothing was logged, and the screen was not wrong when it was drawn - it had just
+stopped being true. This is the trading-shaped-screen shape one layer out from the admin
+competitions list: **the machinery exists, works, and was wired to one branch of two.**
+
+**The second half is not fixed by mounting the monitor**, and merging the two is the mistake a
+summary invites. The monitor refreshes on a status *change*; a running contest sits at `active`
+for its entire duration, so it never fires, and **both** lobbies - trading as well as game - showed
+standings from the moment the page loaded. On the trading lobby that is arguably worse, because a
+rank there moves with the price rather than only when somebody finishes a round.
+
+**`LiveContestRefresher` re-reads the page rather than polling an endpoint, and that is a decision
+rather than the lazy option.** There is no player-facing JSON API that returns a competition's
+ranking: `getCompetitionLeaderboard` is a **server action**, and it is where the whole rule lives -
+the score direction resolved from the catalogue, the R45 eligibility gate, the tie handling.
+Adding an endpoint means a second reader that can drift from it, which is the shape behind
+`referenceId`, `failedReason`, `challengeId` and the Game Master `||`, **none of which
+`check:mirrors` can see**. `router.refresh()` re-runs the page that already calls the action, so
+there is exactly one answer to "who is winning". It costs a whole server render rather than one
+query, which is the trade taken knowingly: a lobby is not a hot path, the refresh is
+visibility-gated, and React preserves client state across it so an open dialog stays open.
+
+**It must not be mounted on the play screen, and that negative is the load-bearing guard.** That
+page hosts the game in an iframe and owns a 20-second poll of `/rounds` which updates the player's
+state without re-rendering the frame. A timer calling `router.refresh()` underneath a live round
+is a way to disturb an attempt somebody has **paid** for, and it would fail intermittently and
+unreproducibly - the worst shape of bug available, because the report is "it sometimes breaks".
+Mounting it there is the obvious next step for anybody fixing that screen's own stale sidebar,
+which is a real and separately-recorded gap, so the test is what stops it being fixed the easy and
+wrong way.
+
+**Running is read from the stored status, never computed from a clock.** A contest whose end time
+has passed is still `active` until a cron finalizes it, so a client deciding for itself stops
+refreshing exactly while the last rounds are being scored - the board freezes at the moment it
+matters most, with nothing in a log. This is the mutation most likely to be made deliberately,
+because it reads as more accurate, and it is probed.
+
+**State the harm precisely.** **Live and player-visible** on every game contest since the branch
+was written, and on both lobbies for standings. No money moved, no ranking was computed wrongly,
+and **nothing was stored, so nothing was backfilled** - the server's answer was correct every time
+it was asked, and the defect is that it was asked once.
+
+**13 tests, 12 probes, all red on exactly the named test.** One probe came back **green on the
+first run and the test was the thing at fault**: it matched a bare `visibilitychange`, which the
+*teardown* line satisfies on its own, so the listener could be left unattached with every
+assertion passing. Sixth instance of one identifier defeating a structural test, after
+`!expectedOrigin`, the fixed-character Edit guard, `canTransitionRound`, `MIN_REASON_LENGTH` and
+the Image Optimizer's refusal count.
+
+**Two surfaces are deliberately still stale and must not be summarised as done**: the play
+screen's own standings sidebar, and the dashboard contest cards, where `ContestsSidebar` polls
+challenges every ten seconds and reads competitions from static props.
 
 ---
 

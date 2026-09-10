@@ -14,6 +14,7 @@ import { getTradingRiskSettings } from "@/lib/actions/trading/risk-settings.acti
 import CompetitionLeaderboard from "@/components/trading/CompetitionLeaderboard";
 import CompetitionDashboard from "@/components/trading/CompetitionDashboard";
 import CompetitionStatusMonitor from "@/components/trading/CompetitionStatusMonitor";
+import LiveContestRefresher from "@/components/competitions/LiveContestRefresher";
 import UTCClock from "@/components/trading/UTCClock";
 import TradingLobbyHero from "@/components/trading/lobby/TradingLobbyHero";
 import TradingLobbySidebar from "@/components/trading/lobby/TradingLobbySidebar";
@@ -187,17 +188,46 @@ const CompetitionDetailsPage = async ({
     */
     if (hasProviderGameLabel(competition)) {
       return (
-        <ProviderContestLobby
-          competition={competition}
-          leaderboard={leaderboard}
-          isUserIn={isUserIn}
-          isFull={isFull}
-          userId={userId}
-          walletBalance={walletBalance.balance}
-          creditSymbol={creditSymbol}
-          participantStatus={userParticipant?.status}
-          registrationClosed={registrationClosed}
-        />
+        <>
+          {/*
+            THESE TWO WERE MOUNTED ONLY ON THE TRADING RETURN, WHICH IS THE COST OF THE BRANCH
+            BEING THE WHOLE PAGE. The comment above explains why returning early is right - and
+            the consequence nobody had noticed is that anything mounted *above* the trading
+            markup is silently not mounted here. `CompetitionStatusMonitor` is one such thing,
+            and it is entirely game-agnostic: it reads a status, a cancellation reason, a rank
+            and a prize, none of which are trading concepts.
+
+            What its absence cost is the owner's report: a player watching the countdown to a
+            contest they had already paid to enter had to RELOAD THE PAGE before the Play button
+            appeared, because `CompetitionEntryButton` decides from `competition.status`, which
+            is a prop frozen at render. Nothing was broken and nothing errored - the screen was
+            simply answering a question it had asked once, several minutes earlier.
+          */}
+          <CompetitionStatusMonitor
+            competitionId={id}
+            initialStatus={competition.status}
+            startTime={competition.startTime}
+            userId={userId}
+          />
+          {/*
+            And the monitor alone is not enough, which is the second half of the same report.
+            It refreshes on a status CHANGE, so during a running contest - when the status stays
+            `active` for its whole duration - it never fires, and the standings a player is
+            watching are the ones that existed when they opened the page.
+          */}
+          <LiveContestRefresher active={competition.status === "active"} />
+          <ProviderContestLobby
+            competition={competition}
+            leaderboard={leaderboard}
+            isUserIn={isUserIn}
+            isFull={isFull}
+            userId={userId}
+            walletBalance={walletBalance.balance}
+            creditSymbol={creditSymbol}
+            participantStatus={userParticipant?.status}
+            registrationClosed={registrationClosed}
+          />
+        </>
       );
     }
 
@@ -292,6 +322,19 @@ const CompetitionDetailsPage = async ({
           startTime={competition.startTime}
           userId={userId}
         />
+        {/*
+          The trading lobby has the same standings gap and it is arguably worse here, because a
+          trading rank moves with the price rather than only when somebody finishes a round - so
+          this board could be wrong within seconds of loading rather than within minutes.
+
+          Added deliberately rather than scoped to games: the owner's instruction was "all pages
+          related to live data like scoring standings", and a live board on one lobby and a
+          photograph on the other is the inconsistency this programme keeps finding. It is safe
+          to add here because this is the LOBBY - the trading workspace at `/trade` is a separate
+          route with its own 15-second live-ranking poll, and nothing here is re-rendered
+          underneath an open position.
+        */}
+        <LiveContestRefresher active={competition.status === "active"} />
 
         {/* Header with Back Button and UTC Clock */}
         <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
