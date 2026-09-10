@@ -29,6 +29,7 @@ import {
 } from "./contest-draft";
 import { isClosedToEdits } from "@/lib/admin/provider-contest-edit-policy";
 import { DEFAULT_CREDIT_SYMBOL } from "@/lib/utils/format-volts";
+import { playShapeRules, type PlayMode } from "@/lib/services/games/play-shape";
 
 /**
  * Editing a provider-game contest.
@@ -48,6 +49,19 @@ import { DEFAULT_CREDIT_SYMBOL } from "@/lib/utils/format-volts";
  * The client's idea of "entered" can go stale while the form is open, which is fine: the
  * server holds the same rule and refuses with the frozen fields named. The policy list lives
  * in `provider-contest-edit-policy.ts` precisely so the two cannot drift.
+ *
+ * IT ADAPTS TO THE CONTEST'S PLAY SHAPE SINCE TASK DOCUMENT 12, and until then it did not -
+ * this screen never imported `play-shape.ts` at all. The wizard had withheld the attempts and
+ * round-start controls on a simultaneous contest since `22` s8; the editor offered both, and
+ * `applyEdit` forces both unconditionally, so an operator could pick "Best of several" on a
+ * race, save it, be told the edit succeeded, and have it stored as `single`. The dates said
+ * "Contest starts" with no hint, on a shape where the start is also the moment entry closes.
+ *
+ * // Reason: the same failure this codebase keeps finding - a control that appears to work
+ * and does nothing - and the same sibling-screen shape as Edit routing, which the list learned
+ * in `12` s2.2 and this page did not until s2.4. The shape is RESOLVED BY THE ROUTE and passed
+ * in, never derived here, because deriving it needs the catalogue row and a second
+ * implementation of that rule is how the screen and the service come to disagree.
  */
 
 interface StoredContest {
@@ -95,6 +109,15 @@ export function ProviderContestEditor({
   const [schema, setSchema] = useState<SchemaState | null>(null);
   const [titleName, setTitleName] = useState<string>();
   const [maxDurationSeconds, setMaxDurationSeconds] = useState<number>();
+  /**
+   * The contest's shape, as the route resolved it.
+   *
+   * Undefined while loading and when the title has left the catalogue. Both fall back to
+   * `anytime`, which is the shape that OFFERS every control - correct in the second case
+   * because `applyEdit` forces nothing without a title, so withholding a control the save
+   * would have honoured is the one error that loses an operator's work.
+   */
+  const [playMode, setPlayMode] = useState<PlayMode>();
   const [draft, setDraft] = useState<ContestDraft>(emptyDraft);
   const [errors, setErrors] = useState<string[]>([]);
 
@@ -110,6 +133,7 @@ export function ProviderContestEditor({
       setSchema(data.schema);
       setTitleName(data.titleName);
       setMaxDurationSeconds(data.maxDurationSeconds);
+      setPlayMode(data.playMode);
       setDraft(draftFromStored(data.contest));
     } catch {
       toast.error("Something went wrong. Please contact support.");
@@ -127,6 +151,10 @@ export function ProviderContestEditor({
   // where `stored` is set - but it reads as use-before-define and one reordered early
   // return would turn it into a real temporal-dead-zone throw.
   const entered = (stored?.currentParticipants ?? 0) > 0;
+
+  // `anytime` while loading and when the title has gone, for the reason beside `playMode`.
+  // Same call the wizard's two steps make, on the same module the edit service forces from.
+  const shape = playShapeRules(playMode ?? "anytime");
 
   function patch(changes: Partial<ContestDraft>) {
     setDraft((current) => ({ ...current, ...changes }));
@@ -382,16 +410,24 @@ export function ProviderContestEditor({
           Timing
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/*
+            THE LABELS AND HINTS COME FROM THE SHAPE, not from this file. On a simultaneous
+            contest the start is the gun and also the moment entry closes, which "Contest
+            starts" with no hint does not say - and the operator most needs to know it here,
+            because moving the start moves the entry deadline with it.
+          */}
           <DateField
             id="startTime"
-            label="Contest starts"
+            label={shape.copy.startLabel}
+            hint={shape.copy.startHint}
             value={draft.startTime}
             disabled={entered}
             onChange={(v) => patch({ startTime: v })}
           />
           <DateField
             id="endTime"
-            label="Contest ends"
+            label={shape.copy.endLabel}
+            hint={shape.copy.endHint}
             value={draft.endTime}
             disabled={entered}
             onChange={(v) => patch({ endTime: v })}
@@ -423,49 +459,85 @@ export function ProviderContestEditor({
           Frozen once anyone has entered: it is not on `EDITABLE_ONCE_ENTERED`, so the server
           would refuse it anyway - the `disabled` here is so an operator finds that out
           before submitting rather than as a refusal naming a field they did not mean to send.
+
+          WITHHELD ENTIRELY on a simultaneous contest, matching the wizard. `applyEdit` writes
+          `forcedRoundStartPolicy` unconditionally - outside the "did the operator send this"
+          branch - so this control could only ever be overridden, and `disabled` is not the
+          same thing: a greyed-out control still says the setting applies to this contest.
         */}
-        <RoundStartPolicyField
-          value={draft.roundStartPolicy}
-          disabled={entered}
-          onChange={(value) => patch({ roundStartPolicy: value })}
-        />
+        {shape.offersRoundStartPolicy ? (
+          <RoundStartPolicyField
+            value={draft.roundStartPolicy}
+            disabled={entered}
+            onChange={(value) => patch({ roundStartPolicy: value })}
+          />
+        ) : (
+          <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-gray-400">
+            {shape.copy.roundStartWithheld}
+          </p>
+        )}
       </section>
 
       <section className="space-y-4">
         <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
           Rounds
         </h2>
+        {/*
+          WITHHELD WITH ITS REASON on a simultaneous contest, matching the wizard, and this is
+          the control the omission cost most: `applyEdit` reads `forcedAttemptsPolicy` FIRST
+          and only falls through to the operator's choice when the shape forces nothing, so
+          picking "Best of several" on a race was saved as `single` with a success toast.
+
+          The sentence is `play-shape.ts`'s, shared with the wizard - see `copy.attemptsWithheld`.
+        */}
+        {shape.requiresSingleAttempt ? (
+          <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-gray-400">
+            {shape.copy.attemptsWithheld}
+          </p>
+        ) : null}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <Label className="text-gray-200">Attempts</Label>
-            <Select
-              value={draft.attemptsPolicy}
-              disabled={entered}
-              onValueChange={(value) =>
-                patch({
-                  attemptsPolicy: value as ContestDraft["attemptsPolicy"],
-                })
-              }
-            >
-              <SelectTrigger className="mt-2 bg-gray-700 border-gray-600 text-gray-100">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="single">One attempt</SelectItem>
-                <SelectItem value="best_of_n">Best of several</SelectItem>
-                <SelectItem value="sum_of_n">Sum of several</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {draft.attemptsPolicy !== "single" && (
-            <NumberField
-              id="attemptsAllowed"
-              label="Attempts allowed"
-              value={draft.attemptsAllowed ?? 3}
-              min={1}
-              disabled={entered}
-              onChange={(v) => patch({ attemptsAllowed: v })}
-            />
+          {/*
+            ONE GUARD OVER BOTH CONTROLS, in a fragment, rather than the same condition
+            written twice. A grid lays out a fragment's children as its own, so nothing moves
+            - and the alternative is the shape a structural test cannot hold: with two
+            conditionals, deleting the second leaves the first satisfying any check that looks
+            backwards from the attempts count for a guard, which is how a half-removed guard
+            hides behind the half that remains.
+          */}
+          {!shape.requiresSingleAttempt && (
+            <>
+              <div>
+                <Label className="text-gray-200">Attempts</Label>
+                <Select
+                  value={draft.attemptsPolicy}
+                  disabled={entered}
+                  onValueChange={(value) =>
+                    patch({
+                      attemptsPolicy: value as ContestDraft["attemptsPolicy"],
+                    })
+                  }
+                >
+                  <SelectTrigger className="mt-2 bg-gray-700 border-gray-600 text-gray-100">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="single">One attempt</SelectItem>
+                    <SelectItem value="best_of_n">Best of several</SelectItem>
+                    <SelectItem value="sum_of_n">Sum of several</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {draft.attemptsPolicy !== "single" && (
+                <NumberField
+                  id="attemptsAllowed"
+                  label="Attempts allowed"
+                  value={draft.attemptsAllowed ?? 3}
+                  min={1}
+                  disabled={entered}
+                  onChange={(v) => patch({ attemptsAllowed: v })}
+                />
+              )}
+            </>
           )}
           <div>
             <Label className="text-gray-200">
@@ -604,12 +676,15 @@ function DateField({
   label,
   value,
   disabled,
+  hint,
   onChange,
 }: {
   id: string;
   label: string;
   value: string;
   disabled?: boolean;
+  /** What this moment means under the contest's shape. From `play-shape.ts`, never local. */
+  hint?: string;
   onChange: (value: string) => void;
 }) {
   return (
@@ -625,6 +700,7 @@ function DateField({
         onChange={(e) => onChange(e.target.value)}
         className="mt-2 bg-gray-700 border-gray-600 text-gray-100 disabled:opacity-50"
       />
+      {hint ? <p className="mt-1 text-xs text-gray-500">{hint}</p> : null}
     </div>
   );
 }

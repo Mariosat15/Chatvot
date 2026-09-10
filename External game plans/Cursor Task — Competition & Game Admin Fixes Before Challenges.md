@@ -1080,6 +1080,90 @@ Potentially:
 
 Do not show irrelevant configuration fields for a competition style.
 
+## 12.1 — WHAT WAS BUILT, 10 September 2026
+
+**Most of this task was already done and one screen had never heard of it.** The wizard has
+adapted to the play shape since `22` s8 — labels, hints, the round-start control and the
+attempts control all come from `playShapeRules`. The **editor** did not import `play-shape.ts`
+at all, and that is **R61**: it offered the attempts and round-start controls on a
+simultaneous contest while `applyEdit` forces both, reading the forced value *before* the
+operator's, so choosing "Best of several" on a race saved as `single` with a success toast.
+A control that appears to work and does nothing — the failure this codebase keeps finding one
+screen at a time.
+
+### The field lists above, mapped honestly against the platform
+
+**Read this before "finishing" the task, because four of the fields it asks for are ones the
+platform deliberately removed**, and adding them back would undo `12` s2.3.
+
+| Asked for | Where it actually is |
+|---|---|
+| Registration Opens | **Not a concept.** Registration opens when the contest is created; an operator who wants sign-up time creates it earlier, exactly as the trading wizard does |
+| Registration Closes | **Derived** by `resolveContestEntryDeadline` (`12` s2.10) — the last moment playing is still possible, or the start under `scheduled` |
+| Play Window Opens / Closes | **Derived** by `deriveWindow` (`12` s2.3). There is ONE contest clock. Four date fields let an operator open play at a different moment from the contest, which is how you build a contest nobody can win fairly. **Do not add these back** |
+| Attempts Allowed | Built, and now withheld on `scheduled` in both screens |
+| Maximum Session Duration | Built — the title's own `configSchema`, found through `format: "duration-seconds"` (`12` s2.9), never a field named `durationSeconds` |
+| Late Entry Allowed | Built as `roundStartPolicy` — *how late may an attempt start* — and forced under `scheduled` |
+| Score Submission Deadline | Built as `resultGracePeriodSeconds`, derived from the chosen playing time |
+| Required Start Time | Built — `startTime`, labelled "Everyone starts at" under `scheduled` |
+| Minimum / Maximum Players | Built |
+| What happens to players who fail to connect | Built, in two settings that answer two different questions: `unresolvedRoundPolicy` for a round that never reports, `unscoredContestPolicy` for a contest where nobody scored |
+| Match / session duration | Built — same source as Maximum Session Duration |
+| **Player Check-In Window, Lobby Opens, Countdown** | **Not built, and blocked rather than deferred by effort.** These are a pre-match lobby: a player-facing screen, a check-in state on the participant and a rule for no-shows at the gun. **No title declares `scheduled`**, so it would be a lobby for a shape nothing in the catalogue uses, and the player surface is X7. Same reasoning as turn-based and heat-based in 10.2 |
+| Turn-based, round-based | **Blocked**, 10.2 |
+
+### What was actually changed
+
+- **`lib/services/games/play-shape.ts`** (mirrored, byte-identical) gains
+  `copy.attemptsWithheld`. It was a **literal in `StepPrizes.tsx`**, which was correct while
+  one screen withheld the control and became the "one rule, two copies" shape the moment the
+  editor had to withhold it too — the shape behind `referenceId`, `failedReason`,
+  `challengeId` and the Game Master `||`, none of which `check:mirrors` can see.
+- **`GET /api/games/contests/[competitionId]`** resolves the contest's shape with
+  `resolveContestPlayMode(contest.playMode, title)` and sends `playMode`. **The screen never
+  resolves it**: resolving needs the catalogue row, and `resolvePlayMode` alone is the wrong
+  question once a title supports two shapes, because the title's answer is only its default.
+- **`ProviderContestEditor.tsx`** takes its date labels and hints from the shape, withholds
+  the round-start control with its reason, and withholds **both** attempts controls under one
+  guard in a fragment.
+
+### Three decisions worth keeping
+
+**One guard over both attempts controls, not the same condition written twice.** A grid lays
+out a fragment's children as its own, so nothing moves — and with two conditionals, deleting
+the second leaves the first satisfying any structural check that looks backwards from the
+attempts count for a guard. That is a half-removed guard hiding behind the half that remains,
+and it is the fifth time an identifier appearing twice has defeated a test here.
+
+**Withheld, never `disabled`.** A greyed-out control still tells an operator the setting
+applies to this contest. The server is about to overwrite whatever it holds, so the honest
+rendering is the sentence explaining that the shape already answers the question.
+
+**The shape falls back to `anytime` while loading and when the title has left the catalogue.**
+That is the shape which *offers* every control, and it is correct rather than lax: `applyEdit`
+forces nothing without a title, so withholding a control the save would have honoured is the
+one error here that loses an operator's work.
+
+### Guard
+
+`__tests__/admin/contest-mode-adaptive-settings.test.ts`, 13 tests, and
+`tools/probe-contest-mode-settings.ps1`, **11 probes, every one red on exactly one failure**.
+The invariant asserted is **a control is withheld exactly when the shape forces its value** —
+a property of the shape module rather than of either screen, so four probes mutate
+`play-shape.ts` rather than a component, and a third mode that forces something while offering
+its control turns them red on the day it is added.
+
+One pre-existing test in `__tests__/services/play-shape.test.ts` was **flipped, not deleted**:
+it asserted the withheld sentence appeared as a literal in `StepPrizes.tsx`, so moving that
+sentence into the shared module turned it red. The claim it was making — each withheld control
+says why — is unchanged, so it now asserts the shared field rather than the words.
+
+761 admin tests green, `check:mirrors` clean, typechecks at baseline (admin **223**, main
+**194**) with nothing in a touched file and nothing disappearing, admin `next build` clean.
+
+**Not verified by eye** — the screen is behind an admin sign-in, and **no contest can be put
+into the shape this fixes until a title declares `scheduled`.**
+
 ---
 
 # TASK 13 — GAME CONFIGURATION MUST BE DATA-DRIVEN

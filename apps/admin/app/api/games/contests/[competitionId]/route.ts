@@ -16,6 +16,7 @@ import {
   editProviderContest,
   type EditProviderContestInput,
 } from "@/lib/services/game-providers/provider-contest-edit.service";
+import { resolveContestPlayMode } from "@/lib/services/games/play-shape";
 
 /**
  * Read and edit one provider-game contest.
@@ -54,6 +55,7 @@ export async function GET(
     const contest = await Competition.findById(competitionId).lean<
       | (Record<string, unknown> & {
           gameType?: string;
+          playMode?: string;
           gameConfig?: { providerKey?: string; gameCode?: string };
         })
       | null
@@ -84,6 +86,21 @@ export async function GET(
     // title's longest possible round to say when the last attempt can start. It is a
     // catalogue fact, never a contest one, so it is read here rather than stored on the draft.
     let maxDurationSeconds: number | undefined;
+    /**
+     * The contest's shape, resolved HERE and never in the browser (task document 12).
+     *
+     * `resolveContestPlayMode` needs the catalogue row, because a contest predating the field
+     * falls back to what its title was when it was created - so a client deriving its own
+     * answer would need the title too, and would then be a second implementation of a rule
+     * whose whole point is that the screen and the service agree. `applyEdit` resolves it the
+     * same way and then FORCES the attempts and round-start policies from it, so a screen
+     * that disagreed would offer controls the save silently overrides.
+     *
+     * Undefined only when the title has gone from the catalogue, which is the one case where
+     * the edit service also declines to force anything: the contest keeps the rule its
+     * entrants signed up under, and the editor keeps offering the controls that still apply.
+     */
+    let playMode: string | undefined;
 
     if (providerKey && gameCode) {
       const title = await ProviderGame.findOne({ providerKey, gameCode }).lean();
@@ -97,6 +114,7 @@ export async function GET(
         titleName = title.displayName;
         scoreDirection = title.scoreDirection;
         maxDurationSeconds = title.maxDurationSeconds;
+        playMode = resolveContestPlayMode(contest.playMode, title);
         const parsed = parseConfigSchema(title.configSchema);
         schema = parsed.ok
           ? { ok: true, fields: parsed.fields }
@@ -111,6 +129,7 @@ export async function GET(
       titleName,
       scoreDirection,
       maxDurationSeconds,
+      playMode,
     });
   } catch (error) {
     console.error("❌ Failed to load provider contest:", error);

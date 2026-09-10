@@ -1042,7 +1042,16 @@ describe("the play shape is declared, never inferred from a game's identity", ()
     expect(prizes).toMatch(/shape\.requiresSingleAttempt/);
     // And each says why rather than merely hiding, which is the difference between a
     // withheld control and a missing feature.
+    //
+    // FLIPPED BY TASK 12, NOT DELETED, and the flip is the interesting part. This used to
+    // read `expect(prizes.toLowerCase()).toContain("same moment")` - the sentence itself,
+    // written out in `StepPrizes.tsx`. That was correct while one screen withheld the
+    // control. The moment the editor had to withhold it too, a literal here would have been
+    // one of two copies of the same operator-facing explanation, and the assertion would
+    // have actively held the duplication in place: moving the sentence to `play-shape.ts`
+    // turned this red. The claim it was making - each withheld control says why - is
+    // unchanged, so the assertion moves to the shared field rather than the words.
     expect(schedule).toMatch(/roundStartWithheld/);
-    expect(prizes.toLowerCase()).toContain("same moment");
+    expect(prizes).toMatch(/attemptsWithheld/);
   });
 });

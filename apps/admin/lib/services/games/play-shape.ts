@@ -353,6 +353,19 @@ export interface PlayShapeRules {
      * is the feature - the same rule as refusing to enable a provider with no adapter.
      */
     roundStartWithheld?: string;
+    /**
+     * Why the attempts control is not being offered, shown in its place.
+     *
+     * Present only when `requiresSingleAttempt` is true, and it lives HERE rather than in the
+     * wizard step that first needed it (task document 12). It was a literal in
+     * `StepPrizes.tsx`, which was correct while one screen withheld the control - and the
+     * moment the editor had to withhold it too, that literal became the "one rule, two
+     * copies" shape behind `referenceId`, `failedReason`, `challengeId` and the Game Master
+     * `||`, none of which `check:mirrors` can see. The drift it invites is not cosmetic: two
+     * screens explaining the same forced value differently is how an operator concludes one
+     * of them is out of date and goes looking for the setting on the other.
+     */
+    attemptsWithheld?: string;
   };
 }
 
@@ -383,6 +396,8 @@ const SCHEDULED: PlayShapeRules = {
     endHint: "Long enough for one run, plus a margin.",
     roundStartWithheld:
       "This game is played by everyone at once, so there is nothing to decide here: entry closes at the start, and a player who opens their board late gets whatever is left of the clock rather than being turned away.",
+    attemptsWithheld:
+      "Everyone plays this game at the same moment, so there is one attempt each. A race cannot be re-run against a field that has already finished.",
   },
 };
 

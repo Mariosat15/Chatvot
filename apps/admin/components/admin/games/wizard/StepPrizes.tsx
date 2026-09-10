@@ -58,11 +58,14 @@ export function StepPrizes({
         attempts with no field to run against. The create service forces `single`, so leaving
         the select here would be three options with one behaviour - the same failure as a
         `rankingMethod` a provider game ignores.
+
+        The sentence comes from `play-shape.ts` and was a literal here until task document 12,
+        which needed the editor to withhold the same control. Two literals is the shape behind
+        `referenceId`, `failedReason` and `challengeId`, and `check:mirrors` cannot see it.
       */}
       {shape.requiresSingleAttempt ? (
         <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-gray-400">
-          Everyone plays this game at the same moment, so there is one attempt each. A race
-          cannot be re-run against a field that has already finished.
+          {shape.copy.attemptsWithheld}
         </p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">

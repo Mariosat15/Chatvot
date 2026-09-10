@@ -34,6 +34,7 @@ chapter covers risks to the programme and to the application.
 | **R58** | **A client component importing one number from a service took the admin panel down** | High | **ALREADY OCCURRED** | **CLOSED 9 Sep 2026** |
 | **R59** | **Every dialog that asked to be wide rendered at 32rem** - an unprefixed `max-w-*` never displaces the primitive's `sm:max-w-lg` | Medium | **ALREADY OCCURRED, 31 dialogs** | **CLOSED for the games surface 9 Sep 2026**; the other 29 are an owner decision |
 | **R60** | **A native `<select>` on a translucent background renders white on white** - the *browser* paints the list, taking the background from the element and letting options inherit `color`. **Two instances found** | Low | **ALREADY OCCURRED, 2 controls** | **Genre picker CLOSED 9 Sep 2026**; `MessagingSection.tsx`'s employee picker is a **named, tested exception** - blocked by that file's lint debt |
+| **R61** | **The contest EDITOR never learned the play shape** - it offered the attempts and round-start controls on a simultaneous contest, and `applyEdit` forces both before reading what the operator sent, so the save reported success and stored something else | Medium | **LATENT** - no title declares `scheduled` yet | **CLOSED 10 Sep 2026** (task doc 12.1); nothing backfilled |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -2212,6 +2213,53 @@ one the first person it inconveniences deletes, which is the same reasoning that
 Probed by `tools/probe-client-bundle-guard.ps1`: two probes, one restoring the admin defect
 verbatim and one reverting the main app's `import type` to a plain import, each red on exactly
 the expected test.
+
+---
+
+### R61 - The second screen never learned the rule the first one enforced - **CLOSED 10 September 2026**
+
+**What it was.** `apps/admin/components/admin/games/ProviderContestEditor.tsx` did not import
+`lib/services/games/play-shape.ts` at all. The wizard had withheld the attempts and
+round-start controls on a simultaneous contest since `22` s8, because the create service
+forces both from the shape. The editor offered both - and `applyEdit` forces them too, reading
+`forcedAttemptsPolicy` **first** and only falling through to the operator's choice when the
+shape forces nothing. So an operator could open a race, choose "Best of several", save, be
+told the edit succeeded, and have `single` stored. No error, no log line, and the screen kept
+showing their choice until they reloaded.
+
+The dates were the quieter half. They were labelled "Contest starts" and "Contest ends" with
+no hint, on a shape where the start is **also the moment entry closes** - which is the one
+fact an operator needs before moving it, because moving the start moves the entry deadline
+with it.
+
+**Severity, stated in both directions.** It is **latent**: no title in the catalogue declares
+`scheduled`, so no contest has ever been created in the shape the editor got wrong, and
+**nothing was backfilled** because there is nothing to correct. But it is not cosmetic and
+must not be filed as a labelling fix - the mechanism is a money-adjacent setting silently
+overridden, and the first scheduled contest anybody edits would have hit it.
+
+**The class, which is the reason to record it at all.** This is the sibling-screen shape, for
+at least the third time: the competitions list learned Edit-routes-by-game in `12` s2.2 and
+the contest view page was missed until s2.4; the wizard learned the play shape in `22` s8 and
+the editor was missed until now. **A rule enforced by one screen is not a rule the product
+enforces.** The remedy that generalises is the guard, not the fix: the invariant asserted is
+*a control is withheld exactly when the shape forces its value*, which is a property of the
+shape module rather than of either screen, so a third mode or a third screen is caught by it.
+
+**One thing was deliberately NOT done.** The editor is handed the resolved `playMode` by
+`GET /api/games/contests/[competitionId]` and does not resolve it. Resolving needs the
+catalogue row, which the screen does not have, and `resolveContestPlayMode` - not
+`resolvePlayMode` - is the right question, because once a title supports two shapes the
+title's answer is only its *default*. A client-side resolution would have been a second
+implementation of the rule the service forces from, which is the disagreement the whole
+change exists to remove.
+
+**Guard.** `__tests__/admin/contest-mode-adaptive-settings.test.ts`, 13 tests, and
+`tools/probe-contest-mode-settings.ps1`, 11 probes, every one red on exactly one failure. Four
+of the probes mutate `play-shape.ts` rather than a screen, because that is where the invariant
+lives. The negative assertions are the load-bearing ones - the editor must **not** contain
+`ANYTIME.copy.startLabel` as a literal, and neither screen may carry the withheld sentences,
+which now live once in `PlayShapeRules.copy`.
 
 ---
 
