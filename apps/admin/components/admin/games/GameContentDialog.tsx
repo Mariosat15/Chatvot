@@ -30,6 +30,7 @@ import {
 } from "@/lib/services/games/game-categories";
 import type { ProviderTitleRow } from "./provider-types";
 import GameArtworkField from "./GameArtworkField";
+import GameContentAiPanel from "./GameContentAiPanel";
 import { DIALOG_WIDTH_MEDIUM } from "@/lib/admin/dialog-widths";
 
 /**
@@ -141,10 +142,17 @@ export default function GameContentDialog({
       }
 
       toast.success(`Content saved for ${draft.displayName}.`);
+      // Reason: every field the draft carries, and the two new ones are why this is worth a
+      // comment. Omitting a saved field here leaves the parent row holding the OLD value, so
+      // reopening the dialog shows the text the operator just replaced - and saving again
+      // writes it back over the server's copy. A silent revert of an edit that reported
+      // success, which is this codebase's recurring failure shape.
       onSaved({
         displayName: draft.displayName,
         tagline: draft.tagline,
         description: draft.description,
+        rulesSummary: draft.rulesSummary,
+        howToPlay: draft.howToPlay,
         category: draft.category,
         thumbnailUrl: draft.thumbnailUrl,
         bannerUrl: draft.bannerUrl,
@@ -174,6 +182,20 @@ export default function GameContentDialog({
         </DialogHeader>
 
         <div className="space-y-5">
+          {/*
+            The assistant PROPOSES into this form and never posts anything itself, so its
+            suggestions are subject to the same Save press, the same validation and the same
+            audit line as anything typed by hand. It is placed above the fields it can write
+            and above the two it cannot, so the sentence explaining the difference is read
+            before an operator wonders why the two big boxes were skipped.
+          */}
+          <GameContentAiPanel
+            gameKey={title.gameKey}
+            onApply={(patch) =>
+              setDraft((current) => (current ? { ...current, ...patch } : current))
+            }
+          />
+
           <Field
             label="Title"
             hint="The name players see. It replaces whatever the provider called it."

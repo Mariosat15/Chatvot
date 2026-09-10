@@ -84,6 +84,40 @@ export const NEVER_EDITABLE_CONTENT_FIELDS: ReadonlyMap<string, string> = new Ma
   ["supportsContentSeed", "declared by the provider and rewritten by every catalogue sync"],
 ]);
 
+/**
+ * What the content assistant may write, and what it may never write.
+ *
+ * TWO LISTS RATHER THAN ONE, for the same reason `NEVER_EDITABLE_CONTENT_FIELDS` sits beside
+ * `EDITABLE_CONTENT_FIELDS` above: a field merely absent from an allow-list is admitted the
+ * moment somebody widens that list for an unrelated reason, and the refusal cannot say why.
+ * A named bar with a reason is the thing that survives the next person's edit.
+ *
+ * THE BAR ON `rulesSummary` AND `howToPlay` IS AN OWNER DECISION, 10 September 2026, and it
+ * is not a matter of taste. `01` s3.1 requires both of a provider and calls the rules summary
+ * the first text support quotes back when a player disputes a prize - so generated wording
+ * there is invented wording in a money argument, about a game the model has never seen, and
+ * an operator reviewing it has no way to know whether it is true. Both are already seeded
+ * from the provider (R63) and both are already editable by hand on the same screen, so there
+ * is nothing the assistant would add except the risk.
+ *
+ * `category`, `thumbnailUrl` and `bannerUrl` are barred as well and for a duller reason: a
+ * genre is a grouping key chosen from a vocabulary, and an image address is not prose.
+ */
+export const AI_WRITABLE_CONTENT_FIELDS = [
+  "displayName",
+  "tagline",
+  "description",
+  "highlights",
+] as const;
+
+export const AI_NEVER_WRITABLE_CONTENT_FIELDS: ReadonlyMap<string, string> = new Map([
+  ["rulesSummary", "the provider's account of how their game scores, and the text support quotes back in a prize dispute"],
+  ["howToPlay", "the provider's account of how their game is played, which the assistant has no way to know"],
+  ["category", "chosen from the genre vocabulary, because it is a grouping key rather than prose"],
+  ["thumbnailUrl", "an image address, not prose"],
+  ["bannerUrl", "an image address, not prose"],
+]);
+
 export const CONTENT_LIMITS = {
   displayName: 80,
   tagline: 120,

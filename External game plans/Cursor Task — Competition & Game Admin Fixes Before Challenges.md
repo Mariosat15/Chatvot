@@ -1661,6 +1661,76 @@ because no rules surface existed for a provider title. **There is now rules text
 it**, so that button can finally do what it says. That is a player-facing change and is its
 own slice.
 
+## 19.2 — THE ASSISTANT, 10 September 2026 (what was built, authoritative)
+
+The second half. An operator opening a title's content dialog can now ask for marketing
+copy, steer it in a sentence, and take the suggestions field by field or all at once.
+**It proposes into the form and never saves** - the operator still presses Save, and every
+value goes through the same `validateGameContent` an operator's own typing does.
+
+`apps/admin/lib/admin/ai-game-content-vocabulary.ts` composes the prompt,
+`ai-game-content-suggestion.ts` parses the reply, `POST /api/ai/generate-game-content`
+joins them, `GameContentAiPanel.tsx` is the screen, and the policy - which fields the
+assistant may write and which it may never write - sits in `game-content-fields.ts` beside
+the operator's own two lists. **21 tests, 22 probes red on exactly one failure.**
+
+### Five things worth carrying
+
+- **The bar is enforced by the SHAPE, not by remembering.** `GameContentSuggestion` has no
+  `rulesSummary` and no `howToPlay` field at all, and the parser builds its result field by
+  field rather than spreading the model's reply - so a model that returns them produces an
+  object with four keys and the extras are gone before any caller sees them. Same reasoning
+  as the play screen's frame message having no score field (`13` s1.1a): **removing a field
+  is stronger than remembering not to read it**, and the test proves it behaviourally by
+  feeding the parser a reply that *does* carry both and asserting the whole object.
+  **Probe 1 is the one that matters** - it makes the parser spread the payload, which is
+  exactly what somebody does in good faith while adding a fifth permitted field.
+- **"Do not state", never "do not invent".** A model told not to invent rules will state the
+  ones it has assumed and consider itself obedient, so `NO_RULES_CLAIMS_RULE` forbids the
+  *acts* - saying how the game is played, what the controls are, how points are earned, how
+  long a round lasts, how ties break, or describing any specific level, board or opponent.
+  The prompt half is belt to the type's braces: the type stops the text being stored, the
+  rule stops it appearing in a description that is stored.
+- **A separate vocabulary module from the contest one, sharing the FACTS rather than the
+  prompt.** A game's page outlives every contest ever run on it, so the two write about
+  different things and one prompt with a mode flag would drift into a `switch`. What is
+  shared is `describeSubject`, `describeWinningRule`, `TRADING_WORDS` and `NO_FIAT_RULE` -
+  the sentences derived from the catalogue row - so a title's facts cannot be described one
+  way on one screen and another way on the next. `TRADING_WORDS` was widened from
+  contest-local to exported for this, one word of diff.
+- **Guarded by `game-providers`, the section that owns the calling screen** (R51), not by a
+  general "AI" grant and not by folding it into `generate-competition`, which is granted
+  `competitions`. Folding would have done one of two things, both wrong: locked out a
+  catalogue operator who has no contest grant, or widened `competitions` to cover the
+  catalogue. Pinned by **counting exported handlers against guard calls**, comments stripped
+  first, because these files name `guardSection` in prose.
+- **`gameKey` is a lookup key and nothing else.** Every word the model gets about the game
+  comes from the row that key finds; the operator's steer is the operator's own sentence and
+  travels in the **user** message, never the system prompt. A title the key does not find is
+  **refused with a 400**, not answered generically - a generic answer here is precisely the
+  "assumes every game is a racing game" failure task 20 names, arriving through the door
+  built to prevent it. Nothing on the panel or in the prompt mentions `gameCode`, `gameKey`
+  or `providerKey`, so no game gets a special case.
+
+### One latent bug of my own, found by the tests
+
+`GameContentDialog`'s `onSaved` handed the parent row seven of the nine fields, having not
+been updated when 19.1 added `rulesSummary` and `howToPlay`. Nothing failed: the save
+succeeded and the server had the new text. But the parent row kept the **old** value, so
+reopening the dialog showed the text the operator had just replaced, and saving again wrote
+it back over the server's copy. **A silent revert of an edit that reported success**, this
+codebase's recurring shape, and a reminder that adding a field to a form is not finished
+when the form saves it. Pinned by a test that reads the `Draft` shape out of the file and
+requires every key of it to be handed back.
+
+### Not built
+
+**No SEO or meta description**, because a provider title has no public page with a `<head>`
+of its own yet. Adding a field the assistant fills and nothing renders would be the sixth
+declared-written-dead field, after `requiresSyncPlay`, `isPaused`, `lastSuccessfulRoundAt`,
+`family` and `playModeOverride` on a head-to-head title. **Never verified by eye** - the
+screen is behind an admin sign-in the automated browser has no session for.
+
 ---
 
 # TASK 20 — AI MUST BE GAME-AGNOSTIC AND CONTEXT-AWARE

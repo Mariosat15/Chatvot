@@ -99,7 +99,7 @@ export const TRADING_VOCABULARY: ContestVocabulary = {
  * sentence on this platform uses them - and copy in front of paying players saying they are
  * about to trade a puzzle is worse than plain copy.
  */
-const TRADING_WORDS = [
+export const TRADING_WORDS = [
   "trade",
   "trades",
   "trading",
