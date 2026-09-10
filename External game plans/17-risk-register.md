@@ -35,6 +35,7 @@ chapter covers risks to the programme and to the application.
 | **R59** | **Every dialog that asked to be wide rendered at 32rem** - an unprefixed `max-w-*` never displaces the primitive's `sm:max-w-lg` | Medium | **ALREADY OCCURRED, 31 dialogs** | **CLOSED for the games surface 9 Sep 2026**; the other 29 are an owner decision |
 | **R60** | **A native `<select>` on a translucent background renders white on white** - the *browser* paints the list, taking the background from the element and letting options inherit `color`. **Two instances found** | Low | **ALREADY OCCURRED, 2 controls** | **Genre picker CLOSED 9 Sep 2026**; `MessagingSection.tsx`'s employee picker is a **named, tested exception** - blocked by that file's lint debt |
 | **R61** | **The contest EDITOR never learned the play shape** - it offered the attempts and round-start controls on a simultaneous contest, and `applyEdit` forces both before reading what the operator sent, so the save reported success and stored something else | Medium | **LATENT** - no title declares `scheduled` yet | **CLOSED 10 Sep 2026** (task doc 12.1); nothing backfilled |
+| **R62** | **The adapter guessed how a title ranks from a hard-coded map of two game codes**, and ingestion believed it - so a third title would have had every player scored on their WORST attempt under `best_of_n`, uniformly enough that no board looked reversed | Medium | **LATENT** - the two listed titles are the only ones synced | **CLOSED 10 Sep 2026** (task doc 13.1); nothing backfilled |
 | R8 | Bulk find-and-replace on wording | High | Medium | X8 |
 | R9 | Fraud throttle blind to provider entries | High | High | X5 |
 | R11 | Legal wording changed without review | High | Medium | X8 |
@@ -2213,6 +2214,82 @@ one the first person it inconveniences deletes, which is the same reasoning that
 Probed by `tools/probe-client-bundle-guard.ps1`: two probes, one restoring the admin defect
 verbatim and one reverting the main app's `import type` to a plain import, each red on exactly
 the expected test.
+
+---
+
+### R62 - The adapter decided how a game ranks - **CLOSED 10 September 2026**
+
+**What it was.** `lib/services/game-providers/adapters/chartvolt-games/normalise.ts` held
+`TITLE_DIRECTIONS`, a map of game code to score direction with two entries - `circuit-sprint`
+upward, `circuit-perfect` downward - and defaulted anything else upward with a `console.warn`.
+Gate 11b of `result-ingestion.service.ts` passed its answer to `syncParticipantScore`, which
+uses the direction to pick the best of several attempts.
+
+So a third title shipped by the games service, with nobody editing that platform file, would
+have had every player on a `best_of_n` contest scored on their **worst** attempt.
+
+**Be precise about the harm in both directions**, because this reads worse than it was and
+also better. It is **not** a reversed leaderboard: settlement and both leaderboards resolve the
+direction from the catalogue through `resolveScoreDirection`, and always did, so the contest
+would have paid the correct order - of the wrong runs. And it is not a rounding-level nicety
+either: on a lower-is-better title the gap between a player's best and worst attempt is the
+whole point of offering several, so the ranking, the ranks and therefore the prizes would all
+have differed. **LATENT**: the only two titles in the catalogue are the two the map listed, so
+no round has ever been scored from the default. **Nothing was backfilled** - the per-round
+scores are on `game_round`, so a wrongly-aggregated contest could have been recomputed, and
+there is not one.
+
+**Why it was invisible.** The failure is uniform across every player of the affected title, so
+no board looks impossible, no total fails to add up, and nothing throws. The only signal was a
+warning on a server nobody watches - and the old test suite asserted that the guess for an
+unknown title **matched settlement's default exactly**, which is what made it coherent. That
+assertion was correct about the code and was pinning the thing that hid the defect.
+
+**The file's own defence was accurate and did not apply.** Its comment said `parseCallback` is
+synchronous in `GameProviderAdapter`, so the adapter cannot await a catalogue read, and the
+contract field it filled was required. Both true. But the mistake was in the **consumer**:
+`result-ingestion.service.ts` is async, holds `round.gameKey`, and gate 10 had already read
+the very catalogue row that declares the direction, forty-five lines earlier, for the range
+check - and then discarded it.
+
+**The fix.** `scoreDirection` left `NormalisedRoundResult` altogether rather than being read
+from the catalogue *and* kept on the payload. Two rules meet at that decision. A supplier's
+opinion is an input, never a decision - so even a provider who volunteered the direction on a
+result body must not be the one who settles it. And a fact with one authoritative home must not
+acquire a second: R32/R33 established that a duplicated ranking input lets two rows in one
+leaderboard disagree, which is incoherent rather than merely wrong. Ingestion resolves it
+through `resolveScoreDirection`, the one definition settlement and both leaderboards already
+share, so **adding a title is now a catalogue sync**.
+
+Resolved there rather than by widening gate 10's read, deliberately: `scoreWithinRange`
+answering a second, unrelated question would make its name a lie, and the cost is one indexed
+`findOne` per ingested result.
+
+**The provider spec needed no change, and checking cost one search.** `01` section 3 and
+`ChartVolt-Game-API-Requirements.html` ask for `scoreDirection` on the **catalogue** and have
+never asked for it on a result body. The issued contract was right all along; the invented
+per-round copy was ours. **No version bump.**
+
+**Guard.** `__tests__/services/game-agnostic-result-ingestion.test.ts`, 9 tests, and
+`tools/probe-game-agnostic-ingestion.ps1`, 8 probes, every one red on exactly one failure.
+Four things about it are worth carrying:
+
+- **The eighth probe is behavioural and the other seven could not be.** Structural tests stay
+  green against a service that calls the resolver and then discards its answer, so one probe
+  hard-codes the platform default - which is exactly what the deleted map returned for an
+  unknown title - and the ranking test turns red.
+- **The positive assertion is not decoration.** A test pins that `ProviderCatalogueGame` still
+  declares `scoreDirection`, because sweeping it away "for consistency" leaves the platform no
+  source at all, at which point every title ranks upward and a time trial pays the slowest
+  player first.
+- **The behavioural test used to override the direction on the payload, which is why it passed
+  against the defect.** It seeds `mock-puzzle` - a code the map never contained - as
+  `lower_is_better` and now passes no direction at all, so a fallback to the upward default
+  scores it 140 rather than 92. Two sources must disagree before a test can prove which one
+  was read; here one of them was removed.
+- **`toHaveProperty` names a field as a STRING, so the compiler cannot see it.** Removing the
+  field turned six type-position uses red and left that one assertion green until the suite
+  ran. A structural rename is only as complete as the assertions that are typed.
 
 ---
 

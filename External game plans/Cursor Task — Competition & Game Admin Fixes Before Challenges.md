@@ -1212,6 +1212,93 @@ The objective is to remove game-specific assumptions from UI and business logic.
 
 ---
 
+## 13.1 — WHAT WAS BUILT, 10 September 2026
+
+**The schema this task sketches already existed. Its closing sentence did not, and that is
+what shipped.** Almost every field in the example above has been on `provider_game` since X2,
+and three of the blocks were completed by tasks 9, 11 and 14 over the preceding two days. So
+building the sketch would have meant renaming working fields; the deliverable was the
+objective line — *remove game-specific assumptions from UI and business logic* — and the one
+that mattered was in the ingestion path, where it decided money.
+
+### The sketch, mapped honestly against the platform
+
+| Task 13 asks for | Where it lives | Status |
+|---|---|---|
+| `name`, `slug`, `type`, `description` | `displayName`, `gameCode`, `category`, `description` | Present since X2; `category` given a vocabulary by **task 9** |
+| `logo`, `banner`, `thumbnail` | `thumbnailUrl` (square), `bannerUrl` (wide) | Present. Two fields, not three — the two shapes crop differently |
+| `supportedCompetitionModes` | `supportedPlayModes` + `supportsCompetition` / `supportsOneVsOne` / `supportsPractice` | **Task 11**. Read through `resolveSupportedPlayModes` |
+| `scoring.type` / `.direction` | `scoreType`, `scoreDirection` | Present since X2, provider-owned |
+| `scoring.allowZero` | `zeroIsValidResult`, `minimumEligibleScore`, `scoreUnit` | **Task 14**. Read through `resolveScoringRules` |
+| `capabilities.multiplayer` | `family` + the two `supports*` flags | Present. Note `family` describes whether a game needs an *opponent* — a race is `independent` |
+| `capabilities.synchronous` / `.asynchronous` | `playMode`, `playModeOverride`, `supportedPlayModes` | `22` s8/s9/s10 |
+| `capabilities.rounds` / `.attempts` | **Deliberately not a title capability** | See below |
+
+**`capabilities.attempts` was considered and deliberately not added.** A title-level
+"supports multiple attempts" flag would be read by nothing: `attemptsPolicy` is a *contest*
+setting, and the one case where a title constrains it — a simultaneous game, where a race
+cannot be re-run against a field that has already finished — is already forced by
+`play-shape.ts`. Adding it now produces the declared-written-dead field this codebase has
+found five times (`requiresSyncPlay`, `isPaused`, `lastSuccessfulRoundAt`, `family`,
+`playModeOverride` on a `head_to_head` title), and `requiresSyncPlay` was *deleted* rather
+than wired up for exactly this reason. Same answer as the turn-based and heat-based modes in
+10.2: nothing in the catalogue needs it, and no provider is signed.
+
+### The assumption that was left, and it decided money
+
+`chartvolt-games/normalise.ts` held `TITLE_DIRECTIONS`, a two-entry map of game code to score
+direction, and gate 11b of `result-ingestion.service.ts` passed its answer to
+`syncParticipantScore`, which uses the direction to pick the best of several attempts. A third
+title shipped by the games service, with nobody editing that platform file, would have had
+every player on a `best_of_n` contest scored on their **worst** attempt.
+
+Recorded as **R62**. Read that entry for the full account; three things belong here.
+
+- **It was not a reversed leaderboard.** Settlement and both leaderboards have always read the
+  direction from the catalogue, so the contest would have paid the correct order of the wrong
+  runs. It was also not trivial: on a lower-is-better title the gap between a player's best and
+  worst attempt is the entire point of offering several.
+- **The file's defence was accurate and did not apply.** `parseCallback` really is synchronous
+  and really cannot read the catalogue. The consumer is async, holds `gameKey`, and had already
+  read the row that declares the direction forty-five lines earlier for the range check.
+- **The field left the contract rather than being read from both places.** A direction is a
+  fact about a title, `provider_game` is its only home, and R32/R33 established that a
+  duplicated ranking input lets two rows in one leaderboard disagree. Ingestion resolves it
+  through `resolveScoreDirection`, so **adding a title is now a catalogue sync**.
+
+The provider contract needed no change: `01` section 3 and the requirements HTML ask for
+`scoreDirection` on the **catalogue** and never on a result body. The issued spec was right;
+the per-round copy was ours. **No version bump.**
+
+### Recorded, not fixed — and it is bigger than this task
+
+The audit turned up a second cluster, and it is deliberately out of scope because it is a
+different phase rather than a smaller job. **The global leaderboard, matchmaking, badge
+evaluation and the journey map all rank on `TradeHistory` alone**, so a player who wins
+provider contests and never trades ranks last on the platform's own leaderboard, is matched as
+a beginner, and unlocks no badges. `lib/services/matchmaking.service.ts` is already risk
+**X13**, and "no aggregate may silently mean trading only" is already the binding rule in `05`
+s10. That is cross-game scoring — `05`, phases X7 and X11 — and it needs a source for
+cross-game points before any screen can be corrected. **Do not let a summary imply task 13
+closed it.**
+
+### Guard
+
+`__tests__/services/game-agnostic-result-ingestion.test.ts`, 9 tests, and
+`tools/probe-game-agnostic-ingestion.ps1`, 8 probes, every one red on exactly one failure. The
+structural tests strip comments first, because every file involved now explains the deleted map
+in prose and names both of its game codes. Four tests were **flipped rather than deleted** — two
+adapter tests that pinned the direction guess, one `toHaveProperty` assertion the compiler could
+not see, and the behavioural ranking test, which used to supply the direction on the payload and
+is precisely why it passed against the defect.
+
+**Verified:** 1,966 main-app tests across 91 files, `check:mirrors` clean, both typechecks at
+their exact baselines (main 194, admin 223) with none in a touched file and none disappearing,
+admin `next build` clean, lint clean. **Nothing here is player- or operator-visible**, so there
+was nothing to verify by eye.
+
+---
+
 # TASK 14 — SCORE CONFIGURATION
 
 Different games do not always use the same scoring logic.

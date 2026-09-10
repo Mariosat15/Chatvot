@@ -489,7 +489,6 @@ describe("the sync leaves no phantom zero behind", () => {
         // Reason it is 5000 rather than 0: a value that would take first place if it were
         // counted, so the test fails loudly instead of coincidentally agreeing with an absence.
         rawScore: 5000,
-        scoreDirection: "higher_is_better" as const,
         completedAt: new Date(),
       },
       eventId: "evt_voided",

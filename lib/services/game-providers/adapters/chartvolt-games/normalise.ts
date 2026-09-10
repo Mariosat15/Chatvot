@@ -2,7 +2,6 @@ import type {
   NormalisedRoundResult,
   ProviderResult,
   ProviderRoundStatus,
-  ProviderScoreDirection,
 } from "../../contract";
 
 /**
@@ -22,7 +21,15 @@ import type {
  * it compares models rather than the code reading them.
  */
 
-/** The shape ChartVolt Games sends. Every field optional, because a payload is an input. */
+/**
+ * The shape ChartVolt Games sends. Every field optional, because a payload is an input.
+ *
+ * The body also carries `gameCode`, and it is deliberately absent from this list: nothing here
+ * reads it since task document 13, and leaving it declared would suggest an adapter has some
+ * use for knowing which title it is looking at. It does not - see the note above
+ * `normaliseResultBody`. The round is identified by `roundId`, and `game_round` already records
+ * which title it belongs to.
+ */
 interface ProviderResultBody {
   eventId?: unknown;
   eventType?: unknown;
@@ -30,7 +37,6 @@ interface ProviderResultBody {
   roundId?: unknown;
   providerRoundId?: unknown;
   playerId?: unknown;
-  gameCode?: unknown;
   status?: unknown;
   score?: unknown;
   scoreBreakdown?: unknown;
@@ -48,47 +54,29 @@ const TERMINAL_STATUSES: ProviderRoundStatus[] = [
   "voided",
 ];
 
-/**
- * Which way each of our own titles ranks.
+/*
+ * THIS FILE USED TO HOLD `TITLE_DIRECTIONS`, A MAP OF GAME CODE TO SCORE DIRECTION, AND
+ * REMOVING IT IS TASK DOCUMENT 13.
  *
- * A SECOND COPY OF A FACT, KEPT DELIBERATELY, WITH ITS LIMITS STATED
- * -----------------------------------------------------------------
- * The authoritative record is `provider_game.scoreDirection`, written by the catalogue sync
- * from the provider's own declaration, and that is what settlement reads. This map exists
- * because `parseCallback` is SYNCHRONOUS in `GameProviderAdapter` - it cannot await a database
- * read - and the field it must fill is required.
+ * It listed two entries - `circuit-sprint` upward, `circuit-perfect` downward - and defaulted
+ * anything else upward with a warning. Its own comment defended it accurately: `parseCallback`
+ * is SYNCHRONOUS in `GameProviderAdapter`, so this file cannot await a catalogue read, and the
+ * contract field it filled was required.
  *
- * What the value here actually affects is narrow and worth being precise about, because
- * "scoreDirection is wrong" sounds catastrophic. It is passed to `syncParticipantScore`, which
- * uses it to pick the best of several attempts. Ranking and payout do NOT come from here; they
- * come from the catalogue via `resolveContestScoreDirection`. So a mistake in this map costs a
- * player the wrong attempt being counted, not a reversed leaderboard.
+ * The mistake was in the CONSUMER rather than here. `result-ingestion.service.ts` passed the
+ * guess to `syncParticipantScore`, which uses the direction to pick the best of several
+ * attempts - and that service is async, holds `gameKey`, and had already read the very
+ * catalogue row that declares the direction one gate earlier. So a third title shipped by the
+ * games service would have had every player scored on their WORST attempt, uniformly enough
+ * that no board looked reversed and no figure looked impossible.
  *
- * The unknown case matches settlement's default EXACTLY, and that is the point rather than
- * laziness: a uniformly wrong direction is coherent and visibly wrong, while two components
- * disagreeing produces a result that looks plausible and cannot be explained to a player.
+ * Rather than keep a second copy of a per-title fact, `scoreDirection` left the contract
+ * altogether: ingestion resolves it through `resolveScoreDirection`, the one definition
+ * settlement and both leaderboards already share. Adding a title is now a catalogue sync.
+ *
+ * DO NOT REINTRODUCE A PER-TITLE TABLE HERE. An adapter translates a payload; it does not get
+ * to say what a game IS. A test asserts this file names no game code at all.
  */
-const TITLE_DIRECTIONS = new Map<string, ProviderScoreDirection>([
-  ["circuit-sprint", "higher_is_better"],
-  ["circuit-perfect", "lower_is_better"],
-]);
-
-export function directionForGameCode(
-  gameCode: string | undefined,
-): ProviderScoreDirection {
-  if (gameCode) {
-    const known = TITLE_DIRECTIONS.get(gameCode);
-    if (known) return known;
-  }
-
-  // Loud, because it means this adapter has seen a title it does not know about - which for a
-  // first-party provider means the service shipped a game the platform was not updated for.
-  console.warn(
-    `⚠️ [chartvolt-games] no known score direction for "${gameCode ?? "(none)"}"; ` +
-      `treating it as higher-is-better, matching settlement's default.`,
-  );
-  return "higher_is_better";
-}
 
 function asString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
@@ -179,8 +167,6 @@ export function normaliseResultBody(
     };
   }
 
-  const gameCode = asString(body.gameCode);
-
   /*
    * A missing score on a terminal round becomes 0 rather than a refusal, and the choice is not
    * obvious in either direction.
@@ -203,7 +189,6 @@ export function normaliseResultBody(
     providerRoundId: asString(body.providerRoundId) ?? roundId,
     status: status as ProviderRoundStatus,
     rawScore,
-    scoreDirection: directionForGameCode(gameCode),
   };
 
   const breakdown = body.scoreBreakdown;

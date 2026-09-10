@@ -139,13 +139,26 @@ export interface CreateRoundResponse {
  * `rawScore` is the only field that may influence ranking. `breakdown` is display-only,
  * and chapter 01 section 5.4 is explicit about it - ranking on a breakdown component would
  * make the result depend on data we never agreed a meaning for.
+ *
+ * IT CARRIED `scoreDirection` UNTIL TASK DOCUMENT 13, AND THE REMOVAL IS THE POINT RATHER
+ * THAN A TIDY-UP. A direction is a fact about a TITLE, not about a round, and the only place
+ * it is recorded is `provider_game.scoreDirection`. Putting it on a per-round payload gave
+ * every adapter a per-title question to answer with no catalogue access - `chartvolt-games`
+ * answered it from a hard-coded map of two game codes, and a third title would have been
+ * scored on each player's worst attempt.
+ *
+ * Two rules meet here. A supplier's opinion is an input, never a decision - so even a
+ * provider who volunteered the direction on a result body must not be the one who settles it.
+ * And a fact with one authoritative home must not acquire a second: R32/R33 established that
+ * a duplicated ranking input lets two rows in one leaderboard disagree, which is incoherent
+ * rather than merely wrong. `resolveScoreDirection` is that one home, and the ingestion
+ * service - which is async and holds `gameKey` - is where it is read.
  */
 export interface NormalisedRoundResult {
   roundId: string;
   providerRoundId: string;
   status: ProviderRoundStatus;
   rawScore: number;
-  scoreDirection: ProviderScoreDirection;
   /** Display only. NEVER used for ranking. */
   breakdown?: Record<string, unknown>;
   startedAt?: Date;

@@ -10,6 +10,7 @@ import { getProviderAdapter } from "@/lib/services/game-providers/registry";
 import type { NormalisedRoundResult } from "@/lib/services/game-providers/contract";
 import { canContestAcceptScore } from "./contest-state";
 import { syncParticipantScore } from "./participant-score.service";
+import { resolveScoreDirection } from "./score-direction.service";
 import {
   checkTimestamp,
   extractEventId,
@@ -453,11 +454,27 @@ export async function applyResult(args: {
   // This was missing entirely until 5 Sep 2026, and settlement's own comment asserted it was
   // here. Without it every provider participant settled on `score: 0`, tied at rank 1, and
   // split the prize pool equally however well they played.
+  //
+  // THE DIRECTION COMES FROM THE CATALOGUE SINCE TASK DOCUMENT 13, AND USED TO COME FROM THE
+  // ADAPTER, which had guessed it from a two-entry map of our own game codes. That map is what
+  // task 13 exists to remove: adding a lower-is-better title to the games service, without
+  // also editing a platform file, meant `syncParticipantScore` picked each player's WORST
+  // attempt on a best-of-several contest. Coherently, for every player, so no board looked
+  // reversed and no figure looked impossible - and settlement's own direction read was right
+  // all along, so the contest paid the correct order of the wrong runs. One `console.warn` was
+  // the entire signal.
+  //
+  // The adapter's excuse was real and did not apply here: `parseCallback` is synchronous and
+  // could not read the catalogue. This function is async, already holds `round.gameKey`, and
+  // gate 10 above has just read the very row that declares the direction. Resolved through
+  // `resolveScoreDirection` rather than by widening gate 10's read, because that is the one
+  // definition settlement and both leaderboards already use - and `scoreWithinRange` answering
+  // a second, unrelated question would make its name a lie.
   const scoreSync = await syncParticipantScore({
     contestId: round.contestId,
     userId: round.userId,
     contestType: round.contestType,
-    scoreDirection: normalised.scoreDirection,
+    scoreDirection: await resolveScoreDirection(round.gameKey),
   });
 
   // Reason the ingestion still succeeds when the sync does not: the round result IS stored,

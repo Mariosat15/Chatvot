@@ -266,8 +266,20 @@ describe("the mock adapter is a faithful liar", () => {
     if (!parsed.success) return;
     expect(parsed.data.rawScore).toBe(777);
     expect(parsed.data.roundId).toBe("r9");
+    /*
+     * FLIPPED BY TASK DOCUMENT 13, NOT DELETED. This asserted the parsed result DID carry a
+     * `scoreDirection`, which is now the thing that must not happen: a direction is a fact
+     * about a title, the catalogue is its only home, and an adapter with a per-round copy is
+     * how a third title got scored on each player's worst attempt.
+     *
+     * Worth keeping for a second reason. `toHaveProperty` names the field as a STRING, so the
+     * compiler could not see it - removing the field from `NormalisedRoundResult` turned six
+     * type-position uses red and left this one green until the suite ran. A structural rename
+     * is only as complete as the assertions that are typed.
+     */
+    expect(parsed.data).not.toHaveProperty("scoreDirection");
     // `breakdown` exists but must never be the ranking input.
-    expect(parsed.data).toHaveProperty("scoreDirection");
+    expect(parsed.data).toHaveProperty("breakdown");
   });
 
   it("rejects a malformed callback body without throwing", () => {

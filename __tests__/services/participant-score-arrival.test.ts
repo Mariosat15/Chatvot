@@ -512,7 +512,6 @@ describe("a partial run counts - the ending decides nothing about eligibility", 
       providerRoundId: `p_${roundId}`,
       status,
       rawScore,
-      scoreDirection: "higher_is_better" as const,
       completedAt: new Date(),
     };
   }
@@ -623,10 +622,22 @@ describe("a partial run counts - the ending decides nothing about eligibility", 
     expect((await CompetitionParticipant.findById(seat._id))?.score).toBe(3200);
   });
 
-  it("takes the LOWEST of two cut-short attempts when lower is better", async () => {
-    // A time trial cut short reports a worse time, not a better one, so the direction has to
-    // survive the widened status filter. Taking the maximum here would rank the player on the
-    // attempt they did worst at.
+  it("takes the LOWEST of two cut-short attempts when the CATALOGUE says lower is better", async () => {
+    /*
+     * A time trial cut short reports a worse time, not a better one, so the direction has to
+     * survive the widened status filter. Taking the maximum here would rank the player on the
+     * attempt they did worst at.
+     *
+     * STRENGTHENED BY TASK DOCUMENT 13, and the removal is what strengthened it. This used to
+     * seed the title as `lower_is_better` AND override `scoreDirection` on both payloads, so
+     * the answer was available from two sources and the test could not say which was read. It
+     * was the payload: the adapter guessed the direction from a hard-coded map of two game
+     * codes, and ingestion believed it.
+     *
+     * Now the payload carries no direction at all and the seeded title is the only source in
+     * existence. If ingestion stopped reading the catalogue - or fell back to the platform's
+     * upward default - this scores 140 rather than 92, which is the player's worse run.
+     */
     await seedTitle("lower_is_better");
     const contest = await seedContest("best_of_n");
     const seat = await seatFor(String(contest._id), USER);
@@ -634,20 +645,14 @@ describe("a partial run counts - the ending decides nothing about eligibility", 
     const first = await launchedRound(contest._id, USER, 1);
     await applyResult({
       providerKey: PROVIDER_KEY,
-      normalised: {
-        ...endingAt(first.roundId, "expired", 92),
-        scoreDirection: "lower_is_better" as const,
-      },
+      normalised: endingAt(first.roundId, "expired", 92),
       source: "manual",
     });
 
     const second = await launchedRound(contest._id, USER, 2);
     await applyResult({
       providerKey: PROVIDER_KEY,
-      normalised: {
-        ...endingAt(second.roundId, "abandoned", 140),
-        scoreDirection: "lower_is_better" as const,
-      },
+      normalised: endingAt(second.roundId, "abandoned", 140),
       source: "manual",
     });
 

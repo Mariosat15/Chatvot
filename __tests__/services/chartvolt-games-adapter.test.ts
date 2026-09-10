@@ -567,7 +567,6 @@ describe("reading a result", () => {
       providerRoundId: "cvg_round-1",
       status: "completed",
       rawScore: 4200,
-      scoreDirection: "higher_is_better",
       durationMs: 120_000,
     });
     expect(result.data.completedAt).toBeInstanceOf(Date);
@@ -598,30 +597,33 @@ describe("reading a result", () => {
     },
   );
 
-  it("reads the direction from the game code, both ways", async () => {
-    ok(resultBody({ gameCode: "circuit-perfect", score: 41_000 }));
-    const perfect = await adapter.fetchRound("round-1");
-    expect(perfect.success && perfect.data.scoreDirection).toBe("lower_is_better");
-
-    ok(resultBody({ gameCode: "circuit-sprint" }));
-    const sprint = await adapter.fetchRound("round-1");
-    expect(sprint.success && sprint.data.scoreDirection).toBe("higher_is_better");
-  });
-
-  it("defaults an unknown game code upward, matching settlement exactly", async () => {
+  it("answers nothing about the direction, whichever title reported", async () => {
     /*
-     * Not laziness, and the alternative is worse. Settlement's `resolveContestScoreDirection`
-     * defaults an unresolvable title to higher-is-better; if this defaulted differently the two
-     * components would disagree, and a result that looks plausible but cannot be explained to a
-     * player is worse than one that is uniformly and visibly wrong.
+     * FLIPPED BY TASK DOCUMENT 13, NOT DELETED. This used to be two tests - "reads the
+     * direction from the game code, both ways" and "defaults an unknown game code upward,
+     * matching settlement exactly" - and they passed, against a `TITLE_DIRECTIONS` map holding
+     * `circuit-sprint` and `circuit-perfect`.
+     *
+     * The claim they pinned was true and the design under it was not. A direction is a fact
+     * about a TITLE, and the catalogue already records it; a per-round copy meant that adding
+     * a third title to the games service - without also editing a platform file - had every
+     * player on a best-of-several contest scored on their WORST attempt. The old second test
+     * is the one worth reading twice: it asserted that the guess for an unknown title matched
+     * settlement's default, which made the failure coherent across every player and therefore
+     * invisible on every screen.
+     *
+     * What survives is the reason the two titles exist. A catalogue of only upward-ranked
+     * games lets a sign error pass every test, so `circuit-perfect` is still synced as
+     * `lower_is_better` and the catalogue test above still asserts it. The direction simply
+     * arrives from there now.
      */
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    ok(resultBody({ gameCode: "some-future-game" }));
-    const result = await adapter.fetchRound("round-1");
-    expect(result.success && result.data.scoreDirection).toBe("higher_is_better");
-    // Loud, because for a first-party provider it means the service shipped a game the platform
-    // was never updated for.
-    expect(warn).toHaveBeenCalled();
+    for (const gameCode of ["circuit-perfect", "circuit-sprint", "some-future-game"]) {
+      ok(resultBody({ gameCode, score: 41_000 }));
+      const result = await adapter.fetchRound("round-1");
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data).not.toHaveProperty("scoreDirection");
+    }
   });
 
   it("keeps the breakdown but never lets it near ranking", async () => {

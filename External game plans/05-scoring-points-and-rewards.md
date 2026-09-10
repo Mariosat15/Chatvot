@@ -121,6 +121,27 @@ exactly which attempt earned their position.
 **"Every round that scored" is not "every round that completed"**, and this table said the
 second until 7 September 2026. See 2.1a - the distinction turned out to be a live defect.
 
+> **AMENDED 10 September 2026 (R62): the `best_of_n` row says "by `scoreDirection`" and never
+> said WHERE that comes from, which is exactly where the defect lived.** Section 2.2 establishes
+> that the direction is a property of the title, read from the catalogue, and that was true of
+> settlement and of both leaderboards. It was **not** true of this aggregation: gate 11b took the
+> direction from `NormalisedRoundResult`, which the ChartVolt Games adapter filled from
+> `TITLE_DIRECTIONS`, a hard-coded map of **two** game codes defaulting anything else upward. A
+> third title would have had every player scored on their **worst** attempt.
+>
+> **The harm is narrower than it sounds and not cosmetic.** Nothing here reverses a board -
+> settlement's own read was right, so the contest would have paid the correct order **of the
+> wrong runs.** But on a lower-is-better title the gap between a player's best and worst attempt
+> is the entire reason for offering several, so the ranks and the prizes both differ. Latent:
+> the only two titles in the catalogue are the two the map listed.
+>
+> **The general form, which is what section 2.2 could not have caught:** a fact with one
+> authoritative home reached one consumer through a *different* route. 2.2's rule was obeyed by
+> every path it named, and this path was not one of them. So `scoreDirection` **left
+> `NormalisedRoundResult` entirely** rather than being read from the catalogue while still
+> arriving on a payload - the same reasoning that keeps it off the participant row, one layer
+> out. Every consumer now goes through `resolveScoreDirection`. Task doc 13.1.
+
 ### 2.1a A round's ENDING says nothing about whether the play counted (R48, 7 September 2026)
 
 The owner's report was that only a player who finished every board seemed to win, and that this

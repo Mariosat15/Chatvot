@@ -345,7 +345,6 @@ export class MockProviderAdapter implements GameProviderAdapter {
       providerRoundId: `mock_${roundId}`,
       status: "completed",
       rawScore: this.resolveScore(roundId),
-      scoreDirection: "higher_is_better",
       breakdown: { correct: 8, total: 10 },
       startedAt: new Date(now.getTime() - 60_000),
       completedAt: now,
