@@ -702,7 +702,7 @@ is an index, not an account.
 | **17** - Remove the legacy game | **Deprecated 8 Sep** and the wizard already filters on `active`, but it needs a **catalogue re-sync** to actually leave the picker. Open |
 | **18** - Redesign the other screen | **Not started** |
 | **19** - AI on the game content screen | **Done** (19.1 storage, 19.2 assistant), both 10 Sep. Setting out to build it found that four of the six content fields the contract REQUIRES were being discarded on every sync (**R63**), so that shipped first. Owner decision the same day: **the AI never writes `rulesSummary` or `howToPlay`**, which are the provider's and are quoted back in prize disputes - enforced by the suggestion type having no such field rather than by a rule somebody must remember. **No SEO or meta description**, deliberately: a provider title has no public page of its own yet, so the field would be written and read by nothing |
-| **20** - AI must be game-agnostic | **Mostly done 8 Sep** for the wizard's assistant (`12` s2.8). Task 19's screen is what remains |
+| **20** - AI must be game-agnostic | **Done 10 Sep** (task doc **20.1**). Game-agnostic was already true and pinned since `12` s2.8; what was missing was the *facts*, and it was unbuildable until 19.1 stored the provider's rules. `describeGameFacts` is now the one producer both assistants read, and `VOCABULARY_SELECT` the one projection that fills it - the routes each had their own, which is a field the prompt describes and one screen never fetches. **Three of the eleven facts are deliberately withheld**: attempts and the chosen structure do not exist when the panel runs, and the supported modes would let the model promise a live race for a contest scheduled as play-any-time |
 | **21-24** - Game Performance section | **Not started.** Task 9's grouping key now exists for it |
 | **25-27** - Consistency, model review, backward compatibility | **Not started** |
 | **28** - Settlement server-side | **Not verified, likely already true.** Worth confirming rather than assuming - the claim is exactly the kind an aside makes |
@@ -750,6 +750,68 @@ Newest at the top.
 **Deferred:** what was consciously left for later
 **Next chat should:** the single clearest next action
 ```
+
+---
+
+### 10 Sep 2026 - TASK 20 - ONE DESCRIPTION OF THE GAME, GIVEN TO BOTH ASSISTANTS
+
+**Shipped:** `describeGameFacts` in `apps/admin/lib/admin/ai-contest-vocabulary.ts` is the
+single producer of everything the model is told about a game, and both assistants - the
+contest wizard's and the game-page one built hours earlier - interpolate it. It now includes
+the provider's own `rulesSummary` and `howToPlay`, the score unit, and whether the title can
+be played one against one. Task doc **20.1**. **12 tests, 13 probes, each red on exactly one
+failure.**
+
+**Files touched:** `ai-contest-vocabulary.ts` (the new function and `VOCABULARY_SELECT`),
+`ai-game-content-vocabulary.ts` (its duplicated block deleted), both AI routes,
+`__tests__/admin/ai-game-facts.test.ts` and `tools/probe-ai-game-facts.ps1`.
+
+**Half of the task was already true and the other half could not have been.** "Data-driven,
+no `if (gameName === ...)`" has held since `12` s2.8 with a test forbidding a game code
+anywhere on the wizard, so an audit found nothing to fix there. The gap was the *facts*: the
+prompt said nothing about how a game is **played**, because until 19.1 the platform discarded
+`rulesSummary` and `howToPlay` on every sync. **Task 20 was unbuildable until task 19**, which
+is worth recording because the two read as independent on the task list.
+
+**Five findings:**
+
+- **Giving the model the rules is the strongest form of "do not invent them", and the two
+  instructions are not in tension.** The next reader will see rules text in a prompt that
+  forbids rules claims and try to "fix" one of them, so the reason is in the file. A model
+  that knows the game is about clearing filled rows writes about stacking; a model that knows
+  only the name reaches for race laps, which is task 20's own Tetris example. It must still
+  not **reproduce or paraphrase** them - `rulesSummary` is the authoritative text support
+  quotes back in a prize dispute (`01` s3.1), and a paraphrase beside it is a second,
+  disagreeing account. One test asserts both halves together so nobody deletes one.
+- **The silent defect was two hand-written projections, and neither typecheck could see it.**
+  Each route had its own `.select(...)` and its own `.lean<{...}>` type, so a field added to
+  the shared source type and to one of them arrives `undefined` at the other and its line is
+  simply omitted - no error, no log line, just blander copy on one screen. An
+  explicitly-typed `.lean<{...}>()` is exactly where a field that does not exist looks real,
+  the R32/R33 shape. Now one constant and one type, with a test that **reads the field names
+  out of the interface** rather than listing them, because a list is a third place to forget.
+- **An absent field states nothing, and here that is safety rather than tidiness.** A "rules
+  to follow" heading over an empty block is an invitation to fill it, which is precisely the
+  failure the slice exists to prevent.
+- **Three of task 20's eleven facts are deliberately withheld, for a reason already in the
+  prompt.** Attempts allowed and the selected structure do not exist when the assistant runs -
+  the panel is on `StepBasics`, step 2, and `StepSchedule` picks the mode and the attempts
+  policy at step 3. The supported modes *do* exist and are withheld anyway: telling the model
+  a title supports a synchronised race lets it write "race everyone live" for a contest then
+  scheduled as play-any-time. Same class as the rule already there - **do not claim a prize
+  amount, a player count or a start time.**
+- **`scoreUnit` is read as a word and never as a number.** Display-only by declaration, so the
+  model is told what a score counts and nothing invites arithmetic with one.
+
+**Verified:** 2,012 tests across 94 files, `check:mirrors` 80/80 with 0 drifted, typechecks at
+194 (main) and 223 (admin) - both the exact baselines with none in a touched file - admin
+`next build` clean, eslint clean.
+
+**Deferred:** the facts do not reach the marketplace or landing-page assistants, which write
+about the platform rather than about one game.
+
+**Next chat should:** tasks 21-24, the Game Performance section - task 9's `category` is the
+grouping key they join on.
 
 ---
 

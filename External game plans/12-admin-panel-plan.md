@@ -873,6 +873,20 @@ operator has since edited. Three properties are load-bearing and each is pinned:
   additional coding" claim - the first title needing a special case makes it quietly false while
   every existing test still passes.
 
+> **Amended 10 September 2026 (task document 20.1).** The field list above is the set as first
+> built and is no longer the whole one. `describeGameFacts` in `ai-contest-vocabulary.ts` is now
+> the single producer of the game description for **both** assistants - this wizard's and the
+> game-page one - and it also reads `rulesSummary`, `howToPlay`, `scoreUnit` and
+> `supportsOneVsOne`. The principle is unchanged and is the reason the list can grow at all:
+> the sentences are composed from declared fields, so a new fact is a new field rather than a
+> new branch. Two things came with it. **The provider's own rules are given to the model and
+> are still barred from being restated**, which is not a contradiction - a model that knows the
+> game writes accurately about it, while `rulesSummary` remains the authoritative text quoted
+> back in a prize dispute (`01` s3.1) and must not acquire a second, paraphrased version. And
+> **the projection is shared too** (`VOCABULARY_SELECT`): both routes previously spelled out
+> their own `.select()`, so a field described in the prompt and fetched by only one of them
+> would have arrived `undefined` at the other, silently omitting its line.
+
 **`duration_ms` is read together with the direction, not instead of it.** A title reporting
 milliseconds and scoring higher-is-better is measuring endurance, not speed, so "the fastest
 time wins" would be exactly backwards. And the trading words are **banned by name** in the game

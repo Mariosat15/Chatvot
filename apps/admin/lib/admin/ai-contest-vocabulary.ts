@@ -34,7 +34,31 @@ export interface CatalogueVocabularySource {
   scoreDirection: ScoreDirection;
   scoreType: ScoreType;
   typicalDurationSeconds?: number;
+  /** The provider's own account of how the game scores. Context only - see `describeGameFacts`. */
+  rulesSummary?: string;
+  /** The provider's own account of how the game is played. Context only. */
+  howToPlay?: string;
+  /** "points", "seconds", "lines". Display only, never parsed - see `provider-game.model.ts`. */
+  scoreUnit?: string;
+  supportsOneVsOne?: boolean;
 }
+
+/**
+ * The Mongoose projection that fills a {@link CatalogueVocabularySource}, in one place.
+ *
+ * BOTH ROUTES USED TO SPELL THIS OUT, along with a hand-written `.lean<{...}>` type each. Two
+ * failures follow from that and neither announces itself. A field added to the interface and
+ * to one projection leaves the other assistant describing the same game from a smaller set of
+ * facts - no error, no log line, just blander copy on one screen. And an explicitly-typed
+ * `.lean<{...}>()` is a place a field that does not exist looks real: the compiler checks the
+ * hand-written generic and not the schema, which is how the missing `scoreDirection` read in
+ * R32/R33 survived two typechecks.
+ *
+ * A test reads the field names out of the interface above and requires each to appear here,
+ * so adding one to the type and forgetting the projection fails rather than degrading.
+ */
+export const VOCABULARY_SELECT =
+  "displayName category description scoreDirection scoreType typicalDurationSeconds rulesSummary howToPlay scoreUnit supportsOneVsOne";
 
 export interface ContestVocabulary {
   /** For the caller's own UI copy, so the wizard and the prompt cannot disagree. */
@@ -154,6 +178,78 @@ export function describeSubject(title: CatalogueVocabularySource): string {
   return category ? `${title.displayName} (${category.label})` : title.displayName;
 }
 
+/**
+ * Everything the model is told about the game, composed once and used by both assistants.
+ *
+ * ONE DEFINITION, TWO CONSUMERS. The contest assistant and the game-page assistant were each
+ * building this block, character for character, which is the "one rule, two copies" shape
+ * behind `referenceId`, `failedReason`, `challengeId` and the Game Master `||`. The drift it
+ * invites here is quiet: one screen learns a new catalogue field and the other keeps writing
+ * copy from a smaller picture of the same game, with nothing failing.
+ *
+ * THE PROVIDER'S RULES ARE GIVEN, AND STILL MAY NOT BE RESTATED, and the two are not in
+ * tension - which is worth saying plainly, because the next reader will see rules text in a
+ * prompt that forbids rules claims and try to "fix" one of them. Handing the model the real
+ * rules is the STRONGEST form of "do not invent them": a model that knows the game is about
+ * clearing filled rows writes copy about stacking and surviving instead of reaching for race
+ * laps, which is exactly task 20's Tetris example. What it must not do is reproduce or
+ * paraphrase them, because `rulesSummary` is the authoritative text support quotes back in a
+ * prize dispute (`01` s3.1) and a paraphrase beside it is a second, disagreeing account.
+ *
+ * AN ABSENT FIELD STATES NOTHING. No default duration, no assumed unit, no "rules to follow"
+ * heading over an empty block - the recurring rule, and the reason every line here is
+ * conditional.
+ *
+ * THIRD-PARTY TEXT REACHES THE MODEL HERE, in `description`, `rulesSummary` and `howToPlay`.
+ * That is not new in kind - `description` always did - and all three are catalogue content an
+ * operator can read and edit on the games screen, so none is trusted more than the rest of
+ * the row.
+ */
+export function describeGameFacts(title: CatalogueVocabularySource): string {
+  const winningRule = describeWinningRule(
+    title.scoreDirection,
+    title.scoreType,
+  );
+
+  const lines = [
+    title.description?.trim()
+      ? `- ${title.description.trim()}`
+      : `- A skill game called ${title.displayName}.`,
+    `- Players compete on skill, and ${winningRule}.`,
+  ];
+
+  // Read as a word and never as a number. `scoreUnit` is display-only by declaration, so the
+  // model is told what a score is measured in - "points", "seconds", "lines" - and nothing
+  // invites it to do arithmetic with one.
+  const unit = title.scoreUnit?.trim();
+  if (unit) lines.push(`- A score is measured in ${unit}.`);
+
+  if (title.typicalDurationSeconds) {
+    lines.push(`- A round takes about ${title.typicalDurationSeconds} seconds.`);
+  }
+
+  // A capability, not a contest setting: it says the game CAN be played one against one, which
+  // is a fact about the game worth knowing when describing it. Whether a given contest is one
+  // is not decided here and must not be implied.
+  if (title.supportsOneVsOne) {
+    lines.push(`- It can also be played one player against one other.`);
+  }
+
+  const rules = [title.rulesSummary?.trim(), title.howToPlay?.trim()].filter(
+    (text): text is string => Boolean(text),
+  );
+
+  const context = rules.length
+    ? `
+
+THE PROVIDER'S OWN ACCOUNT OF THE GAME. Use it so the copy is accurate about what players actually do. Do not reproduce it, paraphrase it, or turn it into instructions - it is published to players separately and a second version of it would disagree with the first:
+${rules.map((text) => `"""${text}"""`).join("\n")}`
+    : "";
+
+  return `WHAT THE GAME IS:
+${lines.join("\n")}${context}`;
+}
+
 export function providerVocabulary(
   title: CatalogueVocabularySource,
 ): ContestVocabulary {
@@ -163,24 +259,10 @@ export function providerVocabulary(
     title.scoreType,
   );
 
-  /*
-    The provider's own description is included when there is one, and it is the one piece of
-    third-party text that reaches the prompt. It is catalogue content an operator can already
-    read and edit on the games screen, so it is no more trusted than the rest of the row - and
-    it is what stops the copy being generic when the game's name says nothing about it.
-  */
-  const flavour = title.description?.trim();
-  const duration = title.typicalDurationSeconds
-    ? `A round takes about ${title.typicalDurationSeconds} seconds.`
-    : "";
-
   const systemPrompt = `You are a creative marketing expert for a skill-game competition platform.
 Generate engaging, exciting competition content for a competition played on ${subject}.
 
-WHAT THE GAME IS:
-${flavour ? `- ${flavour}` : `- A skill game called ${title.displayName}.`}
-- Players compete on skill, and ${winningRule}.
-${duration ? `- ${duration}` : ""}
+${describeGameFacts(title)}
 
 IMPORTANT RULES:
 - Keep the title catchy, max 60 characters

@@ -21,7 +21,10 @@ import {
   parseGameContentSuggestion,
   suggestionIsEmpty,
 } from "@/lib/admin/ai-game-content-suggestion";
-import type { ScoreDirection, ScoreType } from "@/lib/admin/ai-contest-vocabulary";
+import {
+  VOCABULARY_SELECT,
+  type CatalogueVocabularySource,
+} from "@/lib/admin/ai-contest-vocabulary";
 
 interface AIConfig {
   apiKey: string | null;
@@ -92,16 +95,12 @@ export async function POST(request: NextRequest) {
     }
 
     await connectToDatabase();
+    // The projection and the type are the shared ones, never spelled out here: a field this
+    // route selects and the contest route does not is one assistant describing the game from
+    // a smaller set of facts, with nothing failing. See `VOCABULARY_SELECT`.
     const title = await ProviderGame.findOne({ gameKey: gameKey.trim() })
-      .select("displayName category description scoreDirection scoreType typicalDurationSeconds")
-      .lean<{
-        displayName: string;
-        category?: string;
-        description?: string;
-        scoreDirection: ScoreDirection;
-        scoreType: ScoreType;
-        typicalDurationSeconds?: number;
-      }>();
+      .select(VOCABULARY_SELECT)
+      .lean<CatalogueVocabularySource>();
 
     // Reason: refused rather than answered generically. Writing page copy for a game we
     // cannot describe means writing it from the game's key, which is how a puzzle gets copy

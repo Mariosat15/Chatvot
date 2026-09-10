@@ -1777,6 +1777,63 @@ if (gameName === "Circuit Sprint") {
 
 for every game.
 
+## 20.1 What was built — 10 September 2026
+
+**Both assistants now describe the game from one block of facts, and the provider's own
+rules are part of it.** `describeGameFacts` in `apps/admin/lib/admin/ai-contest-vocabulary.ts`
+is the single producer; the contest wizard's prompt and the game-page prompt both interpolate
+it. `VOCABULARY_SELECT` beside it is the single projection that fills it, and both routes use
+it with `.lean<CatalogueVocabularySource>()`. **12 tests, 13 probes, each red on exactly one
+failure.**
+
+**Half of this task was already true and the other half could not have been.** "Data-driven,
+no `if (gameName === ...)`" has held since `12` s2.8 and is pinned by a test forbidding a game
+code anywhere on the wizard — so a reader treating 20.1 as the day the AI stopped enumerating
+games is describing work done in September. What was missing was the *facts*: the prompt named
+the game, its genre, its blurb and how it scores, and said nothing about how it is **played**,
+because until task 19 the platform discarded the provider's `rulesSummary` and `howToPlay` on
+every sync. **This task was unbuildable until 19.1 stored them**, which is worth recording
+because the two look independent on the task list.
+
+### Five findings
+
+- **Giving the model the rules is the STRONGEST form of "do not invent them", and the two
+  instructions are not in tension.** The obvious reading is that a prompt containing the rules
+  and a prompt forbidding rules claims are fighting each other, and the next reader will try to
+  "fix" one of them — so the reason is in the file. A model that knows Block Cascade is about
+  clearing filled rows writes about stacking and surviving; a model that knows only the name
+  reaches for whatever the name suggests, which is task 20's own Tetris example. What it must
+  still not do is **reproduce or paraphrase** them, because `rulesSummary` is the authoritative
+  text support quotes back in a prize dispute (`01` s3.1) and a paraphrase beside it is a
+  second, disagreeing account. One test asserts both halves together so nobody deletes one.
+- **Two hand-written projections were the silent defect, and neither typecheck could see
+  them.** Both routes spelled out their own `.select(...)` and their own `.lean<{...}>` type.
+  A field added to the shared source type and to one projection arrives `undefined` at the
+  other, so its line is simply omitted — no error, no log line, just blander copy on one
+  screen. An explicitly-typed `.lean<{...}>()` is exactly where a field that does not exist
+  looks real, which is how the missing `scoreDirection` read in R32/R33 survived two
+  typechecks. One constant, one type, and a test that **reads the field names out of the
+  interface** and requires each to appear in the projection — a listed copy would be a third
+  place to forget.
+- **An absent field states nothing, and here that is a safety property rather than tidiness.**
+  A "rules to follow" heading over an empty block is an invitation to fill it, which is
+  precisely the failure the whole slice exists to prevent. No default duration, no assumed
+  unit, no empty quote marks.
+- **Three of task 20's eleven facts are deliberately NOT sent, and the reason is the same one
+  already in the prompt.** *Attempts allowed* and *selected competition structure* do not exist
+  when the assistant runs — the AI panel is on `StepBasics`, step 2, and `StepSchedule` picks
+  the play mode and the attempts policy at step 3. *Supported competition modes* does exist,
+  and is withheld anyway: telling the model a title supports a synchronised race lets it write
+  "race everyone live" for a contest the operator then schedules as play-any-time. That is the
+  same class as the rule already there — **do not claim a prize amount, a player count or a
+  start time** — a promise to a paying player that the contest will not keep.
+- **`scoreUnit` is read as a word and never as a number.** It is display-only by declaration
+  ("points", "seconds", "lines"), so the model is told what a score counts and nothing invites
+  it to do arithmetic with one.
+
+**Not built:** the facts do not reach the marketplace or landing-page assistants, which write
+about the platform rather than about one game.
+
 ---
 
 # TASK 21 — FIX GAME PERFORMANCE SECTION

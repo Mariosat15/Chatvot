@@ -13,6 +13,8 @@ import { guardSection } from "@/lib/admin/section-route-guard";
 import {
   TRADING_VOCABULARY,
   providerVocabulary,
+  VOCABULARY_SELECT,
+  type CatalogueVocabularySource,
   type ContestVocabulary,
 } from "@/lib/admin/ai-contest-vocabulary";
 
@@ -67,18 +69,12 @@ async function resolveVocabulary(
   }
 
   await connectToDatabase();
+  // The projection and the type are the shared ones, never spelled out here: a field this
+  // route selects and the game-content route does not is one assistant describing the game
+  // from a smaller set of facts, with nothing failing. See `VOCABULARY_SELECT`.
   const title = await ProviderGame.findOne({ gameKey: gameKey.trim() })
-    .select(
-      "displayName category description scoreDirection scoreType typicalDurationSeconds",
-    )
-    .lean<{
-      displayName: string;
-      category?: string;
-      description?: string;
-      scoreDirection: "higher_is_better" | "lower_is_better";
-      scoreType: "integer" | "decimal" | "duration_ms";
-      typicalDurationSeconds?: number;
-    }>();
+    .select(VOCABULARY_SELECT)
+    .lean<CatalogueVocabularySource>();
 
   if (!title) {
     return {

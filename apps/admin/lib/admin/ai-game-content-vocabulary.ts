@@ -8,10 +8,12 @@
  * promising a prize, which is wrong on the page and wrong again the next time the game is run
  * with a different one.
  *
- * WHAT IS SHARED IS THE FACTS, NOT THE PROMPT. `describeSubject`, `describeWinningRule` and
- * `TRADING_WORDS` are imported rather than restated: how a catalogue row becomes words is one
- * rule, and a second copy of it is the shape behind `referenceId`, `failedReason`,
- * `challengeId` and the Game Master `||`, none of which `check:mirrors` can see.
+ * WHAT IS SHARED IS THE FACTS, NOT THE PROMPT. `describeGameFacts`, `describeSubject`,
+ * `describeWinningRule` and `TRADING_WORDS` are imported rather than restated: how a catalogue
+ * row becomes words is one rule, and a second copy of it is the shape behind `referenceId`,
+ * `failedReason`, `challengeId` and the Game Master `||`, none of which `check:mirrors` can
+ * see. This module writes the sentences AROUND the block and never the block itself - a screen
+ * that composed its own would describe the same game from a smaller set of facts, silently.
  *
  * THE VOCABULARY IS DERIVED SERVER-SIDE FROM THE STORED CATALOGUE ROW, NEVER FROM THE REQUEST
  * BODY - the same rule as the contest assistant. The body carries a `gameKey`, which is a
@@ -28,6 +30,7 @@ import {
   NO_FIAT_RULE,
   describeSubject,
   describeWinningRule,
+  describeGameFacts,
   type CatalogueVocabularySource,
 } from "./ai-contest-vocabulary";
 import { CONTENT_LIMITS } from "./game-content-fields";
@@ -72,21 +75,10 @@ export function gameContentVocabulary(
   const subject = describeSubject(title);
   const winningRule = describeWinningRule(title.scoreDirection, title.scoreType);
 
-  // The provider's own description is the one piece of third-party text that reaches the
-  // prompt, and it is what stops the copy being generic when the game's name says nothing
-  // about it. It is catalogue content an operator can already read and edit on this screen.
-  const flavour = title.description?.trim();
-  const duration = title.typicalDurationSeconds
-    ? `A round takes about ${title.typicalDurationSeconds} seconds.`
-    : "";
-
   const systemPrompt = `You are a creative marketing expert for a skill-game competition platform.
 Write the page copy for one game: ${subject}. This is the game's own page, not a single competition.
 
-WHAT THE GAME IS:
-${flavour ? `- ${flavour}` : `- A skill game called ${title.displayName}.`}
-- Players compete on skill, and ${winningRule}.
-${duration ? `- ${duration}` : ""}
+${describeGameFacts(title)}
 
 IMPORTANT RULES:
 - Write about playing ${title.displayName}, never about trading, investing or financial markets
