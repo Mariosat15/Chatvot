@@ -161,7 +161,8 @@ One document per round. This is the audit trail for every score that decides mon
 | `configSnapshot` | **The exact settings used.** Never re-read from the game later |
 | `contentSeed` | The seed used |
 | `status` | `pending` \| `launched` \| `completed` \| `abandoned` \| `expired` \| `voided` \| `unresolved` |
-| `rawScore`, `scoreBreakdown` | As reported |
+| `rawScore`, `scoreBreakdown` | As reported. **`scoreBreakdown` has two writers** - the result callback, and the optional mid-round progress report (`01` s5.5). `rawScore` has one, for ever |
+| `progressAt` | When a progress report last replaced `scoreBreakdown`. **Absent means no progress reports, never "reported long ago"** - every round predating 11 Sep 2026 and every round from a provider that does not send them. Stored rather than derived from `updatedAt`, which moves for any write at all and so cannot answer whether a player's game has gone quiet |
 | `startedAt`, `completedAt`, `durationMs` | Timing, as reported by the provider |
 | `expiresAt` | Round expiry |
 | `launchUrlExpiresAt` | Launch token expiry |

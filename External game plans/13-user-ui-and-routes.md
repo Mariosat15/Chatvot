@@ -1682,7 +1682,86 @@ moment **after** a round lands, which used to require a reload.
 Closing that needs a signed progress callback writing only `game_round.scoreBreakdown` - and
 that is a protocol change, so it is its own piece of work.
 
+> **Amendment, 11 September 2026.** That piece of work was done the same day. The paragraph
+> above is correct as history and **stale as a present fact**: a round in flight now reports its
+> progress, so the board says what a player has solved while they are still solving it. See
+> **s4.1p** below and `01` s5.5. The rest of this section is unchanged and still accurate.
+
 **Never verified by eye**: the arena is behind sign-in and the automated browser has no session.
+
+### 4.1p A round in flight now says what it has done (11 September 2026)
+
+The third of the owner's three points, and the half s4.1o filed as a protocol change. A
+player still at the board read **"Playing now"** however many boards they had solved,
+because **there was no mid-round reporting anywhere on either side of the seam**: a score
+exists only after `finishRound`, the frame's `postMessage` types carry no score field by
+construction, and the games-service's per-board record never left that database.
+
+**The live code.** Platform: `lib/services/games/round-progress.service.ts`,
+`app/api/games/providers/[providerKey]/progress/route.ts`, `progressAt` on both
+`game-round.model.ts` copies, `progressCallbackUrl` threaded through `round-types.ts`,
+`round.service.ts`, `contract.ts`, `chartvolt-games.adapter.ts` and
+`round-launch.service.ts`, and `activityAt` in `contest-activity.service.ts`.
+games-service: `src/callback/progress.ts`, the one `void sendProgress(round)` in
+`src/rounds/play.ts`, and `progressCallbackUrl` on `src/store/round.model.ts` and
+`src/rounds/create.ts`. 22 platform tests, 20 probes red on exactly one failure; 11
+games-service tests. **Protocol version 1.4 -> 1.5.**
+
+Six things drift easily.
+
+- **It is not a second scoring door, and every design decision here is that sentence.** The
+  service writes `scoreBreakdown` and `progressAt` through an explicit two-path `$set` -
+  never a spread of what the provider sent, because **a spread is how the next field
+  arrives, and the field after that is `rawScore`.** It reads `status` to refuse a round
+  that is not live and never writes one. It touches no participant. It is a **separate
+  route** rather than a flag on `/events`, because a body claiming `final: false` reaching
+  the scoring path is one plausible-looking branch away. `06` s2.2 is the authoritative
+  account; a document describing this as an extension of the result callback is describing
+  the design that was rejected.
+- **The read side needed almost nothing, which is why this was affordable.**
+  `getContestActivity` already passed a live round's breakdown through - only `voided` and
+  `unresolved` withhold - so the board and the feed render progress with **no component
+  change at all**. The one edit is `activityAt`, where `progressAt` sits **below**
+  `completedAt` and **above** `startedAt`: without it every live player's feed entry is
+  frozen at the moment they pressed Play, so a contest in which four people have each just
+  solved a board orders them by who started first and never moves again.
+- **`progressAt` is stored rather than derived from `updatedAt`**, which moves for any write
+  at all - the result landing, a manual resolution - and therefore cannot answer whether a
+  player's game has gone quiet. **Absent means no progress reports, never "reported long
+  ago"**, which is true of every round predating this and every provider that declines the
+  callback.
+- **The game's half is the opposite of `deliver.ts` in every way, deliberately.** No retry,
+  no queue, no delivery record, a three-second timeout, and `void` rather than `await`. A
+  lost result is a contest nobody can settle; a lost progress report is one stale line for a
+  few seconds, and **retrying would be strictly worse than not** - a queue of stale reports
+  arriving out of order behind a finished round is a board that goes backwards. The `void`
+  is the load-bearing half: this sits between a player solving a board and being handed the
+  next one, in a round they **paid** for.
+- **It is sent on the continuing branch only.** A round that has just finished is already
+  being delivered as a result with the same figures and a score beside them, and the
+  platform refuses progress for a round that is no longer live - so a send there is a
+  guaranteed 200-with-nothing-stored at best and a race at worst. Pinned positionally with
+  `lastIndexOf`, because the same finishing call appears earlier in `resumeRound` and
+  measured from the first one the assertion is trivially true.
+- **The address is always offered and the provider always chooses.** `progressCallbackUrl`
+  is supplied unconditionally at launch and is optional in the contract, authenticated with
+  the **same** credentials as the result callback - a second credential for a lower-value
+  endpoint is a second thing to rotate and the first one somebody leaves behind. A provider
+  who ignores it is fully conformant and their contests settle identically.
+
+Two smaller rules worth carrying. The sanitiser keeps **primitives only, 24 at most**, drops
+`__proto__` / `constructor` / `prototype` and writes through `Object.defineProperty` - a
+breakdown is unbounded provider data written once per solved board, so this is **a store
+that fills up by succeeding**, which is the `brandingFiles` failure in a new place. And
+refusals on this route are **deliberately not logged**: it is the highest-rate provider route
+by a wide margin, so a line per refusal turns one misconfigured game into a flood that buries
+the warnings that matter.
+
+**Two deploys, not one.** This is a TypeScript change on **both** sides, so the platform needs
+its build and games-service needs `npm run build` plus `pm2 restart chartvolt-games` - R52 and
+R66 were each reported twice for exactly this.
+
+**Never verified by eye.**
 
 ---
 

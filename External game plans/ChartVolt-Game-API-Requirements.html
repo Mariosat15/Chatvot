@@ -208,7 +208,7 @@
     <p class="lede">ChartVolt runs paid skill competitions. We handle the money, the ranking and the rewards. We are looking for partners who can supply the games and tell us what each player scored. This document specifies exactly what your API must do so that we can operate on top of it &mdash; three calls to you, one call back to us.</p>
     <div class="hero-meta">
       <div><b>Document</b><span>Integration requirements</span></div>
-      <div><b>Version</b><span>1.4</span></div>
+      <div><b>Version</b><span>1.5</span></div>
       <div><b>Audience</b><span>Your engineering team</span></div>
       <div><b>Required calls</b><span>3 out, 1 in</span></div>
       <div><b>Money handled by you</b><span>None, ever</span></div>
@@ -384,15 +384,15 @@
   <p class="sec-sub">Three endpoints you build, one endpoint we build. Everything else is optional.</p>
 
   <figure>
-    <div class="fig-t">Diagram 2 &mdash; the four calls</div>
-    <svg viewBox="0 0 920 250" role="img" aria-label="Three calls from ChartVolt to the provider and one callback">
-      <rect x="8" y="70" width="200" height="112" rx="10" fill="#143a5c"/>
-      <text x="108" y="120" text-anchor="middle" font-size="14" font-weight="700" fill="#f0dda6">CHARTVOLT</text>
-      <text x="108" y="142" text-anchor="middle" font-size="11" fill="#cfdcea">our servers</text>
+    <div class="fig-t">Diagram 2 &mdash; the four required calls, and one optional</div>
+    <svg viewBox="0 0 920 296" role="img" aria-label="Three calls from ChartVolt to the provider, one required callback and one optional callback">
+      <rect x="8" y="86" width="200" height="112" rx="10" fill="#143a5c"/>
+      <text x="108" y="136" text-anchor="middle" font-size="14" font-weight="700" fill="#f0dda6">CHARTVOLT</text>
+      <text x="108" y="158" text-anchor="middle" font-size="11" fill="#cfdcea">our servers</text>
 
-      <rect x="712" y="70" width="200" height="112" rx="10" fill="#1a6e49"/>
-      <text x="812" y="120" text-anchor="middle" font-size="14" font-weight="700" fill="#dff2e7">YOUR API</text>
-      <text x="812" y="142" text-anchor="middle" font-size="11" fill="#dff2e7">what you build</text>
+      <rect x="712" y="86" width="200" height="112" rx="10" fill="#1a6e49"/>
+      <text x="812" y="136" text-anchor="middle" font-size="14" font-weight="700" fill="#dff2e7">YOUR API</text>
+      <text x="812" y="158" text-anchor="middle" font-size="11" fill="#dff2e7">what you build</text>
 
       <line x1="212" y1="34" x2="708" y2="34" stroke="#6b7d8f" stroke-width="1.6" marker-end="url(#ar)"/>
       <text x="460" y="26" text-anchor="middle" font-size="11.5" fill="#143a5c" font-family="Consolas, monospace">GET /v1/games</text>
@@ -644,9 +644,10 @@
 
   "contentSeed": "cv_ctst_774219",        <span class="c">// identical content for everyone</span>
                                           <span class="c">// in this contest - see section 12</span>
-  "expiresAt":         "2026-08-18T14:00:00Z",
-  "resultCallbackUrl": "https://chartvolt.com/api/games/providers/acme/events",
-  "returnUrl":         "https://chartvolt.com/contests/774219"
+  "expiresAt":           "2026-08-18T14:00:00Z",
+  "resultCallbackUrl":   "https://chartvolt.com/api/games/providers/acme/events",
+  "progressCallbackUrl": "https://chartvolt.com/api/games/providers/acme/progress",
+  "returnUrl":           "https://chartvolt.com/contests/774219"
 }</pre>
 
   <h4>Your response</h4>
@@ -666,6 +667,7 @@
       <tr><td><code>launchUrlExpiresAt</code></td><td>Short-lived is correct and expected. Tell us when it dies so we can request a fresh round rather than showing a dead frame</td></tr>
       <tr><td><code>expiresAt</code></td><td>After this moment the round must be <b>unplayable</b> and must report <code>expired</code>. This stops a player finishing long after prizes have been paid</td></tr>
       <tr><td><code>mode</code></td><td><code>ranked</code> counts towards a paid contest and <b>must</b> produce a result callback. <code>practice</code> is free play and is never scored by us</td></tr>
+      <tr><td><code>progressCallbackUrl</code></td><td><b>New in 1.5, and entirely optional.</b> Where you may tell us what the player has done <i>so far</i>, while they are still playing, so a contest board shows more than &ldquo;playing now&rdquo;. We always send the address; ignoring it is fully conformant &mdash; see section 8a</td></tr>
     </tbody>
   </table></div>
 
@@ -751,6 +753,53 @@
     <div class="t">Retry until we acknowledge</div>
     <p>If you do not receive a <code>2xx</code> from us, <b>keep retrying with backoff for at least 24 hours</b> using the same <code>eventId</code>. Deployments, network faults and outages happen on our side too, and a score that is silently dropped means a contest we cannot settle and a player who does not get paid. Duplicate deliveries are completely safe for us; a lost one is not.</p>
   </div>
+</section>
+
+<!-- ===== 8a ===== -->
+<section id="progress">
+  <div class="sec-h"><div class="sec-n">8a</div><h2>Optional &mdash; tell us how they are doing</h2></div>
+  <p class="sec-sub">New in version 1.5. Skip this section entirely and nothing changes.</p>
+
+  <div class="ep"><span class="m post">POST</span><span class="u">{progressCallbackUrl}</span><span class="tag">Optional</span></div>
+
+  <p>While a round is being played, we know only that it started. On a contest board that reads as &ldquo;playing now&rdquo; for every player, however well any of them is doing. If your game can say something a spectator would find interesting, send it here and we will show it.</p>
+
+<pre>{
+  "roundId":         "cv_rnd_01JAV3M7Q2XK8T",
+  "providerRoundId": "acme_r_9f2ab41",
+  "breakdown": {                          <span class="c">// your figures, your order</span>
+    "questionsAnswered": 6,
+    "correct": 5,
+    "streak": 3
+  }
+}</pre>
+
+  <p><b>Authentication is exactly the result callback's</b> &mdash; the same bearer token, the same HMAC over the raw bytes, the same five-minute timestamp window from section 4. There is no second credential to manage.</p>
+
+  <div class="cal bad">
+    <div class="t">There is no score field, and we would ignore one</div>
+    <p>Scores reach us through the result callback and nowhere else. That is not a formality: a number arriving mid-round, with no terminal status beside it, would be shown to players and then contradicted by your own final result. Send figures a spectator can read; send the score when the round ends.</p>
+  </div>
+
+  <p><code>breakdown</code> is the same free-form structure as <code>scoreBreakdown</code> in section 8, and the same promise holds &mdash; <b>we never rank on it</b>. We keep string, boolean and numeric values, up to 24 of them, in the order you send them. Anything nested we drop rather than flatten, because how to present your structure is your decision and not ours.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th style="width:90px">We reply</th><th>What it means</th><th style="width:150px">Retry?</th></tr></thead>
+    <tbody>
+      <tr><td><code>200</code></td><td>Stored &mdash; or superseded, because the round has already finished or there was nothing renderable in it</td><td><b>No.</b> Nothing to gain</td></tr>
+      <tr><td><code>400</code></td><td>The body was not valid JSON</td><td>No</td></tr>
+      <tr><td><code>401</code></td><td>Credentials, signature or timestamp refused</td><td>No &mdash; check your configuration</td></tr>
+      <tr><td><code>404</code></td><td>We have no such round for you. Usually the wrong environment</td><td>No</td></tr>
+      <tr><td><code>500</code></td><td>We failed</td><td>Once, if you like</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="cal good">
+    <div class="t">Do not retry, and never make the player wait</div>
+    <p>This is the opposite of the result callback in both respects, deliberately. A progress report is worthless within seconds because the next one replaces it, so a queue of stale reports arriving out of order behind a finished round is a board that goes <i>backwards</i> &mdash; a lost report costs one stale line and nothing more. And send it <b>without waiting for our response</b>: our own game fires this between one board and the next, so a slow moment on our side can never become a pause in a round somebody has paid to play.</p>
+  </div>
+
+  <p><b>Send it when something happens</b> &mdash; a board solved, a question answered, a lap completed &mdash; rather than on a timer. Each report replaces the last one for that round; nothing accumulates and there is no history to manage.</p>
 </section>
 
 <!-- ===== 9 ===== -->
@@ -1126,6 +1175,7 @@ $headers = [
     <div><span class="box"></span><span>Accurate, complete <code>configSchema</code> per game</span></div>
     <div><span class="box"></span><span>Partial scores reported for <code>abandoned</code> rounds</span></div>
     <div><span class="box"></span><span><code>scoreBreakdown</code> detail for the player's results screen</span></div>
+    <div><span class="box"></span><span><b>Mid-round progress reports</b> &mdash; section 8a. Nothing settles differently without them; what they buy is a contest board that reads as a live event rather than a list of names marked &ldquo;playing now&rdquo;</span></div>
     <div><span class="box"></span><span><code>integrity</code> flags when something looks wrong</span></div>
     <div><span class="box"></span><span>Sandbox controls to force scores, states and suppressed callbacks</span></div>
     <div><span class="box"></span><span>Round voiding</span></div>
@@ -1195,6 +1245,7 @@ $headers = [
   <div class="tw"><table>
     <thead><tr><th style="width:90px">Version</th><th style="width:130px">Date</th><th>Change</th></tr></thead>
     <tbody>
+      <tr><td><b>1.5</b></td><td>11 Sep 2026</td><td><b>One new optional callback, and nothing you must change.</b> Section 8a: while a round is being played you may POST what the player has done so far to a <code>progressCallbackUrl</code> we now include in every create-round request, so a contest board can show more than &ldquo;playing now&rdquo;. It uses the credentials and the signature you already have, it carries <b>no score field</b>, and it must never be retried or awaited. <b>Ignore it entirely and you remain fully conformant</b> &mdash; your contests still run and settle exactly as they do today. We added it because a spectator watching a live contest could see only that everybody was playing, which made a competition read as a list</td></tr>
       <tr><td><b>1.4</b></td><td>8 Sep 2026</td><td><b>One new optional catalogue field, <code>playMode</code>.</b> Declare <code>"scheduled"</code> if your title only makes sense played by everybody at one appointed moment &mdash; a race, a live quiz &mdash; section 3.2a. <b>Omit it and nothing changes</b>: the default is <code>anytime</code>, which describes every title we run today, so a catalogue built against 1.3 remains valid as it stands. We added it because <code>family</code> answers a different question &mdash; whether your game needs an <i>opponent</i> &mdash; and a race is <code>independent</code> under that definition, so nothing we already had could tell a race from a puzzle. Your API is otherwise unchanged</td></tr>
       <tr><td><b>1.3</b></td><td>8 Sep 2026</td><td><b>One new <code>configSchema</code> keyword.</b> If a title's length of play is configurable, the property carrying it must be marked <code>format: "duration-seconds"</code> &mdash; section 3.2. Nothing else about <code>configSchema</code> changes, and a title whose length is fixed needs no change at all. We added it because a competition has to stop accepting attempts one full playing time before it ends, and without the keyword the only figure available is your <code>maxDurationSeconds</code> ceiling &mdash; which made short contests unplayable on our side</td></tr>
       <tr><td><b>1.2</b></td><td>30 Aug 2026</td><td><b>Two field renames.</b> <code>family: "solo_scored"</code> becomes <code>family: "independent"</code>, and the capability flag <code>supportsDuel</code> becomes <code>supportsOneVsOne</code>. Both were renamed because &ldquo;solo&rdquo; and &ldquo;duel&rdquo; were being misread as statements about contest size. Nothing else about either field changes. Added a note in section 4 making it explicit that every contest we run has at least two players, and that an independent-play game is used in contests of a hundred people</td></tr>
@@ -1202,14 +1253,14 @@ $headers = [
       <tr><td><b>1.0</b></td><td>Initial</td><td>First issue &mdash; the four calls, authentication and signing, idempotency, content seeding, round states, error handling, sandbox, service levels</td></tr>
     </tbody>
   </table></div>
-  <p style="margin-bottom:0">If you have already begun work against an earlier version, almost nothing you have built is invalidated. The 1.1 additions are content fields on the catalogue response. The 1.2 changes are <b>two field renames on the same response</b> &mdash; tell us if you have already shipped the old names and we will accept both during your integration. The 1.3 change is <b>one keyword on one property</b> of a schema you are already sending, and only for titles whose length of play is configurable. The 1.4 change is <b>an optional field with a default</b> &mdash; omit it and your catalogue behaves exactly as it did.</p>
+  <p style="margin-bottom:0">If you have already begun work against an earlier version, almost nothing you have built is invalidated. The 1.1 additions are content fields on the catalogue response. The 1.2 changes are <b>two field renames on the same response</b> &mdash; tell us if you have already shipped the old names and we will accept both during your integration. The 1.3 change is <b>one keyword on one property</b> of a schema you are already sending, and only for titles whose length of play is configurable. The 1.4 change is <b>an optional field with a default</b> &mdash; omit it and your catalogue behaves exactly as it did. The 1.5 change is <b>an entirely optional extra callback</b> &mdash; build it if your game has something to say mid-round, and otherwise do nothing at all.</p>
 </section>
 
 </main>
 </div>
 
 <div class="foot">
-  <div>ChartVolt &mdash; Game API Requirements &middot; Version 1.4 &middot; Requirements document for prospective game providers</div>
+  <div>ChartVolt &mdash; Game API Requirements &middot; Version 1.5 &middot; Requirements document for prospective game providers</div>
   <div>Questions on this specification: contact your ChartVolt commercial contact</div>
 </div>
 

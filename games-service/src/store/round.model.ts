@@ -164,6 +164,8 @@ export interface RoundDoc {
 
   /* ---- where results go ---- */
   resultCallbackUrl: string;
+  /** Optional, unlike the result callback - see `progress.ts` for why. */
+  progressCallbackUrl?: string;
   returnUrl?: string;
 
   /* ---- play ---- */
@@ -243,6 +245,7 @@ const RoundSchema = new Schema<RoundDoc>(
     completedAt: { type: Date },
 
     resultCallbackUrl: { type: String, required: true },
+    progressCallbackUrl: { type: String },
     returnUrl: { type: String },
 
     status: {

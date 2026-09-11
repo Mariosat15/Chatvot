@@ -281,6 +281,11 @@ export interface CreateRoundInput {
   returnUrl: string;
   /** Where the provider posts the result. */
   resultCallbackUrl: string;
+  /**
+   * Where the provider may post progress WHILE the round is being played. Optional for them,
+   * always supplied by us - see `contract.ts` for why the asymmetry is deliberate.
+   */
+  progressCallbackUrl?: string;
   /** Non-identifying display name. A provider never receives an email or a wallet. */
   displayName?: string;
   locale?: string;

@@ -343,10 +343,39 @@ the line being crossed.
 
 ---
 
+## Telling the platform how a player is doing
+
+`src/callback/progress.ts`, one `void sendProgress(round)` in `src/rounds/play.ts`.
+
+After each solved board we POST the same breakdown the final result would carry to the
+`progressCallbackUrl` the platform supplies at launch, so a contest board can say what somebody
+has solved while they are still solving it. **No score is sent**; `scoreRound` computes one
+alongside the breakdown and it is discarded here deliberately, because a score that has not been
+signed as a *result* is a number the platform would show and then contradict.
+
+**It is the opposite of `deliver.ts` in every way that matters, and the differences are the
+design rather than shortcuts.** No retry, no queue, no delivery record, a three-second timeout,
+and it never throws. A lost result is a contest nobody can settle; a lost progress report costs
+one stale line on a board for a few seconds, and **retrying would be strictly worse than not** -
+a queue of stale reports arriving out of order behind a finished round is a board that goes
+backwards.
+
+**The `void` is the load-bearing part.** This sits between a player solving a board and being
+handed the next one, in a round they paid for, so an `await` makes a slow moment on the
+platform's side a pause in somebody's game. It is sent on the **continuing** branch only: a round
+that has just finished is already being delivered as a result with the same figures and a score
+beside them, and the platform refuses progress for a round that is no longer live.
+
+Authentication is `signOutbound`, exactly as the result callback - the same bearer token, the
+same HMAC, the same timestamp. A second credential for a lower-value endpoint is a second thing
+to rotate and the first one somebody leaves behind.
+
+---
+
 ## Tests
 
 ```
-npm test                     # isolation, typecheck, then all seven suites
+npm test                     # isolation, typecheck, then all eight suites
 npm run probe:api            # break each guard, one at a time, and watch its test fail
 npm run probe:board          # the same, for the browser module
 npm run probe:presentation   # the same, for the play surface's sizing and wording
@@ -399,12 +428,15 @@ npm run probe:round-clock    # the same, for the clock and the length promised b
 > that would have sent it was definitely present.** A test pins the markup's side of that bargain:
 > exactly one screen ships visible, and it is the loading screen.
 
-`npm test` runs **259 tests**: 15 config, 42 engine, 28 scoring, 41 API, 78 play and delivery,
-15 board client, 40 presentation. (Counted from the suite's own output. Any figure of 249 predates
+`npm test` runs **270 tests**: 15 config, 42 engine, 28 scoring, 41 API, 78 play and delivery,
+11 progress, 15 board client, 40 presentation. (Counted from the suite's own output. Any figure of
+259 predates the mid-round progress callback, which added a whole suite - `tools/test-progress.ts`,
+which opens **no database** on purpose, every assertion in it being about what leaves this process.
+Any figure of 249 predates
 the round-clock fix, which added five tests to each of the play and presentation suites. Any
 figure of 242 predates
 the fingerprinted asset URLs, and was itself understated - the suites summed to 246 at the time,
-so **do not hand-count these either; read the seven result lines**. 226 and 225 predate the sound
+so **do not hand-count these either; read the eight result lines**. 226 and 225 predate the sound
 and animation layer, the two were the same commit and the total was misstated as 225 while the
 suites summed to 226, so both are stale for the same reason. 219 predates the board artwork, 217 predates the
 watchdog's second witness, 216 predates the stale-cache recovery, 213

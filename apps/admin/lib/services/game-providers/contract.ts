@@ -154,6 +154,20 @@ export interface CreateRoundRequest {
   contentSeed?: string;
   expiresAt: Date;
   resultCallbackUrl: string;
+  /**
+   * Where to POST what the player has done SO FAR, while the round is still being played.
+   *
+   * OPTIONAL, AND THE ASYMMETRY WITH `resultCallbackUrl` IS THE POINT. A round that never
+   * reports a result is a round nobody gets paid for, so that one is required. A round that
+   * never reports progress simply shows less on a contest board, so a provider with nothing
+   * useful to say between the start and the end - a single-question quiz, say - sends nothing
+   * and is entirely conformant. Chapter 01 section 3.2a.
+   *
+   * Same authentication as the result callback, deliberately: same bearer token, same HMAC
+   * over the raw bytes, same timestamp window. A second credential for a lower-value endpoint
+   * is a second thing to rotate and the first one somebody leaves behind.
+   */
+  progressCallbackUrl?: string;
   returnUrl: string;
 }
 

@@ -85,6 +85,8 @@ interface ActivityRow {
   startedAt?: Date;
   completedAt?: Date;
   createdAt?: Date;
+  /** When a mid-round progress report last landed. Absent until one does. */
+  progressAt?: Date;
   durationMs?: number;
 }
 
@@ -96,14 +98,21 @@ const EMPTY: ContestActivity = { latestByUser: {}, recent: [] };
 /**
  * When a round's activity happened, from the timestamps the round actually carries.
  *
- * Three candidates rather than one, because the interesting moment moves with the status: a
- * finished round happened when it completed, a live one when it started, and a round created
- * but never opened has only its creation. MongoDB cannot sort on that coalesce without an
+ * Four candidates rather than one, because the interesting moment moves with the status: a
+ * finished round happened when it completed, a live one that has reported progress happened
+ * at that report, a live one that has not happened when it started, and a round created but
+ * never opened has only its creation. MongoDB cannot sort on that coalesce without an
  * aggregation, so the ordering is done here - which is also why the query fetches by round
  * rather than trying to express "most recent activity" as an index.
+ *
+ * `progressAt` SITS BELOW `completedAt` AND ABOVE `startedAt`, and both halves of that matter.
+ * Below, because a round's result is the last word on it and a progress report cannot arrive
+ * afterwards anyway - `recordRoundProgress` refuses one. Above, because without it every live
+ * player's feed entry is frozen at the moment they pressed Play, so a contest in which four
+ * people have each just solved a board orders them by who started first and never moves again.
  */
 function activityAt(row: ActivityRow): Date | undefined {
-  return row.completedAt ?? row.startedAt ?? row.createdAt;
+  return row.completedAt ?? row.progressAt ?? row.startedAt ?? row.createdAt;
 }
 
 /**
@@ -137,7 +146,7 @@ export async function getContestActivity(
     mode: "ranked",
   })
     .select(
-      "userId status attemptNumber rawScore scoreBreakdown startedAt completedAt createdAt durationMs",
+      "userId status attemptNumber rawScore scoreBreakdown startedAt completedAt createdAt progressAt durationMs",
     )
     // Highest attempt first, so the first row seen for a player is their latest.
     .sort({ attemptNumber: -1 })

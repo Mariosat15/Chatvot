@@ -27,6 +27,7 @@ export interface CreateRoundInput {
   contentSeed?: unknown;
   expiresAt?: unknown;
   resultCallbackUrl?: unknown;
+  progressCallbackUrl?: unknown;
   returnUrl?: unknown;
 }
 
@@ -233,6 +234,19 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
   }
 
   const resultCallbackUrl = requireDeliverableUrl(input.resultCallbackUrl, "resultCallbackUrl");
+  /*
+   * OPTIONAL, AND VALIDATED BY THE SAME RULE WHEN IT IS PRESENT.
+   *
+   * A platform that does not want progress reports simply omits it, and this round then plays
+   * exactly as every round before today did. What it must NOT do is accept a malformed value
+   * and discover it board by board: `requireDeliverableUrl` refuses a non-https or loopback
+   * address in production for the same reason it does for the result callback, so a bad URL
+   * is a 400 at creation rather than a round that plays fine and reports nothing.
+   */
+  const progressCallbackUrl =
+    input.progressCallbackUrl === undefined || input.progressCallbackUrl === null
+      ? undefined
+      : requireDeliverableUrl(input.progressCallbackUrl, "progressCallbackUrl");
   const returnUrl =
     input.returnUrl === undefined || input.returnUrl === null
       ? undefined
@@ -290,6 +304,7 @@ export async function createRound(input: CreateRoundInput): Promise<CreateRoundO
         Math.min(now.getTime() + LAUNCH_URL_TTL_MS, expiresAt.getTime()),
       ),
       resultCallbackUrl,
+      progressCallbackUrl,
       returnUrl,
       status: "created",
       boards: [],

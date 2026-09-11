@@ -332,9 +332,14 @@ producing one score.
 
   "expiresAt": "2026-08-18T14:00:00Z",
   "resultCallbackUrl": "https://chartvolt.com/api/games/providers/acme/events",
+  "progressCallbackUrl": "https://chartvolt.com/api/games/providers/acme/progress",
   "returnUrl": "https://chartvolt.com/contests/774219"
 }
 ```
+
+`progressCallbackUrl` is **always sent and never required to be used** - see section
+5.5. A provider with nothing useful to say between the start of a round and the end of
+it ignores it and is entirely conformant.
 
 ### Response
 
@@ -464,6 +469,61 @@ Free-form, game-specific. ChartVolt **never ranks on it** - ranking uses `score`
 It is stored and displayed to players on the results screen, which is what makes a
 result feel transparent rather than arbitrary.
 
+### 5.5 Optional - the progress callback
+
+```
+POST {progressCallbackUrl}
+```
+
+A round may report **what the player has done so far**, while they are still playing,
+so a contest board can say something more useful than "playing now".
+
+```json
+{
+  "roundId": "cv_rnd_01JAV3M7Q2XK8T",
+  "providerRoundId": "acme_r_9f2ab41",
+  "breakdown": { "questionsAnswered": 6, "correct": 5, "streak": 3 }
+}
+```
+
+**Authentication is identical to the result callback** - the same bearer token, the
+same HMAC over the raw bytes, the same five-minute timestamp window (section 2.2). A
+second credential for a lower-value endpoint is a second thing to rotate and the first
+thing somebody leaves behind.
+
+**There is deliberately no `score` field, and sending one is not an error - it is
+ignored.** Scores enter ChartVolt through the result callback and nowhere else. That
+is not a formality: a number arriving mid-round with no terminal status attached would
+be displayed beside figures the final result then contradicts.
+
+`breakdown` is the same free-form, provider-ordered structure as `scoreBreakdown`
+(section 5.4), and the same rule applies - **ChartVolt never ranks on it.** Only
+string, boolean and finite-number values are stored; anything nested is dropped rather
+than flattened, because how to flatten a provider's structure is the provider's
+decision and not ours. At most 24 entries are kept per report.
+
+**Send it when something a spectator would notice has happened** - a board solved, a
+question answered, a lap completed - and not on a timer. Each report replaces the
+previous one for that round; there is no history and nothing accumulates.
+
+What the responses mean:
+
+| Status | Meaning | Retry? |
+|---|---|---|
+| `200` | Stored, or superseded - the round has finished, or there was nothing renderable | **No.** Nothing to gain |
+| `400` | The body was not valid JSON | No |
+| `401` | Credentials, signature or timestamp refused | No - fix the configuration |
+| `404` | No such round for this provider | No - usually the wrong environment |
+| `500` | ChartVolt failed | Optional, once |
+
+**Do not retry and do not queue.** A progress report is worthless within seconds
+because the next one supersedes it, and a backlog arriving out of order behind a
+finished round is a board that goes backwards. A lost report costs one stale line.
+
+**Never let it delay the player.** ChartVolt's own game sends this without waiting for
+the response, between one board and the next, and a provider should do the same: a
+slow platform must never become a pause in a round somebody has paid to play.
+
 ---
 
 ## 6. Required endpoint - fetch a round
@@ -523,6 +583,7 @@ rather than leaving us to infer it.
 | `POST /v1/matches` | **High for Family B** | Creates a head-to-head match between two players. Required for real-time challenges in chess-style games |
 | `GET /v1/games/{gameCode}/leaderboard` | Low | We keep our own leaderboards. Useful only for cross-checking |
 | Webhook for `round.started` | Medium | Confirms the player actually began, which distinguishes "never played" from "played and scored zero" |
+| The progress callback (s5.5) | **High for spectacle, zero for correctness** | Nothing settles differently without it. What it buys is a contest board that reads as a live event rather than a list of names marked "playing now" |
 | Sandbox score injection | **High** | The ability to force an arbitrary score in the sandbox makes automated testing of settlement possible |
 
 ---
@@ -595,11 +656,16 @@ ChartVolt  ->  Provider
 
 Provider  ->  ChartVolt
     POST /api/games/providers/{key}/events    signed result callback
+    POST /api/games/providers/{key}/progress  signed progress report    [optional]
 ```
 
 Three required calls out, one required call in. The narrowness of this interface is
 deliberate: it is what makes a second provider cheap to add and any single provider
 cheap to drop.
+
+The progress report is the only addition that has ever been made to the inbound side,
+and it was kept optional for the same reason: a provider who ignores it entirely is
+still fully conformant, and their contests still settle correctly.
 
 ---
 

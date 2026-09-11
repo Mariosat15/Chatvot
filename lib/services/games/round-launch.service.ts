@@ -322,6 +322,11 @@ export async function launchContestRound(
       },
       returnUrl: `${baseUrl}/competitions/${competitionId}`,
       resultCallbackUrl: `${baseUrl}/api/games/providers/${config.providerKey}/events`,
+      // Supplied UNCONDITIONALLY, and it is the provider's choice whether to use it. The
+      // platform cannot know which titles have anything to say mid-round, and withholding the
+      // URL from a provider who later adds progress reporting would mean a config change on
+      // our side before their feature could work. See `contract.ts` for why it is optional.
+      progressCallbackUrl: `${baseUrl}/api/games/providers/${config.providerKey}/progress`,
       displayName: actor.displayName,
       locale: actor.locale,
       country: actor.country,

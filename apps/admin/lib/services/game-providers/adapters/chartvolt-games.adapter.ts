@@ -350,6 +350,7 @@ export class ChartVoltGamesAdapter implements GameProviderAdapter {
         // serialises differently from a real Date.
         expiresAt: request.expiresAt.toISOString(),
         resultCallbackUrl: request.resultCallbackUrl,
+        progressCallbackUrl: request.progressCallbackUrl,
         returnUrl: request.returnUrl,
       },
     });

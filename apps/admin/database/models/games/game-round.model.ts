@@ -43,6 +43,19 @@ export interface IGameRound extends Document {
   rawScore?: number;
   /** Display only. NEVER an input to ranking (chapter 01 section 5.4). */
   scoreBreakdown?: Record<string, unknown>;
+  /**
+   * When a MID-ROUND progress report last updated `scoreBreakdown` (11 September 2026).
+   *
+   * Absent on every round that has only ever reported once, which is every round before this
+   * field existed and every round from a provider that does not send progress. A screen must
+   * therefore treat an absent value as "no progress reports", never as "reported long ago".
+   *
+   * Reason it is stored rather than derived from `updatedAt`: that timestamp moves for any
+   * write at all, including the result landing and a manual resolution, so it cannot answer
+   * the one question this is for - has this player done anything recently, or has their game
+   * gone quiet.
+   */
+  progressAt?: Date;
   startedAt?: Date;
   completedAt?: Date;
   durationMs?: number;
@@ -174,6 +187,7 @@ const GameRoundSchema = new Schema<IGameRound>(
     },
     rawScore: { type: Number },
     scoreBreakdown: { type: Schema.Types.Mixed },
+    progressAt: { type: Date },
     startedAt: { type: Date },
     completedAt: { type: Date },
     durationMs: { type: Number },

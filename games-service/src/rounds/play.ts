@@ -12,6 +12,7 @@ import {
 import { Round, isTerminal, type RoundDocument } from "../store/round.model";
 import { ApiError, unknownRound } from "../http/errors";
 import { finishRound, hardDeadline, playability, playableSeconds } from "./lifecycle";
+import { sendProgress } from "../callback/progress";
 
 /**
  * The play surface, used by the game in the iframe rather than by the platform.
@@ -346,6 +347,22 @@ export async function submitBoard(
   const nextIndex = round.boards.length;
   round.boards.push({ index: nextIndex, issuedAt: now, attempts: 0 });
   await round.save();
+
+  /*
+   * TELL THE PLATFORM, AND DO NOT WAIT FOR IT.
+   *
+   * No `await`, and that is the whole rule rather than a micro-optimisation: this sits between
+   * a player solving a board and being handed the next one, in a round they PAID for, so an
+   * `await` on a slow or unreachable platform is a visible stall at the worst possible moment.
+   * `sendProgress` cannot reject, so there is no unhandled rejection to guard against - and
+   * `void` is what says the omission is deliberate rather than forgotten.
+   *
+   * Deliberately NOT sent on the finishing branch above. That round is already being delivered
+   * as a result with the same figures and a score beside them, and the platform refuses
+   * progress for a round that is no longer live - so a send there would be a guaranteed
+   * refusal, logged as a warning, on every single completed round.
+   */
+  void sendProgress(round);
 
   return { accepted: true, state: stateFor(round, puzzleFor(round, nextIndex)) };
 }

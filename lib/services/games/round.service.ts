@@ -210,6 +210,7 @@ export async function createRound(
       contentSeed: live.contentSeed,
       expiresAt: live.expiresAt,
       resultCallbackUrl: input.resultCallbackUrl,
+      progressCallbackUrl: input.progressCallbackUrl,
       returnUrl: input.returnUrl,
     });
 
@@ -305,6 +306,7 @@ export async function createRound(
     contentSeed: input.config.contentSeed,
     expiresAt,
     resultCallbackUrl: input.resultCallbackUrl,
+    progressCallbackUrl: input.progressCallbackUrl,
     returnUrl: input.returnUrl,
   });
 

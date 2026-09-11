@@ -64,6 +64,39 @@ should not be able to flood it.
 **Allowlist source IPs** if the provider can supply a stable range. Useful defence
 in depth, but never the only control - IPs change.
 
+### 2.2 The second inbound door, and why it is not a second scoring door
+
+**Built 11 September 2026.** `POST /api/games/providers/{key}/progress` accepts a
+mid-round report of what a player has done so far, so a contest board shows more than
+"playing now". It is the only inbound provider route besides the result callback, and
+the distinction between them is load-bearing.
+
+It runs gates 2 to 5 and 7 above, unchanged and in the same order - the timestamp
+before the signature, because **a replayed request carries a genuinely valid signature
+and the timestamp is the only thing that can see it**. What it does not have is the
+rest: no event store, no idempotency key, no contest-window check, no score range,
+because there is no score.
+
+**It writes `scoreBreakdown` and `progressAt`, and nothing else, ever.** Not
+`rawScore`, which is the only field that can influence ranking. Not `status`, so it can
+neither finish a round nor revive a finished one. Nothing at all on
+`CompetitionParticipant`. The update is an explicit `$set` of two named paths rather
+than a spread of anything the provider sent, and a test asserts that: **a spread is how
+the next field arrives, and the field after that is `rawScore`.**
+
+Three further rules, each of which exists because the obvious alternative is worse.
+
+- **Two routes, not a mode flag on one.** A `final: false` body reaching the scoring
+  path is one wrong branch away, and that branch would look entirely reasonable in
+  review. Two doors cannot be confused by a boolean.
+- **It refuses any round that is not `pending` or `launched`.** A late progress report
+  arriving behind a delivered result would otherwise overwrite the breakdown the player
+  is being shown their score against.
+- **Refusals are not logged.** This is the highest-rate provider route by a wide margin
+  - once per solved board, per player, per contest - so a log line per refusal turns one
+  misconfigured game into a flood that buries the warnings that matter. The status code
+  is the whole diagnosis, and `01` s5.5 tells providers what each one means.
+
 ---
 
 ## 3. Never trust the client
