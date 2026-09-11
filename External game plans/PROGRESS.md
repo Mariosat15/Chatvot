@@ -763,6 +763,76 @@ Newest at the top.
 
 ---
 
+### 11 Sep 2026 - THE ARENA REJECTED A THIRD TIME: SIZE, STANDINGS, CHROME, AGNOSTICISM
+
+**Shipped:** all six items of the owner's third rejection, in the order he put them. The board
+fills its frame at every size again; the standings are rebuilt to his leaderboard crop with player
+avatars on them; both sides of the seam wear the reference's palette; three drawn board artworks,
+one per grid size; a guard holding the arena game-agnostic; and the arena's hero banner is the
+game's own rather than a generic trophy. `13` **s4.1q** (platform) and `21` **s4.1q** (in-frame).
+
+**Files touched:** new `__tests__/games/{arena-game-agnostic,leaderboard-avatars}.test.ts`,
+`lib/services/games/leaderboard-avatars.ts`, `tools/probe-{arena-agnostic,leaderboard-avatars}.ps1`,
+`public/assets/neon/banner-circuit-sprint-r3.webp`,
+`games-service/public/play/board-{4,6,8}.webp`; modified `components/neon/{tokens,Cards,Buttons,
+LeaderboardRow,banners}.ts(x)`, `components/games/ProviderLeaderboard.tsx`,
+`components/games/arena/{GameArenaLayout,ArenaLiveStandings}.tsx`,
+`app/(root)/competitions/[id]/{page,play/page}.tsx`, `lib/services/games/arena-standings.service.ts`,
+`games-service/public/play/{app.css,app.js,board.js,presentation.js}`,
+`games-service/src/games/titles.ts`, `tools/probe-lobby-theme.ps1`.
+
+**Findings.** **Three rejections of one screen is not three misses** - it is a signal that the
+thing corrected each time was not the thing being looked at. The first pass corrected structure,
+the second corrected the repository boundary, and neither addressed what he could see.
+
+**The board was never mis-measured - it was measured against a container that had stopped having a
+size.** `.arena { align-items: center }` stopped `.board-wrap` stretching, so `fitBoard()` had no
+height to converge on and settled at `MIN_CELL_PX`, 34 pixels. That is why every arithmetic review
+of `desiredFrameHeight` came back clean, and why the fix is one `stretch` rather than a constant.
+
+**The agnostic audit found nothing to fix, so the deliverable is a guard rather than a repair** -
+worth saying plainly instead of reporting an improvement nobody made. The nouns are matched
+**inside quoted strings only**, because `boardsCompleted` is a provider metric name rendered by
+`humanizeMetric` - the very mechanism that keeps the screen agnostic - and a variable name is not
+something a player reads; a bare identifier ban fails on correct code.
+
+**Items 4 and 6 were the same requirement pulling opposite ways, and the guard settled it.**
+`GameArenaLayout` called `providerBanner(undefined)`, so the arena drew the generic trophy for
+every title while the lobby and the results screen drew the game's own - and **a fallback that
+works is indistinguishable from a title with no artwork**, so nothing failed and nothing logged.
+Passing the game code in turns `game-content-editor.test.ts` red, because that guard bans a game
+code anywhere in the arena folder. Resolution moved out to the page instead; the layout is handed
+an already-chosen picture and stays unable to have an opinion.
+
+**`NEON_PANEL` was deliberately not touched.** It is what the **trading** lobby renders, so
+brightening it would make an unasked-for change to a screen nobody mentioned, invisibly, through a
+shared token. The arena's chrome is a second shell, and its three new literals are named kit-only
+because they are exactly what a screen would type in to "look more like the arena".
+
+**Seven probes had been reporting nothing.** Four named a test whose `it.each` label had been
+renumbered; three named patterns that had moved with unrelated work. The last is **re-aimed at a
+surviving assertion rather than re-pinned to new text**, because re-pinning a verbatim money
+assertion after a behaviour change looks identical to the test still working. **A probe naming
+something that no longer exists is indistinguishable from a guard that does not work, and it fails
+in the quiet direction.**
+
+**Deviated from plan:** the hero artwork carries no lettering although the reference's does - the
+platform writes the contest's own name over that space, and painted text would be a second
+heading, wrong in every locale and impossible to change.
+
+**Owner tested:** the in-frame half was verified by eye through `tools/smoke-play.ts`. **The
+platform half has never been seen on screen** - the arena is behind sign-in and the automated
+browser has no session.
+
+**Deferred:** Best Time as a record across rounds, Combo, the LEVEL number and the
+GLOBAL/FRIENDS/COUNTRY tabs still have no data source on either side of the seam.
+
+**Next chat should:** get the owner's eye on the platform half, then move to the challenges work.
+**Deploying this needs BOTH repositories, and games-service needs `npm run build`** between the
+pull and the restart, because `titles.ts` changed.
+
+---
+
 ### 11 Sep 2026 - THE BOARD'S OWN CHROME, AND THE TWO FIGURES IT REFUSED TO INVENT
 
 **Shipped:** the centre column of `arena-target-full.png`, inside the game frame. A round header of
