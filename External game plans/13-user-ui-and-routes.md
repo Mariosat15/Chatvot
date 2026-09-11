@@ -1905,6 +1905,16 @@ columns. One panel reads as a full-width panel, three read as the reference.
 | `GAME TIPS` | `ArenaHighlights` in its new `list` layout - ticked lines rather than a strip of cards | the catalogue's feature cards |
 | `RECENT PLAYERS` | `ArenaActivityFeed`, **moved out of the sidebar**, with the reference's `Live activity` label | `game_round.scoreBreakdown`, through the board's own fetch |
 
+> **Amended 11 September 2026 (s4.1u).** The owner rejected the result as ~600px tall against a
+> reference measuring 986 x 103, so **the band is now a fixed `sm:h-[104px]` row** and each card caps
+> its items rather than growing. Two rows of this table are stale as present facts though
+> correct as history - **say which**: `HOW IT WORKS` is no longer `GameRulesPanel` unchanged but
+> a third `strip` layout **without** the amber scoring block, which stays on the lobby; and
+> `GAME TIPS` no longer has a `list` layout, because the full-width `row` variant it was named
+> against was deleted, leaving the component one shape. **`flex-wrap` over `grid-cols-3`
+> survives unchanged and is now a recorded deviation from the owner's own CSS**, which asked
+> for a grid - the empty-slot reasoning above is why.
+
 **The heading names what the content is, not what the reference calls it.** The mock's middle
 panel says `GAME TIPS` and these are not tips - they are the operator's "why this game is fun"
 cards, so the panel is headed **What to expect**. A caption is a claim: heading marketing copy
@@ -2060,6 +2070,144 @@ gate's slice examined the file header and the exact injected defect passed - the
 counted occurrences of the field name, and deleting it from the `.select(...)` left the interface,
 the lean generic and the return still naming it, so the total never fell below the threshold -
 and the projection is the one of the four that decides whether a value arrives at all.
+
+> **Amended 11 September 2026 (s4.1u).** The owner rejected the band for a fourth time: it had
+> grown to roughly 600px tall with the two pictures drawn large, one of them beneath its text at
+> the panel's full width. Three facts above are correct as history and stale as a present fact.
+> The band is now a **fixed-height strip**, so `[&>*]:h-full` sits beside an `sm:h-[104px]` on the row
+> rather than on its own. **Both pictures are now fixed small squares beside the copy**, not
+> flexible blocks under it. And **the rules panel has a third layout**, `strip`, which is a
+> different component rather than a narrower one - so "the rules picture is drawn on both
+> layouts" is now three, and the `layout === "wide"` warning is unchanged and still the reason.
+
+---
+
+### 4.1u The band as a thin information strip (owner rejection, 11 September 2026)
+
+The owner sent the band beside the reference a fourth time and opened with *"STOP. The current
+implementation is structurally wrong."* The measurement is the specification: the reference is
+**986 x 103 pixels**, and *"your current implementation stretches the section to approximately
+600px+ high. THIS IS WRONG."* He listed the spellings that produce that - `min-height: 400px`,
+`flex: 1` vertically, `height: 100%`, `grid-auto-rows: 1fr` - and closed with a ten-point
+acceptance test and *"Do not modify the rest of the Circuit Sprint page."*
+
+**NOTHING WAS COMPUTED WRONGLY AND THERE IS NO RISK NUMBER.** A 600px band renders perfectly and
+reports success; the only witness is a screenshot, which is why the owner found it three times
+before a guard existed and why every assertion in `__tests__/games/arena-band.test.ts` is
+structural. **Nothing was backfilled.**
+
+#### A MEASUREMENT IS A SPECIFICATION, AND THREE MECHANISMS ENFORCE IT
+
+`sm:h-[104px]` on the row - inside the owner's stated 95-115 maximum - is the fixed height. It is
+not enough on its own, and the other two are what make it safe rather than merely true:
+
+- **The banned spellings are asserted as absent**, because any one of them re-inflates the row
+  while the fixed height stays in the file and reads as still governing it.
+- **Each card caps its own items** - three steps, four tips, three feed rows - so the content
+  fits the box rather than being hidden by it. `overflow-hidden` is a **backstop, not the
+  mechanism**: a card that relies on it is a card silently dropping the operator's fourth tip
+  with nothing on screen to say so.
+
+The arithmetic is worth recording because it decides all three numbers, and because **104 was
+arrived at rather than chosen - the first attempt at 96 was wrong in a way nothing would have
+reported.** A card is the band less its 30px `dense` heading strip. At 96 that leaves 66px of
+body, and the owner also specified the pictures at 65-75px; `NeonIllustration` takes its height
+from its **width** through an aspect ratio, so a 66px-wide square is 66px tall in a body that,
+after padding, had 49. It would have been cropped by the `overflow-hidden` backstop - silently,
+on the two acceptance points that ask whether the pictures are there and small. At 104 the body
+is 74px, which fits a 66px picture beside three lines, and three 24px feed rows exactly.
+
+That 74px is also why the counts are the reference's own counts, which is not a coincidence - it
+is what the owner measured. **Both halves of a row height must be asserted or neither is**: the
+feed's 20px avatar and its `py-0.5` are 24px together, and one step up to `py-1` makes them 28,
+at which the third row goes under `overflow-hidden` while `FEED_LIMIT` still reads 3 two lines
+away. The same trap one field along is a picture given a hard height beside an aspect ratio -
+two numbers that disagree the moment either moves - which is why the cards write a width and
+never a height.
+
+**`h-full` IS BANNED ON THE BAND WHILE `[&>*]:h-full` IS REQUIRED ON EACH WRAPPER**, so the guard
+is a **count** rather than a word. Written as `not.toMatch(/h-full/)` it fires on the child
+selector - it did, on correct code, the first time the suite ran - and a guard that fails on a
+correct file is the kind the first person it inconveniences deletes. Same lesson as s4.1g's
+narrowed `GameIcon` ban.
+
+#### THE DEVIATION: FLEX, NOT THE GRID THE OWNER SPECIFIED
+
+He supplied CSS: `grid-template-columns: 1.15fr 1.15fr 1fr`. The build uses
+`flex-[1.15_1_0]` / `flex-[1.15_1_0]` / `flex-[1_1_0]`, which divides the row 34/34/32
+**identically**, and the reason is s4.1r's governing trap: all three slots return `null` when
+their content is absent, **a layout cannot see that its child rendered nothing**, and a hidden
+grid item leaves its track behind where a hidden flex item leaves the line. A grid here puts one
+panel adrift beside an empty third of the page in the common case. Recorded as a deviation rather
+than absorbed, and probed in both directions.
+
+#### TWO RECORDED DECISIONS WERE REVERSED, AND BOTH COST SOMETHING
+
+- **`What to expect` became `Game tips`.** s4.1r kept the former deliberately, because the
+  content is the operator's feature cards rather than advice and *a caption is a claim*. The
+  owner overrode it twice and named the heading explicitly. The cost survives the rename: the
+  seeded `circuit-sprint` highlights still read as marketing, so the card now promises tips and
+  shows selling points until an operator rewrites them.
+- **The scoring rule left the arena.** `13` s4.1k put it on screen on the owner's own earlier
+  instruction; he has now named all five of its strings for removal. It is **not deleted** - the
+  lobby renders the full panel at `layout="wide"`, and every route into the arena passes through
+  the lobby. **The cost is that a player halfway through a contest cannot re-read the rule
+  without leaving the board**, which is exactly the case s4.1k was built for. Stated rather than
+  smoothed over, and the compact card falls back to the scoring rule when a title has one and no
+  instructions.
+
+#### WHAT THE GUARD STILL FORBIDS, AND WHY THE REFERENCE'S WORDS ARE NOT IN THE CODE
+
+The owner listed the steps and tips verbatim - *"Connect matching numbers with a path"*,
+*"Plan ahead before making moves"*. **None of them is in the codebase.** They are the operator's
+`howToPlay` lines and `highlights` titles, read from the catalogue, and the arena's game-agnostic
+guard forbids a game-shaped sentence in a quoted string in these files. A probe hard-codes the
+reference's own steps to prove it. The only words these components write are the two headings,
+and neither names a game.
+
+**The heading drops the game's name where the full panel keeps it.** `How Circuit Sprint: fast and
+fun spatial puzzles is scored` is longer than the card is wide, and at this size a title that
+wraps costs a step.
+
+#### TWO THINGS THE OPERATOR HAS TO DO, AND THE HINTS THAT SAY SO
+
+Neither is a code fix, and both were invisible before this slice:
+
+- **The two uploads are in the wrong slots in the live data** - the emblem is in the rules slot
+  and the diagram beside the tips, which is the reverse of the reference. The labels said "rules"
+  and "highlights" while the screen says "How it works" and "Game tips", so they now name the
+  panel the player sees.
+- **The strip numbers each LINE of `howToPlay`**, so the reference's three numbered instructions
+  appear the moment somebody writes three lines. `circuit-sprint`'s seeded copy is one paragraph
+  and therefore draws one line - correct, and not what the reference shows. The field accepts
+  both and saves both, so **the alternative to saying it in the hint is a screen that looks wrong
+  for a reason that is nowhere on the screen.** `ARENA_STEP_LIMIT` and `ARENA_HIGHLIGHT_LIMIT`
+  are the numbers in those sentences, and a test reads the literals out of the admin and player
+  files and asserts they agree - `apps/admin` cannot import from `components/games/`, and a
+  number that drifts makes the hint a lie.
+
+**`CONTENT_LIMITS.highlights` is 6 and the card draws 4**, and the full-width `row` layout that
+used to show the rest was deleted, so the fifth and sixth are stored and rendered nowhere. That
+is in the hint beside the field, which is the one place an operator can act on it.
+
+#### A DEAD PROP, DELETED RATHER THAN LEFT
+
+`ArenaHighlights` accepted `layout?: "strip"` for an afternoon: narrowed to one value,
+destructured nowhere, read by nothing - the declared-written-dead shape after `requiresSyncPlay`,
+`isPaused`, `lastSuccessfulRoundAt`, `family` and `playModeOverride`. Deleted from the props and
+the call site on the `shouldBlockEntry` precedent, with two tests restated to assert the absence.
+
+**28 tests, 31 probes red on exactly one failure.** Two probing lessons came with it. One came
+back **GREEN on the fourth known cause** - adding `flex-col` puts the picture *under* the lines
+while leaving document order untouched, so the positional assertion had no observable for it and
+the flex **direction** is now asserted too. And six probes reported `PROBE BROKEN - no test
+matched`, because vitest's `-t` is a **regular expression** and five test names carried
+apostrophes: a fragment that matches nothing produces a passing run over zero tests, which reads
+exactly like a guard that does not work. The names were made regex-safe rather than the probes
+escaped.
+
+**Never verified by eye** - the play screen is behind sign-in and the automated browser has no
+session.
 
 ---
 

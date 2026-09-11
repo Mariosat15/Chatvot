@@ -227,11 +227,23 @@ describe("the illustration beside a panel", () => {
       back green. An import is not a use - the same trap as `canTransitionRound` and
       `MIN_REASON_LENGTH`, and it has now cost a false pass in this suite too.
     */
-    const at = code.indexOf("<NeonIllustration");
-    expect(at).toBeGreaterThan(-1);
+    /*
+      COUNTED, because there are now TWO of them - the full panel's and the compact strip's -
+      and `indexOf` checks the first. A guard aimed at one occurrence is green while the other
+      is behind the exact condition being banned, which is the same shape as the `!expectedOrigin`
+      and Edit-guard false passes.
+    */
+    const uses: number[] = [];
+    for (let at = code.indexOf("<NeonIllustration"); at > -1; ) {
+      uses.push(at);
+      at = code.indexOf("<NeonIllustration", at + 1);
+    }
+    expect(uses.length).toBeGreaterThanOrEqual(2);
 
-    const before = code.slice(Math.max(0, at - 400), at);
-    expect(before).not.toMatch(/layout\s*===\s*"wide"/);
+    for (const at of uses) {
+      const before = code.slice(Math.max(0, at - 400), at);
+      expect(before).not.toMatch(/layout\s*===\s*"wide"/);
+    }
   });
 });
 

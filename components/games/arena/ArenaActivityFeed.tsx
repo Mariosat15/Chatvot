@@ -45,6 +45,20 @@ interface Props {
   currentUserId: string;
 }
 
+/**
+ * How many rows the arena band's card draws.
+ *
+ * THREE, MATCHING THE OTHER TWO CARDS' ARITHMETIC - a dense heading strip and three 22px
+ * rows in a 96px card. `getContestActivity` already returns newest first, so the cap takes
+ * the three most recent rather than an arbitrary three, and a fourth would fall off the
+ * bottom of a card that cannot grow.
+ *
+ * IT IS NOT A CAP ON WHAT HAPPENED. Every round is still on `game_round`, the standings rail
+ * beside this card lists every player, and the results screen lists every attempt. This is
+ * the three most recent things, which is what `RECENT PLAYERS` says.
+ */
+const FEED_LIMIT = 3;
+
 export function ArenaActivityFeed({ entries, currentUserId }: Props) {
   if (entries.length === 0) return null;
 
@@ -52,59 +66,67 @@ export function ArenaActivityFeed({ entries, currentUserId }: Props) {
     <NeonHeadedPanel
       icon={Activity}
       title="Recent players"
+      dense
       action={
-        <span className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-300">
+        <span className="flex shrink-0 items-center gap-1 text-[9px] font-medium uppercase tracking-wide text-emerald-300">
           <span
             className="h-1.5 w-1.5 rounded-full bg-emerald-400"
             aria-hidden
           />
-          Live activity
+          Live
         </span>
       }
     >
       <div className={`divide-y ${NEON_DIVIDER}`}>
-        {entries.map((entry) => {
+        {entries.slice(0, FEED_LIMIT).map((entry) => {
           const phrase = describeRoundActivity(entry.activity);
           const isYou = entry.userId === currentUserId;
           const name = entry.username || "Anonymous";
 
           return (
+            /*
+              ONE ROW, NOT TWO, and that is the owner's "do not make each row 60px high". The
+              name sat above the activity phrase, which is 44px of stacked text per player
+              before padding; side by side they are 22, and the phrase is the thing that can
+              give up width because the name is what a player scans for.
+
+              The metrics are dropped from this card for the same reason - `describeRoundActivity`
+              returns them for the results screen, where there is a column for them, and
+              appending them here is what pushed the phrase onto a second line.
+            */
             <div
               key={`${entry.userId}-${entry.activity.attemptNumber}`}
-              className="flex items-center gap-3 px-4 py-3"
+              /*
+                `py-0.5` IS THE ROW HEIGHT AND IT IS ARITHMETIC. A 20px avatar plus 2px above
+                and below is 24, so three rows and their two hairlines are 74 - exactly the
+                band's body once its 30px heading is taken off its 104. At `py-1` the third
+                row is pushed under the card's `overflow-hidden` and disappears with nothing
+                on screen to say so, which is the owner's "3 compact rows" silently becoming 2.
+              */
+              className="flex items-center gap-2 px-2.5 py-0.5"
             >
-              <NeonAvatar name={name} />
+              <NeonAvatar name={name} size="xs" />
 
-              <div className="min-w-0 flex-1">
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <span
-                    className={`truncate text-sm font-semibold ${
-                      isYou ? "text-sky-200" : "text-gray-100"
-                    }`}
-                  >
-                    {name}
-                  </span>
-                  {isYou && (
-                    <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-sky-400">
-                      you
-                    </span>
-                  )}
-                </div>
+              <span
+                className={`shrink-0 max-w-[42%] truncate text-[10px] font-semibold ${
+                  isYou ? "text-sky-200" : "text-gray-100"
+                }`}
+              >
+                {name}
+              </span>
+              {isYou && (
+                <span className="shrink-0 text-[8px] font-semibold uppercase tracking-wide text-sky-400">
+                  you
+                </span>
+              )}
 
-                <div className="mt-0.5 truncate text-[11px] leading-tight">
-                  <span className={roundActivityToneClass(phrase.tone)}>
-                    {phrase.headline}
-                  </span>
-                  {phrase.metrics.length > 0 && (
-                    <span className="text-gray-500">
-                      {" · "}
-                      {phrase.metrics
-                        .map((metric) => `${metric.label} ${metric.value}`)
-                        .join(" · ")}
-                    </span>
-                  )}
-                </div>
-              </div>
+              <span
+                className={`min-w-0 flex-1 truncate text-[9px] leading-tight ${roundActivityToneClass(
+                  phrase.tone,
+                )}`}
+              >
+                {phrase.headline}
+              </span>
 
               {/*
                 An absent score renders nothing at all here rather than a dash. In the
@@ -113,7 +135,7 @@ export function ArenaActivityFeed({ entries, currentUserId }: Props) {
                 noise where the row already says what is going on.
               */}
               {typeof entry.activity.score === "number" && (
-                <span className="shrink-0 text-sm font-bold tabular-nums text-amber-300">
+                <span className="shrink-0 text-[11px] font-bold tabular-nums text-amber-300">
                   {entry.activity.score.toLocaleString()}
                 </span>
               )}

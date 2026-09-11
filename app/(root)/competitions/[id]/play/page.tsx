@@ -288,23 +288,24 @@ export default async function PlayPage({ params }: PlayPageProps) {
           </>
         }
         /*
-          THE BAND, COLUMN BY COLUMN, in the reference's order: how the game is scored, what to
-          expect, who has just played.
+          THE BAND, CARD BY CARD, in the reference's order: how it works, game tips, who has
+          just played.
 
-          The rules take `column` rather than `wide` now. `wide` puts the scoring rule and the
-          instructions side by side, which is right across the whole page and wrong in a third
-          of it - two columns of prose about 150px each.
+          BOTH TAKE `strip`, WHICH IS A DIFFERENT PANEL AND NOT A NARROWER ONE. The band is a
+          fixed 96px row, so each card draws a capped number of one-line items rather than the
+          full copy - see the notes on `GameArenaLayout`'s band and on `STRIP_STEP_LIMIT`. The
+          lobby renders the same two components at their full size, which is where a player
+          reads the whole thing before they pay.
 
           THE FEED MOVED HERE FROM THE SIDEBAR on the owner's instruction. It is still a
           CONSUMER OF THE SAME FETCH AS THE BOARD, not a second read: two polls of one endpoint
           is two answers, so the board could name a rival's finished round while the feed beside
           it had not heard of it.
         */
-        rules={<GameRulesPanel presentation={presentation} layout="column" />}
+        rules={<GameRulesPanel presentation={presentation} layout="strip" />}
         highlights={
           <ArenaHighlights
             highlights={presentation.highlights}
-            layout="list"
             imageUrl={presentation.highlightsImageUrl}
           />
         }

@@ -141,6 +141,33 @@ export const CONTENT_LIMITS = {
   highlightDetail: 140,
 } as const;
 
+/**
+ * How many highlights the player's contest screen actually draws.
+ *
+ * IT IS NOT `CONTENT_LIMITS.highlights` AND THAT IS THE POINT. The arena's bottom band is a
+ * fixed-height strip - the owner's reference measures 986 x 103 - so the card has room for
+ * four ticked lines, while six can be stored. An operator adding a fifth would otherwise get
+ * a control that appears to work and does nothing, which is a shape this programme keeps
+ * finding; the hint beside the field is the only place it can be said.
+ *
+ * IT IS A SECOND COPY OF THE PLAYER APP'S `STRIP_TIP_LIMIT` and it cannot be anything else -
+ * `apps/admin` cannot import from `components/games/`, and a number in a comment drifts
+ * silently in the direction that makes the hint a lie. So `__tests__/games/arena-band.test.ts`
+ * reads the literal out of both files and asserts they agree. Change one, change the other.
+ */
+export const ARENA_HIGHLIGHT_LIMIT = 4;
+
+/**
+ * How many numbered steps that same strip draws from `howToPlay`.
+ *
+ * THREE, FOR THE SAME ARITHMETIC as the four above - a 96px card, a 26px heading, 22px rows.
+ * It is here rather than only in the player app for the same reason too: the hint beside the
+ * field is where an operator learns that a fourth step is stored and not shown, and a number
+ * typed into that sentence is a number that drifts. Pinned against `STRIP_STEP_LIMIT` in
+ * `GameRulesPanel.tsx` by the same test.
+ */
+export const ARENA_STEP_LIMIT = 3;
+
 export interface GameHighlight {
   title: string;
   detail: string;

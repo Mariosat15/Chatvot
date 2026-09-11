@@ -177,7 +177,15 @@ export function NeonAvatar({
   src,
 }: {
   name: string;
-  size?: "sm" | "md";
+  /**
+   * `xs` is the arena band's compact feed - a 20px chip in a 22px row.
+   *
+   * IT KEEPS THE 2px RING, which is the only decision here worth a sentence. Thinning the
+   * border to `border` at this size is the obvious tidy-up and it costs the chip its identity:
+   * the ring is what makes an avatar read as an avatar rather than as a coloured dot, and at
+   * 20px the dot reading is one hairline away.
+   */
+  size?: "xs" | "sm" | "md";
   src?: string | null;
 }) {
   const initials =
@@ -189,9 +197,14 @@ export function NeonAvatar({
       .join("")
       .toUpperCase() || "?";
 
-  const chip = `${
-    size === "sm" ? "h-7 w-7 text-[10px]" : "h-8 w-8 text-[11px]"
-  } shrink-0 rounded-full border-2 border-[#32C2FF] bg-gradient-to-br from-[#811AF4] to-[#0C96DB] font-bold text-white`;
+  const chipSize =
+    size === "xs"
+      ? "h-5 w-5 text-[8px]"
+      : size === "sm"
+        ? "h-7 w-7 text-[10px]"
+        : "h-8 w-8 text-[11px]";
+
+  const chip = `${chipSize} shrink-0 rounded-full border-2 border-[#32C2FF] bg-gradient-to-br from-[#811AF4] to-[#0C96DB] font-bold text-white`;
 
   if (src) {
     return (

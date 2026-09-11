@@ -22,7 +22,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CONTENT_LIMITS } from "@/lib/admin/game-content-fields";
+import {
+  ARENA_HIGHLIGHT_LIMIT,
+  ARENA_STEP_LIMIT,
+  CONTENT_LIMITS,
+} from "@/lib/admin/game-content-fields";
 import {
   GAME_CATEGORIES,
   normaliseCategorySlug,
@@ -272,7 +276,15 @@ export default function GameContentDialog({
 
           <Field
             label="How to play"
-            hint="The controls and constraints in plain language. A player asking how to play and a player asking why they lost are asking two different questions."
+            /*
+              THE HINT NAMES THE FORMAT BECAUSE THE FORMAT IS THE ONLY INPUT TO IT. The contest
+              screen numbers each LINE as a step and shows the first three; written as one
+              paragraph it renders as one line, which is correct and is not what the reference
+              shows. Nothing else can tell an operator that - the field accepts both and both
+              save - so the alternative to this sentence is a screen that looks wrong for a
+              reason nobody can find, which is how this panel came to be rebuilt.
+            */
+            hint={`The controls and constraints in plain language. One line per step: the contest screen numbers them and shows the first ${ARENA_STEP_LIMIT}. A player asking how to play and a player asking why they lost are asking two different questions.`}
             length={draft.howToPlay.length}
             limit={CONTENT_LIMITS.howToPlay}
           >
@@ -330,8 +342,16 @@ export default function GameContentDialog({
                 providerKey={providerKey}
                 gameCode={title.gameCode}
                 slot="how-to-play"
-                label="Rules panel picture"
-                hint="Landscape. Sits beside the scoring and how-to-play text."
+                label="How it works picture"
+                /*
+                  THE HINT NAMES THE PANEL THE PLAYER SEES, and it was renamed with the band.
+                  These two slots are the only place an operator learns which picture lands
+                  where, and the reason that matters is that the two are easy to swap: the
+                  first build of the band had the emblem in the rules card and the diagram
+                  beside the tips, because the labels said "rules" and "highlights" while the
+                  screen says "How it works" and "Game tips".
+                */
+                hint="Small square, beside the numbered steps. A diagram of the game, not a logo."
                 value={draft.howToPlayImageUrl}
                 onChange={(url) => set("howToPlayImageUrl", url)}
               />
@@ -339,8 +359,8 @@ export default function GameContentDialog({
                 providerKey={providerKey}
                 gameCode={title.gameCode}
                 slot="highlight"
-                label="Highlights emblem"
-                hint="Square. Sits above the highlight cards, like a badge."
+                label="Game tips picture"
+                hint="Small landscape, beside the ticked tips. A badge or a slogan graphic."
                 value={draft.highlightsImageUrl}
                 onChange={(url) => set("highlightsImageUrl", url)}
               />
@@ -351,9 +371,21 @@ export default function GameContentDialog({
             <div className="flex items-center justify-between">
               <div>
                 <Label>Highlights</Label>
+                {/*
+                  IT SAYS WHICH ONES GET DRAWN, because the two numbers disagree and only the
+                  operator can act on it. The player's card is a fixed-height strip with room
+                  for four lines, so a fifth and sixth are stored and never shown - and the
+                  only place that is visible is here, beside the button that offers them.
+
+                  The TITLE alone is what the card draws, with the detail on its tooltip, so
+                  the title has to stand on its own. That is worth saying next to a field
+                  labelled "detail" that an operator would otherwise write the substance into.
+                */}
                 <p className="text-xs text-white/50">
-                  The small cards along the bottom of the contest screen. Up to{" "}
-                  {CONTENT_LIMITS.highlights}; none is fine.
+                  Ticked lines on the contest screen. The first{" "}
+                  {ARENA_HIGHLIGHT_LIMIT} titles are shown, so write each title so it
+                  reads on its own; the detail appears on hover. Up to{" "}
+                  {CONTENT_LIMITS.highlights} can be stored; none is fine.
                 </p>
               </div>
               <Button

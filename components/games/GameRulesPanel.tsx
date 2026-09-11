@@ -45,9 +45,31 @@ interface Props {
   /**
    * Widen the copy on a full-width slot. The arena renders this beneath the board where there
    * is room for two columns; the lobby sidebar has one.
+   *
+   * `strip` IS THE ARENA'S BOTTOM BAND and it is a different panel rather than a narrower
+   * one. See `STRIP_STEP_LIMIT` below for what it drops and why that is safe.
    */
-  layout?: "column" | "wide";
+  layout?: "column" | "wide" | "strip";
 }
+
+/**
+ * How many numbered steps the compact strip draws.
+ *
+ * THREE, BECAUSE THREE IS WHAT FITS, and saying that plainly matters more than the number.
+ * The owner's reference measures 986 x 103 for the whole band, so a card is about 96px: a
+ * dense heading strip is 26 of those and three 22px rows are the remaining 70. A fourth step
+ * does not shrink the type, it falls off the bottom of a `overflow-hidden` card - which is
+ * content vanishing with nothing on screen to say so, the failure this codebase keeps
+ * finding. So the cap is explicit, it is asserted by a test, and the overflow rule is there
+ * only as a backstop for a step long enough to wrap.
+ *
+ * NOTHING IS UNREACHABLE BECAUSE OF IT. The lobby renders this same panel at `column`, with
+ * every step and the scoring rule in full, and a player reaches the lobby before they can
+ * reach the arena - the dashboard's contest cards deliberately link there rather than to
+ * `/play`, because launching a round spends an attempt. The strip is a reminder beside a
+ * board, not the only place the rules exist.
+ */
+const STRIP_STEP_LIMIT = 3;
 
 /**
  * Paragraphs from free text.
@@ -81,6 +103,16 @@ export default function GameRulesPanel({ presentation, layout = "column" }: Prop
    * provider registered but not yet re-synced, so it is the common case rather than an edge.
    */
   if (!scoring && !playing) return null;
+
+  if (layout === "strip") {
+    return (
+      <RulesStrip
+        text={playing || scoring || ""}
+        imageUrl={presentation.howToPlayImageUrl}
+        gameName={presentation.gameName}
+      />
+    );
+  }
 
   return (
     /*
@@ -156,6 +188,100 @@ export default function GameRulesPanel({ presentation, layout = "column" }: Prop
             </div>
           </div>
         )}
+      </div>
+    </NeonHeadedPanel>
+  );
+}
+
+/**
+ * The arena band's `HOW IT WORKS` card: a fixed-height panel of numbered steps with the
+ * operator's diagram beside them.
+ *
+ * WHY IT IS HERE AND NOT IN `components/games/arena/`. The steps are the operator's own
+ * sentences about their own game, so the file that renders them is the file that owns this
+ * content - and a test forbids the arena folder from containing a game-shaped sentence in a
+ * quoted string, which is exactly what a hard-coded "Connect matching numbers with a path"
+ * would be. The heading is the only words this component writes, and it names no game.
+ *
+ * THE HEADING DROPS THE GAME'S NAME, WHICH THE FULL PANEL KEEPS. `How Circuit Sprint: fast
+ * and fun spatial puzzles is scored` is a heading longer than the card is wide; at this size
+ * a title that wraps costs a step. The lobby's panel still names the game, where there is
+ * room for it and where a player is deciding whether to pay.
+ *
+ * THE SCORING RULE IS NOT DRAWN HERE, on the owner's instruction of 11 September 2026, and
+ * that is the one thing about this card worth checking before changing it. It is the sentence
+ * that decides a prize and it is deliberately the loudest thing in the full panel - see the
+ * note on that block - so removing it from a screen is a decision rather than a tidy-up. What
+ * makes it safe is the lobby: every route into the arena passes through it, and it carries
+ * the rule in full. What makes it a cost is that a player halfway through a contest cannot
+ * re-read the rule without leaving the board. The compact fallback below is why the panel is
+ * not silent when a title has a scoring rule and no instructions.
+ */
+function RulesStrip({
+  text,
+  imageUrl,
+  gameName,
+}: {
+  text: string;
+  imageUrl?: string;
+  gameName: string;
+}) {
+  const steps = paragraphs(text).slice(0, STRIP_STEP_LIMIT);
+
+  return (
+    <NeonHeadedPanel icon={BookOpen} title="How it works" dense>
+      <div className="flex h-full items-center gap-2.5 px-2.5 py-1">
+        <ol className="min-w-0 flex-1 space-y-1">
+          {steps.map((step, index) => (
+            <li key={index} className="flex items-center gap-2">
+              {/*
+                The reference's small blue numbered disc. `aria-hidden` because the ordinal is
+                already carried by the `<ol>`, and read aloud it would announce every step
+                twice.
+              */}
+              <span
+                className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border border-cyan-400/40 bg-cyan-400/10 text-[9px] font-bold text-cyan-300"
+                aria-hidden
+              >
+                {index + 1}
+              </span>
+              {/*
+                ONE LINE PER STEP, with the whole sentence on the element's `title`. A step
+                that wraps pushes the one below it out of a card that cannot grow, so the
+                clamp is what keeps three steps visible - and the tooltip is what keeps a long
+                one recoverable rather than merely cut. The lobby has it in full either way.
+              */}
+              <span
+                className="truncate text-[10px] leading-tight text-gray-300"
+                title={step}
+              >
+                {step}
+              </span>
+            </li>
+          ))}
+        </ol>
+
+        {/*
+          THE DIAGRAM IS BESIDE THE STEPS AND SMALL, which is the correction the owner asked
+          for: it was drawn beneath them at the panel's full width, so a card meant to be a
+          thin strip became a 600px column with a hero image in it. Fixed at 66px rather than
+          a percentage, because a proportion of a flexible column is how it grew in the first
+          place - and 66 is the owner's 65-75 met at the largest size the band's body has
+          room for.
+
+          THE WIDTH IS THE SIZE. `NeonIllustration` is `aspect-square`, so it takes its height
+          from its width - which is why this is `w-[66px]` and not a height, and why the band
+          had to be 104px rather than 96 for the number the owner asked for to fit at all.
+        */}
+        <div className="hidden w-[66px] shrink-0 sm:block">
+          <NeonIllustration
+            src={imageUrl}
+            alt={`How ${gameName} is played`}
+            icon={BookOpen}
+            accent="players"
+            fit="contain"
+          />
+        </div>
       </div>
     </NeonHeadedPanel>
   );

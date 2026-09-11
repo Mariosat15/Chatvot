@@ -260,39 +260,62 @@ export function GameArenaLayout({
       </div>
 
       {/*
-        THE REFERENCE'S THREE-PANEL BAND, on the owner's instruction of 11 September 2026 -
-        and the reason it is safe this time is the two words `empty:hidden`, not the owner's
-        say-so.
+        THE REFERENCE'S BOTTOM INFORMATION STRIP: three compact cards in one row, the whole
+        band about 100px tall.
 
-        It was tried and reverted the same day. All three of these slots render NOTHING when
-        their content is absent, and that is the common case rather than an edge: no title
-        carries rules text until the catalogue is re-synced, an operator writes the feature
-        cards per title, and a contest nobody has played yet has no activity. A layout cannot
-        see that its child returned `null`, so a grid column holding one is still a column -
-        which is how the first attempt produced one panel adrift in an empty row.
+        THE MEASUREMENT IS THE SPECIFICATION, and it is the only reason this comment is long.
+        The owner supplied the reference at 986 x 103 and rejected the first build for
+        stretching to 600-plus - "three large dashboard cards" instead of a thin bar - so the
+        height here is fixed rather than derived. It does NOT scale with the viewport: a wider
+        screen makes the cards wider and must not make them taller, or the strip becomes a
+        section again at 1440px while measuring correctly at 986.
 
-        CSS can see it, even though React cannot: a wrapper whose child rendered nothing has
-        no child nodes, so `:empty` matches it and the slot leaves the flex line entirely.
-        `flex-wrap` with a basis rather than `grid-cols-3`, so the one or two panels that DO
-        have content grow to fill the row instead of huddling in the first tracks. One panel
-        reads as a full-width panel; three read as the reference.
+        104px IS ARRIVED AT, NOT CHOSEN, and the working is worth keeping because the first
+        attempt at 96 was wrong in a way nothing would have reported. A card is the band less
+        its 30px heading strip, so 96 left 66px of body - and the owner also specified the
+        pictures at 65-75px. `NeonIllustration` derives its height from its WIDTH through an
+        aspect ratio, so a 66px-wide square is 66px tall in a body that, after padding, had
+        49: it would have been silently cropped by the `overflow-hidden` backstop, on the two
+        acceptance points that ask whether the pictures are there. 104 gives 74px of body,
+        which fits a 66px picture, three 24px feed rows, and the owner's own 95-115 range.
+
+        WHICH MEANS THE CARDS CANNOT GROW, so what goes in them is capped rather than
+        wrapped. Each panel takes the reference's own count - three steps, four tips, three
+        players - and clamps every line to one, with the full text on a tooltip and the
+        uncapped version on the lobby. `overflow-hidden` is a backstop, not the mechanism;
+        relying on it alone is how content disappears with nothing on screen to say so.
+
+        STILL `flex-wrap`, NOT `grid-cols-3`, AND THAT IS A DELIBERATE DEVIATION FROM THE
+        OWNER'S CSS - which asked for `grid-template-columns: 1.15fr 1.15fr 1fr`. The
+        proportions are identical: `flex-[1.15_1_0]` twice and `flex-[1_1_0]` once divides the
+        row 34/34/32 exactly as those tracks do. What differs is the empty case, and it is the
+        common one. All three slots render NOTHING when their content is absent - a title with
+        no rules text, no feature cards written, or a contest nobody has played yet - and a
+        layout cannot see that its child returned `null`. A hidden GRID item leaves its track
+        behind, so the first attempt at this band put one panel adrift in an empty row; a
+        hidden FLEX item leaves the line, and `:empty` is how CSS sees what React cannot. The
+        one or two cards that do have content then grow to fill the row.
+
+        `min-w-[260px]` IS WHAT STACKS IT ON A PHONE AND NOT ON A DESKTOP. Three cards at
+        260 plus two 10px gaps needs 800px, so the row survives every width the owner called
+        desktop and wraps below it - which is the responsive rule stated as a measurement
+        instead of a breakpoint that has to agree with one.
+
+        `[&>*]:h-full` IS WHAT MAKES THEM LEVEL. The wrappers already stretch - that is the
+        flex default - so they were the same height all along; what differs is the PANEL
+        inside each one, which sizes to its own text and leaves the rest of its stretched
+        wrapper empty. It belongs here rather than in the three panels because two of them
+        are also rendered in the lobby, where a forced full height would stretch one card to
+        the length of a whole column.
       */}
-      {/*
-        `[&>*]:h-full` IS THE OWNER'S "ONE BIGGER THAN THE OTHER", and the reason it is on the
-        wrapper rather than on the panels is worth stating. The wrappers already stretch -
-        that is the flex default - so they were the same height all along; what differs is
-        the PANEL inside each one, which sizes to its own text and leaves the rest of its
-        stretched wrapper empty. So the fix reaches through the wrapper to whatever it was
-        handed, and it belongs here rather than in the three panels: two of them are also
-        rendered in the lobby sidebar, where a forced full height would stretch one card to
-        the length of the whole column.
-      */}
-      <div className="mt-5 flex flex-wrap items-stretch gap-5">
-        <div className="min-w-[300px] flex-1 empty:hidden [&>*]:h-full">{rules}</div>
-        <div className="min-w-[280px] flex-1 empty:hidden [&>*]:h-full">
+      <div className="mt-4 flex flex-wrap items-stretch gap-2.5 sm:h-[104px]">
+        <div className="min-w-[260px] flex-[1.15_1_0] empty:hidden [&>*]:h-full">
+          {rules}
+        </div>
+        <div className="min-w-[260px] flex-[1.15_1_0] empty:hidden [&>*]:h-full">
           {highlights}
         </div>
-        <div className="min-w-[280px] flex-1 empty:hidden [&>*]:h-full">
+        <div className="min-w-[260px] flex-[1_1_0] empty:hidden [&>*]:h-full">
           {activity}
         </div>
       </div>

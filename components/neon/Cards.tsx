@@ -116,6 +116,7 @@ export function NeonIllustration({
   icon: Icon,
   accent,
   shape = "square",
+  fit = "cover",
 }: {
   /** The operator's upload. Absent - the normal case - draws the emblem instead. */
   src?: string;
@@ -128,6 +129,16 @@ export function NeonIllustration({
   icon: LucideIcon;
   accent: NeonAccent;
   shape?: "square" | "landscape";
+  /**
+   * `contain` keeps the whole picture visible; `cover` fills the box and crops.
+   *
+   * THE ARENA BAND USES `contain` AND THAT IS NOT A PREFERENCE. These two uploads are
+   * graphics rather than photographs - a keyed-out emblem, a small diagram - so the edges
+   * carry the shape and a crop takes the corners off a badge. `cover` stays the default
+   * because the slots that already existed are a logo and a hero banner, where filling the
+   * frame is the whole job and a letterboxed banner reads as a broken image.
+   */
+  fit?: "cover" | "contain";
 }) {
   const box = shape === "landscape" ? "aspect-[4/3]" : "aspect-square";
   const classes = accentClasses(accent);
@@ -138,7 +149,11 @@ export function NeonIllustration({
         className={`overflow-hidden rounded-lg border border-[#161E36] bg-[#080C18]/70 ${box}`}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={alt} className="h-full w-full object-cover" />
+        <img
+          src={src}
+          alt={alt}
+          className={`h-full w-full ${fit === "contain" ? "object-contain" : "object-cover"}`}
+        />
       </div>
     );
   }
@@ -309,6 +324,7 @@ export function NeonHeadedPanel({
   children,
   className = "",
   bodyClassName = "",
+  dense = false,
 }: {
   icon?: LucideIcon;
   title: string;
@@ -318,6 +334,17 @@ export function NeonHeadedPanel({
   /** The shell. Pass `NEON_STAGE_PANEL` for something the player is acting on. */
   className?: string;
   bodyClassName?: string;
+  /**
+   * A shorter heading strip, for a panel that has to fit a fixed compact height.
+   *
+   * IT IS A PROP RATHER THAN A SECOND COMPONENT because the alternative is a second copy of
+   * the strip - the gradient, the hairline, the glyph size and the heading token - and the
+   * arena's bottom band is exactly where a drifted shade shows, three panels across from the
+   * full-height ones above them. The measurement is the reason it exists at all: the default
+   * strip is about 34px of a 96px card, so a third of the panel is spent on its own title
+   * before a single line of content is drawn.
+   */
+  dense?: boolean;
 }) {
   return (
     /*
@@ -330,16 +357,28 @@ export function NeonHeadedPanel({
     */
     <div className={`${className || NEON_PANEL_LIT} overflow-hidden`}>
       <div
-        className={`flex items-center justify-between gap-2 px-4 py-2.5 ${NEON_HEAD_STRIP}`}
+        className={`flex items-center justify-between gap-2 ${
+          dense ? "px-3 py-1.5" : "px-4 py-2.5"
+        } ${NEON_HEAD_STRIP}`}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           {/*
             The reference's heading glyphs are the same cyan as its heading text, not a step
             duller - so the icon takes the heading's own colour rather than a sky tint beside
             it. One colour, one token, and they cannot drift a shade apart.
           */}
-          {Icon && <Icon className="h-3.5 w-3.5 text-[#16DFFF]" />}
-          <h2 className={NEON_HEADING}>{title}</h2>
+          {Icon && (
+            <Icon
+              className={`${dense ? "h-3 w-3" : "h-3.5 w-3.5"} shrink-0 text-[#16DFFF]`}
+            />
+          )}
+          {/*
+            `truncate` on the dense heading and not on the default one. A compact panel is one
+            of three across a band, so its title is the first thing that runs out of room - and
+            a heading that wraps to two lines inside a fixed-height card pushes a line of
+            content out of the bottom, which is content disappearing to make space for a title.
+          */}
+          <h2 className={`${NEON_HEADING} ${dense ? "truncate" : ""}`}>{title}</h2>
         </div>
         {action}
       </div>

@@ -58,10 +58,17 @@ $probes = @(
     # THE OBVIOUS WRONG FIX, restored verbatim. `h-full` on the wrapper is a no-op, because a
     # flex item already stretches - the wrappers were level while the owner was looking at
     # panels that were not. A guard asserting "the band mentions h-full" is green on this.
+    #
+    # RE-AIMED 11 September 2026, when the band became a fixed-height strip. The three probes
+    # in this block named the old markup verbatim and would have reported DID NOT APPLY -
+    # which reads like a broken harness rather than a moved target, and fails in the quiet
+    # direction. The CLAIMS are unchanged; only the class strings moved.
     Name = 'the height is set on the wrapper instead of on the panel inside it'
     File = $LAYOUT
-    From = 'className="min-w-[300px] flex-1 empty:hidden [&>*]:h-full"'
-    To   = 'className="min-w-[300px] flex-1 empty:hidden h-full"'
+    From = 'className="min-w-[260px] flex-[1.15_1_0] empty:hidden [&>*]:h-full">
+          {rules}'
+    To   = 'className="min-w-[260px] flex-[1.15_1_0] empty:hidden h-full">
+          {rules}'
     Test = 'reaches through each wrapper to the panel inside it'
   },
   @{
@@ -69,10 +76,10 @@ $probes = @(
     # short one - and it would be whichever panel happened to have the least text.
     Name = 'one slot stops stretching its panel'
     File = $LAYOUT
-    From = '<div className="min-w-[280px] flex-1 empty:hidden [&>*]:h-full">
+    From = '<div className="min-w-[260px] flex-[1_1_0] empty:hidden [&>*]:h-full">
           {activity}
         </div>'
-    To   = '<div className="min-w-[280px] flex-1 empty:hidden">
+    To   = '<div className="min-w-[260px] flex-[1_1_0] empty:hidden">
           {activity}
         </div>'
     Test = 'reaches through each wrapper to the panel inside it'
@@ -80,11 +87,12 @@ $probes = @(
   @{
     # The band was built, reverted and rebuilt, and this is the mutation that caused the
     # revert: a hidden GRID item leaves its track behind, so `empty:hidden` under a grid is a
-    # hole rather than a shorter row.
+    # hole rather than a shorter row. It is also the owner's own suggested CSS, which is why
+    # the deviation is argued for in the test rather than just asserted.
     Name = 'the band is a grid again, so an absent panel leaves a hole'
     File = $LAYOUT
-    From = 'className="mt-5 flex flex-wrap items-stretch gap-5"'
-    To   = 'className="mt-5 grid items-stretch gap-5 lg:grid-cols-3"'
+    From = 'className="mt-4 flex flex-wrap items-stretch gap-2.5 sm:h-24"'
+    To   = 'className="mt-4 grid items-stretch gap-2.5 sm:h-24 lg:grid-cols-3"'
     Test = 'still lets a panel with nothing in it leave the row'
   },
 
@@ -133,8 +141,8 @@ $probes = @(
   @{
     Name = 'the highlights panel ignores the field it was given'
     File = $HIGHLIGHTS
-    From = '              src={imageUrl}'
-    To   = '              src={undefined}'
+    From = '            src={imageUrl}'
+    To   = '            src={undefined}'
     Test = 'is drawn on both panels, from the field the operator set'
   },
 
