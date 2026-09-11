@@ -7,13 +7,21 @@ import { useRouter } from "next/navigation";
  * Re-reads the server's answer on a cadence while a contest is running, so a lobby's standings
  * stop being a photograph taken when the page happened to load.
  *
- * WHY THIS IS A REFRESH AND NOT A POLL OF A LEADERBOARD ENDPOINT. There is no player-facing JSON
- * API that returns a competition's ranking - `getCompetitionLeaderboard` is a server action, and
- * it is where the whole ranking rule lives: the score direction resolved from the catalogue, the
- * eligibility gate, the tie handling. Adding an endpoint means a second reader that can drift
- * from it, which is the shape behind `referenceId`, `failedReason`, `challengeId` and the Game
- * Master `||`, none of which `check:mirrors` can see. `router.refresh()` re-runs the page that
- * already calls it, so there is exactly one answer to "who is winning".
+ * WHY THIS IS A REFRESH AND NOT A POLL OF A LEADERBOARD ENDPOINT. `getCompetitionLeaderboard` is
+ * a server action, and it is where the whole ranking rule lives: the score direction resolved
+ * from the catalogue, the eligibility gate, the tie handling. `router.refresh()` re-runs the page
+ * that already calls it, so there is exactly one answer to "who is winning", and a lobby page is
+ * cheap enough to re-render.
+ *
+ * THAT REASONING USED TO OPEN WITH "there is no player-facing JSON API that returns a
+ * competition's ranking", AND SINCE 11 SEPTEMBER 2026 THAT IS FALSE - `GET
+ * /api/competitions/[id]/standings` exists for the arena, which cannot re-render its page. The
+ * correction is left visible because the conclusion it supported still holds here and the reason
+ * is now narrower: an endpoint is only a second reader if it composes an answer of its own, and
+ * that one does not. It calls the same server action through `arena-standings.service.ts`, which
+ * the page also calls, so there is still one ranking rule. A poll that read participants and
+ * sorted them itself would be the drift this paragraph warns about - the shape behind
+ * `referenceId`, `failedReason`, `challengeId` and the Game Master `||`.
  *
  * It costs a whole server render rather than one query, which is the trade being made knowingly.
  * A lobby is not a hot path, the refresh is visibility-gated, and React preserves client state

@@ -49,10 +49,18 @@ import {
  * read it onto a board, so a player watching a contest could see that somebody was ahead and
  * nothing about what either of them had done.
  *
- * THE SECOND LINE IS WHERE IT GOES, NOT A FOURTH COLUMN. The reference draws SCORE and TIME
- * side by side, which works at its width; this board also renders in the arena's 300px
- * standings rail, where a fourth column is what turned player names into "M...". A line under
- * the name truncates gracefully and keeps the score where the eye already looks for it.
+ * THE PROGRESS GOES ON A SECOND LINE UNDER THE NAME, and the sentence that used to be here was
+ * wrong about why. It read: "NOT A FOURTH COLUMN. The reference draws SCORE and TIME side by
+ * side, which works at its width; this board also renders in the arena's 300px standings rail,
+ * where a fourth column is what turned player names into 'M...'." The fourth column was not what
+ * squeezed the names - the rail was, and the row's own furniture was. The reference's TIME column
+ * exists here now, and the names fit, because the rail was measured against the reference rather
+ * than argued about and the plates, avatars and padding all shrank. The correction is left
+ * visible because the reasoning was plausible and cost a second rejection.
+ *
+ * The breakdown still belongs on the second line rather than in columns of its own, for a
+ * different reason: a game declares however many metrics it likes, in its own order, so there is
+ * no fixed number of columns to draw.
  *
  * AND THE METRIC IS NOT CHOSEN HERE. `describeRoundActivity` hands over the game's entries in
  * the order the game declared them - see its header for why picking one by name would make the

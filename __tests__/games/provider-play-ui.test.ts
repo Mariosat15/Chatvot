@@ -2090,6 +2090,8 @@ describe("the arena states what the prize figures are", () => {
   });
 });
 
+const ARENA_STANDINGS_SERVICE = "lib/services/games/arena-standings.service.ts";
+
 describe("the player's own position is read, never worked out", () => {
   /*
     THE DEFECT THIS PREVENTS IS R37 REPEATED. `calculateRankings` resolves a contest's score
@@ -2100,9 +2102,21 @@ describe("the player's own position is read, never worked out", () => {
     So the rank is LOOKED UP on the row the server already ranked, and the two assertions are
     the lookup and the absence of any local ordering.
   */
+  /*
+    THE LOOKUP MOVED INTO `arena-standings.service.ts` ON 11 SEPTEMBER 2026, when the rail
+    became live and the page's board read had to be shared with the polling route. The claim is
+    unchanged and only the location moved, so the assertion was RE-POINTED rather than relaxed -
+    and the page is now asserted not to do it, because a screen that re-derives a rank beside a
+    service that resolves one is the "one rule, two copies" shape this codebase keeps finding.
+  */
   it("takes currentRank off the matching row", () => {
+    const service = readCode(ARENA_STANDINGS_SERVICE);
+    expect(service).toMatch(/rows\.find\([\s\S]{0,120}currentRank/);
+
+    // The page is handed the answer. `standings.yourRank` is a read of it, not a computation.
     const page = readCode(PLAY_PAGE);
-    expect(page).toMatch(/rows\.find\([\s\S]{0,120}currentRank/);
+    expect(page).not.toMatch(/rows\.find\(/);
+    expect(page).toMatch(/rank=\{standings\.yourRank\}/);
   });
 
   it("orders nothing itself", () => {

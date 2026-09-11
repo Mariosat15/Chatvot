@@ -203,14 +203,189 @@ describe("the refresher cannot leak a timer or refresh a tab nobody is reading",
    * rather than an omission.
    *
    * `getCompetitionLeaderboard` is a server action and is where the whole ranking rule lives -
-   * the score direction resolved from the catalogue, the eligibility gate, the tie handling. A
-   * JSON endpoint would be a second reader that can drift from it, which is the shape behind
-   * `referenceId`, `failedReason`, `challengeId` and the Game Master `||`, none of which
-   * `check:mirrors` can see.
+   * the score direction resolved from the catalogue, the eligibility gate, the tie handling.
+   * `router.refresh()` re-runs the page that already calls it, so there is one answer to who is
+   * winning, and a lobby page is cheap enough to re-render.
+   *
+   * THE REASON RECORDED HERE WAS ONCE "a JSON endpoint would be a second reader that can drift
+   * from it", AND ONE EXISTS NOW - the arena's, added 11 September 2026, because that page hosts
+   * a paid round in an iframe and cannot re-render. The corrected reason is narrower and is the
+   * one to carry: an endpoint is a second reader only if it composes an answer of its own.
    */
   it("it refreshes the page rather than fetching a second answer of its own", () => {
     const code = readCode(REFRESHER);
     expect(code).toMatch(/router\.refresh\(\)/);
     expect(code).not.toMatch(/fetch\(/);
+  });
+});
+
+/**
+ * THE ARENA REFRESHES ITS STANDINGS WITHOUT REFRESHING THE PAGE, which is the only shape
+ * available to it and is a different mechanism from everything above.
+ *
+ * The defect, reported by the owner on 11 September 2026 as the board "not showing live" what a
+ * player had finished: the arena's standings and recent-players panels are server props rendered
+ * once, so a round that landed while the player sat at the game appeared only after a reload.
+ *
+ * The obvious fix is forbidden - see the negative assertion higher up this file - so the rail
+ * polls a JSON endpoint and swaps only its own two panels. Every claim here is structural, for
+ * the reason in the file header: there is no DOM in this environment.
+ */
+describe("the arena's standings rail is live without the page being", () => {
+  const LIVE_RAIL = "components/games/arena/ArenaLiveStandings.tsx";
+  const STANDINGS_ROUTE = "app/api/competitions/[id]/standings/route.ts";
+  const STANDINGS_SERVICE = "lib/services/games/arena-standings.service.ts";
+
+  /**
+   * THE SAFETY PROPERTY THE WHOLE DESIGN TURNS ON, and it is a property of WHERE the state
+   * lives rather than of what it contains.
+   *
+   * The provider takes the rest of the arena as `children`. A `children` element handed down
+   * from a server component is the same object on every re-render, so React reconciles it by
+   * identity and never descends into it - the iframe cannot remount. That guarantee is destroyed
+   * the moment the round host reads this context instead of being a child of it, which is the
+   * natural thing for somebody to do next, so it is asserted rather than commented.
+   */
+  it("the round host is a child of the live provider, never a consumer of it", () => {
+    const rail = readCode(LIVE_RAIL);
+    expect(rail).toMatch(/\{children\}/);
+    expect(rail).not.toMatch(/ProviderRoundHost/);
+
+    const page = readCode(PLAY_PAGE);
+    const providerAt = page.indexOf("<ArenaLiveProvider");
+    const hostAt = page.indexOf("<ProviderRoundHost");
+    expect(providerAt).toBeGreaterThan(-1);
+    expect(hostAt).toBeGreaterThan(providerAt);
+  });
+
+  /**
+   * ONE FETCH, TWO CONSUMERS. The board and the recent-players feed show the same facts in two
+   * different columns, so fetching in each is two polls of one endpoint and - worse - two
+   * answers: the board could name a rival's finished round while the feed beside it had not
+   * heard of it. The count pill is a third consumer for the same reason.
+   */
+  it("fetches once for every panel that shows it", () => {
+    const rail = readCode(LIVE_RAIL);
+    expect(countOf(rail, "fetch(")).toBe(1);
+
+    // Reason: the trailing semicolon matters. `useArenaLive()` on its own also matches the hook's
+    // own empty-parameter DECLARATION, so the count came out one too high and the first version
+    // of this assertion was written around the wrong number.
+    expect(countOf(rail, "useArenaLive();")).toBe(3);
+  });
+
+  it("the page renders the consumers rather than the panels directly", () => {
+    const page = readCode(PLAY_PAGE);
+
+    expect(page).toMatch(/<ArenaLiveBoard/);
+    expect(page).toMatch(/<ArenaLiveFeed/);
+    expect(page).toMatch(/standingsCount=\{<ArenaLiveCount/);
+
+    // Reason: rendering either panel directly here is how half the rail goes back to being a
+    // photograph while every other assertion in this file stays green.
+    expect(page).not.toMatch(/<ProviderLeaderboard/);
+    expect(page).not.toMatch(/<ArenaActivityFeed/);
+  });
+
+  /**
+   * ONE PRODUCER FOR THE FIRST RENDER AND FOR EVERY REFRESH.
+   *
+   * This is the `dashboard-live` rule in a new place: the property being engineered for is
+   * AGREEMENT with what the player was first shown, not maximal liveness, because any field
+   * where the poll and the server render differ reads as the value having changed. Two
+   * compositions - one in the page, one in the route - is exactly how they come to differ.
+   */
+  it("the page and the route compose the board through the same service", () => {
+    for (const file of [PLAY_PAGE, STANDINGS_ROUTE]) {
+      expect(readCode(file)).toMatch(/getArenaStandings\(/);
+    }
+
+    // Reason: and neither of them reads the two halves itself, which is what the service is for.
+    for (const file of [PLAY_PAGE, STANDINGS_ROUTE]) {
+      const code = readCode(file);
+      expect(code).not.toMatch(/getCompetitionLeaderboard\(/);
+      expect(code).not.toMatch(/getContestActivity\(/);
+    }
+
+    const service = readCode(STANDINGS_SERVICE);
+    expect(service).toMatch(/getCompetitionLeaderboard\(/);
+    expect(service).toMatch(/getContestActivity\(/);
+  });
+
+  /**
+   * Whether the contest is running is decided on the SERVER from the stored status.
+   *
+   * A contest whose end time has passed is still `active` until a cron finalizes it, so a client
+   * comparing the end time against its own clock would freeze the board exactly while the last
+   * rounds are being scored. That reads as *more* accurate, which is why it is pinned.
+   */
+  it("liveness comes from the stored status, not from a clock in the browser", () => {
+    expect(readCode(PLAY_PAGE)).toMatch(
+      /active=\{outcome\.state\.contestStatus === "active"\}/,
+    );
+
+    const rail = readCode(LIVE_RAIL);
+    expect(rail).toMatch(/if\s*\(!active\)\s*return;/);
+    expect(rail).not.toMatch(/Date\.now\(\)/);
+    expect(rail).not.toMatch(/endTime/);
+  });
+
+  /**
+   * A BAD RESPONSE LEAVES THE LAST GOOD BOARD ON SCREEN.
+   *
+   * An error payload spread into state empties the rail, and an empty rail on this screen reads
+   * as "nobody has played" - a false statement about a contest in progress rather than a missing
+   * one. Same class as an absent score rendering `-` instead of `0`.
+   */
+  it("ignores a response that is not a board", () => {
+    const rail = readCode(LIVE_RAIL);
+    expect(rail).toMatch(/if\s*\(!response\.ok\)\s*return;/);
+    expect(rail).toMatch(/if\s*\(!Array\.isArray\(data\?\.rows\)\)\s*return;/);
+  });
+
+  /**
+   * Its OWN mounted flag and its own teardown.
+   *
+   * Sharing the round poll's flag lets that effect's cleanup silence this one with no error and
+   * nothing in a log; a leaked interval keeps fetching for the rest of the session.
+   */
+  it("tears its own timer and listener down", () => {
+    const rail = readCode(LIVE_RAIL);
+    expect(rail).toMatch(/let mounted = true;/);
+    expect(rail).toMatch(/if\s*\(!mounted\)\s*return;/);
+    expect(rail).toMatch(/mounted = false;/);
+    expect(rail).toMatch(/clearInterval\(/);
+    expect(rail).toMatch(/document\.addEventListener\("visibilitychange"/);
+    expect(rail).toMatch(/document\.removeEventListener\("visibilitychange"/);
+  });
+
+  /**
+   * The route refuses a junk id before reading the session, and refuses an anonymous caller
+   * before reading the database. Two indexed reads per request against any guessable id is not
+   * something to hand out unauthenticated, even though the board itself is public on the lobby.
+   */
+  it("the route is guarded and refuses a junk id first", () => {
+    /*
+      SLICED TO THE HANDLER BODY, and the first version of this test was not - it searched the
+      whole file, so `connectToDatabase` matched its own IMPORT at the top and the ordering came
+      out backwards against correct code. The same class as every other "locate the construct,
+      do not scan towards it" lesson here, and the length assertion is what proves the slice
+      found something.
+    */
+    const file = readCode(STANDINGS_ROUTE);
+    const bodyAt = file.indexOf("export async function GET");
+    expect(bodyAt).toBeGreaterThan(-1);
+    const route = file.slice(bodyAt);
+    expect(route.length).toBeGreaterThan(200);
+
+    const shapeAt = route.indexOf("isCompetitionIdShaped");
+    const sessionAt = route.indexOf("getSession");
+    const dbAt = route.indexOf("connectToDatabase");
+
+    expect(shapeAt).toBeGreaterThan(-1);
+    expect(sessionAt).toBeGreaterThan(shapeAt);
+    expect(dbAt).toBeGreaterThan(sessionAt);
+
+    expect(route).toMatch(/status:\s*401/);
   });
 });

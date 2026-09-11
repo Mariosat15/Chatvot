@@ -671,6 +671,13 @@ eye**: both lobbies are behind sign-in and the automated browser has no session.
 screen's own standings sidebar, and the dashboard contest cards, where `ContestsSidebar` polls
 challenges every ten seconds and reads competitions from static props.
 
+> **Both closed since, and the paragraph above is kept as history rather than rewritten.** The
+> dashboard cards on 10 September 2026 (s5.1b) and the play screen's sidebar on 11 September
+> (**s4.1o**). Neither uses this component: the dashboard because a page re-read there is a
+> seven-second rebuild, and the arena because **the prohibition higher up this section still
+> stands** - it polls a narrow endpoint and swaps only its own panels, leaving the iframe's
+> subtree untouched.
+
 ---
 
 ## 2. Provider scoping - the mistake that must not be made
@@ -1593,6 +1600,89 @@ hours, on R54's evidence, which is what it took to work out why a fixed game wou
 new name is fetched immediately by everybody. The superseded files are deleted, and the
 exhaustive `allNeonBanners()` file-existence test - which exists because artwork committed to
 the wrong directory is something no typecheck and no build can notice - passes on the new set.
+
+---
+
+### 4.1o The arena's board is live without the page being (owner instruction, 11 September 2026)
+
+The owner rejected the arena a second time. Three things were named; this section is the second
+of them: *"and have also not showing live the boards the user finished"*.
+
+**Nothing was computed wrongly and there is no risk number.** The board was correct, the
+activity line under each name was correct, and both were **server props rendered once**. A round
+that landed while the player sat at the game - their own or a rival's - appeared only after a
+reload. So there is nothing to backfill and no money was ever involved.
+
+#### The obvious fix is forbidden here, and that is the whole design constraint
+
+`LiveContestRefresher` is what every other contest surface uses, and
+`__tests__/games/live-contest-refresh.test.ts` **forbids it on this page** - deliberately, since
+`13` s1.1j: the arena hosts a live round in an iframe, and a `router.refresh()` timer underneath
+an attempt somebody has **paid** for can disturb it, intermittently and unreproducibly.
+
+So the rail polls a narrow endpoint and swaps only its own two panels:
+
+| Piece | What it is |
+|---|---|
+| `lib/services/games/arena-standings.service.ts` | The **one producer**. Board, activity, feed and the player's own rank |
+| `GET /api/competitions/[id]/standings` | Transport. Composes nothing of its own |
+| `components/games/arena/ArenaLiveStandings.tsx` | One provider, one poll, three consumers |
+
+**THE SAFETY PROPERTY IS A PROPERTY OF WHERE THE STATE LIVES, not of what it contains.** The
+provider takes the rest of the arena as `children`, and a `children` element handed down from a
+server component is the **same object** on every re-render - so React reconciles it by identity
+and never descends into it. The frame cannot remount however often the board changes. That
+guarantee is destroyed the moment `ProviderRoundHost` reads the context instead of being a child
+of it, which is the natural next step for somebody adding a feature, so it is **asserted rather
+than commented** and a probe injects exactly that mutation.
+
+#### One producer, because agreement matters more than liveness
+
+This is the `dashboard-live` rule in a new place (`13` s5.1b). The property engineered for is
+**agreement with what the player was first shown**: any field where the poll and the server
+render differ reads as *the value having changed*, which is a defect dressed as an improvement.
+Two compositions - one in the page, one in the route - is precisely how they come to differ, so
+both call `getArenaStandings` and **neither reads the board or the activity itself**. A test
+pins both halves.
+
+The two reads inside the service are **ordered, not parallel**, because the activity query is
+scoped to the user ids the board returned.
+
+**An endpoint is a second reader only if it composes an answer of its own.**
+`LiveContestRefresher`'s header used to open its reasoning with "there is no player-facing JSON
+API that returns a competition's ranking", and since this section that is false. The conclusion
+still holds there - a lobby page is cheap to re-render, and one answer is better than two - but
+the **reason is narrower**, and the correction is left visible in the file rather than tidied
+into the present tense.
+
+#### Three smaller rules, each of which has an inverse that looks correct
+
+- **Liveness is read from the stored status, never computed from a clock.** A contest whose end
+  time has passed is still `active` until a cron finalizes it, so a client deciding for itself
+  freezes the board exactly while the last rounds are being scored. That reads as *more*
+  accurate, which is why it is probed.
+- **A bad response leaves the last good board on screen.** An error payload spread into state
+  empties the rail, and an empty rail on this screen says *nobody has played* - a false
+  statement about a contest in progress rather than a missing one. Same family as an absent
+  score rendering `-` and never `0`.
+- **The count pill became a consumer.** `GameArenaLayout`'s `standingsCount` is now a `ReactNode`
+  rather than a number: a count rendered once on the server disagrees with the list beneath it
+  the moment somebody joins, which is one panel with two answers - the failure the live rail
+  exists to remove, reintroduced one heading higher.
+
+#### What this does NOT fix, and it is the third of the owner's three points
+
+**It does not make a round in flight report its progress.** There is no mid-round reporting
+anywhere on either side of the provider seam: a score exists only after `finishRound`, the
+frame's `postMessage` carries no score by construction, and the games-service's own per-board
+record never leaves that database. So a player still at the board reads **"Playing now"** until
+their round is reported, however many boards they have solved. What this section fixes is the
+moment **after** a round lands, which used to require a reload.
+
+Closing that needs a signed progress callback writing only `game_round.scoreBreakdown` - and
+that is a protocol change, so it is its own piece of work.
+
+**Never verified by eye**: the arena is behind sign-in and the automated browser has no session.
 
 ---
 

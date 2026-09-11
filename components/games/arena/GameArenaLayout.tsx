@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, ListOrdered } from "lucide-react";
 import { NEON_PANEL, NEON_LABEL } from "@/components/neon/tokens";
-import { NeonCountPill, NeonHeadedPanel } from "@/components/neon/Cards";
+import { NeonHeadedPanel } from "@/components/neon/Cards";
 import { providerBanner } from "@/components/neon/banners";
 import type { GamePresentation } from "@/lib/services/games/game-presentation.service";
 import { ArenaIdentity } from "./ArenaIdentity";
@@ -38,7 +38,15 @@ interface Props {
   stage: ReactNode;
   /** The live standings for this contest. */
   standings: ReactNode;
-  standingsCount: number;
+  /**
+   * The pill beside the Standings heading.
+   *
+   * A NODE RATHER THAN A NUMBER since 11 September 2026, because the board below it refreshes
+   * on a timer. A count rendered once on the server disagrees with the list beneath it the
+   * moment somebody joins - one panel with two answers, which is precisely the failure the
+   * live rail exists to remove rather than to reintroduce one heading higher.
+   */
+  standingsCount: ReactNode;
   /** The contest's facts and, beneath them, the prize table. */
   sidebar: ReactNode;
   /**
@@ -157,14 +165,13 @@ export function GameArenaLayout({
           <NeonHeadedPanel
             icon={ListOrdered}
             title="Standings"
-            action={
-              /*
-                "players", never "traders", and the bare count was the reference's one legible
-                omission - a pill reading `20` beside a heading reading `Standings` says twenty
-                of what.
-              */
-              <NeonCountPill>{standingsCount} players</NeonCountPill>
-            }
+            /*
+              "players", never "traders", and the bare count was the reference's one legible
+              omission - a pill reading `20` beside a heading reading `Standings` says twenty
+              of what. The wording now lives with the count in `ArenaLiveCount`, because the
+              figure and its noun have to change together.
+            */
+            action={standingsCount}
           >
             {/*
               Tight padding, because the rows are flush now and their left accent bar is the

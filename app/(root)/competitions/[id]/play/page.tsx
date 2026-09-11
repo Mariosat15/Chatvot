@@ -13,15 +13,18 @@ import Competition from "@/database/models/trading/competition.model";
 import AppSettingsModel from "@/database/models/app-settings.model";
 import { getPlayState } from "@/lib/services/games/round-status.service";
 import { getGamePresentation } from "@/lib/services/games/game-presentation.service";
-import { getContestActivity } from "@/lib/services/games/contest-activity.service";
-import { getCompetitionLeaderboard } from "@/lib/actions/trading/competition.actions";
+import { getArenaStandings } from "@/lib/services/games/arena-standings.service";
 import { ProviderRoundHost } from "@/components/games/ProviderRoundHost";
-import ProviderLeaderboard from "@/components/games/ProviderLeaderboard";
 import PrizeTable from "@/components/competitions/PrizeTable";
 import { GameArenaLayout } from "@/components/games/arena/GameArenaLayout";
 import { ArenaContestPanel } from "@/components/games/arena/ArenaContestPanel";
 import { ArenaHighlights } from "@/components/games/arena/ArenaHighlights";
-import { ArenaActivityFeed } from "@/components/games/arena/ArenaActivityFeed";
+import {
+  ArenaLiveBoard,
+  ArenaLiveCount,
+  ArenaLiveFeed,
+  ArenaLiveProvider,
+} from "@/components/games/arena/ArenaLiveStandings";
 import GameRulesPanel from "@/components/games/GameRulesPanel";
 import { NeonCountPill, NeonHeadedPanel } from "@/components/neon/Cards";
 import { Button } from "@/components/ui/button";
@@ -150,13 +153,24 @@ export default async function PlayPage({ params }: PlayPageProps) {
   // content layer an operator owns - never from the provider key, and never from `gameKey`,
   // which is an internal join key that happens to be human-readable and would leak our own
   // naming into a player screen.
-  const [presentation, leaderboard, settings] = await Promise.all([
+  const [presentation, standings, settings] = await Promise.all([
     getGamePresentation(contest?.gameConfig?.providerKey, contest?.gameConfig?.gameCode),
-    // The standings are rendered from the server and refreshed when a round settles, which
-    // `ProviderRoundHost` already triggers. They are NOT polled on a timer: a live ticker
-    // needs an endpoint that does not exist yet, and a board that silently goes stale is
-    // better than one that appears live and is not.
-    getCompetitionLeaderboard(competitionId, 25),
+    /*
+      THE BOARD, WHAT EACH PLAYER HAS BEEN DOING, AND THE CALLER'S OWN RANK, from one shared
+      producer. `GET /api/competitions/[id]/standings` calls the same function, so the figure a
+      player sees fifteen seconds after this render was produced by this code rather than by a
+      second reader that can drift from it.
+
+      This used to be a bare `getCompetitionLeaderboard` with a note saying the rail was
+      deliberately not polled "because a live ticker needs an endpoint that does not exist
+      yet". The endpoint exists now. The reasoning that mattered survives and is recorded on
+      `ArenaLiveProvider`: the rail refreshes through a fetch and never through
+      `router.refresh()`, because this page hosts a round a player has paid for.
+    */
+    getArenaStandings(competitionId, session.user.id, {
+      limit: 25,
+      recentLimit: 6,
+    }),
     // `credits.symbol`, not `currency.symbol`. A prize pool is a credit amount, so the fiat
     // symbol was the wrong field - and its fallback here was `$`, which is not even the
     // configured fiat currency.
@@ -171,137 +185,110 @@ export default async function PlayPage({ params }: PlayPageProps) {
 
   const competitionName = contest?.name ?? "this competition";
   const creditSymbol = settings?.credits?.symbol || undefined;
-  const rows = Array.isArray(leaderboard) ? leaderboard : [];
-
-  // The player's own position, READ from the row the server already ranked rather than worked
-  // out here. `calculateRankings` resolves the contest's score direction once from the
-  // catalogue; a second place deciding a position is the shape of R37, where the board and the
-  // payout disagreed because each had computed it separately. Absent when they hold no rank.
-  const yourRank = rows.find((row) => row.userId === session.user.id)?.currentRank;
-
-  /*
-    WHAT EACH PLAYER HAS ACTUALLY DONE, which is the owner's request and is the one thing on
-    this screen that no amount of styling could supply. A board of names and numbers says who
-    is ahead; it says nothing about what anybody did, and the game already reports that - every
-    round is written to `game_round` with the game's own `scoreBreakdown`.
-
-    READ AFTER THE BOARD RATHER THAN BESIDE IT, deliberately. The query is scoped to the user
-    ids the board returned, so it is bounded by the players on screen instead of by every
-    person who has ever entered - which means it cannot be started until the board has answered.
-    One indexed query is the price of that bound, and it is the right way round: an unscoped
-    read grows with the contest for ever.
-
-    The id goes in as the string from the URL because this is a Mongoose query and Mongoose
-    casts it to an ObjectId when the query executes. The raw driver does NOT, which is the
-    boundary that has now produced three separate defects, so the distinction is worth keeping
-    in view rather than relying on.
-  */
-  const activity = await getContestActivity(
-    competitionId,
-    rows.map((row) => row.userId),
-    { recentLimit: 6 },
-  );
-
-  // The feed's names come from the board that has already been read, not from a second user
-  // lookup: every player in the feed is by construction a player in the standings.
-  const nameByUser = new Map(rows.map((row) => [row.userId, row.username]));
-  const activityFeed = activity.recent.map((entry) => ({
-    userId: entry.userId,
-    username: nameByUser.get(entry.userId),
-    activity: entry,
-  }));
 
   const prizePositions = Array.isArray(contest?.prizeDistribution)
     ? contest.prizeDistribution.length
     : 0;
 
   return (
-    <GameArenaLayout
+    /*
+      THE RAIL REFRESHES; THE GAME DOES NOT. The provider takes the rest of the arena as its
+      `children`, and a `children` element handed down from a server component is the same
+      object on every re-render - so React reconciles it by identity and never descends into
+      it. Only the two consumers below re-draw, and the iframe is in neither of their subtrees.
+
+      Which is why `ProviderRoundHost` must stay a child rather than become a consumer: making
+      it read this context would turn a board refresh into a reloaded game, under a player who
+      has paid for the attempt.
+    */
+    <ArenaLiveProvider
       competitionId={competitionId}
-      competitionName={competitionName}
-      presentation={presentation}
-      minParticipants={contest?.minParticipants}
-      maxParticipants={contest?.maxParticipants}
-      standingsCount={rows.length}
-      standings={
-        rows.length === 0 ? (
-          <p className="px-2 py-6 text-center text-xs text-gray-500">
-            No scores yet. Be the first.
-          </p>
-        ) : (
-          <ProviderLeaderboard
-            rows={rows}
-            currentUserId={session.user.id}
-            scoreLabel="Score"
-            activity={activity.latestByUser}
+      currentUserId={session.user.id}
+      initial={{
+        rows: standings.rows,
+        activity: standings.activity,
+        feed: standings.feed,
+      }}
+      // The STORED status, never a clock here: a contest whose end time has passed is still
+      // `active` until a cron finalizes it, so deciding in the browser would stop the refresh
+      // exactly while the last rounds are landing.
+      active={outcome.state.contestStatus === "active"}
+    >
+      <GameArenaLayout
+        competitionId={competitionId}
+        competitionName={competitionName}
+        presentation={presentation}
+        minParticipants={contest?.minParticipants}
+        maxParticipants={contest?.maxParticipants}
+        standingsCount={<ArenaLiveCount />}
+        standings={<ArenaLiveBoard scoreLabel="Score" />}
+        stage={
+          <ProviderRoundHost
+            competitionId={competitionId}
+            competitionName={competitionName}
+            gameName={presentation.gameName}
+            initialState={outcome.state}
           />
-        )
-      }
-      stage={
-        <ProviderRoundHost
-          competitionId={competitionId}
-          competitionName={competitionName}
-          gameName={presentation.gameName}
-          initialState={outcome.state}
-        />
-      }
-      sidebar={
-        <>
-          <ArenaContestPanel
-            facts={{
-              prizePool: contest?.prizePool,
-              entryFee: contest?.entryFee,
-              currentParticipants: contest?.currentParticipants,
-              maxParticipants: contest?.maxParticipants,
-              creditSymbol,
-            }}
-            state={outcome.state}
-            presentation={presentation}
-            rank={yourRank}
-          />
-          {/*
-            The ONE implementation of what each place is paid, shared with both lobbies. It is
-            not reimplemented here, and it must not be: the four expressions inside it have
-            survived two moves character for character, which is the only evidence that no
-            payout figure has changed.
+        }
+        sidebar={
+          <>
+            <ArenaContestPanel
+              facts={{
+                prizePool: contest?.prizePool,
+                entryFee: contest?.entryFee,
+                currentParticipants: contest?.currentParticipants,
+                maxParticipants: contest?.maxParticipants,
+                creditSymbol,
+              }}
+              state={outcome.state}
+              presentation={presentation}
+              rank={standings.yourRank}
+            />
+            {/*
+              The ONE implementation of what each place is paid, shared with both lobbies. It is
+              not reimplemented here, and it must not be: the four expressions inside it have
+              survived two moves character for character, which is the only evidence that no
+              payout figure has changed.
 
-            THE HEADING IS THE CALLER'S, and it was missing entirely until 11 Sep 2026 - the
-            prize rows sat under the contest panel with nothing saying what they were, so the
-            amounts read as a continuation of the facts above them. `PrizeTable` deliberately
-            renders no heading of its own, because the lobby puts it inside an accordion that
-            already has one; two headings is worse than none.
-          */}
-          {prizePositions > 0 && (
-            <NeonHeadedPanel
-              icon={Gift}
-              title="Prize breakdown"
-              action={<NeonCountPill>Top {prizePositions} win</NeonCountPill>}
-              bodyClassName="p-4"
-            >
-              <PrizeTable competition={contest} creditSymbol={creditSymbol} />
-            </NeonHeadedPanel>
-          )}
+              THE HEADING IS THE CALLER'S, and it was missing entirely until 11 Sep 2026 - the
+              prize rows sat under the contest panel with nothing saying what they were, so the
+              amounts read as a continuation of the facts above them. `PrizeTable` deliberately
+              renders no heading of its own, because the lobby puts it inside an accordion that
+              already has one; two headings is worse than none.
+            */}
+            {prizePositions > 0 && (
+              <NeonHeadedPanel
+                icon={Gift}
+                title="Prize breakdown"
+                action={<NeonCountPill>Top {prizePositions} win</NeonCountPill>}
+                bodyClassName="p-4"
+              >
+                <PrizeTable competition={contest} creditSymbol={creditSymbol} />
+              </NeonHeadedPanel>
+            )}
 
-          {/*
-            IN THE SIDEBAR RATHER THAN THE REFERENCE'S BOTTOM BAND, and that is a deviation
-            worth recording rather than absorbing. The reference puts Recent Players in a
-            three-panel row across the foot of the page beside How It Works and Game Tips. Two
-            of those three render nothing at all until the catalogue is re-synced, and a CSS
-            grid cannot see that its child returned `null` - so a two-thirds column holding a
-            null child is still a two-thirds column, and the common case is a band with one
-            panel adrift in it. The same attempt was made and reverted on 11 Sep 2026.
+            {/*
+              IN THE SIDEBAR RATHER THAN THE REFERENCE'S BOTTOM BAND, and that is a deviation
+              worth recording rather than absorbing. The reference puts Recent Players in a
+              three-panel row across the foot of the page beside How It Works and Game Tips. Two
+              of those three render nothing at all until the catalogue is re-synced, and a CSS
+              grid cannot see that its child returned `null` - so a two-thirds column holding a
+              null child is still a two-thirds column, and the common case is a band with one
+              panel adrift in it. The same attempt was made and reverted on 11 Sep 2026.
 
-            Here it sits under the prize breakdown in a column that already stacks, so the
-            panel simply is not there when nobody has played.
-          */}
-          <ArenaActivityFeed
-            entries={activityFeed}
-            currentUserId={session.user.id}
-          />
-        </>
-      }
-      rules={<GameRulesPanel presentation={presentation} layout="wide" />}
-      highlights={<ArenaHighlights highlights={presentation.highlights} />}
-    />
+              Here it sits under the prize breakdown in a column that already stacks, so the
+              panel simply is not there when nobody has played.
+
+              A CONSUMER OF THE SAME FETCH AS THE BOARD, not a second read: two polls of one
+              endpoint is two answers, so the board could name a rival's finished round while
+              the feed beside it had not heard of it.
+            */}
+            <ArenaLiveFeed />
+          </>
+        }
+        rules={<GameRulesPanel presentation={presentation} layout="wide" />}
+        highlights={<ArenaHighlights highlights={presentation.highlights} />}
+      />
+    </ArenaLiveProvider>
   );
 }
