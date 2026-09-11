@@ -454,8 +454,10 @@ npm run probe:round-clock    # the same, for the clock and the length promised b
 > the width is safe only because nothing we report changes it, where a height derived from our own
 > reported height is the postage-stamp defect of `21` s4.1f.
 
-`npm test` runs **297 tests**: 15 config, 42 engine, 28 scoring, 41 API, 82 play and delivery,
-11 progress, 20 board client, 58 presentation. (Counted from the suite's own output. Any figure of
+`npm test` runs **299 tests**: 15 config, 42 engine, 28 scoring, 41 API, 83 play and delivery,
+11 progress, 20 board client, 59 presentation. (Counted from the suite's own output. Any figure of
+297 predates `BOARDS DONE` moving into the round header - the same figure had been in two places
+at once, headed `SOLVED` above the board and `BOARDS DONE` below it. Any figure of
 285 predates the board filling its frame's width - the rails sat beside it and took about a third
 of the room, so the larger the grid the smaller the board was drawn. Any figure of
 270 predates the round header, the coverage meter, the stat tiles and Undo - see the note below.

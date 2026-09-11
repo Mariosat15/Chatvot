@@ -1501,6 +1501,61 @@ movement for R66 and the progress callback, which have never been built on the s
 
 ---
 
+### 4.1s One figure in one place, and the strip beneath the board made even - 11 September 2026
+
+**Owner instruction**, the first of two items in one message, the other being the platform's
+bottom band (`13` s4.1t): *"boards done needs to replace solved and solved deled, no need both,
+and rearange bottom info to be alling"*, with the header's `SOLVED` cell and the strip's
+`BOARDS DONE` tile both circled.
+
+**He is right, and what he had spotted is a duplicate rather than a wrong number.** s4.1q gave
+the header three cells - `SOLVED`, `TIME LEFT`, `FILLED` - and s4.1r moved the figures out of the
+side rail into a strip beneath the board, which included a `BOARDS DONE` tile. Both read the same
+value. **NOTHING WAS COMPUTED WRONGLY and there is no risk number**: two correct statements of one
+fact, in two places, in two different wordings. Nothing was backfilled and no money figure exists
+near this code.
+
+**Three things from it generalise.**
+
+- **When one fact is stated twice, deciding WHICH copy survives is the whole question, and the
+  wording is the evidence.** `SOLVED` and `BOARDS DONE` are the same count; `BOARDS DONE` is the
+  one a player can act on, because it names the unit the score is made of. So the header keeps
+  the cell and takes the clearer label, and the strip loses the tile - **the opposite of the
+  tidier-looking change**, which is to delete the header cell and leave the strip, since that
+  moves the figure a player watches out of the row they watch it in.
+- **A FIXED SHARE IS ONLY EVER RIGHT FOR ONE TILE COUNT, and that is why the count has to be
+  published to the stylesheet.** The strip is two flex children - the coverage meter and the tile
+  group - and the group is itself a grid of `minmax(0, 1fr)` columns, so the tiles are equal to
+  each other whatever the count. Making the *meter* one box wide is the part that does not follow:
+  written as `1` against `2` it is correct with two tiles and wrong the moment a third appears,
+  which is the state the owner was looking at. `app.js` publishes the count as `--tiles` whenever
+  the set changes, the group claims that many parts against the meter's one, and every box is one
+  part of `1 + n` at any count. **`playStatTiles` omits a tile rather than rendering an empty
+  value, so the count genuinely varies** and a hard-coded three-column rule loses this silently.
+- **"Align" was TWO faults and the second is the one a diff hides.** The boxes were already the
+  same size in the owner's screenshot: what differed was where their captions sat. The meter
+  centred its caption while every tile beside it started at the left, because `.screen` centres
+  text and only the tiles said otherwise - and the meter put its label and figure at opposite ends
+  of one line while a tile stacks label above value, so one figure in a row of four sat at a
+  different height. `align-content: start`, `text-align: left` and a label-above-value head fix
+  both; a document describing this as a sizing fix is describing the half that was already right.
+- **A test that asserts the surviving label must also assert the deleted one is GONE.** The two
+  strings are different, so a guard naming only `BOARDS DONE` is satisfied by a build that has it
+  in the header *and* still has `SOLVED` beside it - which is exactly the state being corrected.
+  The probe therefore restores the header's old label and the strip's old tile separately.
+
+**The header's own cells were already a grid** and needed no change, which is worth stating so
+nobody "fixes" them for consistency: three equal cells there have been even since s4.1q.
+
+**6 new tests (299 in the service, from 297), probes red on exactly the named test. Verified by
+eye** through `tools/smoke-play.ts`.
+
+**Deploy: `public/play` needs only a pull and `pm2 restart chartvolt-games`** - all of it is the
+unbundled surface. `npm run build` is still owed in the same movement for R66 and the progress
+callback.
+
+---
+
 ## 5. What this does NOT prove
 
 Stating this matters, because a green harness invites the conclusion that X4 is a formality.
