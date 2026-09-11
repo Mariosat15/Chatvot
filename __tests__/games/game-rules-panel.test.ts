@@ -145,6 +145,70 @@ describe("the rules panel says nothing rather than saying nothing usefully", () 
     // component - and R58 is what a "use client" file importing a service costs.
     expect(code).not.toMatch(/^"use client"/m);
   });
+
+  it("lays the lobby panel out as one row rather than stacked cells", () => {
+    /*
+      THE OWNER'S SECOND MEASUREMENT, one page along from the arena band. The two-column grid
+      put the scoring rule in one cell and the instructions plus a full-width picture in the
+      other, so the panel was as tall as its tallest cell and the short one was a column of
+      empty space beside a hero image. Side by side it is only as tall as its copy.
+
+      The grid spelling is asserted ABSENT as well as the row being present, because both can
+      be in one file at once: a `md:grid-cols-2` left behind on an inner wrapper reads as
+      harmless and restores the taller of the two.
+    */
+    const code = readCode(PANEL);
+
+    expect(code).toMatch(/flex flex-col gap-4 md:flex-row/);
+    expect(code).not.toMatch(/md:grid-cols-2/);
+  });
+
+  it("caps the lobby's diagram and keeps it beside the instructions", () => {
+    /*
+      A WIDTH AND NEVER A HEIGHT, the same rule the arena band arrived at: `NeonIllustration`
+      derives one from the other through an aspect ratio, so a hard height beside it is two
+      numbers that disagree the moment either moves. 132px at 4/3 is 99px tall.
+
+      POSITION AS WELL AS SIZE, because they are two different defects. Uncapped it became a
+      300px hero; below the text it pushed the panel a screen taller whatever its width. The
+      picture must therefore come AFTER the instructions inside a row, which is asserted as
+      the flex container not being a column - document order alone is satisfied by a
+      `flex-col` that puts it underneath, which is the fourth known cause of a green probe and
+      cost one in the arena band's suite.
+    */
+    const code = readCode(PANEL);
+
+    const wideAt = code.indexOf('className="hidden w-[132px] shrink-0 sm:block"');
+    expect(wideAt).toBeGreaterThan(-1);
+
+    const textAt = code.indexOf("<HowToPlay");
+    expect(textAt).toBeGreaterThan(-1);
+    expect(wideAt).toBeGreaterThan(textAt);
+
+    const containerAt = code.lastIndexOf('className="flex min-w-0', textAt);
+    expect(containerAt).toBeGreaterThan(-1);
+    const container = code.slice(containerAt, textAt);
+    expect(container.length).toBeGreaterThan(20);
+    expect(container).not.toMatch(/flex-col/);
+
+    // Both pictures, both `contain`: these two uploads are graphics rather than photographs,
+    // so a crop takes the corners off a badge. `cover` stays the kit's default.
+    expect(code.match(/fit="contain"/g)).toHaveLength(2);
+  });
+
+  it("offers only the two layouts a screen actually asks for", () => {
+    /*
+      `column` WAS THE DEFAULT AND NO CALLER EVER PASSED IT - a stacked layout nobody could
+      see, which is the declared-written-dead shape this codebase keeps deleting, after
+      `requiresSyncPlay`, `isPaused`, `family` and `ArenaHighlights`' own `list` variant the
+      same day. Required rather than defaulted, because a default is how a third unreachable
+      branch arrives without a caller.
+    */
+    const code = readCode(PANEL);
+
+    expect(code).toMatch(/layout: "wide" \| "strip";/);
+    expect(code).not.toMatch(/layout = "/);
+  });
 });
 
 describe("the rules are on both screens, and defined on neither", () => {
@@ -164,8 +228,16 @@ describe("the rules are on both screens, and defined on neither", () => {
     */
     const panel = readCode(PANEL);
     expect(panel).toContain("How to play");
-    expect(panel).toMatch(/How \$\{presentation\.gameName\} is scored/);
     expect(panel).toContain("How you win");
+    /*
+      `How ${presentation.gameName} is scored` WAS PINNED HERE AND IS NOW FORBIDDEN, flipped
+      on 11 September 2026 rather than deleted. The live display name is `Circuit Sprint: Fast
+      and Fun Spatial Puzzles`, so the template produced a page-wide heading that said almost
+      nothing - and the fault is interpolating operator free text of unbounded length into a
+      sentence, not the length of one name. Both screens read `How it works`.
+    */
+    expect(panel).not.toMatch(/gameName\} is scored/);
+    expect(panel).toContain('title="How it works"');
 
     /*
       THE TWO BLOCK HEADINGS ONLY, and the third marker was removed rather than kept, because

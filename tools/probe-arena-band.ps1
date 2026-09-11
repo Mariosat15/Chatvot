@@ -364,6 +364,56 @@ $probes = @(
                   {ARENA_HIGHLIGHT_LIMIT} titles are shown, so write each title so it'
     To   = 'Write each title so it'
     Test = 'says so beside the field that offers more than that'
+  },
+
+  # ---- The LOBBY's panel, rejected the same way one page along ----------------------------
+  # The owner's second screenshot of 11 September 2026: the same two faults - a heading that
+  # ran the width of the page, and the operator's small graphic drawn as a 300px hero beneath
+  # the text - on the full panel rather than the band. These four probes live in the panel's
+  # own suite, which is why the harness takes a `Suite` per probe.
+  @{
+    # THE DEFECT ITSELF. Uncapped, the picture takes its width from the cell and its height
+    # from that width, so a 4/3 graphic in a 300px column is 225px tall and the panel grows a
+    # screen to hold it. Nothing throws and the picture is, technically, correct.
+    Name = 'the lobby diagram loses its cap and goes back to filling the cell'
+    File = $RULES
+    Suite = '__tests__/games/game-rules-panel.test.ts'
+    From = '<div className="hidden w-[132px] shrink-0 sm:block">'
+    To   = '<div className="mt-4">'
+    Test = 'caps the lobby.s diagram and keeps it beside the instructions'
+  },
+  @{
+    # THE HALF-FIX THAT READS AS CORRECT: capped, and still underneath. A width alone does not
+    # fix it - a 132px picture below three lines of text still adds its own height to the
+    # panel, and the row is what stops that. The fourth known cause of a green probe is a
+    # mutation with no observable, which is why position is asserted as well as size.
+    Name = 'the lobby diagram is capped but drawn below the text again'
+    File = $RULES
+    Suite = '__tests__/games/game-rules-panel.test.ts'
+    From = '<div className="flex min-w-0 items-start gap-4 md:flex-1">'
+    To   = '<div className="flex min-w-0 flex-col items-start gap-4 md:flex-1">'
+    Test = 'caps the lobby.s diagram and keeps it beside the instructions'
+  },
+  @{
+    # The stacked cells. Two columns means the panel is as tall as its tallest, so the short
+    # one is a column of empty space - which is the owner's screenshot exactly.
+    Name = 'the lobby panel goes back to a two-column grid'
+    File = $RULES
+    Suite = '__tests__/games/game-rules-panel.test.ts'
+    From = '<div className="flex flex-col gap-4 md:flex-row md:items-start">'
+    To   = '<div className="grid gap-5 md:grid-cols-2">'
+    Test = 'lays the lobby panel out as one row rather than stacked cells'
+  },
+  @{
+    # The heading. `gameName` is operator free text of unbounded length, and the live title
+    # carries its tagline inside it - so the template produced `How Circuit Sprint: Fast and
+    # Fun Spatial Puzzles is scored`, a page-wide heading saying almost nothing.
+    Name = 'the lobby heading interpolates the display name again'
+    File = $RULES
+    Suite = '__tests__/games/game-rules-panel.test.ts'
+    From = '<NeonHeadedPanel icon={BookOpen} title="How it works" bodyClassName="p-4">'
+    To   = '<NeonHeadedPanel icon={BookOpen} title={`How ${presentation.gameName} is scored`} bodyClassName="p-4">'
+    Test = 'has its headings in the panel and in NO consumer'
   }
 )
 
@@ -390,8 +440,14 @@ foreach ($probe in $probes) {
 
   Write-Source $probe.File $broken
 
+  # PARAMETERISED ON THE SUITE, NOT ONLY THE TEST NAME. Some of these guards live in
+  # `game-rules-panel.test.ts` rather than the band's own suite, and run against the default
+  # one they report "no test matched" - which reads like a broken harness rather than a moved
+  # target. That has cost a false result here before.
+  $suite = if ($probe.ContainsKey('Suite')) { $probe.Suite } else { $Suite }
+
   try {
-    $raw = & npx vitest run $Suite -t "$($probe.Test)" 2>&1
+    $raw = & npx vitest run $suite -t "$($probe.Test)" 2>&1
     $out = (($raw | Out-String) -replace '\s+', ' ')
   } finally {
     Write-Source $probe.File $original

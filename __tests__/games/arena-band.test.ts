@@ -430,15 +430,23 @@ describe("the owner's wording, and the decision it reverses", () => {
 
   it("heads the left card HOW IT WORKS, without the game name", () => {
     /*
-      The full panel still names the game and a test in `game-rules-panel.test.ts` pins that
-      template. At this size it cannot: `How Circuit Sprint: fast and fun spatial puzzles is
-      scored` is a heading longer than the card is wide, and a heading that wraps costs a step.
+      A heading longer than the card is wide costs a step, because a wrapped title pushes a
+      line out of a card that cannot grow.
+
+      THE LOBBY'S PANEL USED TO NAME THE GAME AND THIS TEST USED TO PIN THAT, asserting
+      `How ${presentation.gameName} is scored` was still in the file. The owner's screenshot
+      of the lobby on 11 September 2026 is what ended it: the live display name is
+      `Circuit Sprint: Fast and Fun Spatial Puzzles`, so the template produced a heading
+      running the width of the page. Interpolating an operator's free text of unbounded length
+      into a sentence is the fault rather than the length of one name - so the assertion is
+      inverted rather than deleted, and the template must now appear NOWHERE.
     */
     const code = readCode(RULES);
 
     expect(code).toMatch(/title="How it works"/);
-    // Still there for the lobby, which has the room and where a player is deciding to pay.
-    expect(code).toMatch(/How \$\{presentation\.gameName\} is scored/);
+    expect(code).not.toMatch(/gameName\} is scored/);
+    // One heading for both screens, so there is exactly one of it.
+    expect(code.match(/title="How it works"/g)).toHaveLength(2);
   });
 
   it("keeps the live marker on the players card and keeps it short", () => {

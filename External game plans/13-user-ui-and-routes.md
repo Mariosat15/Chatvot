@@ -2165,9 +2165,14 @@ guard forbids a game-shaped sentence in a quoted string in these files. A probe 
 reference's own steps to prove it. The only words these components write are the two headings,
 and neither names a game.
 
-**The heading drops the game's name where the full panel keeps it.** `How Circuit Sprint: fast and
-fun spatial puzzles is scored` is longer than the card is wide, and at this size a title that
-wraps costs a step.
+**The heading drops the game's name.** `How Circuit Sprint: Fast and Fun Spatial Puzzles is
+scored` is longer than the card is wide, and at this size a title that wraps costs a step.
+
+> **AMENDED LATER THE SAME DAY BY s4.1v.** This paragraph read *"the heading drops the game's
+> name **where the full panel keeps it**"*, and the owner's screenshot of the lobby is what
+> disproved the second half: the full panel's heading ran the width of the page. **Both screens
+> now read `How it works`** and the template appears nowhere, so the assertion pinning it was
+> inverted rather than deleted. Correct as history, stale as a present fact.
 
 #### TWO THINGS THE OPERATOR HAS TO DO, AND THE HINTS THAT SAY SO
 
@@ -2197,7 +2202,7 @@ destructured nowhere, read by nothing - the declared-written-dead shape after `r
 `isPaused`, `lastSuccessfulRoundAt`, `family` and `playModeOverride`. Deleted from the props and
 the call site on the `shouldBlockEntry` precedent, with two tests restated to assert the absence.
 
-**28 tests, 31 probes red on exactly one failure.** Two probing lessons came with it. One came
+**29 tests, 32 probes red on exactly one failure.** Two probing lessons came with it. One came
 back **GREEN on the fourth known cause** - adding `flex-col` puts the picture *under* the lines
 while leaving document order untouched, so the positional assertion had no observable for it and
 the flex **direction** is now asserted too. And six probes reported `PROBE BROKEN - no test
@@ -2208,6 +2213,77 @@ escaped.
 
 **Never verified by eye** - the play screen is behind sign-in and the automated browser has no
 session.
+
+---
+
+### 4.1v The same two faults on the lobby's panel (owner instruction, 11 September 2026)
+
+Told that the scoring rule was *"not deleted - the lobby carries it in full"*, the owner went and
+looked at the lobby, and replied with a screenshot of it: *"see image change also this How Circuit
+Sprint: Fast and Fun Spatial Puzzles is scored and do it like the other you fixed"*.
+
+**IT IS THE SAME TWO FAULTS ONE PAGE ALONG, and that is the fact worth carrying.** The heading ran
+the width of the page; the operator's small graphic was drawn beneath the instructions at the
+cell's full width, so a panel of two short paragraphs was a screen tall with a hero image in it.
+Both are what s4.1u had just corrected on the band - and both were **left untouched in that
+commit on purpose**, because the instruction said *"do not modify the rest of the Circuit Sprint
+page"*. The general form: **a fault corrected on one screen is worth looking for on every other
+screen that renders the same component**, because the reason it was scoped out is a reason about
+the request rather than about the code.
+
+**NOTHING WAS COMPUTED WRONGLY and there is no risk number.** A page-wide heading and an
+oversized picture both render perfectly; **nothing was backfilled.**
+
+#### THE HEADING FAULT IS NOT THE LENGTH OF ONE NAME
+
+`How ${presentation.gameName} is scored` reads correctly against a short name and produced
+`How Circuit Sprint: Fast and Fun Spatial Puzzles is scored` against the live one, because
+`gameName` is **operator-editable free text of unbounded length** and this title carries its
+tagline inside it. **Interpolating a field like that into a sentence is the fault**, so any title
+with a subtitle in its name reproduces it, and shortening this one name would have fixed nothing.
+
+Both screens now read **`How it works`**, which is also one fewer thing that can differ between
+them. The name survives on the picture's `alt`, where a length is harmless. The assertions that
+pinned the template - one in each of two suites - were **flipped to forbid it rather than
+deleted**, with the reason left in place, because the sentence *"the lobby has the room and is
+where a player is deciding whether to pay"* was believed for a day and is the reason nobody
+looked.
+
+#### A WIDTH AND A POSITION ARE TWO DEFECTS, AND ONE FIX IS NOT THE OTHER
+
+`NeonIllustration` takes its **height from its width** through an aspect ratio, so uncapped in a
+300px cell a 4/3 graphic is 225px tall. It is now `w-[132px]` - a width and never a height, the
+rule s4.1u arrived at - which is 99px.
+
+That alone is a half-fix that reads as complete: a 132px picture still **below** three lines of
+text adds its own height to the panel. So the body became **one row** rather than a two-column
+grid, and the picture sits beside the instructions. The grid was the other half of the emptiness
+the owner drew: two columns make the panel as tall as its tallest cell, so the short one was a
+column of nothing. `md:grid-cols-2` is asserted **absent** as well as the row being present,
+because both can be in one file at once and an inner wrapper left behind restores the taller
+shape while reading as harmless.
+
+The position guard asserts the **flex direction**, not merely document order - a `flex-col`
+puts the picture underneath while leaving the order untouched, which is the fourth known cause of
+a green probe and has already cost one in the band's suite.
+
+#### `contain`, AND A THIRD DEAD LAYOUT DELETED
+
+The lobby's picture used the kit's default `cover` and now uses `contain`, for the band's reason:
+these two uploads are graphics rather than photographs, so a crop takes the corners off a badge.
+`cover` stays the default, because the slots that came first are a logo and a hero banner.
+
+`layout` offered a third value, **`column`**, which was the default and which **no caller ever
+passed** - a stacked layout nobody could see. Deleted, and the prop made **required**, because a
+default is how a third unreachable branch arrives without a caller. Fourth instance in two days
+after `ArenaHighlights`' `layout`, and the same `shouldBlockEntry` precedent.
+
+**3 tests, 4 probes red on exactly one failure**, and the harness gained a **per-probe `Suite`**:
+these guards live in `game-rules-panel.test.ts` rather than the band's own suite, and run against
+the default one a probe reports "no test matched", which reads like a broken harness rather than a
+moved target.
+
+**Never verified by eye** - the lobby is behind sign-in.
 
 ---
 

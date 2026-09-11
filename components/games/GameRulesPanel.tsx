@@ -43,13 +43,19 @@ interface Props {
     "rulesSummary" | "howToPlay" | "gameName" | "howToPlayImageUrl"
   >;
   /**
-   * Widen the copy on a full-width slot. The arena renders this beneath the board where there
-   * is room for two columns; the lobby sidebar has one.
+   * Which of the two screens this is.
    *
-   * `strip` IS THE ARENA'S BOTTOM BAND and it is a different panel rather than a narrower
-   * one. See `STRIP_STEP_LIMIT` below for what it drops and why that is safe.
+   * `wide` IS THE LOBBY'S FULL PANEL - the scoring rule, the instructions and the diagram in
+   * one row. `strip` IS THE ARENA'S BOTTOM BAND, which is a different panel rather than a
+   * narrower one; see `STRIP_STEP_LIMIT` below for what it drops and why that is safe.
+   *
+   * THERE WAS A THIRD, `column`, AND IT WAS DELETED ON 11 SEPTEMBER 2026. It was the default
+   * and no caller ever passed it, so it was a stacked layout nobody could see - the
+   * declared-written-dead shape, and the same reason `ArenaHighlights` lost its `list`
+   * variant the same day. Required rather than defaulted for the same reason: a default is
+   * how a fourth unreachable branch arrives.
    */
-  layout?: "column" | "wide" | "strip";
+  layout: "wide" | "strip";
 }
 
 /**
@@ -90,7 +96,7 @@ function paragraphs(text: string): string[] {
     .filter((line) => line.length > 0);
 }
 
-export default function GameRulesPanel({ presentation, layout = "column" }: Props) {
+export default function GameRulesPanel({ presentation, layout }: Props) {
   const scoring = presentation.rulesSummary?.trim();
   const playing = presentation.howToPlay?.trim();
 
@@ -120,21 +126,26 @@ export default function GameRulesPanel({ presentation, layout = "column" }: Prop
       not like the design" in its smallest form: every panel in the reference carries its
       heading in a tinted strip running edge to edge, and this one wore the quieter padded
       shell - so the one panel a player most needs to read looked like the least important
-      thing on the page. The title text is unchanged, because it names the game and a test
-      pins the template.
+      thing on the page.
+
+      THE HEADING DROPPED THE GAME'S NAME ON 11 SEPTEMBER 2026, on the owner's "do it like the
+      other you fixed", and it is a defect fix rather than a preference. `gameName` is an
+      operator-editable display name, and the live one is `Circuit Sprint: Fast and Fun
+      Spatial Puzzles` - so the template produced a heading that ran the width of the page and
+      said almost nothing. Interpolating a free-text field of unbounded length into a sentence
+      is the fault; any title with a subtitle in its name reproduces it. Now one heading for
+      both screens, which is also one fewer thing that can differ between them. The name is
+      still on the picture's `alt`, where a length is harmless.
     */
-    <NeonHeadedPanel
-      icon={BookOpen}
-      title={`How ${presentation.gameName} is scored`}
-      bodyClassName="p-4 sm:p-5"
-    >
-      <div
-        className={
-          layout === "wide"
-            ? "grid gap-5 md:grid-cols-2"
-            : "space-y-5"
-        }
-      >
+    <NeonHeadedPanel icon={BookOpen} title="How it works" bodyClassName="p-4">
+      {/*
+        ONE ROW, NOT A GRID OF STACKED BLOCKS, which is the owner's correction applied to the
+        lobby after the arena band. The two-column grid put the scoring rule in one cell and
+        the instructions plus a full-width picture in the other, so the panel was as tall as
+        its tallest cell and the short one was a column of empty space beside a hero image.
+        Side by side the panel is only as tall as the copy inside it.
+      */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-start">
         {scoring && (
           /*
            * THE STANDOUT BLOCK. An amber rule and a tinted ground, because the owner's report
@@ -142,8 +153,8 @@ export default function GameRulesPanel({ presentation, layout = "column" }: Prop
            * panels is invisible in the way that matters. The larger type is on this block only;
            * giving both the same weight is how a page ends up with no emphasis at all.
            */
-          <div className="rounded-lg border-l-2 border-amber-400/70 bg-amber-400/[0.07] p-4">
-            <div className="mb-2 flex items-center gap-2">
+          <div className="rounded-lg border-l-2 border-amber-400/70 bg-amber-400/[0.07] p-3 md:flex-1">
+            <div className="mb-1.5 flex items-center gap-2">
               <Target className="h-4 w-4 text-amber-300" />
               <h3 className="text-sm font-semibold text-amber-200">
                 How you win
@@ -161,8 +172,10 @@ export default function GameRulesPanel({ presentation, layout = "column" }: Prop
         )}
 
         {playing && (
-          <div>
-            <HowToPlay text={playing} />
+          <div className="flex min-w-0 items-start gap-4 md:flex-1">
+            <div className="min-w-0 flex-1">
+              <HowToPlay text={playing} />
+            </div>
 
             {/*
               THE ILLUSTRATION SITS WITH THE STEPS, NOT WITH THE SCORING RULE, and that is
@@ -176,14 +189,28 @@ export default function GameRulesPanel({ presentation, layout = "column" }: Prop
               shows and it is the narrower of the two, so gating this on the wide layout
               would have left the picture off the only screen it was asked for - which is
               the kind of condition that reads as careful and delivers nothing.
+
+              BESIDE THE TEXT AND CAPPED, since 11 September 2026. It was drawn BELOW the
+              instructions at the cell's full width, and the cell was half a two-thirds
+              column - so the operator's small graphic became a 300px hero and the panel grew
+              a screen taller to hold it, which is the arena band's rejection one page along.
+              `w-[132px]` at 4/3 is 99px tall: a width and never a height, because
+              `NeonIllustration` derives one from the other and two numbers beside one aspect
+              ratio disagree the moment either moves.
+
+              `contain`, NOT THE DEFAULT `cover`, for the same reason the band uses it: these
+              two uploads are graphics rather than photographs, so a crop takes the corners
+              off a badge. `cover` stays the kit's default because the slots that came first
+              are a logo and a hero banner.
             */}
-            <div className="mt-4">
+            <div className="hidden w-[132px] shrink-0 sm:block">
               <NeonIllustration
                 src={presentation.howToPlayImageUrl}
                 alt={`How ${presentation.gameName} is played`}
                 icon={BookOpen}
                 accent="players"
                 shape="landscape"
+                fit="contain"
               />
             </div>
           </div>
@@ -203,10 +230,12 @@ export default function GameRulesPanel({ presentation, layout = "column" }: Prop
  * quoted string, which is exactly what a hard-coded "Connect matching numbers with a path"
  * would be. The heading is the only words this component writes, and it names no game.
  *
- * THE HEADING DROPS THE GAME'S NAME, WHICH THE FULL PANEL KEEPS. `How Circuit Sprint: fast
- * and fun spatial puzzles is scored` is a heading longer than the card is wide; at this size
- * a title that wraps costs a step. The lobby's panel still names the game, where there is
- * room for it and where a player is deciding whether to pay.
+ * THE HEADING NAMES NO GAME, AND SINCE 11 SEPTEMBER 2026 NEITHER DOES THE FULL PANEL'S. This
+ * sentence used to end "the lobby's panel still names the game, where there is room for it
+ * and where a player is deciding whether to pay", and the owner's screenshot of that panel is
+ * what disproved it: `How Circuit Sprint: Fast and Fun Spatial Puzzles is scored` ran the
+ * width of the page and said almost nothing, because `gameName` is free text of unbounded
+ * length and this title carries its tagline inside it. Both screens now read `How it works`.
  *
  * THE SCORING RULE IS NOT DRAWN HERE, on the owner's instruction of 11 September 2026, and
  * that is the one thing about this card worth checking before changing it. It is the sentence
